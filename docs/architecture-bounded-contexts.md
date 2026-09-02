@@ -2,67 +2,111 @@
 
 Khadra is a modular monolith built with Clean Architecture and DDD building blocks. Bounded contexts are folders in `Khadra.Domain` and `Khadra.Application`; they share one process, one `KhadraDbContext` and one PostgreSQL database, but never reference each other's aggregates directly. A context can be extracted into its own service later without changing its public contracts.
 
+## Status
+
+| Context | Domain model | Persistence | Use cases and endpoints |
+|---|---|---|---|
+| Identity & Access | done | done | done |
+| Dealers | done | pending | pending |
+| Fleet | done | pending | pending |
+| Bookings | done | pending | pending |
+| Disputes | done | pending | pending |
+| Reviews | done | pending | pending |
+| Platform Settings | done | pending | pending |
+| Payments | **not started, blocked** | — | — |
+
+Payments is deliberately unbuilt. It needs owner decisions and explicit approval (see "Owner decisions required" below and the forbidden-actions list in `CLAUDE.md`).
+
 ## Context map
 
 ```text
 Identity & Access ──supplies actor (UserId, role, verified)──▶ every context
-Dealers ──(DealerId, delivery settings, approval status)──▶ Fleet, Booking
-Fleet ──(VehicleId, rate, deposit, delivery-eligible)──▶ Booking
-Booking ──events (Approved, Cancelled, NoShow, Completed)──▶ Payments, Disputes, Reviews, Notifications
-Payments ──(deposit paid fact)──▶ Booking ; ──commission/payout──▶ Reporting
-Disputes ──resolution──▶ Payments (penalty / refund), Booking (record)
-Platform Settings ──IBusinessRulesProvider──▶ Booking, Payments (never constants)
+Dealers ──(DealerId, delivery settings, approval status)──▶ Fleet, Bookings
+Fleet ──(VehicleId, rate, deposit, delivery-eligible)──▶ Bookings
+Bookings ──events (Approved, PickedUp, Cancelled, NoShow, Completed)──▶ Payments, Disputes, Reviews
+Disputes ──resolution (money instructions)──▶ Payments, Bookings
+Platform Settings ──IBusinessRulesProvider──▶ Bookings (frozen onto each booking as BookingTerms)
 ```
 
-Communication rules: by `Id`, by explicit application contracts, or by domain events. A context never mutates another context's aggregate.
+Communication is by `Id`, by explicit application contracts, or by domain events. A context never mutates another context's aggregate, and there are no navigation properties across contexts.
 
 ## Shared kernel (`Khadra.Domain/Common`)
 
-`Id` (UUIDv7), `Entity`, `AggregateRoot` (domain events), `ValueObject`, `Enumeration` (smart enum), `Error` + `ErrorKind` (the single error currency: `Code`, `Message`, `Kind`, optional field `Details`), `Money` (3 minor units, no cross-currency math), `GeoPoint` (haversine distance), `DateRange` (half-open, whole-day rounding), `ISoftDeletable`, `IUnitOfWork`, `DomainException`, `ConcurrencyConflictException`.
+`Id` (UUIDv7), `Entity`, `AggregateRoot` (domain events), `ValueObject`, `Enumeration` (smart enum), `Error` + `ErrorKind`, `Money` (three minor units for JOD fils, no cross-currency arithmetic), `Percentage`, `GeoPoint` (haversine distance), `DateRange` (half-open, whole days rounded up), `ISoftDeletable`, `IUnitOfWork`, `DomainException`, `ConcurrencyConflictException`.
 
-## 1. Identity & Access — implemented
+## 1. Identity & Access
 
-| Aggregate | Table | Purpose |
-|---|---|---|
-| `User` | `users` | credentials, role (`Admin`, `DealerOwner`, `DealerEmployee`, `Customer`), status (`Active`, `Suspended`), email verification, `MustChangePassword`, `SecurityStamp`, soft delete |
-| `RefreshToken` | `refresh_tokens` | single-use refresh tokens grouped in families; rotation, replay detection, absolute family deadline; xmin concurrency token |
-| `VerificationToken` | `verification_tokens` | single-use email-verification / password-reset links (hash only) |
+`User` (credentials, role, status, email verification, security stamp, soft delete), `RefreshToken` (families, rotation, replay detection, absolute deadline), `VerificationToken` (single-use links). Fully implemented with endpoints; see `docs/auth-and-sessions.md`.
 
-Invariants: normalised unique email and E.164 phone; login requires verified email and active status; suspension/password change/deletion rotate the security stamp and revoke every refresh family (domain events handled after commit); deleted accounts behave like bad credentials.
+## 2. Dealers
 
-Factories reserved for later contexts: `User.RegisterDealerOwner`, `User.CreateEmployee` (temporary password, verified), `User.CreateAdmin`.
+`Dealer` aggregate with `Employee` and `DealerDocument` children. Verification lifecycle is `PendingReview → Approved | Rejected | ClarificationNeeded`, with resubmission restarting the 48-hour admin SLA clock. Approval is refused until all three required documents are on file.
 
-## 2. Dealers — designed
+Verification and suspension are **separate**: verification is the one-time licence check, suspension is an ongoing policy sanction. A suspended dealer stays `Approved`, so reactivating does not send them back through review. `CanTrade` is the single question every other context asks.
 
-`Dealer` aggregate: `OwnerUserId`, `BusinessName`, `Description`, `CommercialRegistrationNumber`, `Location: GeoPoint`, `OperatingHours` (VO), `VerificationStatus` {PendingReview, Approved, Rejected, ClarificationNeeded} + reason/note, `DeliverySettings` (Enabled, RadiusKm), logo/cover keys, private `DealerDocument` entities (commercial registration, vehicle registration, owner ID), `Employee` child entities (`UserId`, `CanViewReports`, `IsActive`). Soft-deletable.
-Invariants: only `Approved` dealers publish vehicles or receive bookings; approval transitions only from `PendingReview`/`ClarificationNeeded`; employee `UserId` unique per dealer; `CoversLocation(GeoPoint)` = delivery enabled and distance ≤ radius. Events: `DealerRegistrationSubmitted`, `DealerApproved`, `DealerRejected`, `DealerClarificationRequested`, `EmployeeAdded`, `EmployeeDeactivated`. 48-hour SLA reminder is a scheduled job.
+Employees never self-register. `CanActOnBookings` and `CanViewReports` encode spec 4.2: acting on bookings is the default permission, report access is off until the owner grants it.
 
-## 3. Fleet — designed
+## 3. Fleet
 
-`Vehicle` aggregate: `DealerId`, `CarTypeId`, make/model/year, `PlateNumber` (green plate), `DailyRate: Money`, `SecurityDepositAmount: Money`, `IsDeliveryEligible`, `MileagePolicy`, `FuelPolicy`, `Status` {Active, Hidden}, images. Availability is derived from Booking, never stored on the vehicle.
+`Vehicle` aggregate with `VehicleImage` children, `PlateNumber`, `VehicleDetails`, `MileagePolicy` and `FuelPolicy` value objects. Lifecycle `Draft → Active → Hidden`. Publishing requires an approved dealer and at least one photo.
 
-## 4. Booking — designed (core)
+Availability is **not** stored on the vehicle. It is derived from bookings, because storing it would create a second source of truth that drifts the first time a booking is cancelled. Mileage excess is charged against the whole-rental allowance, not per day.
 
-`Booking` aggregate: `CustomerId`, `DealerId`, `VehicleId`, `Period: DateRange`, `PickupMethod` {SelfPickup, Delivery}, `DeliveryLocation`, `Pricing` snapshot (daily rate, days, rental total, delivery fee, total, deposit rate, deposit amount, balance due), `PaymentOption` {DepositOnly, FullUpfront}, `Status` state machine `PendingPayment → Requested → Approved|Rejected → PickedUp → Returned → Completed`, plus `Cancelled` (from Requested/Approved) and `NoShow` (system, after the no-show timeout), `ActedByUserId`, `HandoverRecord` entities (optional photos, mileage, fuel).
-Policies fed by `IBusinessRulesProvider`: `PricingPolicy` (deposit %, delivery fee), `CancellationPolicy` (free within the window after approval, penalty to the canceller afterwards), `NoShowPolicy`, `DealerNonDeliveryPenaltyPolicy` (25–50%, tier open).
-Invariants: delivery only inside the dealer radius; no overlapping active booking per vehicle (DB exclusion constraint + handler check); only the dealer's owner/employees approve; handover photos are a neutral record, never arbitration input.
+## 4. Bookings
 
-## 5. Payments — designed (owner approval required before coding)
+`Booking` aggregate with `HandoverRecord` and `BookingStatusChange` children, plus `BookingPricing`, `BookingTerms`, `PenaltyAssessment` and `BookingReference` value objects.
 
-`Payment` (deposit / full / refund / penalty / processing fee; provider reference; status), `Commission` (rate applied, amount, dealer payout, payout status), `SecurityDeposit` (Held / Released / Claimed). Commission is deducted from the always-card deposit (spec §2.1). Card data never touches the API.
+**Lifecycle.** `PendingPayment → Requested → Approved → PickedUp → Returned → Completed`, with terminal exits `Rejected`, `Cancelled`, `NoShow` and `Expired`. Every state has an exit:
 
-## 6. Disputes — designed
+- `PendingPayment` expires after the payment window, releasing the held vehicle.
+- `Requested` expires at the rental start if the dealer never answered, refunding in full.
+- `Returned` completes when the post-return settlement window passes with no open dispute, or immediately once a dispute is resolved.
 
-`DisputeTicket`: `BookingId`, opened by (party + user), reason, evidence, `Status` {Open, Resolved}, `Resolution` {ApplyPenalty, WaivePenalty, PartialPenalty, RefundDeposit} + amount, resolver, SLA deadline (48h). No penalty is ever auto-applied without a ticket.
+**Terms are frozen at booking time.** `BookingTerms` snapshots the deposit and commission percentages, the free-cancellation window, the no-show timeout and the penalty range as they stood when the booking was made. Rules are admin-editable, so judging a cancellation against today's settings would retroactively penalise customers and make past decisions unreproducible.
 
-## 7. Reviews — designed
+**Pricing is frozen too.** `BookingPricing` snapshots the daily rate, the security deposit, the mileage policy and the fuel policy. A dealer raising a rate or tightening a mileage cap cannot rewrite a contract already accepted. The deposit and commission are taken on `RentalTotal`, deliberately excluding the delivery fee, which is a pass-through for the driver's trip rather than rental revenue.
 
-`Review`: `BookingId`, reviewer, direction (customer→dealer, dealer→customer), rating 1–5, comment. One per completed booking per direction; dealer rating is a read model.
+**Penalties are assessed, never charged.** Spec 3.3 and 5.5 make "no ticket, no penalty" the default, so `Cancel`, `ReportDealerNonDelivery` and `MarkNoShow` record a `PenaltyAssessment` and stop. Money moves only when an Admin resolves a dispute. Attribution is honest: a self-pickup no-show is attributed to the customer, but a **delivery** no-show is `Unattributed`, because the dealer was the party who had to travel. The free-cancellation window is capped at the period start so a late approval cannot grant free cancellation after pickup was due.
 
-## 8. Platform Settings & Lookups — designed
+`ConfirmDepositPaid` is idempotent, since payment gateways retry webhooks. Booking is not soft-deletable: it is a financial record, and `Cancelled` / `Expired` are its deletes. An extension is a new booking carrying `ExtendedFromBookingId`, never a mutation of the original.
 
-`BusinessRuleSettings` (single versioned row, admin-editable): commission %, deposit %, no-show hours, delivery fee, penalty range, free-cancellation window, processing fee, SLA hours, minimum renter age, IDP requirement. Lookups: `CarType`, `City`. Today these values are the `BusinessRules` configuration section exposed through `IBusinessRulesProvider`; the aggregate replaces the source without touching consumers.
+## 5. Disputes
+
+`DisputeTicket` with `DisputeStatement` children. One live ticket per booking; both parties add statements to it rather than opening competing tickets. Lifecycle `Open → UnderReview → Resolved`, plus `Withdrawn` as the amicable exit. The 48-hour SLA matches the dealer-approval SLA.
+
+`DisputeResolution` carries **money instructions, not labels**: a `DepositDisposition` splitting the held deposit between refund, platform and dealer (which must balance to the exact amount held), plus an optional `DealerCharge`. Payments can then act mechanically without interpreting an outcome name.
+
+## 6. Reviews
+
+`Review` with a `Rating` value object. One per booking per direction, only on a completed booking. The customer's review of the dealer is public and feeds the dealer's rating; the dealer's review of the customer is visible to other dealers to inform approve/reject decisions (spec 5.6). Moderation hides the text but keeps the score, so a dealer cannot erase a bad rating by reporting it. Ratings are aggregated in SQL as read models.
+
+## 7. Platform Settings
+
+`BusinessRuleSettings` is a single versioned aggregate holding every number from spec section 2, and it refuses a commission above the deposit, because commission is collected from the card deposit. `PendingOwnerDecisions()` surfaces the questions the owner has not answered rather than pretending a default is a decision. `CarType` and `City` are bilingual lookups that deactivate rather than delete.
+
+## 8. Payments — not built
+
+Designed shape: `Payment`, `Commission`, `SecurityDeposit`. Blocked on the owner decisions below, and on explicit approval per `CLAUDE.md`.
+
+The central difficulty: at the confirmed 20% commission and 20% deposit the two are equal, so the platform never pays a dealer and never holds dealer funds. Three things in the spec nonetheless require money to move in a direction that has no rail:
+
+1. A dealer non-delivery penalty of 25-50% has nothing to deduct from.
+2. `PaymentOption.FullUpfront` means the customer pays 100% by card, so the dealer's 80% must be paid out.
+3. Any configured commission above the deposit produces a shortfall to collect.
+
+The likely answer is a single `DealerLedger` aggregate with typed entries and manual settlement, rather than separate payout and penalty mechanisms.
+
+## Owner decisions required
+
+These change field shapes, so they are worth settling before the affected context is built.
+
+1. **Customer cancellation penalty.** Spec 5.5 says a penalty applies to a late-cancelling customer but never names it. The code currently assumes 100% of the deposit, consistent with "deposit is forfeited" on a no-show. Confirm or replace.
+2. **Dealer non-delivery tier.** Spec 2.2 leaves 25%-50% open. The range travels with each booking and an Admin picks inside it; confirm whether that stands or a flat rate is preferred.
+3. **Held deposit with no ticket.** When a cancellation or no-show passes with nobody opening a ticket, is the held deposit refunded or retained? "No penalty is auto-applied" reads as refund, which contradicts "deposit is forfeited". This one is genuinely ambiguous in the spec.
+4. **Vehicle security deposit.** Does the damage deposit pass through the platform on card, or is it cash at handover? Card authorization holds typically lapse after about seven days, so holding one for a ten-day rental invites chargebacks. The model currently records it as cash on the handover record.
+5. **Delivery fee ownership.** Does the dealer keep the 10 JOD, or the platform?
+6. **Quick-cancellation processing fee** (spec 2.3), **minimum renter age**, and the **international driving permit requirement** for foreign renters (spec 2.2), all still unset.
 
 ## Roadmap
 
-1. Dealers (registration + documents + approval + employees) · 2. Fleet · 3. Booking + no-show scheduler · 4. Payments (gateway decision) · 5. Disputes · 6. Reviews · 7. Platform Settings + Admin console · then outbox for cross-context events, token pruning jobs, MFA for Admin, Flutter app.
+Persistence and use cases for Dealers, then Fleet, then Bookings including the expiry and no-show background jobs, then Disputes and Reviews, then Payments once approved. After that: an outbox for cross-context events, token pruning, MFA for Admin, and the Flutter customer app.

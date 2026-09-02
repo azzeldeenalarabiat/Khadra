@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Khadra.Infrastructure.Configuration;
 
-// Spec §2 "Confirmed Business Rules". Values live in configuration (later: an admin-editable
+// Spec section 2 "Confirmed Business Rules". Values live in configuration (later: an admin-editable
 // PlatformSettings aggregate). No defaults here on purpose: a missing value fails validation at startup.
 public sealed class BusinessRulesOptions
 {
@@ -31,4 +31,14 @@ public sealed class BusinessRulesOptions
 
     [Range(1, 720)]
     public int AdminSlaHours { get; init; }
+
+    // Awaiting the owner's confirmation; see the note on BusinessRules.
+    [Range(0, 100)]
+    public decimal CustomerCancellationPenaltyPercent { get; init; }
+
+    [Range(5, 1440)]
+    public int PaymentWindowMinutes { get; init; }
+
+    [Range(0, 720)]
+    public int PostReturnSettlementHours { get; init; }
 }

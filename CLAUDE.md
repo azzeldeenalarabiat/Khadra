@@ -15,7 +15,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 
 ## Architecture map (dependency direction: Domain <- Application <- Infrastructure <- WebAPI)
 
-- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `GeoPoint`, `DateRange`) and one folder per bounded context (`IdentityAccess/` today; `Dealers/`, `Fleet/`, `Booking/`, `Payments/`, `Disputes/`, `Reviews/`, `PlatformSettings/` next). Repository interfaces live next to their aggregate.
+- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `Percentage`, `GeoPoint`, `DateRange`) and one folder per bounded context: `IdentityAccess/`, `Dealers/`, `Fleet/`, `Bookings/`, `Disputes/`, `Reviews/`, `PlatformSettings/`. `Payments/` is NOT built (blocked on owner decisions). Repository interfaces live next to their aggregate. See `docs/architecture-bounded-contexts.md` for the status table and the open owner decisions.
 - `Khadra.Application` — CQRS: `<Context>/<UseCase>/<UseCase>Command.cs` (+ validator) and `<UseCase>Handler.cs` using `ICommand<T>`/`IQuery<T>` (MediatR). Ports in `Common/Ports/`. Behaviors: logging, FluentValidation.
 - `Khadra.Infrastructure` — `KhadraDbContext`, `Persistence/Configurations/<Context>/`, migrations, repositories, `UnitOfWork` (dispatches domain events after commit), BCrypt/JWT/opaque tokens, MailKit email, strongly-typed options.
 - `Khadra.WebAPI` — controllers under `/api/v1`, JWT bearer with security-stamp check, policies, rate limiting, ProblemDetails, OpenAPI.
@@ -31,6 +31,8 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 - Soft delete via `ISoftDeletable`; `DeleteBehavior.Restrict` on every FK; never hard-delete.
 - Handlers return `Result<T, Error>` / `UnitResult<Error>`; `Error.Kind` maps to HTTP status in `ApiControllerBase.Failure`. Do not throw for business outcomes. Handlers call `IUnitOfWork.SaveChangesAsync` explicitly and never touch `HttpContext` (use `ClientInfo` / `ICurrentActor`).
 - Business numbers (commission %, deposit %, no-show hours, delivery fee, penalties, cancellation window, SLA) come ONLY from `IBusinessRulesProvider` (configuration section `BusinessRules` today, admin-editable aggregate later). Never a constant.
+- A booking FREEZES the rules and the price it was made under (`BookingTerms`, `BookingPricing`). Never judge a past booking against current settings.
+- Penalties are ASSESSED, never charged. Spec 3.3: with no dispute ticket, no penalty is applied at all. Money moves only through an Admin resolving a ticket.
 - REST: plural nouns, `/api/v1`, RFC 9457 ProblemDetails with `code` + `traceId`, 201 + Location, 202 for accepted async work, 204 for no body, pagination with `PagedResult<T>`. Anonymous endpoints must be rate limited.
 - Style: primary constructors, file-scoped namespaces, `sealed` by default, `internal` for infrastructure implementations. Every use case ships with tests.
 

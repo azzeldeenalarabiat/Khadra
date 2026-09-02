@@ -62,6 +62,10 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .Validate(options => options.DealerNonDeliveryPenaltyMaxPercent >= options.DealerNonDeliveryPenaltyMinPercent,
                 "BusinessRules: the maximum non-delivery penalty must be at least the minimum.")
+            // Spec 2.1 collects commission out of the card deposit, so a commission above the deposit
+            // would leave the platform chasing every dealer for the difference on every booking.
+            .Validate(options => options.DepositPercent >= options.CommissionPercent,
+                "BusinessRules: DepositPercent must be at least CommissionPercent.")
             .ValidateOnStart();
     }
 
