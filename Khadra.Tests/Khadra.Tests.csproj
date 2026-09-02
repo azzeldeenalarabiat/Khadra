@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CA1707;CA1515;CA2007</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Khadra.Domain\Khadra.Domain.csproj" />
+    <ProjectReference Include="..\Khadra.Application\Khadra.Application.csproj" />
+    <ProjectReference Include="..\Khadra.Infrastructure\Khadra.Infrastructure.csproj" />
+    <ProjectReference Include="..\Khadra.WebAPI\Khadra.WebAPI.csproj" />
+    <ProjectReference Include="..\Khadra.Bff\Khadra.Bff.csproj" />
+  </ItemGroup>
+
+</Project>

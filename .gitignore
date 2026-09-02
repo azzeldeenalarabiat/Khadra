@@ -1,0 +1,46 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.swp
+[Dd]ebug/
+[Rr]elease/
+[Tt]est[Rr]esult*/
+.vs/
+.vscode/
+*.code-workspace
+packages/
+*.deps.json
+*.runtimeconfig.json
+*.runtimeconfig.dev.json
+
+# Angular / Node
+node_modules/
+dist/
+.angular/
+/tmp
+/out-tsc
+npm-debug.log
+yarn-error.log
+coverage/
+Khadra.Bff/wwwroot/
+
+# Local secrets and overrides
+**/appsettings.Local.json
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+.keys/
+.run/
+
+# IDEs / OS
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,5 @@
+{
+  "/bff": { "target": "https://localhost:7243", "secure": false, "changeOrigin": true },
+  "/api": { "target": "https://localhost:7243", "secure": false, "changeOrigin": true },
+  "/health": { "target": "https://localhost:7243", "secure": false, "changeOrigin": true }
+}

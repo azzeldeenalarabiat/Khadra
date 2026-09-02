@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="Khadra.Application/Khadra.Application.csproj" />
+  <Project Path="Khadra.Bff/Khadra.Bff.csproj" />
+  <Project Path="Khadra.Domain/Khadra.Domain.csproj" />
+  <Project Path="Khadra.Infrastructure/Khadra.Infrastructure.csproj" />
+  <Project Path="Khadra.Tests/Khadra.Tests.csproj" />
+  <Project Path="Khadra.WebAPI/Khadra.WebAPI.csproj" />
+</Solution>

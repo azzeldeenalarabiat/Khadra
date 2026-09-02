@@ -1,0 +1,73 @@
+@api = https://localhost:7012
+@email = ali@example.com
+@password = Passw0rd1
+
+### Register (201)
+POST {{api}}/api/v1/auth/register
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}", "fullName": "Ali Ahmad", "phone": "0791234567" }
+
+### Login before verification (403 auth.email_not_verified)
+POST {{api}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+### Verify email (paste the token from Mailpit http://localhost:8025)
+POST {{api}}/api/v1/auth/verify-email
+Content-Type: application/json
+
+{ "token": "PASTE_TOKEN" }
+
+### Login (200) - copy accessToken / refreshToken
+# @name login
+POST {{api}}/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "{{email}}", "password": "{{password}}" }
+
+### Me
+GET {{api}}/api/v1/auth/me
+Authorization: Bearer {{login.response.body.accessToken}}
+
+### Refresh (200, rotated)
+POST {{api}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.refreshToken}}" }
+
+### Logout (204)
+POST {{api}}/api/v1/auth/logout
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "refreshToken": "{{login.response.body.refreshToken}}", "allDevices": false }
+
+### Resend verification (202)
+POST {{api}}/api/v1/auth/resend-verification
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+### Forgot password (202)
+POST {{api}}/api/v1/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "{{email}}" }
+
+### Reset password (paste token from Mailpit)
+POST {{api}}/api/v1/auth/reset-password
+Content-Type: application/json
+
+{ "token": "PASTE_TOKEN", "newPassword": "NewPass99" }
+
+### Change password (authenticated)
+POST {{api}}/api/v1/auth/change-password
+Authorization: Bearer {{login.response.body.accessToken}}
+Content-Type: application/json
+
+{ "currentPassword": "{{password}}", "newPassword": "NewPass99" }
+
+### Health
+GET {{api}}/health/ready

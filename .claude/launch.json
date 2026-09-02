@@ -1,0 +1,24 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Khadra.WebAPI", "--launch-profile", "https"],
+      "port": 7012
+    },
+    {
+      "name": "bff",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Khadra.Bff", "--launch-profile", "https"],
+      "port": 7243
+    },
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--prefix", "Khadra.Dashboard", "ng", "serve", "--host", "localhost", "--port", "4200"],
+      "port": 4200,
+      "autoPort": true
+    }
+  ]
+}
