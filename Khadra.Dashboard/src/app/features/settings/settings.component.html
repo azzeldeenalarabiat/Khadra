@@ -2,7 +2,8 @@
   <div>
     <h1 class="page-title">Platform settings</h1>
     <div class="page-sub">
-      Business rules applied to every new booking. Changes take effect immediately and are attributed to you.
+      Business rules applied to every new booking. Changes take effect immediately and are
+      attributed to you.
     </div>
   </div>
 
@@ -22,10 +23,14 @@
               <div class="setting-audit">Last changed by {{ row.by }} · {{ row.when }}</div>
             </div>
             <div class="setting-input">
-              <label class="visually-hidden" [attr.for]="'setting-' + row.label">{{ row.label }}</label>
+              <label class="visually-hidden" [attr.for]="'setting-' + row.label">{{
+                row.label
+              }}</label>
               <input class="input input-num" [id]="'setting-' + row.label" [value]="row.value" />
             </div>
-            <button type="button" class="btn btn-secondary btn-xs" (click)="change()">Change</button>
+            <button type="button" class="btn btn-secondary btn-xs" (click)="change()">
+              Change
+            </button>
           </div>
         }
       </div>

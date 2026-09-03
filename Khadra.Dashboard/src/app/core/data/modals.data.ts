@@ -25,7 +25,13 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
       {
         label: 'Rejection reason',
         type: 'select',
-        options: ['Documents do not match registration', 'Not a licensed tourist office', 'Green-plate proof missing', 'Duplicate application', 'Other'],
+        options: [
+          'Documents do not match registration',
+          'Not a licensed tourist office',
+          'Green-plate proof missing',
+          'Duplicate application',
+          'Other',
+        ],
       },
       {
         label: 'Explanation sent to the dealer',
@@ -51,7 +57,11 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
       },
     ],
     confirm: 'Send request',
-    result: { title: 'Clarification requested', body: 'Wadi Rum Motors was asked for a clearer registration image.', tone: 'warn' },
+    result: {
+      title: 'Clarification requested',
+      body: 'Wadi Rum Motors was asked for a clearer registration image.',
+      tone: 'warn',
+    },
   },
   'suspend-dealer': {
     icon: 'prohibit',
@@ -60,11 +70,25 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     body: 'Suspending this dealer may prevent new bookings. Active rentals continue until the vehicle is returned.',
     danger: true,
     fields: [
-      { label: 'Reason', type: 'select', options: ['Repeated non-delivery', 'Unresolved disputes', 'Document expired', 'Fraud investigation', 'Other'] },
+      {
+        label: 'Reason',
+        type: 'select',
+        options: [
+          'Repeated non-delivery',
+          'Unresolved disputes',
+          'Document expired',
+          'Fraud investigation',
+          'Other',
+        ],
+      },
       { label: 'Internal note', type: 'text', placeholder: 'Visible to admins only…' },
     ],
     confirm: 'Suspend dealer',
-    result: { title: 'Dealer suspended', body: 'New bookings are blocked for this dealer.', tone: 'bad' },
+    result: {
+      title: 'Dealer suspended',
+      body: 'New bookings are blocked for this dealer.',
+      tone: 'bad',
+    },
   },
   'reactivate-dealer': {
     icon: 'arrow-counter-clockwise',
@@ -80,8 +104,16 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     title: 'Resolve dispute DSP-1207',
     body: 'The resolution, your note and the timestamp are shown to both parties and written to the audit log.',
     fields: [
-      { label: 'Resolution', type: 'select', options: ['No penalty', 'Apply penalty', 'Partial penalty', 'Refund deposit'] },
-      { label: 'Admin note (required)', type: 'text', placeholder: 'Explain the decision and the evidence it rests on…' },
+      {
+        label: 'Resolution',
+        type: 'select',
+        options: ['No penalty', 'Apply penalty', 'Partial penalty', 'Refund deposit'],
+      },
+      {
+        label: 'Admin note (required)',
+        type: 'text',
+        placeholder: 'Explain the decision and the evidence it rests on…',
+      },
     ],
     note: 'Partial penalty: JOD 60 to the dealer, JOD 60 refunded to the customer.',
     confirm: 'Resolve dispute',
@@ -93,11 +125,23 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     title: 'Request more information',
     body: 'The SLA clock pauses while you wait for a reply. Choose who to ask.',
     fields: [
-      { label: 'Ask', type: 'select', options: ['Customer — Layla Odeh', 'Dealer — Al-Nadeem Rentals', 'Both parties'] },
-      { label: 'What is needed', type: 'text', placeholder: 'e.g. photographs of the vehicle at handover…' },
+      {
+        label: 'Ask',
+        type: 'select',
+        options: ['Customer — Layla Odeh', 'Dealer — Al-Nadeem Rentals', 'Both parties'],
+      },
+      {
+        label: 'What is needed',
+        type: 'text',
+        placeholder: 'e.g. photographs of the vehicle at handover…',
+      },
     ],
     confirm: 'Send request',
-    result: { title: 'Information requested', body: 'DSP-1207 is now waiting for the customer.', tone: 'warn' },
+    result: {
+      title: 'Information requested',
+      body: 'DSP-1207 is now waiting for the customer.',
+      tone: 'warn',
+    },
   },
   refund: {
     icon: 'arrow-u-down-left',
@@ -122,7 +166,13 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     tone: 'accent',
     title: 'Create payout run',
     body: '22 dealers are eligible for JOD 18,420 in total. Two dealers are held back for open disputes.',
-    fields: [{ label: 'Scheduled date', type: 'select', options: ['05 September 2026', '08 September 2026', 'Immediately'] }],
+    fields: [
+      {
+        label: 'Scheduled date',
+        type: 'select',
+        options: ['05 September 2026', '08 September 2026', 'Immediately'],
+      },
+    ],
     confirm: 'Create run',
     result: { title: 'Payout run created', body: 'PR-0091 scheduled for 05 September.' },
   },
@@ -132,10 +182,23 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     title: 'Hide this review?',
     body: 'The review is removed from public pages. The rating still counts toward the dealer average — admins cannot edit customer ratings.',
     fields: [
-      { label: 'Policy reason', type: 'select', options: ['Contains personal contact details', 'Abusive language', 'Not about this rental', 'Spam or promotion'] },
+      {
+        label: 'Policy reason',
+        type: 'select',
+        options: [
+          'Contains personal contact details',
+          'Abusive language',
+          'Not about this rental',
+          'Spam or promotion',
+        ],
+      },
     ],
     confirm: 'Hide review',
-    result: { title: 'Review hidden', body: 'Removed from public pages under policy.', tone: 'warn' },
+    result: {
+      title: 'Review hidden',
+      body: 'Removed from public pages under policy.',
+      tone: 'warn',
+    },
   },
   'deactivate-account': {
     icon: 'user-minus',
@@ -145,7 +208,11 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     danger: true,
     fields: [{ label: 'Reason', type: 'text', placeholder: 'Recorded in the audit log…' }],
     confirm: 'Deactivate account',
-    result: { title: 'Account deactivated', body: 'Dana Qasem can no longer sign in.', tone: 'bad' },
+    result: {
+      title: 'Account deactivated',
+      body: 'Dana Qasem can no longer sign in.',
+      tone: 'bad',
+    },
   },
   'invite-admin': {
     icon: 'user-gear',
@@ -166,7 +233,11 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     body: 'They receive a link to the dealer application form and upload their documents there.',
     fields: [
       { label: 'Business email', type: 'text', placeholder: 'office@example.jo' },
-      { label: 'City', type: 'select', options: ['Amman', 'Aqaba', 'Irbid', 'Petra', 'Wadi Rum', 'Dead Sea'] },
+      {
+        label: 'City',
+        type: 'select',
+        options: ['Amman', 'Aqaba', 'Irbid', 'Petra', 'Wadi Rum', 'Dead Sea'],
+      },
     ],
     confirm: 'Send invitation',
     result: { title: 'Invitation sent', body: 'The office can now apply.' },
@@ -206,9 +277,19 @@ export const MODALS: Readonly<Record<string, ModalConfig>> = {
     title: 'Change platform commission to 20%?',
     body: 'This applies to bookings created from now on. Existing bookings keep the rate they were created with.',
     danger: true,
-    fields: [{ label: 'Reason (recorded in audit log)', type: 'text', placeholder: 'e.g. Board decision Q3 2026' }],
+    fields: [
+      {
+        label: 'Reason (recorded in audit log)',
+        type: 'text',
+        placeholder: 'e.g. Board decision Q3 2026',
+      },
+    ],
     confirm: 'Save change',
-    result: { title: 'Setting updated', body: 'Commission is now 20% for new bookings.', tone: 'warn' },
+    result: {
+      title: 'Setting updated',
+      body: 'Commission is now 20% for new bookings.',
+      tone: 'warn',
+    },
   },
   '2fa': {
     icon: 'shield-check',

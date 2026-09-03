@@ -1,6 +1,6 @@
-import { NgClass } from '@angular/common';
+import { DecimalPipe, NgClass } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Cell, RowAction, TableRow, toneClass } from '../../core/models/console.models';
 
@@ -8,12 +8,16 @@ import { Cell, RowAction, TableRow, toneClass } from '../../core/models/console.
  * The console's one table. Every list screen and every profile tab renders
  * through it, which is why cells are data rather than markup: a new table is a
  * new array, not a new component.
+ *
+ * A navigable row exposes its first cell as a real link, so the row is reachable
+ * by keyboard and openable in a new tab. The whole-row click is a mouse
+ * convenience layered on top of that, never the only way in.
  */
 @Component({
   selector: 'kh-data-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './data-table.component.html',
-  imports: [NgClass],
+  imports: [NgClass, RouterLink, DecimalPipe],
 })
 export class DataTableComponent {
   private readonly router = inject(Router);
@@ -30,23 +34,30 @@ export class DataTableComponent {
     if (row.link) void this.router.navigate(row.link);
   }
 
-  /** Row actions must not also trigger the row's own navigation. */
+  /** Row actions and the row link must not both fire. */
   protected runAction(event: Event, action: RowAction): void {
     event.stopPropagation();
+    if (action.disabledReason) return;
     this.ui.run(action.action);
+  }
+
+  protected stop(event: Event): void {
+    event.stopPropagation();
   }
 
   protected cellClasses(cell: Cell): Record<string, boolean> {
     const text = cell.kind === 'text' ? cell : null;
     return {
       td: true,
-      'td-num': text?.align === 'right',
+      'td-num': text?.align === 'right' || cell.kind === 'money',
       'td-mono': text?.variant === 'mono',
       'td-muted': text?.variant === 'muted',
       'td-dim': text?.variant === 'dim',
       'td-accent': text?.variant === 'accent',
       'td-clip-280': text?.variant === 'clip-280',
       'td-clip-320': text?.variant === 'clip-320',
+      'status-text': !!text?.tone,
+      [toneClass(text?.tone ?? 'dim')]: !!text?.tone,
     };
   }
 

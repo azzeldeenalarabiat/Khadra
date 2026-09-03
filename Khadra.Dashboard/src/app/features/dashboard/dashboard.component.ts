@@ -1,6 +1,12 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ATTENTION_QUEUE, BOOKING_TREND, KPIS, MONEY_FLOW, RECENT_ACTIVITY } from '../../core/data/dashboard.data';
+import {
+  ATTENTION_QUEUE,
+  BOOKING_TREND,
+  KPIS,
+  MONEY_FLOW,
+  RECENT_ACTIVITY,
+} from '../../core/data/dashboard.data';
 import { toneClass } from '../../core/models/console.models';
 import { IconComponent } from '../../shared/icon/icon.component';
 

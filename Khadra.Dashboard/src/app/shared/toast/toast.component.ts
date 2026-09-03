@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Tone, toneClass } from '../../core/models/console.models';
+import { IconName } from '../icon/icon-paths';
 import { IconComponent } from '../icon/icon.component';
 
 /** Transient confirmation that an action completed. Auto-dismisses. */
@@ -16,7 +17,7 @@ export class ToastComponent {
   protected readonly toast = this.ui.toast;
   protected readonly toneClass = toneClass;
 
-  protected icon(tone: Tone): string {
+  protected icon(tone: Tone): IconName {
     if (tone === 'bad') return 'x-circle';
     if (tone === 'warn') return 'warning';
     return 'check-circle';

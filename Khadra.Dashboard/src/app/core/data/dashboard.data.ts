@@ -105,7 +105,8 @@ export const ATTENTION_QUEUE: readonly QueueItem[] = [
     severity: 'Overdue',
     tone: 'bad',
     title: 'Dispute DSP-1190 is 54 hours old',
-    description: 'No-show recorded after the 8-hour timeout. The customer disputes the deposit forfeit.',
+    description:
+      'No-show recorded after the 8-hour timeout. The customer disputes the deposit forfeit.',
     entity: 'Dead Sea Drive · BK-20455',
     sla: '6h over',
     percent: 100,
@@ -128,7 +129,8 @@ export const ATTENTION_QUEUE: readonly QueueItem[] = [
     severity: 'Payment',
     tone: 'bad',
     title: 'Payment PAY-99321 failed after three attempts',
-    description: 'Deposit of JOD 120 was not captured. The booking is held and auto-cancels in 4 hours.',
+    description:
+      'Deposit of JOD 120 was not captured. The booking is held and auto-cancels in 4 hours.',
     entity: 'Booking BK-20984',
     sla: '4h left',
     percent: 46,
@@ -139,7 +141,8 @@ export const ATTENTION_QUEUE: readonly QueueItem[] = [
     severity: 'Dispute',
     tone: 'warn',
     title: 'New dispute: vehicle not delivered at pickup time',
-    description: 'Customer waited 90 minutes at the Amman delivery address. The dealer has not responded.',
+    description:
+      'Customer waited 90 minutes at the Amman delivery address. The dealer has not responded.',
     entity: 'Al-Nadeem Rentals · DSP-1207',
     sla: '47h left',
     percent: 12,
@@ -150,7 +153,8 @@ export const ATTENTION_QUEUE: readonly QueueItem[] = [
     severity: 'Payout',
     tone: 'dim',
     title: 'Payout batch of JOD 18,420 pending approval',
-    description: '22 dealers, scheduled for 05 September. Two dealers have unresolved disputes on included bookings.',
+    description:
+      '22 dealers, scheduled for 05 September. Two dealers have unresolved disputes on included bookings.',
     entity: 'Payout run PR-0091',
     sla: '2d left',
     percent: 20,
@@ -160,15 +164,25 @@ export const ATTENTION_QUEUE: readonly QueueItem[] = [
 ];
 
 /** Fourteen daily booking counts, as a percentage of the tallest bar. */
-export const BOOKING_TREND: readonly number[] = [38, 52, 44, 61, 49, 72, 58, 66, 47, 80, 69, 74, 62, 88];
+export const BOOKING_TREND: readonly number[] = [
+  38, 52, 44, 61, 49, 72, 58, 66, 47, 80, 69, 74, 62, 88,
+];
 
-export const MONEY_FLOW: readonly { readonly k: string; readonly v: string; readonly percent: number }[] = [
+export const MONEY_FLOW: readonly {
+  readonly k: string;
+  readonly v: string;
+  readonly percent: number;
+}[] = [
   { k: 'Gross booking value', v: '412,600', percent: 100 },
   { k: 'Platform commission', v: '82,520', percent: 20 },
   { k: 'Dealer payouts', v: '330,080', percent: 80 },
 ];
 
-export const RECENT_ACTIVITY: readonly { readonly icon: IconName; readonly text: string; readonly ts: string }[] = [
+export const RECENT_ACTIVITY: readonly {
+  readonly icon: IconName;
+  readonly text: string;
+  readonly ts: string;
+}[] = [
   { icon: 'check-circle', text: 'Rania approved dealer Aqaba Coast Cars', ts: '9 min ago' },
   { icon: 'scales', text: 'Dispute DSP-1207 opened by customer', ts: '38 min ago' },
   { icon: 'credit-card', text: 'Payment PAY-99321 failed (3rd attempt)', ts: '1h ago' },

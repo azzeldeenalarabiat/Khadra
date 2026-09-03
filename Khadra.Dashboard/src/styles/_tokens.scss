@@ -40,9 +40,9 @@
   --color-accent-2-800: #423e5d;
   --color-accent-2-900: #2b293a;
 
-  --font-heading: "Inter", system-ui, sans-serif;
+  --font-heading: 'Inter', system-ui, sans-serif;
   --font-heading-weight: 500;
-  --font-body: "Inter", system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, Consolas, monospace;
 
   --space-1: 2.8px;
@@ -65,6 +65,9 @@
   --status-ok: #8fbfa6;
   --status-warn: #d0ad74;
   --status-bad: #d1806e;
+  /* The notification count sits on the topbar rather than in a table, and the
+     design gives it a deeper red so it reads at 9.5px against the dark bar. */
+  --status-bad-strong: #c96a5a;
   --status-dim: rgba(233, 233, 237, 0.55);
   --status-accent: var(--color-accent-300);
 

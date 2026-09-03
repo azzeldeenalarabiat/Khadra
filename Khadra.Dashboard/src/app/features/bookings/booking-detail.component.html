@@ -8,16 +8,24 @@
       <div class="detail-meta">{{ booking.meta }}</div>
     </div>
     <div class="detail-actions">
-      <button type="button" class="btn btn-secondary btn-md" (click)="goPayment()">View payment</button>
-      <button type="button" class="btn btn-secondary btn-md" (click)="refund()">Refund deposit</button>
-      <button type="button" class="btn btn-primary btn-md" (click)="goDispute()">Open dispute</button>
+      <button type="button" class="btn btn-secondary btn-md" (click)="goPayment()">
+        View payment
+      </button>
+      <button type="button" class="btn btn-secondary btn-md" (click)="refund()">
+        Refund deposit
+      </button>
+      <button type="button" class="btn btn-primary btn-md" (click)="goDispute()">
+        Open dispute
+      </button>
     </div>
   </header>
 
   <div class="banner s-bad">
     <kh-icon name="warning-circle" class="banner-icon" />
     <span class="banner-body">{{ booking.alert }}</span>
-    <button type="button" class="btn btn-primary btn-xs" (click)="goPayment()">Resolve payment</button>
+    <button type="button" class="btn btn-primary btn-xs" (click)="goPayment()">
+      Resolve payment
+    </button>
   </div>
 
   <div class="split-3">

@@ -1,12 +1,12 @@
-@if (modal(); as m) {
-  <div class="dialog-backdrop" role="presentation" (click)="close()">
-    <div
-      class="dialog"
-      role="dialog"
-      aria-modal="true"
-      [attr.aria-label]="m.title"
-      (click)="$event.stopPropagation()"
-    >
+<dialog
+  #dlg
+  class="dialog-backdrop"
+  (cancel)="cancel($event)"
+  (close)="close()"
+  (click)="backdropClick()"
+>
+  @if (modal(); as m) {
+    <div class="dialog" [attr.aria-label]="m.title" (click)="$event.stopPropagation()">
       <div class="row row-gap-12" [class]="toneClass(m.tone)">
         <div class="modal-icon-wrap">
           <kh-icon [name]="m.icon" />
@@ -15,7 +15,12 @@
           <div class="dialog-title">{{ m.title }}</div>
           <div class="dialog-body">{{ m.body }}</div>
         </div>
-        <button type="button" class="btn btn-icon btn-secondary btn-33" aria-label="Close" (click)="close()">
+        <button
+          type="button"
+          class="btn btn-icon btn-secondary btn-28"
+          aria-label="Close"
+          (click)="close()"
+        >
           <kh-icon name="x" />
         </button>
       </div>
@@ -51,7 +56,9 @@
       }
 
       <div class="dialog-actions">
-        <button type="button" class="btn btn-secondary btn-md" (click)="close()">Cancel</button>
+        <button type="button" class="btn btn-secondary btn-md" autofocus (click)="close()">
+          Cancel
+        </button>
         <button
           type="button"
           class="btn btn-md"
@@ -63,5 +70,5 @@
         </button>
       </div>
     </div>
-  </div>
-}
+  }
+</dialog>

@@ -11,7 +11,18 @@ export const toneClass = (tone: Tone): string => `s-${tone}`;
 
 /** A single table cell. The variant decides how the cell renders. */
 export type Cell =
-  | { kind: 'text'; value: string; sub?: string; align?: 'right'; variant?: CellVariant }
+  | {
+      kind: 'text';
+      value: string;
+      sub?: string;
+      align?: 'right';
+      variant?: CellVariant;
+      tone?: Tone;
+    }
+  // Money always renders with its currency code: a bare figure in a table that
+  // mixes booking values, deposits and commission is ambiguous, and the backend
+  // Money value object carries the currency anyway.
+  | { kind: 'money'; amount: number; currency: string }
   | { kind: 'badge'; value: string; tone: Tone }
   | { kind: 'entity'; value: string; sub: string }
   | { kind: 'actions'; actions: RowAction[] };
@@ -23,11 +34,15 @@ export interface RowAction {
   /** Maps to .btn-primary / .btn-secondary / .btn-ghost. */
   readonly style: 'primary' | 'secondary' | 'ghost';
   readonly action: string;
+  /** A restricted action stays visible but disabled, and says why. */
+  readonly disabledReason?: string;
 }
 
 export interface TableRow {
+  /** Stable identity for tracking, and the accessible name of the row link. */
+  readonly id: string;
   readonly cells: readonly Cell[];
-  /** Route to open when the row is clicked, if the row is navigable. */
+  /** Route to open when the row is activated, if the row is navigable. */
   readonly link?: readonly string[];
 }
 

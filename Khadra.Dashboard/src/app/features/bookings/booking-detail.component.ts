@@ -1,6 +1,11 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { BOOKING_CARDS, BOOKING_DETAIL, BOOKING_TIMELINE, VEHICLE_ROWS } from '../../core/data/details.data';
+import {
+  BOOKING_CARDS,
+  BOOKING_DETAIL,
+  BOOKING_TIMELINE,
+  VEHICLE_ROWS,
+} from '../../core/data/details.data';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';

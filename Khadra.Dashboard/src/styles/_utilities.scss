@@ -48,8 +48,12 @@
   color: var(--text-42);
 }
 
-.sect-clip { overflow: hidden; }
-.sect-pad { padding: 14px; }
+.sect-clip {
+  overflow: hidden;
+}
+.sect-pad {
+  padding: 14px;
+}
 
 /* Placeholder tile standing in for a document or photo the console cannot
    render inline (private files are fetched through short-lived signed URLs). */
@@ -75,11 +79,21 @@
 
 /* Status colour carrier. A modifier sets --c and every child reads it, which is
    how one pill/dot/bar rule serves all five states. */
-.s-ok { --c: var(--status-ok); }
-.s-warn { --c: var(--status-warn); }
-.s-bad { --c: var(--status-bad); }
-.s-dim { --c: var(--status-dim); }
-.s-accent { --c: var(--status-accent); }
+.s-ok {
+  --c: var(--status-ok);
+}
+.s-warn {
+  --c: var(--status-warn);
+}
+.s-bad {
+  --c: var(--status-bad);
+}
+.s-dim {
+  --c: var(--status-dim);
+}
+.s-accent {
+  --c: var(--status-accent);
+}
 
 .pill {
   display: inline-flex;
@@ -94,13 +108,21 @@
   white-space: nowrap;
 }
 
-.status-text { color: var(--c, inherit); }
+.status-text {
+  color: var(--c, inherit);
+}
 
 /* Loading skeleton. */
 @keyframes shimmer {
-  0% { opacity: 0.35; }
-  50% { opacity: 0.7; }
-  100% { opacity: 0.35; }
+  0% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0.35;
+  }
 }
 
 .skel {
@@ -111,19 +133,48 @@
 }
 
 /* Layout helpers. */
-.stack { display: flex; flex-direction: column; }
-.stack-14 { gap: 14px; }
-.stack-12 { gap: 12px; }
-.stack-10 { gap: 10px; }
-.stack-9 { gap: 9px; }
-.row { display: flex; align-items: center; }
-.row-gap-8 { gap: 8px; }
-.row-gap-9 { gap: 9px; }
-.row-gap-12 { gap: 12px; }
-.row-gap-14 { gap: 14px; }
-.push { margin-inline-start: auto; }
-.grow { flex: 1; min-width: 0; }
-.nowrap { white-space: nowrap; }
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+.stack-14 {
+  gap: 14px;
+}
+.stack-12 {
+  gap: 12px;
+}
+.stack-10 {
+  gap: 10px;
+}
+.stack-9 {
+  gap: 9px;
+}
+.row {
+  display: flex;
+  align-items: center;
+}
+.row-gap-8 {
+  gap: 8px;
+}
+.row-gap-9 {
+  gap: 9px;
+}
+.row-gap-12 {
+  gap: 12px;
+}
+.row-gap-14 {
+  gap: 14px;
+}
+.push {
+  margin-inline-start: auto;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.nowrap {
+  white-space: nowrap;
+}
 
 /* Inline notice banner. */
 .banner {
@@ -136,11 +187,25 @@
   font-size: 12.5px;
 }
 
-.banner-icon { color: var(--c); flex: none; }
-.banner-title { font-size: 13px; font-weight: 500; }
-.banner-text { font-size: 12px; color: var(--text-60); margin-top: 2px; }
-.banner-body { flex: 1; }
-.banner .mono { font-size: 11.5px; }
+.banner-icon {
+  color: var(--c);
+  flex: none;
+}
+.banner-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.banner-text {
+  font-size: 12px;
+  color: var(--text-60);
+  margin-top: 2px;
+}
+.banner-body {
+  flex: 1;
+}
+.banner .mono {
+  font-size: 11.5px;
+}
 
 /* Key/value row used by every detail panel. */
 .kv {
@@ -157,10 +222,16 @@
   color: var(--text-50);
 }
 
-.kv-val { font-size: 12.5px; }
+.kv-val {
+  font-size: 12.5px;
+}
 
-.kv-narrow .kv-key { width: 190px; }
-.kv-200 .kv-key { width: 200px; }
+.kv-narrow .kv-key {
+  width: 190px;
+}
+.kv-200 .kv-key {
+  width: 200px;
+}
 
 /* Right-aligned key/value, used by the summary cards. */
 .kv-split {
@@ -170,13 +241,23 @@
   border-bottom: 1px solid var(--hairline);
 }
 
-.kv-split .kv-key { flex: 1; width: auto; }
-.kv-split .kv-val { text-align: end; }
+.kv-split .kv-key {
+  flex: 1;
+  width: auto;
+}
+.kv-split .kv-val {
+  text-align: end;
+}
 
-.kv-body { padding: 6px 14px 12px; }
+.kv-body {
+  padding: 6px 14px 12px;
+}
 
 /* Timeline shared by application, booking, payment and dispute detail. */
-.tl-item { display: flex; gap: 11px; }
+.tl-item {
+  display: flex;
+  gap: 11px;
+}
 
 .tl-gutter {
   display: flex;
@@ -208,12 +289,24 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
-.tl-line.is-last { background: transparent; }
+.tl-line.is-last {
+  background: transparent;
+}
 
-.tl-body { padding-bottom: 14px; }
-.tl-label { font-size: 12.5px; font-weight: 500; }
-.tl-label.is-future { color: var(--text-55); }
-.tl-meta { font-size: 11px; color: var(--text-45); }
+.tl-body {
+  padding-bottom: 14px;
+}
+.tl-label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.tl-label.is-future {
+  color: var(--text-55);
+}
+.tl-meta {
+  font-size: 11px;
+  color: var(--text-45);
+}
 
 /* Visible to screen readers only: labels for inputs whose purpose is obvious
    from the surrounding design but which still need a programmatic name. */
@@ -227,4 +320,17 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* kh-icon carries no inline style of its own: a strict CSP (style-src without
+   unsafe-inline) would otherwise drop the attribute and collapse every icon. */
+kh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+kh-icon svg {
+  display: block;
 }

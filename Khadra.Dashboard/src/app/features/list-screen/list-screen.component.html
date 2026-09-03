@@ -6,20 +6,22 @@
         <div class="page-sub">{{ list.subtitle }}</div>
       </div>
       <div class="push row row-gap-8">
-        <span class="k">State</span>
-        <div class="seg seg-sm">
-          @for (state of states; track state) {
-            <label class="seg-opt">
-              <input
-                type="radio"
-                name="view-state"
-                [checked]="viewState() === state"
-                (change)="setState(state)"
-              />
-              {{ label(state) }}
-            </label>
-          }
-        </div>
+        @if (showStateSwitcher) {
+          <span class="k">State</span>
+          <div class="seg seg-sm">
+            @for (state of states; track state) {
+              <label class="seg-opt">
+                <input
+                  type="radio"
+                  name="view-state"
+                  [checked]="viewState() === state"
+                  (change)="setState(state)"
+                />
+                {{ label(state) }}
+              </label>
+            }
+          </div>
+        }
         @if (list.primary; as primary) {
           <button type="button" class="btn btn-primary btn-md" (click)="run(primary.action)">
             <kh-icon name="plus" />
@@ -37,12 +39,12 @@
           <input id="list-search" class="input input-sm" [placeholder]="list.searchHint" />
         </div>
         @for (filter of list.filters; track filter) {
-          <button type="button" class="btn btn-secondary btn-xs">
+          <button type="button" class="btn btn-secondary btn-sm">
             {{ filter }}
             <kh-icon name="caret-down" />
           </button>
         }
-        <button type="button" class="btn btn-ghost btn-xs push">
+        <button type="button" class="btn btn-ghost push">
           <kh-icon name="download-simple" />
           Export CSV
         </button>
@@ -96,8 +98,8 @@
             <div class="state-icon is-outline"><kh-icon name="tray" /></div>
             <div class="state-title">Nothing here yet</div>
             <div class="state-text">
-              No records match this view. Clear the filters, or wait for new activity to arrive from the
-              marketplace.
+              No records match this view. Clear the filters, or wait for new activity to arrive from
+              the marketplace.
             </div>
             <div class="state-actions">
               <button type="button" class="btn btn-secondary btn-sm">Clear filters</button>
@@ -111,8 +113,8 @@
             <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
             <div class="state-title">Couldn't load this table</div>
             <div class="state-text">
-              The service returned <span class="mono">503 SERVICE_UNAVAILABLE</span> after 3 attempts. Nothing
-              was changed. Your filters are preserved.
+              The service returned <span class="mono">503 SERVICE_UNAVAILABLE</span> after 3
+              attempts. Nothing was changed. Your filters are preserved.
             </div>
             <div class="mono">request-id 7f2a-91cd-4b</div>
             <div class="state-actions">
@@ -127,8 +129,9 @@
             <div class="state-icon is-accent"><kh-icon name="lock-key" /></div>
             <div class="state-title">You don't have access to this data</div>
             <div class="state-text">
-              This view is limited to <strong>Finance Admin</strong> and <strong>Super Admin</strong>. Your role
-              is Support Admin. The request was recorded in the audit log.
+              This view is limited to <strong>Finance Admin</strong> and
+              <strong>Super Admin</strong>. Your role is Support Admin. The request was recorded in
+              the audit log.
             </div>
             <div class="state-actions">
               <button type="button" class="btn btn-primary btn-sm">Request access</button>

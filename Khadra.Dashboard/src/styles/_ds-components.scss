@@ -19,35 +19,78 @@
   border-radius: var(--radius-md);
 }
 
-.btn svg { display: block; }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn svg {
+  display: block;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
-.btn-primary { color: var(--color-accent); border-color: var(--color-accent); }
-.btn-primary:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
-.btn-primary:active { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.btn-primary {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.btn-primary:active {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
 
-.btn-secondary { border-color: var(--color-divider); }
-.btn-secondary:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
-.btn-secondary:active { background: color-mix(in srgb, var(--color-text) 14%, transparent); }
+.btn-secondary {
+  border-color: var(--color-divider);
+}
+.btn-secondary:hover {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+.btn-secondary:active {
+  background: color-mix(in srgb, var(--color-text) 14%, transparent);
+}
 
-.btn-ghost { color: var(--color-accent); padding-inline: var(--space-1); }
-.btn-ghost:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
-.btn-ghost:active { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.btn-ghost {
+  color: var(--color-accent);
+  padding-inline: var(--space-1);
+}
+.btn-ghost:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.btn-ghost:active {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
 
-.btn-icon { width: 36px; height: 36px; padding: 0; }
-.btn-block { width: 100%; margin-top: var(--space-2); }
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+.btn-block {
+  width: 100%;
+  margin-top: var(--space-2);
+}
 
 /* Danger treatment for destructive actions (reject, suspend, deactivate). */
 .btn-danger {
   color: var(--status-bad);
   border-color: color-mix(in srgb, var(--status-bad) 50%, transparent);
 }
-.btn-danger:hover { background: color-mix(in srgb, var(--status-bad) 12%, transparent); }
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--status-bad) 12%, transparent);
+}
 
 /* Sizes used across the console. */
-.btn-sm { padding: 5px 10px; font-size: 12.5px; }
-.btn-xs { padding: 3px 9px; font-size: 11.5px; }
-.btn-md { padding: 6px 12px; font-size: 12.5px; }
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 12.5px;
+}
+.btn-xs {
+  padding: 3px 9px;
+  font-size: 11.5px;
+}
+.btn-md {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
 .btn-lg-row {
   justify-content: flex-start;
   gap: 8px;
@@ -76,12 +119,26 @@
   border-radius: var(--radius-md);
 }
 
-.input:hover { border-color: color-mix(in srgb, var(--color-text) 45%, transparent); }
-.input:focus-visible { border-color: var(--color-accent); outline-offset: 0; }
-textarea.input { min-height: 90px; resize: vertical; }
+.input:hover {
+  border-color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.input:focus-visible {
+  border-color: var(--color-accent);
+  outline-offset: 0;
+}
+textarea.input {
+  min-height: 90px;
+  resize: vertical;
+}
 
-.input-sm { min-height: 31px; font-size: 12px; }
-.input-num { text-align: end; font-variant-numeric: tabular-nums; }
+.input-sm {
+  min-height: 31px;
+  font-size: 12px;
+}
+.input-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
 
 .radio {
   display: inline-flex;
@@ -108,7 +165,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   border: 1.5px solid var(--color-divider);
 }
 
-.radio:hover .dot { border-color: var(--color-accent); }
+.radio:hover .dot {
+  border-color: var(--color-accent);
+}
 
 .radio input:checked + .dot {
   border-color: var(--color-accent);
@@ -137,7 +196,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   cursor: pointer;
 }
 
-.seg-opt + .seg-opt { border-inline-start: 1px solid var(--color-divider); }
+.seg-opt + .seg-opt {
+  border-inline-start: 1px solid var(--color-divider);
+}
 .seg-opt:has(input:checked) {
   color: var(--color-accent);
   box-shadow: inset 0 0 0 1px var(--color-accent);
@@ -149,8 +210,13 @@ textarea.input { min-height: 90px; resize: vertical; }
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
 }
-.seg-sm { height: 30px; }
-.seg-sm .seg-opt { padding: 5px 9px; font-size: 11.5px; }
+.seg-sm {
+  height: 30px;
+}
+.seg-sm .seg-opt {
+  padding: 5px 9px;
+  font-size: 11.5px;
+}
 
 /* — cards — */
 .card {
@@ -162,9 +228,15 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: var(--color-surface);
 }
 
-.elev-sm { box-shadow: var(--shadow-sm); }
-.elev-md { box-shadow: var(--shadow-md); }
-.elev-lg { box-shadow: var(--shadow-lg); }
+.elev-sm {
+  box-shadow: var(--shadow-sm);
+}
+.elev-md {
+  box-shadow: var(--shadow-md);
+}
+.elev-lg {
+  box-shadow: var(--shadow-lg);
+}
 
 /* — tags — */
 .tag {
@@ -176,8 +248,14 @@ textarea.input { min-height: 90px; resize: vertical; }
   border-radius: calc(var(--radius-md) * 0.75);
 }
 
-.tag-accent { background: var(--color-accent-800); color: var(--color-accent-100); }
-.tag-neutral { background: var(--color-neutral-800); color: var(--color-neutral-100); }
+.tag-accent {
+  background: var(--color-accent-800);
+  color: var(--color-accent-100);
+}
+.tag-neutral {
+  background: var(--color-neutral-800);
+  color: var(--color-neutral-100);
+}
 
 /* — tables — */
 .table {
@@ -270,11 +348,45 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-size: 18px;
 }
 
-.dialog-body { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+.dialog-body {
+  font-size: 14px;
+  opacity: 0.85;
+  margin-top: 4px;
+}
 
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
   margin-top: var(--space-2);
+}
+
+/* The confirmation dialog is a native <dialog>, so it must shed the UA's own
+   frame before it can act as the design's full-bleed backdrop. The real dim
+   layer stays on the element itself rather than ::backdrop, so the existing
+   centring and padding keep working unchanged. */
+dialog.dialog-backdrop {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  border: 0;
+  color: inherit;
+  overflow: auto;
+}
+
+dialog.dialog-backdrop:not([open]) {
+  display: none;
+}
+
+dialog.dialog-backdrop::backdrop {
+  background: transparent;
+}
+
+/* The dialog's close affordance is smaller than a toolbar icon button. */
+.btn-28 {
+  width: 28px;
+  height: 28px;
+  padding: 0;
 }

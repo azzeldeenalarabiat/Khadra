@@ -51,7 +51,9 @@
         <div class="doc-grid-4">
           @for (item of evidence; track item.file) {
             <div>
-              <div class="doc evidence-tile"><span class="mono">{{ item.file }}</span></div>
+              <div class="doc evidence-tile">
+                <span class="mono">{{ item.file }}</span>
+              </div>
               <div class="evidence-by">
                 <span class="pill" [class]="toneClass(item.tone)">{{ item.by }}</span>
                 <span class="evidence-ts">{{ item.ts }}</span>
@@ -113,7 +115,9 @@
           ></textarea>
         </div>
 
-        <button type="button" class="btn btn-primary btn-block" (click)="resolve()">Resolve dispute</button>
+        <button type="button" class="btn btn-primary btn-block" (click)="resolve()">
+          Resolve dispute
+        </button>
         <button type="button" class="btn btn-secondary btn-block" (click)="requestInfo()">
           Request more information
         </button>

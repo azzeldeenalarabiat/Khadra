@@ -50,6 +50,11 @@ export class AdminTopbarComponent {
 
   /** '/dealers/review?x=1' becomes 'dealers/review'. */
   private toKey(url: string): string {
-    return url.split('?')[0].split('#')[0].replace(/^\/+|\/+$/g, '') || 'dashboard';
+    return (
+      url
+        .split('?')[0]
+        .split('#')[0]
+        .replace(/^\/+|\/+$/g, '') || 'dashboard'
+    );
   }
 }

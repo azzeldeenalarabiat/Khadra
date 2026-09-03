@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  isDevMode,
+  signal,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
@@ -13,8 +20,10 @@ import { IconComponent } from '../../shared/icon/icon.component';
  *
  * Each route supplies a `list` key in its route data; the config comes from
  * LISTS. The design also exposes a state switcher so loading, empty, error and
- * access-denied can be reviewed without having to reproduce them, and that is
- * kept here deliberately: those states are part of the design.
+ * access-denied can be reviewed without having to reproduce them. It is kept,
+ * because those states are part of the design, but only in development: it
+ * forces a screen into a state the data does not support, which would be a
+ * confusing control to hand a real administrator.
  */
 @Component({
   selector: 'kh-list-screen',
@@ -34,6 +43,7 @@ export class ListScreenComponent {
   protected readonly config = computed(() => LISTS[this.listKey()]);
   protected readonly viewState = signal<ViewState>('data');
 
+  protected readonly showStateSwitcher = isDevMode();
   protected readonly states: readonly ViewState[] = ['data', 'loading', 'empty', 'error', 'denied'];
   protected readonly skeletonColumns = ['22%', '12%', '14%', '16%', '12%', '14%'];
   protected readonly skeletonRows = [0, 1, 2, 3, 4, 5, 6];

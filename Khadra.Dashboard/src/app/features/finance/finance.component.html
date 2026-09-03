@@ -56,7 +56,9 @@
               <td class="td td-num num td-dim">{{ row.rate }}</td>
               <td class="td td-num num td-accent">{{ row.amount }}</td>
               <td class="td td-num num">{{ row.payout }}</td>
-              <td class="td"><span class="pill" [class]="toneClass(row.tone)">{{ row.status }}</span></td>
+              <td class="td">
+                <span class="pill" [class]="toneClass(row.tone)">{{ row.status }}</span>
+              </td>
               <td class="td">{{ row.date }}</td>
             </tr>
           }

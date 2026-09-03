@@ -35,14 +35,30 @@ h6 {
   margin: 0 0 var(--space-2);
 }
 
-h1 { font-size: 42px; }
-h2 { font-size: 32px; }
-h3 { font-size: 25px; }
-h4 { font-size: 20px; }
-h5 { font-size: 16px; }
-h6 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+h1 {
+  font-size: 42px;
+}
+h2 {
+  font-size: 32px;
+}
+h3 {
+  font-size: 25px;
+}
+h4 {
+  font-size: 20px;
+}
+h5 {
+  font-size: 16px;
+}
+h6 {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
-p { margin: 0 0 var(--space-3); }
+p {
+  margin: 0 0 var(--space-3);
+}
 
 a {
   color: var(--color-accent);
@@ -54,7 +70,9 @@ img {
   max-width: 100%;
 }
 
-:focus { outline: none; }
+:focus {
+  outline: none;
+}
 
 :focus-visible {
   outline: 2px solid var(--color-accent);
@@ -65,7 +83,9 @@ img {
   background: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
-.text-muted { color: var(--text-55); }
+.text-muted {
+  color: var(--text-55);
+}
 
 /* Rules fade to transparent at both ends: a Nocturne signature. */
 .hr {
@@ -79,4 +99,13 @@ img {
     var(--color-divider) calc(100% - 48px),
     transparent
   );
+}
+
+/* Screen titles are h1 for document structure, but they sit inside flex rows
+   next to a status pill. The base h1 margin and tight line-height knocked that
+   pairing out of alignment on every detail header, so titles opt back out. */
+.page-title,
+.detail-name {
+  margin: 0;
+  line-height: 1.55;
 }
