@@ -23,7 +23,10 @@ public sealed record BusinessRules(
     // How long a customer has to pay the deposit before the held vehicle is released to others.
     int PaymentWindowMinutes,
     // Quiet period after the vehicle comes back; with no dispute the booking completes on its own.
-    int PostReturnSettlementHours);
+    int PostReturnSettlementHours,
+    // Spec 5.1: enforced at registration. Null means the owner has not set one, and nobody is
+    // refused on age -- a real shipping state, not a missing value.
+    int? MinimumRenterAge);
 
 public interface IBusinessRulesProvider
 {

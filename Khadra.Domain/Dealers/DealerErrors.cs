@@ -25,6 +25,24 @@ public static class DealerErrors
     public static readonly Error NothingToResubmit =
         Error.Conflict("dealer.nothing_to_resubmit", "Only a rejected application or one needing clarification can be resubmitted.");
 
+    public static readonly Error AlreadyRegistered =
+        Error.Conflict("dealer.already_registered", "This account already has a dealer application.");
+
+    public static readonly Error CommercialRegistrationTaken =
+        Error.Conflict("dealer.commercial_registration_taken", "A dealer is already registered with that commercial registration number.");
+
+    public static readonly Error UnsupportedDocumentType =
+        Error.Validation("dealer.unsupported_document_type", "That document type is not accepted.");
+
+    public static readonly Error InvalidDocumentContent =
+        Error.Validation("dealer.invalid_document_content", "Upload a JPEG, PNG or PDF file.");
+
+    public static readonly Error DocumentTooLarge =
+        Error.Validation("dealer.document_too_large", "The file is larger than the upload limit.");
+
+    public static readonly Error NotRegistered =
+        Error.NotFound("dealer.not_registered", "This account has not submitted a dealer application.");
+
     public static readonly Error MissingRequiredDocuments =
         Error.Validation("dealer.missing_documents", "The commercial registration, vehicle registration and owner identity documents are all required before approval.");
 

@@ -18,6 +18,28 @@ public static class IdentityErrors
     public static Error WeakPassword(string detail) =>
         Error.Validation("auth.password_policy", detail);
 
+    public static readonly Error DateOfBirthRequired =
+        Error.Validation("auth.date_of_birth_required", "A date of birth is required to register as a renter.");
+
+    public static readonly Error InvalidDateOfBirth =
+        Error.Validation("auth.invalid_date_of_birth", "The date of birth is not valid.");
+
+    // Carries the configured figure so the client can say WHY without hardcoding the platform's rule.
+    public static Error UnderMinimumAge(int minimumAge) =>
+        Error.Validation("auth.under_minimum_age", $"Renters must be at least {minimumAge} years old.");
+
+    public static readonly Error UnsupportedDocumentType =
+        Error.Validation("documents.unsupported_type", "That document type is not accepted.");
+
+    public static readonly Error InvalidDocumentContent =
+        Error.Validation("documents.invalid_content", "Upload a JPEG, PNG or PDF file.");
+
+    public static readonly Error DocumentTooLarge =
+        Error.Validation("documents.too_large", "The file is larger than the upload limit.");
+
+    public static readonly Error DocumentNotFound =
+        Error.NotFound("documents.not_found", "That document does not exist.");
+
     public static readonly Error EmailTaken =
         Error.Conflict("auth.email_taken", "An account with this email already exists.");
 

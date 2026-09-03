@@ -70,6 +70,9 @@ internal static class Users
 {
     public static readonly DateTimeOffset Now = new(2026, 9, 3, 10, 0, 0, TimeSpan.Zero);
 
+    // Comfortably over any minimum the platform might configure (the domain caps it at 30).
+    public static readonly DateOnly AdultBirthDate = new(1990, 1, 1);
+
     public static User Customer(
         string email = "ali@example.com",
         string phone = "0791234567",

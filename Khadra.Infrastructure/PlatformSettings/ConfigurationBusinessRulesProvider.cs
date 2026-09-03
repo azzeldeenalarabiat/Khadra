@@ -24,6 +24,7 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
             current.AdminSlaHours,
             current.CustomerCancellationPenaltyPercent,
             current.PaymentWindowMinutes,
-            current.PostReturnSettlementHours));
+            current.PostReturnSettlementHours,
+            current.MinimumRenterAge));
     }
 }

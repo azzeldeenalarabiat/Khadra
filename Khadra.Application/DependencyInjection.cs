@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
 
         services.AddScoped<AuthTokenFactory>();
+        services.AddScoped<AccountRegistrar>();
         services.AddScoped<AuthEmailDispatcher>();
 
         var eventHandlerRegistrations = assembly

@@ -41,4 +41,9 @@ public sealed class BusinessRulesOptions
 
     [Range(0, 720)]
     public int PostReturnSettlementHours { get; init; }
+
+    // Spec 5.1 "minimum age enforced at registration". Confirmed by the owner as 21. Nullable so the
+    // rule can be switched off deliberately rather than by deleting a line.
+    [Range(18, 30)]
+    public int? MinimumRenterAge { get; init; }
 }

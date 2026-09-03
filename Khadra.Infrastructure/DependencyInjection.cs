@@ -8,8 +8,10 @@ using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Auditing.Repositories;
+using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Infrastructure.Configuration;
+using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Notifications;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
@@ -65,6 +67,17 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddOptions<DatabaseOptions>()
             .Bind(configuration.GetSection(DatabaseOptions.SectionName));
+        services.AddOptions<DocumentStorageOptions>()
+            .Bind(configuration.GetSection(DocumentStorageOptions.SectionName))
+            .ValidateDataAnnotations()
+            // Spec 7: these files must never be reachable as static content. Catching this at startup
+            // is the difference between a config typo and every customer passport being public.
+            .Validate(options => !options.RootPath.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    .Contains("wwwroot", StringComparison.OrdinalIgnoreCase),
+                "Documents:RootPath must not be inside wwwroot; document files are never served statically.")
+            .Validate(options => options.AllowedContentTypes.Count > 0,
+                "Documents:AllowedContentTypes must list at least one accepted type.")
+            .ValidateOnStart();
         services.AddOptions<AdminDashboardOptions>()
             .Bind(configuration.GetSection(AdminDashboardOptions.SectionName))
             .ValidateDataAnnotations()
@@ -101,6 +114,7 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
         services.AddScoped<IAuditTrail, AuditTrail>();
+        services.AddScoped<IDealerRepository, DealerRepository>();
         services.AddScoped<DevelopmentSeeder>();
 
         AddReporting(services);
@@ -127,6 +141,9 @@ public static class DependencyInjection
         services.AddSingleton<IOpaqueTokenService, OpaqueTokenService>();
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
         services.AddSingleton<IAuthPolicySettings, AuthPolicySettings>();
+        services.AddSingleton<IDocumentPolicySettings, DocumentPolicySettings>();
+        services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
+        services.AddSingleton<IDocumentLinkSigner, HmacDocumentLinkSigner>();
     }
 
     private static void AddNotifications(IServiceCollection services, IConfiguration configuration)
