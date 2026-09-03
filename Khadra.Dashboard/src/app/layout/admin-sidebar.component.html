@@ -7,7 +7,7 @@
   </div>
 
   <nav class="sidebar-nav" aria-label="Admin sections">
-    @for (group of groups; track $index) {
+    @for (group of groups(); track $index) {
       @if (group.group) {
         <div class="nav-group">{{ group.group }}</div>
       }
@@ -30,10 +30,10 @@
 
   <div class="sidebar-foot">
     <div class="sidebar-user">
-      <div class="avatar avatar-28">RH</div>
+      <div class="avatar avatar-28">{{ initials() }}</div>
       <div class="grow">
-        <div class="sidebar-user-name">Rania Haddad</div>
-        <div class="sidebar-user-role">Super Admin</div>
+        <div class="sidebar-user-name">{{ name() }}</div>
+        <div class="sidebar-user-role">{{ role() }}</div>
       </div>
     </div>
     <button type="button" class="sidebar-link">

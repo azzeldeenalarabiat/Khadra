@@ -3,17 +3,27 @@ using Khadra.Domain.Common;
 namespace Khadra.Domain.Fleet;
 
 // Draft lets a dealer build a listing before exposing it. Only Active vehicles reach customer search.
+//
+// Note what is NOT here: "Booked". Whether a car is free on given dates is a question about bookings,
+// and a stored flag would have to be kept in step with every booking, cancellation and no-show. It is
+// derived at query time instead (see Vehicle, which says the same thing about availability).
 public sealed class VehicleStatus : Enumeration
 {
     public static readonly VehicleStatus Draft = new(1, "Draft");
     public static readonly VehicleStatus Active = new(2, "Active");
     public static readonly VehicleStatus Hidden = new(3, "Hidden");
+    // Off the road for servicing. Distinct from Hidden, which is a marketing decision: this car
+    // physically cannot be rented, and a dealer needs to say so without pretending it was delisted.
+    public static readonly VehicleStatus Maintenance = new(4, "Maintenance");
 
     private VehicleStatus(int id, string name) : base(id, name)
     {
     }
 
     public bool IsBookable => this == Active;
+
+    /// <summary>States a dealer moves a listing between; Draft is only ever left, never returned to.</summary>
+    public bool IsDealerControlled => this != Draft;
 }
 
 public sealed class TransmissionType : Enumeration

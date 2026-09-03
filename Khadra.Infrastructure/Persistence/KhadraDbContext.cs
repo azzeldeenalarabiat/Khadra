@@ -3,6 +3,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +19,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<Dealer> Dealers => Set<Dealer>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<DisputeTicket> DisputeTickets => Set<DisputeTicket>();
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

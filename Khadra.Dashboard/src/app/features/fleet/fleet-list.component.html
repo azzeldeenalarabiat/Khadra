@@ -1,0 +1,122 @@
+<div class="stack stack-14">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">My fleet</h1>
+      <div class="page-sub">
+        {{ summary() || 'The cars you rent out. A car reaches customers once it is published.' }}
+      </div>
+    </div>
+    <a class="btn btn-primary btn-md push" routerLink="/fleet/new">
+      <kh-icon name="plus" />
+      Add a car
+    </a>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load your fleet</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading()) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else if (cars().length === 0) {
+    <section class="sect">
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="car" /></div>
+        <div class="state-title">No cars yet</div>
+        <div class="state-text">
+          Add your first car, upload a photo of it, then publish it so customers can book it.
+        </div>
+        <div class="state-actions">
+          <a class="btn btn-primary btn-sm" routerLink="/fleet/new">Add a car</a>
+        </div>
+      </div>
+    </section>
+  } @else {
+    <div class="car-grid">
+      @for (car of cars(); track car.vehicleId) {
+        <section class="sect car-card">
+          <div class="car-photo">
+            @if (cover(car); as url) {
+              <img [src]="url" [alt]="car.make + ' ' + car.model" />
+            } @else {
+              <div class="car-photo-empty">
+                <kh-icon name="car" />
+                <span>No photo yet</span>
+              </div>
+            }
+          </div>
+
+          <div class="car-body">
+            <div class="row row-gap-8">
+              <span class="pill" [class]="'s-' + statusTone(car)">{{ car.status }}</span>
+              <span class="car-plate mono">{{ car.plateNumber }}</span>
+            </div>
+            <div class="car-name">{{ car.year }} {{ car.make }} {{ car.model }}</div>
+            <div class="car-note">{{ statusNote(car) }}</div>
+
+            <div class="car-facts">
+              <div class="car-fact">
+                <span class="k">Daily</span>
+                <span class="num">{{ car.dailyRate.currency }} {{ car.dailyRate.amount }}</span>
+              </div>
+              <div class="car-fact">
+                <span class="k">Deposit</span>
+                <span class="num"
+                  >{{ car.securityDeposit.currency }} {{ car.securityDeposit.amount }}</span
+                >
+              </div>
+              <div class="car-fact">
+                <span class="k">Mileage</span>
+                <span class="num">{{
+                  car.mileage.isUnlimited ? 'Unlimited' : car.mileage.dailyLimitKm + ' km/day'
+                }}</span>
+              </div>
+              <div class="car-fact">
+                <span class="k">Delivery</span>
+                <span class="num">{{ car.isDeliveryEligible ? 'Yes' : 'No' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="car-actions">
+            @if (primaryAction(car); as action) {
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                [disabled]="busy() === car.vehicleId"
+                (click)="changeStatus(car, action.action)"
+              >
+                {{ action.label }}
+              </button>
+            }
+            <button type="button" class="btn btn-secondary btn-sm" (click)="open(car)">Edit</button>
+            @if (car.status === 'Active' || car.status === 'Hidden') {
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                [disabled]="busy() === car.vehicleId"
+                (click)="sendToMaintenance(car)"
+              >
+                Maintenance
+              </button>
+            }
+            <button type="button" class="btn btn-ghost btn-sm push" (click)="remove(car)">
+              Remove
+            </button>
+          </div>
+        </section>
+      }
+    </div>
+  }
+</div>

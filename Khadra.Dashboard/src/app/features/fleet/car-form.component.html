@@ -1,0 +1,292 @@
+<div class="stack stack-14 page-wide">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">{{ isEditing() ? 'Edit car' : 'Add a car' }}</h1>
+      <div class="page-sub">
+        Brand, model, price and the policies that travel with every booking of this car.
+      </div>
+    </div>
+    <a class="btn btn-secondary btn-md push" routerLink="/fleet">Back to fleet</a>
+  </div>
+
+  @if (problem(); as message) {
+    <div class="banner s-bad" role="alert">
+      <kh-icon name="warning-circle" class="banner-icon" />
+      <div class="banner-body">
+        <div class="banner-text">{{ message }}</div>
+      </div>
+    </div>
+  }
+
+  @if (publishHint(); as hint) {
+    <div class="banner s-warn">
+      <kh-icon name="info" class="banner-icon" />
+      <div class="banner-body">
+        <div class="banner-text">{{ hint }}</div>
+      </div>
+    </div>
+  }
+
+  <div class="split-15">
+    <form class="sect sect-pad stack stack-12" (ngSubmit)="save()">
+      <span class="sect-t">The car</span>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="car-make">Brand</label>
+          <input
+            id="car-make"
+            class="input"
+            required
+            [value]="form().make"
+            (input)="set('make', text($event))"
+          />
+        </div>
+        <div class="field">
+          <label for="car-model">Model</label>
+          <input
+            id="car-model"
+            class="input"
+            required
+            [value]="form().model"
+            (input)="set('model', text($event))"
+          />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="car-year">Year</label>
+          <input
+            id="car-year"
+            class="input"
+            type="number"
+            [value]="form().year"
+            (input)="set('year', numeric($event))"
+          />
+        </div>
+        <div class="field">
+          <label for="car-seats">Seats</label>
+          <input
+            id="car-seats"
+            class="input"
+            type="number"
+            [value]="form().seats"
+            (input)="set('seats', numeric($event))"
+          />
+        </div>
+        <div class="field">
+          <label for="car-colour">Colour</label>
+          <input
+            id="car-colour"
+            class="input"
+            [value]="form().color ?? ''"
+            (input)="set('color', text($event))"
+          />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="car-transmission">Transmission</label>
+          <select id="car-transmission" class="input" (change)="set('transmission', text($event))">
+            @for (option of transmissions; track option) {
+              <option [value]="option" [selected]="form().transmission === option">
+                {{ option }}
+              </option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="car-fuel">Fuel</label>
+          <select id="car-fuel" class="input" (change)="set('fuelType', text($event))">
+            @for (option of fuelTypes; track option) {
+              <option [value]="option" [selected]="form().fuelType === option">{{ option }}</option>
+            }
+          </select>
+        </div>
+        <div class="field">
+          <label for="car-plate">Plate number</label>
+          <input
+            id="car-plate"
+            class="input"
+            required
+            [value]="form().plateNumber"
+            (input)="set('plateNumber', text($event))"
+          />
+          <div class="field-hint">
+            Green-plate digits. One car, one listing across the platform.
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="car-description">Description</label>
+        <textarea
+          id="car-description"
+          class="input"
+          [value]="form().description ?? ''"
+          (input)="set('description', text($event))"
+          placeholder="What a customer should know about this car."
+        ></textarea>
+      </div>
+
+      <span class="sect-t">Price and policies</span>
+
+      <div class="form-row">
+        <div class="field">
+          <label for="car-rate">Daily price (JOD)</label>
+          <input
+            id="car-rate"
+            class="input input-num"
+            type="number"
+            step="0.5"
+            [value]="form().dailyRate"
+            (input)="set('dailyRate', numeric($event))"
+          />
+        </div>
+        <div class="field">
+          <label for="car-deposit">Security deposit (JOD)</label>
+          <input
+            id="car-deposit"
+            class="input input-num"
+            type="number"
+            step="1"
+            [value]="form().securityDeposit"
+            (input)="set('securityDeposit', numeric($event))"
+          />
+          <div class="field-hint">
+            The damage deposit for this car, separate from the booking deposit.
+          </div>
+        </div>
+        <div class="field">
+          <label for="car-fuel-policy">Fuel policy</label>
+          <select id="car-fuel-policy" class="input" (change)="set('fuelPolicy', text($event))">
+            @for (option of fuelPolicies; track option) {
+              <option [value]="option" [selected]="form().fuelPolicy === option">
+                {{ option }}
+              </option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="choice">
+          <input
+            type="checkbox"
+            [checked]="form().isDeliveryEligible"
+            (change)="set('isDeliveryEligible', checked($event))"
+          />
+          Available for delivery
+        </label>
+        <div class="field-hint">
+          Only within your dealership's delivery radius. The delivery fee is platform-wide, not
+          yours to set.
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="choice">
+          <input
+            type="checkbox"
+            [checked]="form().mileageUnlimited"
+            (change)="set('mileageUnlimited', checked($event))"
+          />
+          Unlimited mileage
+        </label>
+      </div>
+
+      @if (!form().mileageUnlimited) {
+        <div class="form-row">
+          <div class="field">
+            <label for="car-km">Daily allowance (km)</label>
+            <input
+              id="car-km"
+              class="input input-num"
+              type="number"
+              [value]="form().mileageDailyLimitKm ?? 200"
+              (input)="set('mileageDailyLimitKm', numeric($event))"
+            />
+          </div>
+          <div class="field">
+            <label for="car-excess">Excess fee per km (JOD)</label>
+            <input
+              id="car-excess"
+              class="input input-num"
+              type="number"
+              step="0.01"
+              [value]="form().mileageExcessFeePerKm ?? 0.15"
+              (input)="set('mileageExcessFeePerKm', numeric($event))"
+            />
+            <div class="field-hint">Charged against the whole rental's allowance, not per day.</div>
+          </div>
+        </div>
+      }
+
+      <button type="submit" class="btn btn-primary btn-md self-start" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : isEditing() ? 'Save changes' : 'Add car' }}
+      </button>
+    </form>
+
+    <section class="sect sect-pad stack stack-12">
+      <span class="sect-t">Photos</span>
+
+      @if (!isEditing()) {
+        <div class="field-hint">
+          Save the car first — a photo needs a car to belong to. You will come straight back here.
+        </div>
+      } @else {
+        <div class="field-hint">
+          The first photo becomes the cover. A car needs at least one before it can be published.
+        </div>
+
+        @if (images().length > 0) {
+          <div class="photo-grid">
+            @for (image of images(); track image.imageId) {
+              <div class="photo-tile">
+                <img [src]="image.url" alt="Car photo" />
+                @if (image.isPrimary) {
+                  <span class="pill s-ok photo-badge">Cover</span>
+                }
+                <div class="photo-actions">
+                  @if (!image.isPrimary) {
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-xs"
+                      (click)="makePrimary(image.imageId)"
+                    >
+                      Make cover
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs"
+                    (click)="removeImage(image.imageId)"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="field">
+          <label for="car-photo">Add a photo</label>
+          <input
+            id="car-photo"
+            class="input"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            [disabled]="uploading()"
+            (change)="upload($event)"
+          />
+          <div class="field-hint">
+            {{ uploading() ? 'Uploading…' : 'JPEG, PNG or WebP. Up to 12 photos per car.' }}
+          </div>
+        </div>
+      }
+    </section>
+  </div>
+</div>

@@ -25,6 +25,17 @@ public interface IDocumentStorage
         Stream content,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Writes AT a key that was decided earlier. The presigned flow needs this: the ticket commits to
+    /// a key before the bytes exist, and SaveAsync generating its own would leave the file somewhere
+    /// the confirmation step will never look.
+    /// </summary>
+    Task<StoredDocument> SaveAtAsync(
+        string storageKey,
+        string contentType,
+        Stream content,
+        CancellationToken cancellationToken = default);
+
     Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default);
 
     Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default);

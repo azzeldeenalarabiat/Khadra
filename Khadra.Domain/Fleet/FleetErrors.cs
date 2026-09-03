@@ -43,6 +43,24 @@ public static class FleetErrors
     public static readonly Error CurrencyMismatch =
         Error.Validation("vehicle.currency_mismatch", "The daily rate and the security deposit must use the same currency.");
 
+    public static readonly Error InvalidImageType =
+        Error.Validation("vehicle.invalid_image_type", "Upload a JPEG, PNG or WebP image.");
+
+    public static readonly Error DescriptionTooLong =
+        Error.Validation("vehicle.description_too_long", "The description is longer than 2000 characters.");
+
+    public static readonly Error InMaintenance =
+        Error.Validation("vehicle.in_maintenance", "This car is in maintenance. Return it from maintenance before publishing it.");
+
+    public static readonly Error NotInMaintenance =
+        Error.Validation("vehicle.not_in_maintenance", "This car is not in maintenance.");
+
+    public static readonly Error NotYours =
+        Error.NotFound("vehicle.not_found", "That car does not exist.");
+
+    public static readonly Error PlateNumberTaken =
+        Error.Conflict("vehicle.plate_taken", "A car with that plate number is already listed.");
+
     public static readonly Error AlreadyDeleted =
         Error.Conflict("vehicle.already_deleted", "This vehicle is already deleted.");
 }

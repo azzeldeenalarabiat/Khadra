@@ -45,11 +45,29 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   },
 ];
 
+/**
+ * What a dealer sees.
+ *
+ * Spec 1.5 promises one dashboard serving Admin, Dealer Owner and Employee through role-based views,
+ * so the navigation is CHOSEN by role rather than being one list with items hidden inside it. A
+ * dealer has no business seeing a Payouts link they cannot open.
+ *
+ * Deliberately short: this is the first dealer-facing surface and only the fleet screens exist behind
+ * it. It grows as their bookings, employees and reports land.
+ */
+export const DEALER_NAV: readonly NavGroup[] = [
+  {
+    group: 'Business',
+    items: [{ label: 'My fleet', icon: 'car', route: '/fleet' }],
+  },
+];
+
 /** Page title and breadcrumb parent for every route, keyed by route path. */
 export const SCREEN_TITLES: Readonly<Record<string, string>> = {
   dashboard: 'Dashboard',
   dealers: 'Dealers',
-  'dealers/review': 'Dealer application',
+  // ':id' is what the topbar substitutes for a UUID segment, so one entry covers every record.
+  'dealers/:id': 'Dealer application',
   'dealers/profile': 'Dealer profile',
   bookings: 'Bookings',
   'bookings/detail': 'Booking details',
@@ -69,14 +87,21 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
   'audit-logs': 'Audit logs',
   'admin-users': 'Admin users',
   security: 'Security',
+
+  // Dealer-facing (spec 4.3).
+  fleet: 'My fleet',
+  'fleet/new': 'Add a car',
+  'fleet/:id': 'Edit car',
 };
 
 /** Detail screens sit under a list screen in the breadcrumb trail. */
 export const SCREEN_PARENTS: Readonly<Record<string, string>> = {
-  'dealers/review': 'dealers',
+  'dealers/:id': 'dealers',
   'dealers/profile': 'dealers',
   'bookings/detail': 'bookings',
   'customers/profile': 'customers',
   'payments/detail': 'payments',
   'disputes/detail': 'disputes',
+  'fleet/new': 'fleet',
+  'fleet/:id': 'fleet',
 };

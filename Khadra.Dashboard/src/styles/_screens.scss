@@ -1187,3 +1187,137 @@
 .auth-card .banner-icon {
   margin-top: 1px;
 }
+
+/* ── Fleet (dealer) ────────────────────────────────────────────────────────
+   Composed from the same primitives as everything else; the design export has
+   no fleet artboard, so nothing here invents a new visual language. */
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+
+.car-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.car-photo {
+  aspect-ratio: 16 / 9;
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  overflow: hidden;
+}
+
+.car-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.car-photo-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  align-content: center;
+  color: var(--text-40);
+  font-size: 12px;
+}
+
+.car-photo-empty kh-icon { font-size: 24px; }
+
+.car-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.car-plate {
+  font-size: 11.5px;
+  color: var(--text-60);
+}
+
+.car-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.car-note {
+  font-size: 12px;
+  color: var(--text-60);
+}
+
+.car-facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+
+.car-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.car-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-divider);
+  flex-wrap: wrap;
+}
+
+/* Two or three fields sharing a row on the car form. */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+
+.photo-tile {
+  position: relative;
+  border: 1px solid var(--color-divider);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.photo-tile img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-badge {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+}
+
+.photo-actions {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  flex-wrap: wrap;
+}

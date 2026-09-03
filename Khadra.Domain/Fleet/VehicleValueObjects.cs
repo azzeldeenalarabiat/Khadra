@@ -43,6 +43,8 @@ public sealed class VehicleDetails : ValueObject
 {
     public const int EarliestModelYear = 1990;
 
+    public const int MaxDescriptionLength = 2000;
+
     public string Make { get; }
     public string Model { get; }
     public int Year { get; }
@@ -50,6 +52,8 @@ public sealed class VehicleDetails : ValueObject
     public int Seats { get; }
     public TransmissionType Transmission { get; }
     public FuelType FuelType { get; }
+    // Spec 4.3: the dealer's own words about this car, shown on the listing.
+    public string? Description { get; }
 
     private VehicleDetails(
         string make,
@@ -58,7 +62,8 @@ public sealed class VehicleDetails : ValueObject
         string? color,
         int seats,
         TransmissionType transmission,
-        FuelType fuelType)
+        FuelType fuelType,
+        string? description)
     {
         Make = make;
         Model = model;
@@ -67,6 +72,7 @@ public sealed class VehicleDetails : ValueObject
         Seats = seats;
         Transmission = transmission;
         FuelType = fuelType;
+        Description = description;
     }
 
     // `currentYear` is passed in rather than read from the clock so the rule stays testable and the
@@ -79,7 +85,8 @@ public sealed class VehicleDetails : ValueObject
         TransmissionType transmission,
         FuelType fuelType,
         int currentYear,
-        string? color = null)
+        string? color = null,
+        string? description = null)
     {
         ArgumentNullException.ThrowIfNull(transmission);
         ArgumentNullException.ThrowIfNull(fuelType);
@@ -97,6 +104,9 @@ public sealed class VehicleDetails : ValueObject
         if (seats is < 1 or > 20)
             return FleetErrors.InvalidSeats;
 
+        if (description is not null && description.Trim().Length > MaxDescriptionLength)
+            return FleetErrors.DescriptionTooLong;
+
         return new VehicleDetails(
             make.Trim(),
             model.Trim(),
@@ -104,7 +114,8 @@ public sealed class VehicleDetails : ValueObject
             string.IsNullOrWhiteSpace(color) ? null : color.Trim(),
             seats,
             transmission,
-            fuelType);
+            fuelType,
+            string.IsNullOrWhiteSpace(description) ? null : description.Trim());
     }
 
     protected override IEnumerable<object?> GetEqualityComponents()
@@ -116,6 +127,7 @@ public sealed class VehicleDetails : ValueObject
         yield return Seats;
         yield return Transmission;
         yield return FuelType;
+        yield return Description;
     }
 
     public override string ToString() => $"{Year} {Make} {Model}";

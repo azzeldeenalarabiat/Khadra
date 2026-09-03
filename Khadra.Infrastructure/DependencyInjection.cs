@@ -9,6 +9,7 @@ using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
@@ -115,6 +116,7 @@ public static class DependencyInjection
         services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IDealerRepository, DealerRepository>();
+        services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<DevelopmentSeeder>();
 
         AddReporting(services);
@@ -145,6 +147,7 @@ public static class DependencyInjection
         services.AddSingleton<IDocumentPolicySettings, DocumentPolicySettings>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddSingleton<IDocumentLinkSigner, HmacDocumentLinkSigner>();
+        services.AddSingleton<IUploadTicketService, HmacUploadTicketService>();
     }
 
     private static void AddNotifications(IServiceCollection services, IConfiguration configuration)

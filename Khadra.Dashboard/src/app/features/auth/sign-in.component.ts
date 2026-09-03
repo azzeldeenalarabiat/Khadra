@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { homeRouteFor } from '../../core/guards/role.guards';
 import { SessionService, SignInFailure } from '../../core/services/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 
@@ -61,7 +62,9 @@ export class SignInComponent {
 
     if (result.ok) {
       // Back to wherever the guard interrupted, or the dashboard.
-      const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/dashboard';
+      // Whatever the guard interrupted, or the home this role belongs on (spec 1.5).
+      const returnUrl =
+        this.route.snapshot.queryParamMap.get('returnUrl') ?? homeRouteFor(result.user);
       await this.router.navigateByUrl(returnUrl);
       return;
     }

@@ -95,6 +95,8 @@ public sealed class Vehicle : AggregateRoot, ISoftDeletable
             return UnitResult.Failure(FleetErrors.DealerNotApproved);
         if (Status == VehicleStatus.Active)
             return UnitResult.Failure(FleetErrors.AlreadyPublished);
+        if (Status == VehicleStatus.Maintenance)
+            return UnitResult.Failure(FleetErrors.InMaintenance);
         // A listing with no photo converts badly and looks fraudulent to customers.
         if (_images.Count == 0)
             return UnitResult.Failure(FleetErrors.ImageRequiredToPublish);
@@ -111,6 +113,35 @@ public sealed class Vehicle : AggregateRoot, ISoftDeletable
 
         Status = VehicleStatus.Hidden;
         AddDomainEvent(new VehicleHidden(Id, DealerId, now));
+        return UnitResult.Success<Error>();
+    }
+
+    /// <summary>
+    /// Takes the car off the road. Distinct from Hide: this one says the vehicle physically cannot be
+    /// rented, not that the dealer chose to delist it. A car already in the garage cannot be published.
+    /// </summary>
+    public UnitResult<Error> SendToMaintenance(DateTimeOffset now)
+    {
+        if (Status == VehicleStatus.Draft)
+            return UnitResult.Failure(FleetErrors.NotPublished);
+        if (Status == VehicleStatus.Maintenance)
+            return UnitResult.Success<Error>();
+
+        Status = VehicleStatus.Maintenance;
+        AddDomainEvent(new VehicleHidden(Id, DealerId, now));
+        return UnitResult.Success<Error>();
+    }
+
+    /// <summary>
+    /// Back from the garage, but NOT automatically back on sale: it returns to Hidden so the dealer
+    /// makes the decision to relist deliberately.
+    /// </summary>
+    public UnitResult<Error> ReturnFromMaintenance()
+    {
+        if (Status != VehicleStatus.Maintenance)
+            return UnitResult.Failure(FleetErrors.NotInMaintenance);
+
+        Status = VehicleStatus.Hidden;
         return UnitResult.Success<Error>();
     }
 

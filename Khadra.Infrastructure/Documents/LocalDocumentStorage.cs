@@ -53,6 +53,27 @@ internal sealed partial class LocalDocumentStorage : IDocumentStorage
         return new StoredDocument(key, contentType, file.Length);
     }
 
+    public async Task<StoredDocument> SaveAtAsync(
+        string storageKey,
+        string contentType,
+        Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        // ResolveWithinRoot validates the shape and refuses anything escaping the root, so a key that
+        // came back from a signed ticket still cannot point outside storage.
+        var path = ResolveWithinRoot(storageKey);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+        // Create rather than overwrite: a ticket is meant to be spent once, and silently replacing an
+        // existing file would make a replayed ticket look successful.
+        await using var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        await content.CopyToAsync(file, cancellationToken);
+
+        return new StoredDocument(storageKey, contentType, file.Length);
+    }
+
     public Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default)
     {
         var path = ResolveWithinRoot(storageKey);

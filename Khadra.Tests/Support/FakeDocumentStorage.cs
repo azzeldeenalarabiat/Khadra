@@ -21,6 +21,17 @@ internal sealed class FakeDocumentStorage : IDocumentStorage
         return Task.FromResult(new StoredDocument(key, contentType, size));
     }
 
+    public Task<StoredDocument> SaveAtAsync(
+        string storageKey,
+        string contentType,
+        Stream content,
+        CancellationToken cancellationToken = default)
+    {
+        var size = content.CanSeek ? content.Length : 1024;
+        Saved.Add((storageKey, storageKey, size));
+        return Task.FromResult(new StoredDocument(storageKey, contentType, size));
+    }
+
     public Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default) =>
         Task.FromResult<Stream?>(new MemoryStream([1, 2, 3]));
 
