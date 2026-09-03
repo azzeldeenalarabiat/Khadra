@@ -53,7 +53,8 @@ public sealed class BookingReference : ValueObject
 // arbitrates condition from these; that stays the dealer's own off-platform process.
 public sealed class HandoverRecord : Entity
 {
-    private readonly List<string> _photoStorageKeys = [];
+    // Not readonly: EF materialises this collection by assigning the field when reading a record.
+    private List<string> _photoStorageKeys = [];
 
     public Id BookingId { get; private set; }
     public HandoverType Type { get; private set; } = null!;

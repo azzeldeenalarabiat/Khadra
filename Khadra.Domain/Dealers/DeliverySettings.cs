@@ -10,7 +10,9 @@ public sealed class DeliverySettings : ValueObject
 {
     public const decimal MaxRadiusKm = 200m;
 
-    public static readonly DeliverySettings Disabled = new(false, 0m);
+    // A fresh instance per call: this is assigned to every dealer that has not enabled delivery, and
+    // a shared instance would leave many dealers owning the same tracked value object.
+    public static DeliverySettings Disabled => new(false, 0m);
 
     public bool IsEnabled { get; }
     public decimal RadiusKm { get; }

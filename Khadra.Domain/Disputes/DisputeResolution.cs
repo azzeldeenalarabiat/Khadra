@@ -15,6 +15,13 @@ public sealed class DepositDisposition : ValueObject
     public Money RetainedByPlatform { get; }
     public Money TransferredToDealer { get; }
 
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
+    // the public factories remain the only way application code can create one.
+    private DepositDisposition()
+    {
+    }
+#pragma warning restore CS8618
+
     private DepositDisposition(Money refundToCustomer, Money retainedByPlatform, Money transferredToDealer)
     {
         RefundToCustomer = refundToCustomer;
@@ -75,6 +82,13 @@ public sealed class DisputeResolution : ValueObject
     public string Note { get; }
     public Id ResolvedByAdminId { get; }
     public DateTimeOffset ResolvedAt { get; }
+
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
+    // the public factories remain the only way application code can create one.
+    private DisputeResolution()
+    {
+    }
+#pragma warning restore CS8618
 
     private DisputeResolution(
         DepositDisposition deposit,

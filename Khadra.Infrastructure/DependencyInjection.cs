@@ -1,13 +1,21 @@
 using System.Text;
+using Khadra.Application.Auditing.ReadModels;
+using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Dealers.ReadModels;
+using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
+using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Notifications;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
+using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Infrastructure.PlatformSettings;
+using Khadra.Infrastructure.Reporting;
 using Khadra.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -57,6 +65,14 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddOptions<DatabaseOptions>()
             .Bind(configuration.GetSection(DatabaseOptions.SectionName));
+        services.AddOptions<AdminDashboardOptions>()
+            .Bind(configuration.GetSection(AdminDashboardOptions.SectionName))
+            .ValidateDataAnnotations()
+            // A bad zone id would otherwise surface as an exception on the first dashboard request
+            // rather than at startup, and every figure on the screen depends on it.
+            .Validate(options => TimeZoneInfo.TryFindSystemTimeZoneById(options.ReportingTimeZone, out _),
+                "AdminDashboard:ReportingTimeZone must be a time zone this machine knows.")
+            .ValidateOnStart();
         services.AddOptions<BusinessRulesOptions>()
             .Bind(configuration.GetSection(BusinessRulesOptions.SectionName))
             .ValidateDataAnnotations()
@@ -84,6 +100,24 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
+        services.AddScoped<IAuditTrail, AuditTrail>();
+        services.AddScoped<DevelopmentSeeder>();
+
+        AddReporting(services);
+    }
+
+    // Read-side ports. Each bounded context publishes its own dashboard contract and this is where the
+    // one implementation of it lives; extracting a context later means swapping the implementation for
+    // an HTTP client, with no change above this line.
+    private static void AddReporting(IServiceCollection services)
+    {
+        services.AddScoped<IDealerDashboardReader, DealerDashboardReader>();
+        services.AddScoped<IBookingDashboardReader, BookingDashboardReader>();
+        services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
+        services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();
+        services.AddScoped<IAuditFeedReader, AuditFeedReader>();
+        services.AddSingleton<IReportingCalendar, ReportingCalendar>();
+        services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
     }
 
     private static void AddSecurity(IServiceCollection services)

@@ -4,102 +4,149 @@
     <div class="page-sub">Overview of platform activity and items requiring attention.</div>
   </div>
 
-  <div class="kpi-grid">
-    @for (kpi of kpis; track kpi.label) {
-      <a class="sect kpi-card" [routerLink]="kpi.route">
-        <div class="kpi-head">
-          <span class="k">{{ kpi.label }}</span>
-          <kh-icon [name]="kpi.icon" class="kpi-icon" />
+  @if (failure(); as problem) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ problem.title }}</div>
+        <div class="state-text">{{ problem.body }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
         </div>
-        <div class="num kpi-main">{{ kpi.main }}</div>
-        <div class="kpi-subs">
-          @for (sub of kpi.subs; track sub.k) {
-            <div class="kpi-sub" [class]="sub.tone ? toneClass(sub.tone) : ''">
-              <span class="kpi-sub-k">{{ sub.k }}</span>
-              <span class="num status-text">{{ sub.v }}</span>
-            </div>
-          }
-        </div>
-      </a>
-    }
-  </div>
-
-  <div class="dash-split">
-    <section class="sect stack sect-clip">
-      <div class="sect-h">
-        <kh-icon name="warning-diamond" class="s-bad status-text" />
-        <span class="sect-t">Requires attention</span>
-        <span class="queue-count">6 open · 2 overdue</span>
-        <span class="sect-note">48-hour SLA</span>
       </div>
-
-      @for (item of queue; track item.title) {
-        <div class="queue-row" [class]="toneClass(item.tone)">
-          <div class="queue-rail"></div>
-          <div class="queue-body">
-            <div class="row row-gap-8">
-              <span class="pill">{{ item.severity }}</span>
-              <span class="queue-entity">{{ item.entity }}</span>
-            </div>
-            <div class="queue-title">{{ item.title }}</div>
-            <div class="queue-desc">{{ item.description }}</div>
-          </div>
-          <div class="queue-side">
-            <div class="sla-head">
-              <span class="k">SLA</span>
-              <span class="num sla-value">{{ item.sla }}</span>
-            </div>
-            <div class="meter">
-              <div class="meter-fill" [style.width.%]="item.percent"></div>
-            </div>
-            <a class="btn btn-primary btn-sm" [routerLink]="item.route">{{ item.action }}</a>
-          </div>
+    </section>
+  } @else if (resource.isLoading()) {
+    <div class="kpi-grid">
+      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
+        <div class="sect kpi-card">
+          <div class="skel-row"><div class="skel" [style.width.%]="60"></div></div>
+          <div class="skel-row"><div class="skel" [style.width.%]="40"></div></div>
+          <div class="skel-row"><div class="skel" [style.width.%]="80"></div></div>
         </div>
       }
+    </div>
+    <section class="sect sect-pad">
+      <div class="skel-row"><div class="skel" [style.width.%]="30"></div></div>
+      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
     </section>
+  } @else if (resource.hasValue()) {
+    <div class="kpi-grid">
+      @for (kpi of kpis(); track kpi.label) {
+        <a class="sect kpi-card" [routerLink]="kpi.route">
+          <div class="kpi-head">
+            <span class="k">{{ kpi.label }}</span>
+            <kh-icon [name]="kpi.icon" class="kpi-icon" />
+          </div>
+          <div class="num kpi-main">{{ kpi.main }}</div>
+          <div class="kpi-subs">
+            @for (sub of kpi.subs; track sub.k) {
+              <div class="kpi-sub" [class]="sub.tone ? toneClass(sub.tone) : ''">
+                <span class="kpi-sub-k">{{ sub.k }}</span>
+                <span class="num status-text">{{ sub.v }}</span>
+              </div>
+            }
+          </div>
+        </a>
+      }
+    </div>
 
-    <div class="stack stack-14">
-      <section class="sect sect-pad stack stack-10">
-        <div class="sla-head">
-          <span class="k">Bookings · last 14 days</span>
-          <span class="num trend-up">+12.4%</span>
+    <div class="dash-split">
+      <section class="sect stack sect-clip">
+        <div class="sect-h">
+          <kh-icon name="warning-diamond" class="s-bad status-text" />
+          <span class="sect-t">Requires attention</span>
+          <span class="queue-count">{{ queueSummary() }}</span>
+          <span class="sect-note">{{ slaNote() }}</span>
         </div>
-        <div class="chart-bars" role="img" aria-label="Daily bookings over the last fourteen days">
-          @for (height of trend; track $index) {
-            <div class="chart-bar" [style.height.%]="height"></div>
-          }
-        </div>
-      </section>
 
-      <section class="sect sect-pad stack stack-12">
-        <span class="k">Money in motion · JOD</span>
-        @for (row of money; track row.k) {
-          <div>
-            <div class="money-head">
-              <span class="money-k">{{ row.k }}</span>
-              <span class="num money-v">{{ row.v }}</span>
+        @for (item of queue(); track item.title + item.entity) {
+          <div class="queue-row" [class]="toneClass(item.tone)">
+            <div class="queue-rail"></div>
+            <div class="queue-body">
+              <div class="row row-gap-8">
+                <span class="pill">{{ item.severity }}</span>
+                <span class="queue-entity">{{ item.entity }}</span>
+              </div>
+              <div class="queue-title">{{ item.title }}</div>
+              <div class="queue-desc">{{ item.description }}</div>
             </div>
-            <div class="money-meter">
-              <div class="money-fill" [style.width.%]="row.percent"></div>
+            <div class="queue-side">
+              <div class="sla-head">
+                <span class="k">SLA</span>
+                <span class="num sla-value">{{ item.sla }}</span>
+              </div>
+              <div class="meter">
+                <div class="meter-fill" [style.width.%]="item.percent"></div>
+              </div>
+              <a class="btn btn-primary btn-sm" [routerLink]="item.route">{{ item.action }}</a>
+            </div>
+          </div>
+        } @empty {
+          <div class="state-block is-empty">
+            <div class="state-icon is-outline"><kh-icon name="check-circle" /></div>
+            <div class="state-title">Nothing needs attention</div>
+            <div class="state-text">
+              No dispute or dealer application is approaching its review deadline.
             </div>
           </div>
         }
       </section>
 
-      <section class="sect sect-clip">
-        <div class="activity-head"><span class="k">Recent activity</span></div>
-        <div class="activity-list">
-          @for (entry of activity; track entry.text) {
-            <div class="activity-row">
-              <kh-icon [name]="entry.icon" class="activity-icon" />
-              <div class="grow">
-                <div class="activity-text">{{ entry.text }}</div>
-                <div class="activity-ts">{{ entry.ts }}</div>
+      <div class="stack stack-14">
+        <section class="sect sect-pad stack stack-10">
+          <div class="sla-head">
+            <span class="k">Bookings · last {{ trendDays() }} days</span>
+            <span class="num trend-up">{{ trendChange() }}</span>
+          </div>
+          <div
+            class="chart-bars"
+            role="img"
+            [attr.aria-label]="'Daily bookings over the last ' + trendDays() + ' days'"
+          >
+            @for (height of trend(); track $index) {
+              <div class="chart-bar" [style.height.%]="height"></div>
+            }
+          </div>
+        </section>
+
+        <section class="sect sect-pad stack stack-12">
+          <span class="k">Money in motion</span>
+          @for (row of money(); track row.k) {
+            <div>
+              <div class="money-head">
+                <span class="money-k">{{ row.k }}</span>
+                <span class="num money-v">{{ row.v }}</span>
+              </div>
+              <div class="money-meter">
+                <div class="money-fill" [style.width.%]="row.percent"></div>
               </div>
             </div>
           }
-        </div>
-      </section>
+        </section>
+
+        <section class="sect sect-clip">
+          <div class="activity-head"><span class="k">Recent activity</span></div>
+          <div class="activity-list">
+            @for (entry of activity(); track entry.text + entry.ts) {
+              <div class="activity-row">
+                <kh-icon [name]="entry.icon" class="activity-icon" />
+                <div class="grow">
+                  <div class="activity-text">{{ entry.text }}</div>
+                  <div class="activity-ts">{{ entry.ts }}</div>
+                </div>
+              </div>
+            } @empty {
+              <div class="activity-row">
+                <div class="grow">
+                  <div class="activity-text">No recorded activity yet.</div>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      </div>
     </div>
-  </div>
+  }
 </div>

@@ -73,10 +73,12 @@ public sealed class DealerApprovalTests
         Assert.False(dealer.CanTrade);
 
         var later = Now.AddDays(1);
-        Assert.True(dealer.Resubmit(later).IsSuccess);
+        Assert.True(dealer.Resubmit(later, Build.ReviewSla).IsSuccess);
         Assert.Same(DealerVerificationStatus.PendingReview, dealer.VerificationStatus);
         Assert.Null(dealer.ReviewNote);
         Assert.Equal(later, dealer.SubmittedAt);
+        // The promise is re-frozen from the moment of resubmission, not carried over.
+        Assert.Equal(later.Add(Build.ReviewSla), dealer.ReviewDueAt);
     }
 
     [Fact]
@@ -87,10 +89,10 @@ public sealed class DealerApprovalTests
         rejected.Reject(Id.New(), "Licence expired.", Now);
 
         Assert.Same(DealerVerificationStatus.Rejected, rejected.VerificationStatus);
-        Assert.True(rejected.Resubmit(Now.AddDays(1)).IsSuccess);
+        Assert.True(rejected.Resubmit(Now.AddDays(1), Build.ReviewSla).IsSuccess);
 
         var approved = Build.ApprovedDealer();
-        Assert.Equal("dealer.nothing_to_resubmit", approved.Resubmit(Now).Error.Code);
+        Assert.Equal("dealer.nothing_to_resubmit", approved.Resubmit(Now, Build.ReviewSla).Error.Code);
     }
 
     [Fact]
@@ -116,14 +118,13 @@ public sealed class DealerApprovalTests
     public void The_review_sla_only_counts_while_an_admin_actually_owes_a_decision()
     {
         var dealer = Build.Dealer();
-        var sla = TimeSpan.FromHours(48);
 
-        Assert.False(dealer.IsBreachingReviewSla(Now.AddHours(47), sla));
-        Assert.True(dealer.IsBreachingReviewSla(Now.AddHours(48), sla));
+        Assert.False(dealer.IsBreachingReviewSla(Now.AddHours(47)));
+        Assert.True(dealer.IsBreachingReviewSla(Now.AddHours(48)));
 
         Build.AttachAllDocuments(dealer);
         dealer.Approve(Id.New(), Now);
-        Assert.False(dealer.IsBreachingReviewSla(Now.AddDays(30), sla));
+        Assert.False(dealer.IsBreachingReviewSla(Now.AddDays(30)));
     }
 
     [Fact]

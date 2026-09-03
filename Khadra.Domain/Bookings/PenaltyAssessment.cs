@@ -19,6 +19,13 @@ public sealed class PenaltyAssessment : ValueObject
     public string Reason { get; }
     public DateTimeOffset AssessedAt { get; }
 
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
+    // the public factories remain the only way application code can create one.
+    private PenaltyAssessment()
+    {
+    }
+#pragma warning restore CS8618
+
     private PenaltyAssessment(
         BookingParty attributedTo,
         Percentage minPercent,
@@ -59,8 +66,17 @@ public sealed class PenaltyAssessment : ValueObject
         ArgumentNullException.ThrowIfNull(percent);
         ArgumentNullException.ThrowIfNull(basis);
 
-        var amount = percent.Of(basis);
-        return new PenaltyAssessment(attributedTo, percent, percent, amount, amount, Describe(reason), assessedAt);
+        // A fixed penalty is a range whose ends happen to be equal, so both ends are computed
+        // separately rather than the same instance being put in both slots: two mapped properties
+        // must never hold one object (see Percentage.Zero).
+        return new PenaltyAssessment(
+            attributedTo,
+            Percentage.FromValidated(percent.Value),
+            Percentage.FromValidated(percent.Value),
+            percent.Of(basis),
+            percent.Of(basis),
+            Describe(reason),
+            assessedAt);
     }
 
     // Spec 2.2 leaves the dealer non-delivery penalty as a 25%-50% range. The range travels with the

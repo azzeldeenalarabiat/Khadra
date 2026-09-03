@@ -11,6 +11,9 @@ internal static class Build
 {
     public static readonly DateTimeOffset Now = new(2026, 9, 3, 10, 0, 0, TimeSpan.Zero);
 
+    // The admin review SLA a test dealer is registered under (spec 3.1 uses 48 hours).
+    public static readonly TimeSpan ReviewSla = TimeSpan.FromHours(48);
+
     public static GeoPoint Amman => GeoPoint.Create(31.9539, 35.9106).Value;
 
     public static GeoPoint Zarqa => GeoPoint.Create(32.0728, 36.0880).Value;
@@ -31,7 +34,8 @@ internal static class Build
             CommercialRegistrationNumber.Create("123456").Value,
             Amman,
             NineToFive,
-            moment);
+            moment,
+            ReviewSla);
     }
 
     // A dealer that has cleared the licence check and can trade.

@@ -8,6 +8,7 @@ using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Infrastructure;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Persistence;
+using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Infrastructure.Security;
 using Khadra.WebAPI;
 using Khadra.WebAPI.Security;
@@ -182,6 +183,11 @@ if (app.Environment.IsDevelopment())
     {
         using var scope = app.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<KhadraDbContext>().Database.MigrateAsync();
+
+        // Development only, and a no-op once the database holds users. An empty admin console cannot
+        // be reviewed: every figure reads zero and every query looks like it works.
+        if (app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value.SeedDevelopmentData)
+            await scope.ServiceProvider.SeedDevelopmentDataAsync();
     }
 }
 

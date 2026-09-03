@@ -23,7 +23,8 @@ public sealed class DisputeStatus : Enumeration
 // tickets about the same booking.
 public sealed class DisputeStatement : Entity
 {
-    private readonly List<string> _evidenceStorageKeys = [];
+    // Not readonly: EF materialises this collection by assigning the field when reading a record.
+    private List<string> _evidenceStorageKeys = [];
 
     public Id TicketId { get; private set; }
     public BookingParty Party { get; private set; } = null!;

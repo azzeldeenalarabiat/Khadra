@@ -6,14 +6,17 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 
 | Context | Domain model | Persistence | Use cases and endpoints |
 |---|---|---|---|
-| Identity & Access | done | done | done |
-| Dealers | done | pending | pending |
+| Identity & Access | done | done | auth done; dashboard read model done |
+| Auditing | done | done | read model done; write port wired, no admin commands call it yet |
+| Dealers | done | done | dashboard read model only |
 | Fleet | done | pending | pending |
-| Bookings | done | pending | pending |
-| Disputes | done | pending | pending |
+| Bookings | done | done | dashboard read model only |
+| Disputes | done | done | dashboard read model only |
 | Reviews | done | pending | pending |
-| Platform Settings | done | pending | pending |
+| Platform Settings | done | pending (configuration-backed) | pending |
 | Payments | **not started, blocked** | — | — |
+
+"Dashboard read model only" means the tables and the read-side queries behind `GET /api/v1/admin/dashboard` exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
 Payments is deliberately unbuilt. It needs owner decisions and explicit approval (see "Owner decisions required" below and the forbidden-actions list in `CLAUDE.md`).
 

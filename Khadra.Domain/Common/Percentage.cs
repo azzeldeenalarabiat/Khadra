@@ -7,9 +7,20 @@ namespace Khadra.Domain.Common;
 // configuration, so they get a type that refuses nonsense rather than being passed around as a decimal.
 public sealed class Percentage : ValueObject
 {
-    public static readonly Percentage Zero = new(0m);
+    // A fresh instance each time, not a shared singleton. Value objects compare by value, so nothing
+    // in the domain can tell the difference -- but EF tracks an owned value object by REFERENCE, and
+    // one instance sitting in two mapped properties makes it think a single object is in two places.
+    public static Percentage Zero => new(0m);
 
     public decimal Value { get; }
+
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields.
+    // Reading a stored value must not re-run the factory guards: the value was validated when it was
+    // first created, and a rule tightened since then would make old rows unreadable.
+    private Percentage()
+    {
+    }
+#pragma warning restore CS8618
 
     private Percentage(decimal value)
     {

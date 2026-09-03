@@ -29,6 +29,14 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     public DateTimeOffset? ReviewedAt { get; private set; }
     // Drives the 48-hour admin SLA reminder (spec 3.1).
     public DateTimeOffset SubmittedAt { get; private set; }
+    // The SLA promise, frozen at submission rather than recomputed from the current setting.
+    //
+    // A dispute ticket already freezes its own deadline (DisputeTicket.SlaDeadline). If a dealer
+    // application derived its deadline from the live setting instead, shortening the SLA would leave
+    // open disputes honouring the old promise while pending applications became retroactively
+    // overdue. Freezing both also makes the admin queue an indexable `WHERE review_due_at < now`
+    // rather than arithmetic across every row.
+    public DateTimeOffset ReviewDueAt { get; private set; }
     public DeliverySettings Delivery { get; private set; } = null!;
     public string? LogoStorageKey { get; private set; }
     public string? CoverStorageKey { get; private set; }
@@ -56,6 +64,7 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         GeoPoint location,
         OperatingHours operatingHours,
         DateTimeOffset now,
+        TimeSpan reviewSla,
         string? description = null,
         Id? cityId = null)
     {
@@ -78,6 +87,7 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
             VerificationStatus = DealerVerificationStatus.PendingReview,
             Delivery = DeliverySettings.Disabled,
             SubmittedAt = now,
+            ReviewDueAt = now.Add(reviewSla),
             CreatedAt = now
         };
         dealer.AddDomainEvent(new DealerRegistrationSubmitted(dealer.Id, ownerUserId, now));
@@ -151,8 +161,9 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         return UnitResult.Success<Error>();
     }
 
-    // Restarts the 48-hour SLA clock, which is why SubmittedAt is reset here.
-    public UnitResult<Error> Resubmit(DateTimeOffset now)
+    // Restarts the 48-hour SLA clock, which is why SubmittedAt and ReviewDueAt are both reset here.
+    // A resubmission is a fresh promise, so it takes the SLA in force at that moment.
+    public UnitResult<Error> Resubmit(DateTimeOffset now, TimeSpan reviewSla)
     {
         if (VerificationStatus != DealerVerificationStatus.ClarificationNeeded &&
             VerificationStatus != DealerVerificationStatus.Rejected)
@@ -163,12 +174,14 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         VerificationStatus = DealerVerificationStatus.PendingReview;
         ReviewNote = null;
         SubmittedAt = now;
+        ReviewDueAt = now.Add(reviewSla);
         AddDomainEvent(new DealerResubmitted(Id, now));
         return UnitResult.Success<Error>();
     }
 
-    public bool IsBreachingReviewSla(DateTimeOffset now, TimeSpan sla) =>
-        VerificationStatus.IsAwaitingAdmin && now - SubmittedAt >= sla;
+    // Judged against the promise made at submission, not against the SLA currently configured.
+    public bool IsBreachingReviewSla(DateTimeOffset now) =>
+        VerificationStatus.IsAwaitingAdmin && now >= ReviewDueAt;
 
     public UnitResult<Error> Suspend(Id adminUserId, string reason, DateTimeOffset now)
     {

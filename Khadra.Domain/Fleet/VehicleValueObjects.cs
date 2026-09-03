@@ -128,6 +128,13 @@ public sealed class MileagePolicy : ValueObject
     public int? DailyLimitKm { get; }
     public Money? ExcessFeePerKm { get; }
 
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
+    // the public factories remain the only way application code can create one.
+    private MileagePolicy()
+    {
+    }
+#pragma warning restore CS8618
+
     private MileagePolicy(bool isUnlimited, int? dailyLimitKm, Money? excessFeePerKm)
     {
         IsUnlimited = isUnlimited;

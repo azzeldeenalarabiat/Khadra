@@ -31,6 +31,13 @@ public sealed class BookingTerms : ValueObject
     public Percentage DealerPenaltyMaxPercent { get; }
     public int RulesVersion { get; }
 
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
+    // the public factories remain the only way application code can create one.
+    private BookingTerms()
+    {
+    }
+#pragma warning restore CS8618
+
     private BookingTerms(
         Percentage depositPercent,
         Percentage commissionPercent,

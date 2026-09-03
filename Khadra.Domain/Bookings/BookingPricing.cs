@@ -27,6 +27,13 @@ public sealed class BookingPricing : ValueObject
     public MileagePolicy Mileage { get; }
     public FuelPolicy FuelPolicy { get; }
 
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
+    // the public factories remain the only way application code can create one.
+    private BookingPricing()
+    {
+    }
+#pragma warning restore CS8618
+
     private BookingPricing(
         Money dailyRate,
         int days,

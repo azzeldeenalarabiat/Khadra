@@ -17,3 +17,12 @@ csharp_prefer_simple_using_statement = true:suggestion
 csharp_style_prefer_primary_constructors = true:suggestion
 dotnet_style_qualification_for_field = false:suggestion
 dotnet_sort_system_directives_first = true
+
+# EF scaffolds these files and CLAUDE.md forbids hand-editing them, so holding them to the
+# solution's analyzer rules would force exactly the edit the rule prohibits. Scoped to migrations.
+[Khadra.Infrastructure/Persistence/Migrations/*.cs]
+generated_code = true
+dotnet_diagnostic.CA1825.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+dotnet_diagnostic.IDE0301.severity = none
