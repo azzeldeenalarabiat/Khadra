@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { AdminShellComponent } from './layout/admin-shell.component';
+import { adminSessionGuard } from './core/guards/admin-session.guard';
 
 /**
  * Console routes.
@@ -20,9 +21,29 @@ const list = (path: string, title: string) => ({
 });
 
 export const routes: Routes = [
+  // The auth screens sit OUTSIDE the admin shell: no sidebar, no topbar, and no session required to
+  // reach them. The reset path matches the link AuthEmailComposer builds ({base}/reset-password?token=).
+  {
+    path: 'sign-in',
+    title: 'Sign in · Khadra Admin',
+    loadComponent: () => import('./features/auth/sign-in.component').then((m) => m.SignInComponent),
+  },
+  {
+    path: 'forgot-password',
+    title: 'Reset your password · Khadra Admin',
+    loadComponent: () =>
+      import('./features/auth/forgot-password.component').then((m) => m.ForgotPasswordComponent),
+  },
+  {
+    path: 'reset-password',
+    title: 'Choose a new password · Khadra Admin',
+    loadComponent: () =>
+      import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent),
+  },
   {
     path: '',
     component: AdminShellComponent,
+    canActivate: [adminSessionGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
       {

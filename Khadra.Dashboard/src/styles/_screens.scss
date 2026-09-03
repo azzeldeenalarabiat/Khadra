@@ -1129,3 +1129,61 @@
 .list-search .search-icon {
   font-size: 13px;
 }
+
+/* ── Auth screens ──────────────────────────────────────────────────────────
+   The design export has no sign-in artboard, so these are composed entirely
+   from existing primitives: the sidebar's brand mark, the .sect card, .field /
+   .input, .banner and .btn. Nothing new is invented, so the front door reads as
+   the same product as the console behind it. */
+.auth-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+
+.auth-card {
+  width: min(400px, 100%);
+  padding: 26px;
+}
+
+.auth-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The screen title, one step down from a page heading: this card is the whole page. */
+.auth-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.auth-foot {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.auth-link {
+  color: var(--color-accent);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+/* A banner inside the auth card carries its tone from .s-* like everywhere else. */
+.auth-card .banner {
+  align-items: flex-start;
+}
+
+.auth-card .banner-icon {
+  margin-top: 1px;
+}

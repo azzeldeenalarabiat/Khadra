@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { SessionService } from '../core/services/session.service';
 import { NAV_GROUPS } from '../core/data/nav.data';
 import { IconComponent } from '../shared/icon/icon.component';
 
@@ -11,5 +12,14 @@ import { IconComponent } from '../shared/icon/icon.component';
   imports: [RouterLink, RouterLinkActive, IconComponent],
 })
 export class AdminSidebarComponent {
+  private readonly session = inject(SessionService);
+  private readonly router = inject(Router);
+
   protected readonly groups = NAV_GROUPS;
+
+  // Ends the BFF session, so the cookie is gone and the guard sends the next navigation to sign-in.
+  protected async signOut(): Promise<void> {
+    await this.session.signOut();
+    await this.router.navigateByUrl('/sign-in');
+  }
 }
