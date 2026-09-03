@@ -34,6 +34,12 @@ internal sealed partial class DevelopmentSeeder(
     public const string AdminEmail = "admin@khadra.jo";
     public const string SeedPassword = "Khadra!2026";
 
+    // Car types are a lookup table that does not exist yet, so every seeded car points at the same
+    // placeholder id -- the one the console's add-car form also sends. It resolves to nothing today;
+    // when the lookup ships, this becomes a real row rather than a new concept.
+    private static readonly Id SeedCarTypeId =
+        Id.From(Guid.Parse("01a06675-0000-7000-8000-000000000001"));
+
     private readonly Random _random = new(20260903);
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
@@ -64,8 +70,15 @@ internal sealed partial class DevelopmentSeeder(
         context.Users.AddRange(dealerOwners);
         context.Dealers.AddRange(dealers);
 
+        // A fleet for every dealer that got through review, INCLUDING the suspended one: it was
+        // approved and trading before it was suspended, so an empty fleet there would be a story that
+        // never happened. Dealers still pending, rejected or in clarification have none, because
+        // RequireApprovedDealer would have refused them every car.
+        var fleets = SeedFleets(dealers, now);
+        context.Vehicles.AddRange(fleets.SelectMany(fleet => fleet.Value));
+
         var tradingDealers = dealers.Where(dealer => dealer.CanTrade).ToList();
-        var bookings = SeedBookings(tradingDealers, customers, rules, now);
+        var bookings = SeedBookings(tradingDealers, fleets, customers, rules, now);
         context.Bookings.AddRange(bookings);
 
         var tickets = SeedDisputes(bookings, TimeSpan.FromHours(rules.AdminSlaHours), now, admins[0].Id);
@@ -80,7 +93,8 @@ internal sealed partial class DevelopmentSeeder(
 
         await context.SaveChangesAsync(cancellationToken);
 
-        LogComplete(logger, dealers.Count, customers.Count, bookings.Count, tickets.Count);
+        var vehicleCount = fleets.Sum(fleet => fleet.Value.Count);
+        LogComplete(logger, dealers.Count, customers.Count, vehicleCount, bookings.Count, tickets.Count);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Development seed skipped: the database already holds dealers.")]
@@ -88,8 +102,14 @@ internal sealed partial class DevelopmentSeeder(
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Development seed complete: {Dealers} dealers, {Customers} customers, {Bookings} bookings, {Tickets} disputes.")]
-    private static partial void LogComplete(ILogger logger, int dealers, int customers, int bookings, int tickets);
+        Message = "Development seed complete: {Dealers} dealers, {Customers} customers, {Vehicles} vehicles, {Bookings} bookings, {Tickets} disputes.")]
+    private static partial void LogComplete(
+        ILogger logger,
+        int dealers,
+        int customers,
+        int vehicles,
+        int bookings,
+        int tickets);
 
     private static List<User> SeedAdmins(string passwordHash, DateTimeOffset now) =>
     [
@@ -241,8 +261,148 @@ internal sealed partial class DevelopmentSeeder(
         return (dealers, owners);
     }
 
+    // Models that are actually common on Jordanian rental lots, with a plausible daily rate band in
+    // JOD. Rate drives the booking price, so these numbers decide what the whole platform's revenue
+    // figures look like.
+    private static readonly (string Make, string Model, int Seats, decimal Low, decimal High)[] CarCatalogue =
+    [
+        ("Toyota", "Corolla", 5, 28m, 38m),
+        ("Toyota", "Camry", 5, 40m, 55m),
+        ("Toyota", "RAV4", 5, 55m, 75m),
+        ("Hyundai", "Elantra", 5, 26m, 36m),
+        ("Hyundai", "Tucson", 5, 50m, 68m),
+        ("Kia", "Rio", 5, 22m, 30m),
+        ("Kia", "Sportage", 5, 48m, 65m),
+        ("Nissan", "Sunny", 5, 22m, 30m),
+        ("Nissan", "X-Trail", 7, 60m, 80m),
+        ("Mitsubishi", "Attrage", 5, 24m, 32m),
+        ("Chevrolet", "Malibu", 5, 38m, 52m),
+        ("Mercedes-Benz", "E-Class", 5, 95m, 130m),
+        ("BMW", "5 Series", 5, 95m, 135m),
+        ("Hyundai", "Staria", 9, 85m, 110m),
+    ];
+
+    private static readonly string[] CarColours =
+        ["White", "Silver", "Black", "Grey", "Dark blue", "Beige"];
+
+    /// <summary>
+    /// Gives every approved dealer a real fleet, and hands back the cars per dealer so bookings can be
+    /// made against actual vehicles.
+    ///
+    /// Before this existed the seeder invented a fresh vehicle id per booking, so all 393 bookings
+    /// pointed at cars that had never existed: the dealer list showed every fleet as empty, and any
+    /// screen that named the car in a booking or a dispute had nothing to name.
+    ///
+    /// The status mix is the one a real lot has -- mostly published, a few taken down, the odd one in
+    /// the garage and a couple never finished -- and every car is put there through the same domain
+    /// methods a dealer's own clicks would call.
+    /// </summary>
+    private Dictionary<Id, List<Vehicle>> SeedFleets(List<Dealer> dealers, DateTimeOffset now)
+    {
+        var fleets = new Dictionary<Id, List<Vehicle>>();
+        var plate = 30000;
+
+        foreach (var dealer in dealers)
+        {
+            // Approval is the gate, not the ability to trade: a suspended dealer keeps the fleet it
+            // built while it was in good standing.
+            if (dealer.VerificationStatus != DealerVerificationStatus.Approved)
+                continue;
+
+            var fleet = new List<Vehicle>();
+            var size = _random.Next(4, 13);
+
+            for (var index = 0; index < size; index++)
+            {
+                var car = CarCatalogue[_random.Next(CarCatalogue.Length)];
+                var year = now.Year - _random.Next(0, 6);
+                var listedAt = now.AddDays(-_random.Next(20, 400));
+
+                var details = VehicleDetails.Create(
+                    car.Make,
+                    car.Model,
+                    year,
+                    car.Seats,
+                    _random.Next(100) < 80 ? TransmissionType.Automatic : TransmissionType.Manual,
+                    FuelType.Petrol,
+                    now.Year,
+                    CarColours[_random.Next(CarColours.Length)],
+                    $"{car.Make} {car.Model} {year}, maintained in-house and serviced between rentals.");
+                if (details.IsFailure)
+                    continue;
+
+                var rate = Money.Jod(car.Low + (_random.Next(0, (int)(car.High - car.Low) + 1)));
+                var mileage = _random.Next(100) < 30
+                    ? MileagePolicy.Unlimited()
+                    : MileagePolicy.Limited(200 + (_random.Next(0, 4) * 50), Money.Jod(0.15m)).Value;
+
+                var vehicle = Vehicle.Add(
+                    dealer.Id,
+                    SeedCarTypeId,
+                    details.Value,
+                    PlateNumber.Create((plate++).ToString(System.Globalization.CultureInfo.InvariantCulture)).Value,
+                    rate,
+                    Money.Jod(100m + (_random.Next(0, 5) * 25m)),
+                    mileage,
+                    FuelPolicy.FullToFull,
+                    isDeliveryEligible: _random.Next(100) < 60,
+                    listedAt);
+                if (vehicle.IsFailure)
+                    continue;
+
+                // A photo, because Publish refuses a listing without one -- the same rule a dealer
+                // meets in the console. The key points at nothing on disk; no seeded screen serves it.
+                vehicle.Value.AddImage($"vehicles/{vehicle.Value.Id.Value}/seed-cover.jpg", listedAt);
+
+                // Publishing is judged as of the day the car was LISTED, and on that day an approved
+                // dealer was trading -- suspension came afterwards. Passing today's CanTrade instead
+                // would leave the suspended dealer's whole lot sitting in Draft, a history that never
+                // happened, and would hide the state the fleet screen exists to explain: a car that
+                // is Active and still not reaching customers because the dealership cannot trade.
+                ApplyFleetStatus(vehicle.Value, listedAt);
+                fleet.Add(vehicle.Value);
+            }
+
+            fleets[dealer.Id] = fleet;
+        }
+
+        return fleets;
+    }
+
+    /// <summary>
+    /// A fresh MileagePolicy with the same terms as the car's.
+    ///
+    /// The booking freezes the policy it was made under, and a frozen snapshot must be its own object:
+    /// sharing the vehicle's instance would put one value object under two aggregates, which is the
+    /// mistake this file has now made twice.
+    /// </summary>
+    private static MileagePolicy CopyOf(MileagePolicy policy) =>
+        policy.IsUnlimited
+            ? MileagePolicy.Unlimited()
+            : MileagePolicy.Limited(
+                policy.DailyLimitKm!.Value,
+                Money.Create(policy.ExcessFeePerKm!.Amount, policy.ExcessFeePerKm.CurrencyCode)).Value;
+
+    /// <summary>Puts a seeded car into a lifelike state, always through the domain's own methods.</summary>
+    private void ApplyFleetStatus(Vehicle vehicle, DateTimeOffset listedAt)
+    {
+        var roll = _random.Next(100);
+
+        // Left as a draft: started and never finished. Nothing else to do.
+        if (roll < 8)
+            return;
+
+        vehicle.Publish(dealerCanTrade: true, listedAt.AddHours(2));
+
+        if (roll >= 88 && roll < 95)
+            vehicle.Hide(listedAt.AddDays(_random.Next(1, 30)));
+        else if (roll >= 95)
+            vehicle.SendToMaintenance(listedAt.AddDays(_random.Next(1, 30)));
+    }
+
     private List<Booking> SeedBookings(
         List<Dealer> tradingDealers,
+        Dictionary<Id, List<Vehicle>> fleets,
         List<User> customers,
         BusinessRules rules,
         DateTimeOffset now)
@@ -266,7 +426,7 @@ internal sealed partial class DevelopmentSeeder(
                 // Terms are built per booking, not once and shared. That is what the real flow does
                 // -- each booking freezes its own snapshot of the rules -- and it is also required:
                 // one value-object instance cannot be owned by three hundred bookings at once.
-                var booking = CreateBooking(tradingDealers, customers, BuildTerms(rules), rules, createdAt);
+                var booking = CreateBooking(tradingDealers, fleets, customers, BuildTerms(rules), rules, createdAt);
                 if (booking is not null)
                     bookings.Add(booking);
             }
@@ -277,6 +437,7 @@ internal sealed partial class DevelopmentSeeder(
 
     private Booking? CreateBooking(
         List<Dealer> tradingDealers,
+        Dictionary<Id, List<Vehicle>> fleets,
         List<User> customers,
         BookingTerms terms,
         BusinessRules rules,
@@ -285,6 +446,16 @@ internal sealed partial class DevelopmentSeeder(
         var dealer = tradingDealers[_random.Next(tradingDealers.Count)];
         var customer = customers[_random.Next(customers.Count)];
 
+        // Customers book cars that are actually listed, so a booking's vehicle id resolves to a real
+        // vehicle belonging to that same dealer. Drafts are excluded because a customer could never
+        // have seen one.
+        if (!fleets.TryGetValue(dealer.Id, out var fleet))
+            return null;
+        var bookable = fleet.Where(car => car.Status != VehicleStatus.Draft).ToList();
+        if (bookable.Count == 0)
+            return null;
+        var vehicle = bookable[_random.Next(bookable.Count)];
+
         var days = _random.Next(2, 9);
         // The period must start after the booking was made; a couple of days of lead time is typical.
         var start = createdAt.AddDays(_random.Next(1, 4));
@@ -292,26 +463,31 @@ internal sealed partial class DevelopmentSeeder(
         if (period.IsFailure)
             return null;
 
-        var dailyRate = Money.Jod(25m + (_random.Next(0, 16) * 5m));
-        var delivery = _random.Next(100) < 35;
+        // The price is the CAR's price, not an invented one, and delivery is only offered on a car the
+        // dealer marked eligible for it. That is what makes a seeded booking check out against the
+        // vehicle it names when an admin opens the two side by side.
+        var delivery = vehicle.IsDeliveryEligible && _random.Next(100) < 35;
         var pricing = BookingPricing.Calculate(
-            dailyRate,
+            Money.Create(vehicle.DailyRate.Amount, vehicle.DailyRate.CurrencyCode),
             period.Value.WholeDays,
             delivery ? Money.Jod(rules.DeliveryFee.Amount) : Money.Jod(0m),
             Percentage.FromValidated(rules.DepositPercent),
-            Money.Jod(150m),
-            MileagePolicy.Limited(200, Money.Jod(0.15m)).Value,
-            FuelPolicy.FullToFull);
+            Money.Create(vehicle.SecurityDeposit.Amount, vehicle.SecurityDeposit.CurrencyCode),
+            CopyOf(vehicle.Mileage),
+            vehicle.FuelPolicy);
         if (pricing.IsFailure)
             return null;
 
         var booking = Booking.Create(
             customer.Id,
             dealer.Id,
-            Id.New(),
+            vehicle.Id,
             period.Value,
             delivery ? PickupMethod.Delivery : PickupMethod.SelfPickup,
-            delivery ? dealer.Location : null,
+            // A COPY of the dealer's coordinates. Handing over dealer.Location itself put one GeoPoint
+            // instance under two aggregates, which EF reported on every seed as the same entity being
+            // tracked as two different types.
+            delivery ? GeoPoint.Create(dealer.Location.Latitude, dealer.Location.Longitude).Value : null,
             pricing.Value,
             terms,
             PaymentOption.DepositOnly,

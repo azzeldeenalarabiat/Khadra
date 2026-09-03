@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using Khadra.Domain.Fleet;
 
 namespace Khadra.Application.Fleet.Dtos;
@@ -60,15 +61,6 @@ public sealed record VehicleDto(
     }
 }
 
-/// <summary>Every money value carries its currency; the console never assumes JOD.</summary>
-public sealed record MoneyDto(decimal Amount, string Currency)
-{
-    public static MoneyDto From(Domain.Common.Money money)
-    {
-        ArgumentNullException.ThrowIfNull(money);
-        return new MoneyDto(money.Amount, money.CurrencyCode);
-    }
-}
 
 public sealed record MileagePolicyDto(bool IsUnlimited, int? DailyLimitKm, MoneyDto? ExcessFeePerKm)
 {

@@ -68,7 +68,14 @@ internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminR
                 dealer.ReviewDueAt,
                 dealer.CreatedAt,
                 dealer.Documents.Count,
-                dealer.Employees.Count))
+                dealer.Employees.Count,
+                // Correlated rather than joined: Fleet is another bounded context, so there is no
+                // navigation property from Dealer to Vehicle and there deliberately never will be.
+                // The vehicles' own soft-delete filter removes deleted listings from this count.
+                context.Vehicles.Count(vehicle => vehicle.DealerId == dealer.Id),
+                // Reviews have no table yet, so there is nothing to average. Null, never 0.0.
+                null,
+                0))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<DealerListItem>(items, page.Page, page.PageSize, total);

@@ -33,13 +33,16 @@ export class DealersListComponent {
     { label: 'Rejected', value: 'Rejected' },
   ];
 
+  // "Registration" used to have its own column while also sitting under the dealer's name; the
+  // duplicate went so that fleet size and rating -- what an admin judges a trading dealer on -- fit
+  // without crowding the queue columns a pending application needs.
   protected readonly columns = [
     'Dealer',
     'Status',
-    'Registration',
+    'Cars',
+    'Rating',
     'Documents',
-    'Employees',
-    'Submitted',
+    'Joined',
     'Review due',
     'Actions',
   ];
@@ -96,7 +99,15 @@ export class DealersListComponent {
         sub: `CR ${dealer.commercialRegistrationNumber}`,
       },
       { kind: 'badge', value: this.statusLabel(dealer), tone: this.statusTone(dealer) },
-      { kind: 'text', value: dealer.commercialRegistrationNumber, variant: 'mono' },
+      {
+        kind: 'text',
+        value: String(dealer.carCount),
+        align: 'right',
+        // An approved dealer with an empty fleet has finished nothing: they can trade and have
+        // nothing to trade. Worth the admin's eye, which a plain "0" would not catch.
+        variant: dealer.carCount === 0 ? 'dim' : undefined,
+      },
+      this.ratingCell(dealer),
       // The count an admin actually cares about is whether all three are in (spec 3.1).
       {
         kind: 'text',
@@ -104,8 +115,7 @@ export class DealersListComponent {
         align: 'right',
         tone: dealer.documentCount < 3 ? 'warn' : undefined,
       },
-      { kind: 'text', value: String(dealer.employeeCount), align: 'right' },
-      { kind: 'text', value: this.date(dealer.submittedAt) },
+      { kind: 'text', value: this.date(dealer.createdAt) },
       this.reviewDueCell(dealer),
       {
         kind: 'actions',
@@ -114,6 +124,26 @@ export class DealersListComponent {
     ];
 
     return { id: dealer.dealerId, link: ['/dealers', dealer.dealerId], cells };
+  }
+
+  /**
+   * A rating, or an honest admission that there isn't one.
+   *
+   * Spec 4.1 computes a dealer's rating from customer reviews. The Reviews context has no
+   * persistence yet, so there is nothing to average -- and "0.0" would read as a dealer rated
+   * terribly by every customer, which is the opposite of the truth.
+   */
+  private ratingCell(dealer: DealerListItem): Cell {
+    if (dealer.averageRating === null) {
+      return { kind: 'text', value: 'No reviews yet', variant: 'dim' };
+    }
+
+    return {
+      kind: 'text',
+      value: dealer.averageRating.toFixed(1),
+      sub: `${dealer.reviewCount} ${dealer.reviewCount === 1 ? 'review' : 'reviews'}`,
+      align: 'right',
+    };
   }
 
   /** Suspension is reported ahead of verification: it is what actually stops the business trading. */

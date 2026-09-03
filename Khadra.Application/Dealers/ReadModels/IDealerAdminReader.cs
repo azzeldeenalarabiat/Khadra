@@ -21,7 +21,16 @@ public sealed record DealerListItem(
     DateTimeOffset ReviewDueAt,
     DateTimeOffset CreatedAt,
     int DocumentCount,
-    int EmployeeCount);
+    int EmployeeCount,
+    // Cars still listed, deleted ones excluded. Counted across every status, not just the published
+    // ones: a dealer with eleven cars in draft has a fleet, and an admin reading the list wants to
+    // know that rather than seeing a zero that means "nothing published yet".
+    int CarCount,
+    // Null means "no reviews yet", which is not the same as a rating of zero and must not render as
+    // one. The Reviews context has no persistence at all yet (see docs/pre-launch-checklist.md), so
+    // today this is always null -- the shape is here so the column stops lying the moment it exists.
+    decimal? AverageRating,
+    int ReviewCount);
 
 /// <summary>Which slice of the dealer list the Admin is looking at.</summary>
 public sealed record DealerListFilter(string? Status, bool? SuspendedOnly, string? Search);

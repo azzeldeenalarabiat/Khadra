@@ -47,6 +47,39 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
                     .IsConcurrencyToken();
             }
         }
+
+        // SQLite (the persistence tests) has no timestamp type: it stores DateTimeOffset as text and
+        // refuses to compare or order it. Storing UTC ticks instead makes "starts before", "due by"
+        // and "oldest first" translate, so the repository queries the tests exercise are the SAME
+        // queries production runs -- not a client-evaluated stand-in. Every instant in this system is
+        // UTC, so the zero offset on the way back loses nothing. JSON-mapped value objects keep their
+        // own serialisation; nothing queries into those.
+        // By provider name: IsSqlite() is an extension in the SQLite package, which only the test
+        // project references, and Infrastructure must not take a dependency on a provider it never
+        // ships with.
+        if (string.Equals(Database.ProviderName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal))
+        {
+            var toTicks = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, long>(
+                value => value.UtcTicks,
+                ticks => new DateTimeOffset(ticks, TimeSpan.Zero));
+            var toNullableTicks = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset?, long?>(
+                value => value.HasValue ? value.Value.UtcTicks : null,
+                ticks => ticks.HasValue ? new DateTimeOffset(ticks.Value, TimeSpan.Zero) : null);
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (entityType.IsMappedToJson())
+                    continue;
+
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTimeOffset))
+                        property.SetValueConverter(toTicks);
+                    else if (property.ClrType == typeof(DateTimeOffset?))
+                        property.SetValueConverter(toNullableTicks);
+                }
+            }
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

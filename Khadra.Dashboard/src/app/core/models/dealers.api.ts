@@ -28,6 +28,10 @@ export interface DealerListItem {
   readonly createdAt: string;
   readonly documentCount: number;
   readonly employeeCount: number;
+  readonly carCount: number;
+  /** Null means no reviews yet — render that, never a zero rating. */
+  readonly averageRating: number | null;
+  readonly reviewCount: number;
 }
 
 export interface DealerProfile {

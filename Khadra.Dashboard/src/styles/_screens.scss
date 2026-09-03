@@ -636,6 +636,17 @@
   margin-top: 2px;
 }
 
+/* The reason an admin gave when they settled an application, quoted back on the record. */
+.decision-record {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-70);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border-inline-start: 2px solid var(--color-divider);
+}
+
 .vehicle-block {
   padding: 14px;
   display: flex;
@@ -1226,7 +1237,9 @@
   font-size: 12px;
 }
 
-.car-photo-empty kh-icon { font-size: 24px; }
+.car-photo-empty kh-icon {
+  font-size: 24px;
+}
 
 .car-body {
   padding: 12px 14px;

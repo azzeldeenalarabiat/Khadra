@@ -7,7 +7,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
 import { AdminDealersService } from '../../core/services/admin-dealers.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { DocumentTile, KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
@@ -28,7 +30,7 @@ import { TimelineComponent } from '../../shared/timeline/timeline.component';
   selector: 'kh-dealer-review',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dealer-review.component.html',
-  imports: [DatePipe, IconComponent, DocTileComponent, TimelineComponent],
+  imports: [DatePipe, RouterLink, IconComponent, DocTileComponent, TimelineComponent],
 })
 export class DealerReviewComponent {
   private readonly service = inject(AdminDealersService);
@@ -38,8 +40,18 @@ export class DealerReviewComponent {
 
   protected readonly resource = this.service.review;
 
+  // Angular reuses this component when only the route parameter changes, so reading the snapshot once
+  // in the constructor would leave the screen showing the previous dealer. Nothing links one dealer
+  // to another today, which is why it has never shown -- but it would be a silent wrong-record bug
+  // the moment something does, and a review screen displaying the wrong application is the worst
+  // possible place for one.
+  private readonly dealerId = toSignal(
+    this.route.paramMap.pipe(map((parameters) => parameters.get('dealerId'))),
+    { initialValue: this.route.snapshot.paramMap.get('dealerId') },
+  );
+
   constructor() {
-    this.service.reviewing.set(this.route.snapshot.paramMap.get('dealerId'));
+    effect(() => this.service.reviewing.set(this.dealerId()));
     // Keep the countdown honest while the screen is open without re-fetching.
     const ticker = setInterval(() => this.now.set(Date.now()), 60_000);
     effect((onCleanup) => onCleanup(() => clearInterval(ticker)));
@@ -149,6 +161,14 @@ export class DealerReviewComponent {
   });
 
   protected readonly canReactivate = computed(() => this.dealer()?.isSuspended === true);
+
+  /**
+   * The reason recorded with a settled decision.
+   *
+   * Blank for an approval, which needs none: the note field carries a rejection reason or a
+   * clarification request, and inventing prose for an approval would put words in an admin's mouth.
+   */
+  protected readonly decisionNote = computed(() => this.dealer()?.reviewNote?.trim() || null);
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;

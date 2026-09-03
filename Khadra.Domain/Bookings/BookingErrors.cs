@@ -55,6 +55,14 @@ public static class BookingErrors
     public static readonly Error DisputeOpen =
         Error.Conflict("booking.dispute_open", "This booking cannot settle while a dispute on it is open.");
 
+    // Also the answer for a booking that exists but belongs to someone else. A 403 would confirm the
+    // id is real, and booking ids are the one thing a stranger should not be able to enumerate.
+    public static readonly Error NotFound =
+        Error.NotFound("booking.not_found", "That booking was not found.");
+
+    public static readonly Error NotAParty =
+        Error.Forbidden("booking.not_a_party", "Only a customer or a rental office has bookings of their own.");
+
     public static readonly Error PaymentWindowNotElapsed =
         Error.Conflict("booking.payment_window_open", "The payment window has not elapsed yet.");
 

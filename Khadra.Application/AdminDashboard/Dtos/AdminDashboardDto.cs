@@ -1,3 +1,5 @@
+using Khadra.Application.Common.Dtos;
+
 namespace Khadra.Application.AdminDashboard.Dtos;
 
 // The admin dashboard as one snapshot.
@@ -59,8 +61,6 @@ public sealed record FinanceSummaryDto(
 
 public sealed record MoneyInMotionDto(MoneyDto Gross, MoneyDto Commission, MoneyDto DealerPayouts);
 
-/// <summary>Every money value travels with its currency; the console never assumes JOD.</summary>
-public sealed record MoneyDto(decimal Amount, string Currency);
 
 public sealed record BookingTrendDto(
     DateOnly From,

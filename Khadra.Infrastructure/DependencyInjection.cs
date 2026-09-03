@@ -8,7 +8,9 @@ using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Auditing.Repositories;
+using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Infrastructure.Configuration;
@@ -117,6 +119,8 @@ public static class DependencyInjection
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IDealerRepository, DealerRepository>();
         services.AddScoped<IVehicleRepository, VehicleRepository>();
+        services.AddScoped<IBookingRepository, BookingRepository>();
+        services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<DevelopmentSeeder>();
 
         AddReporting(services);
@@ -130,6 +134,7 @@ public static class DependencyInjection
         services.AddScoped<IDealerDashboardReader, DealerDashboardReader>();
         services.AddScoped<IDealerAdminReader, DealerAdminReader>();
         services.AddScoped<IBookingDashboardReader, BookingDashboardReader>();
+        services.AddScoped<IBookingReader, BookingReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
         services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
