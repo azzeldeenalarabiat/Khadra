@@ -1,12 +1,17 @@
 import { NavGroup } from '../models/console.models';
 
-/** Sidebar structure, matching the AdminSidebar design component. */
+/**
+ * Sidebar structure, matching the AdminSidebar design component.
+ *
+ * Structure only. The two badges name a count the sidebar reads from the live dashboard snapshot;
+ * no figure is written here.
+ */
 export const NAV_GROUPS: readonly NavGroup[] = [
   { items: [{ label: 'Dashboard', icon: 'squares-four', route: '/dashboard' }] },
   {
     group: 'Business',
     items: [
-      { label: 'Dealers', icon: 'storefront', route: '/dealers', badge: '7' },
+      { label: 'Dealers', icon: 'storefront', route: '/dealers', count: 'dealers-pending' },
       { label: 'Bookings', icon: 'calendar-check', route: '/bookings' },
       { label: 'Customers', icon: 'users-three', route: '/customers' },
       { label: 'Reviews', icon: 'star', route: '/reviews' },
@@ -23,7 +28,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     group: 'Operations',
     items: [
-      { label: 'Disputes', icon: 'scales', route: '/disputes', badge: '12' },
+      { label: 'Disputes', icon: 'scales', route: '/disputes', count: 'disputes-live' },
       { label: 'Notifications', icon: 'bell', route: '/notifications' },
     ],
   },
@@ -99,7 +104,6 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
   dealers: 'Dealers',
   // ':id' is what the topbar substitutes for a UUID segment, so one entry covers every record.
   'dealers/:id': 'Dealer application',
-  'dealers/profile': 'Dealer profile',
   bookings: 'Bookings',
   'bookings/detail': 'Booking details',
   customers: 'Customers',
@@ -109,7 +113,7 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
   'payments/detail': 'Payment details',
   payouts: 'Payouts',
   disputes: 'Disputes',
-  'disputes/detail': 'Dispute resolution',
+  'disputes/:id': 'Dispute resolution',
   reviews: 'Reviews',
   cities: 'Cities & Regions',
   'car-types': 'Car Types',
@@ -141,11 +145,10 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
 /** Detail screens sit under a list screen in the breadcrumb trail. */
 export const SCREEN_PARENTS: Readonly<Record<string, string>> = {
   'dealers/:id': 'dealers',
-  'dealers/profile': 'dealers',
   'bookings/detail': 'bookings',
   'customers/profile': 'customers',
   'payments/detail': 'payments',
-  'disputes/detail': 'disputes',
+  'disputes/:id': 'disputes',
   'dealer/bookings/:id': 'dealer/bookings',
   'dealer/fleet/new': 'dealer/fleet',
   'dealer/fleet/:id': 'dealer/fleet',

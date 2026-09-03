@@ -1,47 +1,41 @@
 import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { inject } from '@angular/core';
-import { MODALS } from '../data/modals.data';
 import { ModalConfig, Toast, Tone } from '../models/console.models';
 
 /**
  * Console-wide UI state: the open confirmation dialog and the transient toast.
  *
- * Row actions and buttons carry a small action string rather than a callback, so
- * data files stay serialisable and free of behaviour. This service is the single
- * place that interprets them:
+ * Table row actions carry a small action string rather than a callback, so a row stays serialisable
+ * and free of behaviour. This service is the single place that interprets them:
  *
  *   nav:/route            navigate
- *   modal:<id>            open a confirmation dialog from MODALS
  *   toast:Title|Body      show a toast directly
- *   noop                  deliberately does nothing (placeholder in the design)
+ *
+ * There was a third form, `modal:<id>`, which opened a dialog from a table of canned wording and
+ * reported a canned outcome without doing anything. It went with the sample data: a dialog that
+ * says "Dealer approved" and approves nobody is the most convincing lie the console could tell.
+ * Every dialog now arrives through `openAction`, with the work it performs attached.
  */
 @Injectable({ providedIn: 'root' })
 export class ConsoleUiService {
   private readonly router = inject(Router);
   private toastTimer?: ReturnType<typeof setTimeout>;
 
-  readonly modalId = signal<string | null>(null);
   readonly modal = signal<ModalConfig | null>(null);
   readonly toast = signal<Toast | null>(null);
   /** True while a confirm handler is in flight, so the dialog can disable itself. */
   readonly modalBusy = signal(false);
 
-  // Set when a dialog was opened to perform real work. The fixture-driven dialogs leave it null and
-  // keep their old behaviour of simply reporting a canned outcome.
+  // The work the open dialog will do when confirmed. A dialog cannot be opened without one.
   private pendingAction: ((values: Record<string, string>) => Promise<void>) | null = null;
   private pendingResult: { title: string; body: string; tone?: Tone } | null = null;
 
   run(action: string): void {
-    if (action === 'noop') return;
-
     const [kind, rest] = splitOnce(action, ':');
     switch (kind) {
       case 'nav':
         void this.router.navigateByUrl(rest);
-        return;
-      case 'modal':
-        this.openModal(rest);
         return;
       case 'toast': {
         const [title, body] = splitOnce(rest, '|');
@@ -51,15 +45,6 @@ export class ConsoleUiService {
       default:
         return;
     }
-  }
-
-  openModal(id: string): void {
-    const config = MODALS[id];
-    if (!config) return;
-    this.pendingAction = null;
-    this.pendingResult = null;
-    this.modalId.set(id);
-    this.modal.set(config);
   }
 
   /**
@@ -74,7 +59,6 @@ export class ConsoleUiService {
   ): void {
     this.pendingAction = action;
     this.pendingResult = result;
-    this.modalId.set(null);
     this.modal.set(config);
   }
 
@@ -82,7 +66,6 @@ export class ConsoleUiService {
     if (this.modalBusy()) return;
     this.pendingAction = null;
     this.pendingResult = null;
-    this.modalId.set(null);
     this.modal.set(null);
   }
 
@@ -93,9 +76,8 @@ export class ConsoleUiService {
 
     const action = this.pendingAction;
     const result = this.pendingResult;
-    if (!action) {
+    if (!action || !result) {
       this.closeModal();
-      this.showToast(config.result.title, config.result.body, config.result.tone ?? 'ok');
       return;
     }
 
@@ -104,7 +86,7 @@ export class ConsoleUiService {
       await action(values);
       this.modalBusy.set(false);
       this.closeModal();
-      this.showToast(result!.title, result!.body, result!.tone ?? 'ok');
+      this.showToast(result.title, result.body, result.tone ?? 'ok');
     } catch (error) {
       // The dialog stays open on failure: closing it would leave the admin unsure whether the
       // decision landed, which for an approval is the worst thing to be unsure about.

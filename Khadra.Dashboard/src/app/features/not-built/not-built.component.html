@@ -1,0 +1,28 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ copy().title }}</h1>
+      <div class="page-sub">Not built yet</div>
+    </div>
+  </div>
+
+  <section class="sect">
+    <div class="state-block is-empty">
+      <div class="state-icon is-outline"><kh-icon [name]="copy().icon" /></div>
+      <div class="state-title">There is no data behind this screen yet</div>
+      <div class="state-text">{{ copy().purpose }}</div>
+
+      <div class="note-box is-plain">
+        <kh-icon name="info" />
+        {{ copy().blocked }}
+      </div>
+
+      @if (copy().instead; as instead) {
+        <div class="state-text">{{ instead.text }}</div>
+        <div class="state-actions">
+          <a class="btn btn-secondary btn-sm" [routerLink]="instead.route">{{ instead.label }}</a>
+        </div>
+      }
+    </div>
+  </section>
+</div>

@@ -119,7 +119,15 @@ export class DealersListComponent {
       this.reviewDueCell(dealer),
       {
         kind: 'actions',
-        actions: [{ label: this.actionLabel(dealer), style: 'primary', action: 'noop' }],
+        // The button goes where the row goes. It used to be a placeholder that did nothing, which
+        // is worse than no button: an admin clicks "Review" and the console answers with silence.
+        actions: [
+          {
+            label: this.actionLabel(dealer),
+            style: 'primary',
+            action: `nav:/dealers/${dealer.dealerId}`,
+          },
+        ],
       },
     ];
 

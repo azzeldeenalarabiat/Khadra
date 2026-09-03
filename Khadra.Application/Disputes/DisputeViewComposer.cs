@@ -1,7 +1,9 @@
 using CSharpFunctionalExtensions;
+using Khadra.Application.Bookings;
 using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Dtos;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Disputes.Dtos;
 using Khadra.Application.Disputes.ReadModels;
@@ -91,6 +93,7 @@ public sealed class DisputeViewComposer(
             ticket.Resolution is { } resolved
                 ? DisputeResolutionDto.From(resolved, NameOf(resolved.ResolvedByAdminId))
                 : null,
+            MoneyDto.From(BookingDisputeSettlement.DepositHeldFor(booking)),
             BookingDto.From(booking, context, now));
     }
 }

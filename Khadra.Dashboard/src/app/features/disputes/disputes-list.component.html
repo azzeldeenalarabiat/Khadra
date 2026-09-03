@@ -1,0 +1,186 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Disputes</h1>
+      <div class="page-sub">
+        Tickets between a customer and a dealer. Money only moves when one of these is resolved.
+      </div>
+    </div>
+    <div class="dc-head-actions">
+      <button
+        type="button"
+        class="btn btn-sm"
+        [class.btn-primary]="overdueOnly()"
+        [class.btn-secondary]="!overdueOnly()"
+        (click)="toggleOverdue()"
+      >
+        <kh-icon name="warning-circle" />
+        Overdue only
+      </button>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    <div class="tabs" role="tablist">
+      @for (q of queues; track q.key) {
+        <button
+          type="button"
+          class="tab"
+          role="tab"
+          [class.is-active]="queue() === q.key"
+          [attr.aria-selected]="queue() === q.key"
+          (click)="select(q.key)"
+        >
+          {{ q.label }}
+        </button>
+      }
+    </div>
+
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load the dispute queue</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    } @else if (resource.isLoading() && rows().length === 0) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="scales" /></div>
+        <div class="state-title">
+          {{ queue() === 'live' ? 'Nothing waiting on you' : 'Nothing in this view' }}
+        </div>
+        <div class="state-text">
+          @if (queue() === 'live') {
+            No dispute is open. A customer or a dealer can open one from a finished booking, within
+            the window that booking froze.
+          } @else {
+            No ticket matches this view right now.
+          }
+        </div>
+        @if (queue() !== 'live' || overdueOnly()) {
+          <div class="state-actions">
+            <button type="button" class="btn btn-secondary btn-sm" (click)="select('live')">
+              Back to the live queue
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="list-toolbar">
+        <span class="page-sub">
+          {{ rows().length }} of {{ total() }} tickets
+          @if (overdue()) {
+            · <span class="s-bad">{{ overdue() }} overdue</span>
+          }
+          @if (unassigned()) {
+            · {{ unassigned() }} unassigned
+          }
+        </span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>Ticket</th>
+              <th>Parties</th>
+              <th>Raised by</th>
+              <th>Reason</th>
+              <th>SLA</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.ticketId) {
+              <tr class="rowlink" (click)="open(row)">
+                <td class="td">
+                  <a
+                    class="row-link mono"
+                    [routerLink]="['/disputes', row.ticketId]"
+                    (click)="$event.stopPropagation()"
+                    >{{ row.bookingReference }}</a
+                  >
+                  <div class="td-sub">Opened {{ when(row.openedAt) }}</div>
+                </td>
+                <td class="td">
+                  <div class="entity">
+                    <div class="entity-avatar">{{ initials(row.dealerName) }}</div>
+                    <div>
+                      <div class="entity-name">{{ row.dealerName }}</div>
+                      <div class="entity-sub">{{ row.customerName }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="td">
+                  <span
+                    class="pill"
+                    [class]="row.openedByParty === 'Dealer' ? 's-accent' : 's-dim'"
+                  >
+                    {{ row.openedByParty }}
+                  </span>
+                  <div class="td-sub">
+                    {{ row.statementCount }}
+                    {{ row.statementCount === 1 ? 'statement' : 'statements' }}
+                  </div>
+                </td>
+                <td class="td">
+                  <div class="queue-desc">{{ row.reason }}</div>
+                </td>
+                <td class="td">
+                  <span [class]="row.isOverdue ? 's-bad' : ''">{{ sla(row) }}</span>
+                  <div class="td-sub">
+                    {{ row.assignedAdminName ? 'With ' + row.assignedAdminName : 'Unassigned' }}
+                  </div>
+                </td>
+                <td class="td">
+                  <span class="pill" [class]="'s-' + tone(row)">{{ label(row) }}</span>
+                </td>
+                <td class="td td-num">
+                  <a
+                    class="btn btn-secondary btn-xs"
+                    [routerLink]="['/disputes', row.ticketId]"
+                    (click)="$event.stopPropagation()"
+                  >
+                    {{ row.closedAt ? 'View' : 'Resolve' }}
+                  </a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="pager-count">{{ rows().length }} of {{ total() }} tickets</span>
+        <div class="pager-nav">
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() <= 1"
+            (click)="goTo(page() - 1)"
+          >
+            Previous
+          </button>
+          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() >= totalPages()"
+            (click)="goTo(page() + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+</div>

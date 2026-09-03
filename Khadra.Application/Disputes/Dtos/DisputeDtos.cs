@@ -28,6 +28,9 @@ public sealed record DisputeDto(
     DateTimeOffset? ClosedAt,
     IReadOnlyList<DisputeStatementDto> Statements,
     DisputeResolutionDto? Resolution,
+    // The basis any resolution must split, taken from the same helper the resolve handler validates
+    // against, so the workspace and the rule can never disagree about what is actually held.
+    MoneyDto DepositHeld,
     BookingDto Booking);
 
 public sealed record DisputeStatementDto(

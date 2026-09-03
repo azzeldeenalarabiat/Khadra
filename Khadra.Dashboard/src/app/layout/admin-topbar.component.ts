@@ -41,7 +41,6 @@ export class AdminTopbarComponent {
 
   protected readonly title = computed(() => SCREEN_TITLES[this.path()] ?? 'Dashboard');
   protected readonly initials = computed(() => initialsOf(this.session.user() ?? null));
-  protected readonly isAdmin = computed(() => this.session.user()?.role === 'Admin');
 
   protected readonly crumbs = computed<Crumb[]>(() => {
     const key = this.path();

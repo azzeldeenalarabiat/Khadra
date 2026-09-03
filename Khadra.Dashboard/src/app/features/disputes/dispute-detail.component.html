@@ -1,141 +1,340 @@
-<div class="stack stack-14">
-  <header class="detail-head">
-    <div>
-      <div class="row row-gap-9">
-        <h1 class="detail-name">{{ dispute.reference }}</h1>
-        <span class="pill s-bad">{{ dispute.status }}</span>
-        <span class="pill s-dim">{{ dispute.priority }}</span>
+<div class="stack stack-14 page-wide">
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load this dispute</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/disputes">Back to the queue</a>
+        </div>
       </div>
-      <div class="detail-meta">{{ dispute.meta }}</div>
-    </div>
-    <div class="sla-panel">
-      <div class="s-bad">
-        <div class="k">48-hour SLA</div>
-        <div class="num sla-panel-figure status-text">{{ dispute.slaOver }}</div>
+    </section>
+  } @else if (resource.isLoading() && !dispute()) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else if (dispute(); as d) {
+    <header class="dc-head">
+      <div class="grow">
+        <div class="row row-gap-9">
+          <h1 class="page-title mono">{{ d.booking.reference }}</h1>
+          <span class="pill" [class]="'s-' + tone()">
+            {{ d.status === 'UnderReview' ? 'Under review' : d.status }}
+          </span>
+          @if (d.isOverdue && d.isLive) {
+            <span class="pill s-bad">Overdue</span>
+          }
+        </div>
+        <div class="page-sub">
+          Opened {{ when(d.openedAt) }} by {{ d.openedByName }} ({{ d.openedByParty }}) ·
+          {{ d.booking.dealerName }} and {{ d.booking.customerName }}
+        </div>
       </div>
-      <div class="sla-divider"></div>
-      <div>
-        <div class="k">Age</div>
-        <div class="num sla-panel-figure">{{ dispute.age }}</div>
+      <div class="sla-panel">
+        <div [class]="sla().over ? 's-bad' : ''">
+          <div class="k">Platform SLA</div>
+          <div class="num sla-panel-figure status-text">{{ sla().figure }}</div>
+        </div>
+        <div class="sla-divider"></div>
+        <div>
+          <div class="k">Age</div>
+          <div class="num sla-panel-figure">{{ age() }}</div>
+        </div>
       </div>
-    </div>
-  </header>
+      <div class="dc-head-actions">
+        <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', d.booking.dealerId]">
+          Open dealer
+        </a>
+        @if (d.isLive && !d.assignedAdminName) {
+          <button
+            type="button"
+            class="btn btn-secondary btn-md"
+            [disabled]="busy()"
+            (click)="assign()"
+          >
+            Take this on
+          </button>
+        }
+      </div>
+    </header>
 
-  <div class="split-16">
-    <div class="stack stack-14">
-      <div class="split-3">
-        @for (card of cards; track card.title) {
+    <div class="split-16">
+      <div class="stack stack-14">
+        <div class="split-3">
+          @for (card of cards(); track card.title) {
+            <section class="sect">
+              <div class="sect-h">
+                <kh-icon [name]="card.icon" class="kpi-icon" />
+                <span class="sect-t">{{ card.title }}</span>
+              </div>
+              <div class="kv-body">
+                @for (row of card.rows; track row.k) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ row.k }}</div>
+                    <div class="kv-val">{{ row.v }}</div>
+                  </div>
+                }
+              </div>
+            </section>
+          }
+        </div>
+
+        <section class="sect">
+          <div class="sect-h">
+            <span class="sect-t">Statements</span>
+            <span class="sect-hint">Both parties and the platform read everything here</span>
+          </div>
+          <div class="sect-pad stack stack-12">
+            <div class="row row-gap-12">
+              <div class="customer-avatar" [class.s-accent]="d.openedByParty === 'Dealer'">
+                {{ initials(d.openedByName) }}
+              </div>
+              <div class="grow">
+                <div class="row row-gap-8">
+                  <span class="handover-title">{{ d.openedByName }}</span>
+                  <span class="pill" [class]="d.openedByParty === 'Dealer' ? 's-accent' : 's-dim'">
+                    {{ d.openedByParty }} · opened it
+                  </span>
+                  <span class="page-sub push">{{ when(d.openedAt) }}</span>
+                </div>
+                <div class="queue-desc">{{ d.reason }}</div>
+              </div>
+            </div>
+            @for (s of d.statements; track s.statementId) {
+              <div class="row row-gap-12">
+                <div class="customer-avatar" [class.s-accent]="s.party === 'Dealer'">
+                  {{ initials(s.authorName) }}
+                </div>
+                <div class="grow">
+                  <div class="row row-gap-8">
+                    <span class="handover-title">{{ s.authorName }}</span>
+                    <span class="pill" [class]="s.party === 'Dealer' ? 's-accent' : 's-dim'">
+                      {{ s.party }}
+                    </span>
+                    <span class="page-sub push">{{ when(s.createdAt) }}</span>
+                  </div>
+                  <div class="queue-desc">{{ s.body }}</div>
+                </div>
+              </div>
+            } @empty {
+              <div class="page-sub">No statement has been added since the ticket was opened.</div>
+            }
+          </div>
+        </section>
+
+        @if (evidence().length) {
           <section class="sect">
             <div class="sect-h">
-              <kh-icon [name]="card.icon" class="kpi-icon" />
-              <span class="sect-t">{{ card.title }}</span>
+              <kh-icon name="paperclip" class="kpi-icon" />
+              <span class="sect-t">Evidence</span>
+              <span class="sect-hint">
+                {{ evidence().length }} file(s) from both parties · links expire
+              </span>
             </div>
-            <div class="kv-body">
-              @for (row of card.rows; track row.k) {
-                <div class="kv-split">
-                  <div class="kv-key">{{ row.k }}</div>
-                  <div class="kv-val">{{ row.v }}</div>
+            <div class="doc-grid-4">
+              @for (file of evidence(); track file.url) {
+                <div>
+                  <a class="doc evidence-tile" [href]="file.url" target="_blank" rel="noopener">
+                    <span class="mono">{{ file.fileName }}</span>
+                  </a>
+                  <div class="evidence-by">
+                    <span class="pill" [class]="file.party === 'Dealer' ? 's-accent' : 's-dim'">
+                      {{ file.party }}
+                    </span>
+                    <span class="evidence-ts">{{ file.when }}</span>
+                  </div>
+                  <div class="evidence-label">{{ file.author }}</div>
                 </div>
               }
             </div>
           </section>
         }
+
+        <section class="sect">
+          <div class="sect-h"><span class="sect-t">Case timeline</span></div>
+          <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
+        </section>
       </div>
 
-      <section class="sect">
-        <div class="sect-h">
-          <kh-icon name="paperclip" class="kpi-icon" />
-          <span class="sect-t">Evidence</span>
-          <span class="sect-note">6 files from both parties</span>
-        </div>
-        <div class="doc-grid-4">
-          @for (item of evidence; track item.file) {
-            <div>
-              <div class="doc evidence-tile">
-                <span class="mono">{{ item.file }}</span>
-              </div>
-              <div class="evidence-by">
-                <span class="pill" [class]="toneClass(item.tone)">{{ item.by }}</span>
-                <span class="evidence-ts">{{ item.ts }}</span>
-              </div>
-              <div class="evidence-label">{{ item.label }}</div>
+      <div class="stack stack-14 resolve-panel">
+        @if (d.resolution; as r) {
+          <section class="sect sect-pad stack stack-9">
+            <div class="row row-gap-8">
+              <kh-icon name="scales" class="kpi-icon" />
+              <span class="sect-t">Decision recorded</span>
             </div>
-          }
-        </div>
-      </section>
+            <div class="page-sub">{{ when(r.resolvedAt) }} · {{ r.resolvedByName }}</div>
+            <div class="money-line">
+              <span class="k-label">Deposit held</span>
+              <span class="num">{{ r.depositHeld.amount }} {{ r.depositHeld.currency }}</span>
+            </div>
+            <div class="money-line">
+              <span class="k-label">Refunded to the customer</span>
+              <span class="num">{{ r.refundToCustomer.amount }}</span>
+            </div>
+            <div class="money-line">
+              <span class="k-label">Kept by the platform</span>
+              <span class="num">{{ r.retainedByPlatform.amount }}</span>
+            </div>
+            <div class="money-line">
+              <span class="k-label">Transferred to the dealer</span>
+              <span class="num">{{ r.transferredToDealer.amount }}</span>
+            </div>
+            @if (r.dealerCharge) {
+              <div class="money-line s-bad">
+                <span class="k-label">Charged to the dealer</span>
+                <span class="num">{{ r.dealerCharge.amount }} {{ r.dealerCharge.currency }}</span>
+              </div>
+            }
+            <div class="page-sub">“{{ r.note }}”</div>
+            <div class="note-box is-plain">
+              <kh-icon name="info" />
+              Decision recorded — no funds moved. Money only moves once the platform's payment
+              module is live.
+            </div>
+          </section>
+        } @else if (!d.isLive) {
+          <section class="sect sect-pad stack stack-9">
+            <span class="k">Closed without a decision</span>
+            <div class="page-sub">
+              This ticket was withdrawn by the party who opened it, so nothing is charged to anyone
+              and the booking settles as if no dispute had been raised.
+            </div>
+          </section>
+        } @else {
+          <section class="sect sect-pad stack stack-12">
+            <div class="row row-gap-8">
+              <kh-icon name="scales" class="kpi-icon" />
+              <span class="sect-t">Admin resolution</span>
+            </div>
 
-      <section class="sect">
-        <div class="sect-h"><span class="sect-t">Case timeline</span></div>
-        <div class="sect-pad">
-          <kh-timeline [steps]="timeline" />
-        </div>
-      </section>
-    </div>
+            @if (problem(); as message) {
+              <div class="banner s-bad" role="alert">
+                <kh-icon name="warning-circle" class="banner-icon" />
+                <div class="banner-body">
+                  <div class="banner-text">{{ message }}</div>
+                </div>
+              </div>
+            }
 
-    <div class="stack stack-14 resolve-panel">
-      <section class="sect sect-pad stack stack-12">
-        <div class="row row-gap-8">
-          <kh-icon name="gavel" class="kpi-icon" />
-          <span class="sect-t">Admin resolution</span>
-        </div>
+            <div class="stack stack-9">
+              @for (option of presets; track option.key) {
+                <label class="radio resolution-option" [class.is-on]="preset() === option.key">
+                  <input
+                    type="radio"
+                    name="resolution"
+                    [checked]="preset() === option.key"
+                    (change)="select(option.key)"
+                  />
+                  <span class="dot"></span>
+                  <span class="grow">
+                    <span class="resolution-label">{{ option.label }}</span>
+                    <span class="resolution-desc">{{ option.desc }}</span>
+                  </span>
+                </label>
+              }
+            </div>
 
-        <div class="stack stack-9">
-          @for (option of resolutions; track option.label) {
-            <label class="radio resolution-option" [class.is-on]="selected() === option.label">
+            <div class="field">
+              <label for="leg-refund">Refunded to the customer ({{ currency() }})</label>
               <input
-                type="radio"
-                name="resolution"
-                [checked]="selected() === option.label"
-                (change)="select(option.label)"
+                id="leg-refund"
+                class="input input-num"
+                type="number"
+                min="0"
+                step="0.01"
+                [value]="refund()"
+                (input)="setLeg('refund', $event)"
               />
-              <span class="dot"></span>
-              <span class="grow">
-                <span class="resolution-label">{{ option.label }}</span>
-                <span class="resolution-desc">{{ option.desc }}</span>
+            </div>
+            <div class="field">
+              <label for="leg-platform">Kept by the platform ({{ currency() }})</label>
+              <input
+                id="leg-platform"
+                class="input input-num"
+                type="number"
+                min="0"
+                step="0.01"
+                [value]="platform()"
+                (input)="setLeg('platform', $event)"
+              />
+            </div>
+            <div class="field">
+              <label for="leg-dealer">Transferred to the dealer ({{ currency() }})</label>
+              <input
+                id="leg-dealer"
+                class="input input-num"
+                type="number"
+                min="0"
+                step="0.01"
+                [value]="dealer()"
+                (input)="setLeg('dealer', $event)"
+              />
+            </div>
+
+            <div class="money-line" [class.is-hi]="balanced()" [class.s-bad]="!balanced()">
+              <span class="k-label">
+                {{ balanced() ? 'Balances against the deposit held' : 'Left to allocate' }}
               </span>
-            </label>
-          }
-        </div>
+              <span class="num">
+                {{ allocated() }} of {{ held() }} {{ currency() }}
+                @if (!balanced()) {
+                  ({{ remainder() > 0 ? '+' : '' }}{{ remainder() }})
+                }
+              </span>
+            </div>
 
-        <div class="field">
-          <label for="penalty-split">Penalty split</label>
-          <div class="split-inputs">
-            <input id="penalty-split" class="input input-num" value="60" />
-            <input class="input input-num" value="60" aria-label="Refunded to customer" />
-          </div>
-          <div class="field-hint">To dealer / refunded to customer · JOD</div>
-        </div>
+            <div class="field">
+              <label for="dealer-charge">Charge to the dealer ({{ currency() }}, optional)</label>
+              <input
+                id="dealer-charge"
+                class="input input-num"
+                type="number"
+                min="0"
+                step="0.01"
+                [value]="dealerCharge()"
+                (input)="dealerCharge.set(text($event))"
+              />
+              <div class="field-hint">
+                Separate from the deposit, and only inside the range this booking assessed.
+              </div>
+            </div>
 
-        <div class="field">
-          <label for="admin-note">Admin note (required)</label>
-          <textarea
-            id="admin-note"
-            class="input"
-            placeholder="Explain the decision and the evidence it rests on…"
-          ></textarea>
-        </div>
+            <div class="field">
+              <label for="admin-note">Admin note (required)</label>
+              <textarea
+                id="admin-note"
+                class="input"
+                rows="4"
+                placeholder="Explain the decision and the evidence it rests on…"
+                [value]="note()"
+                (input)="note.set(text($event))"
+              ></textarea>
+            </div>
 
-        <button type="button" class="btn btn-primary btn-block" (click)="resolve()">
-          Resolve dispute
-        </button>
-        <button type="button" class="btn btn-secondary btn-block" (click)="requestInfo()">
-          Request more information
-        </button>
-        <div class="field-hint">
-          The resolution, your note and the timestamp are shown to both parties.
-        </div>
-      </section>
-
-      <section class="sect sect-pad stack stack-9">
-        <span class="k">Previous resolutions on this booking</span>
-        @for (past of pastResolutions; track past.ts) {
-          <div class="past-resolution">
-            <div class="past-res-title">{{ past.res }}</div>
-            <div class="past-res-reason">{{ past.reason }}</div>
-            <div class="past-res-who">{{ past.who }} · {{ past.ts }}</div>
-          </div>
+            <button
+              type="button"
+              class="btn btn-primary btn-block"
+              [disabled]="!canResolve()"
+              (click)="resolve()"
+            >
+              {{ busy() ? 'Working…' : 'Resolve dispute' }}
+            </button>
+            <div class="field-hint">
+              The decision, your note, your name and the timestamp are shown to both parties and
+              written to the audit log.
+            </div>
+            <div class="note-box is-plain">
+              <kh-icon name="info" />
+              Resolving records the decision. No funds move until the payment module is live.
+            </div>
+          </section>
         }
-      </section>
+      </div>
     </div>
-  </div>
+  }
 </div>

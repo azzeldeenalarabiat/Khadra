@@ -91,11 +91,19 @@ export interface DocumentTile {
   readonly href?: string;
 }
 
+/** Which live count a nav item carries, if any. The number itself is never written here. */
+export type NavCount = 'dealers-pending' | 'disputes-live';
+
 export interface NavItem {
   readonly label: string;
   readonly icon: IconName;
   readonly route: string;
-  readonly badge?: string;
+  /**
+   * The badge names a count for the sidebar to look up in the dashboard snapshot; it never holds a
+   * figure. A hard-coded "12" beside Disputes is a number an administrator will act on, and it was
+   * wrong from the moment it was typed.
+   */
+  readonly count?: NavCount;
 }
 
 export interface NavGroup {

@@ -15,34 +15,13 @@
     <div class="topbar-title">{{ title() }}</div>
   </div>
 
-  <!-- Platform-wide search, the reporting period and the admin notification queue all belong to the
-       Admin's view of the business. A dealer offered a search for "dealers, bookings, disputes" is
-       being offered someone else's console. -->
-  @if (isAdmin()) {
-    <div class="topbar-search">
-      <kh-icon name="magnifying-glass" class="search-icon" />
-      <label class="visually-hidden" for="global-search">Search</label>
-      <input id="global-search" class="input" placeholder="Search dealers, bookings, disputes…" />
-    </div>
-  }
-
+  <!--
+    The design also puts a platform-wide search box, a reporting-period picker and a notification
+    count up here. All three are gone with the sample data: there is no search endpoint, nothing
+    reads a reporting period, and the "9" beside the bell was a number that was never counted. A
+    control that does nothing when clicked costs an administrator more than a missing one does.
+  -->
   <div class="topbar-actions">
-    @if (isAdmin()) {
-      <button type="button" class="btn btn-secondary btn-sm">
-        <kh-icon name="calendar-blank" />
-        This month
-      </button>
-      <div class="bell-wrap">
-        <a
-          class="btn btn-icon btn-secondary btn-33"
-          routerLink="/notifications"
-          aria-label="Notifications"
-        >
-          <kh-icon name="bell" />
-        </a>
-        <span class="bell-badge">9</span>
-      </div>
-    }
     <button type="button" class="user-chip">
       <span class="avatar avatar-26">{{ initials() }}</span>
       <kh-icon name="caret-down" />

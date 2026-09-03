@@ -25,8 +25,8 @@
         >
           <kh-icon [name]="item.icon" class="nav-item-icon" />
           <span class="nav-item-label">{{ item.label }}</span>
-          @if (item.badge) {
-            <span class="nav-badge">{{ item.badge }}</span>
+          @if (badge(item.count); as n) {
+            <span class="nav-badge">{{ n }}</span>
           }
         </a>
       }

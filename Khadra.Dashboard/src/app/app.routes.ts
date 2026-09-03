@@ -6,19 +6,20 @@ import { adminOnlyGuard, dealerStaffGuard } from './core/guards/role.guards';
 /**
  * Console routes.
  *
- * The eleven list screens share one lazily-loaded component and differ only by
- * the `list` key in their route data. Detail routes currently show a single
- * representative record, mirroring the design; they will take an `:id` once the
- * API exists.
+ * A screen is here only if something real answers it. The Admin Console design draws several more —
+ * customers, payments, payouts, finance, reviews, the lookups, the audit log, platform settings —
+ * and those were built against sample content until that content was removed. They keep their route
+ * and their place in the navigation, but they now say what they will show and what is missing,
+ * rather than displaying figures nobody can act on. `notBuilt` names the entry that explains each.
  */
-const list = (path: string, title: string) => ({
+const notBuilt = (path: string, title: string, missing = path) => ({
   path,
-  // The tab title is what a browser history entry and a bookmark are named by,
-  // so every route sets one rather than leaving eleven tabs all reading "Khadra".
+  // The tab title is what a browser history entry and a bookmark are named by, so every route sets
+  // one rather than leaving a dozen tabs all reading "Khadra".
   title: `${title} · Khadra Admin`,
-  data: { list: path },
+  data: { missing },
   loadComponent: () =>
-    import('./features/list-screen/list-screen.component').then((m) => m.ListScreenComponent),
+    import('./features/not-built/not-built.component').then((m) => m.NotBuiltComponent),
 });
 
 export const routes: Routes = [
@@ -81,15 +82,9 @@ export const routes: Routes = [
                 (m) => m.DealersListComponent,
               ),
           },
-          {
-            path: 'dealers/profile',
-            title: 'Dealer profile · Khadra Admin',
-            loadComponent: () =>
-              import('./features/dealers/dealer-profile.component').then(
-                (m) => m.DealerProfileComponent,
-              ),
-          },
-          // Literal segments first: this one would otherwise swallow /dealers/profile.
+          // The dealer's own page as an administrator sees it is the application review screen:
+          // same dealership, same documents, and the decisions attached. One screen, not two.
+          { path: 'dealers/profile', pathMatch: 'full', redirectTo: 'dealers' },
           {
             path: 'dealers/:dealerId',
             title: 'Dealer application · Khadra Admin',
@@ -99,48 +94,29 @@ export const routes: Routes = [
               ),
           },
 
-          list('bookings', 'Bookings'),
+          notBuilt('bookings', 'Bookings'),
+          notBuilt('bookings/detail', 'Booking details', 'booking-detail'),
+
+          notBuilt('customers', 'Customers'),
+          notBuilt('customers/profile', 'Customer profile', 'customer-profile'),
+
+          notBuilt('finance', 'Finance'),
+          notBuilt('payments', 'Payments'),
+          notBuilt('payments/detail', 'Payment details', 'payment-detail'),
+          notBuilt('payouts', 'Payouts'),
+
+          // Disputes are real: the queue, and the workspace where the platform's only decision
+          // about money is made.
           {
-            path: 'bookings/detail',
-            title: 'Booking details · Khadra Admin',
+            path: 'disputes',
+            title: 'Disputes · Khadra Admin',
             loadComponent: () =>
-              import('./features/bookings/booking-detail.component').then(
-                (m) => m.BookingDetailComponent,
+              import('./features/disputes/disputes-list.component').then(
+                (m) => m.DisputesListComponent,
               ),
           },
-
-          list('customers', 'Customers'),
           {
-            path: 'customers/profile',
-            title: 'Customer profile · Khadra Admin',
-            loadComponent: () =>
-              import('./features/customers/customer-profile.component').then(
-                (m) => m.CustomerProfileComponent,
-              ),
-          },
-
-          {
-            path: 'finance',
-            title: 'Finance · Khadra Admin',
-            loadComponent: () =>
-              import('./features/finance/finance.component').then((m) => m.FinanceComponent),
-          },
-
-          list('payments', 'Payments'),
-          {
-            path: 'payments/detail',
-            title: 'Payment details · Khadra Admin',
-            loadComponent: () =>
-              import('./features/payments/payment-detail.component').then(
-                (m) => m.PaymentDetailComponent,
-              ),
-          },
-
-          list('payouts', 'Payouts'),
-
-          list('disputes', 'Disputes'),
-          {
-            path: 'disputes/detail',
+            path: 'disputes/:ticketId',
             title: 'Dispute resolution · Khadra Admin',
             loadComponent: () =>
               import('./features/disputes/dispute-detail.component').then(
@@ -148,32 +124,15 @@ export const routes: Routes = [
               ),
           },
 
-          list('reviews', 'Reviews'),
-          list('cities', 'Cities & Regions'),
-          list('car-types', 'Car Types'),
-          list('audit-logs', 'Audit logs'),
-          list('admin-users', 'Admin users'),
+          notBuilt('reviews', 'Reviews'),
+          notBuilt('cities', 'Cities & Regions'),
+          notBuilt('car-types', 'Car Types', 'car-types'),
+          notBuilt('audit-logs', 'Audit logs', 'audit-logs'),
+          notBuilt('admin-users', 'Admin users', 'admin-users'),
 
-          {
-            path: 'settings',
-            title: 'Platform settings · Khadra Admin',
-            loadComponent: () =>
-              import('./features/settings/settings.component').then((m) => m.SettingsComponent),
-          },
-          {
-            path: 'notifications',
-            title: 'Notifications · Khadra Admin',
-            loadComponent: () =>
-              import('./features/notifications/notifications.component').then(
-                (m) => m.NotificationsComponent,
-              ),
-          },
-          {
-            path: 'security',
-            title: 'Security · Khadra Admin',
-            loadComponent: () =>
-              import('./features/security/security.component').then((m) => m.SecurityComponent),
-          },
+          notBuilt('settings', 'Platform settings'),
+          notBuilt('notifications', 'Notifications'),
+          notBuilt('security', 'Security'),
         ],
       },
 
@@ -292,7 +251,9 @@ export const routes: Routes = [
             path: 'fleet/new',
             title: 'Add vehicle · Khadra',
             loadComponent: () =>
-              import('./features/fleet/vehicle-wizard.component').then((m) => m.VehicleWizardComponent),
+              import('./features/fleet/vehicle-wizard.component').then(
+                (m) => m.VehicleWizardComponent,
+              ),
           },
           {
             path: 'fleet/:vehicleId',

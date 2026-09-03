@@ -19,6 +19,8 @@ export interface Dispute {
   readonly closedAt: string | null;
   readonly statements: readonly DisputeStatement[];
   readonly resolution: DisputeResolution | null;
+  /** What a resolution must split, from the server. The console never derives this itself. */
+  readonly depositHeld: Money;
   readonly booking: Booking;
 }
 
@@ -55,4 +57,28 @@ export interface EvidenceUpload {
   readonly uploadUrl: string;
   readonly storageKey: string;
   readonly expiresAt: string;
+}
+
+/**
+ * One row of the Admin's dispute queue (`GET /api/v1/admin/disputes`).
+ *
+ * `isOverdue` is judged against the deadline frozen when the ticket was opened, so raising the SLA
+ * later never retroactively breaches a promise already made.
+ */
+export interface DisputeListItem {
+  readonly ticketId: string;
+  readonly bookingId: string;
+  readonly bookingReference: string;
+  readonly dealerName: string;
+  readonly customerName: string;
+  readonly openedByParty: 'Customer' | 'Dealer';
+  readonly reason: string;
+  readonly status: 'Open' | 'UnderReview' | 'Resolved' | 'Withdrawn';
+  readonly openedAt: string;
+  readonly slaDeadline: string;
+  readonly isOverdue: boolean;
+  readonly assignedAdminId: string | null;
+  readonly assignedAdminName: string | null;
+  readonly closedAt: string | null;
+  readonly statementCount: number;
 }

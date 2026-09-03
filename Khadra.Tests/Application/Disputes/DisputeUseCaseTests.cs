@@ -421,4 +421,30 @@ public sealed class DisputeUseCaseTests
         Assert.Equal("dispute.booking_missing", result.Error.Code);
         Assert.Same(DisputeStatus.Open, ticket.Status);
     }
+
+    /// <summary>
+    /// The workspace must be told what a resolution has to add up to. It comes from the same helper
+    /// the resolve handler validates against, so an admin can never be shown one basis and judged
+    /// against another.
+    /// </summary>
+    [Fact]
+    public async Task The_view_carries_the_deposit_a_resolution_must_split()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now));
+
+        var result = await context.Admin().Handle(
+            new GetDisputeForReviewQuery(ticket.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var held = BookingDisputeSettlement.DepositHeldFor(booking);
+        Assert.Equal(held.Amount, result.Value.DepositHeld.Amount);
+        Assert.Equal(held.CurrencyCode, result.Value.DepositHeld.Currency);
+        // And the figure is the one a balanced split is actually checked against.
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, result.Value.DepositHeld.Amount, 0m, 0m, null, "Refunded in full."),
+            CancellationToken.None);
+        Assert.True(resolved.IsSuccess);
+    }
 }

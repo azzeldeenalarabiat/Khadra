@@ -142,3 +142,26 @@ invitations per owner.
 `DeliverySettings.MaxRadiusKm = 200` is a business number in code, mirrored in the API request
 validation and now surfaced to the console through `GET /dealers/me/delivery`. Move it into
 `BusinessRules` the next time delivery rules are touched.
+
+### 11. Admin screens without a backend
+
+**Status:** open by design · **Raised:** 2026-09-03
+
+The Admin Console design draws more screens than the platform can answer. Their sample data has been
+removed, and each now states what it will show and what is missing: customers, payments, payouts,
+finance, reviews, cities, car types, audit logs, admin users, platform settings, notifications and
+security. Two of them are closer than the rest and worth doing first:
+
+- **Audit logs.** The entries are real, append-only and already written in the same transaction as
+  every dealer decision and dispute resolution. Only a read endpoint and a screen are missing, so
+  this is the cheapest of the group and the one an auditor asks for first.
+- **Platform settings.** The numbers are real and enforced, but they come from configuration through
+  `IBusinessRulesProvider`. `BusinessRuleSettings` is designed to replace that source without
+  touching a single consumer; a booking already freezes what it was made under, so making them
+  editable cannot rewrite history.
+
+**Also removed with the fixtures:** the topbar's platform-wide search box, its reporting-period
+button and its notification count, none of which were connected to anything. Restore them with the
+features, not before.
+
+**To close:** each screen leaves this list by getting a real reader, endpoint and component.
