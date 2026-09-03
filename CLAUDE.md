@@ -1,6 +1,6 @@
 # Khadra
 
-Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.0.docx` (v3.0 "Confirmed Business Rules"). One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens, not in this repo). Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
+Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.1.docx` (v3.1 "Tech Stack Finalized"; v3.0 is kept for history — the two differ only in the header, every numbered section is identical). v3.1 names this stack: ASP.NET Core + PostgreSQL + EF Core. One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens, not in this repo). Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
 
 ## Commands
 
@@ -53,4 +53,6 @@ Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.com
 
 ## Open business decisions (spec §2.2)
 
-Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, minimum renter age, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
+Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
+
+**Minimum renter age: settled at 21** by the owner and enforced (`BusinessRules:MinimumRenterAge`, `RenterAgePolicy`). The spec still says "value pending Section 2 decision" in §5.1 and lists it as open in §2.2 — the document has not caught up with the decision. The code is right; the spec needs a revision.
