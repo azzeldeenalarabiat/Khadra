@@ -24,6 +24,8 @@ internal sealed class HttpCurrentActor(IHttpContextAccessor httpContextAccessor)
         }
     }
 
+    public string? Name => Context?.User.FindFirst(KhadraClaimTypes.Name)?.Value;
+
     public Guid? SecurityStamp =>
         Guid.TryParse(Context?.User.FindFirst(KhadraClaimTypes.SecurityStamp)?.Value, out var stamp) ? stamp : null;
 

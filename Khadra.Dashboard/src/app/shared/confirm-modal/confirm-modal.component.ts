@@ -33,6 +33,10 @@ export class ConfirmModalComponent {
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dlg');
 
   protected readonly modal = this.ui.modal;
+  protected readonly busy = this.ui.modalBusy;
+
+  /** What the admin typed or chose, keyed by field label. */
+  private readonly values = new Map<string, string>();
   protected readonly toneClass = toneClass;
 
   constructor() {
@@ -64,7 +68,14 @@ export class ConfirmModalComponent {
     this.close();
   }
 
+  protected setField(label: string, event: Event): void {
+    this.values.set(
+      label,
+      (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value,
+    );
+  }
+
   protected confirm(): void {
-    this.ui.confirmModal();
+    void this.ui.confirmModal(Object.fromEntries(this.values));
   }
 }

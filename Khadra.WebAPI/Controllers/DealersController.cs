@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers.Dtos;
 using Khadra.Application.Dealers.GetMyDealer;
+using Khadra.Application.Dealers.ReviewDealer;
 using Khadra.Application.Dealers.SubmitDealerProfile;
 using Khadra.Application.Dealers.UpdateDeliverySettings;
 using Khadra.Domain.Common;
@@ -82,6 +83,23 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     public async Task<ActionResult> Mine(CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(new GetMyDealerQuery(actor.UserId!.Value), cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// Spec 3.1 from the dealer side: after a clarification request or a rejection the owner fixes
+    /// the problem and puts the application back in the queue, restarting the 48-hour SLA clock.
+    ///
+    /// Not gated on approval, obviously: this is precisely what an unapproved dealer needs to do.
+    /// </summary>
+    [Authorize(Policy = SecurityPolicies.DealerOwner)]
+    [HttpPost("me/resubmit")]
+    [ProducesResponseType<DealerProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> Resubmit(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new ResubmitDealerCommand(actor.UserId!.Value), cancellationToken);
         return FromResult(result);
     }
 

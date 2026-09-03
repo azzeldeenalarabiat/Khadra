@@ -84,8 +84,11 @@ export interface DocumentTile {
   readonly label: string;
   readonly status: string;
   readonly tone: Tone;
+  /** The file name as an admin would recognise it, never the URL. */
   readonly file: string;
   readonly meta: string;
+  /** A short-lived signed link, when one exists. Absent on sample tiles. */
+  readonly href?: string;
 }
 
 export interface NavItem {

@@ -1,0 +1,91 @@
+<div class="stack stack-14">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Dealers</h1>
+      <div class="page-sub">
+        Rental offices on the platform. Applications are ordered by how close they are to the review
+        deadline.
+      </div>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load the dealer queue</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    </section>
+  } @else {
+    <section class="sect stack sect-clip">
+      <div class="list-toolbar">
+        <div class="list-search">
+          <kh-icon name="magnifying-glass" class="search-icon" />
+          <label class="visually-hidden" for="dealer-search"
+            >Search dealer or registration no.</label
+          >
+          <input
+            id="dealer-search"
+            class="input input-sm"
+            placeholder="Search dealer or registration no."
+            [value]="search()"
+            (input)="setSearch($event)"
+          />
+        </div>
+        @for (option of statuses; track option.label) {
+          <button
+            type="button"
+            class="btn btn-sm"
+            [class.btn-primary]="status() === option.value"
+            [class.btn-secondary]="status() !== option.value"
+            (click)="setStatus(option.value)"
+          >
+            {{ option.label }}
+          </button>
+        }
+      </div>
+
+      @if (resource.isLoading()) {
+        <div class="sect-pad" aria-busy="true" aria-live="polite">
+          @for (placeholder of [0, 1, 2, 3, 4, 5]; track placeholder) {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          }
+        </div>
+      } @else if (rows().length === 0) {
+        <div class="state-block is-empty">
+          <div class="state-icon is-outline"><kh-icon name="tray" /></div>
+          <div class="state-title">No dealers match this view</div>
+          <div class="state-text">Clear the search or choose a different status.</div>
+        </div>
+      } @else {
+        <kh-data-table [columns]="columns" [rows]="rows()" minWidth="1040px" />
+        <div class="pager">
+          <span class="pager-count">{{ summary() }}</span>
+          <div class="pager-nav">
+            <button
+              type="button"
+              class="btn btn-secondary btn-page"
+              [disabled]="!hasPrevious()"
+              (click)="goTo(page() - 1)"
+            >
+              Previous
+            </button>
+            <button type="button" class="btn btn-primary btn-page">{{ page() }}</button>
+            <button
+              type="button"
+              class="btn btn-secondary btn-page"
+              [disabled]="!hasNext()"
+              (click)="goTo(page() + 1)"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      }
+    </section>
+  }
+</div>

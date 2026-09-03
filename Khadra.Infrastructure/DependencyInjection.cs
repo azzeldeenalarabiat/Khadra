@@ -126,6 +126,7 @@ public static class DependencyInjection
     private static void AddReporting(IServiceCollection services)
     {
         services.AddScoped<IDealerDashboardReader, DealerDashboardReader>();
+        services.AddScoped<IDealerAdminReader, DealerAdminReader>();
         services.AddScoped<IBookingDashboardReader, BookingDashboardReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
         services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();

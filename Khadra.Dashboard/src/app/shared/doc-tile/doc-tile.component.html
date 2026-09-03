@@ -4,7 +4,13 @@
     <span class="mono">{{ doc().file }}</span>
     @if (showPreview()) {
       <div>
-        <button type="button" class="btn btn-primary btn-xs">Open secure preview</button>
+        @if (doc().href; as href) {
+          <a class="btn btn-primary btn-xs" [href]="href" target="_blank" rel="noopener">
+            Open secure preview
+          </a>
+        } @else {
+          <button type="button" class="btn btn-primary btn-xs">Open secure preview</button>
+        }
       </div>
     }
   </div>

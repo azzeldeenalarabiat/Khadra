@@ -1,0 +1,83 @@
+using Khadra.Application.Common;
+using Khadra.Application.Dealers.ReadModels;
+using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
+using Khadra.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Khadra.Infrastructure.Reporting;
+
+internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminReader
+{
+    public async Task<PagedResult<DealerListItem>> ListAsync(
+        DealerListFilter filter,
+        PageRequest page,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(page);
+
+        // The soft-delete filter on dealers applies to both branches, so removed applications are
+        // already out either way.
+        //
+        // Search goes through FromSql rather than LINQ because BusinessName and CommercialRegistration
+        // are value objects stored through a converter: EF has a BusinessName in the model and a
+        // varchar in the database, and there is no translation for "ILIKE" across that boundary.
+        // Naming the columns is the honest way to say what this actually does.
+        var query = string.IsNullOrWhiteSpace(filter.Search)
+            ? context.Dealers.AsQueryable()
+            : SearchQuery(filter.Search.Trim());
+
+        if (!string.IsNullOrWhiteSpace(filter.Status))
+        {
+            var status = Enumeration.GetAll<DealerVerificationStatus>()
+                .SingleOrDefault(candidate =>
+                    string.Equals(candidate.Name, filter.Status, StringComparison.OrdinalIgnoreCase));
+            // An unrecognised status filters everything out rather than being ignored: silently
+            // returning the unfiltered list would look like the filter worked and found everything.
+            if (status is null)
+                return PagedResult.Empty<DealerListItem>(page.Page, page.PageSize);
+
+            query = query.Where(dealer => dealer.VerificationStatus == status);
+        }
+
+        if (filter.SuspendedOnly == true)
+            query = query.Where(dealer => dealer.IsSuspended);
+
+        var total = await query.CountAsync(cancellationToken);
+        if (total == 0)
+            return PagedResult.Empty<DealerListItem>(page.Page, page.PageSize);
+
+        var approved = DealerVerificationStatus.Approved;
+
+        var items = await query
+            // Whatever is closest to breaching its review promise comes first; that is the order an
+            // admin working the queue actually wants.
+            .OrderBy(dealer => dealer.ReviewDueAt)
+            .ThenByDescending(dealer => dealer.CreatedAt)
+            .Skip(page.Skip)
+            .Take(page.PageSize)
+            .Select(dealer => new DealerListItem(
+                dealer.Id.Value,
+                dealer.BusinessName.Value,
+                dealer.CommercialRegistration.Value,
+                dealer.VerificationStatus.Name,
+                dealer.IsSuspended,
+                dealer.VerificationStatus == approved && !dealer.IsSuspended,
+                dealer.SubmittedAt,
+                dealer.ReviewDueAt,
+                dealer.CreatedAt,
+                dealer.Documents.Count,
+                dealer.Employees.Count))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<DealerListItem>(items, page.Page, page.PageSize, total);
+    }
+
+    private IQueryable<Dealer> SearchQuery(string term)
+    {
+        var pattern = $"%{term}%";
+        return context.Dealers.FromSql(
+            $"SELECT * FROM dealers WHERE business_name ILIKE {pattern} OR commercial_registration ILIKE {pattern}");
+    }
+}

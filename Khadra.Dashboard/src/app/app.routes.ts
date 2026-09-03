@@ -53,12 +53,11 @@ export const routes: Routes = [
           import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
       },
 
-      list('dealers', 'Dealers'),
       {
-        path: 'dealers/review',
-        title: 'Dealer application · Khadra Admin',
+        path: 'dealers',
+        title: 'Dealers · Khadra Admin',
         loadComponent: () =>
-          import('./features/dealers/dealer-review.component').then((m) => m.DealerReviewComponent),
+          import('./features/dealers/dealers-list.component').then((m) => m.DealersListComponent),
       },
       {
         path: 'dealers/profile',
@@ -67,6 +66,13 @@ export const routes: Routes = [
           import('./features/dealers/dealer-profile.component').then(
             (m) => m.DealerProfileComponent,
           ),
+      },
+      // Literal segments first: this one would otherwise swallow /dealers/profile.
+      {
+        path: 'dealers/:dealerId',
+        title: 'Dealer application · Khadra Admin',
+        loadComponent: () =>
+          import('./features/dealers/dealer-review.component').then((m) => m.DealerReviewComponent),
       },
 
       list('bookings', 'Bookings'),
