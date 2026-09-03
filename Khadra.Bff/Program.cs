@@ -149,6 +149,21 @@ builder.Services.AddReverseProxy()
             var accessToken = await tokens.GetAccessTokenAsync(transform.HttpContext, transform.HttpContext.RequestAborted);
             transform.ProxyRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         });
+
+        // The API says 401 on a proxied call when the bearer token it was given is no longer good:
+        // the security stamp rotated because the password changed elsewhere, an admin suspended the
+        // account, or a dealer owner deactivated this employee (spec 4.2: "their login stops working
+        // immediately"). Until now the cookie session outlived that by up to the access token's
+        // remaining life, so every call failed while /bff/user still said "signed in". End the
+        // session the moment the API disowns it, so the next navigation lands on sign-in.
+        transformBuilder.AddResponseTransform(async transform =>
+        {
+            if (isAnonymousRoute || transform.ProxyResponse?.StatusCode != System.Net.HttpStatusCode.Unauthorized)
+                return;
+
+            if (transform.HttpContext.User.Identity?.IsAuthenticated == true)
+                await transform.HttpContext.SignOutAsync(BffConstants.CookieScheme);
+        });
     });
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>

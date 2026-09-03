@@ -2,6 +2,7 @@ using Khadra.Application.Bookings;
 using Khadra.Application.Bookings.ReadBookings;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Dealers;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
@@ -126,7 +127,7 @@ public sealed class ReadBookingsTests
 
     private GetBookingHandler Get() => new(_bookings, _reader, new BookingPartyResolver(_dealers), _clock);
 
-    private ListMyBookingsHandler List() => new(_reader, _dealers);
+    private ListMyBookingsHandler List() => new(_reader, new DealerMembershipResolver(_dealers));
 
     [Fact]
     public async Task A_customer_reads_their_own_booking_with_its_frozen_terms()

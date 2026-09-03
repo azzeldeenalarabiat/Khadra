@@ -57,8 +57,39 @@ export const NAV_GROUPS: readonly NavGroup[] = [
  */
 export const DEALER_NAV: readonly NavGroup[] = [
   {
+    group: 'Main',
+    items: [{ label: 'Dashboard', icon: 'squares-four', route: '/dealer/dashboard' }],
+  },
+  {
+    group: 'Operations',
+    items: [
+      { label: 'Bookings', icon: 'calendar-check', route: '/dealer/bookings' },
+      { label: 'Fleet', icon: 'car-simple', route: '/dealer/fleet' },
+    ],
+  },
+  {
+    group: 'Team',
+    items: [{ label: 'Employees', icon: 'users-three', route: '/dealer/employees' }],
+  },
+  {
     group: 'Business',
-    items: [{ label: 'My fleet', icon: 'car', route: '/fleet' }],
+    items: [
+      { label: 'Dealer Profile', icon: 'storefront', route: '/dealer/profile' },
+      { label: 'Delivery', icon: 'moped', route: '/dealer/delivery' },
+      { label: 'Reviews', icon: 'star', route: '/dealer/reviews' },
+    ],
+  },
+  {
+    group: 'Finance',
+    items: [{ label: 'Reports', icon: 'chart-line-up', route: '/dealer/reports' }],
+  },
+  {
+    group: 'System',
+    items: [
+      { label: 'Notifications', icon: 'bell', route: '/dealer/notifications' },
+      { label: 'Activity', icon: 'list-magnifying-glass', route: '/dealer/activity' },
+      { label: 'Settings', icon: 'sliders-horizontal', route: '/dealer/settings' },
+    ],
   },
 ];
 
@@ -88,10 +119,23 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
   'admin-users': 'Admin users',
   security: 'Security',
 
-  // Dealer-facing (spec 4.3).
-  fleet: 'My fleet',
-  'fleet/new': 'Add a car',
-  'fleet/:id': 'Edit car',
+  // The Dealer console (design: Dealer Console.dc.html, SCREENS).
+  'dealer/dashboard': 'Dashboard',
+  'dealer/bookings': 'Bookings',
+  'dealer/bookings/:id': 'Booking details',
+  'dealer/fleet': 'Fleet',
+  'dealer/fleet/new': 'Add vehicle',
+  'dealer/fleet/:id': 'Vehicle details',
+  'dealer/employees': 'Employees',
+  'dealer/profile': 'Dealer profile',
+  'dealer/profile/preview': 'Public page preview',
+  'dealer/delivery': 'Delivery',
+  'dealer/reviews': 'Reviews',
+  'dealer/reports': 'Reports',
+  'dealer/notifications': 'Notifications',
+  'dealer/activity': 'Activity',
+  'dealer/settings': 'Settings',
+  'dealer/disputes/:id': 'Dispute',
 };
 
 /** Detail screens sit under a list screen in the breadcrumb trail. */
@@ -102,6 +146,9 @@ export const SCREEN_PARENTS: Readonly<Record<string, string>> = {
   'customers/profile': 'customers',
   'payments/detail': 'payments',
   'disputes/detail': 'disputes',
-  'fleet/new': 'fleet',
-  'fleet/:id': 'fleet',
+  'dealer/bookings/:id': 'dealer/bookings',
+  'dealer/fleet/new': 'dealer/fleet',
+  'dealer/fleet/:id': 'dealer/fleet',
+  'dealer/profile/preview': 'dealer/profile',
+  'dealer/disputes/:id': 'dealer/bookings',
 };

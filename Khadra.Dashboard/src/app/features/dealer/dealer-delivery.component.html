@@ -1,0 +1,163 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Delivery</h1>
+      <div class="page-sub">Whether you deliver, and how far. The fee is set by the platform.</div>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load delivery settings</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="resource.reload()">
+            Retry
+          </button>
+        </div>
+      </div>
+    </section>
+  } @else if (settings(); as s) {
+    @if (!canEdit()) {
+      <div class="banner s-warn" role="status">
+        <kh-icon name="info" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-text">
+            @if (me.value()?.isOwner) {
+              Delivery can be changed once your dealership is approved and trading.
+            } @else {
+              Only the dealer owner can change delivery settings. You can read them here.
+            }
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="dc-split-155">
+      <div class="stack stack-14">
+        <section class="sect sect-pad">
+          <label class="toggle-card">
+            <input
+              type="checkbox"
+              [checked]="enabled()"
+              [disabled]="!canEdit()"
+              (change)="enabled.set(!enabled())"
+            />
+            <div class="grow">
+              <div class="toggle-title">Offer delivery</div>
+              <div class="toggle-desc">
+                Customers inside your radius can ask for the car to be brought to them. A booking
+                outside the radius is only offered as pickup.
+              </div>
+            </div>
+            <span class="pill" [class]="enabled() ? 's-ok' : 's-dim'">{{
+              enabled() ? 'On' : 'Off'
+            }}</span>
+          </label>
+        </section>
+
+        <section class="sect" [class.is-muted]="!enabled()">
+          <div class="sect-h">
+            <span class="sect-t">Delivery radius</span>
+            <span class="sect-hint">From your dealer location · up to {{ s.maxRadiusKm }} km</span>
+          </div>
+          <div class="sect-pad stack stack-10">
+            <div class="radius-head">
+              <span class="radius-figure num">{{ radius() }} km</span>
+            </div>
+            <input
+              class="range"
+              type="range"
+              min="1"
+              [max]="s.maxRadiusKm"
+              step="1"
+              [value]="radius()"
+              [disabled]="!canEdit() || !enabled()"
+              (input)="setRadius($event)"
+              aria-label="Delivery radius in kilometres"
+            />
+            <div class="range-ends">
+              <span>1 km</span><span>{{ s.maxRadiusKm }} km</span>
+            </div>
+            <div class="field">
+              <label for="radius-km">Exact radius (km)</label>
+              <input
+                id="radius-km"
+                class="input"
+                type="number"
+                min="1"
+                [max]="s.maxRadiusKm"
+                step="0.5"
+                [value]="radius()"
+                [disabled]="!canEdit() || !enabled()"
+                (input)="setRadius($event)"
+              />
+              @if (radiusInvalid()) {
+                <div class="field-error">Enter a radius between 0 and {{ s.maxRadiusKm }} km.</div>
+              }
+            </div>
+          </div>
+        </section>
+
+        @if (problem(); as message) {
+          <div class="banner s-bad" role="alert">
+            <kh-icon name="warning-circle" class="banner-icon" />
+            <div class="banner-body">
+              <div class="banner-text">{{ message }}</div>
+            </div>
+          </div>
+        }
+
+        @if (canEdit()) {
+          <div class="action-row">
+            <button
+              type="button"
+              class="btn btn-primary btn-md"
+              [disabled]="busy() || !dirty() || radiusInvalid()"
+              (click)="save()"
+            >
+              {{ busy() ? 'Saving…' : 'Save delivery settings' }}
+            </button>
+            @if (dirty()) {
+              <span class="page-sub">Unsaved changes</span>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="stack stack-14">
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">Delivery fee</span>
+          <div class="stat-v num">
+            {{ s.platformDeliveryFee.amount }} {{ s.platformDeliveryFee.currency }}
+          </div>
+          <div class="page-sub">
+            Charged to the customer on every delivery booking, platform-wide. It is added on top of
+            the rental and paid with the deposit; it is not yours to set.
+          </div>
+        </section>
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">How the radius is used</span>
+          <div class="page-sub">
+            When a customer drops a pin, the platform measures the straight-line distance from your
+            dealer location. Inside the radius, delivery is offered on your cars; outside, pickup
+            only.
+          </div>
+          <div class="note-box is-plain">
+            <kh-icon name="info" />
+            A booking freezes the fee it was made under. Changing the radius never changes an
+            existing booking.
+          </div>
+        </section>
+      </div>
+    </div>
+  } @else {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  }
+</div>

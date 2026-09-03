@@ -81,3 +81,26 @@ export interface UploadTicket {
 
 export type VehicleStatusAction =
   'Publish' | 'Hide' | 'SendToMaintenance' | 'ReturnFromMaintenance';
+
+/** The form shape of an existing car: what an edit or a resumed draft starts from. */
+export function toVehicleRequest(car: Vehicle): VehicleRequest {
+  return {
+    carTypeId: car.carTypeId,
+    make: car.make,
+    model: car.model,
+    year: car.year,
+    color: car.color,
+    seats: car.seats,
+    transmission: car.transmission,
+    fuelType: car.fuelType,
+    description: car.description,
+    plateNumber: car.plateNumber,
+    dailyRate: car.dailyRate.amount,
+    securityDeposit: car.securityDeposit.amount,
+    isDeliveryEligible: car.isDeliveryEligible,
+    mileageUnlimited: car.mileage.isUnlimited,
+    mileageDailyLimitKm: car.mileage.dailyLimitKm,
+    mileageExcessFeePerKm: car.mileage.excessFeePerKm?.amount ?? null,
+    fuelPolicy: car.fuelPolicy,
+  };
+}

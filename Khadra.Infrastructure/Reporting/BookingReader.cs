@@ -22,12 +22,10 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentNullException.ThrowIfNull(page);
 
-        var query = context.Bookings.AsQueryable();
+        var open = DisputeStatus.Open;
+        var underReview = DisputeStatus.UnderReview;
 
-        if (filter.CustomerId is { } customerId)
-            query = query.Where(booking => booking.CustomerId == customerId);
-        if (filter.DealerId is { } dealerId)
-            query = query.Where(booking => booking.DealerId == dealerId);
+        var query = Scoped(filter);
 
         if (!string.IsNullOrWhiteSpace(filter.Status))
         {
@@ -41,12 +39,17 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             query = query.Where(booking => booking.Status == status);
         }
 
+        if (!string.IsNullOrWhiteSpace(filter.Tab))
+        {
+            if (!BookingTabs.IsKnown(filter.Tab))
+                return PagedResult.Empty<BookingListItem>(page.Page, page.PageSize);
+
+            query = ForTab(query, filter.Tab, open, underReview);
+        }
+
         var total = await query.CountAsync(cancellationToken);
         if (total == 0)
             return PagedResult.Empty<BookingListItem>(page.Page, page.PageSize);
-
-        var open = DisputeStatus.Open;
-        var underReview = DisputeStatus.UnderReview;
 
         var items = await query
             // Newest first: for a customer that is "the one I just made"; for a dealer it is the
@@ -92,6 +95,73 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             .ToListAsync(cancellationToken);
 
         return new PagedResult<BookingListItem>(items, page.Page, page.PageSize, total);
+    }
+
+    public async Task<IReadOnlyDictionary<string, int>> TabCountsAsync(
+        BookingListFilter scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+
+        var open = DisputeStatus.Open;
+        var underReview = DisputeStatus.UnderReview;
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        // One round trip per tab rather than a grouped query: eight small COUNTs against indexed
+        // columns, and the code stays the same mapping the list uses, so a tab and its count can
+        // never disagree about what belongs in it.
+        foreach (var tab in BookingTabs.Names)
+            counts[tab] = await ForTab(Scoped(scope), tab, open, underReview).CountAsync(cancellationToken);
+
+        return counts;
+    }
+
+    /// <summary>The bookings this caller may see at all. A dealer never sees PendingPayment.</summary>
+    private IQueryable<Booking> Scoped(BookingListFilter filter)
+    {
+        var query = context.Bookings.AsQueryable();
+
+        if (filter.CustomerId is { } customerId)
+            query = query.Where(booking => booking.CustomerId == customerId);
+
+        if (filter.DealerId is { } dealerId)
+        {
+            var pendingPayment = BookingStatus.PendingPayment;
+            query = query.Where(booking => booking.DealerId == dealerId && booking.Status != pendingPayment);
+        }
+
+        // One car's history (the vehicle detail screen): still inside the caller's own scope.
+        if (filter.VehicleId is { } vehicleId)
+        {
+            var vehicle = Id.From(vehicleId);
+            query = query.Where(booking => booking.VehicleId == vehicle);
+        }
+
+        return query;
+    }
+
+    private IQueryable<Booking> ForTab(IQueryable<Booking> query, string tab, DisputeStatus open, DisputeStatus underReview)
+    {
+        if (string.Equals(tab, BookingTabs.Disputed, StringComparison.OrdinalIgnoreCase))
+        {
+            return query.Where(booking => context.DisputeTickets.Any(ticket =>
+                ticket.BookingId == booking.Id && (ticket.Status == open || ticket.Status == underReview)));
+        }
+
+        var statuses = BookingTabs.StatusesFor(tab);
+        if (statuses is null)
+            return query;
+
+        // Listed out rather than Contains(): smart enums compare through a converter, and a plain
+        // equality per member translates cleanly where a collection Contains does not.
+        return statuses.Count switch
+        {
+            1 => query.Where(booking => booking.Status == statuses[0]),
+            4 => query.Where(booking =>
+                booking.Status == statuses[0] || booking.Status == statuses[1] ||
+                booking.Status == statuses[2] || booking.Status == statuses[3]),
+            _ => query,
+        };
     }
 
     public async Task<BookingContext> ContextAsync(Id bookingId, CancellationToken cancellationToken = default)

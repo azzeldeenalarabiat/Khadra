@@ -132,9 +132,11 @@ internal sealed partial class LocalDocumentStorage : IDocumentStorage
         };
     }
 
-    [GeneratedRegex(@"^[a-z]+/[0-9a-f-]+$")]
+    [GeneratedRegex(@"^[a-z-]+/[0-9a-f-]+$")]
     private static partial Regex ScopePattern();
 
-    [GeneratedRegex(@"^[a-z]+/[0-9a-f-]+/[0-9a-f]+\.(jpg|jpeg|png|webp|pdf)$")]
+    // Scope, id, file. The scope may carry a hyphen (dealer-branding) and the file stem a word before
+    // its guid (logo-…, cover-…); nothing else, and never a path separator or a dot in the stem.
+    [GeneratedRegex(@"^[a-z-]+/[0-9a-f-]+/[0-9a-z-]+\.(jpg|jpeg|png|webp|pdf)$")]
     private static partial Regex KeyPattern();
 }

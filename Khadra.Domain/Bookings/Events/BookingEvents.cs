@@ -16,7 +16,9 @@ public sealed record BookingApproved(
     Id BookingId,
     Id DealerId,
     Id ActedByUserId,
-    DateTimeOffset OccurredAt) : IDomainEvent;
+    DateTimeOffset OccurredAt,
+    // The dealer's word to the customer, if any, so a notification can carry it.
+    string? Note = null) : IDomainEvent;
 
 public sealed record BookingRejected(
     Id BookingId,

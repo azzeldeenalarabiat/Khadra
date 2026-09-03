@@ -35,10 +35,13 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
         // - RefreshToken: two refreshes of the same token must not both succeed.
         // - DisputeTicket and Booking: two admins resolving the same ticket would otherwise both pass
         //   the in-memory status check and both save, so the second silently overwrites the first's
-        //   decision about money, leaving two audit entries asserting different outcomes.
+        //   decision about money, leaving two audit entries asserting different outcomes. Booking also
+        //   covers two staff answering the same request at once: Approve and Reject would both pass
+        //   the Requested check and write contradictory history rows.
+        // - Dealer: an owner editing employees from two tabs.
         if (Database.IsNpgsql())
         {
-            foreach (var type in new[] { typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking) })
+            foreach (var type in new[] { typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer) })
             {
                 modelBuilder.Entity(type)
                     .Property<uint>("xmin")

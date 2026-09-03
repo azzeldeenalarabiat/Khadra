@@ -29,6 +29,7 @@ internal sealed partial class DevelopmentSeeder(
     IPasswordHasher passwordHasher,
     IBusinessRulesProvider businessRules,
     IClock clock,
+    IDocumentStorage storage,
     ILogger<DevelopmentSeeder> logger)
 {
     public const string AdminEmail = "admin@khadra.jo";
@@ -41,6 +42,10 @@ internal sealed partial class DevelopmentSeeder(
         Id.From(Guid.Parse("01a06675-0000-7000-8000-000000000001"));
 
     private readonly Random _random = new(20260903);
+
+    // A valid 8x8 JPEG, plain grey. Enough for an <img> to load; not pretending to be a car.
+    private static readonly byte[] PlaceholderJpeg = Convert.FromBase64String(
+        "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAAIAAgBAREA/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APn+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiv/Z");
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
@@ -92,6 +97,18 @@ internal sealed partial class DevelopmentSeeder(
             aggregate.Entity.ClearDomainEvents();
 
         await context.SaveChangesAsync(cancellationToken);
+
+        // The photo every seeded car carries has to exist on disk, or the console shows a broken
+        // image where a customer would see the car. A flat placeholder, written at the exact key the
+        // listing quotes, through the same storage the real upload flow uses.
+        foreach (var vehicle in fleets.SelectMany(fleet => fleet.Value))
+        {
+            foreach (var image in vehicle.Images)
+            {
+                using var bytes = new MemoryStream(PlaceholderJpeg);
+                await storage.SaveAtAsync(image.StorageKey, "image/jpeg", bytes, cancellationToken);
+            }
+        }
 
         var vehicleCount = fleets.Sum(fleet => fleet.Value.Count);
         LogComplete(logger, dealers.Count, customers.Count, vehicleCount, bookings.Count, tickets.Count);
@@ -351,7 +368,7 @@ internal sealed partial class DevelopmentSeeder(
                     continue;
 
                 // A photo, because Publish refuses a listing without one -- the same rule a dealer
-                // meets in the console. The key points at nothing on disk; no seeded screen serves it.
+                // meets in the console. SeedAsync writes a placeholder file at this key afterwards.
                 vehicle.Value.AddImage($"vehicles/{vehicle.Value.Id.Value}/seed-cover.jpg", listedAt);
 
                 // Publishing is judged as of the day the car was LISTED, and on that day an approved
@@ -493,7 +510,7 @@ internal sealed partial class DevelopmentSeeder(
             PaymentOption.DepositOnly,
             createdAt);
 
-        return booking.IsFailure ? null : Advance(booking.Value, rules, createdAt);
+        return booking.IsFailure ? null : Advance(booking.Value, dealer.OwnerUserId, rules, createdAt);
     }
 
     /// <summary>
@@ -501,7 +518,7 @@ internal sealed partial class DevelopmentSeeder(
     /// platform. Every transition is the domain method, at a plausible instant, which means the seeded
     /// data satisfies the same invariants a real booking would.
     /// </summary>
-    private Booking Advance(Booking booking, BusinessRules rules, DateTimeOffset createdAt)
+    private Booking Advance(Booking booking, Id dealerActorId, BusinessRules rules, DateTimeOffset createdAt)
     {
         var now = clock.UtcNow;
         var roll = _random.Next(100);
@@ -527,12 +544,12 @@ internal sealed partial class DevelopmentSeeder(
 
         if (roll < 27)
         {
-            booking.Reject(Id.New(), "The vehicle is already committed for those dates.", createdAt.AddHours(3));
+            booking.Reject(dealerActorId, "The vehicle is already committed for those dates.", createdAt.AddHours(3));
             return booking;
         }
 
         var approvedAt = createdAt.AddHours(2);
-        booking.Approve(Id.New(), approvedAt);
+        booking.Approve(dealerActorId, approvedAt);
 
         if (roll < 33)
         {
@@ -552,13 +569,13 @@ internal sealed partial class DevelopmentSeeder(
             return booking;
         }
 
-        booking.RecordPickup(BookingParty.Dealer, Id.New(), pickupDue.AddMinutes(20), odometerKm: 42_000, fuelLevel: 1m);
+        booking.RecordPickup(BookingParty.Dealer, dealerActorId, pickupDue.AddMinutes(20), odometerKm: 42_000, fuelLevel: 1m);
 
         var returnDue = booking.Period.End;
         if (returnDue > now)
             return booking; // Out on hire right now.
 
-        booking.RecordReturn(BookingParty.Dealer, Id.New(), returnDue.AddMinutes(15), odometerKm: 42_650, fuelLevel: 1m);
+        booking.RecordReturn(BookingParty.Dealer, dealerActorId, returnDue.AddMinutes(15), odometerKm: 42_650, fuelLevel: 1m);
 
         // A returned booking settles itself once the quiet period passes with no dispute. The ones
         // left un-settled here are what the dispute seeding attaches to.

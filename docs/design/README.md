@@ -1,19 +1,26 @@
-# Admin Console design source
+# Console design source
 
 Exported from the Claude Design project
 `https://claude.ai/design/p/abfd4b04-c3e3-43e6-99c8-747bf8e2ebb0`.
 
-These `.dc.html` files are the **source of truth for how the Admin console looks**.
-When a screen is changed in Claude Design, re-export here and diff before changing
-`Khadra.Dashboard`.
+These `.dc.html` files are the **source of truth for how both consoles look** — the Admin
+console and the Dealer console share one design system (Nocturne) and one shell. When a screen
+is changed in Claude Design, re-export here and diff before changing `Khadra.Dashboard`.
 
 | File | What it defines |
 |---|---|
-| `Admin Console.dc.html` | All 22 screens, the modals and the toast |
-| `AdminSidebar.dc.html` | Navigation rail and its groups |
+| `Admin Console.dc.html` | The Admin's 22 screens, the modals and the toast |
+| `AdminSidebar.dc.html` | The Admin navigation rail and its groups |
 | `AdminTopbar.dc.html` | Breadcrumb, search and account controls |
+| `Dealer Console.dc.html` | The Dealer Owner's 15 screens, the locked states, the list states, modals and toast (handoff of 2026-09-03) |
+| `DealerSidebar.dc.html` | The Dealer navigation rail and its groups |
 | `ds/styles.css` | Nocturne design tokens and component classes |
-| `icons.js` | The line-icon set |
+| `icons.js` | The line-icon set (the dealer export added ~30 icons) |
+| `support.js`, `_ds/` | Claude Design's own runtime and bundle; not used by the app |
+
+The dealer design carries sample data (`KR-1021`, `Al-Nadeem Rentals`, a 4.8 rating). The app
+renders the real platform instead, and where the platform has no source for something the
+design shows — reviews, notifications, payouts — the screen says so rather than inventing it.
 
 ## How it maps onto the Angular app
 

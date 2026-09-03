@@ -11,7 +11,9 @@ import { SessionService, SessionUser } from '../services/session.service';
  */
 export function homeRouteFor(user: SessionUser | null): string {
   if (!user) return '/sign-in';
-  return user.role === 'DealerOwner' || user.role === 'DealerEmployee' ? '/fleet' : '/dashboard';
+  return user.role === 'DealerOwner' || user.role === 'DealerEmployee'
+    ? '/dealer/dashboard'
+    : '/dashboard';
 }
 
 /**

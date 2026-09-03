@@ -1,0 +1,189 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Employees</h1>
+      <div class="page-sub">
+        Staff who act on bookings for your dealership. Every action they take is recorded under
+        their own name.
+      </div>
+    </div>
+    <div class="dc-head-actions">
+      @if (isOwner()) {
+        <button
+          type="button"
+          class="btn btn-primary btn-md"
+          [disabled]="!canInvite()"
+          [title]="canInvite() ? '' : 'Available once your dealership is approved and trading'"
+          (click)="invite()"
+        >
+          <kh-icon name="user-plus" />
+          Invite employee
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load your staff</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="resource.reload()">
+            Retry
+          </button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading() && employees().length === 0) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else {
+    <div class="stat-grid">
+      <div class="stat-card">
+        <span class="k">Active</span>
+        <span class="stat-v num">{{ counts().active }}</span>
+      </div>
+      <div class="stat-card">
+        <span class="k">Invited</span>
+        <span class="stat-v num">{{ counts().invited }}</span>
+      </div>
+      <div class="stat-card">
+        <span class="k">Deactivated</span>
+        <span class="stat-v num">{{ counts().deactivated }}</span>
+      </div>
+    </div>
+
+    @if (employees().length === 0) {
+      <section class="sect">
+        <div class="state-block is-empty">
+          <div class="state-icon is-outline"><kh-icon name="user" /></div>
+          <div class="state-title">No staff yet</div>
+          <div class="state-text">
+            Invite the people who hand over cars for you. They approve requests, record pickups and
+            returns, and only see revenue if you say so.
+          </div>
+          @if (isOwner()) {
+            <div class="state-actions">
+              <button
+                type="button"
+                class="btn btn-primary btn-sm"
+                [disabled]="!canInvite()"
+                (click)="invite()"
+              >
+                Invite employee
+              </button>
+            </div>
+          }
+        </div>
+      </section>
+    } @else {
+      <section class="sect sect-clip">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Contact</th>
+                <th>Status</th>
+                <th>Report access</th>
+                <th>Last sign-in</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (e of employees(); track e.employeeId) {
+                <tr [class.is-dim]="e.status === 'Deactivated'">
+                  <td class="td">
+                    <div class="entity">
+                      <div class="entity-avatar">{{ initials(e.fullName) }}</div>
+                      <div>
+                        <div class="entity-name">{{ e.fullName }}</div>
+                        <div class="entity-sub">Added {{ when(e.createdAt) }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="td">
+                    <div>{{ e.email }}</div>
+                    <div class="td-sub">{{ e.phone }}</div>
+                  </td>
+                  <td class="td">
+                    <span class="pill" [class]="'s-' + tone(e)">{{ e.status }}</span>
+                    @if (e.status === 'Invited') {
+                      <div class="td-sub">Has not set a password yet</div>
+                    } @else if (e.deactivatedAt) {
+                      <div class="td-sub">Since {{ when(e.deactivatedAt) }}</div>
+                    }
+                  </td>
+                  <td class="td">
+                    @if (isOwner() && e.status !== 'Deactivated') {
+                      <label class="toggle-inline">
+                        <input
+                          type="checkbox"
+                          [checked]="e.canViewReports"
+                          [disabled]="busy() === e.employeeId"
+                          (change)="toggleReports(e)"
+                        />
+                        <span>{{ e.canViewReports ? 'Can see reports' : 'Bookings only' }}</span>
+                      </label>
+                    } @else {
+                      <span class="page-sub">{{
+                        e.canViewReports ? 'Can see reports' : 'Bookings only'
+                      }}</span>
+                    }
+                  </td>
+                  <td class="td">{{ when(e.lastLoginAt) }}</td>
+                  <td class="td td-num">
+                    @if (isOwner()) {
+                      <div class="row-actions">
+                        @if (e.status === 'Invited') {
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-xs"
+                            [disabled]="busy() === e.employeeId"
+                            (click)="resend(e)"
+                          >
+                            Resend invite
+                          </button>
+                        }
+                        @if (e.status === 'Deactivated') {
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-xs"
+                            [disabled]="busy() === e.employeeId"
+                            (click)="reactivate(e)"
+                          >
+                            Reactivate
+                          </button>
+                        } @else {
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-xs s-bad"
+                            [disabled]="busy() === e.employeeId"
+                            (click)="deactivate(e)"
+                          >
+                            Deactivate
+                          </button>
+                        }
+                      </div>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    <div class="perm-note">
+      <kh-icon name="info" />
+      Every employee can approve and reject requests and record pickups and returns. Report access
+      is the only extra permission, and it is per person.
+    </div>
+  }
+</div>

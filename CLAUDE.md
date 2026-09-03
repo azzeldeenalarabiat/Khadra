@@ -21,7 +21,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 - `Khadra.WebAPI` — controllers under `/api/v1`, JWT bearer with security-stamp check, policies, rate limiting, ProblemDetails, OpenAPI.
 - `Khadra.Bff` — cookie session (`__Host-Khadra.Session`) + Redis ticket store + antiforgery + YARP proxy to the API. The browser never sees API tokens.
 - `Khadra.Tests` — xunit: `Domain/`, `Application/` (NSubstitute), `Persistence/` (SQLite in-memory), `Security/` (WebApplicationFactory).
-- `Khadra.Dashboard/` — Angular 22 admin console. All 22 screens implemented from `docs/design/` (the exported Claude Design project, which is the source of truth for the look). Sample data in `src/app/core/data/` is shaped like the API responses that will replace it.
+- `Khadra.Dashboard/` — Angular 22 console for both sides of the platform. Admin screens (22) under `features/*`; the dealer console under `features/dealer/` and `features/fleet/` behind `/dealer/*` (`DealerGateComponent` locks it while the dealership cannot trade). Both are implemented from `docs/design/` (`Admin Console` and `Dealer Console.dc.html`, the exported Claude Design project, which is the source of truth for the look). Dealer screens read live API data through the BFF; the remaining sample data in `src/app/core/data/` is shaped like the API responses that will replace it.
 
 ## Backend conventions (MUST) — details in `.claude/rules/backend/architecture.md`
 
@@ -60,5 +60,7 @@ something for later; an item comes off only by being fixed.
 ## Open business decisions (spec §2.2)
 
 Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
+
+**Dealer console defaults awaiting a decision (2026-09-03):** a suspended dealer may still record a pickup on an already-approved booking (default: allowed; returns are always allowed); the business name is locked after approval (default: locked) while location and operating hours stay editable; the customer's contact details are never shown to the dealer (the console makes no promise about it); staff management (`/dealers/me/employees`) requires an approved, trading dealer, so the owner of a suspended dealer cannot deactivate an employee (default kept). Ask the owner before changing any of these.
 
 **Minimum renter age: settled at 21** by the owner and enforced (`BusinessRules:MinimumRenterAge`, `RenterAgePolicy`). The spec still says "value pending Section 2 decision" in §5.1 and lists it as open in §2.2 — the document has not caught up with the decision. The code is right; the spec needs a revision.

@@ -72,4 +72,35 @@ public static class DealerErrors
 
     public static readonly Error AlreadyDeleted =
         Error.Conflict("dealer.already_deleted", "This dealer is already deleted.");
+
+    // Spec 4.2: staff management and dealer settings belong to the owner alone.
+    public static readonly Error OwnerOnly =
+        Error.Forbidden("dealer.owner_only", "Only the dealer owner can do this.");
+
+    public static readonly Error InvitationAlreadyAccepted =
+        Error.Conflict("dealer.invitation_accepted", "This employee has already accepted their invitation.");
+
+    public static readonly Error EmployeeAlreadyActive =
+        Error.Conflict("dealer.employee_already_active", "This employee is already active.");
+
+    // Spec 3.1: the licence was verified against this name. Renaming after approval would change what
+    // that verification meant. (Owner decision pending; locked by default.)
+    public static readonly Error BusinessNameLocked =
+        Error.Conflict("dealer.business_name_locked", "The business name cannot be changed after approval. Contact the platform if it has legally changed.");
+
+    public static readonly Error InvalidBrandingKind =
+        Error.Validation("dealer.invalid_branding_kind", "Branding is either the logo or the cover image.");
+
+    public static readonly Error InvalidBrandingType =
+        Error.Validation("dealer.invalid_branding_type", "A logo or cover must be a JPEG, PNG or WebP image.");
+
+    public static readonly Error BrandingNotUploaded =
+        Error.Validation("dealer.branding_not_uploaded", "That image was never uploaded.");
+
+    public static readonly Error BrandingOutsideDealer =
+        Error.Validation("dealer.branding_outside_dealer", "That image does not belong to this dealer.");
+
+    // Spec 4.2: financial reports are off for an employee unless the owner grants them.
+    public static readonly Error ReportsNotGranted =
+        Error.Forbidden("dealer.reports_not_granted", "Only the dealer owner can see financial reports, unless they grant you access.");
 }

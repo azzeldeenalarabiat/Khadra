@@ -1,0 +1,1149 @@
+/* Dealer console screens. Each block mirrors one area of Dealer Console.dc.html; the design carries
+   these as inline styles because a canvas has no stylesheet, and the app must not. */
+
+/* — page header — */
+.dc-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.dc-head-actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* — dashboard — */
+.dc-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dc-split {
+  display: grid;
+  grid-template-columns: 1.75fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.dc-split-even {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.dc-split-155 {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.dc-split-15 {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.sect-hint {
+  margin-inline-start: auto;
+  font-size: 11px;
+  color: var(--text-40);
+}
+
+/* A pickup or return coming up. */
+.handover {
+  padding: 11px 0;
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.handover-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.handover-when {
+  margin-inline-start: auto;
+  font-size: 12px;
+  color: var(--text-60);
+}
+
+.handover-car {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.thumb {
+  border-radius: 6px;
+  background: linear-gradient(150deg, #22243244, #2b2d3d);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--text-50);
+}
+
+.thumb-sm {
+  width: 34px;
+  height: 26px;
+}
+
+.thumb-lg {
+  width: 128px;
+  height: 86px;
+  font-size: 28px;
+}
+
+.handover-title {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.handover-sub {
+  font-size: 11px;
+  color: var(--text-45);
+}
+
+.handover-loc {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-55);
+}
+
+.tag-delivery {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+}
+
+/* Fleet status bars. */
+.fleet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hairline);
+  text-decoration: none;
+  color: inherit;
+}
+
+.fleet-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--c);
+}
+
+.fleet-label {
+  font-size: 12.5px;
+  flex: 1;
+}
+
+.fleet-bar {
+  width: 82px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.fleet-fill {
+  height: 100%;
+  background: var(--c);
+  opacity: 0.75;
+}
+
+.fleet-n {
+  font-size: 13px;
+  width: 22px;
+  text-align: end;
+}
+
+/* — list screens — */
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--color-divider);
+  overflow-x: auto;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 10px;
+  font-size: 12.5px;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--text-60);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tab.is-active {
+  color: var(--color-accent);
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+.tab-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-55);
+}
+
+.tab.is-active .tab-count {
+  background: var(--color-accent-700);
+  color: var(--color-accent-100);
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stat-card {
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-v {
+  font-size: 20px;
+}
+
+/* — booking detail — */
+.sla-box {
+  text-align: end;
+}
+
+.sla-figure {
+  font-size: 19px;
+  color: var(--status-warn);
+}
+
+.money-line {
+  display: flex;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12.5px;
+}
+
+.money-line .k-label {
+  flex: 1;
+  color: var(--text-70);
+}
+
+.money-line.is-hi .k-label,
+.money-line.is-hi .num {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.money-line.is-dim .k-label,
+.money-line.is-dim .num {
+  color: var(--text-45);
+  font-size: 11.5px;
+}
+
+.note-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 11px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  font-size: 11.5px;
+  color: var(--text-70);
+}
+
+.note-box.is-ok {
+  background: color-mix(in srgb, var(--status-ok) 12%, transparent);
+}
+
+.note-box.is-plain {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-55);
+  line-height: 1.5;
+}
+
+.customer-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--color-neutral-800);
+  color: var(--color-neutral-200);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 600;
+  flex: none;
+}
+
+.history-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.history-line .k-label {
+  color: var(--text-60);
+}
+
+/* — locked (suspended / rejected / pending) — */
+.locked-wrap {
+  max-width: 660px;
+  margin: 40px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.locked-card {
+  padding: 26px 26px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.locked-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.locked-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--c) 15%, transparent);
+  color: var(--c);
+  font-size: 19px;
+}
+
+.locked-title {
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.locked-body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-70);
+}
+
+.locked-points {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.locked-point {
+  display: flex;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--text-60);
+}
+
+.locked-point kh-icon {
+  margin-top: 2px;
+  flex: none;
+  color: var(--c);
+}
+
+/* — vehicle detail — */
+.photo-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.photo-strip .thumb {
+  position: relative;
+  height: 150px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.photo-strip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-label {
+  position: absolute;
+  bottom: 7px;
+  inset-inline-start: 9px;
+  font-size: 10px;
+  color: var(--text-45);
+}
+
+.calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.cal-day {
+  height: 56px;
+  border-radius: 6px;
+  padding: 7px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 28%, transparent);
+  color: var(--c);
+}
+
+.cal-day.is-dim {
+  background: color-mix(in srgb, var(--c) 8%, transparent);
+  border-color: color-mix(in srgb, var(--c) 14%, transparent);
+  color: var(--text-45);
+}
+
+.cal-n {
+  font-size: 11px;
+}
+
+.cal-tag {
+  font-size: 9.5px;
+  opacity: 0.75;
+}
+
+.legend {
+  margin-inline-start: auto;
+  display: flex;
+  gap: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-55);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--c);
+}
+
+/* — wizard — */
+.wiz-grid {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.wiz-steps {
+  padding: 10px;
+}
+
+.wiz-step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 12.5px;
+  color: var(--text-60);
+  background: none;
+  border: 0;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: start;
+}
+
+.wiz-step.is-active {
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  color: var(--color-accent);
+}
+
+.wiz-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: var(--text-45);
+}
+
+.wiz-step.is-active .wiz-dot {
+  background: var(--color-accent);
+  color: #161826;
+  border-color: transparent;
+}
+
+.wiz-step.is-done .wiz-dot {
+  background: color-mix(in srgb, var(--status-ok) 22%, transparent);
+  color: var(--status-ok);
+  border-color: transparent;
+}
+
+.wiz-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-divider);
+}
+
+.toggle-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 13px;
+  border: 1px solid var(--color-divider);
+  border-radius: 8px;
+}
+
+.toggle-card .grow {
+  min-width: 0;
+}
+
+.toggle-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.toggle-desc {
+  font-size: 11.5px;
+  color: var(--text-50);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+/* — profile — */
+.brand-row {
+  display: flex;
+  gap: 14px;
+}
+
+.brand-logo {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: center;
+}
+
+.brand-logo .thumb {
+  width: 74px;
+  height: 74px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.brand-cover {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.brand-cover .thumb {
+  height: 74px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.brand-row img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hours-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.hours-day {
+  width: 110px;
+  font-size: 12.5px;
+}
+
+.hours-time {
+  width: 96px;
+  min-height: 29px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.hours-to {
+  font-size: 12px;
+  color: var(--text-40);
+}
+
+.map-stub {
+  position: relative;
+  border-radius: 8px;
+  border: 1px solid var(--color-divider);
+  overflow: hidden;
+  background: radial-gradient(circle at 46% 50%, #252838, #171926 72%);
+}
+
+.map-stub.is-tall {
+  height: 300px;
+}
+
+.map-stub.is-mid {
+  height: 170px;
+}
+
+.map-pin {
+  position: absolute;
+  inset-inline-start: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.map-coords {
+  position: absolute;
+  bottom: 9px;
+  inset-inline-start: 11px;
+}
+
+.map-ring {
+  position: absolute;
+  inset-inline-start: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.map-ring.is-1 {
+  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.map-ring.is-2 {
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+.map-ring.is-3 {
+  border: 1px dashed rgba(255, 255, 255, 0.07);
+}
+
+.radius-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.radius-figure {
+  font-size: 19px;
+}
+
+.range {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+.range-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--text-38);
+}
+
+/* — public preview — */
+.public-cover {
+  position: relative;
+  height: 168px;
+  background: linear-gradient(160deg, #2a2d40, #191b28);
+  display: grid;
+  place-items: center;
+  color: rgba(233, 233, 237, 0.16);
+  font-size: 30px;
+  overflow: hidden;
+}
+
+.public-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.public-head {
+  padding: 0 20px 18px;
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  margin-top: -34px;
+}
+
+.public-logo {
+  width: 76px;
+  height: 76px;
+  border-radius: 14px;
+  background: #20222f;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--color-accent);
+  font-size: 26px;
+  overflow: hidden;
+}
+
+.public-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.public-name {
+  font-family: var(--font-heading);
+  font-size: 21px;
+  font-weight: 500;
+}
+
+.public-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-60);
+  flex-wrap: wrap;
+}
+
+.public-meta span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.car-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.car-tile {
+  border: 1px solid var(--color-divider);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.car-tile .thumb {
+  height: 96px;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  overflow: hidden;
+}
+
+.car-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.car-tile-body {
+  padding: 10px 12px;
+}
+
+.car-tile-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 7px;
+}
+
+/* — reports — */
+.occ-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.occ-name {
+  font-size: 12.5px;
+  flex: 1;
+}
+
+.occ-days {
+  font-size: 11.5px;
+  color: var(--text-45);
+  width: 88px;
+  text-align: end;
+}
+
+.occ-bar {
+  width: 160px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.occ-fill {
+  height: 100%;
+  background: var(--c);
+  opacity: 0.8;
+}
+
+.occ-pct {
+  font-size: 12.5px;
+  width: 42px;
+  text-align: end;
+}
+
+/* — settings — */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.settings-tabs {
+  padding: 8px;
+}
+
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 12.5px;
+  color: var(--text-60);
+  background: none;
+  border: 0;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: start;
+}
+
+.settings-tab.is-active {
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  color: var(--color-accent);
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: 8px;
+}
+
+.action-row .grow {
+  min-width: 0;
+}
+
+.action-title {
+  font-size: 12.5px;
+}
+
+.action-desc {
+  font-size: 11px;
+  color: var(--text-45);
+  margin-top: 2px;
+}
+
+/* — employees — */
+.perm-note {
+  font-size: 11px;
+  color: var(--text-42);
+}
+
+/* — activity rows — */
+.act-row {
+  display: flex;
+  gap: 9px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.act-row kh-icon {
+  margin-top: 2px;
+  color: var(--color-accent);
+  opacity: 0.8;
+  flex: none;
+}
+
+.act-text {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.act-ts {
+  font-size: 10.5px;
+  color: var(--text-40);
+}
+
+// ── Employees / delivery (Dealer Console.dc.html: isEmployees, isDelivery) ──
+
+.toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-70);
+
+  input {
+    accent-color: var(--color-accent);
+    inline-size: 14px;
+    block-size: 14px;
+    margin: 0;
+  }
+}
+
+.table tr.is-dim .entity-name,
+.table tr.is-dim .td {
+  color: var(--text-45);
+}
+
+.sect.is-muted {
+  opacity: 0.55;
+}
+
+.field-error {
+  font-size: 11.5px;
+  color: var(--status-bad);
+  margin-block-start: 4px;
+}
+
+// ── Fleet list / vehicle detail / wizard (Dealer Console.dc.html: isList, isVehicle, isWizard) ──
+
+.stat-grid-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.tabs-seg {
+  border-block-end: 0;
+  padding: 0;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-block-end: 1px solid var(--color-divider);
+  flex-wrap: wrap;
+}
+
+.list-search {
+  position: relative;
+  inline-size: 220px;
+
+  .search-icon {
+    position: absolute;
+    inset-inline-start: 9px;
+    inset-block-start: 8px;
+    font-size: 13px;
+    color: var(--text-40);
+    pointer-events: none;
+  }
+
+  .input {
+    padding-inline-start: 28px;
+    min-block-size: 31px;
+    font-size: 12px;
+  }
+}
+
+.thumb kh-icon {
+  display: none;
+}
+
+.thumb:not(:has(img)) kh-icon,
+.thumb.is-missing kh-icon {
+  display: inline-flex;
+}
+
+.veh-photos {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.veh-photo {
+  position: relative;
+  block-size: 150px;
+  border-radius: 8px;
+  overflow: hidden;
+
+  img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+
+  .photo-label {
+    position: absolute;
+    inset-block-end: 7px;
+    inset-inline-start: 9px;
+  }
+}
+
+.veh-log-row {
+  display: flex;
+  gap: 9px;
+  padding: 9px 0;
+  border-block-end: 1px solid var(--hairline);
+
+  kh-icon {
+    margin-block-start: 2px;
+    color: var(--color-accent);
+    opacity: 0.8;
+    flex: none;
+  }
+}
+
+.veh-log-ts {
+  font-size: 10.5px;
+  color: var(--text-40);
+}
+
+.wiz-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.wiz-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text-70);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+
+  &.is-ok {
+    background: color-mix(in srgb, var(--status-ok) 12%, transparent);
+  }
+
+  kh-icon {
+    color: var(--color-accent);
+    flex: none;
+  }
+
+  &.is-ok kh-icon {
+    color: var(--status-ok);
+  }
+}
+
+.wiz-review-head {
+  display: flex;
+  gap: 14px;
+}
+
+.wiz-review-title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+// Calendar cells and wizard steps are buttons (they navigate), so undo the UA button chrome.
+button.cal-day,
+button.wiz-step {
+  appearance: none;
+  inline-size: 100%;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+button.wiz-step {
+  background: none;
+  border: 0;
+}
+
+button.cal-day[disabled] {
+  cursor: default;
+}
+
+.photo-strip .thumb-add {
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  background: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  .photo-label {
+    position: static;
+  }
+}
+
+.photo-tools {
+  position: absolute;
+  inset-block-end: 7px;
+  inset-inline: 7px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dc-split-even .span-2 {
+  grid-column: span 2;
+}

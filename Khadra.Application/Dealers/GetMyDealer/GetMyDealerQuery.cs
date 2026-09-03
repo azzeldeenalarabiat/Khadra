@@ -17,7 +17,7 @@ namespace Khadra.Application.Dealers.GetMyDealer;
 /// </summary>
 public sealed record GetMyDealerQuery(Id UserId) : IQuery<Result<DealerProfileDto, Error>>;
 
-public sealed class GetMyDealerHandler(IDealerRepository dealers)
+public sealed class GetMyDealerHandler(DealerMembershipResolver membership)
     : IRequestHandler<GetMyDealerQuery, Result<DealerProfileDto, Error>>
 {
     public async Task<Result<DealerProfileDto, Error>> Handle(
@@ -26,9 +26,11 @@ public sealed class GetMyDealerHandler(IDealerRepository dealers)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var dealer = await dealers.GetByOwnerUserIdAsync(request.UserId, cancellationToken)
-            ?? await dealers.GetByStaffUserIdAsync(request.UserId, cancellationToken);
-
-        return dealer is null ? DealerErrors.NotRegistered : DealerProfileDto.From(dealer);
+        // Through the resolver, so a deactivated employee gets "no dealership" rather than a working
+        // view of the business that let them go.
+        var member = await membership.ResolveAsync(request.UserId, cancellationToken);
+        return member.IsFailure
+            ? member.Error
+            : DealerProfileDto.From(member.Value.Dealer, request.UserId);
     }
 }

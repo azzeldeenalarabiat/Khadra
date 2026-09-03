@@ -17,10 +17,12 @@ export class AdminSidebarComponent {
   private readonly router = inject(Router);
 
   // Spec 1.5: one dashboard, role-based views. Dealer staff get their own business, not the platform.
-  protected readonly groups = computed(() => {
+  protected readonly isDealer = computed(() => {
     const role = this.session.user()?.role;
-    return role === 'DealerOwner' || role === 'DealerEmployee' ? DEALER_NAV : NAV_GROUPS;
+    return role === 'DealerOwner' || role === 'DealerEmployee';
   });
+
+  protected readonly groups = computed(() => (this.isDealer() ? DEALER_NAV : NAV_GROUPS));
 
   // The account footer names whoever is actually signed in. It used to carry the design's sample
   // admin, which told a dealer they were a Super Admin — the one label on screen that has to be true.

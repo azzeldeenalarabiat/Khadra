@@ -3,7 +3,12 @@
     <div class="sidebar-mark">
       <kh-icon name="steering-wheel" />
     </div>
-    <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+    <div>
+      <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+      @if (isDealer()) {
+        <div class="sidebar-caption">Dealer</div>
+      }
+    </div>
   </div>
 
   <nav class="sidebar-nav" aria-label="Admin sections">

@@ -192,7 +192,12 @@ public sealed class Booking : AggregateRoot
         return UnitResult.Success<Error>();
     }
 
-    public UnitResult<Error> Approve(Id actedByUserId, DateTimeOffset now)
+    /// <param name="note">
+    /// An optional word to the customer -- pickup instructions, a delivery window. It travels as the
+    /// transition's reason, so it sits in the status history both parties can read and needs no
+    /// field of its own on the booking.
+    /// </param>
+    public UnitResult<Error> Approve(Id actedByUserId, DateTimeOffset now, string? note = null)
     {
         if (Status != BookingStatus.Requested)
             return UnitResult.Failure(BookingErrors.NotAwaitingDecision);
@@ -203,8 +208,9 @@ public sealed class Booking : AggregateRoot
         ApprovedAt = now;
         var freeUntil = now.Add(Terms.FreeCancellationWindow);
         FreeCancellationDeadline = freeUntil > Period.Start ? Period.Start : freeUntil;
-        Transition(BookingStatus.Approved, BookingParty.Dealer, actedByUserId, null, now);
-        AddDomainEvent(new BookingApproved(Id, DealerId, actedByUserId, now));
+        var trimmed = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        Transition(BookingStatus.Approved, BookingParty.Dealer, actedByUserId, trimmed, now);
+        AddDomainEvent(new BookingApproved(Id, DealerId, actedByUserId, now, trimmed));
         return UnitResult.Success<Error>();
     }
 

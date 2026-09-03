@@ -1,7 +1,7 @@
 using Khadra.Application.Common;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
-using Khadra.Domain.Dealers.Repositories;
+using Khadra.Application.Dealers;
 using Khadra.Domain.IdentityAccess;
 using Microsoft.AspNetCore.Authorization;
 
@@ -28,7 +28,7 @@ public sealed class DomainAuthorizationFailureReason(AuthorizationHandler<Approv
     public Error Error { get; } = error;
 }
 
-internal sealed class ApprovedDealerAuthorizationHandler(IDealerRepository dealers, ICurrentActor actor)
+internal sealed class ApprovedDealerAuthorizationHandler(DealerMembershipResolver membership, ICurrentActor actor)
     : AuthorizationHandler<ApprovedDealerRequirement>
 {
     protected override async Task HandleRequirementAsync(
@@ -50,18 +50,17 @@ internal sealed class ApprovedDealerAuthorizationHandler(IDealerRepository deale
             return;
         }
 
-        // An owner or an employee: both act on behalf of the same business, and neither may act while
-        // that business is unapproved.
-        var dealer = await dealers.GetByOwnerUserIdAsync(userId)
-            ?? await dealers.GetByStaffUserIdAsync(userId);
-
-        if (dealer is null)
+        // An owner or an ACTIVE employee: both act on behalf of the same business, and neither may
+        // act while that business is unapproved. The resolver is what turns a deactivated employee
+        // away here (spec 4.2: their access ends immediately); a raw repository lookup would not.
+        var member = await membership.ResolveAsync(userId);
+        if (member.IsFailure)
         {
-            context.Fail(new DomainAuthorizationFailureReason(this, DealerErrors.NotRegistered));
+            context.Fail(new DomainAuthorizationFailureReason(this, member.Error));
             return;
         }
 
-        if (!dealer.CanTrade)
+        if (!member.Value.Dealer.CanTrade)
         {
             context.Fail(new DomainAuthorizationFailureReason(this, DealerErrors.NotApproved));
             return;

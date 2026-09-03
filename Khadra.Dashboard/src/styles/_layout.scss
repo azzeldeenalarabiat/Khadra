@@ -331,3 +331,12 @@
 [dir='rtl'] .nav-item.is-active {
   box-shadow: inset -2px 0 0 var(--color-accent);
 }
+
+/* The DealerSidebar design adds a small caption under the brand naming the console. */
+.sidebar-caption {
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-top: 3px;
+}

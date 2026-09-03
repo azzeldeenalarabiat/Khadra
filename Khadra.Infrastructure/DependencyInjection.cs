@@ -4,6 +4,7 @@ using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
+using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
@@ -89,6 +90,10 @@ public static class DependencyInjection
             .Validate(options => TimeZoneInfo.TryFindSystemTimeZoneById(options.ReportingTimeZone, out _),
                 "AdminDashboard:ReportingTimeZone must be a time zone this machine knows.")
             .ValidateOnStart();
+        services.AddOptions<DealerConsoleOptions>()
+            .Bind(configuration.GetSection(DealerConsoleOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddOptions<BusinessRulesOptions>()
             .Bind(configuration.GetSection(BusinessRulesOptions.SectionName))
             .ValidateDataAnnotations()
@@ -133,6 +138,9 @@ public static class DependencyInjection
     {
         services.AddScoped<IDealerDashboardReader, DealerDashboardReader>();
         services.AddScoped<IDealerAdminReader, DealerAdminReader>();
+        services.AddScoped<IEmployeeReader, EmployeeReader>();
+        services.AddScoped<IDealerBookingReader, DealerBookingReader>();
+        services.AddScoped<IDealerFleetReader, DealerFleetReader>();
         services.AddScoped<IBookingDashboardReader, BookingDashboardReader>();
         services.AddScoped<IBookingReader, BookingReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
@@ -141,6 +149,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
+        services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();
     }
 
     private static void AddSecurity(IServiceCollection services)

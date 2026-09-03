@@ -123,6 +123,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(SecurityPolicies.ApprovedDealer, policy => policy
         .RequireRole(UserRole.DealerOwner.Name)
         .AddRequirements(new ApprovedDealerRequirement()));
+    options.AddPolicy(SecurityPolicies.ApprovedDealerStaff, policy => policy
+        .RequireRole(UserRole.DealerOwner.Name, UserRole.DealerEmployee.Name)
+        .AddRequirements(new ApprovedDealerRequirement()));
 });
 
 builder.Services.AddRateLimiter(options =>

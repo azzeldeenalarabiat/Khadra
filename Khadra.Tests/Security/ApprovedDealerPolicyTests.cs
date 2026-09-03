@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Khadra.Application.Common;
+using Khadra.Application.Dealers;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
@@ -38,7 +39,7 @@ public sealed class ApprovedDealerPolicyTests
         var context = new AuthorizationHandlerContext(
             [Requirement], new ClaimsPrincipal(identity), resource: null);
 
-        new ApprovedDealerAuthorizationHandler(dealers, actor)
+        new ApprovedDealerAuthorizationHandler(new DealerMembershipResolver(dealers), actor)
             .HandleAsync(context).GetAwaiter().GetResult();
 
         return context;

@@ -26,6 +26,9 @@ public sealed record BookingDto(
     string PaymentOption,
     BookingPricingDto Pricing,
     BookingTermsDto Terms,
+    // Terms.CommissionPercent of Pricing.RentalTotal, at the FROZEN rate, rounded the way a charge
+    // would be. Computed here so no screen ever multiplies money in the browser.
+    MoneyDto CommissionAmount,
     PenaltyAssessmentDto? Penalty,
     string? CancelledBy,
     string? CancellationReason,
@@ -68,6 +71,7 @@ public sealed record BookingDto(
             booking.PaymentOption.Name,
             BookingPricingDto.From(booking.Pricing),
             BookingTermsDto.From(booking.Terms),
+            MoneyDto.From(booking.Terms.CommissionPercent.Of(booking.Pricing.RentalTotal)),
             PenaltyAssessmentDto.From(booking.Penalty),
             booking.CancelledBy?.Name,
             booking.CancellationReason,

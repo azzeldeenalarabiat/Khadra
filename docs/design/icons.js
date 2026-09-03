@@ -59,10 +59,41 @@
     laptop: '<rect x="4.5" y="5.5" width="15" height="10" rx="1.6"/><path d="M2.5 18.5h19"/>',
     desktop: '<rect x="3" y="4.5" width="18" height="11.5" rx="1.6"/><path d="M9 19.5h6M12 16v3.5"/>',
     'device-mobile': '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M10.5 18.5h3"/>',
+    moped: '<circle cx="6" cy="17.5" r="2.6"/><circle cx="18" cy="17.5" r="2.6"/><path d="M8.6 17.5h6.8M4 8.5h4l3.5 9M14 5.5h3l2.5 9M11 8.5h5"/>',
+    gauge: '<path d="M4 18a8.5 8.5 0 1 1 16 0"/><path d="m12 12.5 4-4"/><circle cx="12" cy="14" r="1.6"/>',
+    key: '<circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M15.5 12v2.5"/>',
+    mountains: '<path d="M2.5 19.5h19L14 7l-3.2 5.2L8.8 10z"/><circle cx="17" cy="6.5" r="2"/>',
+    'star-fill': '<path d="M12 3.8l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17.3 6.8 20l1-5.9L3.5 10l5.9-.8z" fill="currentColor" stroke="none"/>',
+    eye: '<path d="M2.5 12S6 6.5 12 6.5s9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.6"/>',
+    'pencil-simple': '<path d="M4 20h4L20 8l-4-4L4 16z"/><path d="m14.5 5.5 4 4"/>',
+    image: '<rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.5" cy="10" r="1.8"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/>',
+    'toggle-right': '<rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.8"/>',
+    'check-square': '<rect x="3.5" y="3.5" width="17" height="17" rx="2.4"/><path d="m8 12.2 2.6 2.6L16.2 9"/>',
+    'currency-circle-dollar': '<circle cx="12" cy="12" r="9"/><path d="M9.5 14.6c.4.9 1.3 1.4 2.5 1.4 1.4 0 2.4-.7 2.4-1.9 0-2.6-4.8-1.4-4.8-4 0-1.2 1-1.9 2.4-1.9 1.2 0 2.1.5 2.5 1.4M12 5.8v1.4M12 16v1.4"/>',
+    'arrow-square-out': '<path d="M13 4.5h6.5V11M19.5 4.5 12 12"/><path d="M17 14.5v4a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 18.5V8.5A1.5 1.5 0 0 1 5.5 7h4"/>',
+    'arrow-square-in': '<path d="M20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5Z"/><path d="M15.5 8.5H9V15M9 8.5 15.5 15" transform="rotate(180 12 11.75)"/>',
+    'arrow-square-up-right': '<rect x="3.5" y="3.5" width="17" height="17" rx="2.4"/><path d="M9 15 15 9M10 9h5v5"/>',
+    'bell-ringing': '<path d="M6.5 10a5.5 5.5 0 0 1 11 0c0 4 1.5 5.5 1.5 5.5H5S6.5 14 6.5 10ZM10 18.5a2.2 2.2 0 0 0 4 0"/><path d="M2.6 8.2A6.6 6.6 0 0 1 5 4M21.4 8.2A6.6 6.6 0 0 0 19 4"/>',
+    'car-profile': '<path d="M3 15.5h18M4.5 15.5V12l2-4.5h8l3.5 4.5h2a1.5 1.5 0 0 1 1.5 1.5v2M4.5 15.5v2.5H7v-2.5M16 15.5V18h2.5v-2.5"/><path d="M13 7.5v4.5H6"/>',
+    'user-plus': '<circle cx="10" cy="8.5" r="3.5"/><path d="M3.5 20c1-3.4 3.4-5 6.5-5M18.5 14v5M16 16.5h5"/>',
+    'user-circle-plus': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="2.8"/><path d="M7 18c.9-2 2.7-3.2 5-3.2M16.5 17h4M18.5 15v4"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5.4l3.6 2.2"/>',
+    'plus-circle': '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    'calendar-plus': '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17M12 13v5M9.5 15.5h5"/>',
+    'file-x': '<path d="M6 3.5h7l5 5v12H6z"/><path d="M13 3.5v5h5"/><path d="m10 13 4 4M14 13l-4 4"/>',
+    'lock-simple': '<rect x="4.5" y="10" width="15" height="10.5" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 8 0V10"/>',
+    'lock-key-open': '<rect x="4.5" y="10" width="15" height="10.5" rx="2"/><path d="M8 10V7.5a4 4 0 0 1 7.8-1.3"/><circle cx="12" cy="14.5" r="1.4"/><path d="M12 16v2"/>',
+    'pause-circle': '<circle cx="12" cy="12" r="9"/><path d="M10 9v6M14 9v6"/>',
+    'clock-counter-clockwise': '<path d="M4 9a8.5 8.5 0 1 1-1 6"/><path d="M4 4v5h5"/><path d="M12 8v4.4l3.2 2"/>',
+    'chat-circle': '<path d="M12 20.5a8.5 8.5 0 1 0-7.6-4.7L3.5 20.5l4.7-.9c1.1.6 2.4.9 3.8.9Z"/>',
+    check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    gear: '<circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M4.2 7.5l2.1 1.2M17.7 15.3l2.1 1.2M4.2 16.5l2.1-1.2M17.7 8.7l2.1-1.2M3 12h2.4M18.6 12H21"/>',
+    'shield-warning': '<path d="M12 3l7.5 3v5.5c0 4.5-3.2 7.6-7.5 9.5-4.3-1.9-7.5-5-7.5-9.5V6z"/><path d="M12 8.5v4M12 15.6v.1"/>',
     'device-tablet': '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M10.5 18.5h3"/>',
   };
   class PhIcon extends HTMLElement {
     static get observedAttributes() { return ['name']; }
+    constructor() { super(); this.attachShadow({ mode: 'open' }); }
     connectedCallback() { this.render(); }
     attributeChangedCallback() { this.render(); }
     render() {
@@ -72,7 +103,7 @@
       this.style.alignItems = 'center';
       this.style.justifyContent = 'center';
       this.style.flex = 'none';
-      this.innerHTML = '<svg viewBox="0 0 24 24" width="1em" height="1em" ' + S + ' style="display:block">' + body + '</svg>';
+      this.shadowRoot.innerHTML = '<svg viewBox="0 0 24 24" width="1em" height="1em" ' + S + ' style="display:block">' + body + '</svg>';
     }
   }
   if (!customElements.get('ph-icon')) customElements.define('ph-icon', PhIcon);

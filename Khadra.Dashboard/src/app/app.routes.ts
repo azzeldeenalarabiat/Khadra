@@ -41,6 +41,15 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent),
   },
+  // The link an invited employee receives (spec 4.2): {base}/accept-invitation?token=
+  {
+    path: 'accept-invitation',
+    title: 'Accept your invitation · Khadra',
+    loadComponent: () =>
+      import('./features/auth/accept-invitation.component').then(
+        (m) => m.AcceptInvitationComponent,
+      ),
+  },
   {
     path: '',
     component: AdminShellComponent,
@@ -168,27 +177,138 @@ export const routes: Routes = [
         ],
       },
 
-      // ── Dealer-facing (spec 4.3). The first screens in the console that are not the Admin's. ──
+      // ── The Dealer console (design: Dealer Console.dc.html). One guarded group under /dealer, so
+      // its paths can never collide with the Admin's (/bookings is the platform's list; /dealer/bookings
+      // is one dealership's) and a screen added later is dealer-only by default.
       {
-        path: 'fleet',
-        title: 'My fleet · Khadra',
-        canActivate: [dealerStaffGuard],
+        path: 'dealer',
+        canActivateChild: [dealerStaffGuard],
+        // The gate: a dealership that cannot trade sees why, instead of a console of 403s.
         loadComponent: () =>
-          import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
-      },
-      {
-        path: 'fleet/new',
-        title: 'Add a car · Khadra',
-        canActivate: [dealerStaffGuard],
-        loadComponent: () =>
-          import('./features/fleet/car-form.component').then((m) => m.CarFormComponent),
-      },
-      {
-        path: 'fleet/:vehicleId',
-        title: 'Edit car · Khadra',
-        canActivate: [dealerStaffGuard],
-        loadComponent: () =>
-          import('./features/fleet/car-form.component').then((m) => m.CarFormComponent),
+          import('./features/dealer/dealer-gate.component').then((m) => m.DealerGateComponent),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+          {
+            path: 'dashboard',
+            title: 'Dashboard · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-dashboard.component').then(
+                (m) => m.DealerDashboardComponent,
+              ),
+          },
+          {
+            path: 'bookings',
+            title: 'Bookings · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-bookings.component').then(
+                (m) => m.DealerBookingsComponent,
+              ),
+          },
+          {
+            path: 'bookings/:bookingId',
+            title: 'Booking details · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/booking-detail.component').then(
+                (m) => m.DealerBookingDetailComponent,
+              ),
+          },
+          {
+            path: 'disputes/:ticketId',
+            title: 'Dispute · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-dispute.component').then(
+                (m) => m.DealerDisputeComponent,
+              ),
+          },
+          {
+            path: 'employees',
+            title: 'Employees · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-employees.component').then(
+                (m) => m.DealerEmployeesComponent,
+              ),
+          },
+          {
+            path: 'delivery',
+            title: 'Delivery · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-delivery.component').then(
+                (m) => m.DealerDeliveryComponent,
+              ),
+          },
+          {
+            path: 'reviews',
+            title: 'Reviews · Khadra',
+            data: { kind: 'reviews' },
+            loadComponent: () =>
+              import('./features/dealer/not-live.component').then((m) => m.NotLiveComponent),
+          },
+          {
+            path: 'notifications',
+            title: 'Notifications · Khadra',
+            data: { kind: 'notifications' },
+            loadComponent: () =>
+              import('./features/dealer/not-live.component').then((m) => m.NotLiveComponent),
+          },
+          {
+            path: 'profile',
+            title: 'Dealer profile · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-profile.component').then(
+                (m) => m.DealerProfileComponent,
+              ),
+          },
+          {
+            path: 'reports',
+            title: 'Reports · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-reports.component').then(
+                (m) => m.DealerReportsComponent,
+              ),
+          },
+          {
+            path: 'activity',
+            title: 'Activity · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-activity.component').then(
+                (m) => m.DealerActivityComponent,
+              ),
+          },
+          {
+            path: 'settings',
+            title: 'Settings · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-settings.component').then(
+                (m) => m.DealerSettingsComponent,
+              ),
+          },
+          {
+            path: 'fleet',
+            title: 'Fleet · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
+          },
+          {
+            path: 'fleet/new',
+            title: 'Add vehicle · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/vehicle-wizard.component').then((m) => m.VehicleWizardComponent),
+          },
+          {
+            path: 'fleet/:vehicleId',
+            title: 'Vehicle · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/vehicle-detail.component').then(
+                (m) => m.VehicleDetailComponent,
+              ),
+          },
+          {
+            path: 'fleet/:vehicleId/edit',
+            title: 'Edit vehicle · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/car-form.component').then((m) => m.CarFormComponent),
+          },
+        ],
       },
 
       // Anything unrecognised goes to whichever home the signed-in role has.

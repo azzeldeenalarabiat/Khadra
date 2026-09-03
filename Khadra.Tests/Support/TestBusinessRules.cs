@@ -39,6 +39,9 @@ internal static class TestBusinessRules
             .Returns(call => DateOnly.FromDateTime(call.Arg<DateTimeOffset>().ToOffset(TimeSpan.FromHours(3)).DateTime));
         calendar.DayOf(Arg.Any<DateTimeOffset>())
             .Returns(call => DateOnly.FromDateTime(call.Arg<DateTimeOffset>().ToOffset(TimeSpan.FromHours(3)).DateTime));
+        // Local midnight in Amman, expressed as the UTC instant it is.
+        calendar.StartOfDay(Arg.Any<DateOnly>())
+            .Returns(call => new DateTimeOffset(call.Arg<DateOnly>().ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(3)).ToUniversalTime());
         return calendar;
     }
 }

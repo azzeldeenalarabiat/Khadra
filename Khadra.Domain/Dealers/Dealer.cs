@@ -233,6 +233,13 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         ArgumentNullException.ThrowIfNull(location);
         ArgumentNullException.ThrowIfNull(operatingHours);
 
+        // The licence check (spec 3.1) verified THIS name against the commercial registration. Once
+        // approved, changing it would quietly change what that approval meant, so it is locked; an
+        // applicant still fixing their submission may change it freely. (Owner decision pending on
+        // whether an approved dealer may rename with an admin record; the default here is no.)
+        if (VerificationStatus == DealerVerificationStatus.Approved && businessName != BusinessName)
+            return UnitResult.Failure(DealerErrors.BusinessNameLocked);
+
         BusinessName = businessName;
         Location = location;
         OperatingHours = operatingHours;
@@ -241,10 +248,20 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         return UnitResult.Success<Error>();
     }
 
-    public void SetBranding(string? logoStorageKey, string? coverStorageKey)
+    /// <summary>Replaces the logo; returns the key it replaced so the caller can delete the old file after commit.</summary>
+    public string? SetLogo(string storageKey)
     {
-        LogoStorageKey = Trim(logoStorageKey, 500);
-        CoverStorageKey = Trim(coverStorageKey, 500);
+        var superseded = LogoStorageKey;
+        LogoStorageKey = Trim(storageKey, 500);
+        return superseded;
+    }
+
+    /// <summary>Replaces the cover image; returns the key it replaced.</summary>
+    public string? SetCover(string storageKey)
+    {
+        var superseded = CoverStorageKey;
+        CoverStorageKey = Trim(storageKey, 500);
+        return superseded;
     }
 
     public Result<Employee, Error> HireEmployee(Id userId, bool canViewReports, DateTimeOffset now)

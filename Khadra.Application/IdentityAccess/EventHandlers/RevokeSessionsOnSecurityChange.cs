@@ -27,6 +27,16 @@ public sealed class RevokeSessionsOnSuspended(IRefreshTokenRepository refreshTok
     }
 }
 
+public sealed class RevokeSessionsOnRevoked(IRefreshTokenRepository refreshTokens, IClock clock)
+    : IDomainEventHandler<UserSessionsRevoked>
+{
+    public Task HandleAsync(UserSessionsRevoked domainEvent, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(domainEvent);
+        return refreshTokens.RevokeAllForUserAsync(domainEvent.UserId, clock.UtcNow, cancellationToken);
+    }
+}
+
 public sealed class RevokeSessionsOnDeleted(IRefreshTokenRepository refreshTokens, IClock clock)
     : IDomainEventHandler<UserDeleted>
 {

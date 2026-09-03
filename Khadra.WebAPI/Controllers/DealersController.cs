@@ -5,6 +5,8 @@ using Khadra.Application.Dealers.GetMyDealer;
 using Khadra.Application.Dealers.ReviewDealer;
 using Khadra.Application.Dealers.SubmitDealerProfile;
 using Khadra.Application.Dealers.UpdateDeliverySettings;
+using Khadra.Application.Dealers.UpdateProfile;
+using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -104,6 +106,20 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     }
 
     /// <summary>
+    /// <summary>
+    /// The delivery page. Readable by every member of staff (they answer customers' questions about
+    /// it); changing it stays owner-only through the PUT below.
+    /// </summary>
+    [Authorize(Policy = SecurityPolicies.DealerStaff)]
+    [HttpGet("me/delivery")]
+    [ProducesResponseType<DeliverySettingsViewDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetDelivery(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetMyDeliverySettingsQuery(actor.UserId!.Value), cancellationToken);
+        return FromResult(result);
+    }
+
     /// A dealer-only action, and the one the approval gate is demonstrated on: while the dealer is
     /// PENDING_REVIEW this returns 403 with <c>dealer.not_approved</c>.
     ///
@@ -126,6 +142,107 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
             new UpdateDeliverySettingsCommand(actor.UserId!.Value, request.IsEnabled, request.RadiusKm),
             cancellationToken);
         return FromResult(result);
+    }
+
+    // ── The dealer page (spec 4.1). Owner-only, but not gated on trading: an applicant sent back
+    // for clarification fixing their description is exactly who needs these. ──
+
+    public sealed record DayScheduleRequest(
+        [Required, MaxLength(9)] string Day,
+        bool IsClosed,
+        [MaxLength(5)] string? OpensAt,
+        [MaxLength(5)] string? ClosesAt);
+
+    public sealed record UpdateProfileRequest(
+        [Required, MaxLength(150)] string BusinessName,
+        [MaxLength(2000)] string? Description,
+        [Range(-90, 90)] double Latitude,
+        [Range(-180, 180)] double Longitude,
+        [Required] IReadOnlyList<DayScheduleRequest> OperatingHours);
+
+    public sealed record BrandingUploadRequest([Required, MaxLength(100)] string ContentType);
+
+    public sealed record BrandingRequest([Required, MaxLength(500)] string StorageKey);
+
+    [Authorize(Policy = SecurityPolicies.DealerOwner)]
+    [HttpPut("me/profile")]
+    [ProducesResponseType<DealerProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> UpdateProfile([FromBody] UpdateProfileRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(
+            new UpdateDealerProfileCommand(
+                actor.UserId!.Value,
+                request.BusinessName,
+                request.Description,
+                request.Latitude,
+                request.Longitude,
+                [.. request.OperatingHours.Select(day => new DayScheduleInput(day.Day, day.IsClosed, day.OpensAt, day.ClosesAt))]),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>Step one of a logo or cover upload; step two is PUT /api/v1/uploads/{token}.</summary>
+    [Authorize(Policy = SecurityPolicies.DealerOwner)]
+    [HttpPost("me/branding/{kind}/upload-url")]
+    [ProducesResponseType<BrandingUploadDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> RequestBrandingUpload(string kind, [FromBody] BrandingUploadRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(
+            new RequestBrandingUploadCommand(actor.UserId!.Value, kind, request.ContentType), cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>Step three: the uploaded image becomes the logo or the cover.</summary>
+    [Authorize(Policy = SecurityPolicies.DealerOwner)]
+    [HttpPut("me/branding/{kind}")]
+    [ProducesResponseType<DealerProfileDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> SetBranding(string kind, [FromBody] BrandingRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(
+            new SetBrandingCommand(actor.UserId!.Value, kind, request.StorageKey), cancellationToken);
+        return FromResult(result);
+    }
+}
+
+/// <summary>
+/// Serves dealer logos and covers.
+///
+/// Anonymous and cacheable like car photos: spec 4.1 shows them to every customer. The path is
+/// pinned to the dealer-branding scope, which is deliberately NOT the dealers/{id} scope where the
+/// licence scans and owner IDs live -- this endpoint can never be talked into serving one of those.
+/// </summary>
+[Route("api/v1/dealer-images")]
+public sealed class DealerImagesController(IDocumentStorage storage) : ApiControllerBase
+{
+    private static readonly System.Text.RegularExpressions.Regex BrandingFileName =
+        new(@"^[0-9a-z-]+\.(jpg|jpeg|png|webp)$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    [AllowAnonymous]
+    [HttpGet("dealer-branding/{dealerId:guid}/{fileName}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> Get(Guid dealerId, string fileName, CancellationToken cancellationToken)
+    {
+        // Anything that is not a generated branding file name is a 404, not a storage exception: the
+        // endpoint is anonymous, and a stray dot or slash must never reach the key parser.
+        if (!BrandingFileName.IsMatch(fileName))
+            return NotFound();
+
+        var content = await storage.OpenAsync($"dealer-branding/{dealerId}/{fileName}", cancellationToken);
+        if (content is null)
+            return NotFound();
+
+        Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+        return File(content, Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "image/jpeg"
+        });
     }
 }
 

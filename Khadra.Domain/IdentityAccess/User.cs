@@ -77,6 +77,22 @@ public sealed class User : AggregateRoot, ISoftDeletable
         DateTimeOffset now) =>
         Create(email, phone, name, temporaryPasswordHash, UserRole.DealerEmployee, isEmailVerified: true, mustChangePassword: true, now);
 
+    /// <summary>
+    /// An employee who has been INVITED but has not yet accepted (spec 4.2's "invite link").
+    ///
+    /// The account is inert until they do: the password hash is unusable (the caller hashes random
+    /// bytes it then discards) and the email is unverified, so CanAuthenticate refuses a login
+    /// whatever anyone guesses. Accepting the invitation verifies the address -- which nobody has yet
+    /// proved they own -- and sets the first real password in one step.
+    /// </summary>
+    public static User CreateInvitedEmployee(
+        EmailAddress email,
+        PhoneNumber phone,
+        PersonName name,
+        PasswordHash unusablePasswordHash,
+        DateTimeOffset now) =>
+        Create(email, phone, name, unusablePasswordHash, UserRole.DealerEmployee, isEmailVerified: false, mustChangePassword: false, now);
+
     // Platform administrators are seeded or created by another admin, never self-registered.
     public static User CreateAdmin(
         EmailAddress email,
@@ -199,6 +215,21 @@ public sealed class User : AggregateRoot, ISoftDeletable
         MustChangePassword = false;
         SecurityStamp = Guid.NewGuid();
         AddDomainEvent(new UserPasswordChanged(Id, now));
+    }
+
+    /// <summary>
+    /// Ends every session this person has, without changing anything else about the account.
+    ///
+    /// This is what a dealer owner deactivating an employee needs (spec 4.2: "their login stops
+    /// working immediately"). Suspend is deliberately NOT used for that: it is the Admin's sanction,
+    /// it would show the person as platform-suspended in admin screens, and lifting it is the Admin's
+    /// tool. Rotating the stamp kills access tokens on their next request; the event revokes the
+    /// refresh-token families after commit.
+    /// </summary>
+    public void RevokeAllSessions(DateTimeOffset now)
+    {
+        SecurityStamp = Guid.NewGuid();
+        AddDomainEvent(new UserSessionsRevoked(Id, now));
     }
 
     public UnitResult<Error> Suspend(string reason, DateTimeOffset now)

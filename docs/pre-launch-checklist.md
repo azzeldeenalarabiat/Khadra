@@ -82,3 +82,63 @@ The rule is still enforced correctly wherever it is asked — the gap is that no
 The same is true of the payment-expiry and no-show jobs.
 
 **To close:** a hosted background service driving the four `ListDueFor*` queries.
+
+---
+
+## Dealer console (2026-09-03)
+
+### 5. Seeded vehicle photos are flat placeholders
+
+**Status:** open · **Raised:** 2026-09-03
+
+The development seeder writes a plain grey JPEG at every seeded car's image key so listings load
+without broken images. Before any demo to a real dealer, replace them with real photos or accept that
+seeded fleets look like grey tiles. The console hides an image that fails to load (`khFallback`) and
+shows the car icon instead, so a missing file is never a broken-image glyph.
+
+### 6. Listing edits are not logged
+
+**Status:** open · **Raised:** 2026-09-03
+
+The vehicle page's Activity tab shows booking changes on that car (from booking history) plus "Vehicle
+added". Price changes, photo changes and delivery-eligibility changes are not recorded anywhere. The
+design shows them; the tab says they are not logged yet.
+
+**To close:** raise domain events from `Vehicle` behaviours and project them into a per-vehicle log,
+or extend the audit trail to dealer-side edits.
+
+### 7. Screens the design has and the platform does not
+
+**Status:** open by design · **Raised:** 2026-09-03
+
+Reviews, a notification feed, two-factor sign-in, notification preferences, bank details for payouts,
+pausing or closing a dealership, a map picker for the dealer location, a vehicle-type lookup, and
+per-day blocked dates. Each screen says plainly that the feature is not live and what exists in its
+place (the dashboard for attention items, "take off the road" for blocking dates, coordinates typed
+by hand for the location). None of them shows invented data.
+
+### 8. Reseeding truncates the database by hand
+
+**Status:** open · **Raised:** 2026-09-03
+
+The seeder only runs on an empty `dealers` table, so applying seeder changes (the 2026-09-03 change
+that names the real dealer owner as the actor on seeded approvals, pickups and returns, and writes the
+placeholder photos) needs every table except `__EFMigrationsHistory` truncated first, then an API
+restart. That is a manual, destructive step with no guard — see item 1.
+
+### 9. Staff invitation reveals whether an email or phone already has an account
+
+**Status:** open · **Raised:** 2026-09-03 (Fable advisor review)
+
+`EmployeeAccountProvisioner` tells an approved dealer owner whether the email or phone they invite is
+already a Khadra account, customers included. Fine for development; before launch, return a neutral
+"invitation sent" for a taken identity (and email the existing account instead) and rate-limit
+invitations per owner.
+
+### 10. Delivery radius ceiling is a constant
+
+**Status:** open · **Raised:** 2026-09-03
+
+`DeliverySettings.MaxRadiusKm = 200` is a business number in code, mirrored in the API request
+validation and now surfaced to the console through `GET /dealers/me/delivery`. Move it into
+`BusinessRules` the next time delivery rules are touched.

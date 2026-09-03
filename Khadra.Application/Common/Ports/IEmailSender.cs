@@ -17,4 +17,7 @@ public interface IAuthEmailComposer
     EmailMessage PasswordReset(User user, string rawToken);
 
     EmailMessage PasswordChanged(User user);
+
+    /// <summary>Spec 4.2: a dealer owner invited this person to act for the business.</summary>
+    EmailMessage EmployeeInvitation(User user, string dealerName, string rawToken);
 }

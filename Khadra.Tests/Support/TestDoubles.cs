@@ -50,6 +50,7 @@ internal sealed record TestAuthPolicy(
     TimeSpan RefreshFamilyLifetime,
     TimeSpan EmailVerificationLifetime,
     TimeSpan PasswordResetLifetime,
+    TimeSpan EmployeeInvitationLifetime,
     int PasswordMinimumLength) : IAuthPolicySettings
 {
     public static TestAuthPolicy Default { get; } = new(
@@ -57,6 +58,7 @@ internal sealed record TestAuthPolicy(
         TimeSpan.FromDays(30),
         TimeSpan.FromHours(24),
         TimeSpan.FromMinutes(60),
+        TimeSpan.FromDays(7),
         8);
 }
 

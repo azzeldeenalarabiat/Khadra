@@ -40,12 +40,40 @@ export interface DealerProfile {
   readonly commercialRegistrationNumber: string;
   readonly verificationStatus: string;
   readonly reviewNote: string | null;
+  readonly suspensionReason: string | null;
   readonly submittedAt: string;
   readonly reviewDueAt: string;
+  readonly createdAt: string;
   readonly canTrade: boolean;
   readonly isSuspended: boolean;
   readonly submittedDocuments: readonly string[];
   readonly missingDocuments: readonly string[];
+  /** Spec 4.1: the dealer page. Editable by the owner. */
+  readonly description: string | null;
+  readonly latitude: number;
+  readonly longitude: number;
+  readonly operatingHours: readonly DaySchedule[];
+  readonly delivery: DeliverySettings;
+  /** Public, cacheable paths; null until the owner uploads one. */
+  readonly logoUrl: string | null;
+  readonly coverUrl: string | null;
+  readonly employeeCount: number;
+  /** Hints for which controls to show; every endpoint enforces the real answer. */
+  readonly isOwner: boolean;
+  readonly canViewReports: boolean;
+}
+
+export interface DaySchedule {
+  /** 'Sunday' … 'Saturday'. */
+  readonly day: string;
+  readonly isClosed: boolean;
+  readonly opensAt: string | null;
+  readonly closesAt: string | null;
+}
+
+export interface DeliverySettings {
+  readonly isEnabled: boolean;
+  readonly radiusKm: number;
 }
 
 /** Spec 7: a short-lived signed link, minted per request and never stored. */

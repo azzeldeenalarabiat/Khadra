@@ -7,10 +7,12 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { map } from 'rxjs';
 import { FleetService } from '../../core/services/fleet.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
-import { Vehicle, VehicleRequest } from '../../core/models/fleet.api';
+import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fleet.api';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -32,7 +34,10 @@ export class CarFormComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  protected readonly vehicleId = this.route.snapshot.paramMap.get('vehicleId');
+  protected readonly vehicleId = toSignal(
+    this.route.paramMap.pipe(map((params) => params.get('vehicleId'))),
+    { initialValue: this.route.snapshot.paramMap.get('vehicleId') },
+  );
   protected readonly resource = this.service.vehicle;
   protected readonly saving = signal(false);
   protected readonly uploading = signal(false);
@@ -64,15 +69,15 @@ export class CarFormComponent {
   });
 
   constructor() {
-    this.service.editing.set(this.vehicleId);
+    effect(() => this.service.editing.set(this.vehicleId()));
     effect(() => {
       const car = this.resource.value();
-      if (car) this.form.set(toRequest(car));
+      if (car) this.form.set(toVehicleRequest(car));
     });
   }
 
   protected readonly car = computed(() => this.resource.value() ?? null);
-  protected readonly isEditing = computed(() => this.vehicleId !== null);
+  protected readonly isEditing = computed(() => this.vehicleId() !== null);
   protected readonly images = computed(() => this.car()?.images ?? []);
 
   /** Publishing needs a photo, so the form says so before the dealer discovers it as an error. */
@@ -108,19 +113,18 @@ export class CarFormComponent {
 
     try {
       const body = this.form();
-      const saved = this.vehicleId
-        ? await this.service.update(this.vehicleId, body)
-        : await this.service.add(body);
+      const id = this.vehicleId();
+      const saved = id ? await this.service.update(id, body) : await this.service.add(body);
 
       this.service.refresh();
       this.ui.showToast(
-        this.vehicleId ? 'Car updated' : 'Car added',
+        id ? 'Car updated' : 'Car added',
         `${saved.year} ${saved.make} ${saved.model} is saved as ${saved.status}.`,
       );
 
       // A new car goes straight to its own page so photos can be attached; there is nowhere to
       // upload them until the car exists.
-      if (!this.vehicleId) await this.router.navigate(['/fleet', saved.vehicleId]);
+      if (!id) await this.router.navigate(['/dealer/fleet', saved.vehicleId]);
     } catch (error) {
       this.problem.set(describe(error));
     } finally {
@@ -131,12 +135,13 @@ export class CarFormComponent {
   protected async upload(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file || !this.vehicleId) return;
+    const id = this.vehicleId();
+    if (!file || !id) return;
 
     this.uploading.set(true);
     this.problem.set(null);
     try {
-      await this.service.uploadImage(this.vehicleId, file);
+      await this.service.uploadImage(id, file);
       this.service.refresh();
     } catch (error) {
       this.problem.set(describe(error));
@@ -148,9 +153,10 @@ export class CarFormComponent {
   }
 
   protected async removeImage(imageId: string): Promise<void> {
-    if (!this.vehicleId) return;
+    const id = this.vehicleId();
+    if (!id) return;
     try {
-      await this.service.removeImage(this.vehicleId, imageId);
+      await this.service.removeImage(id, imageId);
       this.service.refresh();
     } catch (error) {
       this.problem.set(describe(error));
@@ -158,36 +164,15 @@ export class CarFormComponent {
   }
 
   protected async makePrimary(imageId: string): Promise<void> {
-    if (!this.vehicleId) return;
+    const id = this.vehicleId();
+    if (!id) return;
     try {
-      await this.service.setPrimaryImage(this.vehicleId, imageId);
+      await this.service.setPrimaryImage(id, imageId);
       this.service.refresh();
     } catch (error) {
       this.problem.set(describe(error));
     }
   }
-}
-
-function toRequest(car: Vehicle): VehicleRequest {
-  return {
-    carTypeId: car.carTypeId,
-    make: car.make,
-    model: car.model,
-    year: car.year,
-    color: car.color,
-    seats: car.seats,
-    transmission: car.transmission,
-    fuelType: car.fuelType,
-    description: car.description,
-    plateNumber: car.plateNumber,
-    dailyRate: car.dailyRate.amount,
-    securityDeposit: car.securityDeposit.amount,
-    isDeliveryEligible: car.isDeliveryEligible,
-    mileageUnlimited: car.mileage.isUnlimited,
-    mileageDailyLimitKm: car.mileage.dailyLimitKm,
-    mileageExcessFeePerKm: car.mileage.excessFeePerKm?.amount ?? null,
-    fuelPolicy: car.fuelPolicy,
-  };
 }
 
 function describe(error: unknown): string {

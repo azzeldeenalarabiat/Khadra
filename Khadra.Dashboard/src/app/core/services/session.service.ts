@@ -82,6 +82,24 @@ export class SessionService {
     }
   }
 
+  /** The server has already ended the session; only the browser's memory of it is left to clear. */
+  /** Spec 4.2 / 6: the BFF re-signs the cookie with the fresh tokens, so other sessions die and this one lives. */
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    const token = await this.requestToken();
+    const user = await firstValueFrom(
+      this.http.post<SessionUser>(
+        '/bff/change-password',
+        { currentPassword, newPassword },
+        { headers: { 'X-XSRF-TOKEN': token } },
+      ),
+    );
+    this.currentUser.set(user);
+  }
+
+  forget(): void {
+    this.currentUser.set(null);
+  }
+
   async signOut(): Promise<void> {
     try {
       const token = await this.requestToken();

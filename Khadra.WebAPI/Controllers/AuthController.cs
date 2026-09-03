@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Khadra.Application.Common;
+using Khadra.Application.IdentityAccess.AcceptInvitation;
 using Khadra.Application.IdentityAccess.ChangePassword;
 using Khadra.Application.IdentityAccess.Dtos;
 using Khadra.Application.IdentityAccess.ForgotPassword;
@@ -146,6 +147,23 @@ public sealed class AuthController(ICurrentActor currentActor) : ApiControllerBa
         return FromResult(result, () => Ok(new MessageResponse("Your password has been reset. Sign in with your new password.")));
     }
 
+    /// <summary>
+    /// An invited employee takes up their account (spec 4.2): the emailed link proves the mailbox and
+    /// the password they choose here is their first. Anonymous and rate limited like every other
+    /// token-bearing endpoint.
+    /// </summary>
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    [HttpPost("accept-invitation")]
+    [ProducesResponseType<MessageResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> AcceptInvitation(AcceptInvitationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(new AcceptInvitationCommand(request.Token, request.Password), cancellationToken);
+        return FromResult(result, () => Ok(new MessageResponse("Your account is ready. Sign in with the password you chose.")));
+    }
+
     [Authorize]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("change-password")]
@@ -205,6 +223,10 @@ public sealed record EmailRequest([param: Required, StringLength(256)] string Em
 public sealed record ResetPasswordRequest(
     [param: Required, StringLength(512)] string Token,
     [param: Required, StringLength(72)] string NewPassword);
+
+public sealed record AcceptInvitationRequest(
+    [param: Required, StringLength(512)] string Token,
+    [param: Required, StringLength(72)] string Password);
 
 public sealed record ChangePasswordRequest(
     [param: Required, StringLength(72)] string CurrentPassword,
