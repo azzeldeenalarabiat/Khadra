@@ -165,3 +165,25 @@ button and its notification count, none of which were connected to anything. Res
 features, not before.
 
 **To close:** each screen leaves this list by getting a real reader, endpoint and component.
+
+### 12. Nothing stops two bookings holding the same car on the same dates
+
+**Status:** open · **Raised:** 2026-09-03 (found by end-to-end testing)
+
+`IBookingRepository.HasOverlappingBookingAsync` is implemented and covered by repository tests, and
+its own comment says "a database exclusion constraint backs this up, because a check-then-act in
+application code loses the race between two customers booking the same car for the same dates."
+
+**There is no such constraint.** No migration creates one, `btree_gist` is not enabled, and
+`pg_constraint` holds no exclusion constraint on `bookings`. The seeded database currently contains
+59 pairs of Approved/PickedUp bookings that overlap on one vehicle, which is how this was found.
+
+It is not causing harm yet only because nothing creates bookings outside the seeder: the customer
+booking flow is not built. The danger is precisely that the next person to build it will read that
+comment, trust the database, and ship a race that double-books cars.
+
+**To close:** enable `btree_gist`, add an exclusion constraint over `(vehicle_id WITH =,
+tstzrange(period_start, period_end) WITH &&)` limited to the statuses where `HoldsVehicle` is true,
+and call the guard in the booking-creation handler for a friendly error before the constraint fires.
+The seeder must stop generating overlaps first, or the migration will not apply to an existing
+development database.

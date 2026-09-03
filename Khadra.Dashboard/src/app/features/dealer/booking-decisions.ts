@@ -33,6 +33,7 @@ export class BookingDecisions {
           {
             label: 'Note to customer (optional)',
             type: 'text',
+            optional: true,
             placeholder: 'Pickup instructions, delivery window…',
             hint: 'Recorded on the booking with you as the actor; the customer can read it.',
           },
@@ -99,20 +100,23 @@ export class BookingDecisions {
         title: `Hand over ${vehicle}?`,
         body: `Records that ${reference} started and the keys changed hands. The odometer and fuel level protect both sides if the return is disputed.`,
         fields: [
-          { label: 'Odometer (km)', type: 'text', placeholder: 'e.g. 41200' },
+          { label: 'Odometer (km)', type: 'text', optional: true, placeholder: 'e.g. 41200' },
           {
             label: 'Fuel level (0–1)',
             type: 'text',
+            optional: true,
             placeholder: 'e.g. 1 for a full tank, 0.5 for half',
           },
           {
             label: 'Cash collected (JOD)',
             type: 'text',
+            optional: true,
             placeholder: 'The balance paid in cash at handover, if any',
           },
           {
             label: 'Notes',
             type: 'text',
+            optional: true,
             placeholder: 'Condition, accessories, anything worth writing down',
           },
         ],
@@ -136,14 +140,20 @@ export class BookingDecisions {
         title: `Take ${vehicle} back?`,
         body: `Records that ${reference} ended and the car is back with you. The settlement window starts from this moment; either side can open a dispute inside it.`,
         fields: [
-          { label: 'Odometer (km)', type: 'text', placeholder: 'e.g. 41650' },
-          { label: 'Fuel level (0–1)', type: 'text', placeholder: 'e.g. 0.75' },
+          { label: 'Odometer (km)', type: 'text', optional: true, placeholder: 'e.g. 41650' },
+          { label: 'Fuel level (0–1)', type: 'text', optional: true, placeholder: 'e.g. 0.75' },
           {
             label: 'Cash collected (JOD)',
             type: 'text',
+            optional: true,
             placeholder: 'Any balance settled in cash at return',
           },
-          { label: 'Notes', type: 'text', placeholder: 'Damage, cleanliness, missing items' },
+          {
+            label: 'Notes',
+            type: 'text',
+            optional: true,
+            placeholder: 'Damage, cleanliness, missing items',
+          },
         ],
         note: 'Recorded with you as the person who took the car back.',
         confirm: 'Record return',

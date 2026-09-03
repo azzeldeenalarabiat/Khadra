@@ -1,3 +1,4 @@
+using Khadra.Application.Dealers;
 using Khadra.Application.Common;
 using Khadra.Application.Fleet.ManageVehicles;
 using Khadra.Application.Fleet.VehicleImages;
@@ -46,7 +47,8 @@ public sealed class FleetManagementTests
             return vehicle;
         }
 
-        public VehicleHandlers Handlers() => new(Vehicles, Dealers, Clock, UnitOfWork);
+        public VehicleHandlers Handlers() =>
+            new(Vehicles, Dealers, new DealerMembershipResolver(Dealers), Clock, UnitOfWork);
 
         public VehicleImageHandlers Images() => new(
             Vehicles, Dealers, new StubUploadTickets(), Storage, FakeDocumentPolicy.Default, Clock, UnitOfWork);
@@ -335,5 +337,28 @@ public sealed class FleetManagementTests
         Assert.Single(afterRemoval.Value.Images);
         Assert.True(afterRemoval.Value.Images[0].IsPrimary);
         Assert.Contains(key + "a.jpg", context.Storage.Deleted);
+    }
+
+    /// <summary>
+    /// The fleet endpoints admit any dealer staff, so the handler must resolve the dealership the
+    /// same way. Resolving by owner alone told an employee they had no dealership at all, on a
+    /// screen their own sidebar links to.
+    /// </summary>
+    [Fact]
+    public async Task An_employee_can_read_the_fleet_of_the_dealership_they_work_for()
+    {
+        var context = new Context();
+        var dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
+        context.GivenDealer(dealer, OwnerId);
+        var employeeUserId = Id.New();
+        dealer.HireEmployee(employeeUserId, canViewReports: false, Build.Now);
+        context.Dealers.GetByStaffUserIdAsync(employeeUserId, Arg.Any<CancellationToken>()).Returns(dealer);
+        context.Vehicles.ListByDealerAsync(dealer.Id, Arg.Any<CancellationToken>())
+            .Returns([Build.Vehicle(dealerId: dealer.Id)]);
+
+        var listed = await context.Handlers().Handle(new ListMyVehiclesQuery(employeeUserId), CancellationToken.None);
+
+        Assert.True(listed.IsSuccess);
+        Assert.Single(listed.Value);
     }
 }

@@ -130,8 +130,15 @@ export interface ModalField {
   readonly type: 'select' | 'text';
   readonly options?: readonly string[];
   readonly placeholder?: string;
+  /** Pre-filled value. A select without one starts on its first option. */
   readonly value?: string;
   readonly hint?: string;
+  /**
+   * Fields are required by default: every one of these is a reason or a note attached to a decision
+   * that both parties and the audit log will read, and an unexplained decision is the thing the
+   * dialog exists to prevent.
+   */
+  readonly optional?: boolean;
 }
 
 export interface Toast {

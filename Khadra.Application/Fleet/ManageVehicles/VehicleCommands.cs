@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
+using Khadra.Application.Dealers;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Fleet.Dtos;
 using Khadra.Domain.Common;
@@ -38,9 +39,11 @@ public sealed record VehicleDetailsInput(
     MileagePolicyInput Mileage,
     string FuelPolicy);
 
-public sealed record ListMyVehiclesQuery(Id OwnerUserId) : IQuery<Result<IReadOnlyList<VehicleDto>, Error>>;
+// Reading the fleet is for any member of staff: an employee answering "is this car free?" needs the
+// list as much as the owner does. Changing it stays with the owner, which the endpoints enforce.
+public sealed record ListMyVehiclesQuery(Id ActorUserId) : IQuery<Result<IReadOnlyList<VehicleDto>, Error>>;
 
-public sealed record GetMyVehicleQuery(Id OwnerUserId, Id VehicleId) : IQuery<Result<VehicleDto, Error>>;
+public sealed record GetMyVehicleQuery(Id ActorUserId, Id VehicleId) : IQuery<Result<VehicleDto, Error>>;
 
 public sealed record AddVehicleCommand(Id OwnerUserId, VehicleDetailsInput Details)
     : ICommand<Result<VehicleDto, Error>>;
@@ -99,6 +102,7 @@ public sealed class UpdateVehicleCommandValidator : AbstractValidator<UpdateVehi
 public sealed class VehicleHandlers(
     IVehicleRepository vehicles,
     IDealerRepository dealers,
+    DealerMembershipResolver membership,
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<ListMyVehiclesQuery, Result<IReadOnlyList<VehicleDto>, Error>>,
@@ -114,9 +118,13 @@ public sealed class VehicleHandlers(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var dealer = await dealers.GetByOwnerUserIdAsync(request.OwnerUserId, cancellationToken);
-        if (dealer is null)
-            return DealerErrors.NotRegistered;
+        // Through the membership resolver, not the owner lookup: the endpoint admits any dealer
+        // staff, and resolving by owner alone handed an employee "you have no dealership" for a
+        // fleet they work with every day.
+        var member = await membership.ResolveAsync(request.ActorUserId, cancellationToken);
+        if (member.IsFailure)
+            return member.Error;
+        var dealer = member.Value.Dealer;
 
         var fleet = await vehicles.ListByDealerAsync(dealer.Id, cancellationToken);
         IReadOnlyList<VehicleDto> listed = [.. fleet.Select(vehicle => VehicleDto.From(vehicle, dealer.CanTrade))];
@@ -127,8 +135,15 @@ public sealed class VehicleHandlers(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var owned = await LoadOwnedAsync(request.OwnerUserId, request.VehicleId, cancellationToken);
-        return owned.IsFailure ? owned.Error : VehicleDto.From(owned.Value.Vehicle, owned.Value.Dealer.CanTrade);
+        // Same reasoning as the list: staff may read one of their dealership's cars.
+        var member = await membership.ResolveAsync(request.ActorUserId, cancellationToken);
+        if (member.IsFailure)
+            return member.Error;
+
+        var vehicle = await vehicles.GetByIdAsync(request.VehicleId, cancellationToken);
+        return vehicle is null || vehicle.DealerId != member.Value.Dealer.Id
+            ? FleetErrors.NotYours
+            : VehicleDto.From(vehicle, member.Value.Dealer.CanTrade);
     }
 
     public async Task<Result<VehicleDto, Error>> Handle(AddVehicleCommand request, CancellationToken cancellationToken)

@@ -2,8 +2,10 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  computed,
   effect,
   inject,
+  signal,
   viewChild,
 } from '@angular/core';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
@@ -35,8 +37,8 @@ export class ConfirmModalComponent {
   protected readonly modal = this.ui.modal;
   protected readonly busy = this.ui.modalBusy;
 
-  /** What the admin typed or chose, keyed by field label. */
-  private readonly values = new Map<string, string>();
+  /** What the admin typed or chose, keyed by field label. Rebuilt for every dialog. */
+  private readonly values = signal<Record<string, string>>({});
   protected readonly toneClass = toneClass;
 
   constructor() {
@@ -47,7 +49,35 @@ export class ConfirmModalComponent {
       if (wanted && !el.open) el.showModal();
       else if (!wanted && el.open) el.close();
     });
+
+    // Seed the fields from the dialog that is opening, and drop whatever the last one held.
+    //
+    // These values used to survive between dialogs. An admin who typed a rejection reason, changed
+    // their mind and cancelled, then opened "Request clarification" on any dealer would silently
+    // send that stale rejection text as the clarification note — and it lands in an append-only
+    // audit log against their name. Keying by field label made it worse: two dialogs that both say
+    // "Note" shared the same entry.
+    effect(() => {
+      const config = this.modal();
+      const seeded: Record<string, string> = {};
+      for (const field of config?.fields ?? []) {
+        seeded[field.label] =
+          field.value ?? (field.type === 'select' ? (field.options?.[0] ?? '') : '');
+      }
+      this.values.set(seeded);
+    });
   }
+
+  /**
+   * Every field must be answered before the decision can be sent. The server refuses an empty
+   * reason anyway; catching it here means the admin is told which box to fill instead of being
+   * handed a validation error after committing to the action.
+   */
+  protected readonly canConfirm = computed(() => {
+    const fields = this.modal()?.fields ?? [];
+    const values = this.values();
+    return fields.every((field) => field.optional || (values[field.label] ?? '').trim().length > 0);
+  });
 
   protected close(): void {
     this.ui.closeModal();
@@ -69,13 +99,13 @@ export class ConfirmModalComponent {
   }
 
   protected setField(label: string, event: Event): void {
-    this.values.set(
-      label,
-      (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value,
-    );
+    const value = (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)
+      .value;
+    this.values.update((current) => ({ ...current, [label]: value }));
   }
 
   protected confirm(): void {
-    void this.ui.confirmModal(Object.fromEntries(this.values));
+    if (!this.canConfirm()) return;
+    void this.ui.confirmModal({ ...this.values() });
   }
 }
