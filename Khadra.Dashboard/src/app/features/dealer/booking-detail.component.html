@@ -1,0 +1,317 @@
+<div class="stack stack-14 page-wide">
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load this booking</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">Back to bookings</a>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading()) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else if (booking(); as b) {
+    <div class="dc-head">
+      <div class="grow">
+        <div class="row row-gap-9">
+          <h1 class="page-title">Booking {{ b.reference }}</h1>
+          <span class="pill" [class]="'s-' + tone()">{{ label() }}</span>
+        </div>
+        <div class="page-sub">{{ meta() }}</div>
+      </div>
+      @if (answerBy(); as sla) {
+        <div class="sla-box">
+          <div class="k">Answer within</div>
+          <div class="sla-figure num">{{ sla.figure }}</div>
+          <div class="page-sub">{{ sla.note }}</div>
+        </div>
+      }
+      <div class="dc-head-actions">
+        @if (canDecide()) {
+          <button type="button" class="btn btn-primary btn-md" (click)="approve()">
+            <kh-icon name="check" />
+            Approve
+          </button>
+          <button type="button" class="btn btn-secondary btn-md s-bad" (click)="reject()">
+            <kh-icon name="x" />
+            Reject
+          </button>
+        } @else if (b.status === 'Requested') {
+          <span class="page-sub"
+            >Your dealership cannot trade right now, so this request cannot be answered.</span
+          >
+        }
+        @if (canPickUp()) {
+          <button type="button" class="btn btn-primary btn-md" (click)="pickUp()">
+            <kh-icon name="key" />
+            Record pickup
+          </button>
+        }
+        @if (canReturn()) {
+          <button type="button" class="btn btn-primary btn-md" (click)="takeBack()">
+            <kh-icon name="arrow-square-in" />
+            Record return
+          </button>
+        }
+        @if (b.liveDisputeId; as ticketId) {
+          <a class="btn btn-secondary btn-md s-bad" [routerLink]="['/dealer/disputes', ticketId]">
+            <kh-icon name="scales" />
+            Open dispute
+          </a>
+        }
+      </div>
+    </div>
+
+    <div class="dc-split-155">
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="user" class="kpi-icon" />
+            <span class="sect-t">Customer</span>
+            <span class="sect-hint"
+              >Documents on file are checked by the platform, not shown here</span
+            >
+          </div>
+          <div class="sect-pad row row-gap-14">
+            <div class="customer-avatar">{{ initials(b.customerName) }}</div>
+            <div class="grow">
+              @for (row of customerRows(); track row.k) {
+                <div class="kv">
+                  <span class="kv-key">{{ row.k }}</span
+                  ><span class="kv-val">{{ row.v }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="car-simple" class="kpi-icon" />
+            <span class="sect-t">Vehicle</span>
+            @if (b.vehicle) {
+              <a class="sect-hint auth-link" [routerLink]="['/dealer/fleet', b.vehicle.vehicleId]"
+                >Open vehicle</a
+              >
+            }
+          </div>
+          <div class="sect-pad row row-gap-14">
+            <div class="thumb thumb-lg">
+              @if (b.vehicle?.coverImageUrl; as url) {
+                <img [src]="url" alt="" />
+              } @else {
+                <kh-icon name="car-simple" />
+              }
+            </div>
+            <div class="grow">
+              @for (row of vehicleRows(); track row.k) {
+                <div class="kv">
+                  <span class="kv-key">{{ row.k }}</span
+                  ><span class="kv-val" [class]="row.tone ? 's-' + row.tone : ''">{{ row.v }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </section>
+
+        <div class="dc-split-even">
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="calendar-blank" class="kpi-icon" /><span class="sect-t">Rental</span>
+            </div>
+            <div class="sect-pad kv-narrow">
+              @for (row of rentalRows(); track row.k) {
+                <div class="kv">
+                  <span class="kv-key">{{ row.k }}</span
+                  ><span class="kv-val">{{ row.v }}</span>
+                </div>
+              }
+            </div>
+          </section>
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="moped" class="kpi-icon" /><span class="sect-t">Pickup</span>
+            </div>
+            <div class="sect-pad kv-narrow">
+              @for (row of pickupRows(); track row.k) {
+                <div class="kv">
+                  <span class="kv-key">{{ row.k }}</span
+                  ><span class="kv-val">{{ row.v }}</span>
+                </div>
+              }
+            </div>
+          </section>
+        </div>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="currency-circle-dollar" class="kpi-icon" />
+            <span class="sect-t">Financial</span>
+            <span class="sect-hint"
+              >All amounts in {{ b.pricing.totalPrice.currency }} · frozen on this booking</span
+            >
+          </div>
+          <div class="sect-pad">
+            @for (row of moneyRows(); track row.k) {
+              <div class="money-line" [class.is-hi]="row.hi" [class.is-dim]="row.dim">
+                <span class="k-label">{{ row.k }}</span>
+                <span class="num">{{ row.v }}</span>
+              </div>
+            }
+            <div class="note-box">
+              <kh-icon name="info" />
+              Commission is deducted from the card deposit at the rate frozen when this booking was
+              made. Payout scheduling is not live yet, so no net figure is shown.
+            </div>
+          </div>
+        </section>
+
+        @if (canDispute()) {
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="scales" class="kpi-icon" />
+              <span class="sect-t">Open a dispute</span>
+              <span class="sect-hint"
+                >The platform answers within its SLA; nothing is charged without a ticket</span
+              >
+            </div>
+            <div class="sect-pad stack stack-10">
+              @if (problem(); as message) {
+                <div class="banner s-bad" role="alert">
+                  <kh-icon name="warning-circle" class="banner-icon" />
+                  <div class="banner-body">
+                    <div class="banner-text">{{ message }}</div>
+                  </div>
+                </div>
+              }
+              <div class="field">
+                <label for="dispute-reason">What went wrong</label>
+                <textarea
+                  id="dispute-reason"
+                  class="input"
+                  [value]="disputeReason()"
+                  (input)="disputeReason.set(fieldValue($event))"
+                  placeholder="Say what happened, with times. Both parties and the platform will read this."
+                ></textarea>
+              </div>
+              <div class="field">
+                <label for="dispute-evidence">Evidence (optional)</label>
+                <input
+                  id="dispute-evidence"
+                  class="input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  [disabled]="disputeBusy()"
+                  (change)="attachEvidence($event)"
+                />
+                @if (evidenceNames().length) {
+                  <div class="field-hint">Attached: {{ evidenceNames().join(', ') }}</div>
+                } @else {
+                  <div class="field-hint">
+                    Photos or a PDF. Stored privately; only the two parties and the platform can
+                    open them.
+                  </div>
+                }
+              </div>
+              <button
+                type="button"
+                class="btn btn-primary btn-md self-start"
+                [disabled]="disputeBusy() || !disputeReason().trim()"
+                (click)="openDispute()"
+              >
+                {{ disputeBusy() ? 'Working…' : 'Open dispute' }}
+              </button>
+            </div>
+          </section>
+        }
+      </div>
+
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <span class="sect-t">Timeline</span
+            ><span class="sect-hint">Actor recorded on every step</span>
+          </div>
+          <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
+        </section>
+
+        @if (b.handovers.length) {
+          <section class="sect sect-pad stack stack-9">
+            <span class="k">Handovers</span>
+            @for (h of b.handovers; track h.recordedAt) {
+              <div class="history-line">
+                <span class="k-label">{{ h.type }} · {{ dateTime(h.recordedAt) }}</span
+                ><span class="num"
+                  >{{ h.odometerKm ?? '—' }} km · fuel {{ h.fuelLevel ?? '—' }}</span
+                >
+              </div>
+              @if (h.notes) {
+                <div class="page-sub">“{{ h.notes }}”</div>
+              }
+              @if (h.cashCollected) {
+                <div class="page-sub">
+                  Cash collected: {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
+                </div>
+              }
+            }
+          </section>
+        }
+
+        @if (b.penalty && !b.penalty.isNothingOwed) {
+          <section class="sect sect-pad stack stack-9">
+            <span class="k">Penalty assessed</span>
+            <div class="history-line">
+              <span class="k-label">Attributed to</span><span>{{ b.penalty.attributedTo }}</span>
+            </div>
+            <div class="history-line">
+              <span class="k-label">Amount</span
+              ><span class="num"
+                >{{
+                  b.penalty.isRange
+                    ? b.penalty.minAmount.amount + '–' + b.penalty.maxAmount.amount
+                    : b.penalty.minAmount.amount
+                }}
+                {{ b.penalty.minAmount.currency }}</span
+              >
+            </div>
+            <div class="page-sub">{{ b.penalty.reason }}</div>
+            <div class="note-box is-plain">
+              Assessed, not charged. Money only moves when the platform resolves a dispute ticket.
+            </div>
+          </section>
+        }
+
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">Terms frozen on this booking</span>
+          <div class="history-line">
+            <span class="k-label">Deposit</span
+            ><span class="num">{{ b.terms.depositPercent }}%</span>
+          </div>
+          <div class="history-line">
+            <span class="k-label">Commission</span
+            ><span class="num">{{ b.terms.commissionPercent }}%</span>
+          </div>
+          <div class="history-line">
+            <span class="k-label">Free cancellation</span
+            ><span class="num">{{ b.terms.freeCancellationWindowHours }}h after approval</span>
+          </div>
+          <div class="history-line">
+            <span class="k-label">Settlement window</span
+            ><span class="num">{{ b.terms.postReturnSettlementWindowHours }}h after return</span>
+          </div>
+          <div class="history-line">
+            <span class="k-label">Rules version</span
+            ><span class="num">{{ b.terms.rulesVersion }}</span>
+          </div>
+        </section>
+      </div>
+    </div>
+  }
+</div>

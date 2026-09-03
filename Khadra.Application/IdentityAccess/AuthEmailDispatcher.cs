@@ -17,6 +17,9 @@ public sealed partial class AuthEmailDispatcher(
     public Task SendPasswordResetAsync(User user, string rawToken, CancellationToken cancellationToken) =>
         TrySendAsync(user, () => composer.PasswordReset(user, rawToken), "password reset", cancellationToken);
 
+    public Task SendEmployeeInvitationAsync(User user, string dealerName, string rawToken, CancellationToken cancellationToken) =>
+        TrySendAsync(user, () => composer.EmployeeInvitation(user, dealerName, rawToken), "employee invitation", cancellationToken);
+
     public Task SendPasswordChangedAsync(User user, CancellationToken cancellationToken) =>
         TrySendAsync(user, () => composer.PasswordChanged(user), "password changed", cancellationToken);
 

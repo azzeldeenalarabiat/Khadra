@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Khadra.Application.Common;
+using Khadra.Application.IdentityAccess.AcceptInvitation;
 using Khadra.Application.IdentityAccess.ChangePassword;
 using Khadra.Application.IdentityAccess.Dtos;
 using Khadra.Application.IdentityAccess.ForgotPassword;
@@ -8,6 +9,7 @@ using Khadra.Application.IdentityAccess.Login;
 using Khadra.Application.IdentityAccess.Logout;
 using Khadra.Application.IdentityAccess.RefreshTokens;
 using Khadra.Application.IdentityAccess.RegisterCustomer;
+using Khadra.Application.IdentityAccess.RegisterDealerOwner;
 using Khadra.Application.IdentityAccess.ResendVerification;
 using Khadra.Application.IdentityAccess.ResetPassword;
 using Khadra.Application.IdentityAccess.VerifyEmail;
@@ -30,7 +32,33 @@ public sealed class AuthController(ICurrentActor currentActor) : ApiControllerBa
     {
         ArgumentNullException.ThrowIfNull(request);
         var result = await Mediator.Send(
-            new RegisterCustomerCommand(request.Email, request.Password, request.FullName, request.Phone),
+            new RegisterCustomerCommand(
+                request.Email, request.Password, request.FullName, request.Phone,
+                request.DateOfBirth, request.IsForeignNational),
+            cancellationToken);
+        return FromResult(result, created => CreatedAtAction(nameof(Me), null, created));
+    }
+
+    /// <summary>
+    /// Step one of the dealer application (spec 3.1): the owner gets an account.
+    ///
+    /// The account is a DealerOwner from the start; it is the DEALER that begins PENDING_REVIEW.
+    /// Nothing dealer-specific is permitted until that application is approved.
+    /// </summary>
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    [HttpPost("register-dealer-owner")]
+    [ProducesResponseType<RegisteredUserDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> RegisterDealerOwner(
+        RegisterDealerOwnerRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(
+            new RegisterDealerOwnerCommand(
+                request.Email, request.Password, request.FullName, request.Phone, request.DateOfBirth),
             cancellationToken);
         return FromResult(result, created => CreatedAtAction(nameof(Me), null, created));
     }
@@ -119,6 +147,23 @@ public sealed class AuthController(ICurrentActor currentActor) : ApiControllerBa
         return FromResult(result, () => Ok(new MessageResponse("Your password has been reset. Sign in with your new password.")));
     }
 
+    /// <summary>
+    /// An invited employee takes up their account (spec 4.2): the emailed link proves the mailbox and
+    /// the password they choose here is their first. Anonymous and rate limited like every other
+    /// token-bearing endpoint.
+    /// </summary>
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    [HttpPost("accept-invitation")]
+    [ProducesResponseType<MessageResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> AcceptInvitation(AcceptInvitationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(new AcceptInvitationCommand(request.Token, request.Password), cancellationToken);
+        return FromResult(result, () => Ok(new MessageResponse("Your account is ready. Sign in with the password you chose.")));
+    }
+
     [Authorize]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
     [HttpPost("change-password")]
@@ -149,7 +194,19 @@ public sealed record RegisterRequest(
     [param: Required, StringLength(256)] string Email,
     [param: Required, StringLength(72)] string Password,
     [param: Required, StringLength(150)] string FullName,
-    [param: Required, StringLength(32)] string Phone);
+    [param: Required, StringLength(32)] string Phone,
+    // Spec 5.1: the minimum-age check. Not [Required] here on purpose -- whether it is needed depends
+    // on a configured business rule, and RenterAgePolicy is the one place that decides.
+    DateOnly? DateOfBirth = null,
+    // Spec 5.1: a foreign renter files a passport rather than a national ID.
+    bool IsForeignNational = false);
+
+public sealed record RegisterDealerOwnerRequest(
+    [param: Required, StringLength(256)] string Email,
+    [param: Required, StringLength(72)] string Password,
+    [param: Required, StringLength(150)] string FullName,
+    [param: Required, StringLength(32)] string Phone,
+    DateOnly? DateOfBirth = null);
 
 public sealed record LoginRequest(
     [param: Required, StringLength(256)] string Email,
@@ -166,6 +223,10 @@ public sealed record EmailRequest([param: Required, StringLength(256)] string Em
 public sealed record ResetPasswordRequest(
     [param: Required, StringLength(512)] string Token,
     [param: Required, StringLength(72)] string NewPassword);
+
+public sealed record AcceptInvitationRequest(
+    [param: Required, StringLength(512)] string Token,
+    [param: Required, StringLength(72)] string Password);
 
 public sealed record ChangePasswordRequest(
     [param: Required, StringLength(72)] string CurrentPassword,

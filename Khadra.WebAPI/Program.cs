@@ -8,6 +8,7 @@ using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Infrastructure;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Persistence;
+using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Infrastructure.Security;
 using Khadra.WebAPI;
 using Khadra.WebAPI.Security;
@@ -56,6 +57,9 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddScoped<ICurrentActor, HttpCurrentActor>();
+builder.Services.AddScoped<IAuthorizationHandler, ApprovedDealerAuthorizationHandler>();
+// A denied authorization returns ProblemDetails with a stable code, not an empty 403.
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationResultHandler>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -115,6 +119,13 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(SecurityPolicies.DealerOwner, policy => policy.RequireRole(UserRole.DealerOwner.Name));
     options.AddPolicy(SecurityPolicies.Customer, policy => policy.RequireRole(UserRole.Customer.Name));
     options.AddPolicy(SecurityPolicies.VerifiedEmail, policy => policy.RequireClaim(KhadraClaimTypes.EmailVerified, "true"));
+    // Being a dealer owner is not enough: the BUSINESS has to be approved before it may operate.
+    options.AddPolicy(SecurityPolicies.ApprovedDealer, policy => policy
+        .RequireRole(UserRole.DealerOwner.Name)
+        .AddRequirements(new ApprovedDealerRequirement()));
+    options.AddPolicy(SecurityPolicies.ApprovedDealerStaff, policy => policy
+        .RequireRole(UserRole.DealerOwner.Name, UserRole.DealerEmployee.Name)
+        .AddRequirements(new ApprovedDealerRequirement()));
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -182,6 +193,11 @@ if (app.Environment.IsDevelopment())
     {
         using var scope = app.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<KhadraDbContext>().Database.MigrateAsync();
+
+        // Development only, and a no-op once the database holds users. An empty admin console cannot
+        // be reviewed: every figure reads zero and every query looks like it works.
+        if (app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value.SeedDevelopmentData)
+            await scope.ServiceProvider.SeedDevelopmentDataAsync();
     }
 }
 

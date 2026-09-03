@@ -19,6 +19,10 @@ public sealed class AuthOptions
     [Range(5, 1440)]
     public int PasswordResetMinutes { get; init; } = 60;
 
+    // How long a dealer's invitation to a member of staff stays valid (spec 4.2).
+    [Range(1, 30)]
+    public int EmployeeInvitationDays { get; init; } = 7;
+
     [Range(8, 64)]
     public int PasswordMinimumLength { get; init; } = 8;
 

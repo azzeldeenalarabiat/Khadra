@@ -12,5 +12,9 @@ public interface IAuthPolicySettings
 
     TimeSpan PasswordResetLifetime { get; }
 
+    // Days, not minutes: an invited employee reads the email when they next look at their inbox,
+    // which is not the same moment they asked for a password reset.
+    TimeSpan EmployeeInvitationLifetime { get; }
+
     int PasswordMinimumLength { get; }
 }

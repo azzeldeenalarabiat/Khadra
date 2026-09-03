@@ -53,6 +53,26 @@ internal sealed class AuthEmailComposer(IOptions<AppOptions> options) : IAuthEma
             "If this was not you, reset your password immediately and contact support.");
     }
 
+    public EmailMessage EmployeeInvitation(User user, string dealerName, string rawToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        var link = Link("accept-invitation", rawToken);
+        var name = WebUtility.HtmlEncode(user.Name.Value);
+        var business = WebUtility.HtmlEncode(dealerName);
+        return new EmailMessage(
+            user.Email.Value,
+            user.Name.Value,
+            $"{dealerName} has invited you to Khadra",
+            $"<p>Hi {name},</p><p>{business} has added you as a member of staff on Khadra. " +
+            "You will be able to see and answer the office's booking requests.</p>" +
+            $"<p><a href=\"{link}\">Accept the invitation and choose your password</a></p>" +
+            "<p>If you were not expecting this, you can ignore this message; nothing is set up until you accept.</p>",
+            $"Hi {user.Name.Value},\n\n{dealerName} has added you as a member of staff on Khadra. " +
+            "You will be able to see and answer the office's booking requests.\n\n" +
+            $"Accept the invitation and choose your password:\n{link}\n\n" +
+            "If you were not expecting this, ignore this message; nothing is set up until you accept.");
+    }
+
     private string Link(string route, string rawToken) =>
         $"{_clientBaseUrl}/{route}?token={Uri.EscapeDataString(rawToken)}";
 }

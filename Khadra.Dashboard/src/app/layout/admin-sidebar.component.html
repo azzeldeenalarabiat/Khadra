@@ -1,0 +1,53 @@
+<div class="sidebar">
+  <div class="sidebar-head">
+    <div class="sidebar-mark">
+      <kh-icon name="steering-wheel" />
+    </div>
+    <div>
+      <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+      @if (isDealer()) {
+        <div class="sidebar-caption">Dealer</div>
+      }
+    </div>
+  </div>
+
+  <nav class="sidebar-nav" aria-label="Admin sections">
+    @for (group of groups(); track $index) {
+      @if (group.group) {
+        <div class="nav-group">{{ group.group }}</div>
+      }
+      @for (item of group.items; track item.route) {
+        <a
+          class="nav-item"
+          [routerLink]="item.route"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: false }"
+        >
+          <kh-icon [name]="item.icon" class="nav-item-icon" />
+          <span class="nav-item-label">{{ item.label }}</span>
+          @if (badge(item.count); as n) {
+            <span class="nav-badge">{{ n }}</span>
+          }
+        </a>
+      }
+    }
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="sidebar-user">
+      <div class="avatar avatar-28">{{ initials() }}</div>
+      <div class="grow">
+        <div class="sidebar-user-name">{{ name() }}</div>
+        <div class="sidebar-user-role">{{ role() }}</div>
+      </div>
+    </div>
+    <button type="button" class="sidebar-link">
+      <kh-icon name="gear-six" />
+      Account settings
+    </button>
+    <button type="button" class="sidebar-link" (click)="signOut()">
+      <kh-icon name="sign-out" />
+      Logout
+    </button>
+  </div>
+</div>

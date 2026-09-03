@@ -1,0 +1,210 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Fleet</h1>
+      <div class="page-sub">
+        Your cars, what each one is doing, and whether customers can see it.
+      </div>
+    </div>
+    <div class="dc-head-actions">
+      <div class="tabs tabs-seg" role="tablist" aria-label="State">
+        @for (s of states; track s.key) {
+          <button
+            type="button"
+            class="tab"
+            role="tab"
+            [class.is-active]="state() === s.key"
+            [attr.aria-selected]="state() === s.key"
+            (click)="state.set(s.key)"
+          >
+            {{ s.label }}
+          </button>
+        }
+      </div>
+      @if (canAdd()) {
+        <a class="btn btn-primary btn-md" routerLink="/dealer/fleet/new">
+          <kh-icon name="plus" />
+          Add vehicle
+        </a>
+      }
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load your fleet</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading() && cars().length === 0) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else if (cars().length === 0) {
+    <section class="sect">
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="car-simple" /></div>
+        <div class="state-title">No cars yet</div>
+        <div class="state-text">
+          Add your first car. It stays a draft until you publish it, and it needs at least one photo
+          before it can be published.
+        </div>
+        @if (canAdd()) {
+          <div class="state-actions">
+            <a class="btn btn-primary btn-sm" routerLink="/dealer/fleet/new">Add a car</a>
+          </div>
+        }
+      </div>
+    </section>
+  } @else {
+    <div class="stat-grid stat-grid-5">
+      @for (s of stats(); track s.k) {
+        <div class="stat-card">
+          <span class="k">{{ s.k }}</span>
+          <span class="stat-v num">{{ s.v }}</span>
+        </div>
+      }
+    </div>
+
+    <section class="sect sect-clip">
+      <div class="list-toolbar">
+        <div class="list-search">
+          <kh-icon name="magnifying-glass" class="search-icon" />
+          <label class="visually-hidden" for="fleet-search">Search your fleet</label>
+          <input
+            id="fleet-search"
+            class="input"
+            placeholder="Make, model, plate…"
+            [value]="search()"
+            (input)="setSearch($event)"
+          />
+        </div>
+        <span class="page-sub push">{{ rows().length }} of {{ cars().length }} cars</span>
+      </div>
+
+      @if (rows().length === 0) {
+        <div class="state-block is-empty">
+          <div class="state-title">Nothing matches</div>
+          <div class="state-text">No car in this state matches your search.</div>
+          <div class="state-actions">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              (click)="state.set('all'); search.set('')"
+            >
+              Show all
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table table-wide">
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Plate</th>
+                <th class="td-num">Daily rate</th>
+                <th class="td-num">Deposit</th>
+                <th>Delivery</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (car of rows(); track car.vehicleId) {
+                <tr class="rowlink" (click)="open(car)">
+                  <td class="td">
+                    <div class="entity">
+                      <div class="thumb thumb-sm">
+                        @if (cover(car); as url) {
+                          <img khFallback [src]="url" alt="" width="34" height="26" />
+                        }
+                        <kh-icon name="car-simple" />
+                      </div>
+                      <div>
+                        <a
+                          class="entity-name row-link"
+                          [routerLink]="['/dealer/fleet', car.vehicleId]"
+                          (click)="$event.stopPropagation()"
+                          >{{ car.make }} {{ car.model }} {{ car.year }}</a
+                        >
+                        <div class="entity-sub">
+                          {{ car.transmission }} · {{ car.fuelType }} · {{ car.seats }} seats{{
+                            car.color ? ' · ' + car.color : ''
+                          }}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="td mono">{{ car.plateNumber }}</td>
+                  <td class="td td-num">
+                    <span class="num">{{ car.dailyRate.amount }} {{ car.dailyRate.currency }}</span>
+                  </td>
+                  <td class="td td-num">
+                    <span class="num"
+                      >{{ car.securityDeposit.amount }} {{ car.securityDeposit.currency }}</span
+                    >
+                  </td>
+                  <td class="td">
+                    @if (car.isDeliveryEligible) {
+                      <span class="tag-delivery"><kh-icon name="moped" /> Eligible</span>
+                    } @else {
+                      <span class="page-sub">Pickup only</span>
+                    }
+                  </td>
+                  <td class="td">
+                    <span class="pill" [class]="'s-' + statusTone(car)">{{
+                      statusLabel(car)
+                    }}</span>
+                    <div class="td-sub">{{ statusNote(car) }}</div>
+                  </td>
+                  <td class="td td-num">
+                    <div class="row-actions">
+                      @if (primaryAction(car); as action) {
+                        <button
+                          type="button"
+                          class="btn btn-secondary btn-xs"
+                          [disabled]="busy() === car.vehicleId"
+                          (click)="changeStatus($event, car, action.action)"
+                        >
+                          {{ action.label }}
+                        </button>
+                      }
+                      @if (car.status === 'Active' || car.status === 'Hidden') {
+                        <button
+                          type="button"
+                          class="btn btn-ghost btn-xs"
+                          [disabled]="busy() === car.vehicleId"
+                          (click)="takeOffRoad($event, car)"
+                          title="Take off the road"
+                        >
+                          <kh-icon name="gear" />
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs s-bad"
+                        [disabled]="busy() === car.vehicleId"
+                        (click)="remove($event, car)"
+                        title="Remove from fleet"
+                      >
+                        <kh-icon name="x-circle" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</div>

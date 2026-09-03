@@ -1,0 +1,498 @@
+<div class="stack stack-14 page-wide">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Add vehicle</h1>
+      <div class="page-sub">Step {{ step() }} of 8 · {{ footer() }}</div>
+    </div>
+    <div class="dc-head-actions">
+      <button type="button" class="btn btn-ghost btn-md" (click)="cancel()">Cancel</button>
+    </div>
+  </div>
+
+  <div class="wiz-grid">
+    <nav class="sect wiz-steps" aria-label="Steps">
+      @for (s of steps; track s.n) {
+        <button
+          type="button"
+          class="wiz-step"
+          [class.is-active]="s.n === step()"
+          [class.is-done]="s.n < step()"
+          (click)="goTo(s.n)"
+        >
+          <span class="wiz-dot">{{ s.n < step() ? '✓' : s.n }}</span>
+          <span class="grow">{{ s.title }}</span>
+        </button>
+      }
+    </nav>
+
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon [name]="current().icon" class="kpi-icon" />
+        <span class="sect-t">{{ current().title }}</span>
+        <span class="sect-hint">Step {{ step() }} of 8</span>
+      </div>
+
+      <div class="sect-pad stack stack-12">
+        @if (problem(); as message) {
+          <div class="banner s-bad" role="alert">
+            <kh-icon name="warning-circle" class="banner-icon" />
+            <div class="banner-body">
+              <div class="banner-text">{{ message }}</div>
+              @if (resumable(); as own) {
+                <button type="button" class="btn btn-secondary btn-xs" (click)="resume(own)">
+                  Continue that draft
+                </button>
+              }
+            </div>
+          </div>
+        }
+
+        @switch (step()) {
+          @case (1) {
+            <div class="dc-split-even">
+              <div class="field">
+                <label for="w-make">Make</label>
+                <input
+                  id="w-make"
+                  class="input"
+                  list="w-makes"
+                  [value]="form().make"
+                  (input)="patch({ make: text($event) })"
+                />
+                <datalist id="w-makes">
+                  @for (m of makes; track m) {
+                    <option [value]="m"></option>
+                  }
+                </datalist>
+                @if (fieldError('make'); as e) {
+                  <div class="field-error">{{ e }}</div>
+                }
+              </div>
+              <div class="field">
+                <label for="w-model">Model</label>
+                <input
+                  id="w-model"
+                  class="input"
+                  placeholder="e.g. Elantra"
+                  [value]="form().model"
+                  (input)="patch({ model: text($event) })"
+                />
+                @if (fieldError('model'); as e) {
+                  <div class="field-error">{{ e }}</div>
+                }
+              </div>
+              <div class="field">
+                <label for="w-year">Year</label>
+                <select
+                  id="w-year"
+                  class="input"
+                  [value]="form().year"
+                  (change)="patch({ year: number($event) })"
+                >
+                  @for (y of years; track y) {
+                    <option [value]="y" [selected]="y === form().year">{{ y }}</option>
+                  }
+                </select>
+                @if (fieldError('year'); as e) {
+                  <div class="field-error">{{ e }}</div>
+                }
+              </div>
+              <div class="field">
+                <label for="w-color">Colour</label>
+                <input
+                  id="w-color"
+                  class="input"
+                  placeholder="e.g. White"
+                  [value]="form().color ?? ''"
+                  (input)="patch({ color: text($event) || null })"
+                />
+                <div class="field-hint">
+                  Vehicle type (sedan, SUV…) is a platform lookup that is not live yet.
+                </div>
+              </div>
+            </div>
+          }
+          @case (2) {
+            <div class="dc-split-even">
+              <div class="field">
+                <label for="w-trans">Transmission</label>
+                <select id="w-trans" class="input" (change)="patch({ transmission: text($event) })">
+                  @for (t of transmissions; track t) {
+                    <option [value]="t" [selected]="t === form().transmission">{{ t }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label for="w-fuel">Fuel</label>
+                <select id="w-fuel" class="input" (change)="patch({ fuelType: text($event) })">
+                  @for (f of fuelTypes; track f) {
+                    <option [value]="f" [selected]="f === form().fuelType">{{ f }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label for="w-seats">Seats</label>
+                <select id="w-seats" class="input" (change)="patch({ seats: number($event) })">
+                  @for (s of seatOptions; track s) {
+                    <option [value]="s" [selected]="s === form().seats">{{ s }}</option>
+                  }
+                </select>
+              </div>
+              <div class="field">
+                <label for="w-plate">Plate number</label>
+                <input
+                  id="w-plate"
+                  class="input mono"
+                  placeholder="42-88712"
+                  [value]="form().plateNumber"
+                  (input)="patch({ plateNumber: text($event) })"
+                />
+                <div class="field-hint">
+                  Shown to the customer only after you approve their booking.
+                </div>
+                @if (fieldError('plateNumber'); as e) {
+                  <div class="field-error">{{ e }}</div>
+                }
+              </div>
+            </div>
+          }
+          @case (3) {
+            <div class="dc-split-even">
+              <div class="field">
+                <label for="w-rate">Daily rental price (JOD)</label>
+                <input
+                  id="w-rate"
+                  class="input"
+                  type="number"
+                  min="1"
+                  step="1"
+                  [value]="form().dailyRate"
+                  (input)="patch({ dailyRate: number($event) })"
+                />
+                @if (fieldError('dailyRate'); as e) {
+                  <div class="field-error">{{ e }}</div>
+                }
+              </div>
+              <div class="field">
+                <label for="w-deposit">Security deposit (JOD)</label>
+                <input
+                  id="w-deposit"
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="5"
+                  [value]="form().securityDeposit"
+                  (input)="patch({ securityDeposit: number($event) })"
+                />
+                <div class="field-hint">
+                  Held against the booking and returned after a clean handover.
+                </div>
+              </div>
+              <div class="field">
+                <label for="w-mileage">Mileage</label>
+                <select
+                  id="w-mileage"
+                  class="input"
+                  (change)="
+                    patch({
+                      mileageUnlimited: text($event) === 'unlimited',
+                      mileageDailyLimitKm:
+                        text($event) === 'unlimited' ? null : (form().mileageDailyLimitKm ?? 200),
+                      mileageExcessFeePerKm:
+                        text($event) === 'unlimited'
+                          ? null
+                          : (form().mileageExcessFeePerKm ?? 0.15),
+                    })
+                  "
+                >
+                  <option value="unlimited" [selected]="form().mileageUnlimited">Unlimited</option>
+                  <option value="limited" [selected]="!form().mileageUnlimited">Daily limit</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="w-fuelpolicy">Fuel policy</label>
+                <select
+                  id="w-fuelpolicy"
+                  class="input"
+                  (change)="patch({ fuelPolicy: text($event) })"
+                >
+                  <option value="FullToFull" [selected]="form().fuelPolicy === 'FullToFull'">
+                    Full to full
+                  </option>
+                  <option value="SameToSame" [selected]="form().fuelPolicy === 'SameToSame'">
+                    Same to same
+                  </option>
+                </select>
+              </div>
+              @if (!form().mileageUnlimited) {
+                <div class="field">
+                  <label for="w-limit">Daily limit (km)</label>
+                  <input
+                    id="w-limit"
+                    class="input"
+                    type="number"
+                    min="1"
+                    step="10"
+                    [value]="form().mileageDailyLimitKm"
+                    (input)="patch({ mileageDailyLimitKm: number($event) })"
+                  />
+                </div>
+                <div class="field">
+                  <label for="w-excess">Fee per km over (JOD)</label>
+                  <input
+                    id="w-excess"
+                    class="input"
+                    type="number"
+                    min="0"
+                    step="0.05"
+                    [value]="form().mileageExcessFeePerKm"
+                    (input)="patch({ mileageExcessFeePerKm: number($event) })"
+                  />
+                </div>
+              }
+              <div class="field span-2">
+                <label for="w-desc">Description</label>
+                <textarea
+                  id="w-desc"
+                  class="input"
+                  rows="3"
+                  placeholder="What the customer should know: extras, condition, long-rental terms…"
+                  [value]="form().description ?? ''"
+                  (input)="patch({ description: text($event) || null })"
+                ></textarea>
+              </div>
+            </div>
+          }
+          @case (4) {
+            @if (me.value(); as d) {
+              <div class="map-stub is-tall">
+                <span class="map-ring is-1" [style.width.px]="120" [style.height.px]="120"></span>
+                <span class="map-pin"></span>
+                <span class="map-coords mono"
+                  >{{ d.latitude.toFixed(4) }}, {{ d.longitude.toFixed(4) }}</span
+                >
+              </div>
+              <div class="kv-narrow">
+                <div class="kv">
+                  <span class="kv-key">Pickup location</span
+                  ><span class="kv-val">{{ d.businessName }}</span>
+                </div>
+                <div class="kv">
+                  <span class="kv-key">Coordinates</span
+                  ><span class="kv-val mono">{{ d.latitude }}, {{ d.longitude }}</span>
+                </div>
+              </div>
+              <div class="note-box is-plain">
+                <kh-icon name="info" />
+                Every car is collected from your dealership's location. To move it, change the
+                location on your
+                <a class="auth-link" routerLink="/dealer/profile">dealer profile</a>; a per-car
+                pickup point is not offered.
+              </div>
+            } @else {
+              <div class="page-sub">Loading your dealership…</div>
+            }
+          }
+          @case (5) {
+            <div class="photo-strip">
+              @for (p of photos(); track p.imageId) {
+                <div class="thumb">
+                  <img khFallback [src]="p.url" alt="" />
+                  <kh-icon name="image" />
+                  <div class="photo-tools">
+                    @if (p.isPrimary) {
+                      <span class="pill s-ok">Cover</span>
+                    } @else {
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-xs"
+                        [disabled]="uploading()"
+                        (click)="setCover(p.imageId)"
+                      >
+                        Make cover
+                      </button>
+                    }
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs s-bad"
+                      [disabled]="uploading()"
+                      (click)="removePhoto(p.imageId)"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              }
+              <label class="thumb thumb-add">
+                <kh-icon name="plus" />
+                <span class="photo-label">{{ uploading() ? 'Uploading…' : 'Add photo' }}</span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  hidden
+                  [disabled]="uploading()"
+                  (change)="upload($event)"
+                />
+              </label>
+            </div>
+            <div class="wiz-note">
+              <kh-icon name="lock-key" />
+              Photos are uploaded straight to protected storage and served from a public, cacheable
+              path. JPEG, PNG or WebP. At least one is needed before the car can be published.
+            </div>
+          }
+          @case (6) {
+            <label class="toggle-card">
+              <input
+                type="checkbox"
+                [checked]="publishOnSave()"
+                (change)="publishOnSave.set(!publishOnSave())"
+              />
+              <div class="grow">
+                <div class="toggle-title">Publish when I save</div>
+                <div class="toggle-desc">
+                  Published cars appear in customer search straight away. Leave this off to keep the
+                  car as a draft in your fleet.
+                </div>
+              </div>
+              <span class="pill" [class]="publishOnSave() ? 's-ok' : 's-dim'">{{
+                publishOnSave() ? 'On' : 'Off'
+              }}</span>
+            </label>
+            <div class="toggle-card is-off">
+              <div class="grow">
+                <div class="toggle-title">Available for booking</div>
+                <div class="toggle-desc">
+                  A published car is bookable whenever no approved booking holds it. To stop
+                  offering it for a while, take it off the road from its page; existing bookings are
+                  unaffected.
+                </div>
+              </div>
+              <span class="pill s-dim">From its page</span>
+            </div>
+            <div class="toggle-card is-off">
+              <div class="grow">
+                <div class="toggle-title">Block specific dates</div>
+                <div class="toggle-desc">
+                  There is no separate blocked-dates list. Approved bookings hold their dates;
+                  taking the car off the road blocks every day until it is back.
+                </div>
+              </div>
+              <span class="pill s-dim">Not offered</span>
+            </div>
+          }
+          @case (7) {
+            <label class="toggle-card">
+              <input
+                type="checkbox"
+                [checked]="form().isDeliveryEligible"
+                (change)="patch({ isDeliveryEligible: !form().isDeliveryEligible })"
+              />
+              <div class="grow">
+                <div class="toggle-title">Eligible for delivery</div>
+                <div class="toggle-desc">
+                  @if (delivery.value(); as ds) {
+                    @if (ds.isEnabled) {
+                      Customers within your {{ ds.radiusKm }} km radius can ask for this car to be
+                      delivered.
+                    } @else {
+                      Delivery is switched off for your dealership, so this only takes effect once
+                      you switch it on from the Delivery page.
+                    }
+                  } @else {
+                    Customers inside your delivery radius can ask for this car to be delivered.
+                  }
+                </div>
+              </div>
+              <span class="pill" [class]="form().isDeliveryEligible ? 's-ok' : 's-dim'">{{
+                form().isDeliveryEligible ? 'On' : 'Off'
+              }}</span>
+            </label>
+            <div class="toggle-card is-off">
+              <div class="grow">
+                <div class="toggle-title">Delivery fee</div>
+                <div class="toggle-desc">Set platform-wide. Dealers cannot change it.</div>
+              </div>
+              <span class="pill s-dim num">
+                @if (delivery.value(); as ds) {
+                  Fixed · {{ ds.platformDeliveryFee.amount }} {{ ds.platformDeliveryFee.currency }}
+                } @else {
+                  Platform-wide
+                }
+              </span>
+            </div>
+          }
+          @case (8) {
+            <div class="wiz-review-head">
+              <div class="thumb thumb-lg">
+                @if (photos()[0]; as p) {
+                  <img khFallback [src]="p.url" alt="" />
+                }
+                <kh-icon name="car-simple" />
+              </div>
+              <div class="grow">
+                <div class="wiz-review-title">
+                  {{ form().make }} {{ form().model }} {{ form().year }}
+                </div>
+                <div class="page-sub">
+                  {{ form().transmission }} · {{ form().fuelType }} · {{ form().seats }} seats
+                </div>
+                <div class="num">
+                  {{ form().dailyRate }} JOD
+                  <span class="page-sub">per day · {{ form().securityDeposit }} JOD deposit</span>
+                </div>
+              </div>
+            </div>
+            <div class="kv-narrow">
+              @for (row of review(); track row.k) {
+                <div class="kv">
+                  <span class="kv-key">{{ row.k }}</span
+                  ><span class="kv-val" [class]="row.tone ? 's-' + row.tone : ''">{{ row.v }}</span>
+                </div>
+              }
+            </div>
+            <div class="wiz-note" [class.is-ok]="publishOnSave()">
+              <kh-icon [name]="publishOnSave() ? 'check-circle' : 'info'" />
+              {{
+                publishOnSave()
+                  ? 'Saving publishes the vehicle to customer search and makes it bookable straight away.'
+                  : 'Saving keeps the vehicle as a draft. Publish it from its page when it is ready.'
+              }}
+            </div>
+          }
+        }
+      </div>
+
+      <div class="wiz-foot">
+        <span class="page-sub">{{ footer() }}</span>
+        <div class="row row-gap-8 push">
+          <button
+            type="button"
+            class="btn btn-secondary btn-md"
+            [disabled]="step() === 1 || busy()"
+            (click)="back()"
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary btn-md"
+            [disabled]="!stepValid() || busy() || uploading()"
+            (click)="next()"
+          >
+            {{
+              busy()
+                ? 'Saving…'
+                : step() === 8
+                  ? publishOnSave()
+                    ? 'Save & publish'
+                    : 'Save draft'
+                  : 'Continue'
+            }}
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>

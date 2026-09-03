@@ -1,0 +1,1336 @@
+/* Screen-level classes. Each block mirrors one area of the Admin Console design. */
+
+/* — page headers — */
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.page-title {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.page-sub {
+  font-size: 12.5px;
+  color: var(--text-50);
+}
+
+.page-narrow {
+  max-width: 1080px;
+}
+.page-mid {
+  max-width: 1140px;
+}
+.page-wide {
+  max-width: 1240px;
+}
+.page-xwide {
+  max-width: 1300px;
+}
+
+/* — dashboard — */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kpi-card {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 13px 14px;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 0 0 1px var(--color-accent-700);
+}
+
+.kpi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kpi-icon {
+  color: var(--color-accent);
+  opacity: 0.8;
+}
+.kpi-main {
+  font-size: 27px;
+  line-height: 1;
+}
+
+.kpi-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.kpi-sub {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+
+.kpi-sub-k {
+  color: var(--text-50);
+}
+
+.dash-split {
+  display: grid;
+  grid-template-columns: 1.9fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.queue-count {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--status-bad) 16%, transparent);
+  color: #e0a292;
+}
+
+.queue-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.queue-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.queue-rail {
+  width: 3px;
+  flex: none;
+  background: var(--c);
+}
+
+.queue-body {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.queue-entity {
+  font-size: 11px;
+  color: var(--text-45);
+}
+.queue-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.queue-desc {
+  font-size: 12px;
+  color: var(--text-50);
+  line-height: 1.45;
+}
+
+.queue-side {
+  width: 184px;
+  flex: none;
+  padding: 12px 14px;
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  justify-content: center;
+}
+
+.sla-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.sla-value {
+  font-size: 12.5px;
+  color: var(--c);
+}
+
+.meter {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--hairline-strong);
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: var(--c);
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 58px;
+}
+
+.chart-bar {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-accent-700);
+}
+
+.trend-up {
+  font-size: 12px;
+  color: var(--status-ok);
+}
+
+.money-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.money-k {
+  font-size: 12px;
+  color: var(--text-60);
+}
+.money-v {
+  font-size: 14.5px;
+}
+
+.money-meter {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.money-fill {
+  height: 100%;
+  background: var(--color-accent-500);
+}
+
+.activity-head {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.activity-list {
+  padding: 4px 14px 10px;
+}
+
+.activity-row {
+  display: flex;
+  gap: 9px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.activity-icon {
+  margin-top: 2px;
+  color: var(--color-accent);
+  opacity: 0.8;
+  flex: none;
+}
+
+.activity-text {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.activity-ts {
+  font-size: 10.5px;
+  color: var(--text-40);
+}
+
+/* — list screens — */
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--color-divider);
+  flex-wrap: wrap;
+}
+
+.list-search {
+  position: relative;
+  width: 220px;
+}
+
+.list-search .input {
+  padding-inline-start: 28px;
+}
+
+.list-search .search-icon {
+  inset-inline-start: 9px;
+  top: 8px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+.table-wide {
+  min-width: 1040px;
+}
+
+.td {
+  padding: 9px var(--space-2);
+  font-size: 12.5px;
+  vertical-align: middle;
+}
+
+.td-num {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.td-mono {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.td-clip-280 {
+  max-width: 280px;
+}
+.td-clip-320 {
+  max-width: 320px;
+}
+.td-muted {
+  color: var(--text-70);
+}
+.td-dim {
+  color: var(--text-50);
+}
+.td-accent {
+  color: var(--color-accent-300);
+}
+.td-sub {
+  font-size: 10.5px;
+  color: var(--text-40);
+}
+
+.entity {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.entity-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--color-neutral-800);
+  color: var(--color-neutral-200);
+}
+
+.entity-name {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.entity-sub {
+  font-size: 10.5px;
+  color: var(--text-42);
+}
+
+.row-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.rowlink {
+  cursor: pointer;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--color-divider);
+}
+
+.pager-count {
+  font-size: 11.5px;
+  color: var(--text-45);
+}
+
+.pager-nav {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-page {
+  padding: 4px 9px;
+  font-size: 11.5px;
+  min-width: 28px;
+}
+
+/* Empty / error / denied blocks. */
+.state-block {
+  padding: 56px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.state-block.is-empty {
+  padding: 64px 20px;
+}
+
+.state-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.state-icon.is-outline {
+  border: 1px solid var(--color-divider);
+  color: var(--text-45);
+}
+.state-icon.is-bad {
+  background: color-mix(in srgb, var(--status-bad) 14%, transparent);
+  color: var(--status-bad);
+}
+.state-icon.is-accent {
+  border: 1px solid var(--color-accent-700);
+  color: var(--color-accent);
+}
+
+.state-title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.state-text {
+  font-size: 12.5px;
+  color: var(--text-50);
+  max-width: 380px;
+}
+
+.state-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.skel-head {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.skel-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* — tabs — */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.tab {
+  padding: 9px 13px;
+  font-size: 12.5px;
+  text-decoration: none;
+  color: var(--text-55);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tab.is-active {
+  color: var(--color-accent);
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+/* — detail screens — */
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.detail-head-start {
+  align-items: flex-start;
+}
+
+.detail-name {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.detail-meta {
+  font-size: 12.5px;
+  color: var(--text-50);
+}
+
+.detail-actions {
+  margin-inline-start: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.sla-box {
+  text-align: end;
+}
+.sla-figure {
+  font-size: 19px;
+  color: var(--c);
+}
+.sla-note {
+  font-size: 11px;
+  color: var(--text-40);
+}
+
+.sla-panel {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--status-bad) 12%, transparent);
+}
+
+.sla-panel-figure {
+  font-size: 20px;
+}
+.sla-divider {
+  width: 1px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.split-15 {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.split-16 {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.split-14 {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.split-13 {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.split-11 {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.split-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.split-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.doc-grid-3 {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.doc-grid-4 {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.doc-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+}
+.doc-label-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+.doc-meta {
+  font-size: 11px;
+  color: var(--text-42);
+  margin-top: 2px;
+}
+
+.stat-grid {
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-value {
+  font-size: 19px;
+  margin-top: 3px;
+  color: var(--c, inherit);
+}
+
+.verify-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+}
+
+.verify-icon {
+  color: var(--c);
+  flex: none;
+}
+.verify-meta {
+  font-size: 11px;
+  color: var(--text-45);
+}
+
+.decision-note {
+  font-size: 11px;
+  color: var(--text-42);
+  margin-top: 2px;
+}
+
+/* The reason an admin gave when they settled an application, quoted back on the record. */
+.decision-record {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-70);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border-inline-start: 2px solid var(--color-divider);
+}
+
+.vehicle-block {
+  padding: 14px;
+  display: flex;
+  gap: 14px;
+}
+.vehicle-photo {
+  width: 190px;
+  min-height: 118px;
+  flex: none;
+}
+.handover-grid {
+  padding: 0 14px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.handover-tile {
+  min-height: 104px;
+}
+
+.evidence-tile {
+  min-height: 110px;
+}
+.evidence-by {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.evidence-ts {
+  font-size: 11px;
+  color: var(--text-45);
+}
+.evidence-label {
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+
+/* — dispute resolution panel — */
+.resolve-panel {
+  position: sticky;
+  top: 0;
+}
+
+.resolution-option {
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-divider);
+}
+
+.resolution-option.is-on {
+  border-color: var(--color-accent);
+}
+.resolution-label {
+  font-size: 12.5px;
+}
+.resolution-desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-45);
+}
+
+.split-inputs {
+  display: flex;
+  gap: 8px;
+}
+.field-hint {
+  font-size: 11px;
+  color: var(--text-42);
+  margin-top: 4px;
+}
+
+.past-resolution {
+  padding: 9px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.past-res-title {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.past-res-reason {
+  font-size: 11.5px;
+  color: var(--text-55);
+  margin-top: 2px;
+}
+.past-res-who {
+  font-size: 11px;
+  color: var(--text-40);
+  margin-top: 3px;
+}
+
+/* — finance — */
+.finance-kpis {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.finance-kpi {
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.finance-value {
+  font-size: 23px;
+  line-height: 1;
+  color: var(--c, inherit);
+}
+.finance-meta {
+  font-size: 11px;
+  color: var(--text-45);
+}
+
+/* — settings — */
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.setting-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.setting-desc {
+  font-size: 11.5px;
+  color: var(--text-50);
+  margin-top: 2px;
+}
+.setting-audit {
+  font-size: 10.5px;
+  color: var(--text-38);
+  margin-top: 3px;
+}
+.setting-input {
+  width: 120px;
+  flex: none;
+}
+.settings-body {
+  padding: 4px 14px 12px;
+}
+
+/* — notifications — */
+.notif-cats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notif-count {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--color-neutral-800);
+  color: var(--color-neutral-100);
+}
+
+.btn-primary .notif-count {
+  background: var(--color-accent-700);
+}
+
+.notif-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.notif-row.is-unread {
+  background: rgba(145, 132, 217, 0.05);
+}
+.notif-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.notif-icon-wrap {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: var(--c);
+}
+
+.notif-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.notif-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex: none;
+}
+
+.notif-ts {
+  margin-inline-start: auto;
+  font-size: 11px;
+  color: var(--text-40);
+}
+.notif-desc {
+  font-size: 12px;
+  color: var(--text-55);
+  margin-top: 2px;
+}
+
+/* — security — */
+.session-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.session-icon {
+  color: var(--text-55);
+  flex: none;
+}
+.session-device {
+  font-size: 12.5px;
+}
+.session-meta {
+  font-size: 11px;
+  color: var(--text-45);
+}
+
+.login-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.login-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--c);
+}
+
+.tfa-ok {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--status-ok) 12%, transparent);
+}
+
+.tfa-icon {
+  color: var(--status-ok);
+  flex: none;
+}
+.tfa-title {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.tfa-meta {
+  font-size: 11px;
+  color: var(--text-50);
+}
+.security-note {
+  font-size: 11.5px;
+  color: var(--text-45);
+}
+.self-start {
+  align-self: flex-start;
+}
+
+/* — toast — */
+@keyframes toastin {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toast {
+  position: fixed;
+  inset-inline-end: 22px;
+  bottom: 22px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  animation: toastin 0.18s ease-out;
+}
+
+.toast-icon {
+  color: var(--c);
+  flex: none;
+}
+.toast-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.toast-body {
+  font-size: 11.5px;
+  color: var(--text-50);
+}
+
+/* — modal extras — */
+.modal-icon-wrap {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  color: var(--c);
+}
+
+.modal-note {
+  font-size: 12px;
+  padding: 9px 11px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c) 10%, transparent);
+  color: var(--text-70);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+/* Narrower screens: collapse the multi-column grids rather than scrolling sideways. */
+@media (max-width: 1440px) {
+  .kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .finance-kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .dash-split,
+  .split-15,
+  .split-16,
+  .split-14,
+  .split-13,
+  .split-11,
+  .split-2,
+  .split-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Commission report keeps its columns readable before it scrolls. */
+.table-980 {
+  min-width: 980px;
+}
+
+/* Icon sizing.
+   The design set an explicit font-size on every icon. kh-icon renders at 1em of
+   its container, so without these the icons drift a few pixels from the design
+   in a way a reviewer notices immediately. */
+.nav-item-icon {
+  font-size: 15px;
+}
+.kpi-icon {
+  font-size: 14px;
+}
+.activity-icon {
+  font-size: 13px;
+}
+.search-icon {
+  font-size: 14px;
+}
+.banner-icon {
+  font-size: 15px;
+}
+.banner-icon-lg {
+  font-size: 17px;
+}
+.toast-icon {
+  font-size: 17px;
+}
+.verify-icon {
+  font-size: 15px;
+}
+.session-icon {
+  font-size: 16px;
+}
+.tfa-icon {
+  font-size: 16px;
+}
+.doc-lock {
+  font-size: 15px;
+}
+.state-icon kh-icon {
+  font-size: 20px;
+}
+.modal-icon-wrap kh-icon {
+  font-size: 16px;
+}
+.notif-icon-wrap kh-icon {
+  font-size: 15px;
+}
+.btn-33 kh-icon {
+  font-size: 15px;
+}
+.sidebar-mark kh-icon {
+  font-size: 14px;
+}
+.sidebar-link kh-icon {
+  font-size: 15px;
+}
+
+/* Carets sit quieter than the label they follow. */
+.caret {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* Two-line banners align the icon with the first line, not the block centre. */
+.banner-tall {
+  align-items: flex-start;
+}
+.banner-tall .banner-icon,
+.banner-tall .banner-icon-lg {
+  margin-top: 1px;
+}
+
+/* The design emphasises with weight 500, not the browser default 700. */
+.state-text strong {
+  font-weight: 500;
+}
+
+/* A navigable row's first cell is a real link, so the row is reachable by
+   keyboard and can be opened in a new tab. It inherits the cell's type: the
+   affordance is the row hover, not a blue underline. */
+.row-link {
+  color: inherit;
+  text-decoration: none;
+  font: inherit;
+}
+
+.row-link:hover {
+  text-decoration: underline;
+}
+
+/* Keyboard focus on a row link should read like a row hover. */
+.rowlink:focus-within {
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+}
+
+.btn-28 kh-icon {
+  font-size: 14px;
+}
+
+/* The list toolbar runs one step smaller than the console's default control
+   type, and its filter chips sit on the compact button size, not the extra
+   small one used inside table rows. */
+.list-toolbar .btn {
+  font-size: 12px;
+  gap: 6px;
+}
+.list-toolbar .btn-ghost {
+  gap: 5px;
+}
+.list-toolbar .btn-ghost kh-icon {
+  font-size: 13px;
+}
+.list-search .search-icon {
+  font-size: 13px;
+}
+
+/* ── Auth screens ──────────────────────────────────────────────────────────
+   The design export has no sign-in artboard, so these are composed entirely
+   from existing primitives: the sidebar's brand mark, the .sect card, .field /
+   .input, .banner and .btn. Nothing new is invented, so the front door reads as
+   the same product as the console behind it. */
+.auth-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: var(--color-bg);
+}
+
+.auth-card {
+  width: min(400px, 100%);
+  padding: 26px;
+}
+
+.auth-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The screen title, one step down from a page heading: this card is the whole page. */
+.auth-title {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.auth-foot {
+  display: flex;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.auth-link {
+  color: var(--color-accent);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+
+/* A banner inside the auth card carries its tone from .s-* like everywhere else. */
+.auth-card .banner {
+  align-items: flex-start;
+}
+
+.auth-card .banner-icon {
+  margin-top: 1px;
+}
+
+/* ── Fleet (dealer) ────────────────────────────────────────────────────────
+   Composed from the same primitives as everything else; the design export has
+   no fleet artboard, so nothing here invents a new visual language. */
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+
+.car-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.car-photo {
+  aspect-ratio: 16 / 9;
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+  overflow: hidden;
+}
+
+.car-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.car-photo-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  align-content: center;
+  color: var(--text-40);
+  font-size: 12px;
+}
+
+.car-photo-empty kh-icon {
+  font-size: 24px;
+}
+
+.car-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.car-plate {
+  font-size: 11.5px;
+  color: var(--text-60);
+}
+
+.car-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.car-note {
+  font-size: 12px;
+  color: var(--text-60);
+}
+
+.car-facts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px 12px;
+  margin-top: 6px;
+}
+
+.car-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.car-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-divider);
+  flex-wrap: wrap;
+}
+
+/* Two or three fields sharing a row on the car form. */
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2);
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+
+.photo-tile {
+  position: relative;
+  border: 1px solid var(--color-divider);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.photo-tile img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.photo-badge {
+  position: absolute;
+  top: 6px;
+  inset-inline-start: 6px;
+}
+
+.photo-actions {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  flex-wrap: wrap;
+}

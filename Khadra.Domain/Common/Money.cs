@@ -7,6 +7,14 @@ public sealed class Money : ValueObject
     public decimal Amount { get; }
     public string CurrencyCode { get; }
 
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields.
+    // Reading a stored value must not re-run the factory guards: the value was validated when it was
+    // first created, and a rule tightened since then would make old rows unreadable.
+    private Money()
+    {
+    }
+#pragma warning restore CS8618
+
     private Money(decimal amount, string currencyCode)
     {
         if (amount < 0)

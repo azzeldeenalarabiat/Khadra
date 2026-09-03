@@ -1,0 +1,89 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Activity</h1>
+      <div class="page-sub">Every change on your bookings, newest first, with who made it.</div>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load activity</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="resource.reload()">
+            Retry
+          </button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading() && entries().length === 0) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else if (entries().length === 0) {
+    <section class="sect">
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="clock-counter-clockwise" /></div>
+        <div class="state-title">Nothing yet</div>
+        <div class="state-text">
+          Booking requests, approvals, pickups and returns will appear here as they happen.
+        </div>
+      </div>
+    </section>
+  } @else {
+    <section class="sect">
+      <div class="sect-pad">
+        @for (e of entries(); track e.bookingId + e.occurredAt) {
+          <div class="act-row">
+            <span class="fleet-dot" [class]="'s-' + tone(e)"></span>
+            <div class="act-text">
+              <div>
+                <a class="row-link mono" [routerLink]="['/dealer/bookings', e.bookingId]">{{
+                  e.reference
+                }}</a>
+                · {{ describe(e) }}
+                @if (e.fromStatus) {
+                  <span class="page-sub">(was {{ e.fromStatus }})</span>
+                }
+              </div>
+              <div class="page-sub">
+                {{ e.actorName }}
+                @if (e.reason) {
+                  · “{{ e.reason }}”
+                }
+              </div>
+            </div>
+            <span class="act-ts">{{ when(e.occurredAt) }}</span>
+          </div>
+        }
+      </div>
+      <div class="pager">
+        <span class="pager-count">{{ entries().length }} of {{ total() }} changes</span>
+        <div class="pager-nav">
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() <= 1"
+            (click)="goTo(page() - 1)"
+          >
+            Previous
+          </button>
+          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() >= totalPages()"
+            (click)="goTo(page() + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    </section>
+  }
+</div>

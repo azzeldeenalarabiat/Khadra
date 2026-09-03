@@ -1,0 +1,184 @@
+<div class="stack stack-14 page-mid">
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load this dispute</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">Back to bookings</a>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading()) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else if (dispute(); as d) {
+    <div class="dc-head">
+      <div class="grow">
+        <div class="row row-gap-9">
+          <h1 class="page-title">Dispute on {{ d.booking.reference }}</h1>
+          <span class="pill" [class]="'s-' + tone()">{{
+            d.status === 'UnderReview' ? 'Under review' : d.status
+          }}</span>
+        </div>
+        <div class="page-sub">
+          Opened {{ dateTime(d.openedAt) }} by {{ d.openedByName }} ({{
+            d.openedByParty === 'Dealer' ? 'your side' : 'the customer'
+          }})
+          @if (sla(); as s) {
+            · {{ s }}
+          }
+          @if (d.assignedAdminName) {
+            · handled by {{ d.assignedAdminName }}
+          }
+        </div>
+      </div>
+      <div class="dc-head-actions">
+        <a class="btn btn-secondary btn-md" [routerLink]="['/dealer/bookings', d.bookingId]"
+          >Open booking</a
+        >
+        @if (d.isLive && openedByMe()) {
+          <button type="button" class="btn btn-ghost btn-md" (click)="withdraw()">Withdraw</button>
+        }
+      </div>
+    </div>
+
+    @if (d.resolution; as r) {
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="scales" class="kpi-icon" />
+          <span class="sect-t">The platform's decision</span>
+          <span class="sect-hint">{{ dateTime(r.resolvedAt) }} · {{ r.resolvedByName }}</span>
+        </div>
+        <div class="sect-pad stack stack-9">
+          <div class="history-line">
+            <span class="k-label">Deposit held</span
+            ><span class="num">{{ r.depositHeld.amount }} {{ r.depositHeld.currency }}</span>
+          </div>
+          <div class="history-line">
+            <span class="k-label">Refunded to the customer</span
+            ><span class="num">{{ r.refundToCustomer.amount }}</span>
+          </div>
+          <div class="history-line">
+            <span class="k-label">Kept by the platform</span
+            ><span class="num">{{ r.retainedByPlatform.amount }}</span>
+          </div>
+          <div class="history-line">
+            <span class="k-label">Transferred to you</span
+            ><span class="num">{{ r.transferredToDealer.amount }}</span>
+          </div>
+          @if (r.dealerCharge) {
+            <div class="history-line s-bad">
+              <span class="k-label">Charged to you</span
+              ><span class="num">{{ r.dealerCharge.amount }} {{ r.dealerCharge.currency }}</span>
+            </div>
+          }
+          <div class="page-sub">“{{ r.note }}”</div>
+          <div class="note-box is-plain">
+            <kh-icon name="info" />
+            Decision recorded — no funds moved. Money only moves once the platform's payment module
+            is live.
+          </div>
+        </div>
+      </section>
+    }
+
+    <section class="sect">
+      <div class="sect-h">
+        <span class="sect-t">Statements</span>
+        <span class="sect-hint">Both sides and the platform read everything here</span>
+      </div>
+      <div class="sect-pad stack stack-12">
+        @for (s of d.statements; track s.statementId) {
+          <div class="row row-gap-12">
+            <div class="customer-avatar" [class.s-accent]="s.party === 'Dealer'">
+              {{ initials(s.authorName) }}
+            </div>
+            <div class="grow">
+              <div class="row row-gap-8">
+                <span class="handover-title">{{ s.authorName }}</span>
+                <span class="pill" [class]="s.party === 'Dealer' ? 's-accent' : 's-dim'">{{
+                  s.party === 'Dealer' ? 'Your side' : 'Customer'
+                }}</span>
+                <span class="page-sub push">{{ dateTime(s.createdAt) }}</span>
+              </div>
+              <div class="queue-desc">{{ s.body }}</div>
+              @if (s.evidence.length) {
+                <div class="row row-gap-8">
+                  @for (file of s.evidence; track file.url) {
+                    <a
+                      class="btn btn-ghost btn-xs"
+                      [href]="file.url"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      <kh-icon name="paperclip" />
+                      {{ file.fileName }}
+                    </a>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+
+    @if (d.isLive) {
+      <section class="sect">
+        <div class="sect-h"><span class="sect-t">Add to the dispute</span></div>
+        <div class="sect-pad stack stack-10">
+          @if (problem(); as message) {
+            <div class="banner s-bad" role="alert">
+              <kh-icon name="warning-circle" class="banner-icon" />
+              <div class="banner-body">
+                <div class="banner-text">{{ message }}</div>
+              </div>
+            </div>
+          }
+          <div class="field">
+            <label for="statement-body">Your statement</label>
+            <textarea
+              id="statement-body"
+              class="input"
+              [value]="body()"
+              (input)="body.set(fieldValue($event))"
+              placeholder="What happened from your side, with times."
+            ></textarea>
+          </div>
+          <div class="field">
+            <label for="statement-evidence">Evidence (optional)</label>
+            <input
+              id="statement-evidence"
+              class="input"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              [disabled]="busy()"
+              (change)="attachEvidence($event)"
+            />
+            <div class="field-hint">
+              {{
+                evidenceNames().length
+                  ? 'Attached: ' + evidenceNames().join(', ')
+                  : 'Photos or a PDF, stored privately.'
+              }}
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-md self-start"
+            [disabled]="busy() || !body().trim()"
+            (click)="addStatement()"
+          >
+            {{ busy() ? 'Working…' : 'Add statement' }}
+          </button>
+        </div>
+      </section>
+    }
+  }
+</div>

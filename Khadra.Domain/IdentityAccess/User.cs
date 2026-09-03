@@ -8,6 +8,8 @@ namespace Khadra.Domain.IdentityAccess;
 // Dealer/customer profile data lives in their own contexts and references this aggregate by Id.
 public sealed class User : AggregateRoot, ISoftDeletable
 {
+    private readonly List<CustomerDocument> _documents = [];
+
     public EmailAddress Email { get; private set; } = null!;
     public PhoneNumber Phone { get; private set; } = null!;
     public PersonName Name { get; private set; } = null!;
@@ -23,9 +25,17 @@ public sealed class User : AggregateRoot, ISoftDeletable
     public DateTimeOffset? LastLoginAt { get; private set; }
     public DateTimeOffset? PasswordChangedAt { get; private set; }
     public string? SuspensionReason { get; private set; }
+    // Spec 5.1 and 6: needed for the minimum-age check at registration. Nullable because accounts
+    // created before the rule existed, and admin/employee accounts, have no renter age to check.
+    public DateOnly? DateOfBirth { get; private set; }
+    // Spec 5.1: a foreign renter presents a passport, and possibly an international driving permit
+    // once that requirement is decided (spec 2.2, still open).
+    public bool IsForeignNational { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
+
+    public IReadOnlyCollection<CustomerDocument> Documents => _documents.AsReadOnly();
 
     private User()
     {
@@ -41,8 +51,11 @@ public sealed class User : AggregateRoot, ISoftDeletable
         PhoneNumber phone,
         PersonName name,
         PasswordHash passwordHash,
-        DateTimeOffset now) =>
-        Create(email, phone, name, passwordHash, UserRole.Customer, isEmailVerified: false, mustChangePassword: false, now);
+        DateTimeOffset now,
+        DateOnly? dateOfBirth = null,
+        bool isForeignNational = false) =>
+        Create(email, phone, name, passwordHash, UserRole.Customer, isEmailVerified: false, mustChangePassword: false, now,
+            dateOfBirth, isForeignNational);
 
     // Dealer owner self-registration (Dealers context submits the business documents separately).
     public static User RegisterDealerOwner(
@@ -50,8 +63,10 @@ public sealed class User : AggregateRoot, ISoftDeletable
         PhoneNumber phone,
         PersonName name,
         PasswordHash passwordHash,
-        DateTimeOffset now) =>
-        Create(email, phone, name, passwordHash, UserRole.DealerOwner, isEmailVerified: false, mustChangePassword: false, now);
+        DateTimeOffset now,
+        DateOnly? dateOfBirth = null) =>
+        Create(email, phone, name, passwordHash, UserRole.DealerOwner, isEmailVerified: false, mustChangePassword: false, now,
+            dateOfBirth, isForeignNational: false);
 
     // Employees are never self-registered: the owner creates them with a temporary password.
     public static User CreateEmployee(
@@ -61,6 +76,22 @@ public sealed class User : AggregateRoot, ISoftDeletable
         PasswordHash temporaryPasswordHash,
         DateTimeOffset now) =>
         Create(email, phone, name, temporaryPasswordHash, UserRole.DealerEmployee, isEmailVerified: true, mustChangePassword: true, now);
+
+    /// <summary>
+    /// An employee who has been INVITED but has not yet accepted (spec 4.2's "invite link").
+    ///
+    /// The account is inert until they do: the password hash is unusable (the caller hashes random
+    /// bytes it then discards) and the email is unverified, so CanAuthenticate refuses a login
+    /// whatever anyone guesses. Accepting the invitation verifies the address -- which nobody has yet
+    /// proved they own -- and sets the first real password in one step.
+    /// </summary>
+    public static User CreateInvitedEmployee(
+        EmailAddress email,
+        PhoneNumber phone,
+        PersonName name,
+        PasswordHash unusablePasswordHash,
+        DateTimeOffset now) =>
+        Create(email, phone, name, unusablePasswordHash, UserRole.DealerEmployee, isEmailVerified: false, mustChangePassword: false, now);
 
     // Platform administrators are seeded or created by another admin, never self-registered.
     public static User CreateAdmin(
@@ -79,7 +110,9 @@ public sealed class User : AggregateRoot, ISoftDeletable
         UserRole role,
         bool isEmailVerified,
         bool mustChangePassword,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        DateOnly? dateOfBirth = null,
+        bool isForeignNational = false)
     {
         ArgumentNullException.ThrowIfNull(email);
         ArgumentNullException.ThrowIfNull(phone);
@@ -99,6 +132,8 @@ public sealed class User : AggregateRoot, ISoftDeletable
             EmailVerifiedAt = isEmailVerified ? now : null,
             MustChangePassword = mustChangePassword,
             SecurityStamp = Guid.NewGuid(),
+            DateOfBirth = dateOfBirth,
+            IsForeignNational = isForeignNational,
             CreatedAt = now
         };
         user.AddDomainEvent(new UserRegistered(user.Id, email.Value, role.Name, now));
@@ -117,6 +152,44 @@ public sealed class User : AggregateRoot, ISoftDeletable
 
         return UnitResult.Success<Error>();
     }
+
+    /// <summary>
+    /// Records an uploaded identity document.
+    ///
+    /// Re-uploading a type REPLACES the previous file, because spec 5.1 expects a customer whose
+    /// document was unreadable to send a better photo rather than accumulate rejected attempts. The
+    /// caller is responsible for deleting the superseded blob; the returned key says which.
+    /// </summary>
+    public string? AttachDocument(
+        CustomerDocumentType type,
+        string storageKey,
+        string contentType,
+        long sizeBytes,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+
+        var existing = _documents.SingleOrDefault(document => document.Type == type);
+        if (existing is not null)
+            return existing.Replace(storageKey, contentType, sizeBytes, now);
+
+        _documents.Add(CustomerDocument.Attach(Id, type, storageKey, contentType, sizeBytes, now));
+        return null;
+    }
+
+    /// <summary>
+    /// Spec 5.1: both sides of a licence, plus one identity document -- a national ID for a local
+    /// renter, a passport for a foreign one. Whether a foreign renter additionally needs an
+    /// international driving permit is still an open owner decision (spec 2.2), so it is not required
+    /// here and this will need revisiting once that is settled.
+    /// </summary>
+    public bool HasCompleteRenterDocuments =>
+        _documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceFront) &&
+        _documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceBack) &&
+        _documents.Any(document => document.Type.IsIdentity);
+
+    public CustomerDocument? FindDocument(Id documentId) =>
+        _documents.SingleOrDefault(document => document.Id == documentId);
 
     public bool MatchesSecurityStamp(Guid stamp) => SecurityStamp == stamp;
 
@@ -142,6 +215,21 @@ public sealed class User : AggregateRoot, ISoftDeletable
         MustChangePassword = false;
         SecurityStamp = Guid.NewGuid();
         AddDomainEvent(new UserPasswordChanged(Id, now));
+    }
+
+    /// <summary>
+    /// Ends every session this person has, without changing anything else about the account.
+    ///
+    /// This is what a dealer owner deactivating an employee needs (spec 4.2: "their login stops
+    /// working immediately"). Suspend is deliberately NOT used for that: it is the Admin's sanction,
+    /// it would show the person as platform-suspended in admin screens, and lifting it is the Admin's
+    /// tool. Rotating the stamp kills access tokens on their next request; the event revokes the
+    /// refresh-token families after commit.
+    /// </summary>
+    public void RevokeAllSessions(DateTimeOffset now)
+    {
+        SecurityStamp = Guid.NewGuid();
+        AddDomainEvent(new UserSessionsRevoked(Id, now));
     }
 
     public UnitResult<Error> Suspend(string reason, DateTimeOffset now)

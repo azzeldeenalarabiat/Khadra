@@ -5,8 +5,8 @@ using Microsoft.Extensions.Options;
 
 namespace Khadra.Infrastructure.PlatformSettings;
 
-// Configuration-backed source of the business numbers. Swapped for a database-backed provider when the
-// Admin console gets its settings screen; consumers keep using IBusinessRulesProvider.
+// Configuration-backed source of the business numbers. Swapped for a database-backed provider when
+// the Admin console gets its settings screen; consumers keep using IBusinessRulesProvider.
 internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<BusinessRulesOptions> options)
     : IBusinessRulesProvider
 {
@@ -21,6 +21,10 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
             current.DealerNonDeliveryPenaltyMinPercent,
             current.DealerNonDeliveryPenaltyMaxPercent,
             current.FreeCancellationWindowMinutes,
-            current.AdminSlaHours));
+            current.AdminSlaHours,
+            current.CustomerCancellationPenaltyPercent,
+            current.PaymentWindowMinutes,
+            current.PostReturnSettlementHours,
+            current.MinimumRenterAge));
     }
 }

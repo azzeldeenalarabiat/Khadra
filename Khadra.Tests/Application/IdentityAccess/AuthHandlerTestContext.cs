@@ -22,6 +22,8 @@ internal sealed class AuthHandlerTestContext
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
     public IAuthEmailComposer EmailComposer { get; } = Substitute.For<IAuthEmailComposer>();
     public IEmailSender EmailSender { get; } = Substitute.For<IEmailSender>();
+    public IBusinessRulesProvider BusinessRules { get; } = TestBusinessRules.Provider();
+    public IReportingCalendar Calendar { get; } = TestBusinessRules.Calendar();
 
     public List<RefreshToken> AddedRefreshTokens { get; } = [];
     public List<VerificationToken> AddedVerificationTokens { get; } = [];
@@ -46,6 +48,11 @@ internal sealed class AuthHandlerTestContext
         EmailComposer.PasswordChanged(Arg.Any<User>())
             .Returns(call => Message(call.Arg<User>(), "changed", string.Empty));
     }
+
+    // Registration is shared by the customer and dealer-owner flows; both handlers delegate here.
+    public AccountRegistrar Registrar => new(
+        UserRepository, VerificationTokens, Hasher, OpaqueTokens, Policy,
+        BusinessRules, Calendar, Clock, UnitOfWork, Emails);
 
     public AuthTokenFactory TokenFactory => new(new StubAccessTokenIssuer(), OpaqueTokens, RefreshTokens, Policy);
 

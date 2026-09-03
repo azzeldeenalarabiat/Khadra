@@ -1,0 +1,30 @@
+<div class="topbar">
+  <div class="grow">
+    <nav class="topbar-crumbs" aria-label="Breadcrumb">
+      @for (crumb of crumbs(); track $index) {
+        @if ($index > 0) {
+          <span aria-hidden="true">/</span>
+        }
+        @if (crumb.last) {
+          <span class="crumb is-last" aria-current="page">{{ crumb.label }}</span>
+        } @else {
+          <a class="crumb" [routerLink]="crumb.route">{{ crumb.label }}</a>
+        }
+      }
+    </nav>
+    <div class="topbar-title">{{ title() }}</div>
+  </div>
+
+  <!--
+    The design also puts a platform-wide search box, a reporting-period picker and a notification
+    count up here. All three are gone with the sample data: there is no search endpoint, nothing
+    reads a reporting period, and the "9" beside the bell was a number that was never counted. A
+    control that does nothing when clicked costs an administrator more than a missing one does.
+  -->
+  <div class="topbar-actions">
+    <button type="button" class="user-chip">
+      <span class="avatar avatar-26">{{ initials() }}</span>
+      <kh-icon name="caret-down" />
+    </button>
+  </div>
+</div>

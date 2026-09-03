@@ -1,4 +1,9 @@
+using Khadra.Domain.Auditing;
+using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
+using Khadra.Domain.Disputes;
+using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +16,11 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<VerificationToken> VerificationTokens => Set<VerificationToken>();
+    public DbSet<Dealer> Dealers => Set<Dealer>();
+    public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<DisputeTicket> DisputeTickets => Set<DisputeTicket>();
+    public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,14 +28,67 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(KhadraDbContext).Assembly);
 
-        // Refresh-token rotation must detect races (two refreshes of the same token). xmin is a
-        // PostgreSQL system column, so it is applied only when running on Npgsql.
+        // Optimistic concurrency, where losing a race silently would cost more than failing loudly.
+        // xmin is a PostgreSQL system column, so it is applied only when running on Npgsql; it needs
+        // no migration because the column already exists on every table.
+        //
+        // - RefreshToken: two refreshes of the same token must not both succeed.
+        // - DisputeTicket and Booking: two admins resolving the same ticket would otherwise both pass
+        //   the in-memory status check and both save, so the second silently overwrites the first's
+        //   decision about money, leaving two audit entries asserting different outcomes. Booking also
+        //   covers two staff answering the same request at once: Approve and Reject would both pass
+        //   the Requested check and write contradictory history rows.
+        // - Dealer: an owner editing employees from two tabs.
         if (Database.IsNpgsql())
-            modelBuilder.Entity<RefreshToken>().Property<uint>("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
+        {
+            foreach (var type in new[] { typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer) })
+            {
+                modelBuilder.Entity(type)
+                    .Property<uint>("xmin")
+                    .HasColumnType("xid")
+                    .ValueGeneratedOnAddOrUpdate()
+                    .IsConcurrencyToken();
+            }
+        }
+
+        // SQLite (the persistence tests) has no timestamp type: it stores DateTimeOffset as text and
+        // refuses to compare or order it. Storing UTC ticks instead makes "starts before", "due by"
+        // and "oldest first" translate, so the repository queries the tests exercise are the SAME
+        // queries production runs -- not a client-evaluated stand-in. Every instant in this system is
+        // UTC, so the zero offset on the way back loses nothing. JSON-mapped value objects keep their
+        // own serialisation; nothing queries into those.
+        // By provider name: IsSqlite() is an extension in the SQLite package, which only the test
+        // project references, and Infrastructure must not take a dependency on a provider it never
+        // ships with.
+        if (string.Equals(Database.ProviderName, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal))
+        {
+            var toTicks = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, long>(
+                value => value.UtcTicks,
+                ticks => new DateTimeOffset(ticks, TimeSpan.Zero));
+            var toNullableTicks = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset?, long?>(
+                value => value.HasValue ? value.Value.UtcTicks : null,
+                ticks => ticks.HasValue ? new DateTimeOffset(ticks.Value, TimeSpan.Zero) : null);
+
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (entityType.IsMappedToJson())
+                    continue;
+
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTimeOffset))
+                        property.SetValueConverter(toTicks);
+                    else if (property.ClrType == typeof(DateTimeOffset?))
+                        property.SetValueConverter(toNullableTicks);
+                }
+            }
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        GuardAuditTrailIsAppendOnly();
+
         var now = DateTimeOffset.UtcNow;
         foreach (var entry in ChangeTracker.Entries<AggregateRoot>())
         {
@@ -34,5 +97,26 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
         }
 
         return base.SaveChangesAsync(cancellationToken);
+    }
+
+    // The database enforces this too (a trigger added in the migration), but a request that tries it
+    // should fail here with a message that names the problem rather than surfacing a Postgres error.
+    // The check also holds on SQLite, where the tests run and the trigger does not exist.
+    //
+    // PRE-LAUNCH (see docs/pre-launch-checklist.md): the database trigger is FOR EACH ROW BEFORE
+    // DELETE OR UPDATE, and row-level triggers do not fire on TRUNCATE. Anyone holding table
+    // privileges can therefore erase the whole audit trail in one statement without tripping either
+    // guard. Deliberately deferred while this is a development database that gets reseeded; it must
+    // be closed with a FOR EACH STATEMENT ... ON TRUNCATE trigger before real audit data exists.
+    private void GuardAuditTrailIsAppendOnly()
+    {
+        foreach (var entry in ChangeTracker.Entries<AuditEntry>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new InvalidOperationException(
+                    "Audit entries are append-only: an existing entry cannot be modified or deleted.");
+            }
+        }
     }
 }

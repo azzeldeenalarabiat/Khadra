@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="ds/styles.css">
+<script src="_ds/nocturne-1b7158d1-150f-4cd6-98ab-c40935b6f0ab/_ds_bundle.js"></script>
+<script src="icons.js"></script>
+</helmet>
+<div style="width:248px;flex:none;height:100%;display:flex;flex-direction:column;background:#12141f;border-right:1px solid var(--color-divider);font-family:var(--font-body)">
+  <div style="padding:18px 16px 14px;display:flex;align-items:center;gap:9px">
+    <div style="width:24px;height:24px;border-radius:6px;border:1px solid var(--color-accent);display:grid;place-items:center;flex:none"><ph-icon name="steering-wheel" style="font-size:14px;color:var(--color-accent)"></ph-icon></div>
+    <div style="font-family:var(--font-heading);font-weight:600;font-size:11px;letter-spacing:.12em;line-height:1.25;color:var(--color-text)">CAR RENTAL<br>SYSTEM</div>
+  </div>
+  <nav style="flex:1;overflow:auto;padding:4px 10px 10px;display:flex;flex-direction:column;gap:2px">
+    <sc-for list="{{ items }}" as="it" hint-placeholder-count="20">
+      <sc-if value="{{ it.group }}" hint-placeholder-val="{{ false }}">
+        <div style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 34%,transparent);padding:14px 8px 5px">{{ it.group }}</div>
+      </sc-if>
+      <sc-if value="{{ it.label }}" hint-placeholder-val="{{ true }}">
+        <a href="{{ it.href }}" onClick="{{ it.click }}" style="{{ it.style }}" style-hover="background:color-mix(in srgb,var(--color-text) 7%,transparent)">
+          <ph-icon name="{{ it.icon }}" style="font-size:15px;flex:none;opacity:.9"></ph-icon>
+          <span style="flex:1">{{ it.label }}</span>
+          <sc-if value="{{ it.badge }}" hint-placeholder-val="{{ false }}">
+            <span style="{{ it.badgeStyle }}">{{ it.badge }}</span>
+          </sc-if>
+        </a>
+      </sc-if>
+    </sc-for>
+  </nav>
+  <div style="border-top:1px solid var(--color-divider);padding:10px;display:flex;flex-direction:column;gap:2px">
+    <div style="display:flex;align-items:center;gap:9px;padding:7px 8px">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-100);display:grid;place-items:center;font-size:11px;font-weight:600;flex:none">RH</div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Rania Haddad</div>
+        <div style="font-size:10px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Super Admin</div>
+      </div>
+    </div>
+    <a href="#" style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;text-decoration:none;color:color-mix(in srgb,var(--color-text) 62%,transparent);font-size:12.5px" style-hover="background:color-mix(in srgb,var(--color-text) 7%,transparent)"><ph-icon name="gear-six" style="font-size:15px"></ph-icon>Account settings</a>
+    <a href="#" style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:6px;text-decoration:none;color:color-mix(in srgb,var(--color-text) 62%,transparent);font-size:12.5px" style-hover="background:color-mix(in srgb,var(--color-text) 7%,transparent)"><ph-icon name="sign-out" style="font-size:15px"></ph-icon>Logout</a>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;active&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;linkBase&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const NAV = [
+  { label: 'Dashboard', icon: 'squares-four' },
+  { group: 'Business' },
+  { label: 'Dealers', icon: 'storefront', badge: '7' },
+  { label: 'Bookings', icon: 'calendar-check' },
+  { label: 'Customers', icon: 'users-three' },
+  { label: 'Reviews', icon: 'star' },
+  { group: 'Finance' },
+  { label: 'Finance', icon: 'chart-line-up' },
+  { label: 'Payments', icon: 'credit-card' },
+  { label: 'Payouts', icon: 'arrow-line-up-right' },
+  { group: 'Operations' },
+  { label: 'Disputes', icon: 'scales', badge: '12' },
+  { label: 'Notifications', icon: 'bell' },
+  { group: 'Platform' },
+  { label: 'Cities & Regions', icon: 'map-pin' },
+  { label: 'Car Types', icon: 'car-simple' },
+  { label: 'Settings', icon: 'sliders-horizontal' },
+  { group: 'System' },
+  { label: 'Audit Logs', icon: 'list-magnifying-glass' },
+  { label: 'Admin Users', icon: 'user-gear' },
+  { label: 'Security', icon: 'shield-check' },
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'Dashboard';
+    return {
+      items: NAV.map(n => {
+        if (n.group) return { group: n.group };
+        const id = n.label.toLowerCase().replace(/ & /g, '-').replace(/[^a-z]+/g, '-');
+        const on = n.label === active || id === active;
+        const onNav = this.props.onNav;
+        return {
+          label: n.label,
+          icon: n.icon,
+          href: '#',
+          click: e => { if (onNav) { e.preventDefault(); onNav(id); } },
+          badge: n.badge || false,
+          badgeStyle: 'font-size:10px;font-weight:600;min-width:18px;text-align:center;padding:1px 5px;border-radius:9px;background:' + (on ? 'var(--color-accent-700)' : 'var(--color-neutral-800)') + ';color:var(--color-neutral-100)',
+          style: 'display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:6px;text-decoration:none;font-size:13px;'
+            + (on
+              ? 'color:var(--color-accent);background:color-mix(in srgb,var(--color-accent) 14%,transparent);box-shadow:inset 2px 0 0 var(--color-accent)'
+              : 'color:color-mix(in srgb,var(--color-text) 72%,transparent)'),
+        };
+      }),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

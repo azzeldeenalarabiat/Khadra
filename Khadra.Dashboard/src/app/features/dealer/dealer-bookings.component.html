@@ -1,0 +1,196 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Bookings</h1>
+      <div class="page-sub">
+        Every booking for your dealership. Scoped server-side to your dealer.
+      </div>
+    </div>
+  </div>
+
+  <section class="sect stack sect-clip">
+    <div class="tabs" role="tablist">
+      @for (t of tabs; track t.key) {
+        <button
+          type="button"
+          class="tab"
+          role="tab"
+          [class.is-active]="tab() === t.key"
+          [attr.aria-selected]="tab() === t.key"
+          (click)="select(t.key)"
+        >
+          {{ t.label }}
+          @if (count(t.key); as n) {
+            <span class="tab-count">{{ n }}</span>
+          } @else if (count(t.key) === 0) {
+            <span class="tab-count">0</span>
+          }
+        </button>
+      }
+    </div>
+
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load your bookings</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    } @else if (list.isLoading()) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        <div class="skel-head">
+          @for (width of ['110px', '90px', '70px', '80px', '60px', '50px']; track $index) {
+            <div class="skel" [style.width]="width" [style.height.px]="8"></div>
+          }
+        </div>
+        @for (row of [1, 2, 3, 4, 5, 6, 7]; track row) {
+          <div class="skel-row">
+            @for (width of ['140px', '110px', '90px', '100px', '70px', '60px']; track $index) {
+              <div class="skel" [style.width]="width"></div>
+            }
+          </div>
+        }
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="calendar-blank" /></div>
+        <div class="state-title">
+          {{ tab() === 'all' ? 'No bookings yet' : 'Nothing in this tab' }}
+        </div>
+        <div class="state-text">
+          @if (tab() === 'all') {
+            Once your vehicles are published, customer booking requests land here. Answer a request
+            before its rental date arrives, or it expires.
+          } @else {
+            No bookings match this tab right now.
+          }
+        </div>
+        <div class="state-actions">
+          @if (tab() === 'all') {
+            <a class="btn btn-primary btn-sm" routerLink="/dealer/fleet">View fleet</a>
+          } @else {
+            <button type="button" class="btn btn-secondary btn-sm" (click)="select('all')">
+              Show all
+            </button>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>Booking</th>
+              <th>Customer</th>
+              <th>Vehicle</th>
+              <th>Rental period</th>
+              <th class="td-num">Value</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (b of rows(); track b.bookingId) {
+              <tr class="rowlink" (click)="open(b)">
+                <td class="td">
+                  <a
+                    class="row-link mono"
+                    [routerLink]="['/dealer/bookings', b.bookingId]"
+                    (click)="$event.stopPropagation()"
+                    >{{ b.reference }}</a
+                  >
+                  <div class="td-sub">{{ created(b) }}</div>
+                </td>
+                <td class="td">
+                  <div class="entity">
+                    <div class="entity-avatar">{{ initials(b.customerName) }}</div>
+                    <div class="entity-name">{{ b.customerName }}</div>
+                  </div>
+                </td>
+                <td class="td">
+                  <div class="entity">
+                    <div class="thumb thumb-sm">
+                      @if (b.vehicle?.coverImageUrl; as url) {
+                        <img [src]="url" alt="" width="34" height="26" />
+                      } @else {
+                        <kh-icon name="car-simple" />
+                      }
+                    </div>
+                    <div class="grow">
+                      <div class="entity-name">{{ car(b) }}</div>
+                      <div class="entity-sub">
+                        {{ b.pickupMethod === 'Delivery' ? 'Delivery' : 'Dealer location' }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="td">
+                  <div>{{ period(b) }}</div>
+                  <div class="td-sub">{{ days(b) }}</div>
+                </td>
+                <td class="td td-num">
+                  <span class="num">{{ b.currency }} {{ b.totalPrice }}</span>
+                  <div class="td-sub">customer's total</div>
+                </td>
+                <td class="td">
+                  <span class="pill" [class]="'s-' + tone(b)">{{ label(b) }}</span>
+                </td>
+                <td class="td td-num">
+                  <div class="row-actions">
+                    @if (b.status === 'Requested') {
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-xs"
+                        (click)="approve($event, b)"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-xs s-bad"
+                        (click)="reject($event, b)"
+                      >
+                        Reject
+                      </button>
+                    } @else {
+                      <a
+                        class="btn btn-secondary btn-xs"
+                        [routerLink]="['/dealer/bookings', b.bookingId]"
+                        (click)="$event.stopPropagation()"
+                        >View</a
+                      >
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="pager-count">{{ rows().length }} of {{ total() }} bookings</span>
+        <div class="pager-nav">
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() <= 1"
+            (click)="goTo(page() - 1)"
+          >
+            Previous
+          </button>
+          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() >= totalPages()"
+            (click)="goTo(page() + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+</div>

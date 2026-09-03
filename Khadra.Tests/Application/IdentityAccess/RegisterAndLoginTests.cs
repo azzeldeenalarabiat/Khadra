@@ -10,17 +10,9 @@ namespace Khadra.Tests.Application.IdentityAccess;
 public sealed class RegisterCustomerHandlerTests
 {
     private static RegisterCustomerCommand ValidCommand() =>
-        new("Ali@Example.com", "Passw0rd1", "Ali Ahmad", "079 123 4567");
+        new("Ali@Example.com", "Passw0rd1", "Ali Ahmad", "079 123 4567", Users.AdultBirthDate, false);
 
-    private static RegisterCustomerHandler Handler(AuthHandlerTestContext context) => new(
-        context.UserRepository,
-        context.VerificationTokens,
-        context.Hasher,
-        context.OpaqueTokens,
-        context.Policy,
-        context.Clock,
-        context.UnitOfWork,
-        context.Emails);
+    private static RegisterCustomerHandler Handler(AuthHandlerTestContext context) => new(context.Registrar);
 
     [Fact]
     public async Task Creates_an_unverified_customer_with_a_verification_link()
@@ -81,7 +73,7 @@ public sealed class RegisterCustomerHandlerTests
     {
         var context = new AuthHandlerTestContext();
 
-        var result = await Handler(context).Handle(new RegisterCustomerCommand(email, password, name, phone), CancellationToken.None);
+        var result = await Handler(context).Handle(new RegisterCustomerCommand(email, password, name, phone, Users.AdultBirthDate, false), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal(code, result.Error.Code);

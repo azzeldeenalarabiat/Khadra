@@ -13,3 +13,7 @@ public sealed record UserSuspended(Id UserId, string Reason, DateTimeOffset Occu
 public sealed record UserReactivated(Id UserId, DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record UserDeleted(Id UserId, DateTimeOffset OccurredAt) : IDomainEvent;
+
+// Every session ended on purpose, with the account otherwise untouched: a dealer owner deactivating
+// an employee. Distinct from UserSuspended, which is the Admin's sanction.
+public sealed record UserSessionsRevoked(Id UserId, DateTimeOffset OccurredAt) : IDomainEvent;

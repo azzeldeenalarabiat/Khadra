@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="ds/styles.css">
+<script src="_ds/nocturne-1b7158d1-150f-4cd6-98ab-c40935b6f0ab/_ds_bundle.js"></script>
+<script src="icons.js"></script>
+<style>
+html,body{height:100%}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);font-size:15px;overflow:hidden}
+.k{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:rgba(233,233,237,.38)}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sect{border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-sm)}
+.sect-h{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--color-divider)}
+.sect-t{font-family:var(--font-heading);font-weight:500;font-size:14px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:rgba(233,233,237,.5)}
+.rowlink{cursor:pointer}
+.thumb{border-radius:6px;background:linear-gradient(150deg,#22243244,#2b2d3d);border:1px solid rgba(255,255,255,.07);display:grid;place-items:center;flex:none}
+.h1{font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em}
+.sub{font-size:12.5px;color:rgba(233,233,237,.5)}
+.kv{display:flex;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px}
+.kv>span:first-child{width:180px;flex:none;color:rgba(233,233,237,.5)}
+@keyframes shimmer{0%{opacity:.35}50%{opacity:.7}100%{opacity:.35}}
+.skel{height:11px;border-radius:3px;background:var(--color-neutral-800);animation:shimmer 1.4s ease-in-out infinite}
+@keyframes toastin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden">
+<dc-import name="DealerSidebar" active="{{ screen }}" locked="{{ locked }}" onNav="{{ nav }}" hint-size="242px,100%"></dc-import>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+  <div style="height:58px;flex:none;display:flex;align-items:center;gap:14px;padding:0 22px;border-bottom:1px solid var(--color-divider);background:#12141f">
+    <div style="min-width:0">
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:rgba(233,233,237,.4)">
+        <sc-for list="{{ crumbs }}" as="c" hint-placeholder-count="2">
+          <a href="#" onClick="{{ c.click }}" style="{{ c.style }}">{{ c.label }}</a>
+        </sc-for>
+      </div>
+      <div style="font-family:var(--font-heading);font-weight:500;font-size:17px;line-height:1.2">{{ title }}</div>
+    </div>
+    <div style="flex:1;max-width:320px;margin-left:auto;position:relative">
+      <ph-icon name="magnifying-glass" style="position:absolute;left:10px;top:9px;font-size:14px;color:rgba(233,233,237,.4)"></ph-icon>
+      <input class="input" placeholder="Search bookings, vehicles, customers…" style="padding-left:31px;min-height:33px;font-size:12.5px;background:#1b1d2a">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="k">Dealer state</span>
+        <select class="input" onChange="{{ setDealerState }}" style="min-height:31px;font-size:11.5px;padding:3px 8px;width:118px;background:#1b1d2a">
+          <sc-for list="{{ dealerStates }}" as="d" hint-placeholder-count="3"><option selected="{{ d.on }}">{{ d.label }}</option></sc-for>
+        </select>
+      </div>
+      <div style="position:relative">
+        <button class="btn btn-icon btn-secondary" onClick="{{ goNotifications }}" style="width:33px;height:33px"><ph-icon name="bell" style="font-size:15px"></ph-icon></button>
+        <span style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#c96a5a;color:#f3f5fe;font-size:9.5px;font-weight:600;display:grid;place-items:center;border:2px solid #12141f">5</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;padding:3px 7px 3px 3px;border:1px solid var(--color-divider);border-radius:20px;cursor:pointer">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-100);display:grid;place-items:center;font-size:10.5px;font-weight:600">YN</div>
+        <ph-icon name="caret-down" style="font-size:11px;opacity:.6"></ph-icon>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow:auto;padding:20px 22px 32px">
+
+  <sc-if value="{{ locked }}" hint-placeholder-val="{{ false }}">
+  <div style="max-width:660px;margin:40px auto;display:flex;flex-direction:column;gap:14px">
+    <div class="sect" style="padding:26px 26px 22px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div style="{{ block.iconWrap }}"><ph-icon name="{{ block.icon }}" style="{{ block.iconStyle }}"></ph-icon></div>
+        <div>
+          <div style="font-family:var(--font-heading);font-size:19px;font-weight:500">{{ block.title }}</div>
+          <span style="{{ block.badgeStyle }}">{{ block.badge }}</span>
+        </div>
+      </div>
+      <div style="font-size:13px;line-height:1.6;color:rgba(233,233,237,.72)">{{ block.body }}</div>
+      <div style="border-top:1px solid var(--color-divider);padding-top:12px;display:flex;flex-direction:column;gap:8px">
+        <span class="k">{{ block.listTitle }}</span>
+        <sc-for list="{{ block.points }}" as="p" hint-placeholder-count="3">
+          <div style="display:flex;gap:9px;font-size:12.5px;color:rgba(233,233,237,.65)">
+            <ph-icon name="{{ p.icon }}" style="font-size:14px;margin-top:2px;color:{{ p.color }};flex:none"></ph-icon>
+            <span>{{ p.text }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary" onClick="{{ block.primaryClick }}" style="padding:6px 12px;font-size:12.5px">{{ block.primary }}</button>
+        <button class="btn btn-secondary" onClick="{{ goSettings }}" style="padding:6px 12px;font-size:12.5px">Account settings</button>
+      </div>
+      <div class="mono" style="margin-top:2px">RequireApprovedDealer · dealer #dl_1042 · enforced server-side</div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      <div>
+        <div class="h1">{{ greeting }}</div>
+        <div class="sub">{{ statusLine }}</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-primary" onClick="{{ goNewVehicle }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="plus" style="font-size:13px"></ph-icon>Add Vehicle</button>
+        <button class="btn btn-secondary" onClick="{{ goBookings }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="calendar-check" style="font-size:13px"></ph-icon>View Bookings</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="8">
+        <a href="#" onClick="{{ k.click }}" class="sect" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:7px;padding:13px 14px" style-hover="box-shadow:0 0 0 1px var(--color-accent-700)">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span class="k">{{ k.label }}</span>
+            <ph-icon name="{{ k.icon }}" style="font-size:14px;color:var(--color-accent);opacity:.8"></ph-icon>
+          </div>
+          <div class="num" style="{{ k.mainStyle }}">{{ k.main }}</div>
+          <div style="font-size:11.5px;color:rgba(233,233,237,.48)">{{ k.note }}</div>
+        </a>
+      </sc-for>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.75fr 1fr;gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect" style="overflow:hidden">
+          <div class="sect-h">
+            <ph-icon name="warning-diamond" style="font-size:15px;color:#d1806e"></ph-icon>
+            <span class="sect-t">Requires attention</span>
+            <span style="font-size:10.5px;padding:2px 7px;border-radius:9px;background:rgba(209,128,110,.16);color:#e0a292">{{ attentionCount }}</span>
+            <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.4)">Booking requests expire after 48h</span>
+          </div>
+          <sc-for list="{{ attention }}" as="a" hint-placeholder-count="6">
+            <div style="display:flex;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.05)" style-hover="background:rgba(255,255,255,.03)">
+              <div style="{{ a.rail }}"></div>
+              <div style="flex:1;min-width:0;padding:11px 14px;display:flex;flex-direction:column;gap:4px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="{{ a.typeStyle }}">{{ a.type }}</span>
+                  <span style="font-size:11px;color:rgba(233,233,237,.45)">{{ a.entity }}</span>
+                  <span style="font-size:11px;color:rgba(233,233,237,.35);margin-left:auto">{{ a.when }}</span>
+                </div>
+                <div style="font-size:13.5px;font-weight:500;line-height:1.35">{{ a.title }}</div>
+                <div style="font-size:12px;color:rgba(233,233,237,.5);line-height:1.45">{{ a.desc }}</div>
+              </div>
+              <div style="width:150px;flex:none;padding:11px 14px;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:7px;justify-content:center">
+                <span style="{{ a.statusStyle }}">{{ a.status }}</span>
+                <button class="btn btn-primary" onClick="{{ a.click }}" style="padding:5px 10px;font-size:12.5px">{{ a.action }}</button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+          <div class="sect" style="overflow:hidden">
+            <div class="sect-h"><ph-icon name="arrow-square-out" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Upcoming pickups</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.4)">Next 48h</span></div>
+            <div style="padding:2px 14px 12px">
+              <sc-for list="{{ pickups }}" as="p" hint-placeholder-count="4">
+                <div style="padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span class="mono" style="color:var(--color-accent-300)">{{ p.id }}</span>
+                    <span style="{{ p.statusStyle }}">{{ p.status }}</span>
+                    <span class="num" style="margin-left:auto;font-size:12px;color:rgba(233,233,237,.6)">{{ p.when }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <div class="thumb" style="width:34px;height:26px"><ph-icon name="car-simple" style="font-size:14px;color:rgba(233,233,237,.5)"></ph-icon></div>
+                    <div style="min-width:0">
+                      <div style="font-size:12.5px;font-weight:500">{{ p.vehicle }}</div>
+                      <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ p.customer }}</div>
+                    </div>
+                    <button class="btn btn-ghost" onClick="{{ p.click }}" style="margin-left:auto;font-size:11.5px;padding:3px 8px">View</button>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:rgba(233,233,237,.55)">
+                    <ph-icon name="{{ p.locIcon }}" style="font-size:13px;color:{{ p.locColor }}"></ph-icon>
+                    <span>{{ p.location }}</span>
+                    <sc-if value="{{ p.delivery }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:1px 6px;border-radius:4px;background:rgba(145,132,217,.18);color:var(--color-accent)">Delivery</span>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div class="sect" style="overflow:hidden">
+            <div class="sect-h"><ph-icon name="arrow-square-in" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Upcoming returns</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.4)">Next 48h</span></div>
+            <div style="padding:2px 14px 12px">
+              <sc-for list="{{ returns }}" as="r" hint-placeholder-count="4">
+                <div style="padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span class="mono" style="color:var(--color-accent-300)">{{ r.id }}</span>
+                    <span style="{{ r.statusStyle }}">{{ r.status }}</span>
+                    <span class="num" style="margin-left:auto;font-size:12px;color:rgba(233,233,237,.6)">{{ r.when }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <div class="thumb" style="width:34px;height:26px"><ph-icon name="car-simple" style="font-size:14px;color:rgba(233,233,237,.5)"></ph-icon></div>
+                    <div style="min-width:0">
+                      <div style="font-size:12.5px;font-weight:500">{{ r.vehicle }}</div>
+                      <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ r.customer }}</div>
+                    </div>
+                    <button class="btn btn-ghost" onClick="{{ r.click }}" style="margin-left:auto;font-size:11.5px;padding:3px 8px">View</button>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:rgba(233,233,237,.55)">
+                    <ph-icon name="map-pin" style="font-size:13px;opacity:.7"></ph-icon><span>{{ r.location }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect" style="overflow:hidden">
+          <div class="sect-h"><span class="sect-t">Fleet status</span><span class="num" style="margin-left:auto;font-size:12px;color:rgba(233,233,237,.5)">{{ fleetTotal }} vehicles</span></div>
+          <div style="padding:6px 14px 12px">
+            <sc-for list="{{ fleetStatus }}" as="f" hint-placeholder-count="5">
+              <a href="#" onClick="{{ f.click }}" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;color:inherit">
+                <span style="{{ f.dot }}"></span>
+                <span style="font-size:12.5px;flex:1">{{ f.label }}</span>
+                <div style="width:82px;height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden"><div style="{{ f.bar }}"></div></div>
+                <span class="num" style="font-size:13px;width:22px;text-align:right">{{ f.n }}</span>
+              </a>
+            </sc-for>
+          </div>
+        </div>
+
+        <div class="sect" style="overflow:hidden">
+          <div class="sect-h"><span class="sect-t">Recent activity</span><a href="#" onClick="{{ goActivity }}" style="margin-left:auto;font-size:11px;text-decoration:none;color:var(--color-accent-300)">View all</a></div>
+          <div style="padding:4px 14px 10px">
+            <sc-for list="{{ activity }}" as="v" hint-placeholder-count="7">
+              <div style="display:flex;gap:9px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <ph-icon name="{{ v.icon }}" style="font-size:13px;margin-top:2px;color:var(--color-accent);opacity:.8;flex:none"></ph-icon>
+                <div style="min-width:0">
+                  <div style="font-size:12px;line-height:1.45">{{ v.text }}</div>
+                  <div style="font-size:10.5px;color:rgba(233,233,237,.4)">{{ v.ts }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      <div>
+        <div class="h1">{{ list.title }}</div>
+        <div class="sub">{{ list.subtitle }}</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <span class="k">State</span>
+        <div class="seg" style="height:30px">
+          <sc-for list="{{ stateOpts }}" as="o" hint-placeholder-count="5">
+            <label class="seg-opt" style="{{ o.style }}"><input type="radio" name="vstate" checked="{{ o.on }}" onChange="{{ o.click }}">{{ o.label }}</label>
+          </sc-for>
+        </div>
+        <sc-if value="{{ list.primary }}" hint-placeholder-val="{{ false }}">
+          <button class="btn btn-primary" onClick="{{ list.primaryClick }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="plus" style="font-size:13px"></ph-icon>{{ list.primary }}</button>
+        </sc-if>
+      </div>
+    </div>
+
+    <sc-if value="{{ list.stats }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ list.stats }}" as="s" hint-placeholder-count="5">
+        <div class="sect" style="padding:11px 13px;display:flex;flex-direction:column;gap:4px">
+          <span class="k">{{ s.k }}</span>
+          <span class="num" style="font-size:20px">{{ s.v }}</span>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <div class="sect" style="display:flex;flex-direction:column;overflow:hidden">
+      <sc-if value="{{ list.tabs }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:2px;padding:0 8px;border-bottom:1px solid var(--color-divider);overflow-x:auto">
+        <sc-for list="{{ list.tabs }}" as="t" hint-placeholder-count="9">
+          <a href="#" onClick="{{ t.click }}" style="{{ t.style }}">
+            {{ t.label }}<span style="{{ t.countStyle }}">{{ t.count }}</span>
+          </a>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--color-divider);flex-wrap:wrap">
+        <div style="position:relative;width:210px">
+          <ph-icon name="magnifying-glass" style="position:absolute;left:9px;top:8px;font-size:13px;color:rgba(233,233,237,.4)"></ph-icon>
+          <input class="input" placeholder="{{ list.searchHint }}" style="padding-left:28px;min-height:31px;font-size:12px">
+        </div>
+        <sc-for list="{{ list.filters }}" as="f" hint-placeholder-count="4">
+          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;gap:6px">{{ f }}<ph-icon name="caret-down" style="font-size:10px;opacity:.6"></ph-icon></button>
+        </sc-for>
+        <button class="btn btn-ghost" style="font-size:12px;margin-left:auto;gap:5px"><ph-icon name="download-simple" style="font-size:13px"></ph-icon>Export CSV</button>
+      </div>
+
+      <sc-if value="{{ showData }}" hint-placeholder-val="{{ true }}">
+      <div style="overflow-x:auto">
+        <table class="table" style="min-width:1000px">
+          <thead><tr>
+            <sc-for list="{{ list.columns }}" as="c" hint-placeholder-count="8"><th style="{{ c.style }}">{{ c.k }}</th></sc-for>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ list.rows }}" as="r" hint-placeholder-count="8">
+              <tr class="rowlink" onClick="{{ r.click }}">
+                <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="8">
+                  <td style="{{ c.style }}">
+                    <sc-if value="{{ c.entity }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:9px">
+                        <div style="{{ c.thumbStyle }}">
+                          <sc-if value="{{ c.icon }}" hint-placeholder-val="{{ false }}"><ph-icon name="{{ c.icon }}" style="font-size:14px;color:rgba(233,233,237,.5)"></ph-icon></sc-if>
+                          <sc-if value="{{ c.initials }}" hint-placeholder-val="{{ true }}">{{ c.initials }}</sc-if>
+                        </div>
+                        <div style="min-width:0">
+                          <div style="font-size:12.5px;font-weight:500">{{ c.v }}</div>
+                          <div style="font-size:10.5px;color:rgba(233,233,237,.42)">{{ c.sub }}</div>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ c.badge }}" hint-placeholder-val="{{ false }}"><span style="{{ c.badgeStyle }}">{{ c.v }}</span></sc-if>
+                    <sc-if value="{{ c.plain }}" hint-placeholder-val="{{ true }}">
+                      <div>{{ c.v }}</div>
+                      <sc-if value="{{ c.sub }}" hint-placeholder-val="{{ false }}"><div style="font-size:10.5px;color:rgba(233,233,237,.4)">{{ c.sub }}</div></sc-if>
+                    </sc-if>
+                    <sc-if value="{{ c.actions }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;gap:6px;justify-content:flex-end">
+                        <sc-for list="{{ c.acts }}" as="a" hint-placeholder-count="2">
+                          <button class="{{ a.cls }}" onClick="{{ a.click }}" style="{{ a.style }}">{{ a.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </td>
+                </sc-for>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid var(--color-divider)">
+        <span style="font-size:11.5px;color:rgba(233,233,237,.45)">{{ list.count }}</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:5px">
+          <button class="btn btn-secondary" style="padding:4px 9px;font-size:11.5px">Previous</button>
+          <sc-for list="{{ pages }}" as="p" hint-placeholder-count="3"><button class="{{ p.cls }}" style="padding:4px 9px;font-size:11.5px;min-width:28px">{{ p.n }}</button></sc-for>
+          <button class="btn btn-secondary" style="padding:4px 9px;font-size:11.5px">Next</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showLoading }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:14px">
+        <div style="display:flex;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--color-divider)">
+          <sc-for list="{{ skelCols }}" as="s" hint-placeholder-count="6"><div class="skel" style="{{ s.head }}"></div></sc-for>
+        </div>
+        <sc-for list="{{ skelRows }}" as="r" hint-placeholder-count="7">
+          <div style="display:flex;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <sc-for list="{{ r.cells }}" as="s" hint-placeholder-count="6"><div class="skel" style="{{ s.cell }}"></div></sc-for>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:60px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+        <div style="width:44px;height:44px;border-radius:10px;border:1px solid var(--color-divider);display:grid;place-items:center"><ph-icon name="{{ empty.icon }}" style="font-size:20px;color:rgba(233,233,237,.45)"></ph-icon></div>
+        <div style="font-family:var(--font-heading);font-size:16px;font-weight:500">{{ empty.title }}</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5);max-width:340px;line-height:1.55">{{ empty.body }}</div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <sc-if value="{{ empty.primary }}" hint-placeholder-val="{{ false }}">
+            <button class="btn btn-primary" onClick="{{ empty.primaryClick }}" style="padding:5px 11px;font-size:12.5px">{{ empty.primary }}</button>
+          </sc-if>
+          <button class="btn btn-secondary" style="padding:5px 11px;font-size:12.5px">Clear filters</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showError }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+        <div style="width:44px;height:44px;border-radius:10px;background:rgba(209,128,110,.14);display:grid;place-items:center"><ph-icon name="cloud-slash" style="font-size:20px;color:#d1806e"></ph-icon></div>
+        <div style="font-family:var(--font-heading);font-size:16px;font-weight:500">Couldn't load this table</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5);max-width:360px">The service returned <span class="mono">503 SERVICE_UNAVAILABLE</span> after 3 attempts. Nothing was changed and your filters are preserved.</div>
+        <div class="mono" style="margin-top:2px">request-id 4c81-22ae-9f</div>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-primary" style="padding:5px 11px;font-size:12.5px">Retry</button><button class="btn btn-secondary" style="padding:5px 11px;font-size:12.5px">Copy request ID</button></div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showDenied }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+        <div style="width:44px;height:44px;border-radius:10px;border:1px solid var(--color-accent-700);display:grid;place-items:center"><ph-icon name="lock-key" style="font-size:20px;color:var(--color-accent)"></ph-icon></div>
+        <div style="font-family:var(--font-heading);font-size:16px;font-weight:500">Owner-only area</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5);max-width:400px;line-height:1.55">You are signed in as an <strong style="font-weight:500">Employee</strong> of Al-Nadeem Rentals with <strong style="font-weight:500">Booking operations</strong> permission. Financial reports are off by default and only the Dealer Owner can grant them.</div>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-primary" onClick="{{ requestAccess }}" style="padding:5px 11px;font-size:12.5px">Ask the owner for access</button><button class="btn btn-secondary" onClick="{{ goDashboard }}" style="padding:5px 11px;font-size:12.5px">Back to dashboard</button></div>
+        <div class="mono" style="margin-top:4px">403 FORBIDDEN · permission finance.reports.read</div>
+      </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isBooking }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1240px">
+    <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div class="h1">Booking {{ bk.id }}</div>
+          <span style="{{ bk.statusStyle }}">{{ bk.status }}</span>
+        </div>
+        <div class="sub">{{ bk.meta }}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="k">Answer within</div>
+        <div class="num" style="font-size:19px;color:#d0ad74">{{ bk.sla }}</div>
+        <div style="font-size:11px;color:rgba(233,233,237,.4)">{{ bk.slaNote }}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary" onClick="{{ approveBooking }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="check" style="font-size:13px"></ph-icon>Approve</button>
+        <button class="btn btn-secondary" onClick="{{ rejectBooking }}" style="padding:6px 12px;font-size:12.5px;gap:6px;color:#d1806e;border-color:#d1806e"><ph-icon name="x" style="font-size:13px"></ph-icon>Reject</button>
+        <button class="btn btn-ghost" onClick="{{ rejectFailBooking }}" style="padding:6px 10px;font-size:12px">Simulate failure</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="user" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Customer</span>
+            <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Contact details unlock at approval</span></div>
+          <div style="padding:14px;display:flex;gap:14px;align-items:flex-start">
+            <div style="width:44px;height:44px;border-radius:10px;background:var(--color-neutral-800);color:var(--color-neutral-200);display:grid;place-items:center;font-size:14px;font-weight:600;flex:none">LO</div>
+            <div style="flex:1">
+              <sc-for list="{{ bk.customer }}" as="c" hint-placeholder-count="5">
+                <div class="kv"><span>{{ c.k }}</span><span>{{ c.v }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="car-simple" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Vehicle</span>
+            <a href="#" onClick="{{ goVehicle }}" style="margin-left:auto;font-size:11px;text-decoration:none;color:var(--color-accent-300)">Open vehicle</a></div>
+          <div style="padding:14px;display:flex;gap:14px">
+            <div class="thumb" style="width:128px;height:86px"><ph-icon name="car-simple" style="font-size:28px;color:rgba(233,233,237,.35)"></ph-icon></div>
+            <div style="flex:1">
+              <sc-for list="{{ bk.vehicle }}" as="c" hint-placeholder-count="4">
+                <div class="kv"><span>{{ c.k }}</span><span>{{ c.v }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+          <div class="sect">
+            <div class="sect-h"><ph-icon name="calendar-blank" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Rental</span></div>
+            <div style="padding:6px 14px 12px">
+              <sc-for list="{{ bk.rental }}" as="c" hint-placeholder-count="3">
+                <div class="kv" style="gap:10px"><span style="width:110px">{{ c.k }}</span><span>{{ c.v }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="sect">
+            <div class="sect-h"><ph-icon name="moped" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Pickup</span></div>
+            <div style="padding:6px 14px 12px">
+              <sc-for list="{{ bk.pickup }}" as="c" hint-placeholder-count="4">
+                <div class="kv" style="gap:10px"><span style="width:110px">{{ c.k }}</span><span>{{ c.v }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="currency-circle-dollar" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Financial</span>
+            <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">All amounts in JOD</span></div>
+          <div style="padding:6px 14px 12px">
+            <sc-for list="{{ bk.money }}" as="m" hint-placeholder-count="6">
+              <div style="display:flex;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px">
+                <span style="flex:1;color:{{ m.color }}">{{ m.k }}</span>
+                <span class="num" style="{{ m.vStyle }}">{{ m.v }}</span>
+              </div>
+            </sc-for>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 11px;border-radius:6px;background:rgba(145,132,217,.12);font-size:11.5px;color:rgba(233,233,237,.7)">
+              <ph-icon name="info" style="font-size:13px;color:var(--color-accent)"></ph-icon>Platform commission is 20%. Payout scheduling is not live yet, so the net figure is indicative.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect">
+          <div class="sect-h"><span class="sect-t">Timeline</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Actor recorded</span></div>
+          <div style="padding:14px">
+            <sc-for list="{{ bk.timeline }}" as="t" hint-placeholder-count="7">
+              <div style="display:flex;gap:11px">
+                <div style="display:flex;flex-direction:column;align-items:center;flex:none">
+                  <div style="{{ t.dot }}"></div>
+                  <div style="{{ t.line }}"></div>
+                </div>
+                <div style="padding-bottom:14px">
+                  <div style="font-size:12.5px;font-weight:500;color:{{ t.color }}">{{ t.label }}</div>
+                  <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ t.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div class="sect" style="padding:13px 14px;display:flex;flex-direction:column;gap:9px">
+          <span class="k">Customer history</span>
+          <sc-for list="{{ bk.history }}" as="h" hint-placeholder-count="4">
+            <div style="display:flex;justify-content:space-between;font-size:12px">
+              <span style="color:rgba(233,233,237,.6)">{{ h.k }}</span><span class="num">{{ h.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div class="sect" style="padding:13px 14px;display:flex;flex-direction:column;gap:8px">
+          <span class="k">Internal note</span>
+          <textarea class="input" placeholder="Visible to you and your employees only." style="min-height:66px;font-size:12.5px"></textarea>
+          <button class="btn btn-secondary" onClick="{{ saveNote }}" style="padding:5px 11px;font-size:12px;align-self:flex-start">Save note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isVehicle }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1240px">
+    <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div class="h1">Toyota Corolla 2023</div>
+          <span style="{{ pillBooked }}">Booked</span>
+        </div>
+        <div class="sub">Sedan · Automatic · Petrol · 5 seats · plate 42-88712 · added 12 Feb 2026</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onClick="{{ editVehicle }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="pencil-simple" style="font-size:13px"></ph-icon>Edit vehicle</button>
+        <button class="btn btn-secondary" onClick="{{ hideVehicle }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="eye-slash" style="font-size:13px"></ph-icon>Hide</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      <sc-for list="{{ vehPhotos }}" as="p" hint-placeholder-count="4">
+        <div class="thumb" style="{{ p.style }}"><ph-icon name="{{ p.icon }}" style="font-size:22px;color:rgba(233,233,237,.3)"></ph-icon><span style="position:absolute;bottom:7px;left:9px;font-size:10px;color:rgba(233,233,237,.45)">{{ p.label }}</span></div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;gap:2px;border-bottom:1px solid var(--color-divider)">
+      <sc-for list="{{ vehTabs }}" as="t" hint-placeholder-count="4">
+        <a href="#" onClick="{{ t.click }}" style="{{ t.style }}">{{ t.label }}</a>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ vehOverview }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="sect">
+        <div class="sect-h"><span class="sect-t">Information &amp; specifications</span></div>
+        <div style="padding:6px 14px 12px">
+          <sc-for list="{{ vehInfo }}" as="c" hint-placeholder-count="8">
+            <div class="kv"><span>{{ c.k }}</span><span>{{ c.v }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect">
+          <div class="sect-h"><span class="sect-t">Pricing &amp; delivery</span></div>
+          <div style="padding:6px 14px 12px">
+            <sc-for list="{{ vehPricing }}" as="c" hint-placeholder-count="5">
+              <div class="kv"><span>{{ c.k }}</span><span>{{ c.v }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+        <div class="sect" style="padding:13px 14px;display:flex;flex-direction:column;gap:9px">
+          <span class="k">Current rental</span>
+          <div style="font-size:12.5px;line-height:1.5">Held for booking <span class="mono" style="color:var(--color-accent-300)">KR-1021</span> — Layla Odeh, 04–08 Sep, delivery to Amman.</div>
+          <button class="btn btn-secondary" onClick="{{ goBooking }}" style="padding:5px 11px;font-size:12px;align-self:flex-start">Open booking</button>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ vehCalendar }}" hint-placeholder-val="{{ false }}">
+    <div class="sect">
+      <div class="sect-h"><span class="sect-t">Availability · September 2026</span>
+        <div style="margin-left:auto;display:flex;gap:12px">
+          <sc-for list="{{ calLegend }}" as="l" hint-placeholder-count="4">
+            <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(233,233,237,.55)"><span style="{{ l.dot }}"></span>{{ l.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+      <div style="padding:14px">
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">
+          <sc-for list="{{ calDays }}" as="d" hint-placeholder-count="30">
+            <div style="{{ d.style }}"><span style="font-size:11px">{{ d.n }}</span><span style="font-size:9.5px;opacity:.75">{{ d.tag }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ vehBookings }}" hint-placeholder-val="{{ false }}">
+    <div class="sect" style="overflow:hidden">
+      <div class="sect-h"><span class="sect-t">Booking history</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">14 completed · 1 upcoming</span></div>
+      <div style="overflow-x:auto">
+        <table class="table" style="min-width:760px">
+          <thead><tr><th>Booking</th><th>Customer</th><th>Period</th><th style="text-align:right">Value</th><th>Status</th></tr></thead>
+          <tbody>
+            <sc-for list="{{ vehHistory }}" as="r" hint-placeholder-count="6">
+              <tr class="rowlink" onClick="{{ r.click }}">
+                <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5">
+                  <td style="{{ c.style }}">
+                    <sc-if value="{{ c.badge }}" hint-placeholder-val="{{ false }}"><span style="{{ c.badgeStyle }}">{{ c.v }}</span></sc-if>
+                    <sc-if value="{{ c.plain }}" hint-placeholder-val="{{ true }}">{{ c.v }}</sc-if>
+                  </td>
+                </sc-for>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ vehActivity }}" hint-placeholder-val="{{ false }}">
+    <div class="sect">
+      <div class="sect-h"><span class="sect-t">Vehicle activity</span></div>
+      <div style="padding:4px 14px 12px">
+        <sc-for list="{{ vehLog }}" as="v" hint-placeholder-count="5">
+          <div style="display:flex;gap:9px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <ph-icon name="{{ v.icon }}" style="font-size:13px;margin-top:2px;color:var(--color-accent);opacity:.8;flex:none"></ph-icon>
+            <div><div style="font-size:12.5px">{{ v.text }}</div><div style="font-size:10.5px;color:rgba(233,233,237,.4)">{{ v.ts }}</div></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isWizard }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1100px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div>
+        <div class="h1">Add vehicle</div>
+        <div class="sub">Step {{ wiz.n }} of 8 · saved as a draft until you finish</div>
+      </div>
+      <button class="btn btn-ghost" onClick="{{ cancelWizard }}" style="margin-left:auto;padding:6px 11px;font-size:12.5px">Cancel</button>
+    </div>
+    <div style="display:grid;grid-template-columns:230px 1fr;gap:14px;align-items:start">
+      <div class="sect" style="padding:10px">
+        <sc-for list="{{ wizSteps }}" as="s" hint-placeholder-count="8">
+          <a href="#" onClick="{{ s.click }}" style="{{ s.style }}">
+            <span style="{{ s.dot }}">{{ s.mark }}</span>
+            <span style="flex:1">{{ s.label }}</span>
+          </a>
+        </sc-for>
+      </div>
+      <div class="sect">
+        <div class="sect-h"><ph-icon name="{{ wiz.icon }}" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">{{ wiz.title }}</span>
+          <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">{{ wiz.hint }}</span></div>
+        <div style="padding:16px">
+          <sc-if value="{{ wiz.isForm }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <sc-for list="{{ wiz.fields }}" as="f" hint-placeholder-count="4">
+              <div class="field" style="{{ f.wrap }}">
+                <label>{{ f.label }}</label>
+                <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}">
+                  <select class="input" style="font-size:13px">
+                    <sc-for list="{{ f.options }}" as="o" hint-placeholder-count="4"><option>{{ o }}</option></sc-for>
+                  </select>
+                </sc-if>
+                <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ false }}">
+                  <textarea class="input" placeholder="{{ f.placeholder }}" style="min-height:74px;font-size:13px"></textarea>
+                </sc-if>
+                <sc-if value="{{ f.isPlain }}" hint-placeholder-val="{{ true }}">
+                  <input class="input" placeholder="{{ f.placeholder }}" style="font-size:13px">
+                </sc-if>
+                <sc-if value="{{ f.hint }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:4px">{{ f.hint }}</div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ wiz.isMap }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="position:relative;height:230px;border-radius:8px;border:1px solid var(--color-divider);overflow:hidden;background:radial-gradient(circle at 42% 46%,#252838,#171926 70%)">
+              <div style="position:absolute;left:0;right:0;top:34%;height:1px;background:rgba(255,255,255,.05)"></div>
+              <div style="position:absolute;left:0;right:0;top:66%;height:1px;background:rgba(255,255,255,.05)"></div>
+              <div style="position:absolute;top:0;bottom:0;left:30%;width:1px;background:rgba(255,255,255,.05)"></div>
+              <div style="position:absolute;top:0;bottom:0;left:64%;width:1px;background:rgba(255,255,255,.05)"></div>
+              <div style="position:absolute;left:42%;top:46%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--color-accent);box-shadow:0 0 0 8px rgba(145,132,217,.18)"></div>
+              <div style="position:absolute;left:42%;top:46%;transform:translate(14px,-8px);font-size:11px;color:rgba(233,233,237,.7)">Mecca Street, Amman</div>
+              <span class="mono" style="position:absolute;bottom:9px;left:11px">31.9539, 35.9106</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="field"><label>City</label><select class="input" style="font-size:13px"><option>Amman</option><option>Zarqa</option><option>Irbid</option><option>Aqaba</option><option>Madaba</option><option>Salt</option></select></div>
+              <div class="field"><label>Pickup address</label><input class="input" placeholder="Mecca Street, building 118" style="font-size:13px"></div>
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ wiz.isPhotos }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+              <sc-for list="{{ wizPhotos }}" as="p" hint-placeholder-count="5">
+                <div style="{{ p.style }}">
+                  <ph-icon name="{{ p.icon }}" style="font-size:20px;color:{{ p.iconColor }}"></ph-icon>
+                  <span style="font-size:10.5px;color:rgba(233,233,237,.5);text-align:center;line-height:1.35">{{ p.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:6px;background:rgba(145,132,217,.12);font-size:11.5px;color:rgba(233,233,237,.72)">
+              <ph-icon name="lock-key" style="font-size:14px;color:var(--color-accent)"></ph-icon>Uploads go to protected storage and are served through short-lived signed URLs. JPG or PNG, up to 5 MB each.
+            </div>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ wiz.isToggles }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ wiz.toggles }}" as="t" hint-placeholder-count="3">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 13px;border:1px solid var(--color-divider);border-radius:8px">
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:500">{{ t.label }}</div>
+                  <div style="font-size:11.5px;color:rgba(233,233,237,.5);line-height:1.5;margin-top:2px">{{ t.desc }}</div>
+                </div>
+                <button class="{{ t.cls }}" onClick="{{ t.click }}" style="padding:4px 11px;font-size:11.5px;flex:none">{{ t.state }}</button>
+              </div>
+            </sc-for>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{ wiz.isReview }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:14px">
+              <div class="thumb" style="width:150px;height:100px"><ph-icon name="car-simple" style="font-size:28px;color:rgba(233,233,237,.32)"></ph-icon></div>
+              <div style="flex:1">
+                <div style="font-family:var(--font-heading);font-size:17px;font-weight:500">Hyundai Elantra 2023</div>
+                <div class="sub">Sedan · Automatic · Petrol · 5 seats</div>
+                <div class="num" style="font-size:15px;margin-top:6px">125 JOD <span style="font-size:11.5px;color:rgba(233,233,237,.45)">per day · 120 JOD deposit</span></div>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 22px">
+              <sc-for list="{{ wizReview }}" as="c" hint-placeholder-count="8">
+                <div class="kv" style="gap:10px"><span style="width:120px">{{ c.k }}</span><span>{{ c.v }}</span></div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:6px;background:rgba(143,191,166,.12);font-size:11.5px;color:rgba(233,233,237,.75)">
+              <ph-icon name="check-circle" style="font-size:14px;color:#8fbfa6"></ph-icon>Saving publishes the vehicle to customer search and makes it bookable straight away.
+            </div>
+          </div>
+          </sc-if>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--color-divider)">
+          <span style="font-size:11.5px;color:rgba(233,233,237,.42)">{{ wiz.footer }}</span>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn btn-secondary" onClick="{{ wizBack }}" style="padding:6px 12px;font-size:12.5px">Back</button>
+            <button class="btn btn-primary" onClick="{{ wizNext }}" style="padding:6px 13px;font-size:12.5px">{{ wiz.next }}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1180px">
+    <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      <div>
+        <div class="h1">My dealer profile</div>
+        <div class="sub">Business information customers see, plus figures the platform calculates for you.</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-secondary" onClick="{{ goPublic }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="eye" style="font-size:13px"></ph-icon>Preview public page</button>
+        <button class="btn btn-primary" onClick="{{ saveProfile }}" style="padding:6px 12px;font-size:12.5px">Save changes</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="image" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Logo &amp; cover</span>
+            <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Stored privately · served via signed URLs</span></div>
+          <div style="padding:14px;display:flex;gap:14px">
+            <div style="display:flex;flex-direction:column;gap:7px;align-items:center">
+              <div class="thumb" style="width:74px;height:74px;border-radius:12px"><ph-icon name="storefront" style="font-size:24px;color:rgba(233,233,237,.4)"></ph-icon></div>
+              <button class="btn btn-ghost" style="font-size:11px;padding:3px 7px">Replace logo</button>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:7px">
+              <div class="thumb" style="height:74px;border-radius:8px"><ph-icon name="mountains" style="font-size:22px;color:rgba(233,233,237,.32)"></ph-icon></div>
+              <button class="btn btn-ghost" style="font-size:11px;padding:3px 7px;align-self:flex-start">Replace cover · 1600×400 recommended</button>
+            </div>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="buildings" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Business information</span></div>
+          <div style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="field"><label>Business name</label><input class="input" value="Al-Nadeem Rentals" style="font-size:13px"></div>
+            <div class="field"><label>City</label><select class="input" style="font-size:13px"><option>Amman</option><option>Zarqa</option><option>Irbid</option><option>Aqaba</option></select></div>
+            <div class="field" style="grid-column:span 2"><label>Description</label><textarea class="input" style="min-height:78px;font-size:13px">Family-run rental business in Amman since 2014. Sedans, SUVs and 7-seaters with delivery inside the city.</textarea></div>
+            <div class="field"><label>Address</label><input class="input" value="Mecca Street, building 118" style="font-size:13px"></div>
+            <div class="field"><label>Phone</label><input class="input" value="+962 6 553 8871" style="font-size:13px"></div>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="clock" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Operating hours</span></div>
+          <div style="padding:6px 14px 12px">
+            <sc-for list="{{ hours }}" as="h" hint-placeholder-count="7">
+              <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <span style="width:110px;font-size:12.5px">{{ h.day }}</span>
+                <input class="input" value="{{ h.open }}" style="width:96px;min-height:29px;font-size:12px;text-align:center">
+                <span style="font-size:12px;color:rgba(233,233,237,.4)">to</span>
+                <input class="input" value="{{ h.close }}" style="width:96px;min-height:29px;font-size:12px;text-align:center">
+                <span style="{{ h.tagStyle }}">{{ h.tag }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="lock-simple" style="font-size:15px;color:rgba(233,233,237,.5)"></ph-icon><span class="sect-t">Calculated by the platform</span></div>
+          <div style="padding:6px 14px 12px">
+            <sc-for list="{{ calcRows }}" as="c" hint-placeholder-count="4">
+              <div class="kv" style="gap:10px"><span style="width:120px">{{ c.k }}</span><span class="num">{{ c.v }}</span></div>
+            </sc-for>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 11px;border-radius:6px;background:rgba(255,255,255,.04);font-size:11.5px;color:rgba(233,233,237,.55);line-height:1.5">
+              <ph-icon name="info" style="font-size:13px;flex:none"></ph-icon>Rating, review count, car count and live availability come from customer reviews and your fleet. They cannot be edited.
+            </div>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="map-pin" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Map pin</span></div>
+          <div style="padding:14px">
+            <div style="position:relative;height:170px;border-radius:8px;border:1px solid var(--color-divider);overflow:hidden;background:radial-gradient(circle at 46% 50%,#252838,#171926 72%)">
+              <div style="position:absolute;left:46%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--color-accent);box-shadow:0 0 0 8px rgba(145,132,217,.18)"></div>
+              <span class="mono" style="position:absolute;bottom:9px;left:11px">31.9539, 35.9106 · Amman</span>
+            </div>
+            <button class="btn btn-secondary" style="margin-top:10px;padding:5px 11px;font-size:12px">Move pin</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isPublic }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1080px">
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;background:rgba(145,132,217,.12);font-size:12px;color:rgba(233,233,237,.75)">
+      <ph-icon name="eye" style="font-size:14px;color:var(--color-accent)"></ph-icon>Customer view — read-only preview of your public dealer page.
+      <button class="btn btn-ghost" onClick="{{ goProfile }}" style="margin-left:auto;font-size:11.5px;padding:3px 9px">Back to editing</button>
+    </div>
+    <div class="sect" style="overflow:hidden">
+      <div style="position:relative;height:168px;background:linear-gradient(160deg,#2a2d40,#191b28)">
+        <div style="position:absolute;inset:0;display:grid;place-items:center"><ph-icon name="mountains" style="font-size:30px;color:rgba(233,233,237,.16)"></ph-icon></div>
+      </div>
+      <div style="padding:0 20px 18px;display:flex;gap:16px;align-items:flex-end;margin-top:-34px">
+        <div style="width:76px;height:76px;border-radius:14px;background:#20222f;border:1px solid rgba(255,255,255,.09);display:grid;place-items:center;flex:none"><ph-icon name="storefront" style="font-size:26px;color:var(--color-accent)"></ph-icon></div>
+        <div style="flex:1;padding-bottom:4px">
+          <div style="font-family:var(--font-heading);font-size:21px;font-weight:500">Al-Nadeem Rentals</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:12px;color:rgba(233,233,237,.6)">
+            <span style="display:flex;align-items:center;gap:5px"><ph-icon name="star-fill" style="font-size:13px;color:#d0ad74"></ph-icon><span class="num" style="color:var(--color-text)">4.8</span>· 96 reviews</span>
+            <span style="display:flex;align-items:center;gap:5px"><ph-icon name="map-pin" style="font-size:13px"></ph-icon>Mecca Street, Amman</span>
+            <span style="display:flex;align-items:center;gap:5px"><ph-icon name="clock" style="font-size:13px"></ph-icon>Open today 08:00–20:00</span>
+            <span style="display:flex;align-items:center;gap:5px"><ph-icon name="moped" style="font-size:13px;color:var(--color-accent)"></ph-icon>Delivery within 25 km · 10 JOD</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="num" style="font-size:20px">5</div>
+          <div style="font-size:11px;color:rgba(233,233,237,.45)">of 12 cars available now</div>
+        </div>
+      </div>
+    </div>
+    <div class="sect">
+      <div class="sect-h"><span class="sect-t">Available now</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Live from your fleet</span></div>
+      <div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <sc-for list="{{ publicCars }}" as="c" hint-placeholder-count="6">
+          <div style="border:1px solid var(--color-divider);border-radius:8px;overflow:hidden">
+            <div class="thumb" style="height:96px;border-radius:0;border:0;border-bottom:1px solid var(--color-divider)"><ph-icon name="car-simple" style="font-size:24px;color:rgba(233,233,237,.3)"></ph-icon></div>
+            <div style="padding:10px 12px">
+              <div style="font-size:12.5px;font-weight:500">{{ c.name }}</div>
+              <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ c.spec }}</div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:7px">
+                <span class="num" style="font-size:14px">{{ c.price }}</span>
+                <span style="{{ c.tagStyle }}">{{ c.tag }}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div class="sect">
+      <div class="sect-h"><span class="sect-t">Customer reviews</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">96 reviews · average 4.8</span></div>
+      <div style="padding:4px 14px 12px">
+        <sc-for list="{{ reviewList }}" as="r" hint-placeholder-count="3">
+          <div style="padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;gap:12px">
+            <div style="width:30px;height:30px;border-radius:50%;background:var(--color-neutral-800);color:var(--color-neutral-200);display:grid;place-items:center;font-size:11px;font-weight:600;flex:none">{{ r.initials }}</div>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="font-size:12.5px;font-weight:500">{{ r.who }}</span>
+                <span style="font-size:11.5px;color:#d0ad74">{{ r.stars }}</span>
+                <span style="font-size:11px;color:rgba(233,233,237,.4);margin-left:auto">{{ r.date }}</span>
+              </div>
+              <div style="font-size:12.5px;line-height:1.55;margin-top:4px;color:rgba(233,233,237,.8)">{{ r.text }}</div>
+              <div style="font-size:11px;color:rgba(233,233,237,.4);margin-top:4px">{{ r.meta }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isDelivery }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1000px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div>
+        <div class="h1">Delivery</div>
+        <div class="sub">Whether you deliver, and how far. The customer fee is set by the platform.</div>
+      </div>
+      <button class="btn btn-primary" onClick="{{ saveDelivery }}" style="margin-left:auto;padding:6px 12px;font-size:12.5px">Save settings</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect" style="padding:14px">
+          <div style="display:flex;align-items:flex-start;gap:12px">
+            <div style="flex:1">
+              <div style="font-family:var(--font-heading);font-size:15px;font-weight:500">Offer delivery</div>
+              <div style="font-size:12px;color:rgba(233,233,237,.55);line-height:1.55;margin-top:3px">When on, customers inside your radius can ask for the car to be delivered instead of collecting it.</div>
+            </div>
+            <button class="{{ deliveryBtnCls }}" onClick="{{ toggleDelivery }}" style="padding:5px 13px;font-size:12px;flex:none">{{ deliveryState }}</button>
+          </div>
+        </div>
+        <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:11px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span class="k">Delivery radius</span>
+            <span class="num" style="font-size:19px">{{ radius }} km</span>
+          </div>
+          <input type="range" min="5" max="50" step="5" value="{{ radiusVal }}" onChange="{{ setRadius }}" style="width:100%;accent-color:var(--color-accent)">
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:rgba(233,233,237,.38)"><span>5 km</span><span>50 km</span></div>
+          <div style="font-size:12px;color:rgba(233,233,237,.6);line-height:1.55">Requests beyond this distance are not offered delivery — the customer is asked to collect from your location instead.</div>
+        </div>
+        <div class="sect" style="padding:14px;display:flex;align-items:flex-start;gap:12px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500">Delivery fee</div>
+            <div style="font-size:12px;color:rgba(233,233,237,.55);line-height:1.55;margin-top:3px">Set platform-wide at 10 JOD and charged to the customer. Dealers cannot change it.</div>
+          </div>
+          <span style="{{ pillFee }}">Fixed · 10 JOD</span>
+        </div>
+        <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:8px">
+          <span class="k">Non-delivery penalty</span>
+          <div style="font-size:12px;color:rgba(233,233,237,.6);line-height:1.55">If you accept a delivery and fail to deliver, a penalty applies. The tier for repeat cases is still being decided by the platform, so no value is shown here yet.</div>
+          <span style="{{ pillPending }}">Pending platform decision</span>
+        </div>
+      </div>
+      <div class="sect">
+        <div class="sect-h"><span class="sect-t">Coverage area</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">From Mecca Street, Amman</span></div>
+        <div style="padding:14px">
+          <div style="position:relative;height:300px;border-radius:8px;border:1px solid var(--color-divider);overflow:hidden;background:radial-gradient(circle at 50% 50%,#242737,#171926 74%)">
+            <div style="{{ ring3 }}"></div>
+            <div style="{{ ring2 }}"></div>
+            <div style="{{ ring1 }}"></div>
+            <div style="position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--color-accent);box-shadow:0 0 0 7px rgba(145,132,217,.2)"></div>
+            <sc-for list="{{ mapPoints }}" as="p" hint-placeholder-count="4">
+              <div style="{{ p.style }}"><span style="{{ p.dot }}"></span>{{ p.label }}</div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:14px;margin-top:11px">
+            <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(233,233,237,.55)"><span style="width:8px;height:8px;border-radius:50%;background:#8fbfa6"></span>Inside radius</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(233,233,237,.55)"><span style="width:8px;height:8px;border-radius:50%;background:#d1806e"></span>Outside — pickup only</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isReviews }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1080px">
+    <div>
+      <div class="h1">Reviews</div>
+      <div class="sub">Left by customers after completed rentals. Ratings are calculated and cannot be changed.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:250px 1fr;gap:14px;align-items:start">
+      <div class="sect" style="padding:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+        <span class="k">Overall rating</span>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span class="num" style="font-size:40px;line-height:1">4.8</span>
+          <span style="font-size:12px;color:rgba(233,233,237,.45)">/ 5</span>
+        </div>
+        <div style="font-size:12px;color:#d0ad74">★★★★★</div>
+        <div style="font-size:12px;color:rgba(233,233,237,.5)">96 reviews · 4 this month</div>
+        <div style="width:100%;border-top:1px solid var(--color-divider);padding-top:10px;display:flex;flex-direction:column;gap:6px">
+          <sc-for list="{{ dist }}" as="d" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11px;width:26px;color:rgba(233,233,237,.5)">{{ d.label }}</span>
+              <div style="flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden"><div style="{{ d.bar }}"></div></div>
+              <span class="num" style="font-size:11px;width:22px;text-align:right;color:rgba(233,233,237,.5)">{{ d.n }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="font-size:11px;color:rgba(233,233,237,.42);line-height:1.5;border-top:1px solid var(--color-divider);padding-top:10px">Your rating of customers averages 4.7 across 88 completed rentals.</div>
+      </div>
+      <div class="sect">
+        <div class="sect-h"><span class="sect-t">All reviews</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-secondary" style="padding:4px 9px;font-size:11.5px;gap:5px">Rating<ph-icon name="caret-down" style="font-size:10px;opacity:.6"></ph-icon></button>
+            <button class="btn btn-secondary" style="padding:4px 9px;font-size:11.5px;gap:5px">Vehicle<ph-icon name="caret-down" style="font-size:10px;opacity:.6"></ph-icon></button>
+          </div>
+        </div>
+        <div style="padding:4px 14px 12px">
+          <sc-for list="{{ reviewsFull }}" as="r" hint-placeholder-count="6">
+            <div style="padding:13px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;gap:12px">
+              <div style="width:30px;height:30px;border-radius:50%;background:var(--color-neutral-800);color:var(--color-neutral-200);display:grid;place-items:center;font-size:11px;font-weight:600;flex:none">{{ r.initials }}</div>
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                  <span style="font-size:12.5px;font-weight:500">{{ r.who }}</span>
+                  <span style="font-size:11.5px;color:#d0ad74">{{ r.stars }}</span>
+                  <span class="mono" style="color:var(--color-accent-300)">{{ r.booking }}</span>
+                  <span style="font-size:11px;color:rgba(233,233,237,.4);margin-left:auto">{{ r.date }}</span>
+                </div>
+                <div style="font-size:12.5px;line-height:1.55;margin-top:4px;color:rgba(233,233,237,.8)">{{ r.text }}</div>
+                <div style="font-size:11px;color:rgba(233,233,237,.4);margin-top:4px">{{ r.meta }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isReports }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1080px">
+    <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      <div>
+        <div class="h1">Reports</div>
+        <div class="sub">Bookings, revenue and utilisation for {{ periodLabel }}.</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <div class="seg" style="height:30px">
+          <sc-for list="{{ periods }}" as="p" hint-placeholder-count="3">
+            <label class="seg-opt" style="{{ p.style }}"><input type="radio" name="period" checked="{{ p.on }}" onChange="{{ p.click }}">{{ p.label }}</label>
+          </sc-for>
+        </div>
+        <button class="btn btn-secondary" style="padding:6px 11px;font-size:12.5px;gap:6px"><ph-icon name="download-simple" style="font-size:13px"></ph-icon>Export</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ reportCards }}" as="c" hint-placeholder-count="5">
+        <div class="sect" style="padding:13px 14px;display:flex;flex-direction:column;gap:6px">
+          <span class="k">{{ c.k }}</span>
+          <span class="num" style="{{ c.vStyle }}">{{ c.v }}</span>
+          <span style="font-size:11px;color:rgba(233,233,237,.45);line-height:1.4">{{ c.note }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div class="sect" style="overflow:hidden">
+      <div class="sect-h"><span class="sect-t">Occupancy by vehicle</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">{{ periodLabel }}</span></div>
+      <div style="padding:8px 14px 14px">
+        <sc-for list="{{ occupancy }}" as="o" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <span style="font-size:12.5px;flex:1">{{ o.name }}</span>
+            <span class="num" style="font-size:11.5px;color:rgba(233,233,237,.45);width:88px;text-align:right">{{ o.days }}</span>
+            <div style="width:160px;height:5px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden"><div style="{{ o.bar }}"></div></div>
+            <span class="num" style="font-size:12.5px;width:42px;text-align:right">{{ o.pct }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div class="sect" style="padding:14px;display:flex;align-items:flex-start;gap:10px">
+      <ph-icon name="info" style="font-size:15px;color:var(--color-accent);flex:none;margin-top:1px"></ph-icon>
+      <div style="font-size:12px;color:rgba(233,233,237,.62);line-height:1.6">Commission is deducted at the platform rate of 20%. Payout scheduling is not live yet, so net payout is shown as not available rather than estimated. Trends and charts come later.</div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isNotifications }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:900px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div>
+        <div class="h1">Notifications</div>
+        <div class="sub">5 unread · booking, review and operational alerts for your dealer.</div>
+      </div>
+      <button class="btn btn-secondary" onClick="{{ markAllRead }}" style="margin-left:auto;padding:6px 12px;font-size:12.5px">Mark all read</button>
+    </div>
+    <div class="sect" style="overflow:hidden">
+      <sc-for list="{{ notifications }}" as="n" hint-placeholder-count="8">
+        <a href="#" onClick="{{ n.click }}" style="{{ n.style }}" style-hover="background:rgba(255,255,255,.03)">
+          <div style="{{ n.iconWrap }}"><ph-icon name="{{ n.icon }}" style="{{ n.iconStyle }}"></ph-icon></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="{{ n.typeStyle }}">{{ n.type }}</span>
+              <span style="font-size:11px;color:rgba(233,233,237,.4);margin-left:auto">{{ n.ts }}</span>
+            </div>
+            <div style="font-size:13px;line-height:1.45;margin-top:4px;color:{{ n.textColor }}">{{ n.text }}</div>
+            <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:2px">{{ n.entity }}</div>
+          </div>
+          <sc-if value="{{ n.unread }}" hint-placeholder-val="{{ true }}">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--color-accent);flex:none;margin-top:6px"></span>
+          </sc-if>
+        </a>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:980px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div>
+        <div class="h1">Settings</div>
+        <div class="sub">Your account, your business, and how you are notified.</div>
+      </div>
+      <button class="btn btn-primary" onClick="{{ saveSettings }}" style="margin-left:auto;padding:6px 12px;font-size:12.5px">Save changes</button>
+    </div>
+    <div style="display:grid;grid-template-columns:190px 1fr;gap:14px;align-items:start">
+      <div class="sect" style="padding:8px">
+        <sc-for list="{{ setTabs }}" as="t" hint-placeholder-count="5">
+          <a href="#" onClick="{{ t.click }}" style="{{ t.style }}"><ph-icon name="{{ t.icon }}" style="font-size:14px"></ph-icon>{{ t.label }}</a>
+        </sc-for>
+      </div>
+      <div class="sect">
+        <div class="sect-h"><span class="sect-t">{{ setPanel.title }}</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">{{ setPanel.hint }}</span></div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+          <sc-for list="{{ setPanel.rows }}" as="r" hint-placeholder-count="5">
+            <sc-if value="{{ r.isField }}" hint-placeholder-val="{{ true }}">
+              <div class="field" style="{{ r.wrap }}">
+                <label>{{ r.label }}</label>
+                <input class="input" value="{{ r.value }}" placeholder="{{ r.placeholder }}" style="font-size:13px">
+                <sc-if value="{{ r.hint }}" hint-placeholder-val="{{ false }}"><div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:4px">{{ r.hint }}</div></sc-if>
+              </div>
+            </sc-if>
+            <sc-if value="{{ r.isToggle }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 12px;border:1px solid var(--color-divider);border-radius:8px">
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:500">{{ r.label }}</div>
+                  <div style="font-size:11.5px;color:rgba(233,233,237,.5);line-height:1.5;margin-top:2px">{{ r.desc }}</div>
+                </div>
+                <button class="{{ r.cls }}" onClick="{{ r.click }}" style="padding:4px 11px;font-size:11.5px;flex:none">{{ r.state }}</button>
+              </div>
+            </sc-if>
+            <sc-if value="{{ r.isRow }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--color-divider);border-radius:8px">
+                <div style="flex:1">
+                  <div style="font-size:12.5px">{{ r.label }}</div>
+                  <div style="font-size:11px;color:rgba(233,233,237,.45);margin-top:2px">{{ r.desc }}</div>
+                </div>
+                <button class="btn btn-secondary" onClick="{{ r.click }}" style="padding:4px 11px;font-size:11.5px;flex:none">{{ r.action }}</button>
+              </div>
+            </sc-if>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  </div>
+</div>
+</div>
+
+<sc-if value="{{ modal }}" hint-placeholder-val="{{ false }}">
+<div class="dialog-backdrop" style="z-index:50">
+  <div class="dialog" style="width:min(500px,100%)">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="{{ modal.iconWrap }}"><ph-icon name="{{ modal.icon }}" style="{{ modal.iconStyle }}"></ph-icon></div>
+      <div style="flex:1">
+        <div class="dialog-title" style="font-size:18px">{{ modal.title }}</div>
+        <div class="dialog-body" style="margin-top:4px">{{ modal.body }}</div>
+      </div>
+      <button class="btn btn-icon btn-secondary" onClick="{{ closeModal }}" style="width:28px;height:28px;flex:none"><ph-icon name="x" style="font-size:13px"></ph-icon></button>
+    </div>
+    <sc-for list="{{ modal.fields }}" as="f" hint-placeholder-count="2">
+      <div class="field">
+        <label>{{ f.label }}</label>
+        <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}">
+          <select class="input">
+            <sc-for list="{{ f.options }}" as="o" hint-placeholder-count="3"><option>{{ o }}</option></sc-for>
+          </select>
+        </sc-if>
+        <sc-if value="{{ f.isInput }}" hint-placeholder-val="{{ false }}">
+          <input class="input" placeholder="{{ f.placeholder }}" style="font-size:13px">
+        </sc-if>
+        <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ true }}">
+          <textarea class="input" placeholder="{{ f.placeholder }}" style="min-height:74px;font-size:13px"></textarea>
+        </sc-if>
+        <sc-if value="{{ f.hint }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:4px">{{ f.hint }}</div>
+        </sc-if>
+      </div>
+    </sc-for>
+    <sc-if value="{{ modal.note }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ modal.noteStyle }}"><ph-icon name="info" style="font-size:13px;margin-right:6px"></ph-icon>{{ modal.note }}</div>
+    </sc-if>
+    <sc-if value="{{ modal.error }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:8px;padding:10px 12px;border-radius:6px;background:rgba(209,128,110,.14);font-size:12px;color:#e0a292;line-height:1.5">
+        <ph-icon name="warning-circle" style="font-size:14px;flex:none;margin-top:1px"></ph-icon>
+        <div><div style="font-weight:500">{{ modal.error }}</div><div class="mono" style="margin-top:2px;color:rgba(224,162,146,.7)">{{ modal.errorCode }}</div></div>
+      </div>
+    </sc-if>
+    <div class="dialog-actions">
+      <button class="btn btn-secondary" onClick="{{ closeModal }}" style="padding:6px 12px;font-size:13px">Cancel</button>
+      <button class="btn btn-primary" onClick="{{ modal.confirmClick }}" style="{{ modal.confirmStyle }}">{{ modal.confirm }}</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;right:22px;bottom:22px;z-index:60;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-lg);animation:toastin .18s ease-out">
+  <ph-icon name="{{ toast.icon }}" style="{{ toast.iconStyle }}"></ph-icon>
+  <div>
+    <div style="font-size:13px;font-weight:500">{{ toast.title }}</div>
+    <div style="font-size:11.5px;color:rgba(233,233,237,.5)">{{ toast.body }}</div>
+  </div>
+  <button class="btn btn-ghost" onClick="{{ closeToast }}" style="font-size:12px;margin-left:8px">Dismiss</button>
+</div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const OK='#8fbfa6', WARN='#d0ad74', BAD='#d1806e', DIM='rgba(233,233,237,.55)', ACC='var(--color-accent-300)';
+const tint=(c,p)=>'color-mix(in srgb,'+c+' '+p+'%, transparent)';
+const pill=c=>'display:inline-flex;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:'+tint(c,16)+';color:'+c;
+const TD='padding:9px var(--space-2);font-size:12.5px;vertical-align:middle';
+const cell=(v,sub)=>({plain:true,v,sub:sub||false,style:TD});
+const num=(v,sub)=>({plain:true,v,sub:sub||false,style:TD+';text-align:right;font-variant-numeric:tabular-nums'});
+const bdg=(v,c)=>({badge:true,v,badgeStyle:pill(c),style:TD});
+const ent=(v,sub)=>({entity:true,v,sub:sub||'',initials:v.split(' ').slice(0,2).map(x=>x[0]).join(''),icon:false,
+  thumbStyle:'width:26px;height:26px;border-radius:6px;flex:none;display:grid;place-items:center;font-size:10px;font-weight:600;background:var(--color-neutral-800);color:var(--color-neutral-200)',style:TD});
+const veh=(v,sub)=>({entity:true,v,sub:sub||'',initials:false,icon:'car-simple',
+  thumbStyle:'width:38px;height:28px;border-radius:6px;flex:none;display:grid;place-items:center;background:linear-gradient(150deg,#22243244,#2b2d3d);border:1px solid rgba(255,255,255,.07)',style:TD});
+const acts=(list)=>({actions:true,acts:list,style:TD+';text-align:right'});
+const act=(label,click,kind)=>({label,click,cls:'btn '+(kind==='p'?'btn-primary':kind==='d'?'btn-ghost':'btn-secondary'),
+  style:'padding:3px 9px;font-size:11.5px'+(kind==='d'?';color:'+BAD:'')});
+const tl=(items)=>items.map((t,i)=>({label:t.label,meta:t.meta,color:t.off?DIM:'inherit',
+  dot:'width:9px;height:9px;border-radius:50%;margin-top:4px;'+(t.off?'border:1.5px solid rgba(233,233,237,.28)':'background:'+t.c+';box-shadow:0 0 0 3px '+tint(t.c,18)),
+  line:'width:1px;flex:1;min-height:14px;margin-top:4px;background:'+(i===items.length-1?'transparent':'rgba(255,255,255,.12)')}));
+
+const DEALER='Al-Nadeem Rentals';
+
+/* id, customer, vehicle, start, end, days, pickup, total, deposit, status, color, created */
+const BOOKINGS=[
+ ['KR-1021','Layla Odeh','Toyota Corolla 2023','04 Sep','08 Sep','4','Delivery · Amman','520','120','Pending',WARN,'03 Sep 09:12'],
+ ['KR-1020','Sami Farah','Hyundai Tucson 2024','05 Sep','09 Sep','4','Dealer location','680','150','Pending',WARN,'03 Sep 08:40'],
+ ['KR-1019','Rana Bishara','Kia Sportage 2023','06 Sep','10 Sep','4','Delivery · Sweifieh','600','140','Pending',WARN,'03 Sep 07:55'],
+ ['KR-1018','Omar Nasser','Toyota Camry 2024','03 Sep','07 Sep','4','Dealer location','740','160','Approved',ACC,'02 Sep 18:20'],
+ ['KR-1017','Huda Sabbagh','Nissan Sunny 2022','03 Sep','05 Sep','2','Delivery · Jubaiha','230','80','Confirmed',OK,'02 Sep 14:02'],
+ ['KR-1016','Jonas Weber','Toyota Land Cruiser 2024','01 Sep','08 Sep','7','Dealer location','1,890','400','Active',OK,'31 Aug 11:31'],
+ ['KR-1015','Ahmad Zoubi','Hyundai Accent 2023','30 Aug','03 Sep','4','Dealer location','360','100','Active',OK,'29 Aug 09:14'],
+ ['KR-1014','Dana Khoury','Kia Picanto 2021','28 Aug','31 Aug','3','Delivery · Abdoun','210','70','Completed',DIM,'27 Aug 16:45'],
+ ['KR-1013','Rami Zayed','Mitsubishi Attrage 2022','24 Aug','28 Aug','4','Dealer location','280','80','Completed',DIM,'23 Aug 10:08'],
+ ['KR-1012','Nour Halabi','Chevrolet Captiva 2022','22 Aug','26 Aug','4','Dealer location','440','120','Cancelled',DIM,'21 Aug 12:19'],
+ ['KR-1011','Yara Mansour','Toyota Corolla 2023','18 Aug','23 Aug','5','Delivery · Marj Al-Hamam','640','120','Disputed',BAD,'17 Aug 08:50'],
+];
+const TABS=['All','Pending','Approved','Confirmed','Upcoming','Active','Completed','Cancelled','Disputed'];
+
+/* name, year, type, transmission, fuel, seats, price, status, color, availability, current */
+const FLEET=[
+ ['Toyota Corolla','2023','Sedan','Automatic','Petrol','5','130','Booked',ACC,'Delivery on','KR-1021 · 04 Sep'],
+ ['Hyundai Tucson','2024','SUV','Automatic','Petrol','5','170','Available',OK,'Delivery on','—'],
+ ['Kia Sportage','2023','SUV','Automatic','Diesel','5','150','Available',OK,'Delivery on','—'],
+ ['Toyota Camry','2024','Sedan','Automatic','Hybrid','5','185','Booked',ACC,'Delivery off','KR-1018 · 03 Sep'],
+ ['Nissan Sunny','2022','Sedan','Automatic','Petrol','5','115','Active rental',OK,'Delivery on','KR-1017 · until 05 Sep'],
+ ['Toyota Land Cruiser','2024','SUV','Automatic','Diesel','7','270','Active rental',OK,'Delivery off','KR-1016 · until 08 Sep'],
+ ['Hyundai Accent','2023','Sedan','Automatic','Petrol','5','90','Active rental',OK,'Delivery on','KR-1015 · until 03 Sep'],
+ ['Kia Picanto','2021','Hatchback','Manual','Petrol','4','70','Available',OK,'Not set','—'],
+ ['Mitsubishi Attrage','2022','Sedan','Automatic','Petrol','5','70','Available',OK,'Delivery on','—'],
+ ['Chevrolet Captiva','2022','SUV','Automatic','Petrol','7','140','Inactive',DIM,'Delivery off','—'],
+ ['Hyundai Elantra','2023','Sedan','Automatic','Petrol','5','125','Available',OK,'Delivery on','—'],
+ ['Kia Cerato','2022','Sedan','Automatic','Petrol','5','110','Hidden',DIM,'Delivery off','—'],
+];
+
+/* name, email, perms, status, color, last, created */
+const EMPLOYEES=[
+ ['Ahmad Zaid','ahmad@alnadeem.jo','Booking operations','Active',OK,'Today 08:41','12 Feb 2026'],
+ ['Omar Tarawneh','omar@alnadeem.jo','Booking operations · Financial reports','Active',OK,'Today 07:02','04 Mar 2026'],
+ ['Lina Haddad','lina@alnadeem.jo','Booking operations','Invited',WARN,'Never','01 Sep 2026'],
+ ['Khalid Sror','khalid@alnadeem.jo','Booking operations','Deactivated',DIM,'22 Aug 2026 17:10','18 Jan 2026'],
+];
+
+const ACTIVITY=[
+ ['Owner','Yousef Al-Nadeem approved booking KR-1018','check-circle','Today 09:41','Booking KR-1018'],
+ ['Employee','Ahmad Zaid rejected booking KR-1009 — vehicle unavailable','x-circle','Today 08:41','Booking KR-1009'],
+ ['Owner','Yousef Al-Nadeem added Hyundai Elantra 2023','plus-circle','Today 08:02','Vehicle #vh-2288'],
+ ['Owner','Yousef Al-Nadeem updated delivery radius to 25 km','moped','Yesterday 19:14','Delivery settings'],
+ ['Employee','Omar Tarawneh confirmed pickup for KR-1017','key','Yesterday 14:22','Booking KR-1017'],
+ ['Owner','Khalid Sror was deactivated','user-minus','22 Aug 2026 17:12','Employee #em-77'],
+ ['Owner','Yousef Al-Nadeem edited Kia Picanto daily price to 70 JOD','pencil-simple','21 Aug 2026 11:05','Vehicle #vh-2201'],
+];
+
+const SCREENS={dashboard:'Dashboard',bookings:'Bookings','booking-detail':'Booking details',fleet:'Fleet','vehicle-detail':'Vehicle details','vehicle-new':'Add vehicle',employees:'Employees',profile:'Dealer profile','public-preview':'Public page preview',delivery:'Delivery',reviews:'Reviews',reports:'Reports',notifications:'Notifications',activity:'Activity',settings:'Settings'};
+const PARENT={'booking-detail':'bookings','vehicle-detail':'fleet','vehicle-new':'fleet','public-preview':'profile'};
+
+class Component extends DCLogic {
+  state={screen:'dashboard',viewState:'data',tab:'All',modal:null,toast:null,dealerState:'Approved',wizStep:1,vehTab:'Overview',period:'Monthly',setTab:'Account',delivery:true,radius:25};
+  go=(s)=>{ this.setState({screen:s,viewState:'data',modal:null}); const el=document.scrollingElement; if(el) el.scrollTop=0; };
+  goFiltered=(s,tab)=>{ this.setState({screen:s,tab:tab||'All',viewState:'data'}); };
+  open=(k)=>this.setState({modal:k});
+  close=()=>this.setState({modal:null});
+  fire=(title,body,kind)=>{ this.setState({modal:null,toast:{title,body,kind:kind||'ok'}}); clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:null}),4200); };
+
+  bookingRows(){
+    const t=this.state.tab;
+    const map={Upcoming:['Approved','Confirmed']};
+    const rows=BOOKINGS.filter(b=>t==='All'||(map[t]?map[t].includes(b[9]):b[9]===t));
+    return rows.map(b=>({
+      click:()=>this.go('booking-detail'),
+      cells:[cell(b[0],b[11]),ent(b[1]),veh(b[2],b[6]),cell(b[3]+' → '+b[4],b[5]+' days'),num(b[7]+' JOD','dep '+b[8]),bdg(b[9],b[10]),
+        acts(b[9]==='Pending'
+          ?[act('Approve',e=>{e.stopPropagation();this.open('approve');},'p'),act('Reject',e=>{e.stopPropagation();this.open('reject');},'d')]
+          :[act('View',e=>{e.stopPropagation();this.go('booking-detail');})])],
+    }));
+  }
+  fleetRows(){
+    return FLEET.map(v=>({
+      click:()=>this.go('vehicle-detail'),
+      cells:[veh(v[0]+' '+v[1],v[2]+' · '+v[3]+' · '+v[4]+' · '+v[5]+' seats'),num(v[6]+' JOD','per day'),bdg(v[7],v[8]),cell(v[9]),cell(v[10]),
+        acts([act('Edit',e=>{e.stopPropagation();this.open('edit-vehicle');}),act('Hide',e=>{e.stopPropagation();this.open('hide-vehicle');},'d')])],
+    }));
+  }
+  employeeRows(){
+    return EMPLOYEES.map(e2=>({
+      click:()=>this.open('employee-perms'),
+      cells:[ent(e2[0],e2[1]),cell(e2[2]),bdg(e2[3],e2[4]),cell(e2[5]),cell(e2[6]),
+        acts(e2[3]==='Deactivated'
+          ?[act('Reactivate',e=>{e.stopPropagation();this.open('reactivate');},'p')]
+          :[act('Permissions',e=>{e.stopPropagation();this.open('employee-perms');}),act('Deactivate',e=>{e.stopPropagation();this.open('deactivate');},'d')])],
+    }));
+  }
+  activityRows(){
+    return ACTIVITY.map(a=>({click:()=>{},cells:[cell(a[3]),bdg(a[0],a[0]==='Owner'?ACC:OK),cell(a[1]),cell(a[4])]}));
+  }
+
+  lists(){
+    const H=k=>({k,style:''}), R=k=>({k,style:'text-align:right'});
+    const counts={};
+    TABS.forEach(t=>{ const map={Upcoming:['Approved','Confirmed']};
+      counts[t]=t==='All'?BOOKINGS.length:BOOKINGS.filter(b=>map[t]?map[t].includes(b[9]):b[9]===t).length; });
+    return {
+      bookings:{title:'Bookings',subtitle:'Every booking for '+DEALER+'. Scoped server-side to your dealer.',
+        searchHint:'Booking ID, customer, vehicle…',filters:['Status','Date range','Vehicle','Pickup method','Delivery'],
+        tabs:TABS,tabCounts:counts,
+        columns:[H('Booking'),H('Customer'),H('Vehicle'),H('Rental period'),R('Value'),H('Status'),R('')],
+        rows:this.bookingRows(),count:this.bookingRows().length+' of '+BOOKINGS.length+' bookings'},
+      fleet:{title:'Fleet',subtitle:'12 vehicles · availability and pricing you control.',primary:'Add Vehicle',primaryClick:()=>this.go('vehicle-new'),
+        searchHint:'Make, model, plate…',filters:['Vehicle type','Status','Availability','Sort: Newest'],
+        stats:[{k:'Total',v:'12'},{k:'Available',v:'5'},{k:'Booked',v:'2'},{k:'Active rentals',v:'3'},{k:'Inactive / hidden',v:'2'}],
+        columns:[H('Vehicle'),R('Daily price'),H('Status'),H('Delivery'),H('Current booking'),R('')],
+        rows:this.fleetRows(),count:'12 vehicles'},
+      employees:{title:'Employees',subtitle:'Staff who can act on bookings for your dealer.',primary:'Add Employee',primaryClick:()=>this.open('add-employee'),
+        searchHint:'Name or email…',filters:['Status','Permission'],
+        columns:[H('Employee'),H('Permissions'),H('Status'),H('Last activity'),H('Created'),R('')],
+        rows:this.employeeRows(),count:'4 employees · 1 deactivated'},
+      activity:{title:'Activity',subtitle:'Actions taken inside your dealer account, with the actor recorded.',
+        searchHint:'Actor, entity, action…',filters:['Actor','Action type','Date range'],
+        columns:[H('When'),H('Actor role'),H('Action'),H('Entity')],
+        rows:this.activityRows(),count:'7 of 214 entries'},
+    };
+  }
+
+  emptyFor(screen){
+    const E={
+      bookings:{icon:'calendar-blank',title:'No bookings yet',body:'Once your vehicles are live, customer booking requests land here. Requests must be answered within 48 hours.',primary:'View fleet',primaryClick:()=>this.go('fleet')},
+      fleet:{icon:'car-simple',title:'No vehicles yet',body:'Add your first vehicle to start receiving booking requests.',primary:'Add Vehicle',primaryClick:()=>this.go('vehicle-new')},
+      employees:{icon:'users-three',title:'No employees yet',body:'Invite staff to review and answer booking requests. Financial reports stay off unless you grant them.',primary:'Add Employee',primaryClick:()=>this.open('add-employee')},
+      activity:{icon:'list-magnifying-glass',title:'No activity yet',body:'Actions you and your employees take will be recorded here with the actor and timestamp.',primary:false},
+    };
+    return E[screen]||E.bookings;
+  }
+
+  modals(){
+    const M={
+      approve:{icon:'check-circle',c:OK,title:'Approve booking KR-1021?',body:'Layla Odeh · Toyota Corolla 2023 · 04–08 Sep · 520 JOD. The customer is notified and the vehicle is held for these dates.',
+        fields:[{label:'Note to customer (optional)',isText:true,placeholder:'Pickup instructions, delivery window…',hint:'Recorded against the booking with you as the actor.'}],
+        note:'Approved as Dealer Owner — Yousef Al-Nadeem.',confirm:'Approve booking'},
+      reject:{icon:'x-circle',c:BAD,title:'Reject booking KR-1021?',danger:true,body:'The customer is notified immediately and the dates are released. This cannot be undone.',
+        fields:[{label:'Reason',isSelect:true,options:['Vehicle no longer available','Dates conflict with another booking','Delivery location outside radius','Customer verification incomplete','Other']},
+          {label:'Details for the customer',isText:true,placeholder:'Required — shown to the customer and stored in the audit trail.'}],
+        confirm:'Reject booking'},
+      'reject-failed':{icon:'x-circle',c:BAD,title:'Reject booking KR-1021?',danger:true,body:'The customer is notified immediately and the dates are released.',
+        fields:[{label:'Reason',isSelect:true,options:['Vehicle no longer available','Dates conflict with another booking','Delivery location outside radius']},
+          {label:'Details for the customer',isText:true,placeholder:'Required.'}],
+        error:'Booking was already cancelled by the customer',errorCode:'409 CONFLICT · booking.state=cancelled · nothing was changed',confirm:'Retry reject'},
+      'edit-vehicle':{icon:'pencil-simple',c:ACC,title:'Edit Toyota Corolla 2023',body:'Change price, availability or delivery eligibility. Historical bookings are never affected.',
+        fields:[{label:'Daily price (JOD)',isInput:true,placeholder:'130'},{label:'Security deposit (JOD)',isInput:true,placeholder:'120',hint:'Configured per vehicle.'}],
+        confirm:'Save changes'},
+      'hide-vehicle':{icon:'eye-slash',c:WARN,title:'Hide this vehicle?',body:'The vehicle stops appearing to customers and cannot be booked. It is not deleted — 1 active rental and 14 historical bookings stay intact.',
+        fields:[{label:'Reason (internal)',isText:true,placeholder:'Why is this vehicle coming off the market?'}],
+        note:'Vehicles with bookings are hidden, never deleted.',confirm:'Hide vehicle'},
+      'add-employee':{icon:'user-plus',c:ACC,title:'Add employee',body:'They receive an invite email and set their own password. Default permission is booking operations.',
+        fields:[{label:'Full name',isInput:true,placeholder:'e.g. Rania Salem'},{label:'Work email',isInput:true,placeholder:'name@alnadeem.jo',hint:'Booking operations on · financial reports off by default.'}],
+        confirm:'Send invite'},
+      'employee-perms':{icon:'shield-check',c:ACC,title:'Ahmad Zaid — permissions',body:'Booking operations covers viewing, approving and rejecting incoming requests. Financial reports are off unless you grant them.',
+        fields:[{label:'Permission set',isSelect:true,options:['Booking operations','Booking operations + Financial reports']}],
+        note:'Employees cannot manage other employees or edit dealer settings.',confirm:'Save permissions'},
+      deactivate:{icon:'user-minus',c:BAD,title:'Deactivate employee?',danger:true,body:'Ahmad Zaid loses access immediately and any open session ends. Their past actions stay in your activity log with them named as the actor.',
+        fields:[{label:'Reason',isText:true,placeholder:'Recorded in the activity log.'}],
+        confirm:'Deactivate'},
+      reactivate:{icon:'user-circle-plus',c:OK,title:'Reactivate Khalid Sror?',body:'Access is restored with their previous permission set — booking operations only.',confirm:'Reactivate'},
+      'request-access':{icon:'lock-key-open',c:ACC,title:'Request financial report access',body:'Your request goes to Yousef Al-Nadeem, who can grant financial reports from the Employees page.',
+        fields:[{label:'Why do you need it?',isText:true,placeholder:'Optional message to the owner.'}],confirm:'Send request'},
+    };
+    const done={approve:['Booking approved','KR-1021 confirmed · customer notified'],reject:['Booking rejected','Dates released · reason sent to customer'],
+      'edit-vehicle':['Vehicle updated','Toyota Corolla 2023 saved'],'hide-vehicle':['Vehicle hidden','Removed from customer search · bookings intact'],
+      'add-employee':['Invite sent','They appear as Invited until they accept'],'employee-perms':['Permissions saved','Ahmad Zaid · booking operations'],
+      deactivate:['Employee deactivated','Access ended immediately'],reactivate:['Employee reactivated','Khalid Sror can sign in again'],
+      'request-access':['Request sent','The owner will be notified']};
+    const k=this.state.modal, m=M[k];
+    if(!m) return false;
+    const d=done[k]||['Done',''];
+    return {...m,
+      iconWrap:'width:34px;height:34px;border-radius:8px;flex:none;display:grid;place-items:center;background:'+tint(m.c,15),
+      iconStyle:'font-size:17px;color:'+m.c,
+      fields:m.fields||[],note:m.note||false,error:m.error||false,errorCode:m.errorCode||'',
+      noteStyle:'display:flex;align-items:center;padding:9px 11px;border-radius:6px;background:rgba(145,132,217,.12);font-size:11.5px;color:rgba(233,233,237,.72)',
+      confirmClick:()=>{ if(m.error){ this.fire('Still failing','The booking is already cancelled','bad'); } else { this.fire(d[0],d[1],m.danger?'warn':'ok'); } },
+      confirmStyle:'padding:6px 13px;font-size:13px'+(m.danger?';color:'+BAD+';border-color:'+BAD:''),
+    };
+  }
+
+  blockCopy(){
+    const s=this.state.dealerState;
+    if(s==='Suspended') return {icon:'pause-circle',c:WARN,badge:'Suspended',title:'Your dealer account is suspended',
+      body:'Al-Nadeem Rentals cannot take new bookings or change fleet data while suspended. Existing rentals continue and your customers were notified by the platform.',
+      listTitle:'What still works',points:[
+        {icon:'check',c:OK,text:'Active rentals run to completion — returns are handled by platform support'},
+        {icon:'x',c:BAD,text:'New booking requests, fleet edits and employee changes are blocked'},
+        {icon:'chat-circle',c:ACC,text:'Reason on file: repeated non-delivery reports on 3 bookings in August'}],
+      primary:'Contact platform support'};
+    return {icon:'x-circle',c:BAD,badge:'Rejected',title:'Your dealer application was rejected',
+      body:'Al-Nadeem Rentals is not approved to operate on the platform, so the dealer dashboard is unavailable. You can submit a new application with corrected documents.',
+      listTitle:'Reviewer notes',points:[
+        {icon:'file-x',c:BAD,text:'Trade licence expired on 12 June 2026'},
+        {icon:'file-x',c:BAD,text:'Owner ID scan was unreadable'},
+        {icon:'clock-counter-clockwise',c:ACC,text:'Reviewed 28 Aug 2026 by platform admin · you may reapply immediately'}],
+      primary:'Start a new application'};
+  }
+
+  wizardDef(){
+    const F=(label,ph,opts,extra)=>({label,placeholder:ph||'',options:opts||false,isSelect:!!opts,isPlain:!opts,isText:false,hint:(extra&&extra.hint)||false,wrap:(extra&&extra.wide)?'grid-column:span 2':''});
+    return [
+      {title:'Basic information',icon:'info',hint:'Step 1 of 8',isForm:true,fields:[
+        F('Make',null,['Toyota','Hyundai','Kia','Nissan','Mitsubishi','Chevrolet']),F('Model','e.g. Elantra'),
+        F('Year',null,['2026','2025','2024','2023','2022','2021']),F('Vehicle type',null,['Sedan','SUV','Hatchback','Van','Pickup','Luxury'])]},
+      {title:'Specifications',icon:'gear',hint:'Step 2 of 8',isForm:true,fields:[
+        F('Transmission',null,['Automatic','Manual']),F('Fuel',null,['Petrol','Diesel','Hybrid','Electric']),
+        F('Seats',null,['2','4','5','7','8']),F('Plate number','42-88712',null,{hint:'Shown to the customer only after approval.'})]},
+      {title:'Pricing',icon:'currency-circle-dollar',hint:'Step 3 of 8',isForm:true,fields:[
+        F('Daily rental price (JOD)','125'),F('Security deposit (JOD)','120',null,{hint:'Held against the booking and returned after a clean handover.'}),
+        {label:'Pricing note (internal)',isText:true,isSelect:false,isPlain:false,placeholder:'Weekly discounts, long-rental terms…',hint:false,wrap:'grid-column:span 2'}]},
+      {title:'Location',icon:'map-pin',hint:'Step 4 of 8',isMap:true},
+      {title:'Photos',icon:'image',hint:'Step 5 of 8 · 3 of 5 uploaded',isPhotos:true},
+      {title:'Availability',icon:'toggle-right',hint:'Step 6 of 8',isToggles:true,toggles:[
+        ['Listing active','Inactive vehicles stay in your fleet but never appear in customer search.','On'],
+        ['Available for booking','Turn off while the car is off the road. Existing bookings are unaffected.','On'],
+        ['Block specific dates','Mark dates the vehicle cannot be rented on the availability calendar.','Set later']]},
+      {title:'Delivery',icon:'moped',hint:'Step 7 of 8',isToggles:true,toggles:[
+        ['Eligible for delivery','Customers within your 25 km radius can request delivery of this vehicle.','On'],
+        ['Delivery fee','Set platform-wide at 10 JOD. Dealers cannot change it.','Fixed · 10 JOD']]},
+      {title:'Review',icon:'check-square',hint:'Step 8 of 8',isReview:true},
+    ];
+  }
+
+  renderVals(){
+    const s=this.state, go=this.go, L=this.lists();
+    const list=L[s.screen]||false;
+    const locked=s.dealerState!=='Approved'&&s.screen!=='settings'&&s.screen!=='notifications';
+    const vs=s.viewState;
+    const crumbs=[{label:'Dealer',screen:'dashboard'}];
+    const parent=PARENT[s.screen];
+    if(parent) crumbs.push({label:SCREENS[parent],screen:parent});
+    crumbs.push({label:SCREENS[s.screen]||'Dashboard',screen:s.screen,last:true});
+    const t=s.toast, tc=t?(t.kind==='bad'?BAD:t.kind==='warn'?WARN:OK):OK;
+    const fs=[['Available',5,OK],['Booked',2,ACC],['Active rental',3,OK],['Inactive',1,DIM],['Hidden',1,DIM]];
+
+    return {
+      screen:s.screen, nav:go, locked,
+      title:SCREENS[s.screen]||'Dashboard',
+      crumbs:crumbs.map((c,i)=>({label:(i?' / ':'')+c.label,click:e=>{e.preventDefault();go(c.screen);},
+        style:'text-decoration:none;color:'+(c.last?'rgba(233,233,237,.4)':'rgba(233,233,237,.55)')})),
+      dealerStates:['Approved','Suspended','Rejected'].map(d=>({label:d,on:d===s.dealerState})),
+      setDealerState:e=>this.setState({dealerState:e.target.value}),
+      goDashboard:()=>go('dashboard'), goBookings:()=>go('bookings'), goNewVehicle:()=>go('vehicle-new'),
+      goNotifications:()=>go('notifications'), goActivity:()=>go('activity'), goSettings:()=>go('settings'),
+      requestAccess:()=>this.open('request-access'),
+
+      isDashboard:s.screen==='dashboard'&&!locked,
+      isList:!!list&&!locked&&s.screen!=='notifications'&&s.screen!=='settings',
+      block:locked?(()=>{const b=this.blockCopy();return {...b,
+        iconWrap:'width:38px;height:38px;border-radius:9px;display:grid;place-items:center;background:'+tint(b.c,15),
+        iconStyle:'font-size:19px;color:'+b.c, badgeStyle:pill(b.c)+';margin-top:5px',
+        points:b.points.map(p=>({icon:p.icon,color:p.c,text:p.text})),
+        primaryClick:()=>this.fire('Request sent','Platform support will reply within 48 hours')};})():false,
+
+      greeting:'Good morning, '+DEALER,
+      statusLine:'3 booking requests waiting, 4 pickups and 5 returns in the next 48 hours.',
+      kpis:[
+        ['Today\u2019s bookings','6','2 pickups, 4 returns','calendar-check',()=>this.goFiltered('bookings','All')],
+        ['Pending requests','3','oldest 14h ago · 48h limit','bell-ringing',()=>this.goFiltered('bookings','Pending')],
+        ['Active rentals','3','all returning this week','car-profile',()=>this.goFiltered('bookings','Active')],
+        ['Available vehicles','5','of 12 in your fleet','check-square',()=>go('fleet')],
+        ['Upcoming pickups','4','next: today 14:00','arrow-square-out',()=>this.goFiltered('bookings','Upcoming')],
+        ['Upcoming returns','5','next: today 18:00','arrow-square-in',()=>this.goFiltered('bookings','Active')],
+        ['Revenue · September','4,180 JOD','before 20% commission','currency-circle-dollar',()=>go('reports')],
+        ['Occupancy rate','68%','fleet utilisation, 30 days','gauge',()=>go('reports')],
+      ].map(k=>({label:k[0],main:k[1],note:k[2],icon:k[3],
+        mainStyle:'font-size:'+(k[1].length>6?'20px':'26px')+';line-height:1.15',
+        click:e=>{e.preventDefault();k[4]();}})),
+
+      attentionCount:'6 items · 3 need an answer today',
+      attention:[
+        ['Booking request','3 new booking requests','Layla Odeh, Sami Farah and Rana Bishara are waiting. Oldest was created 14 hours ago.','KR-1021 +2','14h ago','Pending',WARN,'Review',()=>this.goFiltered('bookings','Pending')],
+        ['Pickup today','Toyota Corolla pickup today at 14:00','Delivery to Amman — Rainbow Street. Driver and handover checklist not assigned.','KR-1021','in 4h','Confirmed',OK,'View booking',()=>go('booking-detail')],
+        ['Delivery','Delivery request for booking KR-1019','Requested location is 27 km from your base — outside your 25 km radius. Customer must switch to dealer pickup.','KR-1019','2h ago','Blocked',BAD,'Review',()=>go('booking-detail')],
+        ['Return today','Hyundai Accent return today at 18:00','Rental ends today. Confirm the return and note any damage within 24 hours.','KR-1015','in 8h','Active',OK,'View booking',()=>go('booking-detail')],
+        ['Fleet','Kia Picanto has no availability set','The vehicle is active but customers cannot book it until availability is set.','Vehicle #vh-2201','Yesterday','Needs setup',WARN,'Update',()=>go('vehicle-detail')],
+        ['Failed action','Photo upload failed for Nissan Sunny','Two of five images were rejected by storage. The listing shows three photos.','Vehicle #vh-2190','Yesterday','Failed',BAD,'Retry',()=>this.fire('Upload retried','2 images queued for processing','warn')],
+      ].map(a=>({type:a[0],title:a[1],desc:a[2],entity:a[3],when:a[4],status:a[5],action:a[7],
+        rail:'width:3px;flex:none;background:'+a[6],
+        typeStyle:pill(a[6]),statusStyle:pill(a[6]),click:a[8]})),
+
+      pickups:[
+        ['KR-1021','Toyota Corolla 2023','Layla Odeh','Today 14:00','Delivery · Amman, Rainbow Street',true,'Confirmed',OK],
+        ['KR-1018','Toyota Camry 2024','Omar Nasser','Today 16:30','Dealer location · Al-Nadeem, Mecca St',false,'Approved',ACC],
+        ['KR-1020','Hyundai Tucson 2024','Sami Farah','Tomorrow 09:00','Dealer location · Al-Nadeem, Mecca St',false,'Pending',WARN],
+        ['KR-1019','Kia Sportage 2023','Rana Bishara','Tomorrow 11:00','Delivery · Sweifieh (outside radius)',true,'Blocked',BAD],
+      ].map(p=>({id:p[0],vehicle:p[1],customer:p[2],when:p[3],location:p[4],delivery:p[5],status:p[6],
+        statusStyle:pill(p[7]),locIcon:p[5]?'moped':'map-pin',locColor:p[5]?'var(--color-accent)':'rgba(233,233,237,.5)',
+        click:()=>go('booking-detail')})),
+      returns:[
+        ['KR-1015','Hyundai Accent 2023','Ahmad Zoubi','Today 18:00','Dealer location','Active',OK],
+        ['KR-1017','Nissan Sunny 2022','Huda Sabbagh','Tomorrow 12:00','Dealer location','Confirmed',OK],
+        ['KR-1016','Toyota Land Cruiser 2024','Jonas Weber','08 Sep 10:00','Dealer location','Active',OK],
+        ['KR-1011','Toyota Corolla 2023','Yara Mansour','Overdue · 23 Aug','Not returned','Disputed',BAD],
+      ].map(r=>({id:r[0],vehicle:r[1],customer:r[2],when:r[3],location:r[4],status:r[5],statusStyle:pill(r[6]),
+        click:()=>go('booking-detail')})),
+
+      fleetTotal:'12',
+      fleetStatus:fs.map(f=>({label:f[0],n:f[1],dot:'width:8px;height:8px;border-radius:50%;flex:none;background:'+f[2],
+        bar:'height:100%;width:'+Math.round(f[1]/12*100)+'%;background:'+f[2]+';opacity:.75',
+        click:e=>{e.preventDefault();go('fleet');}})),
+      activity:ACTIVITY.slice(0,6).map(a=>({icon:a[2],text:a[1],ts:a[3]})),
+
+      list:list?{...list,
+        tabs:list.tabs?list.tabs.map(tb=>({label:tb,count:list.tabCounts[tb],
+          style:'display:flex;align-items:center;gap:6px;padding:11px 10px;font-size:12.5px;text-decoration:none;white-space:nowrap;'
+            +(tb===s.tab?'color:var(--color-accent);box-shadow:inset 0 -2px 0 var(--color-accent)':'color:rgba(233,233,237,.6)'),
+          countStyle:'font-size:10px;font-weight:600;padding:1px 5px;border-radius:8px;background:'+(tb===s.tab?'var(--color-accent-700)':'rgba(255,255,255,.07)')+';color:'+(tb===s.tab?'var(--color-accent-100)':'rgba(233,233,237,.55)'),
+          click:e=>{e.preventDefault();this.setState({tab:tb});}})):false,
+        stats:list.stats||false,primary:list.primary||false}:false,
+      stateOpts:[['data','Data'],['loading','Loading'],['empty','Empty'],['error','API error'],['denied','Denied']].map(o=>({
+        label:o[1],on:vs===o[0],click:()=>this.setState({viewState:o[0]}),
+        style:'font-size:11px;padding:0 9px'+(vs===o[0]?';color:var(--color-accent)':'')})),
+      showData:vs==='data',showLoading:vs==='loading',showEmpty:vs==='empty',showError:vs==='error',showDenied:vs==='denied',
+      empty:this.emptyFor(s.screen),
+      skelCols:[1,2,3,4,5,6].map(i=>({head:'width:'+[110,90,70,80,60,50][i-1]+'px'})),
+      skelRows:[1,2,3,4,5,6,7].map(()=>({cells:[1,2,3,4,5,6].map(i=>({cell:'width:'+[140,110,90,100,70,60][i-1]+'px;height:'+(i===1?'14px':'11px')}))})),
+      pages:[1,2,3].map(n=>({n,cls:'btn '+(n===1?'btn-primary':'btn-secondary')})),
+
+      isBooking:s.screen==='booking-detail'&&!locked,
+      goVehicle:e=>{e.preventDefault();go('vehicle-detail');},
+      approveBooking:()=>this.open('approve'), rejectBooking:()=>this.open('reject'), rejectFailBooking:()=>this.open('reject-failed'),
+      saveNote:()=>this.fire('Note saved','Visible to you and your employees'),
+      bk:{
+        id:'KR-1021',status:'Pending',statusStyle:pill(WARN),
+        meta:'Requested 03 Sep 2026 09:12 · Layla Odeh · 4 days · delivery to Amman',
+        sla:'34h 12m left',slaNote:'14h of 48h elapsed',
+        customer:[{k:'Name',v:'Layla Odeh'},{k:'Verification',v:'ID verified · driving licence verified'},{k:'Customer rating',v:'4.9 from 12 rentals'},
+          {k:'Member since',v:'04 Feb 2025'},{k:'Phone',v:'Released once you approve'}],
+        vehicle:[{k:'Vehicle',v:'Toyota Corolla 2023'},{k:'Type',v:'Sedan · Automatic · Petrol · 5 seats'},{k:'Daily price',v:'130 JOD'},{k:'Vehicle status',v:'Booked — held for these dates'}],
+        rental:[{k:'Start',v:'04 Sep 2026 · 14:00'},{k:'End',v:'08 Sep 2026 · 14:00'},{k:'Duration',v:'4 days'}],
+        pickup:[{k:'Method',v:'Delivery'},{k:'City',v:'Amman'},{k:'Address',v:'Rainbow Street, building 24'},{k:'Distance',v:'11 km — inside your 25 km radius'}],
+        money:[{k:'Rental · 4 days × 130 JOD',v:'520'},{k:'Delivery fee (platform)',v:'10'},{k:'Security deposit',v:'120'},
+          {k:'Paid by customer so far',v:'130',hi:true},{k:'Balance due at pickup',v:'400',hi:true},
+          {k:'Platform commission · 20%',v:'−104'},{k:'Net payout (indicative)',v:'Not available yet',dim:true}]
+          .map(m=>({k:m.k,color:m.dim?'rgba(233,233,237,.45)':'rgba(233,233,237,.72)',v:m.v,
+            vStyle:'font-size:'+(m.dim?'11.5px':'12.5px')+';color:'+(m.dim?'rgba(233,233,237,.45)':m.hi?'var(--color-text)':'rgba(233,233,237,.8)')+(m.hi?';font-weight:500':'')})),
+        timeline:tl([
+          {label:'Request created',meta:'03 Sep 09:12 · by Layla Odeh',c:ACC},
+          {label:'Deposit authorised',meta:'03 Sep 09:13 · 130 JOD held on card',c:OK},
+          {label:'Awaiting your answer',meta:'Expires 05 Sep 09:12',c:WARN},
+          {label:'Approved / rejected',meta:'Not yet',off:true},
+          {label:'Pickup',meta:'Scheduled 04 Sep 14:00 · delivery',off:true},
+          {label:'Return',meta:'Scheduled 08 Sep 14:00',off:true},
+          {label:'Completed',meta:'—',off:true}]),
+        history:[{k:'Completed rentals',v:'12'},{k:'Cancelled by customer',v:'1'},{k:'Disputes raised',v:'0'},{k:'Average rating given',v:'4.8'}],
+      },
+
+      isVehicle:s.screen==='vehicle-detail'&&!locked,
+      pillBooked:pill(ACC),
+      editVehicle:()=>this.open('edit-vehicle'), hideVehicle:()=>this.open('hide-vehicle'), goBooking:()=>go('booking-detail'),
+      vehPhotos:['Front three-quarter','Rear','Interior','Dashboard'].map((l,i)=>({label:l,icon:i===0?'car-simple':'image',
+        style:'position:relative;height:'+(i===0?'150px':'150px')+';border-radius:8px'})),
+      vehTabs:['Overview','Availability','Bookings','Activity'].map(tb=>({label:tb,
+        click:e=>{e.preventDefault();this.setState({vehTab:tb});},
+        style:'padding:9px 12px;font-size:12.5px;text-decoration:none;'+(tb===s.vehTab?'color:var(--color-accent);box-shadow:inset 0 -2px 0 var(--color-accent)':'color:rgba(233,233,237,.6)')})),
+      vehOverview:s.vehTab==='Overview', vehCalendar:s.vehTab==='Availability', vehBookings:s.vehTab==='Bookings', vehActivity:s.vehTab==='Activity',
+      vehInfo:[{k:'Make / model',v:'Toyota Corolla'},{k:'Year',v:'2023'},{k:'Vehicle type',v:'Sedan'},{k:'Transmission',v:'Automatic'},
+        {k:'Fuel',v:'Petrol'},{k:'Seats',v:'5'},{k:'Plate',v:'42-88712'},{k:'Added',v:'12 Feb 2026 by Yousef Al-Nadeem'}],
+      vehPricing:[{k:'Daily price',v:'130 JOD'},{k:'Security deposit',v:'120 JOD'},{k:'Status',v:'Booked'},
+        {k:'Availability',v:'Available except booked dates'},{k:'Delivery eligible',v:'Yes · radius 25 km · fee fixed at 10 JOD'},
+        {k:'Insurance, mileage, fuel policy',v:'Pending platform configuration'}],
+      calLegend:[['Available',OK],['Booked',ACC],['Active rental','#7f8ec9'],['Blocked',DIM]].map(l=>({label:l[0],
+        dot:'width:8px;height:8px;border-radius:2px;background:'+l[1]})),
+      calDays:Array.from({length:30},(_,i)=>{
+        const n=i+1;
+        let c=OK,tag='Free';
+        if(n>=4&&n<=8){c=ACC;tag='KR-1021';}
+        else if(n===1||n===2||n===3){c='#7f8ec9';tag='In rental';}
+        else if(n>=18&&n<=20){c=DIM;tag='Blocked';}
+        return {n,tag,style:'height:56px;border-radius:6px;padding:7px 8px;display:flex;flex-direction:column;justify-content:space-between;'
+          +'background:'+tint(c,c===DIM?8:14)+';border:1px solid '+tint(c,c===DIM?14:28)+';color:'+(c===DIM?'rgba(233,233,237,.45)':c)};
+      }),
+      vehHistory:[
+        ['KR-1021','Layla Odeh','04–08 Sep 2026','520 JOD','Upcoming',ACC],
+        ['KR-1011','Yara Mansour','18–23 Aug 2026','640 JOD','Disputed',BAD],
+        ['KR-0994','Dana Khoury','02–06 Aug 2026','520 JOD','Completed',DIM],
+        ['KR-0961','Rami Zayed','19–22 Jul 2026','390 JOD','Completed',DIM],
+        ['KR-0940','Omar Nasser','01–08 Jul 2026','910 JOD','Completed',DIM],
+        ['KR-0902','Huda Sabbagh','12–15 Jun 2026','390 JOD','Completed',DIM],
+      ].map(r=>({click:()=>go('booking-detail'),cells:[cell(r[0]),cell(r[1]),cell(r[2]),num(r[3]),bdg(r[4],r[5])]})),
+      vehLog:[
+        {icon:'calendar-plus',text:'Held for booking KR-1021 — approved by Yousef Al-Nadeem',ts:'Today 09:41'},
+        {icon:'pencil-simple',text:'Daily price changed 120 → 130 JOD by Yousef Al-Nadeem',ts:'28 Aug 2026 10:22'},
+        {icon:'moped',text:'Delivery eligibility turned on by Yousef Al-Nadeem',ts:'14 Aug 2026 16:03'},
+        {icon:'image',text:'2 photos replaced by Ahmad Zaid',ts:'02 Aug 2026 11:47'},
+        {icon:'plus-circle',text:'Vehicle added by Yousef Al-Nadeem',ts:'12 Feb 2026 09:15'},
+      ],
+
+      isWizard:s.screen==='vehicle-new'&&!locked,
+      cancelWizard:()=>{this.setState({wizStep:1});go('fleet');},
+      wizSteps:this.wizardDef().map((w,i)=>{
+        const n=i+1, on=n===s.wizStep, done=n<s.wizStep;
+        return {label:w.title,mark:done?'✓':String(n),
+          click:e=>{e.preventDefault();this.setState({wizStep:n});},
+          dot:'width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:10.5px;font-weight:600;'
+            +(on?'background:var(--color-accent);color:#161826':done?'background:'+tint(OK,22)+';color:'+OK:'border:1px solid rgba(255,255,255,.16);color:rgba(233,233,237,.45)'),
+          style:'display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:6px;text-decoration:none;font-size:12.5px;'
+            +(on?'background:color-mix(in srgb,var(--color-accent) 13%,transparent);color:var(--color-accent)':'color:rgba(233,233,237,.66)')};
+      }),
+      wiz:(()=>{ const d=this.wizardDef()[s.wizStep-1];
+        return {...d,n:s.wizStep,isForm:!!d.isForm,isMap:!!d.isMap,isPhotos:!!d.isPhotos,isToggles:!!d.isToggles,isReview:!!d.isReview,
+          fields:d.fields||[],
+          toggles:(d.toggles||[]).map(t=>({label:t[0],desc:t[1],state:t[2],
+            cls:'btn '+(t[2]==='On'?'btn-primary':'btn-secondary'),
+            click:()=>this.fire('Setting noted','Applied when you save the vehicle')})),
+          footer:s.wizStep===8?'Nothing is published until you save.':'Draft saved automatically',
+          next:s.wizStep===8?'Save vehicle':'Continue'};
+      })(),
+      wizBack:()=>this.setState({wizStep:Math.max(1,s.wizStep-1)}),
+      wizNext:()=>{ if(s.wizStep===8){ this.setState({wizStep:1}); this.fire('Vehicle saved','Hyundai Elantra 2023 is live in your fleet'); go('fleet'); }
+        else this.setState({wizStep:s.wizStep+1}); },
+      wizPhotos:[
+        ['Front three-quarter','image',OK],['Rear','image',OK],['Interior','image',OK],
+        ['Upload failed — retry','warning-circle',BAD],['Add photo','plus',DIM],
+      ].map(p=>({label:p[0],icon:p[1],iconColor:p[2],
+        style:'height:104px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;'
+          +(p[1]==='plus'?'border:1px dashed rgba(255,255,255,.16);cursor:pointer':'border:1px solid '+tint(p[2],26)+';background:'+tint(p[2],8))})),
+      wizReview:[{k:'Plate',v:'42-90114'},{k:'Location',v:'Mecca Street, Amman'},{k:'Listing',v:'Active'},{k:'Availability',v:'Available'},
+        {k:'Delivery',v:'Eligible · 25 km radius'},{k:'Delivery fee',v:'10 JOD (platform-wide)'},{k:'Photos',v:'3 uploaded · 1 failed'},
+        {k:'Insurance / mileage',v:'Pending platform configuration'}],
+
+      isProfile:s.screen==='profile'&&!locked,
+      goPublic:()=>go('public-preview'), goProfile:()=>go('profile'),
+      saveProfile:()=>this.fire('Profile saved','Changes are live on your public page'),
+      hours:[['Sunday','08:00','20:00','Open'],['Monday','08:00','20:00','Open'],['Tuesday','08:00','20:00','Open'],
+        ['Wednesday','08:00','20:00','Open'],['Thursday','08:00','20:00','Open'],['Friday','14:00','20:00','Short day'],['Saturday','—','—','Closed']]
+        .map(h=>({day:h[0],open:h[1],close:h[2],tag:h[3],tagStyle:pill(h[3]==='Closed'?DIM:h[3]==='Short day'?WARN:OK)+';margin-left:auto'})),
+      calcRows:[{k:'Average rating',v:'4.8 / 5'},{k:'Total reviews',v:'96'},{k:'Cars listed',v:'12'},
+        {k:'Available now',v:'5'},{k:'Completed rentals',v:'88'},{k:'Member since',v:'12 Feb 2026'}],
+
+      isPublic:s.screen==='public-preview'&&!locked,
+      publicCars:[['Hyundai Tucson 2024','SUV · Automatic · 5 seats','170 JOD / day','Delivery',ACC],
+        ['Kia Sportage 2023','SUV · Automatic · 5 seats','150 JOD / day','Delivery',ACC],
+        ['Hyundai Elantra 2023','Sedan · Automatic · 5 seats','125 JOD / day','Delivery',ACC],
+        ['Kia Picanto 2021','Hatchback · Manual · 4 seats','70 JOD / day','Pickup only',DIM],
+        ['Mitsubishi Attrage 2022','Sedan · Automatic · 5 seats','70 JOD / day','Delivery',ACC],
+        ['Toyota Camry 2024','Sedan · Hybrid · 5 seats','185 JOD / day','Pickup only',DIM]]
+        .map(c=>({name:c[0],spec:c[1],price:c[2],tag:c[3],tagStyle:pill(c[4])})),
+      reviewList:[
+        {who:'Jonas Weber',stars:'★★★★★',date:'01 Sep 2026',text:'Car was clean and delivered on time to my hotel. Handover took five minutes.',meta:'Toyota Land Cruiser 2024 · 7 days',initials:'JW'},
+        {who:'Dana Khoury',stars:'★★★★★',date:'31 Aug 2026',text:'Second time renting from Al-Nadeem. Straightforward and no surprises on the deposit.',meta:'Kia Picanto 2021 · 3 days',initials:'DK'},
+        {who:'Rami Zayed',stars:'★★★★☆',date:'28 Aug 2026',text:'Good service, but the car had less fuel than I expected at pickup.',meta:'Mitsubishi Attrage 2022 · 4 days',initials:'RZ'},
+      ],
+
+      isDelivery:s.screen==='delivery'&&!locked,
+      deliveryState:s.delivery?'On':'Off',
+      deliveryBtnCls:'btn '+(s.delivery?'btn-primary':'btn-secondary'),
+      toggleDelivery:()=>{const v=!s.delivery;this.setState({delivery:v});this.fire(v?'Delivery enabled':'Delivery disabled',v?'Customers within 25 km can request delivery':'Pickup only from now on',v?'ok':'warn');},
+      radius:String(s.radius), radiusVal:s.radius,
+      setRadius:e=>this.setState({radius:Number(e.target.value)}),
+      saveDelivery:()=>this.fire('Delivery settings saved','Radius '+s.radius+' km · fee fixed at 10 JOD'),
+      pillFee:pill(DIM), pillPending:pill(WARN)+';align-self:flex-start',
+      ring1:'position:absolute;left:50%;top:50%;width:'+(s.radius*3.4)+'px;height:'+(s.radius*3.4)+'px;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(145,132,217,.55);background:rgba(145,132,217,.1)',
+      ring2:'position:absolute;left:50%;top:50%;width:'+(s.radius*5.2)+'px;height:'+(s.radius*5.2)+'px;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed rgba(145,132,217,.24)',
+      ring3:'position:absolute;left:50%;top:50%;width:'+(s.radius*7)+'px;height:'+(s.radius*7)+'px;transform:translate(-50%,-50%);border-radius:50%;border:1px dashed rgba(255,255,255,.07)',
+      mapPoints:[['Abdoun · 6 km',36,34,true],['Sweifieh · 27 km',12,76,false],['Jubaiha · 9 km',68,26,true],['Zarqa · 24 km',80,68,s.radius>=25]]
+        .map(p=>({label:p[0],
+          style:'position:absolute;left:'+p[1]+'%;top:'+p[2]+'%;display:flex;align-items:center;gap:6px;font-size:10.5px;color:'+(p[3]?'rgba(233,233,237,.7)':'rgba(233,233,237,.45)'),
+          dot:'width:7px;height:7px;border-radius:50%;background:'+(p[3]?OK:BAD)})),
+
+      isReviews:s.screen==='reviews'&&!locked,
+      dist:[['5★',74],['4★',15],['3★',5],['2★',1],['1★',1]].map(d=>({label:d[0],n:d[1],
+        bar:'height:100%;width:'+Math.round(d[1]/74*100)+'%;background:#d0ad74;opacity:.8'})),
+      reviewsFull:[
+        {who:'Jonas Weber',stars:'★★★★★',booking:'KR-1016',date:'01 Sep 2026',text:'Car was clean and delivered on time to my hotel. Handover took five minutes.',meta:'Toyota Land Cruiser 2024 · 7 days',initials:'JW'},
+        {who:'Dana Khoury',stars:'★★★★★',booking:'KR-1014',date:'31 Aug 2026',text:'Second time renting from Al-Nadeem. Straightforward and no surprises on the deposit.',meta:'Kia Picanto 2021 · 3 days',initials:'DK'},
+        {who:'Rami Zayed',stars:'★★★★☆',booking:'KR-1013',date:'28 Aug 2026',text:'Good service, but the car had less fuel than I expected at pickup.',meta:'Mitsubishi Attrage 2022 · 4 days',initials:'RZ'},
+        {who:'Yara Mansour',stars:'★★☆☆☆',booking:'KR-1011',date:'24 Aug 2026',text:'Delivery arrived two hours late and I was not told in advance.',meta:'Toyota Corolla 2023 · 5 days · booking disputed',initials:'YM'},
+        {who:'Huda Sabbagh',stars:'★★★★★',booking:'KR-0902',date:'16 Jun 2026',text:'Friendly team, easy pickup from Mecca Street.',meta:'Nissan Sunny 2022 · 3 days',initials:'HS'},
+        {who:'Omar Nasser',stars:'★★★★★',booking:'KR-0940',date:'09 Jul 2026',text:'Booked a 7-seater for a family trip to Aqaba. No issues at all.',meta:'Toyota Land Cruiser 2024 · 7 days',initials:'ON'},
+      ],
+
+      isReports:s.screen==='reports'&&!locked,
+      periods:['Daily','Weekly','Monthly'].map(p=>({label:p,on:p===s.period,
+        click:()=>this.setState({period:p}),style:'font-size:11px;padding:0 10px'+(p===s.period?';color:var(--color-accent)':'')})),
+      periodLabel:s.period==='Daily'?'today, 03 Sep 2026':s.period==='Weekly'?'week of 31 Aug – 06 Sep 2026':'September 2026',
+      reportCards:(s.period==='Daily'
+        ?[['Bookings','6','2 pickups · 4 returns'],['Revenue','410 JOD','before commission'],['Commission · 20%','−82 JOD','platform rate'],['Net payout','Not available yet','payouts not live'],['Occupancy','71%','9 of 12 cars engaged']]
+        :s.period==='Weekly'
+        ?[['Bookings','19','4 pending answers'],['Revenue','1,240 JOD','before commission'],['Commission · 20%','−248 JOD','platform rate'],['Net payout','Not available yet','payouts not live'],['Occupancy','69%','average across 7 days']]
+        :[['Bookings','62','8 cancelled · 1 disputed'],['Revenue','4,180 JOD','before commission'],['Commission · 20%','−836 JOD','platform rate'],['Net payout','Not available yet','payouts not live'],['Occupancy','68%','average across 30 days']])
+        .map(c=>({k:c[0],v:c[1],note:c[2],vStyle:'font-size:'+(c[1].length>9?'14px':'22px')+';line-height:1.2;color:'+(c[1]==='Not available yet'?'rgba(233,233,237,.45)':'var(--color-text)')})),
+      occupancy:[['Toyota Land Cruiser 2024',26,87],['Toyota Camry 2024',24,80],['Hyundai Tucson 2024',22,73],['Toyota Corolla 2023',21,70],
+        ['Kia Sportage 2023',19,63],['Nissan Sunny 2022',18,60],['Hyundai Accent 2023',16,53],['Kia Picanto 2021',9,30],
+        ['Mitsubishi Attrage 2022',8,27],['Chevrolet Captiva 2022',0,0]]
+        .map(o=>({name:o[0],days:o[1]+' of 30 days',pct:o[2]+'%',
+          bar:'height:100%;width:'+o[2]+'%;background:'+(o[2]>=70?OK:o[2]>=40?ACC:o[2]>0?WARN:DIM)+';opacity:.8'})),
+
+      isNotifications:s.screen==='notifications',
+      markAllRead:()=>this.fire('All notifications marked read','5 items cleared'),
+      notifications:[
+        ['Booking request','New request from Layla Odeh — Toyota Corolla, 04–08 Sep','KR-1021 · answer within 34h','bell-ringing',WARN,'14h ago',true,()=>go('booking-detail')],
+        ['Booking request','New request from Sami Farah — Hyundai Tucson, 05–09 Sep','KR-1020 · answer within 36h','bell-ringing',WARN,'15h ago',true,()=>this.goFiltered('bookings','Pending')],
+        ['Delivery blocked','Delivery for KR-1019 is 27 km away — outside your 25 km radius','KR-1019 · customer must switch to pickup','moped',BAD,'2h ago',true,()=>go('booking-detail')],
+        ['Upload failed','2 photos for Nissan Sunny were rejected by storage','Vehicle #vh-2190','warning-circle',BAD,'Yesterday',true,()=>go('vehicle-detail')],
+        ['New review','Jonas Weber left a 5-star review','KR-1016 · Toyota Land Cruiser 2024','star',OK,'2 days ago',true,()=>go('reviews')],
+        ['Booking confirmed','Huda Sabbagh confirmed pickup for tomorrow 12:00','KR-1017','check-circle',OK,'2 days ago',false,()=>go('booking-detail')],
+        ['Employee','Lina Haddad has not accepted her invite yet','Employee #em-91','user-plus',ACC,'3 days ago',false,()=>go('employees')],
+        ['Payout','Payout scheduling is not live yet — no transfers have been made','Platform notice','info',DIM,'1 week ago',false,()=>go('reports')],
+      ].map(n=>({type:n[0],text:n[1],entity:n[2],icon:n[3],ts:n[5],unread:n[6],
+        click:e=>{e.preventDefault();n[7]();},
+        typeStyle:pill(n[4]),
+        textColor:n[6]?'var(--color-text)':'rgba(233,233,237,.62)',
+        iconWrap:'width:30px;height:30px;border-radius:8px;flex:none;display:grid;place-items:center;background:'+tint(n[4],14),
+        iconStyle:'font-size:15px;color:'+n[4],
+        style:'display:flex;gap:11px;padding:13px 14px;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;color:inherit;'
+          +(n[6]?'background:rgba(145,132,217,.05)':'')})),
+
+      isSettings:s.screen==='settings',
+      saveSettings:()=>this.fire('Settings saved','Your changes are applied'),
+      setTabs:[['Account','user'],['Business','buildings'],['Notifications','bell'],['Security','shield-check'],['Danger zone','warning']]
+        .map(t=>({label:t[0],icon:t[1],click:e=>{e.preventDefault();this.setState({setTab:t[0]});},
+          style:'display:flex;align-items:center;gap:9px;padding:8px 9px;border-radius:6px;text-decoration:none;font-size:12.5px;'
+            +(t[0]===s.setTab?'background:color-mix(in srgb,var(--color-accent) 13%,transparent);color:var(--color-accent)':'color:rgba(233,233,237,.66)')})),
+      setPanel:(()=>{
+        const fld=(label,value,hint,wide)=>({isField:true,label,value:value||'',placeholder:'',hint:hint||false,wrap:wide?'':'max-width:380px',isToggle:false,isRow:false});
+        const tog=(label,desc,on)=>({isToggle:true,isField:false,isRow:false,label,desc,state:on?'On':'Off',
+          cls:'btn '+(on?'btn-primary':'btn-secondary'),click:()=>this.fire('Preference updated',label+' · '+(on?'off':'on'))});
+        const row=(label,desc,action,fn)=>({isRow:true,isField:false,isToggle:false,label,desc,action,click:fn});
+        const P={
+          Account:{title:'Account',hint:'Dealer Owner',rows:[fld('Full name','Yousef Al-Nadeem'),fld('Email','yousef@alnadeem.jo','Used for sign-in and platform notices.'),
+            fld('Phone','+962 79 442 1180'),fld('Language','English','Arabic and RTL layout are planned, not built.')]},
+          Business:{title:'Business',hint:'Shown to customers',rows:[fld('Business name','Al-Nadeem Rentals'),fld('Trade licence','TL-2014-88712','Verified 12 Feb 2026 · expires 12 Feb 2027.'),
+            fld('Tax number','JO-4471209'),row('Bank account for payouts','Payout scheduling is not live yet, so nothing can be added.','Not available',()=>this.fire('Not available yet','Payouts are pending platform rollout','warn'))]},
+          Notifications:{title:'Notifications',hint:'Per channel',rows:[tog('New booking requests','Email and in-app alert the moment a request arrives.',true),
+            tog('Pickup and return reminders','Sent 2 hours before each handover.',true),tog('New reviews','When a customer rates a completed rental.',true),
+            tog('Platform announcements','Commission changes, policy updates and outages.',false)]},
+          Security:{title:'Security',hint:'Owner-only',rows:[row('Password','Last changed 14 Aug 2026.','Change',()=>this.fire('Email sent','Follow the link to set a new password')),
+            row('Two-factor authentication','Not enabled. Recommended for accounts that approve bookings.','Enable',()=>this.fire('2FA setup started','Scan the code in your authenticator app')),
+            row('Active sessions','2 devices — Amman (this device) and iPhone.','Sign out others',()=>this.fire('Other sessions ended','1 device signed out','warn')),
+            row('Employee access','4 employees. Financial reports are off by default.','Manage',()=>go('employees'))]},
+          'Danger zone':{title:'Danger zone',hint:'Irreversible',rows:[
+            row('Pause my dealer account','Stops new booking requests. Existing rentals continue to completion.','Pause',()=>this.fire('Account paused','New requests are blocked until you resume','warn')),
+            row('Delete my dealer account','Requires platform approval and cannot be done while rentals are active. You have 3 active rentals.','Request deletion',()=>this.fire('Cannot delete yet','3 active rentals must complete first','bad'))]},
+        };
+        return P[s.setTab]||P.Account;
+      })(),
+
+      modal:this.modals(), closeModal:this.close, openModal:this.open,
+      toast:t?{...t,icon:t.kind==='bad'?'x-circle':t.kind==='warn'?'warning':'check-circle',iconStyle:'font-size:17px;color:'+tc}:false,
+      closeToast:()=>this.setState({toast:null}),
+    };
+  }
+}
+</script>
+</body>
+</html>

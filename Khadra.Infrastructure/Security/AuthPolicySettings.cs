@@ -16,5 +16,7 @@ internal sealed class AuthPolicySettings(IOptions<AuthOptions> options) : IAuthP
 
     public TimeSpan PasswordResetLifetime => TimeSpan.FromMinutes(_options.PasswordResetMinutes);
 
+    public TimeSpan EmployeeInvitationLifetime => TimeSpan.FromDays(_options.EmployeeInvitationDays);
+
     public int PasswordMinimumLength => _options.PasswordMinimumLength;
 }

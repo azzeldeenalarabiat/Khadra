@@ -1,0 +1,88 @@
+<dialog
+  #dlg
+  class="dialog-backdrop"
+  (cancel)="cancel($event)"
+  (close)="close()"
+  (click)="backdropClick()"
+>
+  @if (modal(); as m) {
+    <div class="dialog" [attr.aria-label]="m.title" (click)="$event.stopPropagation()">
+      <div class="row row-gap-12" [class]="toneClass(m.tone)">
+        <div class="modal-icon-wrap">
+          <kh-icon [name]="m.icon" />
+        </div>
+        <div class="grow">
+          <div class="dialog-title">{{ m.title }}</div>
+          <div class="dialog-body">{{ m.body }}</div>
+        </div>
+        <button
+          type="button"
+          class="btn btn-icon btn-secondary btn-28"
+          aria-label="Close"
+          (click)="close()"
+        >
+          <kh-icon name="x" />
+        </button>
+      </div>
+
+      @for (field of m.fields ?? []; track field.label) {
+        <div class="field">
+          <label [attr.for]="'modal-field-' + $index">{{ field.label }}</label>
+          @if (field.type === 'select') {
+            <select
+              class="input"
+              [id]="'modal-field-' + $index"
+              (change)="setField(field.label, $event)"
+            >
+              @for (option of field.options ?? []; track option) {
+                <option [selected]="option === (field.value ?? field.options?.[0])">
+                  {{ option }}
+                </option>
+              }
+            </select>
+          } @else {
+            <textarea
+              class="input"
+              [id]="'modal-field-' + $index"
+              [placeholder]="field.placeholder ?? ''"
+              [value]="field.value ?? ''"
+              (input)="setField(field.label, $event)"
+            ></textarea>
+          }
+          @if (field.hint) {
+            <div class="field-hint">{{ field.hint }}</div>
+          }
+        </div>
+      }
+
+      @if (m.note) {
+        <div class="modal-note" [class]="toneClass(m.tone)">
+          <kh-icon name="info" />
+          <span>{{ m.note }}</span>
+        </div>
+      }
+
+      <div class="dialog-actions">
+        <button
+          type="button"
+          class="btn btn-secondary btn-md"
+          autofocus
+          [disabled]="busy()"
+          (click)="close()"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="btn btn-md"
+          [class.btn-primary]="!m.danger"
+          [class.btn-danger]="m.danger"
+          [disabled]="busy() || !canConfirm()"
+          (click)="confirm()"
+        >
+          {{ busy() ? 'Working…' : m.confirm }}
+        </button>
+      </div>
+    </div>
+  }
+</dialog>

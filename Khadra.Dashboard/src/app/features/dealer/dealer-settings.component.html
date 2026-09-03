@@ -1,0 +1,116 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Settings</h1>
+      <div class="page-sub">Your account. Dealership details live on the Dealer Profile page.</div>
+    </div>
+  </div>
+
+  <div class="dc-split-155">
+    <div class="stack stack-14">
+      <section class="sect">
+        <div class="sect-h">
+          <span class="sect-t">Account</span
+          ><span class="sect-hint">As the platform knows you</span>
+        </div>
+        <div class="sect-pad kv-narrow">
+          <div class="kv">
+            <span class="kv-key">Name</span><span class="kv-val">{{ user()?.fullName }}</span>
+          </div>
+          <div class="kv">
+            <span class="kv-key">Email</span><span class="kv-val">{{ user()?.email }}</span>
+          </div>
+          <div class="kv">
+            <span class="kv-key">Role</span><span class="kv-val">{{ role() }}</span>
+          </div>
+          @if (dealer(); as d) {
+            <div class="kv">
+              <span class="kv-key">Dealership</span><span class="kv-val">{{ d.businessName }}</span>
+            </div>
+          }
+          <div class="field-hint">
+            Name and email are changed by the platform on request, so they always match your licence
+            and your sign-in.
+          </div>
+        </div>
+      </section>
+
+      <section class="sect">
+        <div class="sect-h">
+          <span class="sect-t">Change password</span
+          ><span class="sect-hint">Signs out every other session</span>
+        </div>
+        <div class="sect-pad stack stack-10">
+          @if (problem(); as message) {
+            <div class="banner s-bad" role="alert">
+              <kh-icon name="warning-circle" class="banner-icon" />
+              <div class="banner-body">
+                <div class="banner-text">{{ message }}</div>
+              </div>
+            </div>
+          }
+          <div class="field">
+            <label for="pw-current">Current password</label>
+            <input
+              id="pw-current"
+              class="input"
+              type="password"
+              autocomplete="current-password"
+              [value]="current()"
+              (input)="current.set(value($event))"
+            />
+          </div>
+          <div class="field">
+            <label for="pw-new">New password</label>
+            <input
+              id="pw-new"
+              class="input"
+              type="password"
+              autocomplete="new-password"
+              [value]="next()"
+              (input)="next.set(value($event))"
+            />
+            <div class="field-hint">At least 8 characters, with a letter and a digit.</div>
+          </div>
+          <div class="field">
+            <label for="pw-confirm">Confirm new password</label>
+            <input
+              id="pw-confirm"
+              class="input"
+              type="password"
+              autocomplete="new-password"
+              [value]="confirm()"
+              (input)="confirm.set(value($event))"
+            />
+            @if (mismatch()) {
+              <div class="field-error">The two passwords do not match.</div>
+            }
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-md self-start"
+            [disabled]="!canSubmit()"
+            (click)="changePassword()"
+          >
+            {{ busy() ? 'Changing…' : 'Change password' }}
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <section class="sect">
+      <div class="sect-h"><span class="sect-t">Not live yet</span></div>
+      <div class="sect-pad stack stack-10">
+        @for (item of notLive; track item.title) {
+          <div class="toggle-card is-off">
+            <div class="grow">
+              <div class="toggle-title">{{ item.title }}</div>
+              <div class="toggle-desc">{{ item.body }}</div>
+            </div>
+            <span class="pill s-dim">Not live</span>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+</div>

@@ -1,0 +1,336 @@
+/* Small utilities the console reuses everywhere. The design expressed these as
+   repeated inline styles; naming them keeps the templates free of style attributes. */
+
+/* Kicker: the small uppercase label above a figure. */
+.k {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-38);
+}
+
+/* Tabular figures, so columns of numbers line up. */
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-50);
+}
+
+/* Section panel: the console's primary container. */
+.sect {
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.sect-h {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.sect-t {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.sect-note {
+  margin-inline-start: auto;
+  font-size: 11px;
+  color: var(--text-42);
+}
+
+.sect-clip {
+  overflow: hidden;
+}
+.sect-pad {
+  padding: 14px;
+}
+
+/* Placeholder tile standing in for a document or photo the console cannot
+   render inline (private files are fetched through short-lived signed URLs). */
+.doc {
+  position: relative;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: repeating-linear-gradient(135deg, #20222f, #20222f 6px, #252734 6px, #252734 12px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px;
+  gap: 6px;
+  min-height: 132px;
+}
+
+.doc-lock {
+  position: absolute;
+  top: 10px;
+  inset-inline-end: 10px;
+  color: var(--text-45);
+}
+
+/* Status colour carrier. A modifier sets --c and every child reads it, which is
+   how one pill/dot/bar rule serves all five states. */
+.s-ok {
+  --c: var(--status-ok);
+}
+.s-warn {
+  --c: var(--status-warn);
+}
+.s-bad {
+  --c: var(--status-bad);
+}
+.s-dim {
+  --c: var(--status-dim);
+}
+.s-accent {
+  --c: var(--status-accent);
+}
+
+.pill {
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--c, var(--status-dim)) 16%, transparent);
+  color: var(--c, var(--status-dim));
+  white-space: nowrap;
+}
+
+.status-text {
+  color: var(--c, inherit);
+}
+
+/* Loading skeleton. */
+@keyframes shimmer {
+  0% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0.35;
+  }
+}
+
+.skel {
+  height: 11px;
+  border-radius: 3px;
+  background: var(--color-neutral-800);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Layout helpers. */
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+.stack-14 {
+  gap: 14px;
+}
+.stack-12 {
+  gap: 12px;
+}
+.stack-10 {
+  gap: 10px;
+}
+.stack-9 {
+  gap: 9px;
+}
+.row {
+  display: flex;
+  align-items: center;
+}
+.row-gap-8 {
+  gap: 8px;
+}
+.row-gap-9 {
+  gap: 9px;
+}
+.row-gap-12 {
+  gap: 12px;
+}
+.row-gap-14 {
+  gap: 14px;
+}
+.push {
+  margin-inline-start: auto;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Inline notice banner. */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--c, var(--status-warn)) 12%, transparent);
+  font-size: 12.5px;
+}
+
+.banner-icon {
+  color: var(--c);
+  flex: none;
+}
+.banner-title {
+  font-size: 13px;
+  font-weight: 500;
+}
+.banner-text {
+  font-size: 12px;
+  color: var(--text-60);
+  margin-top: 2px;
+}
+.banner-body {
+  flex: 1;
+}
+.banner .mono {
+  font-size: 11.5px;
+}
+
+/* Key/value row used by every detail panel. */
+.kv {
+  display: flex;
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.kv-key {
+  width: 210px;
+  flex: none;
+  font-size: 12px;
+  color: var(--text-50);
+}
+
+.kv-val {
+  font-size: 12.5px;
+}
+
+.kv-narrow .kv-key {
+  width: 190px;
+}
+.kv-200 .kv-key {
+  width: 200px;
+}
+
+/* Right-aligned key/value, used by the summary cards. */
+.kv-split {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.kv-split .kv-key {
+  flex: 1;
+  width: auto;
+}
+.kv-split .kv-val {
+  text-align: end;
+}
+
+.kv-body {
+  padding: 6px 14px 12px;
+}
+
+/* Timeline shared by application, booking, payment and dispute detail. */
+.tl-item {
+  display: flex;
+  gap: 11px;
+}
+
+.tl-gutter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+}
+
+.tl-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-top: 4px;
+  background: var(--c);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 18%, transparent);
+}
+
+.tl-dot.is-future {
+  background: transparent;
+  box-shadow: none;
+  border: 1.5px solid rgba(233, 233, 237, 0.28);
+}
+
+.tl-line {
+  width: 1px;
+  flex: 1;
+  min-height: 14px;
+  margin-top: 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tl-line.is-last {
+  background: transparent;
+}
+
+.tl-body {
+  padding-bottom: 14px;
+}
+.tl-label {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.tl-label.is-future {
+  color: var(--text-55);
+}
+.tl-meta {
+  font-size: 11px;
+  color: var(--text-45);
+}
+
+/* Visible to screen readers only: labels for inputs whose purpose is obvious
+   from the surrounding design but which still need a programmatic name. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* kh-icon carries no inline style of its own: a strict CSP (style-src without
+   unsafe-inline) would otherwise drop the attribute and collapse every icon. */
+kh-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+kh-icon svg {
+  display: block;
+}

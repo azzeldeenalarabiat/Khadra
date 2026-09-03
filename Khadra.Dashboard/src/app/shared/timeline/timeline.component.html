@@ -1,0 +1,12 @@
+@for (step of steps(); track $index) {
+  <div class="tl-item" [class]="toneClass(step.tone)">
+    <div class="tl-gutter">
+      <div class="tl-dot" [class.is-future]="step.future"></div>
+      <div class="tl-line" [class.is-last]="isLast($index)"></div>
+    </div>
+    <div class="tl-body">
+      <div class="tl-label" [class.is-future]="step.future">{{ step.label }}</div>
+      <div class="tl-meta">{{ step.meta }}</div>
+    </div>
+  </div>
+}

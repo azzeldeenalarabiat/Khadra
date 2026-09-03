@@ -7,8 +7,12 @@ namespace Khadra.Infrastructure.Persistence.Repositories;
 
 internal sealed class UserRepository(KhadraDbContext context) : IUserRepository
 {
+    // Documents are part of the aggregate: attaching one replaces the previous of that type, which
+    // cannot be decided without them loaded.
     public Task<User?> GetByIdAsync(Id id, CancellationToken cancellationToken = default) =>
-        context.Users.SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
+        context.Users
+            .Include(user => user.Documents)
+            .SingleOrDefaultAsync(user => user.Id == id, cancellationToken);
 
     public Task<User?> GetByEmailAsync(EmailAddress email, CancellationToken cancellationToken = default) =>
         context.Users.SingleOrDefaultAsync(user => user.Email == email, cancellationToken);

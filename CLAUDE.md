@@ -1,6 +1,6 @@
 # Khadra
 
-Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.0.docx` (v3.0 "Confirmed Business Rules"). One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens, not in this repo). Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
+Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.1.docx` (v3.1 "Tech Stack Finalized"; v3.0 is kept for history — the two differ only in the header, every numbered section is identical). v3.1 names this stack: ASP.NET Core + PostgreSQL + EF Core. One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens, not in this repo). Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
 
 ## Commands
 
@@ -15,13 +15,14 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 
 ## Architecture map (dependency direction: Domain <- Application <- Infrastructure <- WebAPI)
 
-- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `GeoPoint`, `DateRange`) and one folder per bounded context (`IdentityAccess/` today; `Dealers/`, `Fleet/`, `Booking/`, `Payments/`, `Disputes/`, `Reviews/`, `PlatformSettings/` next). Repository interfaces live next to their aggregate.
+- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `Percentage`, `GeoPoint`, `DateRange`) and one folder per bounded context: `IdentityAccess/`, `Auditing/`, `Dealers/`, `Fleet/`, `Bookings/`, `Disputes/`, `Reviews/`, `PlatformSettings/`. `Payments/` is NOT built (blocked on owner decisions). Repository interfaces live next to their aggregate. See `docs/architecture-bounded-contexts.md` for the status table and the open owner decisions.
 - `Khadra.Application` — CQRS: `<Context>/<UseCase>/<UseCase>Command.cs` (+ validator) and `<UseCase>Handler.cs` using `ICommand<T>`/`IQuery<T>` (MediatR). Ports in `Common/Ports/`. Behaviors: logging, FluentValidation.
 - `Khadra.Infrastructure` — `KhadraDbContext`, `Persistence/Configurations/<Context>/`, migrations, repositories, `UnitOfWork` (dispatches domain events after commit), BCrypt/JWT/opaque tokens, MailKit email, strongly-typed options.
 - `Khadra.WebAPI` — controllers under `/api/v1`, JWT bearer with security-stamp check, policies, rate limiting, ProblemDetails, OpenAPI.
 - `Khadra.Bff` — cookie session (`__Host-Khadra.Session`) + Redis ticket store + antiforgery + YARP proxy to the API. The browser never sees API tokens.
 - `Khadra.Tests` — xunit: `Domain/`, `Application/` (NSubstitute), `Persistence/` (SQLite in-memory), `Security/` (WebApplicationFactory).
-- `Khadra.Dashboard/` — Angular 22 workspace (empty scaffold).
+- `Khadra.Dashboard/` — Angular 22 console for both sides of the platform. Admin screens under `features/*`; the dealer console under `features/dealer/` and `features/fleet/` behind `/dealer/*` (`DealerGateComponent` locks it while the dealership cannot trade). Both are implemented from `docs/design/` (`Admin Console` and `Dealer Console.dc.html`, the exported Claude Design project, which is the source of truth for the look).
+- **The console holds no sample data.** Every screen reads the live API through the BFF or says plainly that it is not built. `features/not-built/` is that screen for the Admin (customers, payments, payouts, finance, reviews, the lookups, audit logs, admin users, platform settings, notifications, security); `features/dealer/not-live.component.ts` is its dealer counterpart (reviews, notifications). Each names what it will show and which context is missing, so nobody has to guess whether a figure is real. `core/data/` now holds structure only: `nav.data.ts` (sidebar and breadcrumbs, with badges naming a live count rather than carrying a number) and `dashboard.data.ts` (presenter view-model types). When you build a context, replace its `notBuilt` route with a real component and delete its entry from `SCREENS` there. Never reintroduce a fixture to fill a screen.
 
 ## Backend conventions (MUST) — details in `.claude/rules/backend/architecture.md`
 
@@ -31,12 +32,17 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 - Soft delete via `ISoftDeletable`; `DeleteBehavior.Restrict` on every FK; never hard-delete.
 - Handlers return `Result<T, Error>` / `UnitResult<Error>`; `Error.Kind` maps to HTTP status in `ApiControllerBase.Failure`. Do not throw for business outcomes. Handlers call `IUnitOfWork.SaveChangesAsync` explicitly and never touch `HttpContext` (use `ClientInfo` / `ICurrentActor`).
 - Business numbers (commission %, deposit %, no-show hours, delivery fee, penalties, cancellation window, SLA) come ONLY from `IBusinessRulesProvider` (configuration section `BusinessRules` today, admin-editable aggregate later). Never a constant.
+- A booking FREEZES the rules and the price it was made under (`BookingTerms`, `BookingPricing`). Never judge a past booking against current settings.
+- Audit trail: a privileged admin action records an `AuditEntry` through `IAuditTrail.Record(...)` in the handler, committed by that handler's own `SaveChangesAsync` so the record and the action land in ONE transaction. Never fed from domain events (they dispatch after commit, with no outbox). `audit_entries` is append-only: a database trigger and a `SaveChanges` guard both refuse UPDATE and DELETE.
+- Read models for admin screens are per-context reader ports (`Khadra.Application/<Context>/ReadModels/`), implemented in `Khadra.Infrastructure/Reporting/` and composed by one handler. Never call the readers concurrently: they share the scoped `DbContext`.
+- Reporting dates are LOCAL to `AdminDashboard:ReportingTimeZone` (Asia/Amman), never UTC. Use `IReportingCalendar`.
+- Penalties are ASSESSED, never charged. Spec 3.3: with no dispute ticket, no penalty is applied at all. Money moves only through an Admin resolving a ticket.
 - REST: plural nouns, `/api/v1`, RFC 9457 ProblemDetails with `code` + `traceId`, 201 + Location, 202 for accepted async work, 204 for no body, pagination with `PagedResult<T>`. Anonymous endpoints must be rate limited.
 - Style: primary constructors, file-scoped namespaces, `sealed` by default, `internal` for infrastructure implementations. Every use case ships with tests.
 
 ## Frontend conventions (MUST)
 
-Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.component.ts` + `.component.html` only, PrimeNG community, all calls through the BFF, English/Arabic + LTR/RTL, currency code on every money value.
+Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.component.ts` + `.component.html` only (no per-component styles and no `style=` attributes), all calls through the BFF, logical CSS properties for RTL, currency code on every money value. The Admin console deliberately does NOT use PrimeNG: it is built to the bespoke Nocturne design system, and that exception is recorded in the rules file.
 
 ## Forbidden actions
 
@@ -46,6 +52,16 @@ Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.com
 - Never `git push` without explicit owner approval; never force-push; never `dotnet ef database drop` or `docker compose down -v`.
 - Never bypass the soft-delete query filter without an explicit, commented reason.
 
+## Deferred work that must not be forgotten
+
+`docs/pre-launch-checklist.md` lists what is knowingly deferred while this is a development system
+and must be closed before real users, real bookings or real money. Add to it whenever you leave
+something for later; an item comes off only by being fixed.
+
 ## Open business decisions (spec §2.2)
 
-Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, minimum renter age, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
+Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
+
+**Dealer console defaults awaiting a decision (2026-09-03):** a suspended dealer may still record a pickup on an already-approved booking (default: allowed; returns are always allowed); the business name is locked after approval (default: locked) while location and operating hours stay editable; the customer's contact details are never shown to the dealer (the console makes no promise about it); staff management (`/dealers/me/employees`) requires an approved, trading dealer, so the owner of a suspended dealer cannot deactivate an employee (default kept). Ask the owner before changing any of these.
+
+**Minimum renter age: settled at 21** by the owner and enforced (`BusinessRules:MinimumRenterAge`, `RenterAgePolicy`). The spec still says "value pending Section 2 decision" in §5.1 and lists it as open in §2.2 — the document has not caught up with the decision. The code is right; the spec needs a revision.

@@ -1,0 +1,63 @@
+<div class="auth-shell">
+  <form class="sect auth-card stack stack-14" (ngSubmit)="submit()">
+    <div class="auth-head">
+      <div class="sidebar-mark"><kh-icon name="steering-wheel" /></div>
+      <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+    </div>
+
+    @if (!token) {
+      <div>
+        <h1 class="auth-title">This link is incomplete</h1>
+        <div class="page-sub">
+          Open the invitation link straight from the email, or ask the dealer owner to send it
+          again.
+        </div>
+      </div>
+    } @else if (done()) {
+      <div>
+        <h1 class="auth-title">You're in</h1>
+        <div class="page-sub">Your account is ready. Taking you to sign in…</div>
+      </div>
+    } @else {
+      <div>
+        <h1 class="auth-title">Accept your invitation</h1>
+        <div class="page-sub">
+          Choose the password you will sign in with. At least 8 characters, with a letter and a
+          digit.
+        </div>
+      </div>
+
+      @if (problem(); as message) {
+        <div class="banner s-bad" role="alert">
+          <kh-icon name="warning-circle" class="banner-icon" />
+          <div class="banner-body">
+            <div class="banner-text">{{ message }}</div>
+          </div>
+        </div>
+      }
+
+      <div class="field">
+        <label for="invite-password">Password</label>
+        <input
+          id="invite-password"
+          class="input"
+          type="password"
+          name="password"
+          autocomplete="new-password"
+          required
+          [disabled]="busy()"
+          [value]="password()"
+          (input)="password.set(fieldValue($event))"
+        />
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="busy()">
+        {{ busy() ? 'Setting up…' : 'Accept and continue' }}
+      </button>
+    }
+
+    <div class="auth-foot">
+      <a class="auth-link" routerLink="/sign-in">Back to sign in</a>
+    </div>
+  </form>
+</div>

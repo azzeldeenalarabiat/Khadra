@@ -22,6 +22,13 @@ public static class DependencyInjection
         services.AddValidatorsFromAssembly(assembly, includeInternalTypes: true);
 
         services.AddScoped<AuthTokenFactory>();
+        services.AddScoped<AccountRegistrar>();
+        services.AddScoped<Dealers.DealerReviewAuditor>();
+        services.AddScoped<Dealers.DealerMembershipResolver>();
+        services.AddScoped<EmployeeAccountProvisioner>();
+        services.AddScoped<Bookings.BookingPartyResolver>();
+        services.AddScoped<Disputes.DisputeAuditor>();
+        services.AddScoped<Disputes.DisputeViewComposer>();
         services.AddScoped<AuthEmailDispatcher>();
 
         var eventHandlerRegistrations = assembly

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="ds/styles.css">
+<script src="_ds/nocturne-1b7158d1-150f-4cd6-98ab-c40935b6f0ab/_ds_bundle.js"></script>
+<script src="icons.js"></script>
+</helmet>
+<div style="height:58px;flex:none;display:flex;align-items:center;gap:16px;padding:0 22px;border-bottom:1px solid var(--color-divider);background:#12141f;font-family:var(--font-body)">
+  <div style="min-width:0">
+    <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:color-mix(in srgb,var(--color-text) 40%,transparent)">
+      <span>Admin</span><ph-icon name="caret-right" style="font-size:9px"></ph-icon><span>{{ crumb }}</span>
+    </div>
+    <div style="font-family:var(--font-heading);font-weight:500;font-size:17px;line-height:1.2">{{ title }}</div>
+  </div>
+  <div style="flex:1;max-width:380px;margin-left:auto;position:relative">
+    <ph-icon name="magnifying-glass" style="position:absolute;left:10px;top:9px;font-size:14px;color:color-mix(in srgb,var(--color-text) 40%,transparent)"></ph-icon>
+    <input class="input" placeholder="Search dealers, bookings, disputes…" style="padding-left:31px;min-height:33px;font-size:12.5px;background:#1b1d2a">
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="btn btn-secondary" style="padding:5px 9px;font-size:12px;gap:5px"><ph-icon name="calendar-blank" style="font-size:13px"></ph-icon>This month</button>
+    <div style="position:relative">
+      <button class="btn btn-icon btn-secondary" style="width:33px;height:33px"><ph-icon name="bell" style="font-size:15px"></ph-icon></button>
+      <span style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#c96a5a;color:#fff;font-size:9.5px;font-weight:600;display:grid;place-items:center;border:2px solid #12141f">9</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;padding:3px 7px 3px 3px;border:1px solid var(--color-divider);border-radius:20px;cursor:pointer">
+      <div style="width:26px;height:26px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-100);display:grid;place-items:center;font-size:10.5px;font-weight:600">RH</div>
+      <ph-icon name="caret-down" style="font-size:11px;opacity:.6"></ph-icon>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;title&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;crumb&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      title: this.props.title ?? 'Dashboard',
+      crumb: this.props.crumb ?? this.props.title ?? 'Dashboard',
+    };
+  }
+}
+
+</script>
+</body>
+</html>
