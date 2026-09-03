@@ -68,7 +68,11 @@ public sealed class DisputePersistenceTests : IDisposable
         var stored = await reader.DisputeTickets.SingleAsync(t => t.Id == ticket.Id);
 
         Assert.Same(DisputeStatus.Resolved, stored.Status);
-        Assert.Equal(18m, stored.Resolution!.Deposit.RefundToCustomer.Amount);
+        // The written reason and the moment are part of the record, not decoration: both are get-only
+        // and were silently dropped until mapped by hand.
+        Assert.Equal("Refunded in full; neither side was at fault.", stored.Resolution!.Note);
+        Assert.Equal(Build.Now.AddHours(6), stored.Resolution.ResolvedAt);
+        Assert.Equal(18m, stored.Resolution.Deposit.RefundToCustomer.Amount);
         Assert.True(stored.Resolution.Deposit.RetainedByPlatform.IsZero);
         Assert.True(stored.Resolution.Deposit.TransferredToDealer.IsZero);
         // The basis is stored, not re-derived: Payments must be able to check the split on its own.
@@ -144,5 +148,40 @@ public sealed class DisputePersistenceTests : IDisposable
         Assert.NotEqual(0m, stored.Terms.CommissionPercent.Value);
         Assert.Equal(booking.Pricing.DepositPercent.Value, stored.Pricing.DepositPercent.Value);
         Assert.Equal(booking.Pricing.DepositAmount.Amount, stored.Pricing.DepositAmount.Amount);
+
+        // The get-only primitives, every one of which convention leaves out of a JSON document. The
+        // settlement window is the one CanBeDisputed reads: lost, it read as zero and no booking on
+        // the platform could ever be disputed after a reload.
+        Assert.Equal(booking.Terms.PostReturnSettlementWindow, stored.Terms.PostReturnSettlementWindow);
+        Assert.Equal(booking.Terms.FreeCancellationWindow, stored.Terms.FreeCancellationWindow);
+        Assert.Equal(booking.Terms.NoShowTimeout, stored.Terms.NoShowTimeout);
+        Assert.Equal(booking.Terms.PaymentWindow, stored.Terms.PaymentWindow);
+        Assert.Equal(booking.Terms.RulesVersion, stored.Terms.RulesVersion);
+        Assert.Equal(booking.Pricing.Days, stored.Pricing.Days);
+        Assert.NotEqual(TimeSpan.Zero, stored.Terms.PostReturnSettlementWindow);
+        Assert.Equal(booking.Pricing.Mileage.IsUnlimited, stored.Pricing.Mileage.IsUnlimited);
+        Assert.Equal(booking.Pricing.Mileage.DailyLimitKm, stored.Pricing.Mileage.DailyLimitKm);
+    }
+
+    [Fact]
+    public async Task A_penalty_assessment_keeps_its_reason_and_moment()
+    {
+        var booking = Build.ApprovedBooking();
+        booking.Cancel(BookingParty.Customer, Id.New(), "Changed plans.", Build.Now.AddHours(3));
+
+        await using (var context = NewContext())
+        {
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stored = await reader.Bookings.SingleAsync(b => b.Id == booking.Id);
+
+        Assert.NotNull(stored.Penalty);
+        Assert.Equal(booking.Penalty!.Reason, stored.Penalty.Reason);
+        Assert.False(string.IsNullOrWhiteSpace(stored.Penalty.Reason));
+        Assert.Equal(booking.Penalty.AssessedAt, stored.Penalty.AssessedAt);
+        Assert.Same(BookingParty.Customer, stored.Penalty.AttributedTo);
     }
 }

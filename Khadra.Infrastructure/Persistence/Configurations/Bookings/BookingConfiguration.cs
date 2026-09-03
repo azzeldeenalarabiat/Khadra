@@ -57,6 +57,11 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             location.Property(point => point.Longitude).HasColumnName("delivery_longitude");
         });
 
+        // EVERY property of a ToJson value object is mapped by hand. EF Core includes a property by
+        // convention only when it has a setter; these value objects are get-only by design, so anything
+        // left to convention is silently dropped on the way to the database. That is how every
+        // Percentage became {} and how the frozen windows, Days, Reason and AssessedAt were lost --
+        // with no error, because a JSON document has no schema to complain.
         entity.OwnsOne(booking => booking.Pricing, pricing =>
         {
             pricing.ToJson();
@@ -69,7 +74,12 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             ConfigureMoney(pricing.OwnsOne(value => value.SecurityDeposit));
             ConfigurePercentage(pricing.OwnsOne(value => value.DepositPercent));
             pricing.OwnsOne(value => value.Mileage, mileage =>
-                ConfigureMoney(mileage.OwnsOne(policy => policy.ExcessFeePerKm)));
+            {
+                mileage.Property(policy => policy.IsUnlimited);
+                mileage.Property(policy => policy.DailyLimitKm);
+                ConfigureMoney(mileage.OwnsOne(policy => policy.ExcessFeePerKm));
+            });
+            pricing.Property(value => value.Days);
             pricing.Property(value => value.FuelPolicy)
                 .HasConversion(policy => policy.Name, name => Enumeration.FromName<FuelPolicy>(name));
         });
@@ -83,6 +93,11 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             ConfigurePercentage(terms.OwnsOne(value => value.CustomerCancellationPenaltyPercent));
             ConfigurePercentage(terms.OwnsOne(value => value.DealerPenaltyMinPercent));
             ConfigurePercentage(terms.OwnsOne(value => value.DealerPenaltyMaxPercent));
+            terms.Property(value => value.FreeCancellationWindow);
+            terms.Property(value => value.NoShowTimeout);
+            terms.Property(value => value.PaymentWindow);
+            terms.Property(value => value.PostReturnSettlementWindow);
+            terms.Property(value => value.RulesVersion);
         });
         entity.Navigation(booking => booking.Terms).IsRequired();
 
@@ -93,6 +108,8 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             ConfigurePercentage(penalty.OwnsOne(value => value.MaxPercent));
             ConfigureMoney(penalty.OwnsOne(value => value.MinAmount));
             ConfigureMoney(penalty.OwnsOne(value => value.MaxAmount));
+            penalty.Property(value => value.Reason).HasMaxLength(500);
+            penalty.Property(value => value.AssessedAt);
             penalty.Property(value => value.AttributedTo)
                 .HasConversion(party => party.Name, name => Enumeration.FromName<BookingParty>(name));
         });

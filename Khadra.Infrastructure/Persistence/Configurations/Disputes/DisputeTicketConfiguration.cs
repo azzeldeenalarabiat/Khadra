@@ -36,6 +36,10 @@ internal sealed class DisputeTicketConfiguration : IEntityTypeConfiguration<Disp
                 ConfigureMoney(deposit.OwnsOne(split => split.TransferredToDealer));
             });
             ConfigureMoney(resolution.OwnsOne(value => value.DealerCharge));
+            // Get-only, so mapped by hand or lost: an Admin's written reason for a money decision was
+            // being discarded on save while the API happily echoed it back from memory.
+            resolution.Property(value => value.Note).HasMaxLength(2000);
+            resolution.Property(value => value.ResolvedAt);
             resolution.Property(value => value.ResolvedByAdminId).HasConversion(IdConverter);
         });
 

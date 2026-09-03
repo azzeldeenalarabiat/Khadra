@@ -137,6 +137,7 @@ public static class DependencyInjection
         services.AddScoped<IBookingReader, BookingReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
         services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();
+        services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();

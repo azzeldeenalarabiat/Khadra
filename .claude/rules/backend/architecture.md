@@ -40,6 +40,8 @@ paths:
 ## Infrastructure (MUST)
 - snake_case naming (`UseSnakeCaseNamingConvention`). One `IEntityTypeConfiguration<T>` per aggregate/entity under `Persistence/Configurations/<Context>/`.
 - `DeleteBehavior.Restrict` on every FK. Smart enums persisted via `HasConversion` to their string name. Value objects via `OwnsOne` or converters.
+- **Every property of a value object mapped with `ToJson()` is configured explicitly** (`.Property(v => v.X)` / nested `OwnsOne`). EF includes a property by convention only when it has a setter; our value objects are get-only by design, so anything left to convention is silently dropped from the JSON document with no error. This is how every `Percentage`, the frozen booking windows, `Days`, penalty `Reason` and resolution `Note` were all lost once. A persistence round-trip test on SQLite must assert each field.
+- Never hand one value-object instance to two aggregates or two mapped properties (`Percentage.Zero`, `Money.ZeroIn`, a `GeoPoint`, a `DateRange`): EF tracks owned instances by reference and the second owner saves null or fails with a severed association. Copy it.
 - Add migrations with `dotnet ef migrations add <Name> --project Khadra.Infrastructure --startup-project Khadra.WebAPI`. Never hand-edit an existing migration.
 - Secrets only from user-secrets / env vars / gitignored `appsettings.Local.json`. Tracked appsettings contain empty placeholders.
 
