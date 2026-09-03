@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="ds/styles.css">
+<script src="_ds/nocturne-1b7158d1-150f-4cd6-98ab-c40935b6f0ab/_ds_bundle.js"></script>
+<script src="icons.js"></script>
+<style>
+body{margin:0;background:#0c0d14;color:#e9e9ed;font-family:"Inter",system-ui,sans-serif}
+.dv-turn{padding:40px 44px 34px;border-bottom:1px solid rgba(255,255,255,.07)}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#e9e9ed;color:#12141f;border-radius:4px;text-decoration:none}
+.dv-tname{font:500 13px/1.2 "Inter",system-ui,sans-serif;color:#e9e9ed}
+.dv-opts{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(255,255,255,.1);color:#e9e9ed;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.3 "Inter",system-ui,sans-serif;color:rgba(233,233,237,.55)}
+.dv-card{width:1440px;height:900px;overflow:hidden;background:var(--color-bg);border:1px solid rgba(255,255,255,.1);border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.dv-opt:target .dv-oid{background:var(--color-accent);color:#12141f}
+.dv-next{margin:24px 0 0;font:12px/1.6 "Inter",system-ui,sans-serif;color:rgba(233,233,237,.45)}
+.shell{display:flex;height:100%}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.body{flex:1;overflow:hidden;padding:20px 22px}
+.k{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:rgba(233,233,237,.38)}
+.num{font-family:"Inter",system-ui,sans-serif;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Dashboard home — three directions, Nocturne, 1440px</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Ops console — KPI grid over attention feed, by the book</div>
+<div class="dv-card">
+<div class="shell">
+<dc-import name="AdminSidebar" active="Dashboard" hint-size="248px,100%"></dc-import>
+<div class="main">
+<dc-import name="AdminTopbar" title="Dashboard" crumb="Dashboard" hint-size="100%,58px"></dc-import>
+<div class="body" style="display:flex;flex-direction:column;gap:16px">
+  <div>
+    <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Dashboard</div>
+    <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Overview of platform activity and items requiring attention.</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="5">
+      <a href="#1a" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:9px;padding:13px 14px;border-radius:8px;background:var(--color-surface);box-shadow:var(--shadow-sm)" style-hover="box-shadow:0 0 0 1px var(--color-accent-700)">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span class="k">{{ k.label }}</span>
+          <ph-icon name="{{ k.icon }}" style="font-size:14px;color:var(--color-accent);opacity:.8"></ph-icon>
+        </div>
+        <div class="num" style="font-size:27px;line-height:1">{{ k.main }}</div>
+        <div style="display:flex;flex-direction:column;gap:3px;margin-top:1px">
+          <sc-for list="{{ k.sub }}" as="s" hint-placeholder-count="3">
+            <div style="display:flex;justify-content:space-between;font-size:11.5px">
+              <span style="color:rgba(233,233,237,.5)">{{ s.k }}</span>
+              <span class="num" style="{{ s.style }}">{{ s.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </a>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:1.9fr 1fr;gap:14px;flex:1;min-height:0">
+    <div style="display:flex;flex-direction:column;border-radius:8px;background:var(--color-surface);box-shadow:var(--shadow-sm);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--color-divider)">
+        <ph-icon name="warning-diamond" style="font-size:15px;color:#d1806e"></ph-icon>
+        <span style="font-family:var(--font-heading);font-size:14px;font-weight:500">Requires attention</span>
+        <span style="font-size:10.5px;padding:2px 7px;border-radius:9px;background:rgba(209,128,110,.16);color:#e0a292">6 open</span>
+        <a href="#1a" style="margin-left:auto;font-size:11.5px;text-decoration:none">View all</a>
+      </div>
+      <div style="flex:1;overflow:auto;display:flex;flex-direction:column">
+        <sc-for list="{{ attention }}" as="a" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.05)" style-hover="background:rgba(255,255,255,.03)">
+            <span style="{{ a.dot }}"></span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:500;line-height:1.35">{{ a.title }}</div>
+              <div style="font-size:11.5px;color:rgba(233,233,237,.5);display:flex;gap:7px;align-items:center;margin-top:2px">
+                <span>{{ a.entity }}</span><span style="opacity:.4">·</span><span>{{ a.ts }}</span>
+              </div>
+            </div>
+            <span style="{{ a.sevStyle }}">{{ a.sev }}</span>
+            <button class="btn btn-primary" style="padding:4px 10px;font-size:12px;white-space:nowrap">{{ a.action }}</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;min-height:0">
+      <div style="padding:13px 14px;border-radius:8px;background:var(--color-surface);box-shadow:var(--shadow-sm);display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between"><span class="k">Bookings · last 14 days</span><span class="num" style="font-size:12px;color:#8fbfa6">+12.4%</span></div>
+        <div style="display:flex;align-items:flex-end;gap:4px;height:58px">
+          <sc-for list="{{ bars }}" as="b" hint-placeholder-count="14">
+            <div style="{{ b.style }}"></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;border-radius:8px;background:var(--color-surface);box-shadow:var(--shadow-sm);overflow:hidden">
+        <div style="padding:11px 14px;border-bottom:1px solid var(--color-divider)"><span class="k">Recent activity</span></div>
+        <div style="flex:1;overflow:auto;padding:6px 14px 10px;display:flex;flex-direction:column">
+          <sc-for list="{{ activity }}" as="v" hint-placeholder-count="7">
+            <div style="display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <ph-icon name="{{ v.icon }}" style="font-size:13px;margin-top:2px;color:var(--color-accent);opacity:.8;flex:none"></ph-icon>
+              <div style="min-width:0">
+                <div style="font-size:12px;line-height:1.4">{{ v.text }}</div>
+                <div style="font-size:10.5px;color:rgba(233,233,237,.4)">{{ v.ts }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Triage first — the SLA queue is the page, metrics compress to a strip</div>
+<div class="dv-card">
+<div class="shell">
+<dc-import name="AdminSidebar" active="Dashboard" hint-size="248px,100%"></dc-import>
+<div class="main">
+<dc-import name="AdminTopbar" title="Dashboard" crumb="Dashboard" hint-size="100%,58px"></dc-import>
+<div class="body" style="display:flex;flex-direction:column;gap:0;padding:0">
+  <div style="display:flex;align-items:stretch;border-bottom:1px solid var(--color-divider)">
+    <sc-for list="{{ strip }}" as="s" hint-placeholder-count="6">
+      <a href="#1b" style="{{ s.style }}" style-hover="background:rgba(255,255,255,.03)">
+        <span class="k">{{ s.label }}</span>
+        <span class="num" style="font-size:23px;line-height:1.1">{{ s.v }}</span>
+        <span style="{{ s.deltaStyle }}">{{ s.delta }}</span>
+      </a>
+    </sc-for>
+  </div>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:20px 24px">
+      <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:4px">
+        <div>
+          <div style="font-family:var(--font-heading);font-size:23px;font-weight:500;letter-spacing:-.02em">What needs you now</div>
+          <div style="font-size:12.5px;color:rgba(233,233,237,.5)">6 items · 2 past the 48-hour SLA · oldest 61 hours</div>
+        </div>
+        <div class="seg" style="margin-left:auto;height:31px">
+          <label class="seg-opt"><input type="radio" name="q1b" checked>All</label>
+          <label class="seg-opt"><input type="radio" name="q1b">Disputes</label>
+          <label class="seg-opt"><input type="radio" name="q1b">Dealers</label>
+          <label class="seg-opt"><input type="radio" name="q1b">Payments</label>
+        </div>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:9px;padding-top:12px">
+        <sc-for list="{{ queue }}" as="q" hint-placeholder-count="6">
+          <div style="{{ q.card }}" style-hover="background:#282a38">
+            <div style="{{ q.rail }}"></div>
+            <div style="flex:1;min-width:0;padding:13px 16px;display:flex;flex-direction:column;gap:7px">
+              <div style="display:flex;align-items:center;gap:9px">
+                <span style="{{ q.sevStyle }}">{{ q.sev }}</span>
+                <span style="font-size:11px;color:rgba(233,233,237,.45)">{{ q.entity }}</span>
+                <span style="font-size:11px;color:rgba(233,233,237,.35);margin-left:auto">{{ q.ts }}</span>
+              </div>
+              <div style="font-family:var(--font-heading);font-size:15.5px;font-weight:500;line-height:1.3">{{ q.title }}</div>
+              <div style="font-size:12.5px;color:rgba(233,233,237,.55);line-height:1.45">{{ q.desc }}</div>
+            </div>
+            <div style="width:190px;flex:none;padding:13px 16px;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:8px;justify-content:center">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span class="k">48h SLA</span>
+                <span class="num" style="{{ q.slaTextStyle }}">{{ q.sla }}</span>
+              </div>
+              <div style="height:4px;border-radius:2px;background:rgba(255,255,255,.09);overflow:hidden"><div style="{{ q.slaBar }}"></div></div>
+              <button class="btn btn-primary" style="padding:5px 10px;font-size:12.5px;margin-top:2px">{{ q.action }}</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="width:322px;flex:none;border-left:1px solid var(--color-divider);padding:18px 18px;display:flex;flex-direction:column;gap:16px;overflow:auto">
+      <div>
+        <div class="k" style="margin-bottom:9px">Today</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ today }}" as="t" hint-placeholder-count="4">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;font-size:12.5px">
+              <span style="color:rgba(233,233,237,.6)">{{ t.k }}</span>
+              <span class="num" style="font-size:14px">{{ t.v }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <hr class="hr" style="margin:0">
+      <div>
+        <div class="k" style="margin-bottom:10px">Money in motion</div>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <sc-for list="{{ money }}" as="m" hint-placeholder-count="3">
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12px;color:rgba(233,233,237,.6)">{{ m.k }}</span><span class="num" style="font-size:14.5px">{{ m.v }}</span></div>
+              <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08);margin-top:5px;overflow:hidden"><div style="{{ m.bar }}"></div></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <hr class="hr" style="margin:0">
+      <div>
+        <div class="k" style="margin-bottom:9px">Dealer watchlist</div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ watchlist }}" as="w" hint-placeholder-count="4">
+            <a href="#1b" style="display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:6px;text-decoration:none;color:inherit" style-hover="background:rgba(255,255,255,.04)">
+              <div style="{{ w.avatar }}">{{ w.initials }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.name }}</div>
+                <div style="font-size:10.5px;color:rgba(233,233,237,.42)">{{ w.city }}</div>
+              </div>
+              <span style="{{ w.flagStyle }}">{{ w.flag }}</span>
+            </a>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Ledger split — money band left, operational queues tabbed right</div>
+<div class="dv-card">
+<div class="shell">
+<dc-import name="AdminSidebar" active="Dashboard" hint-size="248px,100%"></dc-import>
+<div class="main">
+<dc-import name="AdminTopbar" title="Dashboard" crumb="Dashboard" hint-size="100%,58px"></dc-import>
+<div class="body" style="display:flex;gap:0;padding:0">
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <div style="background:linear-gradient(140deg,var(--color-section) 0%,#1e2150 70%);padding:22px 26px 20px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:baseline;gap:12px">
+        <div style="font-family:var(--font-heading);font-size:20px;font-weight:500;letter-spacing:-.02em">Platform ledger</div>
+        <span style="font-size:11.5px;color:rgba(233,233,237,.55)">1–30 September 2026 · JOD</span>
+        <span style="margin-left:auto;font-size:11px;padding:3px 9px;border-radius:9px;border:1px solid rgba(233,233,237,.28)">Commission 20%</span>
+      </div>
+      <div style="display:flex;gap:34px">
+        <sc-for list="{{ ledger }}" as="l" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <span class="k" style="color:rgba(233,233,237,.5)">{{ l.k }}</span>
+            <span class="num" style="font-size:31px;line-height:1">{{ l.v }}</span>
+            <span style="{{ l.deltaStyle }}">{{ l.delta }}</span>
+          </div>
+        </sc-for>
+        <div style="flex:1;display:flex;align-items:flex-end;gap:5px;height:66px;min-width:0">
+          <sc-for list="{{ bars }}" as="b" hint-placeholder-count="14">
+            <div style="{{ b.lightStyle }}"></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    <div style="padding:16px 26px 0;display:flex;align-items:center;gap:10px">
+      <span style="font-family:var(--font-heading);font-size:14px;font-weight:500">Commission report</span>
+      <span style="font-size:11px;color:rgba(233,233,237,.42)">Latest completed bookings</span>
+      <a href="#1c" style="margin-left:auto;font-size:11.5px;text-decoration:none">Open finance</a>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:6px 12px 16px 12px">
+      <table class="table">
+        <thead><tr><th>Booking</th><th>Dealer</th><th style="text-align:right">Value</th><th style="text-align:right">Rate</th><th style="text-align:right">Commission</th><th style="text-align:right">Payout</th><th>Status</th></tr></thead>
+        <tbody>
+          <sc-for list="{{ commission }}" as="c" hint-placeholder-count="8">
+            <tr>
+              <td style="font-size:12.5px;font-variant-numeric:tabular-nums">{{ c.id }}</td>
+              <td style="font-size:12.5px">{{ c.dealer }}</td>
+              <td class="num" style="text-align:right;font-size:12.5px">{{ c.value }}</td>
+              <td class="num" style="text-align:right;font-size:12.5px;color:rgba(233,233,237,.55)">{{ c.rate }}</td>
+              <td class="num" style="text-align:right;font-size:12.5px;color:var(--color-accent-300)">{{ c.amount }}</td>
+              <td class="num" style="text-align:right;font-size:12.5px">{{ c.payout }}</td>
+              <td><span style="{{ c.statusStyle }}">{{ c.status }}</span></td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div style="width:430px;flex:none;border-left:1px solid var(--color-divider);display:flex;flex-direction:column;min-height:0">
+    <div style="display:flex;border-bottom:1px solid var(--color-divider)">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+        <a href="#1c" style="{{ t.style }}">{{ t.label }}<span style="{{ t.countStyle }}">{{ t.count }}</span></a>
+      </sc-for>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column">
+      <sc-for list="{{ attention }}" as="a" hint-placeholder-count="6">
+        <div style="padding:13px 18px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;flex-direction:column;gap:7px" style-hover="background:rgba(255,255,255,.03)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="{{ a.dot }}"></span>
+            <span style="{{ a.sevStyle }}">{{ a.sev }}</span>
+            <span style="font-size:10.5px;color:rgba(233,233,237,.35);margin-left:auto">{{ a.ts }}</span>
+          </div>
+          <div style="font-size:13px;font-weight:500;line-height:1.35">{{ a.title }}</div>
+          <div style="font-size:11.5px;color:rgba(233,233,237,.5)">{{ a.entity }}</div>
+          <div style="display:flex;gap:7px;margin-top:1px">
+            <button class="btn btn-primary" style="padding:4px 10px;font-size:12px">{{ a.action }}</button>
+            <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px">Snooze</button>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="border-top:1px solid var(--color-divider);padding:12px 18px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:11.5px;color:rgba(233,233,237,.5)">Oldest item 61h · past SLA</span>
+      <button class="btn btn-primary btn-block" style="margin:0;width:auto;margin-left:auto;padding:5px 12px;font-size:12.5px">Open triage</button>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Try next: "build out 1b into the full prototype" · "1a but with 1c's money band" · "show me the dealer application review screen"</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const OK = '#8fbfa6', WARN = '#d0ad74', BAD = '#d1806e', DIM = 'rgba(233,233,237,.55)';
+const tint = (c, p) => 'color-mix(in srgb,' + c + ' ' + p + '%, transparent)';
+const pill = c => 'font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:' + tint(c, 16) + ';color:' + c;
+
+const ATTENTION = [
+  { sev: 'Overdue', c: BAD, title: '2 disputes are overdue past the 48-hour SLA', entity: 'DSP-1184 · DSP-1190', ts: '4h ago', action: 'Resolve now' },
+  { sev: 'SLA', c: WARN, title: '3 dealer applications are approaching the 48-hour SLA', entity: 'Dealer approval queue', ts: '12 min ago', action: 'Review applications' },
+  { sev: 'Payment', c: BAD, title: 'Payment PAY-99321 failed — deposit was not captured', entity: 'Booking BK-20984 · Amman', ts: '1h ago', action: 'Retry payment' },
+  { sev: 'Dispute', c: WARN, title: 'New dispute: vehicle not delivered at pickup time', entity: 'Al-Nadeem Rentals · DSP-1207', ts: '38 min ago', action: 'Open dispute' },
+  { sev: 'Clarify', c: DIM, title: 'Dealer application waiting on clarification response', entity: 'Petra Wheels · 26h elapsed', ts: '3h ago', action: 'View' },
+  { sev: 'Payout', c: DIM, title: 'Payout batch of JOD 18,420 pending approval', entity: '22 dealers · scheduled 05 Sep', ts: '5h ago', action: 'Approve payout' },
+];
+
+const QUEUE = [
+  { sev: 'Overdue', c: BAD, title: 'Dispute DSP-1184 is 61 hours old', desc: 'Customer claims the vehicle was returned undamaged; dealer applied a JOD 180 penalty. Both parties submitted evidence.', entity: 'Aqaba Coast Cars · BK-20411', ts: '61h', sla: '13h over', pct: 100, action: 'Resolve' },
+  { sev: 'Overdue', c: BAD, title: 'Dispute DSP-1190 is 54 hours old', desc: 'No-show recorded after the 8-hour timeout. Customer disputes the deposit forfeit.', entity: 'Dead Sea Drive · BK-20455', ts: '54h', sla: '6h over', pct: 100, action: 'Resolve' },
+  { sev: 'SLA 41h', c: WARN, title: '3 dealer applications approaching the 48-hour SLA', desc: 'Wadi Rum Motors, Irbid Auto Lease and Jerash Rentals have complete document sets awaiting first review.', entity: 'Dealer approval queue', ts: '41h', sla: '7h left', pct: 85, action: 'Review' },
+  { sev: 'Payment', c: BAD, title: 'Payment PAY-99321 failed after three attempts', desc: 'Deposit of JOD 120 was not captured. The booking is held and will auto-cancel in 4 hours.', entity: 'Booking BK-20984', ts: '1h', sla: '4h left', pct: 46, action: 'Retry' },
+  { sev: 'Dispute', c: WARN, title: 'New dispute: vehicle not delivered at pickup time', desc: 'Customer waited 90 minutes at the Amman delivery address. Dealer has not responded.', entity: 'Al-Nadeem Rentals · DSP-1207', ts: '38m', sla: '47h left', pct: 12, action: 'Assign' },
+  { sev: 'Payout', c: DIM, title: 'Payout batch of JOD 18,420 pending approval', desc: '22 dealers, scheduled for 05 September. Two dealers have unresolved disputes on included bookings.', entity: 'Payout run PR-0091', ts: '5h', sla: '2d left', pct: 20, action: 'Review batch' },
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const heights = [38, 52, 44, 61, 49, 72, 58, 66, 47, 80, 69, 74, 62, 88];
+    return {
+      kpis: [
+        { label: 'Total dealers', icon: 'storefront', main: '148', sub: [
+          { k: 'Approved', v: '118' }, { k: 'Pending review', v: '7', style: 'color:' + WARN }, { k: 'Suspended', v: '5', style: 'color:' + BAD } ] },
+        { label: 'Bookings', icon: 'calendar-check', main: '3,412', sub: [
+          { k: 'Today', v: '96' }, { k: 'Active', v: '214' }, { k: 'Pending', v: '38', style: 'color:' + WARN } ] },
+        { label: 'Customers', icon: 'users-three', main: '8,240', sub: [
+          { k: 'Verified', v: '6,915' }, { k: 'Pending verification', v: '412', style: 'color:' + WARN }, { k: 'Suspended', v: '31' } ] },
+        { label: 'Revenue', icon: 'chart-line-up', main: '412,600', sub: [
+          { k: 'Commission', v: '82,520', style: 'color:var(--color-accent-300)' }, { k: 'Dealer payouts', v: '330,080' }, { k: 'Refunds', v: '4,180' } ] },
+        { label: 'Disputes', icon: 'scales', main: '12', sub: [
+          { k: 'Pending admin', v: '5', style: 'color:' + WARN }, { k: 'Overdue', v: '2', style: 'color:' + BAD }, { k: 'Resolved 30d', v: '41' } ] },
+      ],
+      attention: ATTENTION.map(a => ({
+        ...a,
+        dot: 'width:7px;height:7px;border-radius:50%;flex:none;background:' + a.c + ';box-shadow:0 0 0 3px ' + tint(a.c, 18),
+        sevStyle: pill(a.c),
+      })),
+      queue: QUEUE.map(q => ({
+        ...q,
+        card: 'display:flex;border-radius:8px;background:var(--color-surface);box-shadow:var(--shadow-sm);overflow:hidden',
+        rail: 'width:3px;flex:none;background:' + q.c,
+        sevStyle: pill(q.c),
+        slaTextStyle: 'font-size:12.5px;color:' + q.c,
+        slaBar: 'height:100%;width:' + q.pct + '%;background:' + q.c,
+      })),
+      strip: [
+        { label: 'Needs attention', v: '6', delta: '2 overdue', c: BAD },
+        { label: 'Pending dealers', v: '7', delta: '3 near SLA', c: WARN },
+        { label: 'Bookings today', v: '96', delta: '+12.4%', c: OK },
+        { label: 'Active rentals', v: '214', delta: '38 pending', c: DIM },
+        { label: 'Commission MTD', v: '82,520', delta: 'JOD · 20%', c: DIM },
+        { label: 'Pending payouts', v: '18,420', delta: 'JOD · 22 dealers', c: DIM },
+      ].map((s, i) => ({
+        ...s,
+        style: 'flex:1;display:flex;flex-direction:column;gap:3px;padding:13px 18px;text-decoration:none;color:inherit'
+          + (i ? ';border-left:1px solid var(--color-divider)' : ''),
+        deltaStyle: 'font-size:11px;color:' + s.c,
+      })),
+      today: [
+        { k: 'New bookings', v: '96' }, { k: 'Completed', v: '71' },
+        { k: 'Cancellations', v: '9' }, { k: 'No-shows (8h rule)', v: '3' },
+      ],
+      money: [
+        { k: 'Gross booking value', v: '412,600', pct: 100 },
+        { k: 'Platform commission', v: '82,520', pct: 20 },
+        { k: 'Dealer payouts', v: '330,080', pct: 80 },
+      ].map(m => ({ ...m, bar: 'height:100%;width:' + m.pct + '%;background:var(--color-accent-500)' })),
+      ledger: [
+        { k: 'Gross booking value', v: '412,600', delta: '+12.4% vs Aug', c: OK },
+        { k: 'Platform commission', v: '82,520', delta: '20% blended rate', c: DIM },
+        { k: 'Dealer payouts', v: '330,080', delta: '18,420 pending', c: WARN },
+      ].map(l => ({ ...l, deltaStyle: 'font-size:11.5px;color:' + l.c })),
+      watchlist: [
+        { name: 'Al-Nadeem Rentals', city: 'Amman', flag: '2 disputes', c: BAD },
+        { name: 'Dead Sea Drive', city: 'Dead Sea', flag: '1 no-show', c: WARN },
+        { name: 'Petra Wheels', city: 'Petra', flag: 'Clarification', c: WARN },
+        { name: 'Aqaba Coast Cars', city: 'Aqaba', flag: '4.9 ★', c: OK },
+      ].map(w => ({
+        ...w,
+        initials: w.name.split(' ').slice(0, 2).map(x => x[0]).join(''),
+        avatar: 'width:26px;height:26px;border-radius:6px;flex:none;display:grid;place-items:center;font-size:10px;font-weight:600;background:var(--color-neutral-800);color:var(--color-neutral-200)',
+        flagStyle: 'font-size:10.5px;color:' + w.c,
+      })),
+      bars: heights.map(h => ({
+        style: 'flex:1;height:' + h + '%;border-radius:2px 2px 0 0;background:var(--color-accent-700)',
+        lightStyle: 'flex:1;height:' + h + '%;border-radius:2px 2px 0 0;background:rgba(233,233,237,.22)',
+      })),
+      activity: [
+        { icon: 'check-circle', text: 'Rania approved dealer Aqaba Coast Cars', ts: '9 min ago' },
+        { icon: 'scales', text: 'Dispute DSP-1207 opened by customer', ts: '38 min ago' },
+        { icon: 'credit-card', text: 'Payment PAY-99321 failed (3rd attempt)', ts: '1h ago' },
+        { icon: 'user-gear', text: 'Omar suspended customer #882', ts: '2h ago' },
+        { icon: 'sliders-horizontal', text: 'Commission rate changed 18% → 20%', ts: '5h ago' },
+        { icon: 'arrow-line-up-right', text: 'Payout run PR-0090 paid — JOD 21,300', ts: 'Yesterday' },
+        { icon: 'shield-check', text: 'New admin sign-in from Amman (2FA)', ts: 'Yesterday' },
+      ],
+      commission: [
+        { id: 'BK-20984', dealer: 'Al-Nadeem Rentals', value: '1,240', rate: '20%', amount: '248', payout: '992', status: 'Paid', c: OK },
+        { id: 'BK-20977', dealer: 'Aqaba Coast Cars', value: '860', rate: '20%', amount: '172', payout: '688', status: 'Paid', c: OK },
+        { id: 'BK-20961', dealer: 'Petra Wheels', value: '2,105', rate: '18%', amount: '379', payout: '1,726', status: 'Processing', c: WARN },
+        { id: 'BK-20940', dealer: 'Wadi Rum Motors', value: '640', rate: '20%', amount: '128', payout: '512', status: 'Pending', c: DIM },
+        { id: 'BK-20933', dealer: 'Irbid Auto Lease', value: '1,480', rate: '15%', amount: '222', payout: '1,258', status: 'Pending', c: DIM },
+        { id: 'BK-20918', dealer: 'Dead Sea Drive', value: '990', rate: '20%', amount: '198', payout: '792', status: 'Failed', c: BAD },
+        { id: 'BK-20902', dealer: 'Al-Nadeem Rentals', value: '3,320', rate: '20%', amount: '664', payout: '2,656', status: 'Paid', c: OK },
+        { id: 'BK-20896', dealer: 'Jerash Rentals', value: '710', rate: '20%', amount: '142', payout: '568', status: 'Paid', c: OK },
+      ].map(c => ({ ...c, statusStyle: pill(c.c) })),
+      tabs: [
+        { label: 'Attention', count: '6', on: true },
+        { label: 'Applications', count: '7' },
+        { label: 'Disputes', count: '12' },
+      ].map(t => ({
+        ...t,
+        style: 'flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:13px 8px;font-size:12.5px;text-decoration:none;'
+          + (t.on ? 'color:var(--color-accent);box-shadow:inset 0 -2px 0 var(--color-accent)' : 'color:rgba(233,233,237,.55)'),
+        countStyle: 'font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;background:' + (t.on ? 'var(--color-accent-700)' : 'var(--color-neutral-800)') + ';color:var(--color-neutral-100)',
+      })),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

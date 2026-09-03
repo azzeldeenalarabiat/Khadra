@@ -1,0 +1,50 @@
+<div class="table-wrap">
+  <table class="table" [style.min-width]="minWidth()">
+    <thead>
+      <tr>
+        @for (column of columns(); track column) {
+          <th>{{ column }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of rows(); track $index) {
+        <tr [class.rowlink]="!!row.link" (click)="openRow(row)">
+          @for (cell of row.cells; track $index) {
+            <td [ngClass]="cellClasses(cell)">
+              @switch (cell.kind) {
+                @case ('entity') {
+                  <div class="entity">
+                    <div class="entity-avatar">{{ initials(cell.value) }}</div>
+                    <div class="grow">
+                      <div class="entity-name">{{ cell.value }}</div>
+                      <div class="entity-sub">{{ cell.sub }}</div>
+                    </div>
+                  </div>
+                }
+                @case ('badge') {
+                  <span class="pill" [class]="toneClass(cell.tone)">{{ cell.value }}</span>
+                }
+                @case ('actions') {
+                  <div class="row-actions">
+                    @for (action of cell.actions; track action.label) {
+                      <button type="button" [class]="buttonClass(action)" (click)="runAction($event, action)">
+                        {{ action.label }}
+                      </button>
+                    }
+                  </div>
+                }
+                @default {
+                  <div>{{ cell.value }}</div>
+                  @if (cell.sub) {
+                    <div class="td-sub">{{ cell.sub }}</div>
+                  }
+                }
+              }
+            </td>
+          }
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

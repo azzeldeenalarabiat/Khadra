@@ -1,0 +1,137 @@
+<div class="stack stack-14">
+  <header class="detail-head">
+    <div>
+      <div class="row row-gap-9">
+        <h1 class="detail-name">{{ dispute.reference }}</h1>
+        <span class="pill s-bad">{{ dispute.status }}</span>
+        <span class="pill s-dim">{{ dispute.priority }}</span>
+      </div>
+      <div class="detail-meta">{{ dispute.meta }}</div>
+    </div>
+    <div class="sla-panel">
+      <div class="s-bad">
+        <div class="k">48-hour SLA</div>
+        <div class="num sla-panel-figure status-text">{{ dispute.slaOver }}</div>
+      </div>
+      <div class="sla-divider"></div>
+      <div>
+        <div class="k">Age</div>
+        <div class="num sla-panel-figure">{{ dispute.age }}</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="split-16">
+    <div class="stack stack-14">
+      <div class="split-3">
+        @for (card of cards; track card.title) {
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon [name]="card.icon" class="kpi-icon" />
+              <span class="sect-t">{{ card.title }}</span>
+            </div>
+            <div class="kv-body">
+              @for (row of card.rows; track row.k) {
+                <div class="kv-split">
+                  <div class="kv-key">{{ row.k }}</div>
+                  <div class="kv-val">{{ row.v }}</div>
+                </div>
+              }
+            </div>
+          </section>
+        }
+      </div>
+
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="paperclip" class="kpi-icon" />
+          <span class="sect-t">Evidence</span>
+          <span class="sect-note">6 files from both parties</span>
+        </div>
+        <div class="doc-grid-4">
+          @for (item of evidence; track item.file) {
+            <div>
+              <div class="doc evidence-tile"><span class="mono">{{ item.file }}</span></div>
+              <div class="evidence-by">
+                <span class="pill" [class]="toneClass(item.tone)">{{ item.by }}</span>
+                <span class="evidence-ts">{{ item.ts }}</span>
+              </div>
+              <div class="evidence-label">{{ item.label }}</div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="sect">
+        <div class="sect-h"><span class="sect-t">Case timeline</span></div>
+        <div class="sect-pad">
+          <kh-timeline [steps]="timeline" />
+        </div>
+      </section>
+    </div>
+
+    <div class="stack stack-14 resolve-panel">
+      <section class="sect sect-pad stack stack-12">
+        <div class="row row-gap-8">
+          <kh-icon name="gavel" class="kpi-icon" />
+          <span class="sect-t">Admin resolution</span>
+        </div>
+
+        <div class="stack stack-9">
+          @for (option of resolutions; track option.label) {
+            <label class="radio resolution-option" [class.is-on]="selected() === option.label">
+              <input
+                type="radio"
+                name="resolution"
+                [checked]="selected() === option.label"
+                (change)="select(option.label)"
+              />
+              <span class="dot"></span>
+              <span class="grow">
+                <span class="resolution-label">{{ option.label }}</span>
+                <span class="resolution-desc">{{ option.desc }}</span>
+              </span>
+            </label>
+          }
+        </div>
+
+        <div class="field">
+          <label for="penalty-split">Penalty split</label>
+          <div class="split-inputs">
+            <input id="penalty-split" class="input input-num" value="60" />
+            <input class="input input-num" value="60" aria-label="Refunded to customer" />
+          </div>
+          <div class="field-hint">To dealer / refunded to customer · JOD</div>
+        </div>
+
+        <div class="field">
+          <label for="admin-note">Admin note (required)</label>
+          <textarea
+            id="admin-note"
+            class="input"
+            placeholder="Explain the decision and the evidence it rests on…"
+          ></textarea>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-block" (click)="resolve()">Resolve dispute</button>
+        <button type="button" class="btn btn-secondary btn-block" (click)="requestInfo()">
+          Request more information
+        </button>
+        <div class="field-hint">
+          The resolution, your note and the timestamp are shown to both parties.
+        </div>
+      </section>
+
+      <section class="sect sect-pad stack stack-9">
+        <span class="k">Previous resolutions on this booking</span>
+        @for (past of pastResolutions; track past.ts) {
+          <div class="past-resolution">
+            <div class="past-res-title">{{ past.res }}</div>
+            <div class="past-res-reason">{{ past.reason }}</div>
+            <div class="past-res-who">{{ past.who }} · {{ past.ts }}</div>
+          </div>
+        }
+      </section>
+    </div>
+  </div>
+</div>

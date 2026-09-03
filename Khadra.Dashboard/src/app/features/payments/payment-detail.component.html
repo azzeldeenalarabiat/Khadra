@@ -1,0 +1,45 @@
+<div class="stack stack-14 page-narrow">
+  <header class="detail-head">
+    <div>
+      <div class="row row-gap-9">
+        <h1 class="detail-name">{{ payment.reference }}</h1>
+        <span class="pill s-bad">{{ payment.status }}</span>
+      </div>
+      <div class="detail-meta">{{ payment.meta }}</div>
+    </div>
+    <div class="detail-actions">
+      <button type="button" class="btn btn-secondary btn-md" (click)="goBooking()">View booking</button>
+      <button type="button" class="btn btn-secondary btn-md" (click)="refund()">Refund</button>
+      <button type="button" class="btn btn-primary btn-md" (click)="retry()">Retry payment</button>
+    </div>
+  </header>
+
+  <div class="banner s-bad">
+    <kh-icon name="x-circle" class="banner-icon" />
+    <div class="banner-body">
+      <div class="banner-title">{{ payment.failureTitle }}</div>
+      <div class="banner-text">{{ payment.failureBody }}</div>
+    </div>
+  </div>
+
+  <div class="split-2">
+    <section class="sect">
+      <div class="sect-h"><span class="sect-t">Transaction</span></div>
+      <div class="kv-body kv-narrow">
+        @for (row of rows; track row.k) {
+          <div class="kv">
+            <div class="kv-key">{{ row.k }}</div>
+            <div class="kv-val">{{ row.v }}</div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-h"><span class="sect-t">Full transaction history</span></div>
+      <div class="sect-pad">
+        <kh-timeline [steps]="history" />
+      </div>
+    </section>
+  </div>
+</div>

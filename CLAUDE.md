@@ -21,7 +21,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 - `Khadra.WebAPI` — controllers under `/api/v1`, JWT bearer with security-stamp check, policies, rate limiting, ProblemDetails, OpenAPI.
 - `Khadra.Bff` — cookie session (`__Host-Khadra.Session`) + Redis ticket store + antiforgery + YARP proxy to the API. The browser never sees API tokens.
 - `Khadra.Tests` — xunit: `Domain/`, `Application/` (NSubstitute), `Persistence/` (SQLite in-memory), `Security/` (WebApplicationFactory).
-- `Khadra.Dashboard/` — Angular 22 workspace (empty scaffold).
+- `Khadra.Dashboard/` — Angular 22 admin console. All 22 screens implemented from `docs/design/` (the exported Claude Design project, which is the source of truth for the look). Sample data in `src/app/core/data/` is shaped like the API responses that will replace it.
 
 ## Backend conventions (MUST) — details in `.claude/rules/backend/architecture.md`
 
@@ -38,7 +38,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 
 ## Frontend conventions (MUST)
 
-Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.component.ts` + `.component.html` only, PrimeNG community, all calls through the BFF, English/Arabic + LTR/RTL, currency code on every money value.
+Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.component.ts` + `.component.html` only (no per-component styles and no `style=` attributes), all calls through the BFF, logical CSS properties for RTL, currency code on every money value. The Admin console deliberately does NOT use PrimeNG: it is built to the bespoke Nocturne design system, and that exception is recorded in the rules file.
 
 ## Forbidden actions
 

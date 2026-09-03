@@ -1,0 +1,88 @@
+<div class="stack stack-14 page-wide">
+  <header class="detail-head detail-head-start">
+    <div class="avatar-square avatar-46">{{ application.initials }}</div>
+    <div class="grow">
+      <div class="row row-gap-9">
+        <h1 class="detail-name">{{ application.name }}</h1>
+        <span class="pill s-warn">{{ application.status }}</span>
+      </div>
+      <div class="detail-meta">{{ application.meta }}</div>
+    </div>
+    <div class="sla-box s-warn">
+      <div class="k">Approval SLA</div>
+      <div class="num sla-figure">{{ application.slaLeft }}</div>
+      <div class="sla-note">{{ application.slaNote }}</div>
+    </div>
+  </header>
+
+  <div class="split-15">
+    <div class="stack stack-14">
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="buildings" class="kpi-icon" />
+          <span class="sect-t">Business information</span>
+        </div>
+        <div class="kv-body">
+          @for (row of businessRows; track row.k) {
+            <div class="kv">
+              <div class="kv-key">{{ row.k }}</div>
+              <div class="kv-val">{{ row.v }}</div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="lock-key" class="kpi-icon" />
+          <span class="sect-t">Verification documents</span>
+          <span class="sect-note">Signed URLs · expire in 5 minutes · access is logged</span>
+        </div>
+        <div class="doc-grid-3">
+          @for (doc of documents; track doc.label) {
+            <kh-doc-tile [doc]="doc" />
+          }
+        </div>
+        <div class="sect-pad">
+          <div class="banner s-bad">
+            <kh-icon name="warning" class="banner-icon" />
+            <span class="banner-body">
+              Document unavailable — the owner ID scan failed a virus check and was quarantined. Ask the
+              dealer to re-upload.
+            </span>
+            <button type="button" class="btn btn-ghost btn-xs">Retry fetch</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="stack stack-14">
+      <section class="sect">
+        <div class="sect-h"><span class="sect-t">Application timeline</span></div>
+        <div class="sect-pad">
+          <kh-timeline [steps]="timeline" />
+        </div>
+      </section>
+
+      <section class="sect sect-pad stack stack-9">
+        <span class="k">Decision</span>
+        <button type="button" class="btn btn-primary btn-lg-row" (click)="open('approve-dealer')">
+          <kh-icon name="check-circle" />
+          Approve dealer
+        </button>
+        <button type="button" class="btn btn-secondary btn-lg-row" (click)="open('clarify-dealer')">
+          <kh-icon name="question" />
+          Request clarification
+        </button>
+        <button type="button" class="btn btn-danger btn-lg-row" (click)="open('reject-dealer')">
+          <kh-icon name="x-circle" />
+          Reject application
+        </button>
+        <div class="decision-note">
+          Rejection and clarification both require a written reason. Every decision is attributed to you in
+          the audit log.
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

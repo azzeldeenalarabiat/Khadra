@@ -1,0 +1,10 @@
+@if (toast(); as t) {
+  <div class="toast" [class]="toneClass(t.tone)" role="status" aria-live="polite">
+    <kh-icon [name]="icon(t.tone)" class="toast-icon" />
+    <div>
+      <div class="toast-title">{{ t.title }}</div>
+      <div class="toast-body">{{ t.body }}</div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-xs" (click)="dismiss()">Dismiss</button>
+  </div>
+}

@@ -1,1 +1,10 @@
-/* You can add global styles to this file, and also import other style files */
+/* Khadra Admin Console — global stylesheet.
+   Per .claude/rules/frontend/angular-dashboard.md components carry no styles of
+   their own, so every rule the console uses lives here. */
+
+@use 'styles/tokens';
+@use 'styles/base';
+@use 'styles/ds-components';
+@use 'styles/utilities';
+@use 'styles/layout';
+@use 'styles/screens';

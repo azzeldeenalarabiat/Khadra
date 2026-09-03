@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="ds/styles.css">
+<script src="_ds/nocturne-1b7158d1-150f-4cd6-98ab-c40935b6f0ab/_ds_bundle.js"></script>
+<script src="icons.js"></script>
+<style>
+html,body{height:100%}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);font-size:15px;overflow:hidden}
+.k{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:rgba(233,233,237,.38)}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sect{border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-sm)}
+.sect-h{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--color-divider)}
+.sect-t{font-family:var(--font-heading);font-weight:500;font-size:14px}
+.doc{position:relative;border-radius:var(--radius-md);border:1px solid var(--color-divider);background:repeating-linear-gradient(135deg,#20222f,#20222f 6px,#252734 6px,#252734 12px);display:flex;flex-direction:column;justify-content:flex-end;padding:10px;gap:6px;min-height:132px}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;color:rgba(233,233,237,.5)}
+.rowlink{cursor:pointer}
+@keyframes shimmer{0%{opacity:.35}50%{opacity:.7}100%{opacity:.35}}
+.skel{height:11px;border-radius:3px;background:var(--color-neutral-800);animation:shimmer 1.4s ease-in-out infinite}
+@keyframes toastin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;overflow:hidden">
+<dc-import name="AdminSidebar" active="{{ screen }}" onNav="{{ nav }}" hint-size="248px,100%"></dc-import>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+  <div style="height:58px;flex:none;display:flex;align-items:center;gap:16px;padding:0 22px;border-bottom:1px solid var(--color-divider);background:#12141f">
+    <div style="min-width:0">
+      <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:rgba(233,233,237,.4)">
+        <sc-for list="{{ crumbs }}" as="c" hint-placeholder-count="2">
+          <a href="#" onClick="{{ c.click }}" style="{{ c.style }}">{{ c.label }}</a>
+        </sc-for>
+      </div>
+      <div style="font-family:var(--font-heading);font-weight:500;font-size:17px;line-height:1.2">{{ title }}</div>
+    </div>
+    <div style="flex:1;max-width:380px;margin-left:auto;position:relative">
+      <ph-icon name="magnifying-glass" style="position:absolute;left:10px;top:9px;font-size:14px;color:rgba(233,233,237,.4)"></ph-icon>
+      <input class="input" placeholder="Search dealers, bookings, disputes…" style="padding-left:31px;min-height:33px;font-size:12.5px;background:#1b1d2a">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="btn btn-secondary" style="padding:5px 9px;font-size:12px;gap:5px"><ph-icon name="calendar-blank" style="font-size:13px"></ph-icon>This month</button>
+      <div style="position:relative">
+        <button class="btn btn-icon btn-secondary" onClick="{{ goNotifications }}" style="width:33px;height:33px"><ph-icon name="bell" style="font-size:15px"></ph-icon></button>
+        <span style="position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#c96a5a;color:#f3f5fe;font-size:9.5px;font-weight:600;display:grid;place-items:center;border:2px solid #12141f">9</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;padding:3px 7px 3px 3px;border:1px solid var(--color-divider);border-radius:20px;cursor:pointer">
+        <div style="width:26px;height:26px;border-radius:50%;background:var(--color-accent-800);color:var(--color-accent-100);display:grid;place-items:center;font-size:10.5px;font-weight:600">RH</div>
+        <ph-icon name="caret-down" style="font-size:11px;opacity:.6"></ph-icon>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;overflow:auto;padding:20px 22px 32px">
+
+  <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div>
+      <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Dashboard</div>
+      <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Overview of platform activity and items requiring attention.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="5">
+        <a href="#" onClick="{{ k.click }}" class="sect" style="text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:9px;padding:13px 14px" style-hover="box-shadow:0 0 0 1px var(--color-accent-700)">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span class="k">{{ k.label }}</span>
+            <ph-icon name="{{ k.icon }}" style="font-size:14px;color:var(--color-accent);opacity:.8"></ph-icon>
+          </div>
+          <div class="num" style="font-size:27px;line-height:1">{{ k.main }}</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            <sc-for list="{{ k.sub }}" as="s" hint-placeholder-count="3">
+              <div style="display:flex;justify-content:space-between;font-size:11.5px">
+                <span style="color:rgba(233,233,237,.5)">{{ s.k }}</span>
+                <span class="num" style="{{ s.style }}">{{ s.v }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </a>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:1.9fr 1fr;gap:14px;align-items:start">
+      <div class="sect" style="display:flex;flex-direction:column;overflow:hidden">
+        <div class="sect-h">
+          <ph-icon name="warning-diamond" style="font-size:15px;color:#d1806e"></ph-icon>
+          <span class="sect-t">Requires attention</span>
+          <span style="font-size:10.5px;padding:2px 7px;border-radius:9px;background:rgba(209,128,110,.16);color:#e0a292">6 open · 2 overdue</span>
+          <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.4)">48-hour SLA</span>
+        </div>
+        <sc-for list="{{ queue }}" as="q" hint-placeholder-count="6">
+          <div style="display:flex;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.05)" style-hover="background:rgba(255,255,255,.03)">
+            <div style="{{ q.rail }}"></div>
+            <div style="flex:1;min-width:0;padding:12px 14px;display:flex;flex-direction:column;gap:5px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="{{ q.sevStyle }}">{{ q.sev }}</span>
+                <span style="font-size:11px;color:rgba(233,233,237,.45)">{{ q.entity }}</span>
+              </div>
+              <div style="font-size:13.5px;font-weight:500;line-height:1.35">{{ q.title }}</div>
+              <div style="font-size:12px;color:rgba(233,233,237,.5);line-height:1.45">{{ q.desc }}</div>
+            </div>
+            <div style="width:184px;flex:none;padding:12px 14px;border-left:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:7px;justify-content:center">
+              <div style="display:flex;align-items:baseline;justify-content:space-between">
+                <span class="k">SLA</span><span class="num" style="{{ q.slaTextStyle }}">{{ q.sla }}</span>
+              </div>
+              <div style="height:4px;border-radius:2px;background:rgba(255,255,255,.09);overflow:hidden"><div style="{{ q.slaBar }}"></div></div>
+              <button class="btn btn-primary" onClick="{{ q.click }}" style="padding:5px 10px;font-size:12.5px">{{ q.action }}</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect" style="padding:13px 14px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between"><span class="k">Bookings · last 14 days</span><span class="num" style="font-size:12px;color:#8fbfa6">+12.4%</span></div>
+          <div style="display:flex;align-items:flex-end;gap:4px;height:58px">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="14"><div style="{{ b.style }}"></div></sc-for>
+          </div>
+        </div>
+        <div class="sect" style="padding:13px 14px;display:flex;flex-direction:column;gap:11px">
+          <span class="k">Money in motion · JOD</span>
+          <sc-for list="{{ money }}" as="m" hint-placeholder-count="3">
+            <div>
+              <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-size:12px;color:rgba(233,233,237,.6)">{{ m.k }}</span><span class="num" style="font-size:14.5px">{{ m.v }}</span></div>
+              <div style="height:3px;border-radius:2px;background:rgba(255,255,255,.08);margin-top:5px;overflow:hidden"><div style="{{ m.bar }}"></div></div>
+            </div>
+          </sc-for>
+        </div>
+        <div class="sect" style="overflow:hidden">
+          <div style="padding:11px 14px;border-bottom:1px solid var(--color-divider)"><span class="k">Recent activity</span></div>
+          <div style="padding:4px 14px 10px">
+            <sc-for list="{{ activity }}" as="v" hint-placeholder-count="7">
+              <div style="display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <ph-icon name="{{ v.icon }}" style="font-size:13px;margin-top:2px;color:var(--color-accent);opacity:.8;flex:none"></ph-icon>
+                <div style="min-width:0">
+                  <div style="font-size:12px;line-height:1.4">{{ v.text }}</div>
+                  <div style="font-size:10.5px;color:rgba(233,233,237,.4)">{{ v.ts }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isList }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div>
+        <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">{{ list.title }}</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">{{ list.subtitle }}</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <span class="k">State</span>
+        <div class="seg" style="height:30px">
+          <sc-for list="{{ stateOpts }}" as="o" hint-placeholder-count="5">
+            <label class="seg-opt" style="{{ o.style }}"><input type="radio" name="vstate" checked="{{ o.on }}" onChange="{{ o.click }}">{{ o.label }}</label>
+          </sc-for>
+        </div>
+        <sc-if value="{{ list.primary }}" hint-placeholder-val="{{ false }}">
+          <button class="btn btn-primary" onClick="{{ list.primaryClick }}" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="plus" style="font-size:13px"></ph-icon>{{ list.primary }}</button>
+        </sc-if>
+      </div>
+    </div>
+    <div class="sect" style="display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--color-divider);flex-wrap:wrap">
+        <div style="position:relative;width:220px">
+          <ph-icon name="magnifying-glass" style="position:absolute;left:9px;top:8px;font-size:13px;color:rgba(233,233,237,.4)"></ph-icon>
+          <input class="input" placeholder="{{ list.searchHint }}" style="padding-left:28px;min-height:31px;font-size:12px">
+        </div>
+        <sc-for list="{{ list.filters }}" as="f" hint-placeholder-count="4">
+          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;gap:6px">{{ f }}<ph-icon name="caret-down" style="font-size:10px;opacity:.6"></ph-icon></button>
+        </sc-for>
+        <button class="btn btn-ghost" style="font-size:12px;margin-left:auto;gap:5px"><ph-icon name="download-simple" style="font-size:13px"></ph-icon>Export CSV</button>
+      </div>
+
+      <sc-if value="{{ showData }}" hint-placeholder-val="{{ true }}">
+      <div style="overflow-x:auto">
+        <table class="table" style="min-width:1040px">
+          <thead><tr>
+            <sc-for list="{{ list.columns }}" as="c" hint-placeholder-count="8"><th style="{{ c.style }}">{{ c.k }}</th></sc-for>
+          </tr></thead>
+          <tbody>
+            <sc-for list="{{ list.rows }}" as="r" hint-placeholder-count="8">
+              <tr class="rowlink" onClick="{{ r.click }}">
+                <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="8">
+                  <td style="{{ c.style }}">
+                    <sc-if value="{{ c.entity }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:9px">
+                        <div style="width:26px;height:26px;border-radius:6px;flex:none;display:grid;place-items:center;font-size:10px;font-weight:600;background:var(--color-neutral-800);color:var(--color-neutral-200)">{{ c.initials }}</div>
+                        <div style="min-width:0">
+                          <div style="font-size:12.5px;font-weight:500">{{ c.v }}</div>
+                          <div style="font-size:10.5px;color:rgba(233,233,237,.42)">{{ c.sub }}</div>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ c.badge }}" hint-placeholder-val="{{ false }}"><span style="{{ c.badgeStyle }}">{{ c.v }}</span></sc-if>
+                    <sc-if value="{{ c.plain }}" hint-placeholder-val="{{ true }}">
+                      <div>{{ c.v }}</div>
+                      <sc-if value="{{ c.sub }}" hint-placeholder-val="{{ false }}"><div style="font-size:10.5px;color:rgba(233,233,237,.4)">{{ c.sub }}</div></sc-if>
+                    </sc-if>
+                    <sc-if value="{{ c.actions }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;gap:6px;justify-content:flex-end">
+                        <sc-for list="{{ c.acts }}" as="a" hint-placeholder-count="2">
+                          <button class="{{ a.cls }}" onClick="{{ a.click }}" style="padding:3px 9px;font-size:11.5px">{{ a.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </td>
+                </sc-for>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid var(--color-divider)">
+        <span style="font-size:11.5px;color:rgba(233,233,237,.45)">{{ list.count }}</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:5px">
+          <button class="btn btn-secondary" style="padding:4px 9px;font-size:11.5px">Previous</button>
+          <sc-for list="{{ pages }}" as="p" hint-placeholder-count="4"><button class="{{ p.cls }}" style="padding:4px 9px;font-size:11.5px;min-width:28px">{{ p.n }}</button></sc-for>
+          <button class="btn btn-secondary" style="padding:4px 9px;font-size:11.5px">Next</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showLoading }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:14px">
+        <div style="display:flex;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--color-divider)">
+          <sc-for list="{{ skelCols }}" as="s" hint-placeholder-count="6"><div class="skel" style="{{ s.head }}"></div></sc-for>
+        </div>
+        <sc-for list="{{ skelRows }}" as="r" hint-placeholder-count="7">
+          <div style="display:flex;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+            <sc-for list="{{ r.cells }}" as="s" hint-placeholder-count="6"><div class="skel" style="{{ s.cell }}"></div></sc-for>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:64px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+        <div style="width:44px;height:44px;border-radius:10px;border:1px solid var(--color-divider);display:grid;place-items:center"><ph-icon name="tray" style="font-size:20px;color:rgba(233,233,237,.45)"></ph-icon></div>
+        <div style="font-family:var(--font-heading);font-size:16px;font-weight:500">Nothing here yet</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5);max-width:340px">No records match this view. Clear the filters, or wait for new activity to arrive from the marketplace.</div>
+        <div style="display:flex;gap:8px;margin-top:4px"><button class="btn btn-secondary" style="padding:5px 11px;font-size:12.5px">Clear filters</button><button class="btn btn-primary" style="padding:5px 11px;font-size:12.5px">Reload</button></div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showError }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+        <div style="width:44px;height:44px;border-radius:10px;background:rgba(209,128,110,.14);display:grid;place-items:center"><ph-icon name="cloud-slash" style="font-size:20px;color:#d1806e"></ph-icon></div>
+        <div style="font-family:var(--font-heading);font-size:16px;font-weight:500">Couldn't load this table</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5);max-width:360px">The service returned <span class="mono">503 SERVICE_UNAVAILABLE</span> after 3 attempts. Nothing was changed. Your filters are preserved.</div>
+        <div class="mono" style="margin-top:2px">request-id 7f2a-91cd-4b</div>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-primary" style="padding:5px 11px;font-size:12.5px">Retry</button><button class="btn btn-secondary" style="padding:5px 11px;font-size:12.5px">Copy request ID</button></div>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ showDenied }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:56px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+        <div style="width:44px;height:44px;border-radius:10px;border:1px solid var(--color-accent-700);display:grid;place-items:center"><ph-icon name="lock-key" style="font-size:20px;color:var(--color-accent)"></ph-icon></div>
+        <div style="font-family:var(--font-heading);font-size:16px;font-weight:500">You don't have access to this data</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5);max-width:380px">This view is limited to <strong style="font-weight:500">Finance Admin</strong> and <strong style="font-weight:500">Super Admin</strong>. Your role is Support Admin. The request was recorded in the audit log.</div>
+        <div style="display:flex;gap:8px;margin-top:6px"><button class="btn btn-primary" style="padding:5px 11px;font-size:12.5px">Request access</button><button class="btn btn-secondary" onClick="{{ goDashboard }}" style="padding:5px 11px;font-size:12.5px">Back to dashboard</button></div>
+      </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isDealerReview }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1240px">
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <div style="width:46px;height:46px;border-radius:10px;background:var(--color-neutral-800);display:grid;place-items:center;font-size:14px;font-weight:600;color:var(--color-neutral-200)">WM</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Wadi Rum Motors</div>
+          <span style="{{ pillWarn }}">Pending Review</span>
+        </div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Application DA-2291 · submitted 01 September 2026 08:14 · Wadi Rum</div>
+      </div>
+      <div style="text-align:right">
+        <div class="k">Approval SLA</div>
+        <div class="num" style="font-size:19px;color:#d0ad74">7h 12m left</div>
+        <div style="font-size:11px;color:rgba(233,233,237,.4)">41h of 48h elapsed</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="buildings" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Business information</span></div>
+          <div style="padding:6px 14px 12px">
+            <sc-for list="{{ bizRows }}" as="b" hint-placeholder-count="7">
+              <div style="display:flex;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <div style="width:210px;flex:none;font-size:12px;color:rgba(233,233,237,.5)">{{ b.k }}</div>
+                <div style="font-size:12.5px">{{ b.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="lock-key" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Verification documents</span>
+            <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Signed URLs · expire in 5 minutes · access is logged</span></div>
+          <div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+            <sc-for list="{{ docs }}" as="d" hint-placeholder-count="3">
+              <div>
+                <div class="doc">
+                  <ph-icon name="file-lock" style="position:absolute;top:10px;right:10px;font-size:15px;color:rgba(233,233,237,.45)"></ph-icon>
+                  <span class="mono">{{ d.file }}</span>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-primary" style="padding:3px 9px;font-size:11.5px">Open secure preview</button>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:7px">
+                  <span style="font-size:12px;font-weight:500">{{ d.label }}</span>
+                  <span style="{{ d.badgeStyle }}">{{ d.status }}</span>
+                </div>
+                <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:2px">{{ d.meta }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:0 14px 14px">
+            <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:6px;background:rgba(209,128,110,.12);font-size:12px;color:rgba(233,233,237,.8)">
+              <ph-icon name="warning" style="font-size:14px;color:#d1806e"></ph-icon>Document unavailable — the owner ID scan failed a virus check and was quarantined. Ask the dealer to re-upload.
+              <button class="btn btn-ghost" style="font-size:11.5px;margin-left:auto">Retry fetch</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect">
+          <div class="sect-h"><span class="sect-t">Application timeline</span></div>
+          <div style="padding:14px">
+            <sc-for list="{{ appTimeline }}" as="t" hint-placeholder-count="4">
+              <div style="display:flex;gap:11px">
+                <div style="display:flex;flex-direction:column;align-items:center;flex:none">
+                  <div style="{{ t.dot }}"></div>
+                  <div style="{{ t.line }}"></div>
+                </div>
+                <div style="padding-bottom:14px">
+                  <div style="font-size:12.5px;font-weight:500;color:{{ t.color }}">{{ t.label }}</div>
+                  <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ t.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:9px">
+          <span class="k">Decision</span>
+          <button class="btn btn-primary" onClick="{{ mApprove }}" style="justify-content:flex-start;gap:8px;padding:8px 12px;font-size:13px"><ph-icon name="check-circle" style="font-size:15px"></ph-icon>Approve dealer</button>
+          <button class="btn btn-secondary" onClick="{{ mClarify }}" style="justify-content:flex-start;gap:8px;padding:8px 12px;font-size:13px"><ph-icon name="question" style="font-size:15px"></ph-icon>Request clarification</button>
+          <button class="btn btn-secondary" onClick="{{ mReject }}" style="justify-content:flex-start;gap:8px;padding:8px 12px;font-size:13px;color:#d1806e;border-color:rgba(209,128,110,.5)"><ph-icon name="x-circle" style="font-size:15px"></ph-icon>Reject application</button>
+          <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:2px">Rejection and clarification both require a written reason. Every decision is attributed to you in the audit log.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isDealerProfile }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:52px;height:52px;border-radius:10px;background:var(--color-neutral-800);display:grid;place-items:center;font-size:15px;font-weight:600;color:var(--color-neutral-200)">AN</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Al-Nadeem Rentals</div>
+          <span style="{{ pillOk }}">Approved</span>
+        </div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Amman · 4.8 ★ (312 reviews) · 24 cars · 412 bookings · CR 89168</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-secondary" style="padding:6px 12px;font-size:12.5px">Message dealer</button>
+        <button class="btn btn-secondary" onClick="{{ mSuspend }}" style="padding:6px 12px;font-size:12.5px;color:#d1806e;border-color:rgba(209,128,110,.5)">Suspend</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:2px;border-bottom:1px solid var(--color-divider)">
+      <sc-for list="{{ dealerTabs }}" as="t" hint-placeholder-count="8">
+        <a href="#" onClick="{{ t.click }}" style="{{ t.style }}">{{ t.label }}</a>
+      </sc-for>
+    </div>
+    <sc-if value="{{ isOverviewTab }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:14px;align-items:start">
+      <div class="sect">
+        <div class="sect-h"><span class="sect-t">Business details</span></div>
+        <div style="padding:6px 14px 12px">
+          <sc-for list="{{ dealerRows }}" as="b" hint-placeholder-count="9">
+            <div style="display:flex;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <div style="width:210px;flex:none;font-size:12px;color:rgba(233,233,237,.5)">{{ b.k }}</div>
+              <div style="font-size:12.5px">{{ b.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+          <span class="k">Verification</span>
+          <sc-for list="{{ dealerVerify }}" as="v" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:9px;font-size:12.5px">
+              <ph-icon name="{{ v.icon }}" style="{{ v.iconStyle }}"></ph-icon><span style="flex:1">{{ v.label }}</span><span style="font-size:11px;color:rgba(233,233,237,.45)">{{ v.meta }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div class="sect" style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <sc-for list="{{ dealerStats }}" as="s" hint-placeholder-count="4">
+            <div><div class="k">{{ s.k }}</div><div class="num" style="font-size:19px;margin-top:3px">{{ s.v }}</div></div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ isDocsTab }}" hint-placeholder-val="{{ false }}">
+    <div class="sect" style="padding:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+      <sc-for list="{{ docs }}" as="d" hint-placeholder-count="3">
+        <div>
+          <div class="doc"><ph-icon name="file-lock" style="position:absolute;top:10px;right:10px;font-size:15px;color:rgba(233,233,237,.45)"></ph-icon><span class="mono">{{ d.file }}</span><button class="btn btn-primary" style="padding:3px 9px;font-size:11.5px">Open secure preview</button></div>
+          <div style="display:flex;align-items:center;gap:7px;margin-top:7px"><span style="font-size:12px;font-weight:500">{{ d.label }}</span><span style="{{ d.badgeStyle }}">{{ d.status }}</span></div>
+          <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:2px">{{ d.meta }}</div>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+    <sc-if value="{{ tabTable }}" hint-placeholder-val="{{ false }}">
+    <div class="sect" style="overflow:hidden">
+      <div style="overflow-x:auto"><table class="table">
+        <thead><tr><sc-for list="{{ tabTable.columns }}" as="c" hint-placeholder-count="5"><th>{{ c }}</th></sc-for></tr></thead>
+        <tbody><sc-for list="{{ tabTable.rows }}" as="r" hint-placeholder-count="5">
+          <tr><sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5"><td style="{{ c.style }}">
+            <sc-if value="{{ c.badge }}" hint-placeholder-val="{{ false }}"><span style="{{ c.badgeStyle }}">{{ c.v }}</span></sc-if>
+            <sc-if value="{{ c.plain }}" hint-placeholder-val="{{ true }}">{{ c.v }}</sc-if>
+          </td></sc-for></tr>
+        </sc-for></tbody>
+      </table></div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isBookingDetail }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1300px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Booking BK-20984</div>
+          <span style="{{ pillWarn }}">Pending</span>
+        </div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Created 03 Sep 2026 09:12 · Rental 04–08 September 2026 · Amman</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-secondary" onClick="{{ goPayment }}" style="padding:6px 12px;font-size:12.5px">View payment</button>
+        <button class="btn btn-secondary" onClick="{{ mRefund }}" style="padding:6px 12px;font-size:12.5px">Refund deposit</button>
+        <button class="btn btn-primary" onClick="{{ goDispute }}" style="padding:6px 12px;font-size:12.5px">Open dispute</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:6px;background:rgba(209,128,110,.12);font-size:12.5px">
+      <ph-icon name="warning-circle" style="font-size:15px;color:#d1806e"></ph-icon>
+      <span>Deposit payment failed — this booking auto-cancels in 4 hours unless the deposit is captured.</span>
+      <button class="btn btn-primary" onClick="{{ goPayment }}" style="padding:4px 10px;font-size:12px;margin-left:auto">Resolve payment</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start">
+      <sc-for list="{{ bookingCards }}" as="c" hint-placeholder-count="3">
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="{{ c.icon }}" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">{{ c.title }}</span></div>
+          <div style="padding:6px 14px 12px">
+            <sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="5">
+              <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <div style="flex:1;font-size:12px;color:rgba(233,233,237,.5)">{{ r.k }}</div>
+                <div style="font-size:12.5px;text-align:right">{{ r.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:14px;align-items:start">
+      <div class="sect">
+        <div class="sect-h"><ph-icon name="car" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Vehicle & handover</span></div>
+        <div style="padding:14px;display:flex;gap:14px">
+          <div class="doc" style="width:190px;min-height:118px;flex:none"><span class="mono">vehicle photo · 4:3</span></div>
+          <div style="flex:1">
+            <sc-for list="{{ vehicleRows }}" as="r" hint-placeholder-count="6">
+              <div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <div style="flex:1;font-size:12px;color:rgba(233,233,237,.5)">{{ r.k }}</div>
+                <div style="font-size:12.5px;text-align:right">{{ r.v }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="padding:0 14px 14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="doc" style="min-height:104px"><span class="mono">handover photo · pickup</span></div>
+          <div class="doc" style="min-height:104px"><span class="mono">handover photo · return</span></div>
+        </div>
+      </div>
+      <div class="sect">
+        <div class="sect-h"><span class="sect-t">Booking timeline</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Approved by John — Employee</span></div>
+        <div style="padding:14px">
+          <sc-for list="{{ bookingTimeline }}" as="t" hint-placeholder-count="6">
+            <div style="display:flex;gap:11px">
+              <div style="display:flex;flex-direction:column;align-items:center;flex:none"><div style="{{ t.dot }}"></div><div style="{{ t.line }}"></div></div>
+              <div style="padding-bottom:13px">
+                <div style="font-size:12.5px;font-weight:500;color:{{ t.color }}">{{ t.label }}</div>
+                <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ t.meta }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isCustomerProfile }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1240px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--color-neutral-800);display:grid;place-items:center;font-size:14px;font-weight:600;color:var(--color-neutral-200)">LO</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Layla Odeh</div>
+          <span style="{{ pillOk }}">Verified</span><span style="{{ pillOk }}">Active</span>
+        </div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Jordan · 4.9 ★ · 14 bookings · joined 04 February 2025</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-secondary" style="padding:6px 12px;font-size:12.5px">Message</button>
+        <button class="btn btn-secondary" onClick="{{ mDeactivate }}" style="padding:6px 12px;font-size:12.5px;color:#d1806e;border-color:rgba(209,128,110,.5)">Suspend account</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:2px;border-bottom:1px solid var(--color-divider)">
+      <sc-for list="{{ customerTabs }}" as="t" hint-placeholder-count="5"><a href="#" onClick="{{ t.click }}" style="{{ t.style }}">{{ t.label }}</a></sc-for>
+    </div>
+    <sc-if value="{{ isVerifyTab }}" hint-placeholder-val="{{ false }}">
+    <div class="sect">
+      <div class="sect-h"><ph-icon name="lock-key" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Identity & licence</span>
+        <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Restricted — Super Admin only · every view is logged</span></div>
+      <div style="padding:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+        <sc-for list="{{ verifyDocs }}" as="d" hint-placeholder-count="3">
+          <div>
+            <div class="doc"><ph-icon name="file-lock" style="position:absolute;top:10px;right:10px;font-size:15px;color:rgba(233,233,237,.45)"></ph-icon><span class="mono">{{ d.file }}</span><button class="btn btn-primary" style="padding:3px 9px;font-size:11.5px">Open secure preview</button></div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:7px"><span style="font-size:12px;font-weight:500">{{ d.label }}</span><span style="{{ d.badgeStyle }}">{{ d.status }}</span></div>
+            <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:2px">{{ d.meta }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ isCustOverviewTab }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;align-items:start">
+      <div class="sect"><div class="sect-h"><span class="sect-t">Account</span></div>
+        <div style="padding:6px 14px 12px">
+          <sc-for list="{{ customerRows }}" as="b" hint-placeholder-count="8">
+            <div style="display:flex;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <div style="width:200px;flex:none;font-size:12px;color:rgba(233,233,237,.5)">{{ b.k }}</div><div style="font-size:12.5px">{{ b.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div class="sect" style="padding:14px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <sc-for list="{{ customerStats }}" as="s" hint-placeholder-count="4">
+          <div><div class="k">{{ s.k }}</div><div class="num" style="font-size:19px;margin-top:3px;color:{{ s.color }}">{{ s.v }}</div></div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+    <sc-if value="{{ tabTable }}" hint-placeholder-val="{{ false }}">
+    <div class="sect" style="overflow:hidden"><div style="overflow-x:auto"><table class="table">
+      <thead><tr><sc-for list="{{ tabTable.columns }}" as="c" hint-placeholder-count="5"><th>{{ c }}</th></sc-for></tr></thead>
+      <tbody><sc-for list="{{ tabTable.rows }}" as="r" hint-placeholder-count="5">
+        <tr><sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5"><td style="{{ c.style }}">
+          <sc-if value="{{ c.badge }}" hint-placeholder-val="{{ false }}"><span style="{{ c.badgeStyle }}">{{ c.v }}</span></sc-if>
+          <sc-if value="{{ c.plain }}" hint-placeholder-val="{{ true }}">{{ c.v }}</sc-if>
+        </td></sc-for></tr>
+      </sc-for></tbody></table></div></div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isPaymentDetail }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1100px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Payment PAY-99321</div>
+          <span style="{{ pillBad }}">Failed</span>
+        </div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Deposit for BK-20984 · JOD 120 · Visa •••• 4242</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn btn-secondary" onClick="{{ goBooking }}" style="padding:6px 12px;font-size:12.5px">View booking</button>
+        <button class="btn btn-secondary" onClick="{{ mRefund }}" style="padding:6px 12px;font-size:12.5px">Refund</button>
+        <button class="btn btn-primary" onClick="{{ retryPayment }}" style="padding:6px 12px;font-size:12.5px">Retry payment</button>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:6px;background:rgba(209,128,110,.12)">
+      <ph-icon name="x-circle" style="font-size:17px;color:#d1806e;margin-top:1px"></ph-icon>
+      <div>
+        <div style="font-size:13px;font-weight:500">Payment failed — card declined by the issuing bank</div>
+        <div style="font-size:12px;color:rgba(233,233,237,.6);margin-top:2px">Three attempts, the last at 09:14. Processor code <span class="mono">do_not_honor</span>. No funds were captured and the customer was notified. The booking is held for 4 more hours.</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="sect"><div class="sect-h"><span class="sect-t">Transaction</span></div>
+        <div style="padding:6px 14px 12px">
+          <sc-for list="{{ paymentRows }}" as="b" hint-placeholder-count="9">
+            <div style="display:flex;gap:16px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <div style="width:190px;flex:none;font-size:12px;color:rgba(233,233,237,.5)">{{ b.k }}</div><div style="font-size:12.5px">{{ b.v }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div class="sect"><div class="sect-h"><span class="sect-t">Full transaction history</span></div>
+        <div style="padding:14px">
+          <sc-for list="{{ payHistory }}" as="t" hint-placeholder-count="6">
+            <div style="display:flex;gap:11px">
+              <div style="display:flex;flex-direction:column;align-items:center;flex:none"><div style="{{ t.dot }}"></div><div style="{{ t.line }}"></div></div>
+              <div style="padding-bottom:13px">
+                <div style="font-size:12.5px;font-weight:500;color:{{ t.color }}">{{ t.label }}</div>
+                <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ t.meta }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isDisputeDetail }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Dispute DSP-1184</div>
+          <span style="{{ pillBad }}">Overdue</span><span style="{{ pillNeutral }}">High priority</span>
+        </div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Damage penalty disputed · opened by customer 27 Aug 2026 08:41 · BK-20411</div>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:14px;padding:9px 14px;border-radius:8px;background:rgba(209,128,110,.12)">
+        <div><div class="k">48-hour SLA</div><div class="num" style="font-size:20px;color:#d1806e">13h 06m over</div></div>
+        <div style="width:1px;height:34px;background:rgba(255,255,255,.1)"></div>
+        <div><div class="k">Age</div><div class="num" style="font-size:20px">61h</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+          <sc-for list="{{ disputeCards }}" as="c" hint-placeholder-count="3">
+            <div class="sect">
+              <div class="sect-h"><ph-icon name="{{ c.icon }}" style="font-size:14px;color:var(--color-accent)"></ph-icon><span class="sect-t">{{ c.title }}</span></div>
+              <div style="padding:6px 14px 12px">
+                <sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="4">
+                  <div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                    <div style="flex:1;font-size:11.5px;color:rgba(233,233,237,.5)">{{ r.k }}</div><div style="font-size:12px;text-align:right">{{ r.v }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><ph-icon name="paperclip" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Evidence</span>
+            <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">6 files from both parties</span></div>
+          <div style="padding:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+            <sc-for list="{{ evidence }}" as="e" hint-placeholder-count="4">
+              <div>
+                <div class="doc" style="min-height:110px"><span class="mono">{{ e.file }}</span></div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:6px"><span style="{{ e.byStyle }}">{{ e.by }}</span><span style="font-size:11px;color:rgba(233,233,237,.45)">{{ e.ts }}</span></div>
+                <div style="font-size:11.5px;margin-top:2px">{{ e.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="sect-h"><span class="sect-t">Case timeline</span></div>
+          <div style="padding:14px">
+            <sc-for list="{{ disputeTimeline }}" as="t" hint-placeholder-count="6">
+              <div style="display:flex;gap:11px">
+                <div style="display:flex;flex-direction:column;align-items:center;flex:none"><div style="{{ t.dot }}"></div><div style="{{ t.line }}"></div></div>
+                <div style="padding-bottom:13px">
+                  <div style="font-size:12.5px;font-weight:500;color:{{ t.color }}">{{ t.label }}</div>
+                  <div style="font-size:11px;color:rgba(233,233,237,.45)">{{ t.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;position:sticky;top:0">
+        <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:8px"><ph-icon name="gavel" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">Admin resolution</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <sc-for list="{{ resolutions }}" as="r" hint-placeholder-count="4">
+              <label class="radio" style="{{ r.style }}">
+                <input type="radio" name="res" checked="{{ r.on }}" onChange="{{ r.click }}"><span class="dot"></span>
+                <span style="flex:1"><span style="font-size:12.5px">{{ r.label }}</span><span style="display:block;font-size:11px;color:rgba(233,233,237,.45)">{{ r.desc }}</span></span>
+              </label>
+            </sc-for>
+          </div>
+          <div class="field"><label>Penalty split</label>
+            <div style="display:flex;gap:8px"><input class="input" value="60" style="text-align:right"><input class="input" value="60" style="text-align:right"></div>
+            <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:4px">To dealer / refunded to customer · JOD</div>
+          </div>
+          <div class="field"><label>Admin note (required)</label>
+            <textarea class="input" placeholder="Explain the decision and the evidence it rests on…" style="min-height:82px;font-size:13px"></textarea>
+          </div>
+          <button class="btn btn-primary btn-block" onClick="{{ mResolve }}" style="padding:8px 12px;font-size:13px">Resolve dispute</button>
+          <button class="btn btn-secondary btn-block" onClick="{{ mMoreInfo }}" style="padding:8px 12px;font-size:13px;margin-top:0">Request more information</button>
+          <div style="font-size:11px;color:rgba(233,233,237,.42)">The resolution, your note and the timestamp are shown to both parties.</div>
+        </div>
+        <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:9px">
+          <span class="k">Previous resolutions on this booking</span>
+          <sc-for list="{{ pastResolutions }}" as="p" hint-placeholder-count="2">
+            <div style="padding:9px 0;border-top:1px solid rgba(255,255,255,.06)">
+              <div style="font-size:12.5px;font-weight:500">{{ p.res }}</div>
+              <div style="font-size:11.5px;color:rgba(233,233,237,.55);margin-top:2px">{{ p.reason }}</div>
+              <div style="font-size:11px;color:rgba(233,233,237,.4);margin-top:3px">{{ p.who }} · {{ p.ts }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isFinance }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div>
+        <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Finance</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">1–30 September 2026 · all amounts in JOD · blended commission 20%</div>
+      </div>
+      <div class="seg" style="margin-left:auto;height:31px">
+        <label class="seg-opt" style="font-size:12px"><input type="radio" name="fin">Today</label>
+        <label class="seg-opt" style="font-size:12px"><input type="radio" name="fin">This week</label>
+        <label class="seg-opt" style="font-size:12px"><input type="radio" name="fin" checked>This month</label>
+        <label class="seg-opt" style="font-size:12px"><input type="radio" name="fin">Custom range</label>
+      </div>
+      <button class="btn btn-secondary" style="padding:6px 12px;font-size:12.5px;gap:6px"><ph-icon name="download-simple" style="font-size:13px"></ph-icon>Export</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">
+      <sc-for list="{{ financeKpis }}" as="k" hint-placeholder-count="6">
+        <div class="sect" style="padding:13px 14px;display:flex;flex-direction:column;gap:6px">
+          <span class="k">{{ k.label }}</span>
+          <span class="num" style="font-size:23px;line-height:1;color:{{ k.color }}">{{ k.v }}</span>
+          <span style="font-size:11px;color:rgba(233,233,237,.45)">{{ k.meta }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div class="sect" style="overflow:hidden">
+      <div class="sect-h"><span class="sect-t">Commission report</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">1,204 settled bookings this month</span></div>
+      <div style="overflow-x:auto"><table class="table" style="min-width:980px">
+        <thead><tr><th>Booking</th><th>Dealer</th><th style="text-align:right">Booking value</th><th style="text-align:right">Rate</th><th style="text-align:right">Commission</th><th style="text-align:right">Dealer payout</th><th>Payout status</th><th>Date</th></tr></thead>
+        <tbody><sc-for list="{{ commission }}" as="c" hint-placeholder-count="8">
+          <tr><td style="font-size:12.5px">{{ c.id }}</td><td style="font-size:12.5px">{{ c.dealer }}</td>
+            <td class="num" style="text-align:right;font-size:12.5px">{{ c.value }}</td>
+            <td class="num" style="text-align:right;font-size:12.5px;color:rgba(233,233,237,.55)">{{ c.rate }}</td>
+            <td class="num" style="text-align:right;font-size:12.5px;color:var(--color-accent-300)">{{ c.amount }}</td>
+            <td class="num" style="text-align:right;font-size:12.5px">{{ c.payout }}</td>
+            <td><span style="{{ c.statusStyle }}">{{ c.status }}</span></td><td style="font-size:12.5px">{{ c.date }}</td></tr>
+        </sc-for></tbody>
+      </table></div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1080px">
+    <div>
+      <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Platform settings</div>
+      <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Business rules applied to every new booking. Changes take effect immediately and are attributed to you.</div>
+    </div>
+    <sc-for list="{{ settingsGroups }}" as="g" hint-placeholder-count="3">
+      <div class="sect">
+        <div class="sect-h"><ph-icon name="{{ g.icon }}" style="font-size:15px;color:var(--color-accent)"></ph-icon><span class="sect-t">{{ g.title }}</span>
+          <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">{{ g.note }}</span></div>
+        <div style="padding:4px 14px 12px">
+          <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500">{{ r.label }}</div>
+                <div style="font-size:11.5px;color:rgba(233,233,237,.5);margin-top:2px">{{ r.desc }}</div>
+                <div style="font-size:10.5px;color:rgba(233,233,237,.38);margin-top:3px">Last changed by {{ r.by }} · {{ r.when }}</div>
+              </div>
+              <div style="width:120px;flex:none"><input class="input" value="{{ r.value }}" style="text-align:right;font-variant-numeric:tabular-nums"></div>
+              <button class="btn btn-secondary" onClick="{{ mSaveSetting }}" style="padding:5px 11px;font-size:12px;flex:none">Change</button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isNotifications }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1080px">
+    <div style="display:flex;align-items:flex-end;gap:14px">
+      <div>
+        <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Notifications</div>
+        <div style="font-size:12.5px;color:rgba(233,233,237,.5)">9 unread across dealer approval, disputes, payments, payouts, security and system</div>
+      </div>
+      <button class="btn btn-secondary" style="margin-left:auto;padding:6px 12px;font-size:12.5px">Mark all as read</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <sc-for list="{{ notifCats }}" as="c" hint-placeholder-count="7">
+        <button class="{{ c.cls }}" style="padding:5px 11px;font-size:12px;gap:6px"><ph-icon name="{{ c.icon }}" style="font-size:13px"></ph-icon>{{ c.label }}<span style="{{ c.countStyle }}">{{ c.count }}</span></button>
+      </sc-for>
+    </div>
+    <div class="sect" style="overflow:hidden">
+      <sc-for list="{{ notifItems }}" as="n" hint-placeholder-count="8">
+        <div style="{{ n.rowStyle }}" style-hover="background:rgba(255,255,255,.03)">
+          <div style="{{ n.iconWrap }}"><ph-icon name="{{ n.icon }}" style="{{ n.iconStyle }}"></ph-icon></div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:13px;font-weight:500">{{ n.title }}</span>
+              <sc-if value="{{ n.unread }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:50%;background:var(--color-accent)"></span></sc-if>
+              <span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.4)">{{ n.ts }}</span>
+            </div>
+            <div style="font-size:12px;color:rgba(233,233,237,.55);margin-top:2px">{{ n.desc }}</div>
+          </div>
+          <button class="btn btn-ghost" onClick="{{ n.click }}" style="font-size:12px;flex:none">{{ n.link }}</button>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isSecurity }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1140px">
+    <div>
+      <div style="font-family:var(--font-heading);font-size:22px;font-weight:500;letter-spacing:-.02em">Security</div>
+      <div style="font-size:12.5px;color:rgba(233,233,237,.5)">Your account, active sessions and platform-wide sign-in activity.</div>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:6px;background:rgba(208,173,116,.12)">
+      <ph-icon name="warning" style="font-size:17px;color:#d0ad74;margin-top:1px"></ph-icon>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500">Suspicious sign-in blocked</div>
+        <div style="font-size:12px;color:rgba(233,233,237,.6);margin-top:2px">Four failed attempts on <span class="mono">omar@carrental.jo</span> from 91.204.x.x (Bucharest) at 02:14. The account was locked for 30 minutes and the owner notified.</div>
+      </div>
+      <button class="btn btn-secondary" style="padding:5px 11px;font-size:12px">Review</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+        <span class="sect-t">Password</span>
+        <div class="field"><label>Current password</label><input class="input" type="password" value="............"></div>
+        <div class="field"><label>New password</label><input class="input" type="password" placeholder="At least 12 characters"></div>
+        <div style="font-size:11.5px;color:rgba(233,233,237,.45)">Changing your password signs out every other session.</div>
+        <button class="btn btn-primary" style="padding:6px 12px;font-size:12.5px;align-self:flex-start">Update password</button>
+      </div>
+      <div class="sect" style="padding:14px;display:flex;flex-direction:column;gap:12px">
+        <span class="sect-t">Two-factor authentication</span>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;background:rgba(143,191,166,.12)">
+          <ph-icon name="shield-check" style="font-size:16px;color:#8fbfa6"></ph-icon>
+          <div style="flex:1"><div style="font-size:12.5px;font-weight:500">Authenticator app enabled</div><div style="font-size:11px;color:rgba(233,233,237,.5)">Added 04 January 2025 · last used today</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="flex:1"><div style="font-size:12.5px">Require 2FA for all admin users</div><div style="font-size:11px;color:rgba(233,233,237,.5)">Currently 5 of 6 admins enrolled</div></div>
+          <button class="btn btn-primary" onClick="{{ m2fa }}" style="padding:5px 11px;font-size:12px">Enforce</button>
+        </div>
+        <button class="btn btn-secondary" style="padding:6px 12px;font-size:12.5px;align-self:flex-start">View recovery codes</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
+      <div class="sect" style="overflow:hidden">
+        <div class="sect-h"><span class="sect-t">Active sessions</span><button class="btn btn-ghost" onClick="{{ mRevoke }}" style="font-size:11.5px;margin-left:auto">Revoke all others</button></div>
+        <div style="padding:4px 14px 12px">
+          <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <ph-icon name="{{ s.icon }}" style="font-size:16px;color:rgba(233,233,237,.55)"></ph-icon>
+              <div style="flex:1"><div style="font-size:12.5px">{{ s.device }}</div><div style="font-size:11px;color:rgba(233,233,237,.45)">{{ s.meta }}</div></div>
+              <sc-if value="{{ s.current }}" hint-placeholder-val="{{ false }}"><span style="{{ s.badgeStyle }}">This device</span></sc-if>
+              <sc-if value="{{ s.revocable }}" hint-placeholder-val="{{ true }}"><button class="btn btn-secondary" onClick="{{ mRevoke }}" style="padding:3px 9px;font-size:11.5px">Revoke</button></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div class="sect" style="overflow:hidden">
+        <div class="sect-h"><span class="sect-t">Login history</span><span style="margin-left:auto;font-size:11px;color:rgba(233,233,237,.42)">Platform-wide</span></div>
+        <div style="padding:4px 14px 12px">
+          <sc-for list="{{ loginHistory }}" as="h" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+              <span style="{{ h.dot }}"></span>
+              <div style="flex:1"><div style="font-size:12.5px">{{ h.who }}</div><div style="font-size:11px;color:rgba(233,233,237,.45)">{{ h.meta }}</div></div>
+              <span style="{{ h.badgeStyle }}">{{ h.result }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  </div>
+</div>
+</div>
+
+<sc-if value="{{ modal }}" hint-placeholder-val="{{ false }}">
+<div class="dialog-backdrop" style="z-index:50">
+  <div class="dialog" style="width:min(480px,100%)">
+    <div style="display:flex;align-items:flex-start;gap:10px">
+      <div style="{{ modal.iconWrap }}"><ph-icon name="{{ modal.icon }}" style="{{ modal.iconStyle }}"></ph-icon></div>
+      <div style="flex:1">
+        <div class="dialog-title" style="font-size:18px">{{ modal.title }}</div>
+        <div class="dialog-body" style="margin-top:4px">{{ modal.body }}</div>
+      </div>
+      <button class="btn btn-icon btn-secondary" onClick="{{ closeModal }}" style="width:28px;height:28px;flex:none"><ph-icon name="x" style="font-size:13px"></ph-icon></button>
+    </div>
+    <sc-for list="{{ modal.fields }}" as="f" hint-placeholder-count="2">
+      <div class="field">
+        <label>{{ f.label }}</label>
+        <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}">
+          <select class="input">
+            <sc-for list="{{ f.options }}" as="o" hint-placeholder-count="3"><option>{{ o }}</option></sc-for>
+          </select>
+        </sc-if>
+        <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ true }}">
+          <textarea class="input" placeholder="{{ f.placeholder }}" style="min-height:74px;font-size:13px">{{ f.value }}</textarea>
+        </sc-if>
+        <sc-if value="{{ f.hint }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:11px;color:rgba(233,233,237,.42);margin-top:4px">{{ f.hint }}</div>
+        </sc-if>
+      </div>
+    </sc-for>
+    <sc-if value="{{ modal.note }}" hint-placeholder-val="{{ false }}">
+      <div style="{{ modal.noteStyle }}"><ph-icon name="info" style="font-size:13px;margin-right:6px"></ph-icon>{{ modal.note }}</div>
+    </sc-if>
+    <div class="dialog-actions">
+      <button class="btn btn-secondary" onClick="{{ closeModal }}" style="padding:6px 12px;font-size:13px">Cancel</button>
+      <button class="btn btn-primary" onClick="{{ modal.confirmClick }}" style="{{ modal.confirmStyle }}">{{ modal.confirm }}</button>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;right:22px;bottom:22px;z-index:60;display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:var(--radius-md);background:var(--color-surface);box-shadow:var(--shadow-lg);animation:toastin .18s ease-out">
+  <ph-icon name="{{ toast.icon }}" style="{{ toast.iconStyle }}"></ph-icon>
+  <div>
+    <div style="font-size:13px;font-weight:500">{{ toast.title }}</div>
+    <div style="font-size:11.5px;color:rgba(233,233,237,.5)">{{ toast.body }}</div>
+  </div>
+  <button class="btn btn-ghost" onClick="{{ closeToast }}" style="font-size:12px;margin-left:8px">Dismiss</button>
+</div>
+</sc-if>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const OK='#8fbfa6', WARN='#d0ad74', BAD='#d1806e', DIM='rgba(233,233,237,.55)', ACC='var(--color-accent-300)';
+const tint=(c,p)=>'color-mix(in srgb,'+c+' '+p+'%, transparent)';
+const pill=c=>'display:inline-flex;font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:'+tint(c,16)+';color:'+c;
+const TD='padding:9px var(--space-2);font-size:12.5px;vertical-align:middle';
+const cell=(v,sub)=>({plain:true,v,sub:sub||false,style:TD});
+const num=(v,sub)=>({plain:true,v,sub:sub||false,style:TD+';text-align:right;font-variant-numeric:tabular-nums'});
+const bad=(v,c)=>({badge:true,v,badgeStyle:pill(c),style:TD});
+const tl=(items)=>items.map((t,i)=>({label:t.label,meta:t.meta,color:t.off?'rgba(233,233,237,.55)':'inherit',
+  dot:'width:9px;height:9px;border-radius:50%;margin-top:4px;'+(t.off
+    ?'border:1.5px solid rgba(233,233,237,.28)'
+    :'background:'+t.c+';box-shadow:0 0 0 3px '+tint(t.c,18)),
+  line:'width:1px;flex:1;min-height:14px;margin-top:4px;background:'+(i===items.length-1?'transparent':'rgba(255,255,255,.12)')}));
+const ent=(v,sub)=>({entity:true,v,sub,initials:v.split(' ').slice(0,2).map(x=>x[0]).join(''),style:TD});
+
+const DEALERS=[
+ ['Al-Nadeem Rentals','Amman','Approved',OK,24,412,'4.8','12 Jan 2025','2h ago'],
+ ['Aqaba Coast Cars','Aqaba','Approved',OK,18,286,'4.9','03 Mar 2025','20 min ago'],
+ ['Wadi Rum Motors','Wadi Rum','Pending Review',WARN,9,0,'—','01 Sep 2026','41h ago'],
+ ['Irbid Auto Lease','Irbid','Pending Review',WARN,14,0,'—','01 Sep 2026','40h ago'],
+ ['Petra Wheels','Petra','Clarification Needed',WARN,11,64,'4.4','18 Aug 2026','26h ago'],
+ ['Dead Sea Drive','Dead Sea','Suspended',BAD,7,138,'3.6','22 Nov 2025','3d ago'],
+ ['Jerash Rentals','Amman','Pending Review',WARN,6,0,'—','02 Sep 2026','18h ago'],
+ ['Madaba Car Hire','Amman','Rejected',DIM,0,0,'—','14 Aug 2026','20d ago'],
+];
+const BOOKINGS=[
+ ['BK-20984','Layla Odeh','Al-Nadeem Rentals','Toyota Corolla 2023','04 Sep','08 Sep','1,240','120','Pending',WARN,'03 Sep 09:12'],
+ ['BK-20977','Sami Farah','Aqaba Coast Cars','Hyundai Tucson 2024','05 Sep','09 Sep','860','100','Confirmed',OK,'03 Sep 08:40'],
+ ['BK-20961','Marta Kowal','Petra Wheels','Mercedes E200 2022','02 Sep','12 Sep','2,105','300','Active',ACC,'01 Sep 17:02'],
+ ['BK-20955','Omar Nasser','Wadi Rum Motors','Nissan Patrol 2021','29 Aug','02 Sep','1,480','200','Completed',DIM,'28 Aug 11:24'],
+ ['BK-20455','Huda Sabbagh','Dead Sea Drive','Kia Rio 2023','30 Aug','01 Sep','420','80','Disputed',BAD,'29 Aug 14:55'],
+ ['BK-20411','Jonas Weber','Aqaba Coast Cars','Toyota Yaris 2022','27 Aug','30 Aug','360','80','Disputed',BAD,'26 Aug 10:03'],
+ ['BK-20402','Rami Zayed','Irbid Auto Lease','Hyundai Accent 2023','26 Aug','28 Aug','280','60','No-show',BAD,'25 Aug 19:41'],
+ ['BK-20388','Nour Halabi','Al-Nadeem Rentals','Toyota Land Cruiser 2024','24 Aug','31 Aug','3,320','400','Cancelled',DIM,'22 Aug 08:17'],
+];
+const CUSTOMERS=[
+ ['Layla Odeh','Jordan','Verified',OK,14,12,1,0,'4.9','Active','04 Feb 2025'],
+ ['Sami Farah','Jordan','Verified',OK,9,9,0,0,'5.0','Active','19 Mar 2025'],
+ ['Marta Kowal','Poland','Verified',OK,3,2,0,0,'4.7','Active','28 Aug 2026'],
+ ['Jonas Weber','Germany','Pending Verification',WARN,1,0,0,0,'—','Active','01 Sep 2026'],
+ ['Omar Nasser','Jordan','Verified',OK,22,19,2,1,'4.5','Active','11 Nov 2024'],
+ ['Huda Sabbagh','Jordan','Verified',OK,6,4,1,1,'4.1','Active','06 Jun 2025'],
+ ['Rami Zayed','Jordan','Verified',OK,8,4,2,2,'3.4','Suspended','23 Jan 2025'],
+ ['Aisha Kamal','Egypt','Pending Verification',WARN,0,0,0,0,'—','Active','02 Sep 2026'],
+];
+const PAYMENTS=[
+ ['PAY-99321','BK-20984','Layla Odeh','Al-Nadeem Rentals','120','Card · Visa 4242','txn_9f21ab','Failed',BAD,'03 Sep 09:14'],
+ ['PAY-99318','BK-20977','Sami Farah','Aqaba Coast Cars','100','Card · Mastercard','txn_9f18cc','Paid',OK,'03 Sep 08:41'],
+ ['PAY-99302','BK-20961','Marta Kowal','Petra Wheels','300','Card · Visa 1881','txn_9f02de','Paid',OK,'01 Sep 17:05'],
+ ['PAY-99288','BK-20955','Omar Nasser','Wadi Rum Motors','200','Cash on pickup','—','Paid',OK,'28 Aug 11:30'],
+ ['PAY-99266','BK-20455','Huda Sabbagh','Dead Sea Drive','80','Card · Visa 3310','txn_8ff6aa','Refunded',DIM,'29 Aug 15:02'],
+ ['PAY-99251','BK-20411','Jonas Weber','Aqaba Coast Cars','80','Card · Amex','txn_8fe1b2','Partially Refunded',WARN,'26 Aug 10:07'],
+ ['PAY-99240','BK-20402','Rami Zayed','Irbid Auto Lease','60','Card · Visa 7702','txn_8fd0c9','Initiated',DIM,'25 Aug 19:44'],
+ ['PAY-99231','BK-20388','Nour Halabi','Al-Nadeem Rentals','400','Card · Visa 5521','txn_8fc4e1','Pending',WARN,'22 Aug 08:20'],
+];
+const PAYOUTS=[
+ ['Al-Nadeem Rentals','BK-20902','3,320','664','2,656','Paid',OK,'01 Sep 2026','01 Sep 2026'],
+ ['Aqaba Coast Cars','BK-20977','860','172','688','Paid',OK,'01 Sep 2026','01 Sep 2026'],
+ ['Petra Wheels','BK-20961','2,105','379','1,726','Processing',WARN,'05 Sep 2026','—'],
+ ['Wadi Rum Motors','BK-20955','640','128','512','Pending',DIM,'05 Sep 2026','—'],
+ ['Irbid Auto Lease','BK-20933','1,480','222','1,258','Pending',DIM,'05 Sep 2026','—'],
+ ['Dead Sea Drive','BK-20918','990','198','792','Failed',BAD,'01 Sep 2026','—'],
+ ['Jerash Rentals','BK-20896','710','142','568','Paid',OK,'01 Sep 2026','01 Sep 2026'],
+];
+const DISPUTES=[
+ ['DSP-1184','BK-20411','Customer','Damage penalty disputed','Aqaba Coast Cars','Jonas Weber','61h','Overdue',BAD,'High'],
+ ['DSP-1190','BK-20455','Customer','Deposit forfeited after no-show','Dead Sea Drive','Huda Sabbagh','54h','Overdue',BAD,'High'],
+ ['DSP-1207','BK-20984','Customer','Vehicle not delivered','Al-Nadeem Rentals','Layla Odeh','38m','Open',WARN,'High'],
+ ['DSP-1201','BK-20961','Dealer','Late return, extra day charged','Petra Wheels','Marta Kowal','19h','Under Review',ACC,'Medium'],
+ ['DSP-1198','BK-20402','Dealer','Fuel level on return','Irbid Auto Lease','Rami Zayed','2d','Waiting for Customer',WARN,'Low'],
+ ['DSP-1193','BK-20388','Customer','Cancellation fee','Al-Nadeem Rentals','Nour Halabi','3d','Waiting for Dealer',WARN,'Medium'],
+ ['DSP-1177','BK-20301','Customer','Cleanliness on handover','Wadi Rum Motors','Omar Nasser','6d','Resolved',OK,'Low'],
+];
+const REVIEWS=[
+ ['Layla Odeh','Al-Nadeem Rentals','4.8','Car was clean and delivery was on time in Amman.','BK-20902','01 Sep 2026','Published',OK],
+ ['Jonas Weber','Aqaba Coast Cars','2.0','Charged me for damage that was already there.','BK-20411','27 Aug 2026','Reported',WARN],
+ ['Omar Nasser','Wadi Rum Motors','5.0','Excellent 4x4 for the desert route, would rent again.','BK-20955','02 Sep 2026','Published',OK],
+ ['Huda Sabbagh','Dead Sea Drive','1.0','Never showed up. Do not book here — call this number…','BK-20455','30 Aug 2026','Hidden',BAD],
+ ['Marta Kowal','Petra Wheels','4.5','Good service, paperwork took a while.','BK-20961','02 Sep 2026','Published',OK],
+ ['Rami Zayed','Irbid Auto Lease','3.0','Fuel policy was not explained clearly.','BK-20402','29 Aug 2026','Reported',WARN],
+];
+const CITIES=[
+ ['Amman','Central','62','1,842','Active',OK],['Aqaba','South','24','604','Active',OK],
+ ['Irbid','North','16','288','Active',OK],['Petra','South','19','431','Active',OK],
+ ['Wadi Rum','South','12','214','Active',OK],['Dead Sea','Central','9','133','Active',OK],
+ ['Jerash','North','6','41','Inactive',DIM],
+];
+const CARTYPES=[
+ ['Sedan','1,120','38%','Active',OK],['SUV','864','29%','Active',OK],['Hatchback','412','14%','Active',OK],
+ ['Luxury','188','6%','Active',OK],['Van','214','7%','Active',OK],['Pickup','96','3%','Inactive',DIM],
+];
+const AUDIT=[
+ ['03 Sep 2026 09:41','Rania Haddad','Super Admin','Approved dealer','Dealer','#102','Pending Review','Approved','Documents verified'],
+ ['03 Sep 2026 09:12','System','—','Payment failed','Payment','PAY-99321','Pending','Failed','Card declined (do_not_honor)'],
+ ['02 Sep 2026 18:20','Omar Deeb','Support Admin','Suspended customer','Customer','#882','Active','Suspended','Two no-shows in 30 days'],
+ ['02 Sep 2026 14:05','Rania Haddad','Super Admin','Changed commission rate','Setting','commission_rate','18%','20%','Board decision Q3'],
+ ['02 Sep 2026 11:47','Yousef Barakat','Finance Admin','Approved payout run','Payout','PR-0090','Pending','Paid','Scheduled batch'],
+ ['01 Sep 2026 16:30','Rania Haddad','Super Admin','Resolved dispute','Dispute','#88','Under Review','Resolved','Partial penalty applied'],
+ ['01 Sep 2026 10:02','Nadia Sweiss','Support Admin','Hid review','Review','#4471','Published','Hidden','Contained phone number'],
+];
+const ADMINS=[
+ ['Rania Haddad','rania@carrental.jo','Super Admin','Active',OK,'03 Sep 2026 08:52','04 Jan 2025'],
+ ['Omar Deeb','omar@carrental.jo','Support Admin','Active',OK,'03 Sep 2026 07:15','22 Feb 2025'],
+ ['Yousef Barakat','yousef@carrental.jo','Finance Admin','Active',OK,'02 Sep 2026 17:40','12 Mar 2025'],
+ ['Nadia Sweiss','nadia@carrental.jo','Support Admin','Active',OK,'01 Sep 2026 09:03','09 Jun 2025'],
+ ['Khalid Amr','khalid@carrental.jo','Finance Admin','Invited',WARN,'—','02 Sep 2026'],
+ ['Dana Qasem','dana@carrental.jo','Support Admin','Disabled',DIM,'14 Jul 2026 12:20','18 Apr 2025'],
+];
+
+const SCREENS={
+ dashboard:'Dashboard', dealers:'Dealers', 'dealer-review':'Dealer application', 'dealer-profile':'Dealer profile',
+ bookings:'Bookings', 'booking-detail':'Booking details', customers:'Customers', 'customer-profile':'Customer profile',
+ finance:'Finance', payments:'Payments', 'payment-detail':'Payment details', payouts:'Payouts',
+ disputes:'Disputes', 'dispute-detail':'Dispute resolution', reviews:'Reviews', cities:'Cities & Regions',
+ 'car-types':'Car Types', settings:'Platform settings', notifications:'Notifications', 'audit-logs':'Audit logs',
+ 'admin-users':'Admin users', security:'Security'
+};
+const PARENT={'dealer-review':'dealers','dealer-profile':'dealers','booking-detail':'bookings','customer-profile':'customers','payment-detail':'payments','dispute-detail':'disputes'};
+
+class Component extends DCLogic {
+  state={screen:'dashboard',viewState:'data',modal:null,toast:null,tab:'Overview',resolution:'Partial penalty'};
+  go=(s)=>{ this.setState({screen:s,viewState:'data',tab:s==='dealer-profile'?'Overview':(s==='customer-profile'?'Overview':this.state.tab)}); const el=document.scrollingElement; if(el) el.scrollTop=0; };
+  open=(k)=>this.setState({modal:k});
+  close=()=>this.setState({modal:null});
+  fire=(title,body,kind)=>{ this.setState({modal:null,toast:{title,body,kind:kind||'ok'}}); clearTimeout(this._t); this._t=setTimeout(()=>this.setState({toast:null}),4200); };
+
+  tabTable(){
+    const s=this.state, T={};
+    const row=cells=>({cells});
+    const c=(v,extra)=>({plain:true,v,style:TD+(extra||'')});
+    if(s.screen==='dealer-profile'){
+      T.Cars={columns:['Vehicle','Type','Year','Plate','Daily price','Status'],rows:[
+        ['Toyota Corolla','Sedan','2023','42-19883','310','Available',OK],
+        ['Toyota Land Cruiser','SUV','2024','42-20114','980','Rented',ACC],
+        ['Hyundai Accent','Sedan','2022','42-18770','240','Available',OK],
+        ['Kia Carnival','Van','2023','42-19002','520','Maintenance',WARN],
+        ['Mercedes E200','Luxury','2022','42-17654','1,050','Available',OK],
+      ].map(r=>row([c(r[0]),c(r[1]),c(r[2]),c(r[3]),c(r[4],';text-align:right'),{badge:true,v:r[5],badgeStyle:pill(r[6]),style:TD}]))};
+      T.Bookings={columns:['Booking','Customer','Vehicle','Dates','Total','Status'],rows:[
+        ['BK-20984','Layla Odeh','Toyota Corolla','04–08 Sep','1,240','Pending',WARN],
+        ['BK-20902','Nour Halabi','Land Cruiser','20–27 Aug','3,320','Completed',DIM],
+        ['BK-20388','Nour Halabi','Land Cruiser','24–31 Aug','3,320','Cancelled',DIM],
+        ['BK-20301','Omar Nasser','Hyundai Accent','12–15 Aug','720','Completed',DIM],
+      ].map(r=>row([c(r[0]),c(r[1]),c(r[2]),c(r[3]),c(r[4],';text-align:right'),{badge:true,v:r[5],badgeStyle:pill(r[6]),style:TD}]))};
+      T.Employees={columns:['Name','Role','Can approve bookings','Last active'],rows:[
+        ['John Sabbagh','Employee','Yes','Today 09:20'],['Maha Odeh','Employee','Yes','Today 08:02'],
+        ['Ziad Karam','Employee','No','Yesterday'],['Nadeem Khoury','Owner','Yes','Today 07:40'],
+      ].map(r=>row(r.map(v=>c(v))))};
+      T.Financial={columns:['Period','Bookings','Gross','Commission','Net payout','Status'],rows:[
+        ['September 2026','12','8,410','1,682','6,728','Open',WARN],
+        ['August 2026','44','31,220','6,244','24,976','Paid',OK],
+        ['July 2026','39','27,880','5,018','22,862','Paid',OK],
+      ].map(r=>row([c(r[0]),c(r[1]),c(r[2],';text-align:right'),c(r[3],';text-align:right'),c(r[4],';text-align:right'),{badge:true,v:r[5],badgeStyle:pill(r[6]),style:TD}]))};
+      T.Reviews={columns:['Reviewer','Rating','Comment','Booking','Status'],rows:[
+        ['Layla Odeh','4.8','Car was clean and delivery was on time in Amman.','BK-20902','Published',OK],
+        ['Nour Halabi','3.5','Pickup took longer than agreed.','BK-20388','Published',OK],
+        ['Omar Nasser','5.0','Straightforward, good price.','BK-20301','Published',OK],
+      ].map(r=>row([c(r[0]),c(r[1]+' ★'),c(r[2],';max-width:320px'),c(r[3]),{badge:true,v:r[4],badgeStyle:pill(r[5]),style:TD}]))};
+      T.Activity={columns:['Timestamp','Actor','Action','Detail'],rows:[
+        ['Today 09:20','John — Employee','Approved booking','BK-20984'],
+        ['Today 07:40','Nadeem Khoury','Updated car price','Toyota Corolla · 290 → 310'],
+        ['Yesterday 18:11','System','Dispute opened','DSP-1207'],
+        ['01 Sep 14:05','Rania Haddad','Verified documents','Commercial registration'],
+      ].map(r=>row(r.map(v=>c(v))))};
+    } else if(s.screen==='customer-profile'){
+      T.Bookings={columns:['Booking','Dealer','Vehicle','Dates','Total','Status'],rows:[
+        ['BK-20984','Al-Nadeem Rentals','Toyota Corolla','04–08 Sep','1,240','Pending',WARN],
+        ['BK-20790','Aqaba Coast Cars','Hyundai Tucson','12–16 Aug','980','Completed',DIM],
+        ['BK-20612','Petra Wheels','Kia Rio','02–05 Jul','420','Completed',DIM],
+        ['BK-20455','Dead Sea Drive','Kia Rio','30 Aug–01 Sep','420','Disputed',BAD],
+      ].map(r=>row([c(r[0]),c(r[1]),c(r[2]),c(r[3]),c(r[4],';text-align:right'),{badge:true,v:r[5],badgeStyle:pill(r[6]),style:TD}]))};
+      T.Reviews={columns:['Dealer','Rating','Comment','Booking','Status'],rows:[
+        ['Al-Nadeem Rentals','4.8','Car was clean and delivery was on time in Amman.','BK-20902','Published',OK],
+        ['Aqaba Coast Cars','5.0','Very smooth pickup at the airport.','BK-20790','Published',OK],
+      ].map(r=>row([c(r[0]),c(r[1]+' ★'),c(r[2],';max-width:320px'),c(r[3]),{badge:true,v:r[4],badgeStyle:pill(r[5]),style:TD}]))};
+      T.Activity={columns:['Timestamp','Action','Detail','Channel'],rows:[
+        ['Today 09:12','Created booking','BK-20984','Mobile app'],
+        ['Today 09:14','Payment failed','PAY-99321 · card declined','Mobile app'],
+        ['12 Aug 10:02','Left review','Aqaba Coast Cars · 5.0','Web'],
+        ['06 Feb 09:41','Verification approved','National ID + licence','Admin'],
+      ].map(r=>row(r.map(v=>c(v))))};
+    }
+    return T[s.tab]||false;
+  }
+
+  lists(){
+    const go=this.go, open=this.open;
+    const act=(label,cls,fn)=>({label,cls:'btn '+cls,click:e=>{e.stopPropagation();fn();}});
+    return {
+      dealers:{title:'Dealers',subtitle:'148 rental offices · 7 awaiting review · 3 approaching the 48-hour SLA',searchHint:'Search dealer or registration no.',
+        filters:['Status: All','City: All','Rating: Any','Joined: Any'],primary:'Invite dealer',primaryClick:()=>open('invite-dealer'),count:'Showing 8 of 148 dealers',
+        columns:['Dealer','Status','City','Cars','Bookings','Rating','Joined','Last activity','Actions'],
+        rows:DEALERS.map(d=>({click:()=>go(d[2]==='Pending Review'?'dealer-review':'dealer-profile'),cells:[
+          ent(d[0],'CR '+(89000+d[4]*7)),bad(d[2],d[3]),cell(d[1]),num(String(d[4])),num(String(d[5])),cell(d[6]==='—'?'—':d[6]+' ★'),cell(d[7]),cell(d[8]),
+          {actions:true,style:TD,acts:d[2]==='Pending Review'?[act('Review','btn-primary',()=>go('dealer-review'))]
+            :d[2]==='Suspended'?[act('Reactivate','btn-secondary',()=>open('reactivate-dealer'))]
+            :[act('View','btn-secondary',()=>go('dealer-profile')),act('Suspend','btn-ghost',()=>open('suspend-dealer'))]}]}))},
+      bookings:{title:'Bookings',subtitle:'3,412 bookings all-time · 214 active · 38 pending dealer approval',searchHint:'Search booking ID or customer',
+        filters:['Status: All','Dealer: All','Date range','Vehicle: All','Pickup: All'],count:'Showing 8 of 3,412 bookings',
+        columns:['Booking','Customer','Dealer','Vehicle','Pickup','Return','Total','Deposit','Status','Created','Actions'],
+        rows:BOOKINGS.map(b=>({click:()=>go('booking-detail'),cells:[
+          cell(b[0]),cell(b[1]),cell(b[2]),cell(b[3]),cell(b[4]),cell(b[5]),num(b[6]),num(b[7]),bad(b[8],b[9]),cell(b[10]),
+          {actions:true,style:TD,acts:[act('View','btn-secondary',()=>go('booking-detail'))]}]}))},
+      customers:{title:'Customers',subtitle:'8,240 customers · 6,915 verified · 412 awaiting verification',searchHint:'Search name, email or phone',
+        filters:['Verification: All','Country: All','Rating: Any','Account: All'],count:'Showing 8 of 8,240 customers',
+        columns:['Customer','Country','Verification','Bookings','Completed','Cancelled','No-shows','Rating','Account','Joined'],
+        rows:CUSTOMERS.map(c=>({click:()=>go('customer-profile'),cells:[
+          ent(c[0],c[1]),cell(c[1]),bad(c[2],c[3]),num(String(c[4])),num(String(c[5])),num(String(c[6])),num(String(c[7])),cell(c[8]==='—'?'—':c[8]+' ★'),
+          bad(c[9],c[9]==='Active'?OK:BAD),cell(c[10])]}))},
+      payments:{title:'Payments',subtitle:'Transaction ledger across all dealers and booking channels',searchHint:'Search payment or transaction ID',
+        filters:['Status: All','Method: All','Dealer: All','Date range'],count:'Showing 8 of 5,904 payments',
+        columns:['Payment','Booking','Customer','Dealer','Amount','Method','Transaction','Status','Created','Actions'],
+        rows:PAYMENTS.map(p=>({click:()=>go('payment-detail'),cells:[
+          cell(p[0]),cell(p[1]),cell(p[2]),cell(p[3]),num(p[4]),cell(p[5]),{plain:true,v:p[6],sub:false,style:TD+';font-family:ui-monospace,Menlo,monospace;font-size:11.5px'},
+          bad(p[7],p[8]),cell(p[9]),{actions:true,style:TD,acts:p[7]==='Failed'?[act('Retry','btn-primary',()=>this.fire('Payment retried','PAY-99321 sent to the processor again.'))]:[act('View','btn-secondary',()=>go('payment-detail'))]}]}))},
+      payouts:{title:'Payouts',subtitle:'Dealer settlements · next scheduled run 05 September 2026',searchHint:'Search dealer or booking',
+        filters:['Status: All','Dealer: All','Scheduled: Any'],primary:'Create payout run',primaryClick:()=>open('payout-run'),count:'Showing 7 of 1,204 payouts',
+        columns:['Dealer','Booking','Gross','Commission','Net payout','Status','Scheduled','Paid','Actions'],
+        rows:PAYOUTS.map(p=>({click:()=>{},cells:[
+          ent(p[0],'JOD'),cell(p[1]),num(p[2]),num(p[3]),num(p[4]),bad(p[5],p[6]),cell(p[7]),cell(p[8]),
+          {actions:true,style:TD,acts:p[5]==='Failed'?[act('Retry','btn-primary',()=>this.fire('Payout retried','Dead Sea Drive payout queued for the next run.'))]:p[5]==='Pending'?[act('Approve','btn-primary',()=>open('approve-payout'))]:[act('Receipt','btn-secondary',()=>{})]}]}))},
+      disputes:{title:'Disputes',subtitle:'12 open · 2 past the 48-hour SLA · median resolution 19 hours',searchHint:'Search ticket or booking ID',
+        filters:['Status: All','Priority: Any','Dealer: All','Age: Any'],count:'Showing 7 of 12 open disputes',
+        columns:['Ticket','Booking','Opened by','Reason','Dealer','Customer','Age','Status','Priority','Actions'],
+        rows:DISPUTES.map(d=>({click:()=>go('dispute-detail'),cells:[
+          cell(d[0]),cell(d[1]),cell(d[2]),cell(d[3]),cell(d[4]),cell(d[5]),{plain:true,v:d[6],sub:false,style:TD+';color:'+(d[8]===BAD?BAD:'inherit')},
+          bad(d[7],d[8]),cell(d[9]),{actions:true,style:TD,acts:[act(d[7]==='Resolved'?'View':'Resolve',d[7]==='Resolved'?'btn-secondary':'btn-primary',()=>go('dispute-detail'))]}]}))},
+      reviews:{title:'Reviews',subtitle:'Moderation queue · ratings cannot be edited, only hidden under policy',searchHint:'Search reviewer or text',
+        filters:['Status: All','Rating: Any','Target: All','Reported only'],count:'Showing 6 of 4,471 reviews',
+        columns:['Reviewer','Target','Rating','Comment','Booking','Date','Status','Actions'],
+        rows:REVIEWS.map(r=>({click:()=>{},cells:[
+          ent(r[0],'Customer'),cell(r[1]),cell(r[2]+' ★'),{plain:true,v:r[3],sub:false,style:TD+';max-width:280px;color:rgba(233,233,237,.7)'},
+          cell(r[4]),cell(r[5]),bad(r[6],r[7]),
+          {actions:true,style:TD,acts:r[6]==='Hidden'?[act('Restore','btn-secondary',()=>this.fire('Review restored','Review #4471 is public again.'))]:[act('Hide','btn-ghost',()=>open('hide-review'))]}]}))},
+      cities:{title:'Cities & Regions',subtitle:'Service areas available to dealers and customers at booking time',searchHint:'Search city',
+        filters:['Region: All','Status: All'],primary:'Add city',primaryClick:()=>open('add-city'),count:'7 cities',
+        columns:['City','Region','Dealers','Bookings','Status','Actions'],
+        rows:CITIES.map(c=>({click:()=>{},cells:[cell(c[0]),cell(c[1]),num(c[2]),num(c[3]),bad(c[4],c[5]),
+          {actions:true,style:TD,acts:[act('Edit','btn-secondary',()=>open('add-city')),act(c[4]==='Active'?'Deactivate':'Activate','btn-ghost',()=>open('toggle-city'))]}]}))},
+      'car-types':{title:'Car Types',subtitle:'Vehicle categories dealers can list against',searchHint:'Search type',
+        filters:['Status: All'],primary:'Add type',primaryClick:()=>open('add-type'),count:'6 types',
+        columns:['Type','Cars listed','Share of bookings','Status','Actions'],
+        rows:CARTYPES.map(c=>({click:()=>{},cells:[cell(c[0]),num(c[1]),num(c[2]),bad(c[3],c[4]),
+          {actions:true,style:TD,acts:[act('Edit','btn-secondary',()=>open('add-type')),act(c[3]==='Active'?'Deactivate':'Activate','btn-ghost',()=>open('toggle-city'))]}]}))},
+      'audit-logs':{title:'Audit logs',subtitle:'Read-only record of every privileged action on the platform',searchHint:'Search user, entity or action',
+        filters:['User: All','Role: All','Entity: All','Date range'],count:'Showing 7 of 82,410 entries',
+        columns:['Timestamp','User','Role','Action','Entity','Entity ID','Previous','New','Reason'],
+        rows:AUDIT.map(a=>({click:()=>{},cells:[cell(a[0]),cell(a[1]),cell(a[2]),cell(a[3]),cell(a[4]),
+          {plain:true,v:a[5],sub:false,style:TD+';font-family:ui-monospace,Menlo,monospace;font-size:11.5px'},
+          {plain:true,v:a[6],sub:false,style:TD+';color:rgba(233,233,237,.5)'},{plain:true,v:a[7],sub:false,style:TD+';color:'+ACC},
+          {plain:true,v:a[8],sub:false,style:TD+';max-width:220px;color:rgba(233,233,237,.6)'}]}))},
+      'admin-users':{title:'Admin users',subtitle:'Platform staff · role structure prepared for finer permissions later',searchHint:'Search name or email',
+        filters:['Role: All','Status: All'],primary:'Invite admin',primaryClick:()=>open('invite-admin'),count:'6 admin users',
+        columns:['Name','Email','Role','Status','Last login','Created','Actions'],
+        rows:ADMINS.map(a=>({click:()=>{},cells:[ent(a[0],a[2]),{plain:true,v:a[1],sub:false,style:TD+';color:rgba(233,233,237,.7)'},
+          bad(a[2],a[2]==='Super Admin'?ACC:DIM),bad(a[3],a[4]),cell(a[5]),cell(a[6]),
+          {actions:true,style:TD,acts:[act('Edit','btn-secondary',()=>open('invite-admin')),act('Deactivate','btn-ghost',()=>open('deactivate-account'))]}]}))},
+    };
+  }
+
+  modals(){
+    const f=this.fire;
+    return {
+      'approve-dealer':{icon:'check-circle',c:OK,title:'Approve this dealer?',body:'Wadi Rum Motors will be able to publish cars and accept bookings immediately. The approval is recorded in the audit log against your account.',
+        note:'Commercial registration and green-plate proof were both marked verified.',confirm:'Approve dealer',
+        onConfirm:()=>f('Dealer approved','Wadi Rum Motors can now accept bookings.')},
+      'reject-dealer':{icon:'x-circle',c:BAD,title:'Reject application',body:'The dealer will be notified and cannot re-apply for 30 days. A reason is required.',danger:true,
+        fields:[{label:'Rejection reason',isSelect:true,options:['Documents do not match registration','Not a licensed tourist office','Green-plate proof missing','Duplicate application','Other']},
+                {label:'Explanation sent to the dealer',isText:true,placeholder:'Explain what failed verification…',hint:'This text is sent verbatim to the dealer.'}],
+        confirm:'Reject application',onConfirm:()=>f('Application rejected','Madaba Car Hire was notified.','bad')},
+      'clarify-dealer':{icon:'question',c:WARN,title:'Request clarification',body:'The 48-hour SLA pauses until the dealer responds. Be specific about what is needed.',
+        fields:[{label:'What the dealer must provide',isText:true,value:'Vehicle registration image is unreadable. Please upload a clearer image.',hint:'Required · sent by email and in-app notification.'}],
+        confirm:'Send request',onConfirm:()=>f('Clarification requested','Wadi Rum Motors was asked for a clearer registration image.','warn')},
+      'suspend-dealer':{icon:'prohibit',c:BAD,title:'Suspend this dealer?',body:'Suspending this dealer may prevent new bookings. Active rentals continue until the vehicle is returned.',danger:true,
+        fields:[{label:'Reason',isSelect:true,options:['Repeated non-delivery','Unresolved disputes','Document expired','Fraud investigation','Other']},
+                {label:'Internal note',isText:true,placeholder:'Visible to admins only…'}],
+        confirm:'Suspend dealer',onConfirm:()=>f('Dealer suspended','New bookings are blocked for this dealer.','bad')},
+      'reactivate-dealer':{icon:'arrow-counter-clockwise',c:OK,title:'Reactivate Dead Sea Drive?',body:'The dealer can accept bookings again from now. Their two unresolved disputes stay open.',
+        confirm:'Reactivate dealer',onConfirm:()=>f('Dealer reactivated','Dead Sea Drive is live again.')},
+      'resolve-dispute':{icon:'scales',c:ACC,title:'Resolve dispute DSP-1207',body:'The resolution, your note and the timestamp are shown to both parties and written to the audit log.',
+        fields:[{label:'Resolution',isSelect:true,options:['No penalty','Apply penalty','Partial penalty','Refund deposit']},
+                {label:'Admin note (required)',isText:true,placeholder:'Explain the decision and the evidence it rests on…'}],
+        note:'Partial penalty: JOD 60 to the dealer, JOD 60 refunded to the customer.',confirm:'Resolve dispute',
+        onConfirm:()=>f('Dispute resolved','DSP-1207 closed with a partial penalty.')},
+      'more-info':{icon:'chat-circle-dots',c:WARN,title:'Request more information',body:'The SLA clock pauses while you wait for a reply. Choose who to ask.',
+        fields:[{label:'Ask',isSelect:true,options:['Customer — Layla Odeh','Dealer — Al-Nadeem Rentals','Both parties']},
+                {label:'What is needed',isText:true,placeholder:'e.g. photographs of the vehicle at handover…'}],
+        confirm:'Send request',onConfirm:()=>f('Information requested','DSP-1207 is now waiting for the customer.','warn')},
+      refund:{icon:'arrow-u-down-left',c:WARN,title:'Refund JOD 120 to the customer?',body:'The deposit for BK-20984 is returned to the original card. Refunds settle in 5–10 business days and cannot be reversed.',danger:true,
+        note:'Dealer payout for this booking will be reduced by JOD 120 in the next run.',confirm:'Issue refund',
+        onConfirm:()=>f('Refund issued','JOD 120 is on its way to Visa 4242.','warn')},
+      'approve-payout':{icon:'arrow-line-up-right',c:OK,title:'Approve payout of JOD 512?',body:'Wadi Rum Motors will be paid in the 05 September run. Bookings with open disputes are excluded automatically.',
+        confirm:'Approve payout',onConfirm:()=>f('Payout approved','Included in payout run PR-0091.')},
+      'payout-run':{icon:'arrow-line-up-right',c:ACC,title:'Create payout run',body:'22 dealers are eligible for JOD 18,420 in total. Two dealers are held back for open disputes.',
+        fields:[{label:'Scheduled date',isSelect:true,options:['05 September 2026','08 September 2026','Immediately']}],
+        confirm:'Create run',onConfirm:()=>f('Payout run created','PR-0091 scheduled for 05 September.')},
+      'hide-review':{icon:'eye-slash',c:WARN,title:'Hide this review?',body:'The review is removed from public pages. The rating still counts toward the dealer average — admins cannot edit customer ratings.',
+        fields:[{label:'Policy reason',isSelect:true,options:['Contains personal contact details','Abusive language','Not about this rental','Spam or promotion']}],
+        confirm:'Hide review',onConfirm:()=>f('Review hidden','Removed from public pages under policy.','warn')},
+      'deactivate-account':{icon:'user-minus',c:BAD,title:'Deactivate this account?',body:'The user is signed out of all sessions immediately and loses access. History and audit entries are kept.',danger:true,
+        fields:[{label:'Reason',isText:true,placeholder:'Recorded in the audit log…'}],
+        confirm:'Deactivate account',onConfirm:()=>f('Account deactivated','Dana Qasem can no longer sign in.','bad')},
+      'invite-admin':{icon:'user-gear',c:ACC,title:'Invite an admin user',body:'The invitation expires in 7 days. Two-factor authentication is mandatory on first sign-in.',
+        fields:[{label:'Role',isSelect:true,options:['Support Admin','Finance Admin','Super Admin']},{label:'Email',isText:true,placeholder:'name@carrental.jo'}],
+        confirm:'Send invitation',onConfirm:()=>f('Invitation sent','They have 7 days to accept.')},
+      'invite-dealer':{icon:'storefront',c:ACC,title:'Invite a rental office',body:'They receive a link to the dealer application form and upload their documents there.',
+        fields:[{label:'Business email',isText:true,placeholder:'office@example.jo'},{label:'City',isSelect:true,options:['Amman','Aqaba','Irbid','Petra','Wadi Rum','Dead Sea']}],
+        confirm:'Send invitation',onConfirm:()=>f('Invitation sent','The office can now apply.')},
+      'add-city':{icon:'map-pin',c:ACC,title:'Add a city',body:'Cities appear in dealer registration and customer search once active.',
+        fields:[{label:'City name',isText:true,placeholder:'e.g. Ajloun'},{label:'Region',isSelect:true,options:['Central','North','South']}],
+        confirm:'Save city',onConfirm:()=>f('City saved','Ajloun is now selectable.')},
+      'add-type':{icon:'car-simple',c:ACC,title:'Add a car type',body:'Types drive search filters and the price benchmarks shown to dealers.',
+        fields:[{label:'Type name',isText:true,placeholder:'e.g. Convertible'}],confirm:'Save type',onConfirm:()=>f('Car type saved','Dealers can list against it now.')},
+      'toggle-city':{icon:'toggle-left',c:WARN,title:'Deactivate this entry?',body:'Existing bookings are unaffected. Dealers can no longer select it for new listings.',
+        confirm:'Deactivate',onConfirm:()=>f('Deactivated','Removed from new listings.','warn')},
+      'save-setting':{icon:'sliders-horizontal',c:WARN,title:'Change platform commission to 20%?',body:'This applies to bookings created from now on. Existing bookings keep the rate they were created with.',danger:true,
+        fields:[{label:'Reason (recorded in audit log)',isText:true,placeholder:'e.g. Board decision Q3 2026'}],
+        confirm:'Save change',onConfirm:()=>f('Setting updated','Commission is now 20% for new bookings.','warn')},
+      '2fa':{icon:'shield-check',c:OK,title:'Require 2FA for all admins?',body:'Admins without an authenticator app will be prompted to enrol at their next sign-in and cannot skip it.',
+        confirm:'Require 2FA',onConfirm:()=>f('2FA enforced','All admin accounts now require a second factor.')},
+      'revoke-session':{icon:'sign-out',c:BAD,title:'Revoke this session?',body:'The device is signed out immediately. If this was not you, change your password as well.',danger:true,
+        confirm:'Revoke session',onConfirm:()=>f('Session revoked','That device has been signed out.','bad')},
+    };
+  }
+
+  renderVals(){
+    const s=this.state, go=this.go, L=this.lists(), M=this.modals();
+    const list=L[s.screen]||false;
+    const heights=[38,52,44,61,49,72,58,66,47,80,69,74,62,88];
+    const m=s.modal?M[s.modal]:null;
+    const crumbs=[];
+    const parent=PARENT[s.screen];
+    crumbs.push({label:'Admin',screen:'dashboard'});
+    if(parent) crumbs.push({label:SCREENS[parent],screen:parent});
+    crumbs.push({label:SCREENS[s.screen]||'Dashboard',screen:s.screen,last:true});
+    const t=s.toast;
+    const tc=t?(t.kind==='bad'?BAD:t.kind==='warn'?WARN:OK):OK;
+
+    return {
+      screen:s.screen, nav:go, goDashboard:e=>{e.preventDefault();go('dashboard');}, goNotifications:()=>go('notifications'),
+      title:SCREENS[s.screen]||'Dashboard',
+      crumbs:crumbs.map((c,i)=>({label:(i?' / ':'')+c.label,click:e=>{e.preventDefault();go(c.screen);},
+        style:'text-decoration:none;color:'+(c.last?'rgba(233,233,237,.4)':'rgba(233,233,237,.55)')})),
+      isDashboard:s.screen==='dashboard', isList:!!list, list,
+      showData:!!list&&s.viewState==='data', showLoading:s.viewState==='loading', showEmpty:s.viewState==='empty',
+      showError:s.viewState==='error', showDenied:s.viewState==='denied',
+      stateOpts:['data','loading','empty','error','denied'].map(v=>({label:v[0].toUpperCase()+v.slice(1),on:s.viewState===v,
+        click:()=>this.setState({viewState:v}),style:'padding:5px 9px;font-size:11.5px'})),
+      skelCols:[{head:'width:22%'},{head:'width:12%'},{head:'width:14%'},{head:'width:16%'},{head:'width:12%'},{head:'width:14%'}].map(x=>({head:'height:8px;'+x.head})),
+      skelRows:[0,1,2,3,4,5,6].map(()=>({cells:['22%','12%','14%','16%','12%','14%'].map(w=>({cell:'width:'+w}))})),
+      pages:[1,2,3,4].map(n=>({n:String(n),cls:'btn '+(n===1?'btn-primary':'btn-secondary')})),
+      kpis:[
+        {label:'Total dealers',icon:'storefront',main:'148',t:'dealers',sub:[{k:'Approved',v:'118'},{k:'Pending review',v:'7',style:'color:'+WARN},{k:'Suspended',v:'5',style:'color:'+BAD}]},
+        {label:'Bookings',icon:'calendar-check',main:'3,412',t:'bookings',sub:[{k:'Today',v:'96'},{k:'Active',v:'214'},{k:'Pending',v:'38',style:'color:'+WARN}]},
+        {label:'Customers',icon:'users-three',main:'8,240',t:'customers',sub:[{k:'Verified',v:'6,915'},{k:'Pending verification',v:'412',style:'color:'+WARN},{k:'Suspended',v:'31'}]},
+        {label:'Revenue · JOD',icon:'chart-line-up',main:'412,600',t:'finance',sub:[{k:'Commission',v:'82,520',style:'color:'+ACC},{k:'Dealer payouts',v:'330,080'},{k:'Refunds',v:'4,180'}]},
+        {label:'Disputes',icon:'scales',main:'12',t:'disputes',sub:[{k:'Pending admin',v:'5',style:'color:'+WARN},{k:'Overdue',v:'2',style:'color:'+BAD},{k:'Resolved 30d',v:'41'}]},
+      ].map(k=>({...k,click:e=>{e.preventDefault();go(k.t);}})),
+      queue:[
+        {sev:'Overdue',c:BAD,title:'Dispute DSP-1184 is 61 hours old',desc:'Customer claims the vehicle was returned undamaged; the dealer applied a JOD 180 penalty. Both parties submitted evidence.',entity:'Aqaba Coast Cars · BK-20411',sla:'13h over',pct:100,action:'Resolve',t:'dispute-detail'},
+        {sev:'Overdue',c:BAD,title:'Dispute DSP-1190 is 54 hours old',desc:'No-show recorded after the 8-hour timeout. The customer disputes the deposit forfeit.',entity:'Dead Sea Drive · BK-20455',sla:'6h over',pct:100,action:'Resolve',t:'dispute-detail'},
+        {sev:'SLA 41h',c:WARN,title:'3 dealer applications are approaching the 48-hour SLA',desc:'Wadi Rum Motors, Irbid Auto Lease and Jerash Rentals have complete document sets awaiting first review.',entity:'Dealer approval queue',sla:'7h left',pct:85,action:'Review',t:'dealers'},
+        {sev:'Payment',c:BAD,title:'Payment PAY-99321 failed after three attempts',desc:'Deposit of JOD 120 was not captured. The booking is held and auto-cancels in 4 hours.',entity:'Booking BK-20984',sla:'4h left',pct:46,action:'Open',t:'payment-detail'},
+        {sev:'Dispute',c:WARN,title:'New dispute: vehicle not delivered at pickup time',desc:'Customer waited 90 minutes at the Amman delivery address. The dealer has not responded.',entity:'Al-Nadeem Rentals · DSP-1207',sla:'47h left',pct:12,action:'Assign',t:'dispute-detail'},
+        {sev:'Payout',c:DIM,title:'Payout batch of JOD 18,420 pending approval',desc:'22 dealers, scheduled for 05 September. Two dealers have unresolved disputes on included bookings.',entity:'Payout run PR-0091',sla:'2d left',pct:20,action:'Review',t:'payouts'},
+      ].map(q=>({...q,rail:'width:3px;flex:none;background:'+q.c,sevStyle:pill(q.c),slaTextStyle:'font-size:12.5px;color:'+q.c,
+        slaBar:'height:100%;width:'+q.pct+'%;background:'+q.c,click:()=>go(q.t)})),
+      bars:heights.map(h=>({style:'flex:1;height:'+h+'%;border-radius:2px 2px 0 0;background:var(--color-accent-700)'})),
+      money:[{k:'Gross booking value',v:'412,600',pct:100},{k:'Platform commission',v:'82,520',pct:20},{k:'Dealer payouts',v:'330,080',pct:80}]
+        .map(x=>({...x,bar:'height:100%;width:'+x.pct+'%;background:var(--color-accent-500)'})),
+      activity:[
+        {icon:'check-circle',text:'Rania approved dealer Aqaba Coast Cars',ts:'9 min ago'},
+        {icon:'scales',text:'Dispute DSP-1207 opened by customer',ts:'38 min ago'},
+        {icon:'credit-card',text:'Payment PAY-99321 failed (3rd attempt)',ts:'1h ago'},
+        {icon:'user-gear',text:'Omar suspended customer #882',ts:'2h ago'},
+        {icon:'sliders-horizontal',text:'Commission rate changed 18% → 20%',ts:'5h ago'},
+        {icon:'arrow-line-up-right',text:'Payout run PR-0090 paid — JOD 21,300',ts:'Yesterday'},
+        {icon:'shield-check',text:'New admin sign-in from Amman (2FA)',ts:'Yesterday'},
+      ],
+      pillOk:pill(OK), pillWarn:pill(WARN), pillBad:pill(BAD), pillNeutral:pill(DIM),
+      isDealerReview:s.screen==='dealer-review', isDealerProfile:s.screen==='dealer-profile',
+      isBookingDetail:s.screen==='booking-detail', isCustomerProfile:s.screen==='customer-profile',
+      isPaymentDetail:s.screen==='payment-detail', isDisputeDetail:s.screen==='dispute-detail',
+      isFinance:s.screen==='finance', isSettings:s.screen==='settings',
+      isNotifications:s.screen==='notifications', isSecurity:s.screen==='security',
+      mApprove:()=>this.open('approve-dealer'), mClarify:()=>this.open('clarify-dealer'), mReject:()=>this.open('reject-dealer'),
+      mSuspend:()=>this.open('suspend-dealer'), mRefund:()=>this.open('refund'), mResolve:()=>this.open('resolve-dispute'),
+      mMoreInfo:()=>this.open('more-info'), mDeactivate:()=>this.open('deactivate-account'),
+      mSaveSetting:()=>this.open('save-setting'), m2fa:()=>this.open('2fa'), mRevoke:()=>this.open('revoke-session'),
+      goPayment:()=>go('payment-detail'), goBooking:()=>go('booking-detail'), goDispute:()=>go('dispute-detail'),
+      retryPayment:()=>this.fire('Payment retried','PAY-99321 was sent to the processor again.'),
+      bizRows:[
+        {k:'Business name',v:'Wadi Rum Motors'},{k:'Commercial registration',v:'CR 91744 · issued 12 Mar 2024'},
+        {k:'Licence type',v:'Licensed tourist car rental office'},{k:'Location',v:'Wadi Rum Village, main street — Aqaba Governorate'},
+        {k:'Contact',v:'Faisal Zalabieh · +962 7 9012 4477 · office@wadirummotors.jo'},
+        {k:'Operating hours',v:'Sat–Thu 08:00–20:00 · Fri 10:00–18:00'},
+        {k:'Fleet declared',v:'9 vehicles · 6 SUV, 2 Sedan, 1 Van'},{k:'Delivery',v:'Enabled · 45 km radius'},
+      ],
+      docs:[
+        {label:'Commercial registration',status:'Verified',c:OK,file:'cr-91744.pdf · 1.2 MB',meta:'Uploaded 01 Sep 08:14 · checked by Rania'},
+        {label:'Green-plate registration',status:'Needs review',c:WARN,file:'plates-scan.jpg · 3.4 MB',meta:'Uploaded 01 Sep 08:16 · low resolution'},
+        {label:'Owner ID',status:'Unavailable',c:BAD,file:'owner-id.jpg · quarantined',meta:'Failed virus scan 01 Sep 08:17'},
+      ].map(d=>({...d,badgeStyle:pill(d.c)})),
+      appTimeline:tl([
+        {label:'Application submitted',meta:'01 Sep 2026 08:14 · by the dealer',c:OK},
+        {label:'Under review',meta:'01 Sep 2026 09:02 · assigned to Rania Haddad',c:OK},
+        {label:'Clarification requested',meta:'Not requested yet',c:DIM,off:true},
+        {label:'Approved / Rejected',meta:'Due 03 Sep 2026 08:14 — 7h 12m left',c:WARN,off:true},
+      ]),
+      dealerTabs:['Overview','Documents','Cars','Bookings','Employees','Financial','Reviews','Activity'].map(t=>({
+        label:t,click:e=>{e.preventDefault();this.setState({tab:t});},
+        style:'padding:9px 13px;font-size:12.5px;text-decoration:none;'+(s.tab===t
+          ?'color:var(--color-accent);box-shadow:inset 0 -2px 0 var(--color-accent)':'color:rgba(233,233,237,.55)')})),
+      customerTabs:['Overview','Bookings','Reviews','Verification','Activity'].map(t=>({
+        label:t,click:e=>{e.preventDefault();this.setState({tab:t});},
+        style:'padding:9px 13px;font-size:12.5px;text-decoration:none;'+(s.tab===t
+          ?'color:var(--color-accent);box-shadow:inset 0 -2px 0 var(--color-accent)':'color:rgba(233,233,237,.55)')})),
+      isOverviewTab:s.screen==='dealer-profile'&&s.tab==='Overview',
+      isCustOverviewTab:s.screen==='customer-profile'&&s.tab==='Overview',
+      isDocsTab:s.screen==='dealer-profile'&&s.tab==='Documents',
+      isVerifyTab:s.screen==='customer-profile'&&s.tab==='Verification',
+      tabTable:this.tabTable(),
+      dealerRows:[
+        {k:'Business name',v:'Al-Nadeem Rentals'},{k:'Commercial registration',v:'CR 89168 · verified 14 Jan 2025'},
+        {k:'Location',v:'Zahran Street, Amman'},{k:'Contact',v:'Nadeem Khoury · +962 7 7788 1120'},
+        {k:'Operating hours',v:'Daily 07:00–23:00'},{k:'Delivery',v:'Enabled'},{k:'Delivery radius',v:'30 km · JOD 8 fee'},
+        {k:'Account created',v:'12 January 2025'},{k:'Employees',v:'6 · 2 can approve bookings'},
+      ],
+      dealerVerify:[
+        {label:'Commercial registration',meta:'Valid to 2027',icon:'check-circle',c:OK},
+        {label:'Green-plate proof',meta:'Valid to 2027',icon:'check-circle',c:OK},
+        {label:'Owner ID',meta:'Expires in 3 months',icon:'warning-circle',c:WARN},
+      ].map(v=>({...v,iconStyle:'font-size:15px;color:'+v.c})),
+      dealerStats:[{k:'Cars listed',v:'24'},{k:'Bookings',v:'412'},{k:'Rating',v:'4.8 ★'},{k:'Open disputes',v:'2'}],
+      bookingCards:[
+        {title:'Booking summary',icon:'receipt',rows:[
+          {k:'Booking ID',v:'BK-20984'},{k:'Status',v:'Pending dealer approval'},{k:'Created',v:'03 Sep 2026 09:12'},
+          {k:'Rental dates',v:'04 Sep — 08 Sep 2026'},{k:'Pickup method',v:'Delivery · Abdoun, Amman'},{k:'Delivery fee',v:'JOD 8'}]},
+        {title:'Customer & dealer',icon:'users-three',rows:[
+          {k:'Customer',v:'Layla Odeh · Verified'},{k:'Customer rating',v:'4.9 ★ (14 bookings)'},{k:'Contact',v:'+962 7 9955 2010'},
+          {k:'Dealer',v:'Al-Nadeem Rentals · Approved'},{k:'Dealer rating',v:'4.8 ★'},{k:'Approved by',v:'John — Employee'}]},
+        {title:'Payment',icon:'credit-card',rows:[
+          {k:'Total booking value',v:'JOD 1,240'},{k:'Deposit paid',v:'JOD 0 of 120'},{k:'Remaining balance',v:'JOD 1,240'},
+          {k:'Method / status',v:'Visa 4242 · Failed'},{k:'Commission (20%)',v:'JOD 248'},{k:'Dealer payout',v:'JOD 992'}]},
+      ],
+      vehicleRows:[
+        {k:'Make / model',v:'Toyota Corolla'},{k:'Year',v:'2023'},{k:'Plate',v:'Green plate · 42-19883'},
+        {k:'Car type',v:'Sedan'},{k:'Daily price',v:'JOD 310'},{k:'Odometer at pickup',v:'Not recorded yet'},
+      ],
+      bookingTimeline:tl([
+        {label:'Booking created',meta:'03 Sep 2026 09:12 · by the customer',c:OK},
+        {label:'Deposit payment attempted',meta:'03 Sep 2026 09:14 · failed, card declined',c:BAD},
+        {label:'Booking approved',meta:'03 Sep 2026 09:20 · by John — Employee',c:OK},
+        {label:'Pickup confirmed',meta:'Due 04 Sep 2026 10:00',c:DIM,off:true},
+        {label:'Return confirmed',meta:'Due 08 Sep 2026 10:00',c:DIM,off:true},
+        {label:'Booking completed',meta:'Pending',c:DIM,off:true},
+      ]),
+      customerRows:[
+        {k:'Full name',v:'Layla Odeh'},{k:'Country',v:'Jordan'},{k:'Email',v:'layla.odeh@example.com'},
+        {k:'Phone',v:'+962 7 9955 2010'},{k:'Date of birth',v:'14 May 1994 · age 32'},
+        {k:'Verification',v:'Verified 06 Feb 2025 by Omar Deeb'},{k:'Account status',v:'Active'},{k:'Joined',v:'04 February 2025'},
+      ],
+      customerStats:[{k:'Total bookings',v:'14'},{k:'Completed',v:'12'},{k:'Cancellations',v:'1',color:WARN},{k:'No-shows',v:'0',color:OK}],
+      verifyDocs:[
+        {label:'National ID',status:'Verified',c:OK,file:'national-id.jpg · restricted',meta:'Expires 12 Aug 2029'},
+        {label:'Driving licence',status:'Verified',c:OK,file:'licence.jpg · restricted',meta:'Expires 03 Mar 2027'},
+        {label:'Passport',status:'Not required',c:DIM,file:'not uploaded',meta:'Required for foreign customers only'},
+      ].map(d=>({...d,badgeStyle:pill(d.c)})),
+      paymentRows:[
+        {k:'Payment ID',v:'PAY-99321'},{k:'Booking',v:'BK-20984'},{k:'Customer',v:'Layla Odeh'},
+        {k:'Dealer',v:'Al-Nadeem Rentals'},{k:'Amount',v:'JOD 120 (deposit)'},{k:'Method',v:'Card · Visa •••• 4242'},
+        {k:'Transaction ID',v:'txn_9f21ab'},{k:'Processor',v:'MEPS Gateway'},{k:'Status',v:'Failed — do_not_honor'},
+      ],
+      payHistory:tl([
+        {label:'Payment initiated',meta:'03 Sep 2026 09:12 · JOD 120 · Visa 4242',c:OK},
+        {label:'Attempt 1 declined',meta:'09:12 · insufficient_funds',c:BAD},
+        {label:'Attempt 2 declined',meta:'09:13 · do_not_honor',c:BAD},
+        {label:'Attempt 3 declined',meta:'09:14 · do_not_honor · retries exhausted',c:BAD},
+        {label:'Customer notified',meta:'09:14 · email and in-app',c:OK},
+        {label:'Booking hold expires',meta:'03 Sep 2026 13:14 · auto-cancel',c:WARN,off:true},
+      ]),
+      disputeCards:[
+        {title:'Booking',icon:'receipt',rows:[{k:'Booking',v:'BK-20411'},{k:'Rental',v:'27–30 Aug 2026'},{k:'Value',v:'JOD 360'},{k:'Deposit',v:'JOD 80'}]},
+        {title:'Customer',icon:'user',rows:[{k:'Name',v:'Jonas Weber'},{k:'Country',v:'Germany'},{k:'Verification',v:'Pending'},{k:'Rating',v:'—'}]},
+        {title:'Dealer',icon:'storefront',rows:[{k:'Business',v:'Aqaba Coast Cars'},{k:'Status',v:'Approved'},{k:'Rating',v:'4.9 ★'},{k:'Past disputes',v:'1 resolved'}]},
+      ],
+      evidence:[
+        {label:'Front bumper at pickup',by:'Dealer',c:DIM,ts:'27 Aug 09:04',file:'pickup-front.jpg'},
+        {label:'Front bumper at return',by:'Dealer',c:DIM,ts:'30 Aug 18:22',file:'return-front.jpg'},
+        {label:'Customer photo at pickup',by:'Customer',c:ACC,ts:'27 Aug 09:01',file:'customer-pickup.jpg'},
+        {label:'Repair quote',by:'Dealer',c:DIM,ts:'31 Aug 11:40',file:'repair-quote.pdf'},
+      ].map(e=>({...e,byStyle:pill(e.c)})),
+      disputeTimeline:tl([
+        {label:'Dispute opened by customer',meta:'27 Aug 2026 08:41 · damage penalty disputed',c:BAD},
+        {label:'Dealer submitted evidence',meta:'31 Aug 2026 11:40 · 3 files',c:OK},
+        {label:'Customer submitted evidence',meta:'31 Aug 2026 19:05 · 3 files',c:OK},
+        {label:'Under review',meta:'01 Sep 2026 09:10 · assigned to Rania Haddad',c:OK},
+        {label:'48-hour SLA breached',meta:'02 Sep 2026 08:41 · escalated to High',c:BAD},
+        {label:'Resolution',meta:'Pending admin decision',c:DIM,off:true},
+      ]),
+      resolutions:[
+        {label:'No penalty',desc:'Dealer claim rejected, deposit returned in full'},
+        {label:'Apply penalty',desc:'Full JOD 180 charged to the customer'},
+        {label:'Partial penalty',desc:'Split between dealer and customer'},
+        {label:'Refund deposit',desc:'JOD 80 returned, no penalty recorded'},
+      ].map(r=>({...r,on:s.resolution===r.label,click:()=>this.setState({resolution:r.label}),
+        style:'align-items:flex-start;gap:9px;padding:9px 10px;border-radius:6px;border:1px solid '+(s.resolution===r.label?'var(--color-accent)':'var(--color-divider)')})),
+      pastResolutions:[
+        {res:'Partial penalty — JOD 45 to dealer',reason:'Scratch visible in the pickup photo but not in the customer photo; cost shared.',who:'Rania Haddad · Super Admin',ts:'12 Aug 2026 14:22'},
+        {res:'No penalty',reason:'Fuel gauge photo supported the customer.',who:'Omar Deeb · Support Admin',ts:'04 Jul 2026 10:08'},
+      ],
+      financeKpis:[
+        {label:'Gross revenue',v:'412,600',meta:'+12.4% vs August'},
+        {label:'Platform commission',v:'82,520',meta:'20% blended rate',color:'var(--color-accent-300)'},
+        {label:'Dealer payouts',v:'330,080',meta:'1,182 settled'},
+        {label:'Pending payouts',v:'18,420',meta:'22 dealers · 05 Sep run',color:WARN},
+        {label:'Refunds',v:'4,180',meta:'31 refunds'},
+        {label:'Penalties',v:'2,640',meta:'18 applied',color:WARN},
+      ],
+      commission:[
+        {id:'BK-20984',dealer:'Al-Nadeem Rentals',value:'1,240',rate:'20%',amount:'248',payout:'992',status:'Paid',c:OK,date:'01 Sep'},
+        {id:'BK-20977',dealer:'Aqaba Coast Cars',value:'860',rate:'20%',amount:'172',payout:'688',status:'Paid',c:OK,date:'01 Sep'},
+        {id:'BK-20961',dealer:'Petra Wheels',value:'2,105',rate:'18%',amount:'379',payout:'1,726',status:'Processing',c:WARN,date:'02 Sep'},
+        {id:'BK-20940',dealer:'Wadi Rum Motors',value:'640',rate:'20%',amount:'128',payout:'512',status:'Pending',c:DIM,date:'02 Sep'},
+        {id:'BK-20933',dealer:'Irbid Auto Lease',value:'1,480',rate:'15%',amount:'222',payout:'1,258',status:'Pending',c:DIM,date:'02 Sep'},
+        {id:'BK-20918',dealer:'Dead Sea Drive',value:'990',rate:'20%',amount:'198',payout:'792',status:'Failed',c:BAD,date:'01 Sep'},
+        {id:'BK-20902',dealer:'Al-Nadeem Rentals',value:'3,320',rate:'20%',amount:'664',payout:'2,656',status:'Paid',c:OK,date:'01 Sep'},
+        {id:'BK-20896',dealer:'Jerash Rentals',value:'710',rate:'20%',amount:'142',payout:'568',status:'Paid',c:OK,date:'01 Sep'},
+      ].map(c=>({...c,statusStyle:pill(c.c)})),
+      settingsGroups:[
+        {title:'Booking rules',icon:'calendar-check',note:'Applied at booking creation',rows:[
+          {label:'Platform commission',desc:'Share of each booking retained by the platform. Range 15–20%.',value:'20%',by:'Rania Haddad',when:'02 Sep 2026 14:05'},
+          {label:'No-show timeout',desc:'Hours after pickup time before a booking is marked no-show.',value:'8h',by:'Rania Haddad',when:'18 Jul 2026 09:31'},
+          {label:'Cancellation grace period',desc:'Free cancellation window after booking confirmation.',value:'24h',by:'Omar Deeb',when:'02 May 2026 16:40'},
+          {label:'Default delivery fee',desc:'Charged when a dealer delivers outside their free radius.',value:'8 JOD',by:'Rania Haddad',when:'12 Mar 2026 11:02'}]},
+        {title:'Penalty rules',icon:'gavel',note:'Used by dispute resolution',rows:[
+          {label:'Dealer non-delivery penalty',desc:'Charged to the dealer when a confirmed vehicle is not delivered.',value:'50 JOD',by:'Rania Haddad',when:'21 Jun 2026 13:55'},
+          {label:'Customer no-show penalty',desc:'Share of the deposit forfeited on a no-show.',value:'100%',by:'Yousef Barakat',when:'21 Jun 2026 13:58'},
+          {label:'Late return charge',desc:'Extra day charged after this grace period.',value:'2h',by:'Omar Deeb',when:'09 Feb 2026 08:12'}]},
+        {title:'Verification rules',icon:'identification-card',note:'Applied at customer sign-up',rows:[
+          {label:'Minimum renter age',desc:'Customers below this age cannot complete a booking.',value:'21',by:'Rania Haddad',when:'04 Jan 2025 10:00'},
+          {label:'ID requirement',desc:'National ID for residents, passport for foreign customers.',value:'Required',by:'Rania Haddad',when:'04 Jan 2025 10:00'},
+          {label:'Licence held for',desc:'Minimum time since the driving licence was issued.',value:'2 years',by:'Omar Deeb',when:'15 Apr 2026 12:20'},
+          {label:'Foreign customer deposit',desc:'Additional deposit for customers without a Jordanian ID.',value:'150 JOD',by:'Yousef Barakat',when:'15 Apr 2026 12:24'}]},
+      ],
+      notifCats:[
+        {label:'All',count:'9',icon:'bell',on:true},{label:'Dealer approval',count:'3',icon:'storefront'},
+        {label:'Dispute',count:'3',icon:'scales'},{label:'Payment',count:'1',icon:'credit-card'},
+        {label:'Payout',count:'1',icon:'arrow-line-up-right'},{label:'Security',count:'1',icon:'shield-check'},
+        {label:'System',count:'0',icon:'gear'},
+      ].map(c=>({...c,cls:'btn '+(c.on?'btn-primary':'btn-secondary'),
+        countStyle:'font-size:10px;font-weight:600;padding:1px 6px;border-radius:8px;background:'+(c.on?'var(--color-accent-700)':'var(--color-neutral-800)')+';color:var(--color-neutral-100)'})),
+      notifItems:[
+        {title:'Dealer application approaching SLA',desc:'Wadi Rum Motors · 7h 12m left of the 48-hour window',ts:'12 min ago',icon:'storefront',c:WARN,unread:true,link:'Review',t:'dealer-review'},
+        {title:'New dispute opened',desc:'DSP-1207 · vehicle not delivered · Al-Nadeem Rentals',ts:'38 min ago',icon:'scales',c:WARN,unread:true,link:'Open',t:'dispute-detail'},
+        {title:'Payment failed',desc:'PAY-99321 · JOD 120 deposit · card declined',ts:'1h ago',icon:'credit-card',c:BAD,unread:true,link:'Open',t:'payment-detail'},
+        {title:'Dispute breached the 48-hour SLA',desc:'DSP-1184 · 13h over · escalated to High',ts:'2h ago',icon:'scales',c:BAD,unread:true,link:'Resolve',t:'dispute-detail'},
+        {title:'Payout batch pending approval',desc:'PR-0091 · JOD 18,420 across 22 dealers',ts:'5h ago',icon:'arrow-line-up-right',c:DIM,unread:true,link:'Review',t:'payouts'},
+        {title:'Suspicious sign-in blocked',desc:'omar@carrental.jo · 4 failed attempts from Bucharest',ts:'7h ago',icon:'shield-check',c:WARN,unread:true,link:'Review',t:'security'},
+        {title:'Dealer approved',desc:'Aqaba Coast Cars · approved by you',ts:'Yesterday',icon:'check-circle',c:OK,link:'View',t:'dealer-profile'},
+        {title:'Payout run completed',desc:'PR-0090 · JOD 21,300 paid to 19 dealers',ts:'Yesterday',icon:'arrow-line-up-right',c:OK,link:'View',t:'payouts'},
+      ].map(n=>({...n,unread:!!n.unread,click:()=>go(n.t),
+        rowStyle:'display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.05)'+(n.unread?';background:rgba(145,132,217,.05)':''),
+        iconWrap:'width:30px;height:30px;flex:none;border-radius:8px;display:grid;place-items:center;background:'+tint(n.c,14),
+        iconStyle:'font-size:15px;color:'+n.c})),
+      sessions:[
+        {device:'MacBook Pro · Chrome 128',meta:'Amman, Jordan · 94.187.x.x · active now',icon:'laptop',current:true,revocable:false},
+        {device:'iPhone 15 · Safari',meta:'Amman, Jordan · last active 2h ago',icon:'device-mobile',revocable:true},
+        {device:'Windows 11 · Edge',meta:'Irbid, Jordan · last active 3d ago',icon:'desktop',revocable:true},
+        {device:'iPad · Safari',meta:'Aqaba, Jordan · last active 11d ago',icon:'device-tablet',revocable:true},
+      ].map(x=>({...x,current:!!x.current,revocable:!!x.revocable,badgeStyle:pill(OK)})),
+      loginHistory:[
+        {who:'Rania Haddad · Super Admin',meta:'Today 08:52 · Amman · 2FA',result:'Success',c:OK},
+        {who:'Omar Deeb · Support Admin',meta:'Today 02:14 · Bucharest · 4 attempts',result:'Blocked',c:BAD},
+        {who:'Yousef Barakat · Finance Admin',meta:'Yesterday 17:40 · Amman · 2FA',result:'Success',c:OK},
+        {who:'Nadia Sweiss · Support Admin',meta:'01 Sep 09:03 · Irbid · 2FA',result:'Success',c:OK},
+        {who:'Khalid Amr · Finance Admin',meta:'31 Aug 22:10 · Amman · no 2FA enrolled',result:'Warning',c:WARN},
+        {who:'Dana Qasem · disabled account',meta:'28 Aug 11:02 · Amman',result:'Denied',c:BAD},
+      ].map(h=>({...h,badgeStyle:pill(h.c),dot:'width:7px;height:7px;border-radius:50%;flex:none;background:'+h.c})),
+      modal:m?{...m,fields:m.fields||[],confirmClick:()=>m.onConfirm(),
+        iconWrap:'width:32px;height:32px;flex:none;border-radius:8px;display:grid;place-items:center;background:'+tint(m.c,14),
+        iconStyle:'font-size:16px;color:'+m.c,
+        noteStyle:'font-size:12px;padding:9px 11px;border-radius:6px;background:'+tint(m.c,10)+';color:rgba(233,233,237,.75)',
+        confirmStyle:'padding:6px 13px;font-size:13px'+(m.danger?';color:'+BAD+';border-color:'+BAD:'')}:false,
+      closeModal:this.close, openModal:this.open,
+      toast:t?{...t,icon:t.kind==='bad'?'x-circle':t.kind==='warn'?'warning':'check-circle',
+        iconStyle:'font-size:17px;color:'+tc}:false,
+      closeToast:()=>this.setState({toast:null}),
+    };
+  }
+}
+
+</script>
+</body>
+</html>

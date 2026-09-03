@@ -1,0 +1,67 @@
+<div class="stack stack-14">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Finance</h1>
+      <div class="page-sub">1–30 September 2026 · all amounts in JOD · blended commission 20%</div>
+    </div>
+    <div class="seg push">
+      @for (range of ranges; track range) {
+        <label class="seg-opt">
+          <input type="radio" name="finance-range" [checked]="range === 'This month'" />
+          {{ range }}
+        </label>
+      }
+    </div>
+    <button type="button" class="btn btn-secondary btn-md">
+      <kh-icon name="download-simple" />
+      Export
+    </button>
+  </div>
+
+  <div class="finance-kpis">
+    @for (kpi of kpis; track kpi.label) {
+      <section class="sect finance-kpi" [class]="kpi.tone ? toneClass(kpi.tone) : ''">
+        <span class="k">{{ kpi.label }}</span>
+        <span class="num finance-value">{{ kpi.v }}</span>
+        <span class="finance-meta">{{ kpi.meta }}</span>
+      </section>
+    }
+  </div>
+
+  <section class="sect sect-clip">
+    <div class="sect-h">
+      <span class="sect-t">Commission report</span>
+      <span class="sect-note">1,204 settled bookings this month</span>
+    </div>
+    <div class="table-wrap">
+      <table class="table table-980">
+        <thead>
+          <tr>
+            <th>Booking</th>
+            <th>Dealer</th>
+            <th class="td-num">Booking value</th>
+            <th class="td-num">Rate</th>
+            <th class="td-num">Commission</th>
+            <th class="td-num">Dealer payout</th>
+            <th>Payout status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of commission; track row.id) {
+            <tr>
+              <td class="td">{{ row.id }}</td>
+              <td class="td">{{ row.dealer }}</td>
+              <td class="td td-num num">{{ row.value }}</td>
+              <td class="td td-num num td-dim">{{ row.rate }}</td>
+              <td class="td td-num num td-accent">{{ row.amount }}</td>
+              <td class="td td-num num">{{ row.payout }}</td>
+              <td class="td"><span class="pill" [class]="toneClass(row.tone)">{{ row.status }}</span></td>
+              <td class="td">{{ row.date }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

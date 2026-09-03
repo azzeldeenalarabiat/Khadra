@@ -1,0 +1,16 @@
+<div>
+  <div class="doc">
+    <kh-icon name="file-lock" class="doc-lock" />
+    <span class="mono">{{ doc().file }}</span>
+    @if (showPreview()) {
+      <div>
+        <button type="button" class="btn btn-primary btn-xs">Open secure preview</button>
+      </div>
+    }
+  </div>
+  <div class="doc-label">
+    <span class="doc-label-text">{{ doc().label }}</span>
+    <span class="pill" [class]="toneClass(doc().tone)">{{ doc().status }}</span>
+  </div>
+  <div class="doc-meta">{{ doc().meta }}</div>
+</div>

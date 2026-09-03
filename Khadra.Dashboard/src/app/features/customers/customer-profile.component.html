@@ -1,0 +1,74 @@
+<div class="stack stack-14 page-wide">
+  <header class="detail-head">
+    <div class="avatar avatar-48">{{ customer.initials }}</div>
+    <div>
+      <div class="row row-gap-9">
+        <h1 class="detail-name">{{ customer.name }}</h1>
+        <span class="pill s-ok">Verified</span>
+        <span class="pill s-ok">Active</span>
+      </div>
+      <div class="detail-meta">{{ customer.meta }}</div>
+    </div>
+    <div class="detail-actions">
+      <button type="button" class="btn btn-secondary btn-md">Message</button>
+      <button type="button" class="btn btn-danger btn-md" (click)="suspend()">Suspend account</button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    @for (tab of tabs; track tab) {
+      <button
+        type="button"
+        class="tab"
+        role="tab"
+        [class.is-active]="activeTab() === tab"
+        [attr.aria-selected]="activeTab() === tab"
+        (click)="select(tab)"
+      >
+        {{ tab }}
+      </button>
+    }
+  </div>
+
+  @if (activeTab() === 'Overview') {
+    <div class="split-13">
+      <section class="sect">
+        <div class="sect-h"><span class="sect-t">Account</span></div>
+        <div class="kv-body kv-200">
+          @for (row of rows; track row.k) {
+            <div class="kv">
+              <div class="kv-key">{{ row.k }}</div>
+              <div class="kv-val">{{ row.v }}</div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="sect stat-grid">
+        @for (stat of stats; track stat.k) {
+          <div [class]="stat.tone ? toneClass(stat.tone) : ''">
+            <div class="k">{{ stat.k }}</div>
+            <div class="num stat-value">{{ stat.v }}</div>
+          </div>
+        }
+      </section>
+    </div>
+  } @else if (activeTab() === 'Verification') {
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon name="lock-key" class="kpi-icon" />
+        <span class="sect-t">Identity &amp; licence</span>
+        <span class="sect-note">Restricted — Super Admin only · every view is logged</span>
+      </div>
+      <div class="doc-grid-3">
+        @for (doc of documents; track doc.label) {
+          <kh-doc-tile [doc]="doc" />
+        }
+      </div>
+    </section>
+  } @else if (table(); as tabTable) {
+    <section class="sect sect-clip">
+      <kh-data-table [columns]="tabTable.columns" [rows]="tabTable.rows" minWidth="0" />
+    </section>
+  }
+</div>

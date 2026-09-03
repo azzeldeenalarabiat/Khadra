@@ -1,0 +1,34 @@
+<div class="stack stack-14 page-narrow">
+  <div>
+    <h1 class="page-title">Platform settings</h1>
+    <div class="page-sub">
+      Business rules applied to every new booking. Changes take effect immediately and are attributed to you.
+    </div>
+  </div>
+
+  @for (group of groups; track group.title) {
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon [name]="group.icon" class="kpi-icon" />
+        <span class="sect-t">{{ group.title }}</span>
+        <span class="sect-note">{{ group.note }}</span>
+      </div>
+      <div class="settings-body">
+        @for (row of group.rows; track row.label) {
+          <div class="setting-row">
+            <div class="grow">
+              <div class="setting-label">{{ row.label }}</div>
+              <div class="setting-desc">{{ row.desc }}</div>
+              <div class="setting-audit">Last changed by {{ row.by }} · {{ row.when }}</div>
+            </div>
+            <div class="setting-input">
+              <label class="visually-hidden" [attr.for]="'setting-' + row.label">{{ row.label }}</label>
+              <input class="input input-num" [id]="'setting-' + row.label" [value]="row.value" />
+            </div>
+            <button type="button" class="btn btn-secondary btn-xs" (click)="change()">Change</button>
+          </div>
+        }
+      </div>
+    </section>
+  }
+</div>

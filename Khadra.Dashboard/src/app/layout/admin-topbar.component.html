@@ -1,0 +1,40 @@
+<div class="topbar">
+  <div class="grow">
+    <nav class="topbar-crumbs" aria-label="Breadcrumb">
+      @for (crumb of crumbs(); track $index) {
+        @if ($index > 0) {
+          <span aria-hidden="true">/</span>
+        }
+        @if (crumb.last) {
+          <span class="crumb is-last" aria-current="page">{{ crumb.label }}</span>
+        } @else {
+          <a class="crumb" [routerLink]="crumb.route">{{ crumb.label }}</a>
+        }
+      }
+    </nav>
+    <div class="topbar-title">{{ title() }}</div>
+  </div>
+
+  <div class="topbar-search">
+    <kh-icon name="magnifying-glass" class="search-icon" />
+    <label class="visually-hidden" for="global-search">Search</label>
+    <input id="global-search" class="input" placeholder="Search dealers, bookings, disputes…" />
+  </div>
+
+  <div class="topbar-actions">
+    <button type="button" class="btn btn-secondary btn-sm">
+      <kh-icon name="calendar-blank" />
+      This month
+    </button>
+    <div class="bell-wrap">
+      <a class="btn btn-icon btn-secondary btn-33" routerLink="/notifications" aria-label="Notifications">
+        <kh-icon name="bell" />
+      </a>
+      <span class="bell-badge">9</span>
+    </div>
+    <button type="button" class="user-chip">
+      <span class="avatar avatar-26">RH</span>
+      <kh-icon name="caret-down" />
+    </button>
+  </div>
+</div>

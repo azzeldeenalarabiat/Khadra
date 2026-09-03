@@ -1,0 +1,98 @@
+<div class="stack stack-14 page-mid">
+  <div>
+    <h1 class="page-title">Security</h1>
+    <div class="page-sub">Your account, active sessions and platform-wide sign-in activity.</div>
+  </div>
+
+  <div class="banner s-warn">
+    <kh-icon name="warning" class="banner-icon" />
+    <div class="banner-body">
+      <div class="banner-title">Suspicious sign-in blocked</div>
+      <div class="banner-text">
+        Four failed attempts on <span class="mono">omar&#64;carrental.jo</span> from 91.204.x.x (Bucharest) at
+        02:14. The account was locked for 30 minutes and the owner notified.
+      </div>
+    </div>
+    <button type="button" class="btn btn-secondary btn-xs">Review</button>
+  </div>
+
+  <div class="split-2">
+    <section class="sect sect-pad stack stack-12">
+      <span class="sect-t">Password</span>
+      <div class="field">
+        <label for="current-password">Current password</label>
+        <input id="current-password" class="input" type="password" value="password" />
+      </div>
+      <div class="field">
+        <label for="new-password">New password</label>
+        <input id="new-password" class="input" type="password" placeholder="At least 12 characters" />
+      </div>
+      <div class="security-note">Changing your password signs out every other session.</div>
+      <button type="button" class="btn btn-primary btn-md self-start">Update password</button>
+    </section>
+
+    <section class="sect sect-pad stack stack-12">
+      <span class="sect-t">Two-factor authentication</span>
+      <div class="tfa-ok">
+        <kh-icon name="shield-check" class="tfa-icon" />
+        <div class="grow">
+          <div class="tfa-title">Authenticator app enabled</div>
+          <div class="tfa-meta">Added 04 January 2025 · last used today</div>
+        </div>
+      </div>
+      <div class="row row-gap-12">
+        <div class="grow">
+          <div class="session-device">Require 2FA for all admin users</div>
+          <div class="tfa-meta">Currently 5 of 6 admins enrolled</div>
+        </div>
+        <button type="button" class="btn btn-primary btn-xs" (click)="enforce2fa()">Enforce</button>
+      </div>
+      <button type="button" class="btn btn-secondary btn-md self-start">View recovery codes</button>
+    </section>
+  </div>
+
+  <div class="split-2">
+    <section class="sect sect-clip">
+      <div class="sect-h">
+        <span class="sect-t">Active sessions</span>
+        <button type="button" class="btn btn-ghost btn-xs push" (click)="revoke()">Revoke all others</button>
+      </div>
+      <div class="settings-body">
+        @for (session of sessions; track session.device) {
+          <div class="session-row">
+            <kh-icon [name]="session.icon" class="session-icon" />
+            <div class="grow">
+              <div class="session-device">{{ session.device }}</div>
+              <div class="session-meta">{{ session.meta }}</div>
+            </div>
+            @if (session.current) {
+              <span class="pill s-ok">This device</span>
+            }
+            @if (session.revocable) {
+              <button type="button" class="btn btn-secondary btn-xs" (click)="revoke()">Revoke</button>
+            }
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="sect sect-clip">
+      <div class="sect-h">
+        <span class="sect-t">Login history</span>
+        <span class="sect-note">Platform-wide</span>
+      </div>
+      <div class="settings-body">
+        @for (entry of history; track entry.meta) {
+          <div class="login-row" [class]="toneClass(entry.tone)">
+            <span class="login-dot"></span>
+            <div class="grow">
+              <div class="session-device">{{ entry.who }}</div>
+              <div class="session-meta">{{ entry.meta }}</div>
+            </div>
+            <span class="pill">{{ entry.result }}</span>
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+</div>

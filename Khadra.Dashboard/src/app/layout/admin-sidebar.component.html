@@ -1,0 +1,48 @@
+<div class="sidebar">
+  <div class="sidebar-head">
+    <div class="sidebar-mark">
+      <kh-icon name="steering-wheel" />
+    </div>
+    <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+  </div>
+
+  <nav class="sidebar-nav" aria-label="Admin sections">
+    @for (group of groups; track $index) {
+      @if (group.group) {
+        <div class="nav-group">{{ group.group }}</div>
+      }
+      @for (item of group.items; track item.route) {
+        <a
+          class="nav-item"
+          [routerLink]="item.route"
+          routerLinkActive="is-active"
+          [routerLinkActiveOptions]="{ exact: false }"
+        >
+          <kh-icon [name]="item.icon" class="nav-item-icon" />
+          <span class="nav-item-label">{{ item.label }}</span>
+          @if (item.badge) {
+            <span class="nav-badge">{{ item.badge }}</span>
+          }
+        </a>
+      }
+    }
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="sidebar-user">
+      <div class="avatar avatar-28">RH</div>
+      <div class="grow">
+        <div class="sidebar-user-name">Rania Haddad</div>
+        <div class="sidebar-user-role">Super Admin</div>
+      </div>
+    </div>
+    <button type="button" class="sidebar-link">
+      <kh-icon name="gear-six" />
+      Account settings
+    </button>
+    <button type="button" class="sidebar-link">
+      <kh-icon name="sign-out" />
+      Logout
+    </button>
+  </div>
+</div>

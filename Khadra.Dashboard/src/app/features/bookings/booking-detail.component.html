@@ -1,0 +1,75 @@
+<div class="stack stack-14 page-xwide">
+  <header class="detail-head">
+    <div>
+      <div class="row row-gap-9">
+        <h1 class="detail-name">{{ booking.reference }}</h1>
+        <span class="pill s-warn">{{ booking.status }}</span>
+      </div>
+      <div class="detail-meta">{{ booking.meta }}</div>
+    </div>
+    <div class="detail-actions">
+      <button type="button" class="btn btn-secondary btn-md" (click)="goPayment()">View payment</button>
+      <button type="button" class="btn btn-secondary btn-md" (click)="refund()">Refund deposit</button>
+      <button type="button" class="btn btn-primary btn-md" (click)="goDispute()">Open dispute</button>
+    </div>
+  </header>
+
+  <div class="banner s-bad">
+    <kh-icon name="warning-circle" class="banner-icon" />
+    <span class="banner-body">{{ booking.alert }}</span>
+    <button type="button" class="btn btn-primary btn-xs" (click)="goPayment()">Resolve payment</button>
+  </div>
+
+  <div class="split-3">
+    @for (card of cards; track card.title) {
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon [name]="card.icon" class="kpi-icon" />
+          <span class="sect-t">{{ card.title }}</span>
+        </div>
+        <div class="kv-body">
+          @for (row of card.rows; track row.k) {
+            <div class="kv-split">
+              <div class="kv-key">{{ row.k }}</div>
+              <div class="kv-val">{{ row.v }}</div>
+            </div>
+          }
+        </div>
+      </section>
+    }
+  </div>
+
+  <div class="split-11">
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon name="car" class="kpi-icon" />
+        <span class="sect-t">Vehicle &amp; handover</span>
+      </div>
+      <div class="vehicle-block">
+        <div class="doc vehicle-photo"><span class="mono">vehicle photo · 4:3</span></div>
+        <div class="grow">
+          @for (row of vehicleRows; track row.k) {
+            <div class="kv-split">
+              <div class="kv-key">{{ row.k }}</div>
+              <div class="kv-val">{{ row.v }}</div>
+            </div>
+          }
+        </div>
+      </div>
+      <div class="handover-grid">
+        <div class="doc handover-tile"><span class="mono">handover photo · pickup</span></div>
+        <div class="doc handover-tile"><span class="mono">handover photo · return</span></div>
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-h">
+        <span class="sect-t">Booking timeline</span>
+        <span class="sect-note">Approved by John — Employee</span>
+      </div>
+      <div class="sect-pad">
+        <kh-timeline [steps]="timeline" />
+      </div>
+    </section>
+  </div>
+</div>

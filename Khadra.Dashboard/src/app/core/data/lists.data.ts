@@ -1,0 +1,395 @@
+import { Cell, CellVariant, ListConfig, RowAction, TableRow, Tone } from '../models/console.models';
+
+/**
+ * List-screen content from the Admin Console design.
+ *
+ * SAMPLE DATA. Every list in the console shares one shape, so the generic list
+ * screen renders all eleven of them. When the API arrives only these builders
+ * change; the components do not.
+ */
+
+const txt = (value: string, sub?: string, variant?: CellVariant): Cell => ({
+  kind: 'text',
+  value,
+  sub,
+  variant,
+});
+
+const rightAligned = (value: string, variant?: CellVariant): Cell => ({
+  kind: 'text',
+  value,
+  align: 'right',
+  variant,
+});
+
+const badge = (value: string, tone: Tone): Cell => ({ kind: 'badge', value, tone });
+
+const entity = (value: string, sub: string): Cell => ({ kind: 'entity', value, sub });
+
+const actions = (...list: RowAction[]): Cell => ({ kind: 'actions', actions: list });
+
+const act = (label: string, style: RowAction['style'], action: string): RowAction => ({
+  label,
+  style,
+  action,
+});
+
+/** Star rating, or an em dash when a party has not been rated yet. */
+const rating = (value: string): Cell => txt(value === '—' ? '—' : `${value} ★`);
+
+const DEALERS: readonly TableRow[] = [
+  ['Al-Nadeem Rentals', 'Amman', 'Approved', 'ok', '24', '412', '4.8', '12 Jan 2025', '2h ago'],
+  ['Aqaba Coast Cars', 'Aqaba', 'Approved', 'ok', '18', '286', '4.9', '03 Mar 2025', '20 min ago'],
+  ['Wadi Rum Motors', 'Wadi Rum', 'Pending Review', 'warn', '9', '0', '—', '01 Sep 2026', '41h ago'],
+  ['Irbid Auto Lease', 'Irbid', 'Pending Review', 'warn', '14', '0', '—', '01 Sep 2026', '40h ago'],
+  ['Petra Wheels', 'Petra', 'Clarification Needed', 'warn', '11', '64', '4.4', '18 Aug 2026', '26h ago'],
+  ['Dead Sea Drive', 'Dead Sea', 'Suspended', 'bad', '7', '138', '3.6', '22 Nov 2025', '3d ago'],
+  ['Jerash Rentals', 'Amman', 'Pending Review', 'warn', '6', '0', '—', '02 Sep 2026', '18h ago'],
+  ['Madaba Car Hire', 'Amman', 'Rejected', 'dim', '0', '0', '—', '14 Aug 2026', '20d ago'],
+].map(([name, city, status, tone, cars, bookings, stars, joined, active]) => {
+  const pending = status === 'Pending Review';
+  return {
+    link: pending ? ['/dealers/review'] : ['/dealers/profile'],
+    cells: [
+      entity(name, `CR ${89000 + Number(cars) * 7}`),
+      badge(status, tone as Tone),
+      txt(city),
+      rightAligned(cars),
+      rightAligned(bookings),
+      rating(stars),
+      txt(joined),
+      txt(active),
+      actions(
+        ...(pending
+          ? [act('Review', 'primary', 'nav:/dealers/review')]
+          : status === 'Suspended'
+            ? [act('Reactivate', 'secondary', 'modal:reactivate-dealer')]
+            : [act('View', 'secondary', 'nav:/dealers/profile'), act('Suspend', 'ghost', 'modal:suspend-dealer')]),
+      ),
+    ],
+  };
+});
+
+const BOOKINGS: readonly TableRow[] = [
+  ['BK-20984', 'Layla Odeh', 'Al-Nadeem Rentals', 'Toyota Corolla 2023', '04 Sep', '08 Sep', '1,240', '120', 'Pending', 'warn', '03 Sep 09:12'],
+  ['BK-20977', 'Sami Farah', 'Aqaba Coast Cars', 'Hyundai Tucson 2024', '05 Sep', '09 Sep', '860', '100', 'Confirmed', 'ok', '03 Sep 08:40'],
+  ['BK-20961', 'Marta Kowal', 'Petra Wheels', 'Mercedes E200 2022', '02 Sep', '12 Sep', '2,105', '300', 'Active', 'accent', '01 Sep 17:02'],
+  ['BK-20955', 'Omar Nasser', 'Wadi Rum Motors', 'Nissan Patrol 2021', '29 Aug', '02 Sep', '1,480', '200', 'Completed', 'dim', '28 Aug 11:24'],
+  ['BK-20455', 'Huda Sabbagh', 'Dead Sea Drive', 'Kia Rio 2023', '30 Aug', '01 Sep', '420', '80', 'Disputed', 'bad', '29 Aug 14:55'],
+  ['BK-20411', 'Jonas Weber', 'Aqaba Coast Cars', 'Toyota Yaris 2022', '27 Aug', '30 Aug', '360', '80', 'Disputed', 'bad', '26 Aug 10:03'],
+  ['BK-20402', 'Rami Zayed', 'Irbid Auto Lease', 'Hyundai Accent 2023', '26 Aug', '28 Aug', '280', '60', 'No-show', 'bad', '25 Aug 19:41'],
+  ['BK-20388', 'Nour Halabi', 'Al-Nadeem Rentals', 'Toyota Land Cruiser 2024', '24 Aug', '31 Aug', '3,320', '400', 'Cancelled', 'dim', '22 Aug 08:17'],
+].map((b) => ({
+  link: ['/bookings/detail'],
+  cells: [
+    txt(b[0]), txt(b[1]), txt(b[2]), txt(b[3]), txt(b[4]), txt(b[5]),
+    rightAligned(b[6]), rightAligned(b[7]), badge(b[8], b[9] as Tone), txt(b[10]),
+    actions(act('View', 'secondary', 'nav:/bookings/detail')),
+  ],
+}));
+
+const CUSTOMERS: readonly TableRow[] = [
+  ['Layla Odeh', 'Jordan', 'Verified', 'ok', '14', '12', '1', '0', '4.9', 'Active', '04 Feb 2025'],
+  ['Sami Farah', 'Jordan', 'Verified', 'ok', '9', '9', '0', '0', '5.0', 'Active', '19 Mar 2025'],
+  ['Marta Kowal', 'Poland', 'Verified', 'ok', '3', '2', '0', '0', '4.7', 'Active', '28 Aug 2026'],
+  ['Jonas Weber', 'Germany', 'Pending Verification', 'warn', '1', '0', '0', '0', '—', 'Active', '01 Sep 2026'],
+  ['Omar Nasser', 'Jordan', 'Verified', 'ok', '22', '19', '2', '1', '4.5', 'Active', '11 Nov 2024'],
+  ['Huda Sabbagh', 'Jordan', 'Verified', 'ok', '6', '4', '1', '1', '4.1', 'Active', '06 Jun 2025'],
+  ['Rami Zayed', 'Jordan', 'Verified', 'ok', '8', '4', '2', '2', '3.4', 'Suspended', '23 Jan 2025'],
+  ['Aisha Kamal', 'Egypt', 'Pending Verification', 'warn', '0', '0', '0', '0', '—', 'Active', '02 Sep 2026'],
+].map((c) => ({
+  link: ['/customers/profile'],
+  cells: [
+    entity(c[0], c[1]),
+    txt(c[1]),
+    badge(c[2], c[3] as Tone),
+    rightAligned(c[4]), rightAligned(c[5]), rightAligned(c[6]), rightAligned(c[7]),
+    rating(c[8]),
+    badge(c[9], c[9] === 'Active' ? 'ok' : 'bad'),
+    txt(c[10]),
+  ],
+}));
+
+const PAYMENTS: readonly TableRow[] = [
+  ['PAY-99321', 'BK-20984', 'Layla Odeh', 'Al-Nadeem Rentals', '120', 'Card · Visa 4242', 'txn_9f21ab', 'Failed', 'bad', '03 Sep 09:14'],
+  ['PAY-99318', 'BK-20977', 'Sami Farah', 'Aqaba Coast Cars', '100', 'Card · Mastercard', 'txn_9f18cc', 'Paid', 'ok', '03 Sep 08:41'],
+  ['PAY-99302', 'BK-20961', 'Marta Kowal', 'Petra Wheels', '300', 'Card · Visa 1881', 'txn_9f02de', 'Paid', 'ok', '01 Sep 17:05'],
+  ['PAY-99288', 'BK-20955', 'Omar Nasser', 'Wadi Rum Motors', '200', 'Cash on pickup', '—', 'Paid', 'ok', '28 Aug 11:30'],
+  ['PAY-99266', 'BK-20455', 'Huda Sabbagh', 'Dead Sea Drive', '80', 'Card · Visa 3310', 'txn_8ff6aa', 'Refunded', 'dim', '29 Aug 15:02'],
+  ['PAY-99251', 'BK-20411', 'Jonas Weber', 'Aqaba Coast Cars', '80', 'Card · Amex', 'txn_8fe1b2', 'Partially Refunded', 'warn', '26 Aug 10:07'],
+  ['PAY-99240', 'BK-20402', 'Rami Zayed', 'Irbid Auto Lease', '60', 'Card · Visa 7702', 'txn_8fd0c9', 'Initiated', 'dim', '25 Aug 19:44'],
+  ['PAY-99231', 'BK-20388', 'Nour Halabi', 'Al-Nadeem Rentals', '400', 'Card · Visa 5521', 'txn_8fc4e1', 'Pending', 'warn', '22 Aug 08:20'],
+].map((p) => ({
+  link: ['/payments/detail'],
+  cells: [
+    txt(p[0]), txt(p[1]), txt(p[2]), txt(p[3]),
+    rightAligned(p[4]),
+    txt(p[5]),
+    txt(p[6], undefined, 'mono'),
+    badge(p[7], p[8] as Tone),
+    txt(p[9]),
+    actions(
+      p[7] === 'Failed'
+        ? act('Retry', 'primary', 'toast:Payment retried|PAY-99321 sent to the processor again.')
+        : act('View', 'secondary', 'nav:/payments/detail'),
+    ),
+  ],
+}));
+
+const PAYOUTS: readonly TableRow[] = [
+  ['Al-Nadeem Rentals', 'BK-20902', '3,320', '664', '2,656', 'Paid', 'ok', '01 Sep 2026', '01 Sep 2026'],
+  ['Aqaba Coast Cars', 'BK-20977', '860', '172', '688', 'Paid', 'ok', '01 Sep 2026', '01 Sep 2026'],
+  ['Petra Wheels', 'BK-20961', '2,105', '379', '1,726', 'Processing', 'warn', '05 Sep 2026', '—'],
+  ['Wadi Rum Motors', 'BK-20955', '640', '128', '512', 'Pending', 'dim', '05 Sep 2026', '—'],
+  ['Irbid Auto Lease', 'BK-20933', '1,480', '222', '1,258', 'Pending', 'dim', '05 Sep 2026', '—'],
+  ['Dead Sea Drive', 'BK-20918', '990', '198', '792', 'Failed', 'bad', '01 Sep 2026', '—'],
+  ['Jerash Rentals', 'BK-20896', '710', '142', '568', 'Paid', 'ok', '01 Sep 2026', '01 Sep 2026'],
+].map((p) => ({
+  cells: [
+    entity(p[0], 'JOD'),
+    txt(p[1]),
+    rightAligned(p[2]), rightAligned(p[3]), rightAligned(p[4]),
+    badge(p[5], p[6] as Tone),
+    txt(p[7]), txt(p[8]),
+    actions(
+      p[5] === 'Failed'
+        ? act('Retry', 'primary', 'toast:Payout retried|Dead Sea Drive payout queued for the next run.')
+        : p[5] === 'Pending'
+          ? act('Approve', 'primary', 'modal:approve-payout')
+          : act('Receipt', 'secondary', 'noop'),
+    ),
+  ],
+}));
+
+const DISPUTES: readonly TableRow[] = [
+  ['DSP-1184', 'BK-20411', 'Customer', 'Damage penalty disputed', 'Aqaba Coast Cars', 'Jonas Weber', '61h', 'Overdue', 'bad', 'High'],
+  ['DSP-1190', 'BK-20455', 'Customer', 'Deposit forfeited after no-show', 'Dead Sea Drive', 'Huda Sabbagh', '54h', 'Overdue', 'bad', 'High'],
+  ['DSP-1207', 'BK-20984', 'Customer', 'Vehicle not delivered', 'Al-Nadeem Rentals', 'Layla Odeh', '38m', 'Open', 'warn', 'High'],
+  ['DSP-1201', 'BK-20961', 'Dealer', 'Late return, extra day charged', 'Petra Wheels', 'Marta Kowal', '19h', 'Under Review', 'accent', 'Medium'],
+  ['DSP-1198', 'BK-20402', 'Dealer', 'Fuel level on return', 'Irbid Auto Lease', 'Rami Zayed', '2d', 'Waiting for Customer', 'warn', 'Low'],
+  ['DSP-1193', 'BK-20388', 'Customer', 'Cancellation fee', 'Al-Nadeem Rentals', 'Nour Halabi', '3d', 'Waiting for Dealer', 'warn', 'Medium'],
+  ['DSP-1177', 'BK-20301', 'Customer', 'Cleanliness on handover', 'Wadi Rum Motors', 'Omar Nasser', '6d', 'Resolved', 'ok', 'Low'],
+].map((d) => ({
+  link: ['/disputes/detail'],
+  cells: [
+    txt(d[0]), txt(d[1]), txt(d[2]), txt(d[3]), txt(d[4]), txt(d[5]),
+    // An overdue ticket shows its age in the alarm colour.
+    d[8] === 'bad' ? badge(d[6], 'bad') : txt(d[6]),
+    badge(d[7], d[8] as Tone),
+    txt(d[9]),
+    actions(
+      d[7] === 'Resolved'
+        ? act('View', 'secondary', 'nav:/disputes/detail')
+        : act('Resolve', 'primary', 'nav:/disputes/detail'),
+    ),
+  ],
+}));
+
+const REVIEWS: readonly TableRow[] = [
+  ['Layla Odeh', 'Al-Nadeem Rentals', '4.8', 'Car was clean and delivery was on time in Amman.', 'BK-20902', '01 Sep 2026', 'Published', 'ok'],
+  ['Jonas Weber', 'Aqaba Coast Cars', '2.0', 'Charged me for damage that was already there.', 'BK-20411', '27 Aug 2026', 'Reported', 'warn'],
+  ['Omar Nasser', 'Wadi Rum Motors', '5.0', 'Excellent 4x4 for the desert route, would rent again.', 'BK-20955', '02 Sep 2026', 'Published', 'ok'],
+  ['Huda Sabbagh', 'Dead Sea Drive', '1.0', 'Never showed up. Do not book here — call this number…', 'BK-20455', '30 Aug 2026', 'Hidden', 'bad'],
+  ['Marta Kowal', 'Petra Wheels', '4.5', 'Good service, paperwork took a while.', 'BK-20961', '02 Sep 2026', 'Published', 'ok'],
+  ['Rami Zayed', 'Irbid Auto Lease', '3.0', 'Fuel policy was not explained clearly.', 'BK-20402', '29 Aug 2026', 'Reported', 'warn'],
+].map((r) => ({
+  cells: [
+    entity(r[0], 'Customer'),
+    txt(r[1]),
+    rating(r[2]),
+    txt(r[3], undefined, 'clip-280'),
+    txt(r[4]), txt(r[5]),
+    badge(r[6], r[7] as Tone),
+    actions(
+      r[6] === 'Hidden'
+        ? act('Restore', 'secondary', 'toast:Review restored|Review #4471 is public again.')
+        : act('Hide', 'ghost', 'modal:hide-review'),
+    ),
+  ],
+}));
+
+const CITIES: readonly TableRow[] = [
+  ['Amman', 'Central', '62', '1,842', 'Active', 'ok'],
+  ['Aqaba', 'South', '24', '604', 'Active', 'ok'],
+  ['Irbid', 'North', '16', '288', 'Active', 'ok'],
+  ['Petra', 'South', '19', '431', 'Active', 'ok'],
+  ['Wadi Rum', 'South', '12', '214', 'Active', 'ok'],
+  ['Dead Sea', 'Central', '9', '133', 'Active', 'ok'],
+  ['Jerash', 'North', '6', '41', 'Inactive', 'dim'],
+].map((c) => ({
+  cells: [
+    txt(c[0]), txt(c[1]),
+    rightAligned(c[2]), rightAligned(c[3]),
+    badge(c[4], c[5] as Tone),
+    actions(
+      act('Edit', 'secondary', 'modal:add-city'),
+      act(c[4] === 'Active' ? 'Deactivate' : 'Activate', 'ghost', 'modal:toggle-entry'),
+    ),
+  ],
+}));
+
+const CAR_TYPES: readonly TableRow[] = [
+  ['Sedan', '1,120', '38%', 'Active', 'ok'],
+  ['SUV', '864', '29%', 'Active', 'ok'],
+  ['Hatchback', '412', '14%', 'Active', 'ok'],
+  ['Luxury', '188', '6%', 'Active', 'ok'],
+  ['Van', '214', '7%', 'Active', 'ok'],
+  ['Pickup', '96', '3%', 'Inactive', 'dim'],
+].map((c) => ({
+  cells: [
+    txt(c[0]),
+    rightAligned(c[1]), rightAligned(c[2]),
+    badge(c[3], c[4] as Tone),
+    actions(
+      act('Edit', 'secondary', 'modal:add-type'),
+      act(c[3] === 'Active' ? 'Deactivate' : 'Activate', 'ghost', 'modal:toggle-entry'),
+    ),
+  ],
+}));
+
+const AUDIT: readonly TableRow[] = [
+  ['03 Sep 2026 09:41', 'Rania Haddad', 'Super Admin', 'Approved dealer', 'Dealer', '#102', 'Pending Review', 'Approved', 'Documents verified'],
+  ['03 Sep 2026 09:12', 'System', '—', 'Payment failed', 'Payment', 'PAY-99321', 'Pending', 'Failed', 'Card declined (do_not_honor)'],
+  ['02 Sep 2026 18:20', 'Omar Deeb', 'Support Admin', 'Suspended customer', 'Customer', '#882', 'Active', 'Suspended', 'Two no-shows in 30 days'],
+  ['02 Sep 2026 14:05', 'Rania Haddad', 'Super Admin', 'Changed commission rate', 'Setting', 'commission_rate', '18%', '20%', 'Board decision Q3'],
+  ['02 Sep 2026 11:47', 'Yousef Barakat', 'Finance Admin', 'Approved payout run', 'Payout', 'PR-0090', 'Pending', 'Paid', 'Scheduled batch'],
+  ['01 Sep 2026 16:30', 'Rania Haddad', 'Super Admin', 'Resolved dispute', 'Dispute', '#88', 'Under Review', 'Resolved', 'Partial penalty applied'],
+  ['01 Sep 2026 10:02', 'Nadia Sweiss', 'Support Admin', 'Hid review', 'Review', '#4471', 'Published', 'Hidden', 'Contained phone number'],
+].map((a) => ({
+  cells: [
+    txt(a[0]), txt(a[1]), txt(a[2]), txt(a[3]), txt(a[4]),
+    txt(a[5], undefined, 'mono'),
+    txt(a[6], undefined, 'dim'),
+    txt(a[7], undefined, 'accent'),
+    txt(a[8], undefined, 'clip-280'),
+  ],
+}));
+
+const ADMINS: readonly TableRow[] = [
+  ['Rania Haddad', 'rania@carrental.jo', 'Super Admin', 'Active', 'ok', '03 Sep 2026 08:52', '04 Jan 2025'],
+  ['Omar Deeb', 'omar@carrental.jo', 'Support Admin', 'Active', 'ok', '03 Sep 2026 07:15', '22 Feb 2025'],
+  ['Yousef Barakat', 'yousef@carrental.jo', 'Finance Admin', 'Active', 'ok', '02 Sep 2026 17:40', '12 Mar 2025'],
+  ['Nadia Sweiss', 'nadia@carrental.jo', 'Support Admin', 'Active', 'ok', '01 Sep 2026 09:03', '09 Jun 2025'],
+  ['Khalid Amr', 'khalid@carrental.jo', 'Finance Admin', 'Invited', 'warn', '—', '02 Sep 2026'],
+  ['Dana Qasem', 'dana@carrental.jo', 'Support Admin', 'Disabled', 'dim', '14 Jul 2026 12:20', '18 Apr 2025'],
+].map((a) => ({
+  cells: [
+    entity(a[0], a[2]),
+    txt(a[1], undefined, 'muted'),
+    badge(a[2], a[2] === 'Super Admin' ? 'accent' : 'dim'),
+    badge(a[3], a[4] as Tone),
+    txt(a[5]), txt(a[6]),
+    actions(act('Edit', 'secondary', 'modal:invite-admin'), act('Deactivate', 'ghost', 'modal:deactivate-account')),
+  ],
+}));
+
+/** Every list screen, keyed by its route segment. */
+export const LISTS: Readonly<Record<string, ListConfig>> = {
+  dealers: {
+    title: 'Dealers',
+    subtitle: '148 rental offices · 7 awaiting review · 3 approaching the 48-hour SLA',
+    searchHint: 'Search dealer or registration no.',
+    filters: ['Status: All', 'City: All', 'Rating: Any', 'Joined: Any'],
+    primary: { label: 'Invite dealer', action: 'modal:invite-dealer' },
+    count: 'Showing 8 of 148 dealers',
+    columns: ['Dealer', 'Status', 'City', 'Cars', 'Bookings', 'Rating', 'Joined', 'Last activity', 'Actions'],
+    rows: DEALERS,
+  },
+  bookings: {
+    title: 'Bookings',
+    subtitle: '3,412 bookings all-time · 214 active · 38 pending dealer approval',
+    searchHint: 'Search booking ID or customer',
+    filters: ['Status: All', 'Dealer: All', 'Date range', 'Vehicle: All', 'Pickup: All'],
+    count: 'Showing 8 of 3,412 bookings',
+    columns: ['Booking', 'Customer', 'Dealer', 'Vehicle', 'Pickup', 'Return', 'Total', 'Deposit', 'Status', 'Created', 'Actions'],
+    rows: BOOKINGS,
+  },
+  customers: {
+    title: 'Customers',
+    subtitle: '8,240 customers · 6,915 verified · 412 awaiting verification',
+    searchHint: 'Search name, email or phone',
+    filters: ['Verification: All', 'Country: All', 'Rating: Any', 'Account: All'],
+    count: 'Showing 8 of 8,240 customers',
+    columns: ['Customer', 'Country', 'Verification', 'Bookings', 'Completed', 'Cancelled', 'No-shows', 'Rating', 'Account', 'Joined'],
+    rows: CUSTOMERS,
+  },
+  payments: {
+    title: 'Payments',
+    subtitle: 'Transaction ledger across all dealers and booking channels',
+    searchHint: 'Search payment or transaction ID',
+    filters: ['Status: All', 'Method: All', 'Dealer: All', 'Date range'],
+    count: 'Showing 8 of 5,904 payments',
+    columns: ['Payment', 'Booking', 'Customer', 'Dealer', 'Amount', 'Method', 'Transaction', 'Status', 'Created', 'Actions'],
+    rows: PAYMENTS,
+  },
+  payouts: {
+    title: 'Payouts',
+    subtitle: 'Dealer settlements · next scheduled run 05 September 2026',
+    searchHint: 'Search dealer or booking',
+    filters: ['Status: All', 'Dealer: All', 'Scheduled: Any'],
+    primary: { label: 'Create payout run', action: 'modal:payout-run' },
+    count: 'Showing 7 of 1,204 payouts',
+    columns: ['Dealer', 'Booking', 'Gross', 'Commission', 'Net payout', 'Status', 'Scheduled', 'Paid', 'Actions'],
+    rows: PAYOUTS,
+  },
+  disputes: {
+    title: 'Disputes',
+    subtitle: '12 open · 2 past the 48-hour SLA · median resolution 19 hours',
+    searchHint: 'Search ticket or booking ID',
+    filters: ['Status: All', 'Priority: Any', 'Dealer: All', 'Age: Any'],
+    count: 'Showing 7 of 12 open disputes',
+    columns: ['Ticket', 'Booking', 'Opened by', 'Reason', 'Dealer', 'Customer', 'Age', 'Status', 'Priority', 'Actions'],
+    rows: DISPUTES,
+  },
+  reviews: {
+    title: 'Reviews',
+    subtitle: 'Moderation queue · ratings cannot be edited, only hidden under policy',
+    searchHint: 'Search reviewer or text',
+    filters: ['Status: All', 'Rating: Any', 'Target: All', 'Reported only'],
+    count: 'Showing 6 of 4,471 reviews',
+    columns: ['Reviewer', 'Target', 'Rating', 'Comment', 'Booking', 'Date', 'Status', 'Actions'],
+    rows: REVIEWS,
+  },
+  cities: {
+    title: 'Cities & Regions',
+    subtitle: 'Service areas available to dealers and customers at booking time',
+    searchHint: 'Search city',
+    filters: ['Region: All', 'Status: All'],
+    primary: { label: 'Add city', action: 'modal:add-city' },
+    count: '7 cities',
+    columns: ['City', 'Region', 'Dealers', 'Bookings', 'Status', 'Actions'],
+    rows: CITIES,
+    minWidth: '0',
+  },
+  'car-types': {
+    title: 'Car Types',
+    subtitle: 'Vehicle categories dealers can list against',
+    searchHint: 'Search type',
+    filters: ['Status: All'],
+    primary: { label: 'Add type', action: 'modal:add-type' },
+    count: '6 types',
+    columns: ['Type', 'Cars listed', 'Share of bookings', 'Status', 'Actions'],
+    rows: CAR_TYPES,
+    minWidth: '0',
+  },
+  'audit-logs': {
+    title: 'Audit logs',
+    subtitle: 'Read-only record of every privileged action on the platform',
+    searchHint: 'Search user, entity or action',
+    filters: ['User: All', 'Role: All', 'Entity: All', 'Date range'],
+    count: 'Showing 7 of 82,410 entries',
+    columns: ['Timestamp', 'User', 'Role', 'Action', 'Entity', 'Entity ID', 'Previous', 'New', 'Reason'],
+    rows: AUDIT,
+  },
+  'admin-users': {
+    title: 'Admin users',
+    subtitle: 'Platform staff · role structure prepared for finer permissions later',
+    searchHint: 'Search name or email',
+    filters: ['Role: All', 'Status: All'],
+    primary: { label: 'Invite admin', action: 'modal:invite-admin' },
+    count: '6 admin users',
+    columns: ['Name', 'Email', 'Role', 'Status', 'Last login', 'Created', 'Actions'],
+    rows: ADMINS,
+    minWidth: '0',
+  },
+};
