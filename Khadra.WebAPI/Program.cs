@@ -57,6 +57,9 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddScoped<ICurrentActor, HttpCurrentActor>();
+builder.Services.AddScoped<IAuthorizationHandler, ApprovedDealerAuthorizationHandler>();
+// A denied authorization returns ProblemDetails with a stable code, not an empty 403.
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationResultHandler>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -116,6 +119,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(SecurityPolicies.DealerOwner, policy => policy.RequireRole(UserRole.DealerOwner.Name));
     options.AddPolicy(SecurityPolicies.Customer, policy => policy.RequireRole(UserRole.Customer.Name));
     options.AddPolicy(SecurityPolicies.VerifiedEmail, policy => policy.RequireClaim(KhadraClaimTypes.EmailVerified, "true"));
+    // Being a dealer owner is not enough: the BUSINESS has to be approved before it may operate.
+    options.AddPolicy(SecurityPolicies.ApprovedDealer, policy => policy
+        .RequireRole(UserRole.DealerOwner.Name)
+        .AddRequirements(new ApprovedDealerRequirement()));
 });
 
 builder.Services.AddRateLimiter(options =>

@@ -86,10 +86,15 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     }
 
     /// <summary>
-    /// A dealer-only action, and the one that demonstrates the approval gate: while the dealer is
+    /// A dealer-only action, and the one the approval gate is demonstrated on: while the dealer is
     /// PENDING_REVIEW this returns 403 with <c>dealer.not_approved</c>.
+    ///
+    /// Guarded twice, deliberately. RequireApprovedDealer stops the request in the pipeline, which is
+    /// what a future fleet or booking endpoint will inherit from the attribute alone; the handler
+    /// then asks the aggregate again, so the rule still holds for any caller that reaches it another
+    /// way. Neither layer is decorative.
     /// </summary>
-    [Authorize(Policy = SecurityPolicies.DealerOwner)]
+    [Authorize(Policy = SecurityPolicies.ApprovedDealer)]
     [HttpPut("me/delivery")]
     [ProducesResponseType<DealerProfileDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
