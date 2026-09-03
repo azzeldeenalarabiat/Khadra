@@ -121,6 +121,29 @@ public sealed class Booking : AggregateRoot
 
     public bool CanBeReviewed => Status == BookingStatus.Completed;
 
+    /// <summary>
+    /// Whether either party can still open a dispute on this booking (spec 3.3).
+    ///
+    /// The window is the one FROZEN on this booking, never the current setting, and it runs from the
+    /// moment the booking finished: ReturnedAt for a car that came back, FinishedAt for one that was
+    /// cancelled or never collected. Completed is deliberately excluded -- reaching Completed IS the
+    /// settlement window having elapsed, so a dispute afterwards would reopen a closed financial
+    /// record.
+    /// </summary>
+    public bool CanBeDisputed(DateTimeOffset now)
+    {
+        var finishedAt = Status == BookingStatus.Returned
+            ? ReturnedAt
+            : Status == BookingStatus.Cancelled || Status == BookingStatus.NoShow
+                ? FinishedAt
+                : null;
+
+        if (finishedAt is null)
+            return false;
+
+        return now < finishedAt.Value.Add(Terms.PostReturnSettlementWindow);
+    }
+
     // Idempotent: payment gateways retry their webhooks, and a retry must not fail or double-charge.
     public UnitResult<Error> ConfirmDepositPaid(Id depositPaymentId, DateTimeOffset now)
     {
@@ -359,17 +382,29 @@ public sealed class Booking : AggregateRoot
         if (Status != BookingStatus.Returned)
             return UnitResult.Failure(BookingErrors.NotReturned);
         if (hasOpenDispute)
-            return UnitResult.Failure(BookingErrors.AlreadyFinished);
+            return UnitResult.Failure(BookingErrors.DisputeOpen);
         if (now < ReturnedAt!.Value.Add(Terms.PostReturnSettlementWindow))
             return UnitResult.Failure(BookingErrors.SettlementTooEarly);
 
         return CompleteInternal(BookingParty.System, null, "Settlement window elapsed with no dispute.", now);
     }
 
-    // The other path to Completed: an Admin resolved the dispute, so the booking can close immediately
-    // without waiting out the window.
-    public UnitResult<Error> SettleAfterDisputeResolved(Id adminUserId, DateTimeOffset now)
+    /// <summary>
+    /// Closes the booking out after an Admin resolved a dispute on it.
+    ///
+    /// Named "close", not "settle", because for most disputes there is nothing to transition: a
+    /// booking can be disputed once it is Returned, Cancelled or NoShow, and the last two are already
+    /// terminal. Only a Returned booking moves, skipping the rest of its settlement window because the
+    /// question the window existed to answer has now been answered.
+    ///
+    /// A terminal booking succeeds as a no-op rather than failing. The alternative made the resolve
+    /// handler's success depend on which way the booking happened to end, which is not something an
+    /// Admin resolving a ticket should have to think about.
+    /// </summary>
+    public UnitResult<Error> CloseAfterDisputeResolved(Id adminUserId, DateTimeOffset now)
     {
+        if (Status.IsTerminal)
+            return UnitResult.Success<Error>();
         if (Status != BookingStatus.Returned)
             return UnitResult.Failure(BookingErrors.NotReturned);
 

@@ -30,6 +30,7 @@ internal sealed class DisputeTicketConfiguration : IEntityTypeConfiguration<Disp
             resolution.ToJson();
             resolution.OwnsOne(value => value.Deposit, deposit =>
             {
+                ConfigureMoney(deposit.OwnsOne(split => split.DepositHeld));
                 ConfigureMoney(deposit.OwnsOne(split => split.RefundToCustomer));
                 ConfigureMoney(deposit.OwnsOne(split => split.RetainedByPlatform));
                 ConfigureMoney(deposit.OwnsOne(split => split.TransferredToDealer));
@@ -45,7 +46,14 @@ internal sealed class DisputeTicketConfiguration : IEntityTypeConfiguration<Disp
         entity.Metadata.FindNavigation(nameof(DisputeTicket.Statements))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
-        entity.HasIndex(ticket => ticket.BookingId);
+        // At most ONE live ticket per booking, enforced by the database rather than promised by a
+        // comment. IDisputeTicketRepository.GetLiveByBookingAsync uses SingleOrDefault on the strength
+        // of this rule; without the constraint, two concurrent opens produce two live tickets and that
+        // booking's reads throw for good. A partial unique index is valid in both PostgreSQL and
+        // SQLite, so the persistence tests exercise the same guarantee production has.
+        entity.HasIndex(ticket => ticket.BookingId)
+            .IsUnique()
+            .HasFilter("status IN ('Open', 'UnderReview')");
         entity.HasIndex(ticket => ticket.Status);
         // The overdue count and the attention queue both ask for live tickets past their deadline.
         entity.HasIndex(ticket => ticket.SlaDeadline);

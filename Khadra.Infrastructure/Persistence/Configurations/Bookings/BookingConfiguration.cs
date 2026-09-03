@@ -67,7 +67,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             ConfigureMoney(pricing.OwnsOne(value => value.DepositAmount));
             ConfigureMoney(pricing.OwnsOne(value => value.BalanceDue));
             ConfigureMoney(pricing.OwnsOne(value => value.SecurityDeposit));
-            pricing.OwnsOne(value => value.DepositPercent);
+            ConfigurePercentage(pricing.OwnsOne(value => value.DepositPercent));
             pricing.OwnsOne(value => value.Mileage, mileage =>
                 ConfigureMoney(mileage.OwnsOne(policy => policy.ExcessFeePerKm)));
             pricing.Property(value => value.FuelPolicy)
@@ -78,19 +78,19 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         entity.OwnsOne(booking => booking.Terms, terms =>
         {
             terms.ToJson();
-            terms.OwnsOne(value => value.DepositPercent);
-            terms.OwnsOne(value => value.CommissionPercent);
-            terms.OwnsOne(value => value.CustomerCancellationPenaltyPercent);
-            terms.OwnsOne(value => value.DealerPenaltyMinPercent);
-            terms.OwnsOne(value => value.DealerPenaltyMaxPercent);
+            ConfigurePercentage(terms.OwnsOne(value => value.DepositPercent));
+            ConfigurePercentage(terms.OwnsOne(value => value.CommissionPercent));
+            ConfigurePercentage(terms.OwnsOne(value => value.CustomerCancellationPenaltyPercent));
+            ConfigurePercentage(terms.OwnsOne(value => value.DealerPenaltyMinPercent));
+            ConfigurePercentage(terms.OwnsOne(value => value.DealerPenaltyMaxPercent));
         });
         entity.Navigation(booking => booking.Terms).IsRequired();
 
         entity.OwnsOne(booking => booking.Penalty, penalty =>
         {
             penalty.ToJson();
-            penalty.OwnsOne(value => value.MinPercent);
-            penalty.OwnsOne(value => value.MaxPercent);
+            ConfigurePercentage(penalty.OwnsOne(value => value.MinPercent));
+            ConfigurePercentage(penalty.OwnsOne(value => value.MaxPercent));
             ConfigureMoney(penalty.OwnsOne(value => value.MinAmount));
             ConfigureMoney(penalty.OwnsOne(value => value.MaxAmount));
             penalty.Property(value => value.AttributedTo)
@@ -127,6 +127,22 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
     {
         money.Property(value => value.Amount).HasPrecision(18, 3);
         money.Property(value => value.CurrencyCode).HasMaxLength(3);
+    }
+
+    /// <summary>
+    /// Maps a Percentage's single value EXPLICITLY, exactly as ConfigureMoney does for an amount.
+    ///
+    /// Percentage.Value is a get-only property set through a private constructor, and EF does not
+    /// pick it up by convention inside a ToJson-mapped owned type. Left implicit, every rate wrote
+    /// itself to the database as an empty object -- which meant BookingTerms, whose whole purpose is
+    /// to freeze the rules a booking was made under, was freezing nothing at all. Money escaped the
+    /// same fate only because it was always configured by hand.
+    /// </summary>
+    private static void ConfigurePercentage<TOwner>(OwnedNavigationBuilder<TOwner, Percentage> percentage)
+        where TOwner : class
+    {
+        // 0-100 rounded to four decimals by Percentage.Create.
+        percentage.Property(value => value.Value).HasPrecision(7, 4);
     }
 }
 

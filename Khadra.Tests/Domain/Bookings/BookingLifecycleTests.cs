@@ -459,10 +459,12 @@ public sealed class BookingHandoverAndSettlementTests
 
         var blocked = booking.Settle(returnedAt.AddDays(10), hasOpenDispute: true);
         Assert.True(blocked.IsFailure);
+        // Not "already finished": the settlement job's log has to say which of the two happened.
+        Assert.Equal("booking.dispute_open", blocked.Error.Code);
         Assert.Same(BookingStatus.Returned, booking.Status);
 
         // Resolving the dispute closes the booking immediately, without waiting out the window again.
-        Assert.True(booking.SettleAfterDisputeResolved(Id.New(), returnedAt.AddHours(2)).IsSuccess);
+        Assert.True(booking.CloseAfterDisputeResolved(Id.New(), returnedAt.AddHours(2)).IsSuccess);
         Assert.Same(BookingStatus.Completed, booking.Status);
     }
 
@@ -472,7 +474,67 @@ public sealed class BookingHandoverAndSettlementTests
         var booking = Build.ApprovedBooking();
 
         Assert.Equal("booking.not_returned", booking.Settle(Now.AddDays(30), false).Error.Code);
-        Assert.Equal("booking.not_returned", booking.SettleAfterDisputeResolved(Id.New(), Now).Error.Code);
+        Assert.Equal("booking.not_returned", booking.CloseAfterDisputeResolved(Id.New(), Now).Error.Code);
+    }
+
+    [Fact]
+    public void Closing_a_terminal_booking_after_a_dispute_succeeds_without_changing_it()
+    {
+        // Most disputes are opened on cancellations and no-shows, which are already terminal. There is
+        // nothing to transition, and failing would make the resolve handler's outcome depend on how the
+        // booking happened to end -- which is not the Admin's problem.
+        var booking = Build.ApprovedBooking();
+        booking.Cancel(BookingParty.Customer, Id.New(), "Plans changed.", Now.AddDays(1));
+
+        var result = booking.CloseAfterDisputeResolved(Id.New(), Now.AddDays(2));
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(BookingStatus.Cancelled, booking.Status);
+    }
+
+    [Fact]
+    public void A_booking_is_disputable_only_while_its_own_frozen_window_is_open()
+    {
+        var terms = Build.Terms(settlementWindow: TimeSpan.FromDays(7));
+        var booking = Build.ApprovedBooking(terms: terms);
+        var start = booking.Period.Start;
+        booking.RecordPickup(BookingParty.Dealer, Id.New(), start);
+
+        Assert.False(booking.CanBeDisputed(start));
+
+        var returnedAt = start.AddDays(3);
+        booking.RecordReturn(BookingParty.Dealer, Id.New(), returnedAt);
+
+        Assert.True(booking.CanBeDisputed(returnedAt.AddDays(6)));
+        Assert.False(booking.CanBeDisputed(returnedAt.AddDays(8)));
+    }
+
+    [Fact]
+    public void A_cancelled_booking_is_disputable_from_when_it_finished()
+    {
+        var terms = Build.Terms(settlementWindow: TimeSpan.FromDays(7));
+        var booking = Build.ApprovedBooking(terms: terms);
+        var cancelledAt = Now.AddDays(1);
+        booking.Cancel(BookingParty.Customer, Id.New(), "Plans changed.", cancelledAt);
+
+        Assert.True(booking.CanBeDisputed(cancelledAt.AddDays(6)));
+        Assert.False(booking.CanBeDisputed(cancelledAt.AddDays(8)));
+    }
+
+    [Fact]
+    public void A_completed_booking_can_no_longer_be_disputed()
+    {
+        // Reaching Completed IS the window having elapsed, so a dispute afterwards would reopen a
+        // closed financial record.
+        var booking = Build.ApprovedBooking();
+        var start = booking.Period.Start;
+        booking.RecordPickup(BookingParty.Dealer, Id.New(), start);
+        var returnedAt = start.AddDays(3);
+        booking.RecordReturn(BookingParty.Dealer, Id.New(), returnedAt);
+        booking.Settle(returnedAt.AddDays(30), hasOpenDispute: false);
+
+        Assert.Same(BookingStatus.Completed, booking.Status);
+        Assert.False(booking.CanBeDisputed(returnedAt.AddDays(30)));
     }
 
     [Fact]

@@ -28,10 +28,25 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(KhadraDbContext).Assembly);
 
-        // Refresh-token rotation must detect races (two refreshes of the same token). xmin is a
-        // PostgreSQL system column, so it is applied only when running on Npgsql.
+        // Optimistic concurrency, where losing a race silently would cost more than failing loudly.
+        // xmin is a PostgreSQL system column, so it is applied only when running on Npgsql; it needs
+        // no migration because the column already exists on every table.
+        //
+        // - RefreshToken: two refreshes of the same token must not both succeed.
+        // - DisputeTicket and Booking: two admins resolving the same ticket would otherwise both pass
+        //   the in-memory status check and both save, so the second silently overwrites the first's
+        //   decision about money, leaving two audit entries asserting different outcomes.
         if (Database.IsNpgsql())
-            modelBuilder.Entity<RefreshToken>().Property<uint>("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
+        {
+            foreach (var type in new[] { typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking) })
+            {
+                modelBuilder.Entity(type)
+                    .Property<uint>("xmin")
+                    .HasColumnType("xid")
+                    .ValueGeneratedOnAddOrUpdate()
+                    .IsConcurrencyToken();
+            }
+        }
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -51,6 +66,12 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     // The database enforces this too (a trigger added in the migration), but a request that tries it
     // should fail here with a message that names the problem rather than surfacing a Postgres error.
     // The check also holds on SQLite, where the tests run and the trigger does not exist.
+    //
+    // PRE-LAUNCH (see docs/pre-launch-checklist.md): the database trigger is FOR EACH ROW BEFORE
+    // DELETE OR UPDATE, and row-level triggers do not fire on TRUNCATE. Anyone holding table
+    // privileges can therefore erase the whole audit trail in one statement without tripping either
+    // guard. Deliberately deferred while this is a development database that gets reseeded; it must
+    // be closed with a FOR EACH STATEMENT ... ON TRUNCATE trigger before real audit data exists.
     private void GuardAuditTrailIsAppendOnly()
     {
         foreach (var entry in ChangeTracker.Entries<AuditEntry>())

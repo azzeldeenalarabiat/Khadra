@@ -49,6 +49,12 @@ public static class BookingErrors
     public static readonly Error SettlementTooEarly =
         Error.Conflict("booking.settlement_too_early", "The post-return settlement window has not elapsed yet.");
 
+    // Distinct from AlreadyFinished on purpose: the settlement job declining a booking because someone
+    // disputed it is not the same event as it declining one that already ended, and a log that calls
+    // both "already ended" cannot tell you which happened.
+    public static readonly Error DisputeOpen =
+        Error.Conflict("booking.dispute_open", "This booking cannot settle while a dispute on it is open.");
+
     public static readonly Error PaymentWindowNotElapsed =
         Error.Conflict("booking.payment_window_open", "The payment window has not elapsed yet.");
 

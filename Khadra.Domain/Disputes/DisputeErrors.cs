@@ -30,4 +30,19 @@ public static class DisputeErrors
 
     public static readonly Error StatementRequired =
         Error.Validation("dispute.statement_required", "A statement cannot be empty.");
+
+    public static readonly Error DealerChargeWithoutAssessment =
+        Error.Validation(
+            "dispute.dealer_charge_unassessed",
+            "This booking carries no penalty attributed to the dealer, so no dealer charge can be applied.");
+
+    public static readonly Error DealerChargeOutsideAssessment =
+        Error.Validation(
+            "dispute.dealer_charge_out_of_range",
+            "A dealer charge must fall inside the penalty range assessed on the booking.");
+
+    public static readonly Error DealerChargeCurrencyMismatch =
+        Error.Validation(
+            "dispute.dealer_charge_currency_mismatch",
+            "A dealer charge must use the same currency as the booking's assessed penalty.");
 }

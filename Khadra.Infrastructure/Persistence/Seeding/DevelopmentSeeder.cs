@@ -421,11 +421,14 @@ internal sealed partial class DevelopmentSeeder(
 
         // Only bookings that actually finished can be disputed, which is the domain rule the ticket
         // relies on and the reason the seeder picks from this set rather than from all bookings.
+        //
+        // Completed is excluded to match Booking.CanBeDisputed: reaching Completed IS the settlement
+        // window having elapsed, so a ticket on one would be a record the domain would now refuse to
+        // create. The seeder must not manufacture data the rules forbid.
         var candidates = bookings
             .Where(booking => booking.Status == BookingStatus.Returned ||
                               booking.Status == BookingStatus.NoShow ||
-                              booking.Status == BookingStatus.Cancelled ||
-                              booking.Status == BookingStatus.Completed)
+                              booking.Status == BookingStatus.Cancelled)
             .OrderByDescending(booking => booking.CreatedAt)
             .Take(40)
             .ToList();
@@ -498,6 +501,7 @@ internal sealed partial class DevelopmentSeeder(
             var resolution = DisputeResolution.Create(
                 disposition.Value,
                 dealerCharge: null,
+                assessedPenalty: booking.Penalty,
                 note: "Evidence from both sides reviewed; the penalty was applied at half the assessed amount.",
                 resolvedByAdminId: adminId,
                 resolvedAt: openedAt.AddHours(19));

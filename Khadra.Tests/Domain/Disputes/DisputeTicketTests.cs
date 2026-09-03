@@ -81,7 +81,7 @@ public sealed class DisputeTicketTests
         Assert.True(ticket.IsBreachingSla(Now.AddHours(48)));
 
         var resolution = DisputeResolution.Create(
-            DepositDisposition.RefundEverything(Money.Jod(18m)).Value, null, "Refunded.", Id.New(), Now).Value;
+            DepositDisposition.RefundEverything(Money.Jod(18m)).Value, null, null, "Refunded.", Id.New(), Now).Value;
         ticket.Resolve(resolution);
 
         Assert.False(ticket.IsBreachingSla(Now.AddDays(30)));
@@ -92,9 +92,20 @@ public sealed class DisputeTicketTests
     {
         var ticket = OpenTicket();
         var admin = Id.New();
+        // A dealer charge is a choice made INSIDE the range the booking already assessed, so the
+        // resolution can only be built with that assessment in hand.
+        var assessed = PenaltyAssessment.Range(
+            BookingParty.Dealer,
+            Percentage.FromValidated(25m),
+            Percentage.FromValidated(50m),
+            Money.Jod(100m),
+            "Dealer did not deliver.",
+            Now);
+
         var resolution = DisputeResolution.Create(
             DepositDisposition.RefundEverything(Money.Jod(18m)).Value,
             dealerCharge: Money.Jod(30m),
+            assessedPenalty: assessed,
             "Dealer failed to deliver; customer refunded and dealer charged.",
             admin,
             Now.AddHours(5)).Value;
@@ -128,7 +139,7 @@ public sealed class DisputeTicketTests
         var ticket = OpenTicket(opener: opener);
         ticket.Withdraw(opener, Now);
         var resolution = DisputeResolution.Create(
-            DepositDisposition.RefundEverything(Money.Jod(18m)).Value, null, "n/a", Id.New(), Now).Value;
+            DepositDisposition.RefundEverything(Money.Jod(18m)).Value, null, null, "n/a", Id.New(), Now).Value;
 
         Assert.Equal("dispute.already_withdrawn", ticket.Resolve(resolution).Error.Code);
     }
@@ -178,7 +189,7 @@ public sealed class DepositDispositionTests
     public void A_resolution_must_explain_itself()
     {
         var resolution = DisputeResolution.Create(
-            DepositDisposition.RefundEverything(Deposit).Value, null, "  ", Id.New(), Build.Now);
+            DepositDisposition.RefundEverything(Deposit).Value, null, null, "  ", Id.New(), Build.Now);
 
         Assert.Equal("dispute.resolution_note_required", resolution.Error.Code);
     }
@@ -187,8 +198,98 @@ public sealed class DepositDispositionTests
     public void A_full_refund_with_no_dealer_charge_waives_everything()
     {
         var resolution = DisputeResolution.Create(
-            DepositDisposition.RefundEverything(Deposit).Value, null, "Amicable.", Id.New(), Build.Now).Value;
+            DepositDisposition.RefundEverything(Deposit).Value, null, null, "Amicable.", Id.New(), Build.Now).Value;
 
         Assert.True(resolution.WaivesEverything);
+    }
+
+    // A dealer charge is a choice inside a range the BOOKING fixed when the event happened. The
+    // aggregate always said "an Admin picks inside it on a ticket"; these are the checks that make
+    // that true rather than aspirational.
+    private static PenaltyAssessment DealerPenalty() =>
+        PenaltyAssessment.Range(
+            BookingParty.Dealer,
+            Percentage.FromValidated(25m),
+            Percentage.FromValidated(50m),
+            Money.Jod(100m),
+            "Dealer did not deliver.",
+            Build.Now);
+
+    [Fact]
+    public void A_dealer_charge_needs_a_penalty_the_booking_attributed_to_the_dealer()
+    {
+        var withoutAssessment = DisputeResolution.Create(
+            DepositDisposition.RefundEverything(Deposit).Value,
+            dealerCharge: Money.Jod(30m),
+            assessedPenalty: null,
+            "Charged.",
+            Id.New(),
+            Build.Now);
+
+        var blamedTheCustomer = DisputeResolution.Create(
+            DepositDisposition.RefundEverything(Deposit).Value,
+            dealerCharge: Money.Jod(30m),
+            assessedPenalty: PenaltyAssessment.Fixed(
+                BookingParty.Customer,
+                Percentage.FromValidated(100m),
+                Money.Jod(40m),
+                "Customer cancelled late.",
+                Build.Now),
+            "Charged.",
+            Id.New(),
+            Build.Now);
+
+        Assert.Equal("dispute.dealer_charge_unassessed", withoutAssessment.Error.Code);
+        Assert.Equal("dispute.dealer_charge_unassessed", blamedTheCustomer.Error.Code);
+    }
+
+    [Theory]
+    [InlineData(24)]
+    [InlineData(51)]
+    public void A_dealer_charge_outside_the_assessed_range_is_refused(decimal amount)
+    {
+        var resolution = DisputeResolution.Create(
+            DepositDisposition.RefundEverything(Deposit).Value,
+            dealerCharge: Money.Jod(amount),
+            assessedPenalty: DealerPenalty(),
+            "Charged.",
+            Id.New(),
+            Build.Now);
+
+        Assert.Equal("dispute.dealer_charge_out_of_range", resolution.Error.Code);
+    }
+
+    [Theory]
+    [InlineData(25)]
+    [InlineData(37.5)]
+    [InlineData(50)]
+    public void A_dealer_charge_anywhere_inside_the_assessed_range_is_accepted(decimal amount)
+    {
+        var resolution = DisputeResolution.Create(
+            DepositDisposition.RefundEverything(Deposit).Value,
+            dealerCharge: Money.Jod(amount),
+            assessedPenalty: DealerPenalty(),
+            "Charged at the Admin's discretion inside the assessed band.",
+            Id.New(),
+            Build.Now);
+
+        Assert.True(resolution.IsSuccess);
+        Assert.Equal(amount, resolution.Value.DealerCharge!.Amount);
+        Assert.False(resolution.Value.WaivesEverything);
+    }
+
+    [Fact]
+    public void A_disposition_keeps_the_basis_it_was_split_from()
+    {
+        // Payments reads this decision long after it was made and must be able to check the split
+        // without re-deriving the basis from the very legs it is checking.
+        var disposition = DepositDisposition.Create(
+            Deposit,
+            Money.Jod(10m),
+            Money.Jod(8m),
+            Money.ZeroIn("JOD")).Value;
+
+        Assert.Equal(Deposit.Amount, disposition.DepositHeld.Amount);
+        Assert.Equal("JOD", disposition.DepositHeld.CurrencyCode);
     }
 }

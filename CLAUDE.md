@@ -51,6 +51,12 @@ Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.com
 - Never `git push` without explicit owner approval; never force-push; never `dotnet ef database drop` or `docker compose down -v`.
 - Never bypass the soft-delete query filter without an explicit, commented reason.
 
+## Deferred work that must not be forgotten
+
+`docs/pre-launch-checklist.md` lists what is knowingly deferred while this is a development system
+and must be closed before real users, real bookings or real money. Add to it whenever you leave
+something for later; an item comes off only by being fixed.
+
 ## Open business decisions (spec §2.2)
 
 Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
