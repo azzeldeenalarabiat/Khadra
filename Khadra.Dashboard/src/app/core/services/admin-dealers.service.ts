@@ -2,6 +2,7 @@ import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DealerListItem, DealerProfile, DealerReview, PagedResult } from '../models/dealers.api';
+import { AdminDashboardService } from './admin-dashboard.service';
 
 /**
  * The Admin's dealer queue.
@@ -13,6 +14,7 @@ import { DealerListItem, DealerProfile, DealerReview, PagedResult } from '../mod
 @Injectable({ providedIn: 'root' })
 export class AdminDealersService {
   private readonly http = inject(HttpClient);
+  private readonly dashboard = inject(AdminDashboardService);
 
   /** Filter state the list resource reacts to. */
   readonly status = signal<string | null>(null);
@@ -59,9 +61,17 @@ export class AdminDealersService {
 
   reactivate = (dealerId: string) => this.decide(dealerId, 'reactivate');
 
-  /** After a decision both views are stale: the one being read and the queue it came from. */
+  /**
+   * After a decision three things are stale: the application being read, the queue it came from, and
+   * the rail's count of what the platform still owes.
+   *
+   * The rail was the one nobody refreshed. It read a whole-dashboard snapshot fetched once when the
+   * console loaded, so approving a dealer left the badge advertising that same application until the
+   * admin reloaded the page — the count was live-looking rather than live.
+   */
   refresh(): void {
     this.review.reload();
     this.dealers.reload();
+    this.dashboard.refreshWorkload();
   }
 }

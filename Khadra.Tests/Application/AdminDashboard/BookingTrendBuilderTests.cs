@@ -13,11 +13,15 @@ public sealed class BookingTrendBuilderTests
 
     private static readonly DateOnly Today = new(2026, 9, 3);
 
+    // The instant the panel speaks for. Not what these tests are about -- they are about the
+    // bucketing -- so it is one constant, passed through and asserted once below.
+    private static readonly DateTimeOffset GeneratedAt = new(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public void Every_day_in_the_window_gets_a_bar_even_when_nothing_happened()
     {
         // A missing bar reads as a broken chart; a zero-height bar reads as a quiet day.
-        var trend = BookingTrendBuilder.Build([], Amman, Today, trendDays: 14);
+        var trend = BookingTrendBuilder.Build([], Amman, Today, trendDays: 14, GeneratedAt);
 
         Assert.Equal(14, trend.Points.Count);
         Assert.All(trend.Points, point => Assert.Equal(0, point.Count));
@@ -32,7 +36,7 @@ public sealed class BookingTrendBuilderTests
         // booking under the wrong day and quietly understate today.
         var lateNightInAmman = new DateTimeOffset(2026, 9, 2, 22, 30, 0, TimeSpan.Zero);
 
-        var trend = BookingTrendBuilder.Build([lateNightInAmman], Amman, Today, trendDays: 14);
+        var trend = BookingTrendBuilder.Build([lateNightInAmman], Amman, Today, trendDays: 14, GeneratedAt);
 
         Assert.Equal(1, trend.Points.Single(point => point.Date == new DateOnly(2026, 9, 3)).Count);
         Assert.Equal(0, trend.Points.Single(point => point.Date == new DateOnly(2026, 9, 2)).Count);
@@ -46,7 +50,7 @@ public sealed class BookingTrendBuilderTests
         instants.AddRange(Enumerable.Repeat(Noon(2026, 9, 1), 4));
         instants.AddRange(Enumerable.Repeat(Noon(2026, 8, 25), 2));
 
-        var trend = BookingTrendBuilder.Build(instants, Amman, Today, trendDays: 7);
+        var trend = BookingTrendBuilder.Build(instants, Amman, Today, trendDays: 7, GeneratedAt);
 
         Assert.Equal(100m, trend.ChangePercent);
     }
@@ -54,7 +58,7 @@ public sealed class BookingTrendBuilderTests
     [Fact]
     public void No_baseline_means_no_percentage_rather_than_a_made_up_one()
     {
-        var trend = BookingTrendBuilder.Build([Noon(2026, 9, 1)], Amman, Today, trendDays: 7);
+        var trend = BookingTrendBuilder.Build([Noon(2026, 9, 1)], Amman, Today, trendDays: 7, GeneratedAt);
 
         Assert.Null(trend.ChangePercent);
     }
@@ -66,7 +70,7 @@ public sealed class BookingTrendBuilderTests
         instants.AddRange(Enumerable.Repeat(Noon(2026, 9, 1), 2));
         instants.AddRange(Enumerable.Repeat(Noon(2026, 8, 25), 4));
 
-        var trend = BookingTrendBuilder.Build(instants, Amman, Today, trendDays: 7);
+        var trend = BookingTrendBuilder.Build(instants, Amman, Today, trendDays: 7, GeneratedAt);
 
         Assert.Equal(-50m, trend.ChangePercent);
     }
@@ -75,7 +79,7 @@ public sealed class BookingTrendBuilderTests
     public void Bookings_outside_the_charted_window_do_not_appear_as_bars()
     {
         // It still counts towards the comparison window, which is exactly what it is read for.
-        var trend = BookingTrendBuilder.Build([Noon(2026, 8, 20)], Amman, Today, trendDays: 14);
+        var trend = BookingTrendBuilder.Build([Noon(2026, 8, 20)], Amman, Today, trendDays: 14, GeneratedAt);
 
         Assert.Equal(14, trend.Points.Count);
         Assert.All(trend.Points, point => Assert.Equal(0, point.Count));
@@ -91,7 +95,7 @@ public sealed class BookingTrendBuilderTests
     public void A_window_of_no_days_is_a_programming_error()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            BookingTrendBuilder.Build([], Amman, Today, trendDays: 0));
+            BookingTrendBuilder.Build([], Amman, Today, trendDays: 0, GeneratedAt));
     }
 
     private static DateTimeOffset Noon(int year, int month, int day) =>

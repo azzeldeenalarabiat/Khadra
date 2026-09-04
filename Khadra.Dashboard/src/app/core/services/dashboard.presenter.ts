@@ -2,35 +2,57 @@ import { IconName } from '../../shared/icon/icon-paths';
 import { Tone } from '../models/console.models';
 import {
   ActivityEntry,
-  AdminDashboard,
   AttentionItem,
+  AttentionQueue,
+  BookingCounts,
   BookingTrend,
-  Money,
+  CustomerCounts,
+  DealerCounts,
+  DisputeCounts,
 } from '../models/dashboard.api';
 import { KpiCard, QueueItem } from '../data/dashboard.data';
 
 /**
- * Turns the API snapshot into what the design renders.
+ * Turns the API responses into what the design renders.
  *
  * Everything the server refuses to decide is decided here: which colour a severity is, which icon an
  * action gets, which route a queue row opens, how a deadline reads as "13h over", and how tall a bar
  * is. Keeping it in pure functions means the countdowns can be recomputed on a timer without
  * refetching, and that all of it is testable without a component.
+ *
+ * Each panel arrives on its own now, so every function here takes the one response it needs and a
+ * card is built the moment its own answer lands.
  */
 
 const UNAVAILABLE = '—';
 
-/** Every money figure carries its currency; nothing here assumes JOD. */
-export const formatMoney = (money: Money): string =>
-  `${money.currency} ${money.amount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
-
 const formatCount = (value: number): string => value.toLocaleString('en-US');
 
-export function toKpiCards(dashboard: AdminDashboard): readonly KpiCard[] {
-  const { dealers, bookings, customers, disputes, finance } = dashboard;
+/** The four count responses, each present only once its own request has answered. */
+export interface KpiSources {
+  readonly dealers: DealerCounts | undefined;
+  readonly bookings: BookingCounts | undefined;
+  readonly customers: CustomerCounts | undefined;
+  readonly disputes: DisputeCounts | undefined;
+}
 
-  return [
-    {
+/**
+ * The KPI row, built from whichever answers have arrived.
+ *
+ * A card is omitted until its own response lands rather than the row waiting on the slowest, and no
+ * card is ever rendered from a partial or assumed figure.
+ *
+ * There is no Revenue card. It used to be here showing dashes, fed by a permanently-null slice of the
+ * composite — a request made on every load to be told the Payments context does not exist. The money
+ * panel below states that once, in words; a KPI card of dashes said it four times and looked like a
+ * figure that had failed to load.
+ */
+export function toKpiCards(sources: KpiSources): readonly KpiCard[] {
+  const { dealers, bookings, customers, disputes } = sources;
+  const cards: KpiCard[] = [];
+
+  if (dealers) {
+    cards.push({
       label: 'Total dealers',
       icon: 'storefront',
       main: formatCount(dealers.total),
@@ -40,8 +62,11 @@ export function toKpiCards(dashboard: AdminDashboard): readonly KpiCard[] {
         { k: 'Pending review', v: formatCount(dealers.pendingReview), tone: 'warn' as Tone },
         { k: 'Suspended', v: formatCount(dealers.suspended), tone: 'bad' as Tone },
       ],
-    },
-    {
+    });
+  }
+
+  if (bookings) {
+    cards.push({
       label: 'Bookings',
       icon: 'calendar-check',
       main: formatCount(bookings.total),
@@ -51,8 +76,11 @@ export function toKpiCards(dashboard: AdminDashboard): readonly KpiCard[] {
         { k: 'Active', v: formatCount(bookings.active) },
         { k: 'Pending', v: formatCount(bookings.pendingApproval), tone: 'warn' as Tone },
       ],
-    },
-    {
+    });
+  }
+
+  if (customers) {
+    cards.push({
       label: 'Customers',
       icon: 'users-three',
       main: formatCount(customers.total),
@@ -66,33 +94,11 @@ export function toKpiCards(dashboard: AdminDashboard): readonly KpiCard[] {
         },
         { k: 'Suspended', v: formatCount(customers.suspended) },
       ],
-    },
-    // The Payments context is not built. Dashes, never zeros: an admin reading "0 refunds" would
-    // believe the platform issued none, which is a claim this deployment cannot make.
-    finance
-      ? {
-          label: `Revenue · ${finance.grossBookingValue.currency}`,
-          icon: 'chart-line-up',
-          main: formatCount(finance.grossBookingValue.amount),
-          route: '/finance',
-          subs: [
-            { k: 'Commission', v: formatMoney(finance.commission), tone: 'accent' as Tone },
-            { k: 'Dealer payouts', v: formatMoney(finance.dealerPayouts) },
-            { k: 'Refunds', v: formatMoney(finance.refunds) },
-          ],
-        }
-      : {
-          label: 'Revenue',
-          icon: 'chart-line-up',
-          main: UNAVAILABLE,
-          route: '/finance',
-          subs: [
-            { k: 'Commission', v: UNAVAILABLE },
-            { k: 'Dealer payouts', v: UNAVAILABLE },
-            { k: 'Payments module', v: 'Not built', tone: 'dim' as Tone },
-          ],
-        },
-    {
+    });
+  }
+
+  if (disputes) {
+    cards.push({
       label: 'Disputes',
       icon: 'scales',
       main: formatCount(disputes.open + disputes.underReview),
@@ -101,12 +107,16 @@ export function toKpiCards(dashboard: AdminDashboard): readonly KpiCard[] {
         { k: 'Pending admin', v: formatCount(disputes.open), tone: 'warn' as Tone },
         { k: 'Overdue', v: formatCount(disputes.overdue), tone: 'bad' as Tone },
         {
+          // The window travels with the figure, from the server. "4 resolved" means nothing without
+          // "in 30 days", and the console must not be the thing that remembers which 30.
           k: `Resolved ${disputes.resolvedWindowDays}d`,
           v: formatCount(disputes.resolvedRecently),
         },
       ],
-    },
-  ];
+    });
+  }
+
+  return cards;
 }
 
 /** Severity is the server's word; the colour is ours. */
@@ -177,10 +187,7 @@ const queueTitle = (item: AttentionItem, now: number): string => {
   return item.subtitle ?? 'Needs attention';
 };
 
-export function toQueueItems(
-  queue: AdminDashboard['attentionQueue'],
-  now: number,
-): readonly QueueItem[] {
+export function toQueueItems(queue: AttentionQueue, now: number): readonly QueueItem[] {
   return queue.items.map((item) => {
     const target = kindTarget(item.kind);
     return {
@@ -209,38 +216,10 @@ export function toTrendHeights(trend: BookingTrend): readonly number[] {
   return counts.map((count) => (count === 0 ? 0 : Math.max(6, Math.round((count / busiest) * 88))));
 }
 
-export interface MoneyRow {
-  readonly k: string;
-  readonly v: string;
-  readonly percent: number;
-}
-
-export function toMoneyRows(dashboard: AdminDashboard): readonly MoneyRow[] {
-  const flow = dashboard.moneyInMotion;
-  if (!flow) {
-    return [
-      { k: 'Gross booking value', v: UNAVAILABLE, percent: 0 },
-      { k: 'Platform commission', v: UNAVAILABLE, percent: 0 },
-      { k: 'Dealer payouts', v: UNAVAILABLE, percent: 0 },
-    ];
-  }
-
-  const gross = flow.gross.amount;
-  const share = (value: number): number => (gross > 0 ? Math.round((value / gross) * 100) : 0);
-  return [
-    { k: 'Gross booking value', v: formatMoney(flow.gross), percent: 100 },
-    {
-      k: 'Platform commission',
-      v: formatMoney(flow.commission),
-      percent: share(flow.commission.amount),
-    },
-    {
-      k: 'Dealer payouts',
-      v: formatMoney(flow.dealerPayouts),
-      percent: share(flow.dealerPayouts.amount),
-    },
-  ];
-}
+// toMoneyRows is gone with the composite's null finance slice. It mapped three permanently-null
+// figures onto three dashed rows, which is a lot of machinery to say "the Payments context is not
+// built" — the panel now says exactly that, once, and calls nothing to find it out. When Payments
+// ships it arrives as its own endpoint and this comes back as a real mapping.
 
 const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   DealerApproved: 'check-circle',

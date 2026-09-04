@@ -30,19 +30,24 @@ export class AdminSidebarComponent {
   /**
    * A badge is a live count or it is nothing.
    *
-   * It reads the same dashboard snapshot the dashboard screen does, so the rail and the screen can
-   * never disagree, and shows nothing at all until that snapshot has arrived — a zero would claim
-   * the queue is empty when the truth is that nobody has looked yet.
+   * It reads `GET /admin/workload` — two counts, re-fetched on every navigation and after every
+   * decision. It used to read the whole dashboard snapshot, which was fetched once when the shell
+   * loaded and never again, so a badge went on advertising an application an admin had already
+   * approved for the rest of the session. Cheap enough to ask often is the whole point of that
+   * endpoint being small.
+   *
+   * Nothing is shown until the answer arrives: a zero would claim the queue is empty when the truth
+   * is that nobody has looked yet.
    */
   protected badge(count: NavCount | undefined): string | null {
     if (!count) return null;
-    const snapshot = this.dashboard.dashboard.value();
-    if (!snapshot) return null;
+    const workload = this.dashboard.workload.value();
+    if (!workload) return null;
 
     const value =
       count === 'dealers-pending'
-        ? snapshot.dealers.pendingReview + snapshot.dealers.clarificationNeeded
-        : snapshot.disputes.open + snapshot.disputes.underReview;
+        ? workload.dealerApplicationsAwaitingReview
+        : workload.liveDisputes;
     return value > 0 ? String(value) : null;
   }
 

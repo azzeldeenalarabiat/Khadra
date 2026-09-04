@@ -3,7 +3,7 @@ import { NavGroup } from '../models/console.models';
 /**
  * Sidebar structure, matching the AdminSidebar design component.
  *
- * Structure only. The two badges name a count the sidebar reads from the live dashboard snapshot;
+ * Structure only. The two badges name a count the sidebar reads from GET /admin/workload;
  * no figure is written here.
  */
 export const NAV_GROUPS: readonly NavGroup[] = [

@@ -12,7 +12,6 @@ import {
   formatChangePercent,
   toActivityRows,
   toKpiCards,
-  toMoneyRows,
   toQueueItems,
   toTrendHeights,
 } from '../../core/services/dashboard.presenter';
@@ -21,7 +20,8 @@ import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
  * Landing screen: platform figures, the work queue that drives the admin SLA, and a short activity
- * feed. All of it from `GET /api/v1/admin/dashboard`.
+ * feed. Each panel is its own request, so each has its own skeleton, its own failure and its own
+ * retry — one slow or broken reader no longer blanks the screen.
  *
  * The clock ticks locally. The API sends absolute instants rather than "13h over", so the countdowns
  * and the SLA meters stay honest between refreshes without asking the server again.
@@ -36,41 +36,67 @@ export class DashboardComponent {
   private readonly service = inject(AdminDashboardService);
   private readonly now = signal(Date.now());
 
-  protected readonly resource = this.service.dashboard;
+  protected readonly dealers = this.service.dealerCounts;
+  protected readonly bookings = this.service.bookingCounts;
+  protected readonly customers = this.service.customerCounts;
+  protected readonly disputes = this.service.disputeCounts;
+  protected readonly queueResource = this.service.attentionQueue;
+  protected readonly trendResource = this.service.bookingTrend;
+  protected readonly activityResource = this.service.activity;
+
   protected readonly toneClass = toneClass;
 
   constructor() {
+    // Entering the screen re-reads it. The resources are root-scoped and would otherwise still hold
+    // whatever they fetched the first time the console was opened.
+    this.service.reload();
+
     const ticker = setInterval(() => this.now.set(Date.now()), 30_000);
     inject(DestroyRef).onDestroy(() => clearInterval(ticker));
   }
 
-  protected readonly kpis = computed(() => {
-    const data = this.resource.value();
-    return data ? toKpiCards(data) : [];
-  });
+  /**
+   * The KPI row, from four independent responses.
+   *
+   * A card appears as its own answer arrives rather than the row waiting for the slowest. There is no
+   * Revenue card: the Payments context is not built, so nothing can answer for money, and the row
+   * does not call an endpoint that could only ever reply "not built" — the money panel below says it
+   * once, in words.
+   */
+  protected readonly kpis = computed(() =>
+    toKpiCards({
+      dealers: this.dealers.value(),
+      bookings: this.bookings.value(),
+      customers: this.customers.value(),
+      disputes: this.disputes.value(),
+    }),
+  );
+
+  protected readonly countsLoading = computed(
+    () =>
+      this.dealers.isLoading() ||
+      this.bookings.isLoading() ||
+      this.customers.isLoading() ||
+      this.disputes.isLoading(),
+  );
 
   protected readonly queue = computed(() => {
-    const data = this.resource.value();
-    return data ? toQueueItems(data.attentionQueue, this.now()) : [];
+    const data = this.queueResource.value();
+    return data ? toQueueItems(data, this.now()) : [];
   });
 
   protected readonly trend = computed(() => {
-    const data = this.resource.value();
-    return data ? toTrendHeights(data.bookingTrend) : [];
-  });
-
-  protected readonly money = computed(() => {
-    const data = this.resource.value();
-    return data ? toMoneyRows(data) : [];
+    const data = this.trendResource.value();
+    return data ? toTrendHeights(data) : [];
   });
 
   protected readonly activity = computed(() => {
-    const data = this.resource.value();
-    return data ? toActivityRows(data.recentActivity, this.now()) : [];
+    const data = this.activityResource.value();
+    return data ? toActivityRows(data.entries, this.now()) : [];
   });
 
   protected readonly trendChange = computed(() =>
-    formatChangePercent(this.resource.value()?.bookingTrend.changePercent ?? null),
+    formatChangePercent(this.trendResource.value()?.changePercent ?? null),
   );
 
   /**
@@ -81,43 +107,35 @@ export class DashboardComponent {
    * is neither, and reads as neither.
    */
   protected readonly trendTone = computed<Tone | null>(() => {
-    const change = this.resource.value()?.bookingTrend.changePercent ?? null;
+    const change = this.trendResource.value()?.changePercent ?? null;
     if (change === null) return 'dim';
     if (change > 0) return 'ok';
     if (change < 0) return 'bad';
     return null;
   });
 
-  protected readonly trendDays = computed(
-    () => this.resource.value()?.bookingTrend.points.length ?? 0,
-  );
+  protected readonly trendDays = computed(() => this.trendResource.value()?.points.length ?? 0);
 
   protected readonly queueSummary = computed(() => {
-    const queue = this.resource.value()?.attentionQueue;
+    const queue = this.queueResource.value();
     return queue ? `${queue.openCount} open · ${queue.overdueCount} overdue` : '';
   });
 
-  /**
-   * The SLA in force today, labelled as such.
-   *
-   * It sat above the queue reading "48-hour SLA", which invited the reading that every row below was
-   * measured against 48 hours. They are not: each row is judged against the window its own record
-   * froze, which for anything submitted before a settings change is a different number.
-   */
+  /** The SLA in force today, labelled as such — each row is judged against its own frozen window. */
   protected readonly slaNote = computed(() => {
-    const hours = this.resource.value()?.adminSlaHours;
+    const hours = this.queueResource.value()?.slaHours;
     return hours ? `Current SLA ${hours}h` : '';
   });
 
   /**
    * A 401 or 403 is not a broken dashboard, it is a missing session, and telling an admin to "try
    * again" when they simply are not signed in wastes their time.
+   *
+   * Read from the counts because they are the cheapest thing that proves the session: if the whole
+   * screen is unauthorised, this is the page-level message rather than four identical panel errors.
    */
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as { status?: number } | undefined;
-    if (!error) return null;
-
-    const status = error.status ?? 0;
+    const status = (this.dealers.error() as { status?: number } | undefined)?.status ?? 0;
     if (status === 401) {
       return { title: 'Your session has expired', body: 'Sign in again to see platform figures.' };
     }
@@ -127,11 +145,13 @@ export class DashboardComponent {
         body: 'Platform figures are restricted to administrators.',
       };
     }
-    return {
-      title: 'The dashboard could not be loaded',
-      body: 'The platform figures service did not respond. Nothing has been changed.',
-    };
+    return null;
   });
+
+  /** Whether one panel failed on its own, while the rest of the screen is fine. */
+  protected panelFailed(resource: { error: () => unknown }): boolean {
+    return !!resource.error() && !this.failure();
+  }
 
   protected reload(): void {
     this.service.reload();

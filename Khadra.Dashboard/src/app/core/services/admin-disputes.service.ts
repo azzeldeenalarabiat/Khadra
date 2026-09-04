@@ -3,6 +3,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
 import { Dispute, DisputeListItem } from '../models/disputes.api';
+import { AdminDashboardService } from './admin-dashboard.service';
 
 /** What the queue is filtered to. `live` is the default because it is the queue an admin works. */
 export type DisputeQueue = 'live' | 'Open' | 'UnderReview' | 'Resolved' | 'Withdrawn';
@@ -18,6 +19,7 @@ export type DisputeQueue = 'live' | 'Open' | 'UnderReview' | 'Resolved' | 'Withd
 export class AdminDisputesService {
   private readonly http = inject(HttpClient);
   private readonly base = '/api/v1/admin/disputes';
+  private readonly dashboard = inject(AdminDashboardService);
 
   readonly queue = signal<DisputeQueue>('live');
   readonly overdueOnly = signal(false);
@@ -65,9 +67,17 @@ export class AdminDisputesService {
 
   refreshList(): void {
     this.list.reload();
+    this.dashboard.refreshWorkload();
   }
 
+  /**
+   * After taking or resolving a ticket, the rail's live-dispute count is stale too.
+   *
+   * It used to come from a whole-dashboard snapshot fetched once per page load, so an admin who
+   * resolved every open ticket still saw the badge claiming they were all waiting.
+   */
   refresh(): void {
     this.dispute.reload();
+    this.dashboard.refreshWorkload();
   }
 }

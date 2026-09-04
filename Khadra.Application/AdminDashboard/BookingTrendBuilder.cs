@@ -18,7 +18,8 @@ public static class BookingTrendBuilder
         IReadOnlyCollection<DateTimeOffset> createdInstants,
         IReportingCalendar calendar,
         DateOnly today,
-        int trendDays)
+        int trendDays,
+        DateTimeOffset generatedAt)
     {
         ArgumentNullException.ThrowIfNull(createdInstants);
         ArgumentNullException.ThrowIfNull(calendar);
@@ -51,7 +52,7 @@ public static class BookingTrendBuilder
             ? null
             : decimal.Round((current - previous) / (decimal)previous * 100m, 1, MidpointRounding.ToEven);
 
-        return new BookingTrendDto(from, today, points, changePercent);
+        return new BookingTrendDto(generatedAt, from, today, points, changePercent);
     }
 
     /// <summary>

@@ -104,7 +104,7 @@ export interface NavItem {
   readonly icon: IconName;
   readonly route: string;
   /**
-   * The badge names a count for the sidebar to look up in the dashboard snapshot; it never holds a
+   * The badge names a count for the sidebar to look up in the workload response; it never holds a
    * figure. A hard-coded "12" beside Disputes is a number an administrator will act on, and it was
    * wrong from the moment it was typed.
    */
