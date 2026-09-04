@@ -145,6 +145,7 @@ public static class DependencyInjection
         services.AddScoped<IBookingReader, BookingReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
         services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();
+        services.AddScoped<ICustomerAdminReader, CustomerAdminReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         // The dashboard glance and the audit screen read one table with different questions: a fixed

@@ -94,11 +94,40 @@ export const routes: Routes = [
               ),
           },
 
-          notBuilt('bookings', 'Bookings'),
-          notBuilt('bookings/detail', 'Booking details', 'booking-detail'),
+          // Every booking on the platform, and the three interventions an admin can make in one.
+          {
+            path: 'bookings',
+            title: 'Bookings · Khadra Admin',
+            loadComponent: () =>
+              import('./features/bookings/bookings-list.component').then(
+                (m) => m.BookingsListComponent,
+              ),
+          },
+          {
+            path: 'bookings/:bookingId',
+            title: 'Booking details · Khadra Admin',
+            loadComponent: () =>
+              import('./features/bookings/booking-detail.component').then(
+                (m) => m.AdminBookingDetailComponent,
+              ),
+          },
 
-          notBuilt('customers', 'Customers'),
-          notBuilt('customers/profile', 'Customer profile', 'customer-profile'),
+          {
+            path: 'customers',
+            title: 'Customers · Khadra Admin',
+            loadComponent: () =>
+              import('./features/customers/customers-list.component').then(
+                (m) => m.CustomersListComponent,
+              ),
+          },
+          {
+            path: 'customers/:customerId',
+            title: 'Customer profile · Khadra Admin',
+            loadComponent: () =>
+              import('./features/customers/customer-profile.component').then(
+                (m) => m.CustomerProfileComponent,
+              ),
+          },
 
           notBuilt('finance', 'Finance'),
           notBuilt('payments', 'Payments'),

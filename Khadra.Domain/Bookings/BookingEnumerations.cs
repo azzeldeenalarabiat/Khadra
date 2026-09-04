@@ -64,6 +64,20 @@ public sealed class BookingParty : Enumeration
     // Nobody can be blamed from the facts available. Spec 3.3: an admin decides, if anyone asks.
     public static readonly BookingParty Unattributed = new(4, "Unattributed");
 
+    /// <summary>
+    /// A named administrator acting on the platform's behalf.
+    /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="System"/>, which is a timer. An admin intervening in a booking is a
+    /// person, and the status history has to say which one.
+    ///
+    /// It is also the only safe party for an admin cancellation: <c>AssessCancellation</c> attributes
+    /// a penalty to <see cref="Customer"/> and <see cref="Dealer"/>, so cancelling "on behalf of" the
+    /// customer would have an administrator assess the full deposit against them by hand. Every other
+    /// party falls through to no penalty, which is what the platform cancelling actually means.
+    /// </remarks>
+    public static readonly BookingParty Admin = new(5, "Admin");
+
     private BookingParty(int id, string name) : base(id, name)
     {
     }

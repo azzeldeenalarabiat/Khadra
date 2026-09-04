@@ -66,12 +66,7 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
         if (total == 0)
             return PagedResult.Empty<DisputeListItem>(page.Page, page.PageSize);
 
-        // A live queue is worked soonest-deadline first; a closed list is read newest first.
-        var ordered = live
-            ? query.OrderBy(ticket => ticket.SlaDeadline)
-            : query.OrderByDescending(ticket => ticket.ClosedAt).ThenByDescending(ticket => ticket.OpenedAt);
-
-        var items = await ordered
+        var items = await OrderForQueue(query, live)
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(ticket => new DisputeListItem(
@@ -117,6 +112,26 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
 
         return new PagedResult<DisputeListItem>(items, page.Page, page.PageSize, total);
     }
+
+    /// <summary>
+    /// A live queue is worked soonest-deadline first; a closed list is read newest first.
+    /// </summary>
+    /// <remarks>
+    /// Both break their tie on the id, because neither key is unique: two tickets opened in the same
+    /// second share a deadline, and two closed in the same second share ClosedAt AND OpenedAt. A
+    /// non-total order lets a page boundary fall inside the tie and drop a ticket from every page,
+    /// or show it on two — the same reason the audit reader orders by (occurred_at DESC, id DESC).
+    ///
+    /// Its own method so a test can read the SQL it produces. Paging the rows cannot prove this:
+    /// SQLite returns a tied scan in a stable order, so the test passes with the tiebreak removed,
+    /// and PostgreSQL — where it actually breaks — is free not to.
+    /// </remarks>
+    internal static IOrderedQueryable<DisputeTicket> OrderForQueue(IQueryable<DisputeTicket> query, bool live) =>
+        live
+            ? query.OrderBy(ticket => ticket.SlaDeadline).ThenBy(ticket => ticket.Id)
+            : query.OrderByDescending(ticket => ticket.ClosedAt)
+                .ThenByDescending(ticket => ticket.OpenedAt)
+                .ThenBy(ticket => ticket.Id);
 
     public async Task<IReadOnlyDictionary<Guid, string>> NamesAsync(
         IReadOnlyCollection<Id> userIds,

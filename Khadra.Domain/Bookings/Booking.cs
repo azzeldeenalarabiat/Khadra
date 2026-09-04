@@ -162,7 +162,7 @@ public sealed class Booking : AggregateRoot
     }
 
     // The customer opened the checkout and walked away. Releases the vehicle; nobody is at fault.
-    public UnitResult<Error> ExpireUnpaid(DateTimeOffset now)
+    public UnitResult<Error> ExpireUnpaid(DateTimeOffset now, Id? actorUserId = null)
     {
         if (Status != BookingStatus.PendingPayment)
             return UnitResult.Failure(BookingErrors.NotAwaitingPayment);
@@ -171,14 +171,14 @@ public sealed class Booking : AggregateRoot
 
         Penalty = PenaltyAssessment.None("The deposit was not paid within the payment window.", Pricing.CurrencyCode, now);
         FinishedAt = now;
-        Transition(BookingStatus.Expired, BookingParty.System, null, "Payment window elapsed.", now);
+        Transition(BookingStatus.Expired, PartyFor(actorUserId), actorUserId, "Payment window elapsed.", now);
         AddDomainEvent(new BookingExpired(Id, VehicleId, "PaymentWindowElapsed", now));
         return UnitResult.Success<Error>();
     }
 
     // The dealer never answered and the rental period has arrived. The deposit is refunded in full:
     // the customer did everything asked of them.
-    public UnitResult<Error> ExpireUnanswered(DateTimeOffset now)
+    public UnitResult<Error> ExpireUnanswered(DateTimeOffset now, Id? actorUserId = null)
     {
         if (Status != BookingStatus.Requested)
             return UnitResult.Failure(BookingErrors.NotAwaitingDecision);
@@ -187,7 +187,7 @@ public sealed class Booking : AggregateRoot
 
         Penalty = PenaltyAssessment.None("The dealer did not respond before the rental was due to start.", Pricing.CurrencyCode, now);
         FinishedAt = now;
-        Transition(BookingStatus.Expired, BookingParty.System, null, "Dealer did not respond.", now);
+        Transition(BookingStatus.Expired, PartyFor(actorUserId), actorUserId, "Dealer did not respond.", now);
         AddDomainEvent(new BookingExpired(Id, VehicleId, "DealerDidNotRespond", now));
         return UnitResult.Success<Error>();
     }
@@ -298,7 +298,7 @@ public sealed class Booking : AggregateRoot
     // Blame is only assigned for self-pickup, where the customer was the one who had to show up. On a
     // delivery booking the dealer was supposed to travel to the customer, so the system refuses to
     // accuse either side and leaves it to an Admin if anyone opens a ticket.
-    public UnitResult<Error> MarkNoShow(DateTimeOffset now)
+    public UnitResult<Error> MarkNoShow(DateTimeOffset now, Id? actorUserId = null)
     {
         if (Status != BookingStatus.Approved)
             return UnitResult.Failure(BookingErrors.NotApproved);
@@ -320,7 +320,7 @@ public sealed class Booking : AggregateRoot
                 now);
 
         FinishedAt = now;
-        Transition(BookingStatus.NoShow, BookingParty.System, null, "No-show window elapsed.", now);
+        Transition(BookingStatus.NoShow, PartyFor(actorUserId), actorUserId, "No-show window elapsed.", now);
         AddDomainEvent(new BookingMarkedNoShow(Id, VehicleId, Penalty.AttributedTo.Name, now));
         return UnitResult.Success<Error>();
     }
@@ -424,6 +424,19 @@ public sealed class Booking : AggregateRoot
         AddDomainEvent(new BookingCompleted(Id, CustomerId, DealerId, now));
         return UnitResult.Success<Error>();
     }
+
+    /// <summary>
+    /// Who moved the booking: a named administrator, or the platform on a timer.
+    /// </summary>
+    /// <remarks>
+    /// These three transitions are the job's work, and the job does not exist yet (pre-launch item
+    /// 4), so an Admin triggers them by hand today. The status history has to say which it was --
+    /// "System" against an action a person took would misattribute it to a timer that never ran.
+    /// Neither party changes the outcome: the penalty each of these assesses is decided by the
+    /// booking's own frozen terms, not by who asked.
+    /// </remarks>
+    private static BookingParty PartyFor(Id? actorUserId) =>
+        actorUserId is null ? BookingParty.System : BookingParty.Admin;
 
     private PenaltyAssessment AssessCancellation(BookingParty cancelledBy, DateTimeOffset now)
     {

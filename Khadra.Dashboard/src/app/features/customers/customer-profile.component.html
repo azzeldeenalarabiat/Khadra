@@ -1,0 +1,157 @@
+@if (failure(); as message) {
+  <div class="stack stack-14 page-wide">
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load this customer</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/customers">Back to customers</a>
+        </div>
+      </div>
+    </section>
+  </div>
+} @else if (resource.isLoading() && !customer()) {
+  <div class="stack stack-14 page-wide">
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  </div>
+} @else if (customer(); as c) {
+  <div class="stack stack-14 page-wide">
+    <header class="dc-head">
+      <div class="grow">
+        <div class="row row-gap-9">
+          <div class="customer-avatar">{{ initials(c.fullName) }}</div>
+          <h1 class="page-title">{{ c.fullName }}</h1>
+          <span class="pill" [class]="'s-' + tone()">{{ statusLabel() }}</span>
+        </div>
+        <div class="page-sub">{{ c.email }} · {{ c.phone }}</div>
+      </div>
+      <div class="dc-head-actions">
+        <a
+          class="btn btn-secondary btn-md"
+          routerLink="/bookings"
+          [queryParams]="{ customerId: c.userId }"
+        >
+          Their bookings
+        </a>
+      </div>
+    </header>
+
+    <div class="split-16">
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="user-circle-plus" class="kpi-icon" />
+            <span class="sect-t">Account</span>
+          </div>
+          <div class="kv-body">
+            @for (row of accountRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="identification-card" class="kpi-icon" />
+            <span class="sect-t">Documents on file</span>
+            <span class="sect-hint" [class.s-ok]="c.hasCompleteRenterDocuments">
+              {{ c.hasCompleteRenterDocuments ? 'Complete to rent' : 'Incomplete' }}
+            </span>
+          </div>
+          @if (c.documents.length) {
+            <div class="sect-pad stack stack-12">
+              @for (document of c.documents; track document.documentId) {
+                <div class="row row-gap-12">
+                  <div class="grow">
+                    <div class="row row-gap-8">
+                      <span class="handover-title">{{ documentLabel(document) }}</span>
+                      <span class="pill" [class]="'s-' + documentTone(document)">
+                        {{ document.status }}
+                      </span>
+                    </div>
+                    <div class="page-sub">{{ documentDetail(document) }}</div>
+                    @if (document.reviewNote) {
+                      <div class="queue-desc">{{ document.reviewNote }}</div>
+                    }
+                  </div>
+                </div>
+              }
+              <!-- Why there is no "view" here. This is a limit of what has been decided, not an
+                   oversight, so the screen says which decision is missing rather than going quiet. -->
+              <div class="note-box is-plain">
+                The platform holds these but does not open them here. Identity papers are private
+                (spec 7) and the domain lets only the customer and a dealer with an active request
+                see one; whether an administrator may, and whether admin review is how a document
+                becomes verified, is an owner decision that has not been made.
+              </div>
+            </div>
+          } @else {
+            <div class="state-block is-empty">
+              <div class="state-icon is-outline"><kh-icon name="identification-card" /></div>
+              <div class="state-title">Nothing uploaded yet</div>
+              <div class="state-text">
+                This customer cannot complete a booking until their licence and identity are on
+                file.
+              </div>
+            </div>
+          }
+        </section>
+      </div>
+
+      <div class="stack stack-14 resolve-panel">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="calendar-check" class="kpi-icon" />
+            <span class="sect-t">Bookings</span>
+          </div>
+          <div class="kv-body">
+            @for (row of bookingRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val num">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">Account status</span>
+          @if (c.suspensionReason) {
+            <div class="decision-record">{{ c.suspensionReason }}</div>
+          }
+          @if (canSuspend()) {
+            <button type="button" class="btn btn-danger btn-lg-row" (click)="suspend()">
+              <kh-icon name="prohibit" />
+              Suspend account
+            </button>
+          }
+          @if (canReactivate()) {
+            <button type="button" class="btn btn-primary btn-lg-row" (click)="reactivate()">
+              <kh-icon name="check-circle" />
+              Reactivate account
+            </button>
+          }
+          <div class="decision-note">
+            Suspending ends every session at once. It does not cancel bookings already made, and it
+            moves no money. The decision is attributed to you in the
+            <a
+              routerLink="/audit-logs"
+              [queryParams]="{ entityType: 'Customer', entityId: c.userId }"
+            >
+              audit log</a
+            >, which records the account by reference rather than by name.
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+}

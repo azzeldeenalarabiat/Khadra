@@ -1,0 +1,225 @@
+@if (failure(); as message) {
+  <div class="stack stack-14 page-wide">
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load this booking</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/bookings">Back to bookings</a>
+        </div>
+      </div>
+    </section>
+  </div>
+} @else if (resource.isLoading() && !booking()) {
+  <div class="stack stack-14 page-wide">
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  </div>
+} @else if (booking(); as b) {
+  <div class="stack stack-14 page-wide">
+    <header class="dc-head">
+      <div class="grow">
+        <div class="row row-gap-9">
+          <h1 class="page-title mono">{{ b.reference }}</h1>
+          <span class="pill" [class]="'s-' + tone()">{{ statusLabel() }}</span>
+          @if (b.liveDisputeId) {
+            <span class="pill s-bad">Disputed</span>
+          }
+        </div>
+        <div class="page-sub">
+          Booked {{ when(b.createdAt) }} · {{ when(b.periodStart) }} to {{ when(b.periodEnd) }}
+        </div>
+      </div>
+      <div class="dc-head-actions">
+        <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', b.dealerId]">Open dealer</a>
+        <a class="btn btn-secondary btn-md" [routerLink]="['/customers', b.customerId]">
+          Open customer
+        </a>
+        @if (b.liveDisputeId) {
+          <a class="btn btn-primary btn-md" [routerLink]="['/disputes', b.liveDisputeId]">
+            Open dispute
+          </a>
+        }
+      </div>
+    </header>
+
+    <div class="split-16">
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="users-three" class="kpi-icon" />
+            <span class="sect-t">Parties</span>
+          </div>
+          <div class="kv-body">
+            @for (row of partyRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="currency-circle-dollar" class="kpi-icon" />
+            <span class="sect-t">Money</span>
+            <span class="sect-hint">Frozen when the booking was made</span>
+          </div>
+          <div class="kv-body">
+            @for (row of moneyRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val num">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        @if (b.penalty; as penalty) {
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="warning-diamond" class="kpi-icon" />
+              <span class="sect-t">Penalty assessed</span>
+            </div>
+            <div class="sect-pad stack stack-9">
+              @if (penalty.isNothingOwed) {
+                <div class="money-line">
+                  <span class="k-label">Nothing is owed</span>
+                </div>
+              } @else {
+                <div class="money-line">
+                  <span class="k-label">Against {{ penalty.attributedTo }}</span>
+                  <span class="num">
+                    @if (penalty.isRange) {
+                      {{ penalty.minAmount.amount }}–{{ penalty.maxAmount.amount }}
+                      {{ penalty.maxAmount.currency }}
+                    } @else {
+                      {{ penalty.maxAmount.amount }} {{ penalty.maxAmount.currency }}
+                    }
+                  </span>
+                </div>
+              }
+              <div class="page-sub">{{ penalty.reason }}</div>
+              <div class="note-box is-plain">
+                Assessed, not charged. Money moves only when an administrator resolves a dispute.
+              </div>
+            </div>
+          </section>
+        }
+
+        @if (b.handovers.length) {
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="steering-wheel" class="kpi-icon" />
+              <span class="sect-t">Handovers</span>
+            </div>
+            <div class="sect-pad stack stack-12">
+              @for (h of b.handovers; track h.recordedAt) {
+                <div class="stack stack-4">
+                  <div class="row row-gap-8">
+                    <span class="handover-title">{{ h.type }}</span>
+                    <span class="page-sub push">{{ when(h.recordedAt) }}</span>
+                  </div>
+                  <div class="page-sub">
+                    Recorded by {{ h.recordedBy }}
+                    @if (h.odometerKm !== null) {
+                      · {{ h.odometerKm }} km
+                    }
+                    @if (h.fuelLevel !== null) {
+                      · fuel {{ h.fuelLevel }}
+                    }
+                    @if (h.photoCount) {
+                      · {{ h.photoCount }} photo(s)
+                    }
+                  </div>
+                  @if (h.cashCollected) {
+                    <div class="page-sub">
+                      Cash collected: {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
+                    </div>
+                  }
+                  @if (h.notes) {
+                    <div class="queue-desc">{{ h.notes }}</div>
+                  }
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <section class="sect">
+          <div class="sect-h"><span class="sect-t">History</span></div>
+          <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
+        </section>
+      </div>
+
+      <div class="stack stack-14 resolve-panel">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="file-lock" class="kpi-icon" />
+            <span class="sect-t">Terms it was made under</span>
+          </div>
+          <div class="kv-body">
+            @for (row of termsRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">Platform actions</span>
+          @if (hasAnyAction()) {
+            @if (canCancel()) {
+              <button type="button" class="btn btn-danger btn-lg-row" (click)="cancel()">
+                <kh-icon name="x-circle" />
+                Cancel booking
+              </button>
+            }
+            @if (canExpire()) {
+              <button type="button" class="btn btn-secondary btn-lg-row" (click)="expire()">
+                <kh-icon name="clock-counter-clockwise" />
+                Expire booking
+              </button>
+            }
+            @if (canMarkNoShow()) {
+              <button type="button" class="btn btn-danger btn-lg-row" (click)="markNoShow()">
+                <kh-icon name="prohibit" />
+                Mark as no-show
+              </button>
+            }
+            <div class="decision-note">
+              None of these moves money. A cancellation by the platform assesses no penalty against
+              either party; the two deadline actions are refused while this booking's own window
+              still has time in it. Every one is attributed to you in the
+              <a
+                routerLink="/audit-logs"
+                [queryParams]="{ entityType: 'Booking', entityId: b.bookingId }"
+              >
+                audit log</a
+              >.
+            </div>
+          } @else {
+            <div class="decision-note">
+              This booking has reached a state the platform does not step into. Its record stays
+              exactly as it is; what happened to it is in the
+              <a
+                routerLink="/audit-logs"
+                [queryParams]="{ entityType: 'Booking', entityId: b.bookingId }"
+              >
+                audit log</a
+              >.
+            </div>
+          }
+        </section>
+      </div>
+    </div>
+  </div>
+}

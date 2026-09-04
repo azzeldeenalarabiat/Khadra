@@ -1,5 +1,5 @@
 import { httpResource } from '@angular/common/http';
-import { Injectable, computed, inject } from '@angular/core';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
@@ -69,8 +69,29 @@ export class AdminDashboardService {
     return this.isAdmin() ? '/api/v1/admin/workload' : undefined;
   });
 
+  /**
+   * Whether the dashboard SCREEN is the one on show.
+   *
+   * This service is injected by the sidebar, which every admin screen renders, and an `httpResource`
+   * fires the moment it is created — so opening the audit log fetched the dealer counts, the booking
+   * counts, the customer counts, the dispute counts, the work queue, the fourteen-day trend and the
+   * activity feed, seven requests for a screen that draws none of them. The rule is that a screen
+   * calls the APIs it needs and only those, and root-scoped resources quietly broke it for every
+   * screen at once.
+   *
+   * `workload` above is deliberately not behind this: two counts are what the rail badges, and the
+   * rail is on every screen.
+   */
+  private readonly showing = signal(false);
+
+  /** The dashboard screen owns this for as long as it is mounted. */
+  watch(): void {
+    this.showing.set(true);
+    inject(DestroyRef).onDestroy(() => this.showing.set(false));
+  }
+
   private adminUrl(path: string): string | undefined {
-    return this.isAdmin() ? `/api/v1/admin/dashboard/${path}` : undefined;
+    return this.isAdmin() && this.showing() ? `/api/v1/admin/dashboard/${path}` : undefined;
   }
 
   readonly dealerCounts = httpResource<DealerCounts>(() => this.adminUrl('dealer-counts'));

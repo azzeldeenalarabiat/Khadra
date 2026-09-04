@@ -1,0 +1,143 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Customers</h1>
+      <div class="page-sub">
+        The people who rent, their verification state and their history with the platform.
+      </div>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    <div class="list-toolbar">
+      <div class="list-search">
+        <kh-icon name="magnifying-glass" class="search-icon" />
+        <label class="visually-hidden" for="customer-search">Search name, email or phone</label>
+        <input
+          id="customer-search"
+          class="input input-sm"
+          placeholder="Search name, email or phone"
+          [value]="search()"
+          (input)="setSearch($event)"
+        />
+      </div>
+      @for (chip of chips; track chip.key) {
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="active() === chip.key"
+          [class.btn-secondary]="active() !== chip.key"
+          (click)="select(chip.key)"
+        >
+          {{ chip.label }}
+          <!-- The number is the database's, for the whole platform, not a tally of this page. -->
+          @if (count(chip.key) !== null) {
+            <span class="tab-count">{{ count(chip.key) }}</span>
+          }
+        </button>
+      }
+    </div>
+
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load the customers</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    } @else if (resource.isLoading() && rows().length === 0) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="users-three" /></div>
+        <div class="state-title">No customer matches this view</div>
+        <div class="state-text">
+          Clear the search or choose a different filter. Customers register in the app; the platform
+          does not create them.
+        </div>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Contact</th>
+              <th>Status</th>
+              <th>Documents</th>
+              <th>Bookings</th>
+              <th>Last seen</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.userId) {
+              <tr>
+                <td class="td">
+                  <div class="entity">
+                    <div class="entity-avatar">{{ initials(row.fullName) }}</div>
+                    <div>
+                      <a class="row-link" [routerLink]="['/customers', row.userId]">
+                        {{ row.fullName }}
+                      </a>
+                      <div class="entity-sub">Joined {{ when(row.createdAt) }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="td">
+                  {{ row.email }}
+                  <div class="td-sub mono">{{ row.phone }}</div>
+                </td>
+                <td class="td">
+                  <span class="pill" [class]="'s-' + tone(row)">{{ statusLabel(row) }}</span>
+                </td>
+                <td class="td">
+                  {{ row.documentCount }} on file
+                  <div class="td-sub" [class.s-ok]="row.hasCompleteRenterDocuments">
+                    {{ row.hasCompleteRenterDocuments ? 'Complete to rent' : 'Incomplete' }}
+                  </div>
+                </td>
+                <td class="td td-num">{{ row.bookingCount }}</td>
+                <td class="td">{{ when(row.lastLoginAt) }}</td>
+                <td class="td td-num">
+                  <a class="btn btn-secondary btn-xs" [routerLink]="['/customers', row.userId]">
+                    Open
+                  </a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="pager-count">{{ summary() }}</span>
+        <div class="pager-nav">
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() <= 1"
+            (click)="goTo(page() - 1)"
+          >
+            Previous
+          </button>
+          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="page() >= totalPages()"
+            (click)="goTo(page() + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+</div>

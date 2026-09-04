@@ -19,7 +19,11 @@ public sealed record BookingListItem(
     VehicleLabel? Vehicle,
     string DealerName,
     string CustomerName,
-    bool HasLiveDispute);
+    bool HasLiveDispute,
+    // Both parties by id, so a platform-wide row can open the dealership or the customer behind it.
+    // A dealer or customer reading their own list already knows one of them; the Admin knows neither.
+    Guid DealerId,
+    Guid CustomerId);
 
 /// <summary>What a booking needs from the other contexts to be readable as a whole.</summary>
 /// <remarks>
@@ -47,7 +51,24 @@ public sealed record VehicleLabel(
 /// Which bookings. Either a raw domain status or a TAB, the console's vocabulary, resolved here so
 /// the client never encodes state names and the tab counts are the database's answer.
 /// </summary>
-public sealed record BookingListFilter(Id? CustomerId, Id? DealerId, string? Status, string? Tab = null, Guid? VehicleId = null);
+/// <param name="IncludePendingPayment">
+/// Whether bookings that have never been paid for count.
+///
+/// They are hidden from a DEALER because nothing has been asked of them yet — no deposit has cleared,
+/// so spec 5.3 says the request does not exist as far as the dealership is concerned. That is a rule
+/// about the dealer's list, not about the data, and the platform's own list must not inherit it: an
+/// Admin filtering to one dealership would otherwise lose exactly the bookings that are holding cars
+/// unpaid, which are the ones worth looking at.
+/// </param>
+/// <param name="Reference">One booking by its reference, matched exactly. The Admin's search box.</param>
+public sealed record BookingListFilter(
+    Id? CustomerId,
+    Id? DealerId,
+    string? Status,
+    string? Tab = null,
+    Guid? VehicleId = null,
+    bool IncludePendingPayment = false,
+    string? Reference = null);
 
 /// <summary>
 /// The dealer's tabs mapped onto the domain (design: Dealer Console, TABS). The design's "Confirmed"

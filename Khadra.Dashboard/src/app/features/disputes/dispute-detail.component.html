@@ -167,17 +167,27 @@
               <span class="k-label">Deposit held</span>
               <span class="num">{{ r.depositHeld.amount }} {{ r.depositHeld.currency }}</span>
             </div>
+            <!-- Each leg carries its own currency code, like every other money value in the console.
+                 Three bare numbers under one that reads "120 JOD" invite the eye to borrow the code
+                 from the line above -- which is the assumption the rule exists to stop, on the one
+                 screen where the platform decides who gets what. -->
             <div class="money-line">
               <span class="k-label">Refunded to the customer</span>
-              <span class="num">{{ r.refundToCustomer.amount }}</span>
+              <span class="num"
+                >{{ r.refundToCustomer.amount }} {{ r.refundToCustomer.currency }}</span
+              >
             </div>
             <div class="money-line">
               <span class="k-label">Kept by the platform</span>
-              <span class="num">{{ r.retainedByPlatform.amount }}</span>
+              <span class="num"
+                >{{ r.retainedByPlatform.amount }} {{ r.retainedByPlatform.currency }}</span
+              >
             </div>
             <div class="money-line">
               <span class="k-label">Transferred to the dealer</span>
-              <span class="num">{{ r.transferredToDealer.amount }}</span>
+              <span class="num"
+                >{{ r.transferredToDealer.amount }} {{ r.transferredToDealer.currency }}</span
+              >
             </div>
             @if (r.dealerCharge) {
               <div class="money-line s-bad">

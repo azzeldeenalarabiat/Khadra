@@ -55,47 +55,6 @@ const FALLBACK: Missing = {
  * is not built" tells the next person what to do, where "coming soon" tells them nothing.
  */
 const SCREENS: Readonly<Record<string, Missing>> = {
-  bookings: {
-    title: 'Bookings',
-    icon: 'calendar-blank',
-    purpose:
-      'Every booking on the platform, across all dealers, with the frozen price and terms each one was made under.',
-    blocked:
-      'The Booking context is built and bookings are real, but `GET /api/v1/bookings` answers only for the customer or the dealer on a booking. A platform-wide reader for administrators has not been written.',
-    instead: {
-      text: 'A dealer sees their own bookings today, and a dispute opens the whole booking behind it.',
-      label: 'Open the dispute queue',
-      route: '/disputes',
-    },
-  },
-  'booking-detail': {
-    title: 'Booking details',
-    icon: 'calendar-blank',
-    purpose:
-      'One booking as the platform sees it: the frozen pricing and terms, the handover records, and every status change with the person who made it.',
-    blocked:
-      'There is no administrator-facing booking endpoint yet. The same booking is already visible in full from the dispute raised against it.',
-    instead: {
-      text: 'Open the ticket on a booking to see the whole booking with it.',
-      label: 'Open the dispute queue',
-      route: '/disputes',
-    },
-  },
-  customers: {
-    title: 'Customers',
-    icon: 'user',
-    purpose:
-      'The people who rent: their verification state, their documents, and the bookings behind their reputation.',
-    blocked:
-      'Customers exist as users and can upload their own documents, but no administrator endpoints for listing or reviewing them have been built.',
-  },
-  'customer-profile': {
-    title: 'Customer profile',
-    icon: 'user',
-    purpose:
-      'One customer: identity documents, booking history, disputes raised, and the account actions an administrator can take.',
-    blocked: 'No administrator endpoint exists for reading or acting on a customer account.',
-  },
   payments: {
     title: 'Payments',
     icon: 'currency-circle-dollar',

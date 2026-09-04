@@ -23,6 +23,7 @@ public static class DependencyInjection
 
         services.AddScoped<AuthTokenFactory>();
         services.AddScoped<AccountRegistrar>();
+        services.AddScoped<Auditing.AdminActionRecorder>();
         services.AddScoped<Dealers.DealerReviewAuditor>();
         services.AddScoped<Dealers.DealerMembershipResolver>();
         services.AddScoped<EmployeeAccountProvisioner>();

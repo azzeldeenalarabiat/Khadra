@@ -58,8 +58,12 @@ export class DashboardComponent {
   protected readonly toneClass = toneClass;
 
   constructor() {
-    // Entering the screen re-reads it. The resources are root-scoped and would otherwise still hold
-    // whatever they fetched the first time the console was opened.
+    // Claims the panels for as long as this screen is mounted. They are root-scoped resources on a
+    // service the sidebar injects, so without an owner they fetch on every admin screen; with one
+    // they fetch here and nowhere else. Released automatically when the screen is destroyed.
+    this.service.watch();
+    // Entering the screen re-reads it: the resources outlive the component and would otherwise still
+    // hold whatever they fetched the last time the dashboard was open.
     this.service.reload();
 
     const ticker = setInterval(() => this.now.set(Date.now()), 30_000);

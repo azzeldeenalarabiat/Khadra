@@ -105,9 +105,9 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
   // ':id' is what the topbar substitutes for a UUID segment, so one entry covers every record.
   'dealers/:id': 'Dealer application',
   bookings: 'Bookings',
-  'bookings/detail': 'Booking details',
+  'bookings/:id': 'Booking details',
   customers: 'Customers',
-  'customers/profile': 'Customer profile',
+  'customers/:id': 'Customer profile',
   finance: 'Finance',
   payments: 'Payments',
   'payments/detail': 'Payment details',
@@ -145,8 +145,8 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
 /** Detail screens sit under a list screen in the breadcrumb trail. */
 export const SCREEN_PARENTS: Readonly<Record<string, string>> = {
   'dealers/:id': 'dealers',
-  'bookings/detail': 'bookings',
-  'customers/profile': 'customers',
+  'bookings/:id': 'bookings',
+  'customers/:id': 'customers',
   'payments/detail': 'payments',
   'disputes/:id': 'disputes',
   'dealer/bookings/:id': 'dealer/bookings',
