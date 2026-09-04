@@ -24,6 +24,17 @@ internal sealed class UserRepository(KhadraDbContext context) : IUserRepository
     public Task<bool> ExistsByPhoneAsync(PhoneNumber phone, CancellationToken cancellationToken = default) =>
         context.Users.IgnoreQueryFilters().AnyAsync(user => user.Phone == phone, cancellationToken);
 
+    // The soft-delete filter applies here on purpose: a deleted administrator cannot sign in, so
+    // they are not one of the accounts standing between the platform and a lockout.
+    public Task<int> CountActiveAdminsExceptAsync(Id excludedUserId, CancellationToken cancellationToken = default)
+    {
+        var admin = UserRole.Admin;
+        var active = UserStatus.Active;
+        return context.Users.CountAsync(
+            user => user.Role == admin && user.Status == active && user.Id != excludedUserId,
+            cancellationToken);
+    }
+
     public async Task AddAsync(User user, CancellationToken cancellationToken = default) =>
         await context.Users.AddAsync(user, cancellationToken);
 }

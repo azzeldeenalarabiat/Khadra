@@ -40,6 +40,16 @@
                 </option>
               }
             </select>
+          } @else if (field.type === 'password') {
+            <!-- Masked and single-line. A textarea here would show the password to the room. -->
+            <input
+              class="input"
+              type="password"
+              autocomplete="off"
+              [id]="'modal-field-' + $index"
+              [placeholder]="field.placeholder ?? ''"
+              (input)="setField(field.label, $event)"
+            />
           } @else {
             <textarea
               class="input"

@@ -85,7 +85,10 @@
             >
               Previous
             </button>
-            <button type="button" class="btn btn-primary btn-page">{{ page() }}</button>
+            <!-- Which page you are on is a label, not a control. It was a <button> with nothing
+                 behind it, which invites a click that does nothing; the other four lists say it
+                 this way. -->
+            <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
             <button
               type="button"
               class="btn btn-secondary btn-page"

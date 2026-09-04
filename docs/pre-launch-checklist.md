@@ -143,22 +143,22 @@ invitations per owner.
 validation and now surfaced to the console through `GET /dealers/me/delivery`. Move it into
 `BusinessRules` the next time delivery rules are touched.
 
-### 11. Admin screens without a backend
+### 11. Admin screens the platform still cannot answer
 
-**Status:** open by design · **Raised:** 2026-09-03
+**Status:** open by design · **Raised:** 2026-09-03 · **Reduced:** 2026-09-04
 
-The Admin Console design draws more screens than the platform can answer. Their sample data has been
-removed, and each now states what it will show and what is missing: customers, payments, payouts,
-finance, reviews, cities, car types, audit logs, admin users, platform settings, notifications and
-security. Two of them are closer than the rest and worth doing first:
+The Admin Console design draws more screens than the platform can answer. Bookings, customers, admin
+users, security, platform settings, cities, car types and the audit log have since been built on
+real data. Four remain, each blocked on something that does not exist rather than on effort:
 
-- **Audit logs.** The entries are real, append-only and already written in the same transaction as
-  every dealer decision and dispute resolution. Only a read endpoint and a screen are missing, so
-  this is the cheapest of the group and the one an auditor asks for first.
-- **Platform settings.** The numbers are real and enforced, but they come from configuration through
-  `IBusinessRulesProvider`. `BusinessRuleSettings` is designed to replace that source without
-  touching a single consumer; a booking already freezes what it was made under, so making them
-  editable cannot rewrite history.
+- **Finance, Payments, Payouts.** The Payments context is NOT built and is blocked on owner
+  decisions (provider, the non-delivery penalty tier, the quick-cancellation fee). No money has ever
+  moved through the platform. CLAUDE.md forbids touching it without explicit owner approval.
+- **Reviews.** The `Review` aggregate is written but has no table, and nothing in this repository can
+  create one — reviews come from the customer app, which is not here. A moderation screen would list
+  an empty table for ever, and its actions could never be tested end to end.
+- **Notifications.** No notification context exists at all. Email is the only channel the platform
+  sends on.
 
 **Also removed with the fixtures:** the topbar's platform-wide search box, its reporting-period
 button and its notification count, none of which were connected to anything. Restore them with the
@@ -262,14 +262,14 @@ and follow it.
 
 ### 17. "Account settings" in the sidebar is wired to nothing
 
-**Status:** open · **Raised:** 2026-09-04
+**Status:** CLOSED · **Raised:** 2026-09-04 · **Closed:** 2026-09-04
 
-`admin-sidebar.component.html` renders an "Account settings" button with no click handler. The
-topbar's own comment states the principle it breaks: "A control that does nothing when clicked costs
-an administrator more than a missing one does" — which is why the search box, period picker and
-notification count were removed rather than left inert.
+The button was removed when it was found, because a control that does nothing costs an administrator
+more than a missing one does. The screen behind it now exists: `/security` shows the signed-in
+administrator's own account, their sessions and a password change.
 
-**To close:** build the screen, or remove the button until there is one.
+Deliberately their OWN account only. Reading another person's devices, addresses and sign-in times is
+surveillance rather than administration, and there is no endpoint for it.
 
 ## Audit log (2026-09-04)
 
@@ -371,3 +371,97 @@ Development data only — no production impact.
 
 **To close:** seed each audit entry from the aggregate it describes, taking the actor, the instant
 and the before/after states from the object rather than restating them.
+
+## Admin console completion (2026-09-04)
+
+### 24. Revoking a session is not immediate, and the console says so
+
+**Status:** open by design · **Raised:** 2026-09-04
+
+Revoking a refresh-token family stops it being refreshed but does not rotate the security stamp, so
+an access token already issued keeps working until it expires — up to `Authentication:Jwt:
+AccessTokenMinutes`. The security screen states that figure, read from the server, rather than
+promising "signed out immediately" as the design does.
+
+Two things follow from the same gap. There is no `sid` claim on the access token, so the API cannot
+tell which session is making the current request: the screen cannot mark "this device", and cannot
+offer "revoke all others" without also killing the caller's own session on its next refresh.
+
+**To close:** add the refresh family id as a `sid` claim in `JwtAccessTokenIssuer`, expose it on
+`ICurrentActor`, then flag the current row and add "revoke all others". If the owner wants immediate
+revocation, add an `AnyAsync(FamilyId == sid && RevokedAt == null)` check beside the security-stamp
+check in `OnTokenValidated` — that is a per-request query, so it is a deliberate trade, not a tidy-up.
+
+### 25. Platform settings are read-only, and cannot be made editable yet
+
+**Status:** open · **Raised:** 2026-09-04
+
+`/settings` serves the business numbers from `IBusinessRulesProvider` (configuration) and says so on
+the screen. It cannot become editable as it stands, for two independent reasons:
+
+- `BusinessRules` and the `BusinessRuleSettings` aggregate do not carry the same fields.
+  `CustomerCancellationPenaltyPercent`, `PaymentWindowMinutes` and `PostReturnSettlementHours` exist
+  on the record the platform reads and not on the aggregate meant to replace it. `BookingTerms
+  .RulesVersion` is also hardcoded to 1 everywhere it is written.
+- Two of the values are open owner decisions (spec 2.2): the dealer non-delivery penalty tier and the
+  customer quick-cancellation fee. An editable form would let an administrator settle a business
+  question by typing into a box.
+
+**To close:** reconcile the aggregate with the provider record, decide what `RulesVersion` increments
+on, and get the two figures settled. A booking freezes its own terms, so editing them later can never
+rewrite a past booking — that part is already safe.
+
+### 26. Cities have no consumer yet
+
+**Status:** open · **Raised:** 2026-09-04
+
+`/cities` curates the list and `GET /api/v1/cities` serves it, but nothing reads it. Dealer locations
+are coordinates and distance is measured from them, so the platform works without it; a city cannot
+yet be attached to a dealership or used to filter a search.
+
+**To close:** add `CityId` to `UpdateDealerProfileCommand` and a select to the dealer profile, then
+let the customer search filter by it.
+
+### 27. Admins cannot view a customer's identity documents
+
+**Status:** open by decision · **Raised:** 2026-09-04
+
+The customer profile lists what is on file — type, state, format, size, when — and mints no signed
+URL. `CustomerDocument` scopes viewing to the customer themselves and to a dealer with an active
+booking request; an administrator is not named there, spec 7 keeps these private, and spec 5.1's
+review mechanism has not been decided. `MarkVerified` and `MarkRejected` are `internal` with no
+public path, so nothing can move a document out of `PendingReview` today.
+
+Deliberately conservative: minting links for passports and national IDs widens item 14's exposure and
+is the owner's call, not a convenience to add quietly. Cheap to add once decided.
+
+**To close:** the owner decides whether an Admin may open these, and whether admin review is how a
+document becomes verified. Then a signed link and the two review actions.
+
+### 28. Seeded vehicles in an already-seeded database point at a car type that is not there
+
+**Status:** open · **Raised:** 2026-09-04 · Development data only
+
+`car_types` and `cities` ship empty; the seeder now writes one car type at the id every seeded
+vehicle carries, so a FRESH database is self-consistent. A database seeded before that migration has
+71 vehicles pointing at an id with no row, and the seeder will not run again.
+
+No production impact, and no data is wrong — the fleet screens read the type by correlated lookup and
+show nothing rather than inventing a name.
+
+**To close:** reseed a development database, or add the row through the Car Types screen at that id.
+
+### 29. Vehicle forms still send a hardcoded car type id
+
+**Status:** open · **Raised:** 2026-09-04
+
+`car-form.component.ts` and `vehicle-wizard.component.ts` post a literal
+`01a06675-0000-7000-8000-000000000001` for every car a dealer lists. That was the placeholder for a
+table that did not exist; the table exists now, and `GET /api/v1/car-types` serves it to any signed-in
+caller.
+
+Left alone because these are dealer-console screens, outside the admin pass that built the lookup,
+and changing a form nobody has re-driven end to end is how a working screen breaks quietly.
+
+**To close:** both forms fetch the list and offer a select; `VehicleHandlers` rejects a CarTypeId that
+is not an active car type.

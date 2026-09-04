@@ -6,7 +6,6 @@ import { SCREEN_PARENTS, SCREEN_TITLES } from '../core/data/nav.data';
 import { areaLabel, initialsOf } from '../core/models/user-display';
 import { homeRouteFor } from '../core/guards/role.guards';
 import { SessionService } from '../core/services/session.service';
-import { IconComponent } from '../shared/icon/icon.component';
 
 interface Crumb {
   readonly label: string;
@@ -24,7 +23,7 @@ interface Crumb {
   selector: 'kh-admin-topbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-topbar.component.html',
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink],
 })
 export class AdminTopbarComponent {
   private readonly router = inject(Router);

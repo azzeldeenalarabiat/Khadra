@@ -1,3 +1,4 @@
+using Khadra.Domain.PlatformSettings.Repositories;
 using System.Text;
 using Khadra.Application.Auditing.ReadModels;
 using Khadra.Application.Bookings.ReadModels;
@@ -145,6 +146,10 @@ public static class DependencyInjection
         services.AddScoped<IBookingReader, BookingReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
         services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();
+        services.AddScoped<IAdminUserReader, AdminUserReader>();
+        services.AddScoped<ISessionReader, SessionReader>();
+        services.AddScoped<ICarTypeRepository, CarTypeRepository>();
+        services.AddScoped<ICityRepository, CityRepository>();
         services.AddScoped<ICustomerAdminReader, CustomerAdminReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
@@ -164,6 +169,7 @@ public static class DependencyInjection
         services.AddSingleton<IOpaqueTokenService, OpaqueTokenService>();
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
         services.AddSingleton<IAuthPolicySettings, AuthPolicySettings>();
+        services.AddSingleton<IAccessTokenSettings, AccessTokenSettings>();
         services.AddSingleton<IDocumentPolicySettings, DocumentPolicySettings>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddSingleton<IDocumentLinkSigner, HmacDocumentLinkSigner>();

@@ -1,0 +1,114 @@
+<div class="stack stack-14 page-wide">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Platform settings</h1>
+      <div class="page-sub">
+        The numbers the whole platform runs on. Every booking freezes the ones in force when it was
+        made, so changing one here can never re-judge a booking that already exists.
+      </div>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load the settings</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading()) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else {
+    <section class="sect sect-pad">
+      <!-- Why there is no Save button. This is a limit of what has been decided, not an oversight. -->
+      <div class="note-box is-plain">
+        These values are read-only here. They come from <strong>{{ source() }}</strong
+        >, not from a record an administrator can edit: the settings aggregate is not wired to a
+        table yet, and two of the penalties below are still open business decisions. A form here
+        would let an administrator settle one of those by typing into a box.
+      </div>
+    </section>
+
+    <div class="split-16">
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="currency-circle-dollar" class="kpi-icon" />
+            <span class="sect-t">Money</span>
+          </div>
+          <div class="kv-body">
+            @for (row of moneyRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val num">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="warning-diamond" class="kpi-icon" />
+            <span class="sect-t">Penalties</span>
+            <span class="sect-hint">Assessed, never charged</span>
+          </div>
+          <div class="kv-body">
+            @for (row of penaltyRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val num">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+          <div class="sect-pad">
+            <div class="decision-note">
+              A penalty is what the platform records as owed. Nothing is taken from anyone until an
+              administrator resolves a dispute, and the dealer tier above is one of the figures the
+              owner has still to settle.
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack stack-14 resolve-panel">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="clock-counter-clockwise" class="kpi-icon" />
+            <span class="sect-t">Windows and deadlines</span>
+          </div>
+          <div class="kv-body">
+            @for (row of windowRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="identification-card" class="kpi-icon" />
+            <span class="sect-t">Who may rent</span>
+          </div>
+          <div class="kv-body">
+            @for (row of renterRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+      </div>
+    </div>
+  }
+</div>

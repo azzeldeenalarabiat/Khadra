@@ -96,41 +96,6 @@ const SCREENS: Readonly<Record<string, Missing>> = {
     blocked:
       'The Review aggregate exists in the domain but has no table, no repository and no data. Until it does, a dealer with no reviews reads "No reviews yet" rather than showing a rating nobody gave.',
   },
-  cities: {
-    title: 'Cities & regions',
-    icon: 'map-pin',
-    purpose: 'The places customers filter by, and the regions delivery is judged against.',
-    blocked:
-      'The city lookup has not been built. Dealer and delivery locations are coordinates today, and distance is measured directly from them.',
-  },
-  'car-types': {
-    title: 'Car types',
-    icon: 'car-simple',
-    purpose: 'The vehicle categories customers browse by: sedan, SUV, van and the rest.',
-    blocked:
-      'The car-type lookup has not been built. Every vehicle currently points at a single placeholder type id, which becomes a real row when the table ships.',
-  },
-
-  'admin-users': {
-    title: 'Admin users',
-    icon: 'user',
-    purpose: 'Who can administer the platform, and what each of them may do.',
-    blocked:
-      'Administrator accounts exist and are seeded, but there are no endpoints to invite, list or change one, and no permission model finer than the Admin role.',
-  },
-  settings: {
-    title: 'Platform settings',
-    icon: 'gear',
-    purpose:
-      'The numbers the whole platform runs on: commission, deposit, cancellation window, no-show timeout, delivery fee, penalty tiers and the review SLA.',
-    blocked:
-      'These values are real and enforced, but they come from configuration through `IBusinessRulesProvider`, not from an editable record. The `BusinessRuleSettings` aggregate is designed for exactly this and is not yet wired to a table or an endpoint.',
-    instead: {
-      text: 'A booking freezes the numbers it was made under, so editing them later can never rewrite a past booking.',
-      label: 'Dispute queue',
-      route: '/disputes',
-    },
-  },
   notifications: {
     title: 'Notifications',
     icon: 'bell',
@@ -142,13 +107,5 @@ const SCREENS: Readonly<Record<string, Missing>> = {
       label: 'Dashboard',
       route: '/dashboard',
     },
-  },
-  security: {
-    title: 'Security',
-    icon: 'lock-simple',
-    purpose:
-      'Active sessions, sign-in history and the controls to end a session or require a second factor.',
-    blocked:
-      'Refresh tokens do record the device, address and time behind every session, and a password change or suspension already revokes them all. There is no endpoint to read that history, and no second factor.',
   },
 };

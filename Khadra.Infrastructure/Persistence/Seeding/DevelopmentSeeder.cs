@@ -7,6 +7,7 @@ using Khadra.Domain.Dealers;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.PlatformSettings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -35,9 +36,9 @@ internal sealed partial class DevelopmentSeeder(
     public const string AdminEmail = "admin@khadra.jo";
     public const string SeedPassword = "Khadra!2026";
 
-    // Car types are a lookup table that does not exist yet, so every seeded car points at the same
-    // placeholder id -- the one the console's add-car form also sends. It resolves to nothing today;
-    // when the lookup ships, this becomes a real row rather than a new concept.
+    // The car type every seeded car is listed under. This id was a placeholder for a table that did
+    // not exist, and both fleet forms hardcode it; the table exists now, so SeedCarType below writes
+    // a real row at exactly this id and the 71 seeded cars resolve to a type an admin can curate.
     private static readonly Id SeedCarTypeId =
         Id.From(Guid.Parse("01a06675-0000-7000-8000-000000000001"));
 
@@ -94,6 +95,11 @@ internal sealed partial class DevelopmentSeeder(
         // a quarter of a second, and hashing three hundred identical dev passwords would turn seeding
         // into a coffee break for no benefit.
         var sharedHash = passwordHasher.Hash(SeedPassword);
+
+        // The car type every seeded vehicle points at. It used to be an id with no row behind it —
+        // a placeholder the fleet forms also hardcoded — so the type on 71 cars resolved to nothing.
+        // Now the table exists, so it is a real entry an administrator can rename or retire.
+        context.CarTypes.Add(SeedCarType(now));
 
         var admins = SeedAdmins(sharedHash, now);
         var customers = SeedCustomers(sharedHash, now);
@@ -164,6 +170,24 @@ internal sealed partial class DevelopmentSeeder(
         int vehicles,
         int bookings,
         int tickets);
+
+    /// <summary>
+    /// The one car type the seeded fleet is listed under, at the id those cars already carry.
+    /// </summary>
+    /// <remarks>
+    /// Reflection on the private id, because <c>CarType.Create</c> generates its own: every seeded
+    /// vehicle and both fleet forms were written against this constant, and a type row with a
+    /// different id would leave all 71 cars pointing at nothing again. A real platform grows this
+    /// list through the Car Types screen; this is only the row that makes the seed self-consistent.
+    /// </remarks>
+    private static CarType SeedCarType(DateTimeOffset now)
+    {
+        var carType = CarType.Create("Sedan", "سيدان", 0, now).Value;
+        typeof(Entity)
+            .GetProperty(nameof(Entity.Id))!
+            .SetValue(carType, SeedCarTypeId);
+        return carType;
+    }
 
     private static List<User> SeedAdmins(string passwordHash, DateTimeOffset now) =>
     [

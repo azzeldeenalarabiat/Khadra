@@ -73,4 +73,14 @@ public static class IdentityErrors
 
     public static readonly Error AlreadyDeleted =
         Error.Conflict("auth.already_deleted", "The account is already deleted.");
+
+    // Deactivating yourself ends the session that is doing it, mid-action.
+    public static readonly Error CannotDeactivateSelf =
+        Error.Conflict("admin.cannot_deactivate_self", "You cannot deactivate your own administrator account.");
+
+    // Nothing creates an administrator except another administrator, so an empty set is permanent.
+    public static readonly Error LastAdministrator =
+        Error.Conflict(
+            "admin.last_administrator",
+            "This is the last active administrator. Invite another before deactivating this one.");
 }

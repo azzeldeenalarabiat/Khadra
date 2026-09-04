@@ -53,6 +53,27 @@ internal sealed class AuthEmailComposer(IOptions<AppOptions> options) : IAuthEma
             "If this was not you, reset your password immediately and contact support.");
     }
 
+    public EmailMessage AdminInvitation(User user, string rawToken)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        // Same route the staff invitation uses: one screen redeems both, told apart by the token.
+        var link = Link("accept-invitation", rawToken);
+        var name = WebUtility.HtmlEncode(user.Name.Value);
+        return new EmailMessage(
+            user.Email.Value,
+            user.Name.Value,
+            "You have been invited to administer Khadra",
+            $"<p>Hi {name},</p><p>You have been given an administrator account on Khadra. " +
+            "Administrators review rental offices, decide disputes and can see every booking on the platform.</p>" +
+            $"<p><a href=\"{link}\">Accept the invitation and choose your password</a></p>" +
+            "<p>If you were not expecting this, ignore this message and tell whoever runs the platform; " +
+            "nothing is set up until you accept.</p>",
+            $"Hi {user.Name.Value},\n\nYou have been given an administrator account on Khadra. " +
+            "Administrators review rental offices, decide disputes and can see every booking on the platform.\n\n" +
+            $"Accept the invitation and choose your password:\n{link}\n\n" +
+            "If you were not expecting this, ignore this message and tell whoever runs the platform.");
+    }
+
     public EmailMessage EmployeeInvitation(User user, string dealerName, string rawToken)
     {
         ArgumentNullException.ThrowIfNull(user);

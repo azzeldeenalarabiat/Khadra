@@ -132,7 +132,14 @@ export interface ModalConfig {
 
 export interface ModalField {
   readonly label: string;
-  readonly type: 'select' | 'text';
+  /**
+   * `text` is a textarea — these are reasons and notes, which run to sentences.
+   *
+   * `password` is a single-line masked input, and has to be its own type rather than a `text` one:
+   * the textarea would put the password on screen in clear, next to whoever is standing behind the
+   * person typing it.
+   */
+  readonly type: 'select' | 'text' | 'password';
   readonly options?: readonly string[];
   readonly placeholder?: string;
   /** Pre-filled value. A select without one starts on its first option. */

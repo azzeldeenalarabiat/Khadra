@@ -93,6 +93,21 @@ public sealed class User : AggregateRoot, ISoftDeletable
         DateTimeOffset now) =>
         Create(email, phone, name, unusablePasswordHash, UserRole.DealerEmployee, isEmailVerified: false, mustChangePassword: false, now);
 
+    /// <summary>An administrator invited by another, whose account does nothing until they accept.</summary>
+    /// <remarks>
+    /// Mirrors <see cref="CreateInvitedEmployee"/>: an unusable password hash and an unverified
+    /// email, so the account cannot be signed into until the one-time link proves the address. The
+    /// alternative — creating them with a temporary password — puts a working credential into an
+    /// email nobody controls.
+    /// </remarks>
+    public static User CreateInvitedAdmin(
+        EmailAddress email,
+        PhoneNumber phone,
+        PersonName name,
+        PasswordHash unusablePasswordHash,
+        DateTimeOffset now) =>
+        Create(email, phone, name, unusablePasswordHash, UserRole.Admin, isEmailVerified: false, mustChangePassword: false, now);
+
     // Platform administrators are seeded or created by another admin, never self-registered.
     public static User CreateAdmin(
         EmailAddress email,

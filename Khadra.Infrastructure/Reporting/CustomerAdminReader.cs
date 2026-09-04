@@ -84,15 +84,22 @@ internal sealed class CustomerAdminReader(KhadraDbContext context) : ICustomerAd
         var cancelled = BookingStatus.Cancelled;
         var noShow = BookingStatus.NoShow;
 
+        // "Live" is a booking that has not reached a terminal state. Asked for as a list of captured
+        // statuses, NOT as `!booking.Status.IsTerminal`: IsTerminal is a C# property on the smart
+        // enum with no column behind it, so EF cannot translate it and the whole query throws. The
+        // list is derived from IsTerminal itself, so a status added to the enum is classified once,
+        // in the domain, rather than needing this to be remembered.
+        var live = Enumeration.GetAll<BookingStatus>()
+            .Where(status => !status.IsTerminal)
+            .ToList();
+
         var bookings = context.Bookings.Where(booking => booking.CustomerId == user.Id);
         var totals = new CustomerBookingTotals(
             await bookings.CountAsync(cancellationToken),
             await bookings.CountAsync(booking => booking.Status == completed, cancellationToken),
             await bookings.CountAsync(booking => booking.Status == cancelled, cancellationToken),
             await bookings.CountAsync(booking => booking.Status == noShow, cancellationToken),
-            // "Live" is a booking still running or still owed something: not one of the terminal
-            // states. Asking for the complement keeps this honest when a new status is added.
-            await bookings.CountAsync(booking => !booking.Status.IsTerminal, cancellationToken));
+            await bookings.CountAsync(booking => live.Contains(booking.Status), cancellationToken));
 
         return new CustomerProfile(
             user.Id.Value,

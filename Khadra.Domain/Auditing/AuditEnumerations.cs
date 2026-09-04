@@ -27,6 +27,8 @@ public sealed class AuditAction : Enumeration
     public static readonly AuditAction BookingCancelledByAdmin = new(16, "BookingCancelledByAdmin");
     public static readonly AuditAction BookingExpired = new(17, "BookingExpired");
     public static readonly AuditAction BookingMarkedNoShow = new(18, "BookingMarkedNoShow");
+    // Deactivating an administrator has to be reversible, and the reversal has to be on the record.
+    public static readonly AuditAction AdminReactivated = new(19, "AdminReactivated");
 
     private AuditAction(int id, string name) : base(id, name)
     {

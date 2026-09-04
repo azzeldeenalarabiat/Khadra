@@ -154,8 +154,22 @@ export const routes: Routes = [
           },
 
           notBuilt('reviews', 'Reviews'),
-          notBuilt('cities', 'Cities & Regions'),
-          notBuilt('car-types', 'Car Types', 'car-types'),
+          // One component serves both: the same aggregate with the same four actions, and the
+          // route says which list it is curating.
+          {
+            path: 'cities',
+            title: 'Cities & Regions · Khadra Admin',
+            data: { kind: 'cities' },
+            loadComponent: () =>
+              import('./features/lookups/lookups.component').then((m) => m.LookupsComponent),
+          },
+          {
+            path: 'car-types',
+            title: 'Car Types · Khadra Admin',
+            data: { kind: 'car-types' },
+            loadComponent: () =>
+              import('./features/lookups/lookups.component').then((m) => m.LookupsComponent),
+          },
           // The entries have existed and been append-only from the start; only a way to read them
           // was missing.
           {
@@ -164,11 +178,28 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
           },
-          notBuilt('admin-users', 'Admin users', 'admin-users'),
+          {
+            path: 'admin-users',
+            title: 'Admin users · Khadra Admin',
+            loadComponent: () =>
+              import('./features/admin-users/admin-users.component').then(
+                (m) => m.AdminUsersComponent,
+              ),
+          },
 
-          notBuilt('settings', 'Platform settings'),
+          {
+            path: 'settings',
+            title: 'Platform settings · Khadra Admin',
+            loadComponent: () =>
+              import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+          },
           notBuilt('notifications', 'Notifications'),
-          notBuilt('security', 'Security'),
+          {
+            path: 'security',
+            title: 'Security · Khadra Admin',
+            loadComponent: () =>
+              import('./features/security/security.component').then((m) => m.SecurityComponent),
+          },
         ],
       },
 

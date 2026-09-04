@@ -30,4 +30,7 @@ public static class PlatformSettingsErrors
 
     public static readonly Error LookupAlreadyInactive =
         Error.Conflict("lookup.already_inactive", "This entry is already inactive.");
+
+    public static readonly Error LookupNotFound =
+        Error.NotFound("platform.lookup_not_found", "That entry was not found.");
 }

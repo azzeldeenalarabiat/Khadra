@@ -53,8 +53,12 @@ export class AuditLogComponent {
     const params = inject(ActivatedRoute).snapshot.queryParamMap;
     const entityType = params.get('entityType');
     const entityId = params.get('entityId');
+    // Who acted, as well as what was acted on: the Admin users screen links here to answer "what is
+    // this account accountable for" before anyone deactivates it.
+    const actorUserId = params.get('actorUserId');
     if (entityType) this.service.entityType.set(entityType);
     if (entityId) this.service.entityId.set(entityId);
+    if (actorUserId) this.service.actorUserId.set(actorUserId);
   }
 
   /** Which row is open. One at a time: this is a reading screen, not a comparison one. */
