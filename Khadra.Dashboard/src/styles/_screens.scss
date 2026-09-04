@@ -1336,3 +1336,30 @@
   padding: 6px;
   flex-wrap: wrap;
 }
+
+/* The audit log's filter bar: several small controls that wrap rather than scroll, because an
+   auditor combines them (who + what + when) and a row that scrolls sideways hides the combination
+   they just built. */
+.filters-row {
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: end;
+}
+
+.field-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 132px;
+}
+
+.field-inline .k {
+  font-size: 11px;
+}
+
+/* The change column reads "old -> new" on one line; the arrow is decoration between two values. */
+.table .mono + kh-icon {
+  margin-inline: 6px;
+  vertical-align: middle;
+  opacity: 0.6;
+}

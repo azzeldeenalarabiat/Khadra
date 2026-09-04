@@ -151,14 +151,7 @@ const SCREENS: Readonly<Record<string, Missing>> = {
     blocked:
       'The car-type lookup has not been built. Every vehicle currently points at a single placeholder type id, which becomes a real row when the table ships.',
   },
-  'audit-logs': {
-    title: 'Audit logs',
-    icon: 'file-lock',
-    purpose:
-      'Every privileged action an administrator took, who took it, and what it changed — the record that settles a later argument.',
-    blocked:
-      'The entries are real and are being written: `audit_entries` is append-only, guarded by a database trigger and a save guard, and every dealer decision and dispute resolution lands there in the same transaction as the action. What is missing is a read endpoint to show them.',
-  },
+
   'admin-users': {
     title: 'Admin users',
     icon: 'user',

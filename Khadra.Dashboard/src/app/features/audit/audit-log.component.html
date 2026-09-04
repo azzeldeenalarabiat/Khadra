@@ -1,0 +1,264 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Audit logs</h1>
+      <div class="page-sub">
+        Every privileged action on the platform, who took it, and on what grounds. Entries cannot be
+        edited or removed — by anyone, including an administrator.
+      </div>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    <!-- Every option below comes from /audit-logs/vocabulary. Nothing on this screen is a list the
+         console keeps: a filter set that goes stale silently excludes real entries, which is the one
+         failure the audit log cannot have. -->
+    <div class="list-toolbar filters-row">
+      <label class="field-inline">
+        <span class="k">Action</span>
+        <select class="input input-sm" (change)="setFilter('action', $any($event.target).value)">
+          <option value="" [selected]="!action()">All actions</option>
+          @for (name of vocabulary.value()?.actions ?? []; track name) {
+            <option [value]="name" [selected]="action() === name">{{ label(name) }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field-inline">
+        <span class="k">Record</span>
+        <select
+          class="input input-sm"
+          (change)="setFilter('entityType', $any($event.target).value)"
+        >
+          <option value="" [selected]="!entityType()">All records</option>
+          @for (name of vocabulary.value()?.entityTypes ?? []; track name) {
+            <option [value]="name" [selected]="entityType() === name">{{ name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field-inline">
+        <span class="k">Who</span>
+        <select
+          class="input input-sm"
+          (change)="setFilter('actorUserId', $any($event.target).value)"
+        >
+          <option value="" [selected]="!actorUserId()">Anyone</option>
+          @for (actor of vocabulary.value()?.actors ?? []; track actor.name) {
+            @if (actor.userId) {
+              <option [value]="actor.userId" [selected]="actorUserId() === actor.userId">
+                {{ actor.name }} ({{ actor.entryCount }})
+              </option>
+            }
+          }
+        </select>
+      </label>
+
+      <label class="field-inline">
+        <span class="k">From</span>
+        <input
+          class="input input-sm"
+          type="date"
+          [value]="from() ?? ''"
+          (change)="setDate('from', $event)"
+        />
+      </label>
+
+      <label class="field-inline">
+        <span class="k">To</span>
+        <input
+          class="input input-sm"
+          type="date"
+          [value]="to() ?? ''"
+          (change)="setDate('to', $event)"
+        />
+      </label>
+
+      <label class="field-inline grow">
+        <span class="k">Search</span>
+        <input
+          class="input input-sm"
+          type="search"
+          placeholder="Dealer, booking reference or person…"
+          [value]="search()"
+          (input)="setSearch($event)"
+        />
+      </label>
+
+      @if (anyFilter()) {
+        <button type="button" class="btn btn-secondary btn-sm" (click)="clear()">Clear</button>
+      }
+    </div>
+
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">Couldn't load the audit log</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+        </div>
+      </div>
+    } @else if (resource.isLoading() && rows().length === 0) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        @for (placeholder of [0, 1, 2, 3, 4, 5]; track placeholder) {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="list-magnifying-glass" /></div>
+        <div class="state-title">
+          {{ anyFilter() ? 'Nothing matches those filters' : 'No actions have been recorded yet' }}
+        </div>
+        <div class="state-text">
+          @if (anyFilter()) {
+            No entry matches this combination. Widen the range or clear the filters.
+          } @else {
+            The log fills as administrators act: approving a dealer, resolving a dispute, changing a
+            platform setting. Each entry is written in the same transaction as the action itself.
+          }
+        </div>
+        @if (anyFilter()) {
+          <div class="state-actions">
+            <button type="button" class="btn btn-secondary btn-sm" (click)="clear()">
+              Clear filters
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="list-toolbar">
+        <span class="page-sub">{{ summary() }}</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Who</th>
+              <th>Action</th>
+              <th>Record</th>
+              <th>Change</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr class="rowlink" (click)="toggle(row)">
+                <td class="td">
+                  <span class="mono">{{ when(row.occurredAt) }}</span>
+                </td>
+                <td class="td">
+                  <div class="entity">
+                    <div class="entity-avatar">
+                      @if (isSystem(row)) {
+                        <kh-icon name="gear-six" />
+                      } @else {
+                        {{ initials(row.actorName) }}
+                      }
+                    </div>
+                    <div>
+                      <div class="entity-name">{{ row.actorName }}</div>
+                      <!-- The role held AT THE TIME. An admin later demoted still reads as an admin
+                           on the line where they acted. -->
+                      <div class="entity-sub">
+                        {{ isSystem(row) ? 'Automated' : (row.actorRole ?? '—') }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="td">
+                  <span class="pill" [class]="'s-' + tone(row.action)">{{
+                    label(row.action)
+                  }}</span>
+                </td>
+                <td class="td">
+                  <div class="entity-name">{{ row.subjectLabel }}</div>
+                  <div class="td-sub">{{ row.entityType }}</div>
+                </td>
+                <td class="td">
+                  @if (hasChange(row)) {
+                    <span class="mono">{{ row.previousValue ?? '—' }}</span>
+                    <kh-icon name="arrow-line-up-right" class="kpi-icon" />
+                    <span class="mono">{{ row.newValue ?? '—' }}</span>
+                  } @else {
+                    <span class="td-sub">—</span>
+                  }
+                </td>
+                <td class="td td-num">
+                  <button type="button" class="btn btn-secondary btn-xs">
+                    {{ expanded() === row.id ? 'Hide' : 'Details' }}
+                  </button>
+                </td>
+              </tr>
+
+              @if (expanded() === row.id) {
+                <tr>
+                  <td class="td" colspan="6">
+                    <div class="kv-body">
+                      <!-- The reason is why this screen exists. Without it the log records that a
+                           dealer was suspended and not why, which settles nothing. -->
+                      <div class="kv">
+                        <div class="kv-key">Reason given</div>
+                        <div class="kv-val">
+                          {{ row.reason ?? 'No reason was recorded with this action.' }}
+                        </div>
+                      </div>
+                      @if (hasChange(row)) {
+                        <div class="kv">
+                          <div class="kv-key">Previous value</div>
+                          <div class="kv-val">{{ row.previousValue ?? '—' }}</div>
+                        </div>
+                        <div class="kv">
+                          <div class="kv-key">New value</div>
+                          <div class="kv-val">{{ row.newValue ?? '—' }}</div>
+                        </div>
+                      }
+                      <div class="kv">
+                        <div class="kv-key">Recorded at</div>
+                        <div class="kv-val">{{ when(row.occurredAt) }}</div>
+                      </div>
+                      @if (row.correlationId) {
+                        <div class="kv">
+                          <div class="kv-key">Correlation</div>
+                          <!-- Everything one request did shares this, so a support question about
+                               one incident can be followed across the entries it produced. -->
+                          <div class="kv-val mono">{{ row.correlationId }}</div>
+                        </div>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="pager-count">{{ summary() }}</span>
+        <div class="pager-nav">
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="!hasPrevious()"
+            (click)="goTo(page() - 1)"
+          >
+            Previous
+          </button>
+          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <button
+            type="button"
+            class="btn btn-secondary btn-page"
+            [disabled]="!hasNext()"
+            (click)="goTo(page() + 1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+</div>

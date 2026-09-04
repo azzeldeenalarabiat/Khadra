@@ -127,7 +127,14 @@ export const routes: Routes = [
           notBuilt('reviews', 'Reviews'),
           notBuilt('cities', 'Cities & Regions'),
           notBuilt('car-types', 'Car Types', 'car-types'),
-          notBuilt('audit-logs', 'Audit logs', 'audit-logs'),
+          // The entries have existed and been append-only from the start; only a way to read them
+          // was missing.
+          {
+            path: 'audit-logs',
+            title: 'Audit logs · Khadra Admin',
+            loadComponent: () =>
+              import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
+          },
           notBuilt('admin-users', 'Admin users', 'admin-users'),
 
           notBuilt('settings', 'Platform settings'),

@@ -147,6 +147,10 @@ public static class DependencyInjection
         services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
+        // The dashboard glance and the audit screen read one table with different questions: a fixed
+        // seven-row feed, and a filtered, paged log. Two readers, deliberately.
+        services.AddScoped<IAuditLogReader, AuditLogReader>();
+        services.AddScoped<IAuditActorReader, AuditActorReader>();
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();
