@@ -203,6 +203,108 @@ public sealed class AuditLogReaderTests : IDisposable
         Assert.Equal(AuditEntry.SystemActorName, entry.ActorName);
     }
 
+    /// <summary>
+    /// A LIKE wildcard typed into the search box is a literal, not a wildcard.
+    ///
+    /// `%` and `_` are LIKE metacharacters. Unescaped, an admin searching for a literal underscore
+    /// was handed every row — and told, by the count beside it, that they had all matched their term.
+    /// On the one screen where "this is all of it" has to be true, a search that silently means
+    /// "everything" is worse than one that finds nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("_")]
+    [InlineData("%")]
+    [InlineData("%%")]
+    public async Task A_like_wildcard_in_the_search_term_matches_nothing_rather_than_everything(string term)
+    {
+        await GivenAsync(
+            Entry(Noon, subject: "Aqaba Coast Cars"),
+            Entry(Noon.AddMinutes(-1), subject: "Petra Wheels"));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var result = await Reader(context)
+            .ListAsync(new AuditLogFilter(Search: term), new PageRequest(1, 10));
+
+        Assert.Equal(0, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task A_subject_containing_an_underscore_is_still_found_by_searching_for_it()
+    {
+        await GivenAsync(
+            Entry(Noon, entityType: AuditEntityType.Setting, subject: "commission_rate"),
+            Entry(Noon.AddMinutes(-1), subject: "Aqaba Coast Cars"));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var result = await Reader(context)
+            .ListAsync(new AuditLogFilter(Search: "commission_rate"), new PageRequest(1, 10));
+
+        var only = Assert.Single(result.Items);
+        Assert.Equal("commission_rate", only.SubjectLabel);
+    }
+
+    [Fact]
+    public async Task Search_matches_the_subject_or_the_actor_and_ignores_case()
+    {
+        await GivenAsync(Entry(Noon, subject: "Aqaba Coast Cars"));
+
+        await using var context = new KhadraDbContext(_options);
+        var reader = Reader(context);
+
+        Assert.Equal(1, (await reader.ListAsync(new AuditLogFilter(Search: "aqaba"), new PageRequest(1, 10))).TotalCount);
+        Assert.Equal(1, (await reader.ListAsync(new AuditLogFilter(Search: "RANIA"), new PageRequest(1, 10))).TotalCount);
+        Assert.Equal(0, (await reader.ListAsync(new AuditLogFilter(Search: "petra"), new PageRequest(1, 10))).TotalCount);
+    }
+
+    /// <summary>
+    /// The System is the absence of an actor, so it needs its own filter to be reachable at all.
+    ///
+    /// Without it, unattended actions are the single class of entry an auditor cannot isolate — which
+    /// is backwards, since an action nobody was present for is the one most worth reviewing.
+    /// </summary>
+    [Fact]
+    public async Task Unattended_actions_can_be_isolated_from_the_ones_a_person_took()
+    {
+        await GivenAsync(
+            Entry(Noon),
+            AuditEntry.BySystem(
+                AuditAction.BookingExpired,
+                AuditEntityType.Booking,
+                Id.New(),
+                "KH-20411",
+                Noon.AddMinutes(-1)));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var result = await Reader(context)
+            .ListAsync(new AuditLogFilter(SystemOnly: true), new PageRequest(1, 10));
+
+        var only = Assert.Single(result.Items);
+        Assert.Null(only.ActorUserId);
+        Assert.Equal("KH-20411", only.SubjectLabel);
+    }
+
+    [Fact]
+    public async Task Everything_recorded_against_one_record_can_be_read_together()
+    {
+        var dealerId = Id.New();
+        var mine = AuditEntry.By(
+            AdminId, "Rania Haddad", UserRole.Admin, AuditAction.DealerApproved,
+            AuditEntityType.Dealer, dealerId, "Aqaba Coast Cars", Noon);
+
+        await GivenAsync(mine, Entry(Noon.AddMinutes(-1), subject: "Someone else"));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var result = await Reader(context)
+            .ListAsync(new AuditLogFilter(EntityId: dealerId), new PageRequest(1, 10));
+
+        var only = Assert.Single(result.Items);
+        Assert.Equal("Aqaba Coast Cars", only.SubjectLabel);
+    }
+
     [Fact]
     public async Task The_reason_and_the_change_survive_the_read()
     {

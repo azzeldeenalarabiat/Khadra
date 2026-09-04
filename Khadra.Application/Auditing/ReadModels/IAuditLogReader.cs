@@ -58,7 +58,15 @@ public sealed record AuditLogFilter(
     /// <summary>Free text over the subject label and the actor's name.</summary>
     string? Search = null,
     /// <summary>Everything recorded against one record, however it was reached.</summary>
-    Id? EntityId = null);
+    Id? EntityId = null,
+    /// <summary>
+    /// Only what a background job did, rather than a person.
+    ///
+    /// Its own flag because "the System" cannot be expressed as an actor id — it IS the absence of
+    /// one. Without it, sweeps and expiries are the single class of entry an auditor cannot isolate,
+    /// which is backwards: an action nobody was present for is the one most worth reviewing.
+    /// </summary>
+    bool? SystemOnly = null);
 
 public interface IAuditLogReader
 {

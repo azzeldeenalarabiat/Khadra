@@ -24,6 +24,7 @@ public sealed record ListAuditLogQuery(
     DateOnly? From,
     DateOnly? To,
     string? Search,
+    bool? SystemOnly,
     int? Page,
     int? PageSize) : IQuery<Result<PagedResult<AuditLogEntry>, Error>>;
 
@@ -77,7 +78,8 @@ public sealed class ListAuditLogHandler(IAuditLogReader reader, IReportingCalend
             from,
             to,
             request.Search,
-            request.EntityId is { } entity ? Id.From(entity) : null);
+            request.EntityId is { } entity ? Id.From(entity) : null,
+            request.SystemOnly);
 
         return await reader.ListAsync(filter, page, cancellationToken);
     }

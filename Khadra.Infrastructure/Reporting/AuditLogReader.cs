@@ -45,6 +45,10 @@ internal sealed class AuditLogReader(KhadraDbContext context) : IAuditLogReader
         if (filter.ActorUserId is { } actorId)
             query = query.Where(entry => entry.ActorUserId == actorId);
 
+        // "The System" is the absence of an actor, not an actor id, so it needs its own predicate.
+        if (filter.SystemOnly == true)
+            query = query.Where(entry => entry.ActorUserId == null);
+
         if (filter.EntityId is { } entityId)
             query = query.Where(entry => entry.EntityId == entityId);
 
@@ -57,12 +61,34 @@ internal sealed class AuditLogReader(KhadraDbContext context) : IAuditLogReader
 
         if (!string.IsNullOrWhiteSpace(filter.Search))
         {
-            // Both columns are plain strings here (no value-object converter), so this translates
-            // without dropping to raw SQL the way the dealer list has to.
-            var pattern = $"%{filter.Search.Trim()}%";
+            // The term is ESCAPED before it becomes a pattern. `%` and `_` are LIKE wildcards, so an
+            // admin searching for a literal underscore was handed the entire log -- thirteen entries
+            // reported as thirteen matches for their term, on the one screen where "this is all of
+            // it" has to be true.
+            //
+            // Like + ToLower rather than ILike: ILike is Npgsql-only, which means the search branch
+            // cannot be tested on the SQLite the persistence tests run on, and an untested branch on
+            // this screen is the one nobody notices is wrong. This form translates on both, and is
+            // just as trigram-indexable on Postgres if it ever needs to be.
+            var term = filter.Search.Trim()
+                .Replace(@"\", @"\\", StringComparison.Ordinal)
+                .Replace("%", @"\%", StringComparison.Ordinal)
+                .Replace("_", @"\_", StringComparison.Ordinal)
+                .ToLowerInvariant();
+            var pattern = $"%{term}%";
+
+            // A sequential scan over two 200-character columns. Fine into the tens of thousands of
+            // rows; if an unfiltered search ever exceeds ~100ms on production data, the answer is
+            // pg_trgm with GIN indexes on lower(subject_label) and lower(actor_name) -- not before.
+            // CA1304/CA1311 want a culture on ToLower. There is no culture here to give: this is an
+            // expression tree, never executed by .NET — EF translates it to SQL LOWER(). Calling
+            // ToLowerInvariant instead, which is what the analyzer would accept, is exactly the thing
+            // that does NOT translate, and the query would fail at runtime.
+#pragma warning disable CA1304, CA1311
             query = query.Where(entry =>
-                EF.Functions.ILike(entry.SubjectLabel, pattern) ||
-                EF.Functions.ILike(entry.ActorName, pattern));
+                EF.Functions.Like(entry.SubjectLabel.ToLower(), pattern, @"\") ||
+                EF.Functions.Like(entry.ActorName.ToLower(), pattern, @"\"));
+#pragma warning restore CA1304, CA1311
         }
 
         var total = await query.CountAsync(cancellationToken);

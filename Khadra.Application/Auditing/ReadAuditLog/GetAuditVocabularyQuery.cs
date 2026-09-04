@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using Khadra.Application.Auditing.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Ports;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Common;
 using MediatR;
@@ -11,7 +12,11 @@ namespace Khadra.Application.Auditing.ReadAuditLog;
 public sealed record AuditVocabularyDto(
     IReadOnlyList<string> Actions,
     IReadOnlyList<string> EntityTypes,
-    IReadOnlyList<AuditActorDto> Actors);
+    IReadOnlyList<AuditActorDto> Actors,
+    // The zone the date filters are resolved in, so the screen can STAMP rows in the same calendar
+    // it filters by. Rendering in the browser zone while filtering in Amman made entries near
+    // midnight appear to vanish for an admin sitting anywhere else.
+    string ReportingTimeZone);
 
 /// <summary>
 /// Someone who appears in the log, for the "who did it" filter.
@@ -32,7 +37,7 @@ public sealed record AuditActorDto(Guid? UserId, string Name, int EntryCount);
 /// </summary>
 public sealed record GetAuditVocabularyQuery : IQuery<Result<AuditVocabularyDto, Error>>;
 
-public sealed class GetAuditVocabularyHandler(IAuditActorReader actors)
+public sealed class GetAuditVocabularyHandler(IAuditActorReader actors, IAdminDashboardSettings settings)
     : IRequestHandler<GetAuditVocabularyQuery, Result<AuditVocabularyDto, Error>>
 {
     public async Task<Result<AuditVocabularyDto, Error>> Handle(
@@ -52,6 +57,10 @@ public sealed class GetAuditVocabularyHandler(IAuditActorReader actors)
             .Select(type => type.Name)
             .ToList();
 
-        return new AuditVocabularyDto(actions, entityTypes, await actors.ListAsync(cancellationToken));
+        return new AuditVocabularyDto(
+            actions,
+            entityTypes,
+            await actors.ListAsync(cancellationToken),
+            settings.ReportingTimeZone);
     }
 }

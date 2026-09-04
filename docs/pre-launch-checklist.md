@@ -270,3 +270,47 @@ an administrator more than a missing one does" — which is why the search box, 
 notification count were removed rather than left inert.
 
 **To close:** build the screen, or remove the button until there is one.
+
+## Audit log (2026-09-04)
+
+### 18. A customer erasure request will meet an append-only table
+
+**Status:** open · **Raised:** 2026-09-04 (while building the audit-log screen)
+
+`audit_entries` cannot be updated or deleted — a database trigger and a `SaveChanges` guard both
+refuse — and that is the point of it. But `subject_label` is a free-text snapshot of what an action
+was taken on, and a customer has the right to have their personal data erased. If a handler ever
+writes a customer's name, phone or email into that column, the platform has put personal data
+somewhere it has promised never to remove.
+
+No handler writes a `Customer` audit entry yet, so the rule can be established before the first one
+exists rather than discovered afterwards: **for `Customer` entries, `subject_label` is a reference,
+never an identity** — the seeded "Customer #882" is the right shape. The same goes for
+`previous_value` and `new_value`.
+
+**To close:** state the rule on `AuditEntry` where the other snapshotting decisions are recorded, and
+hold it in review when the first customer-facing admin action ships.
+
+### 19. Renaming an AuditAction or UserRole would make historical entries unreadable
+
+**Status:** open · **Raised:** 2026-09-04
+
+Both are persisted by NAME and materialised through `Enumeration.FromName`, which throws for a name
+that no longer exists. Rename or remove one member of `AuditAction`, `AuditEntityType` or `UserRole`
+and every historical row carrying it becomes unreadable — the list endpoint fails outright, and the
+record is lost even though the data is still in the table.
+
+These enumerations are effectively **add-only** once a row references them. Renaming one is a data
+migration, not a refactor.
+
+**To close:** a domain test pinning the exact member names, and a comment on each enumeration saying
+why they cannot be renamed.
+
+### 20. The audit log has no export
+
+**Status:** open by design · **Raised:** 2026-09-04
+
+An auditor asked for "everything about this dealer for the year" can filter to it on screen but
+cannot take it away. Not built because nobody has asked yet, and the shape is already there when
+they do: `GET /admin/audit-logs/export` streaming `text/csv` over the same `AuditLogFilter`, via
+`IAsyncEnumerable` so a large range does not materialise in memory.

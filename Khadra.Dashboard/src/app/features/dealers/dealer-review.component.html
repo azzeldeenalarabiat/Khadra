@@ -157,7 +157,14 @@
               is attributed to you in the audit log, which cannot be edited afterwards.
             } @else {
               Who decided this and when is in the
-              <a routerLink="/audit-logs">audit log</a>, which cannot be edited afterwards.
+              <!-- Straight to THIS dealer's history, not the whole platform's. The audit log takes
+                   the record's type and id as filters, so "everything that has happened to this
+                   dealership" is one click rather than a search through everyone's decisions. -->
+              <a
+                routerLink="/audit-logs"
+                [queryParams]="{ entityType: 'Dealer', entityId: application.dealerId }"
+                >audit log</a
+              >, which cannot be edited afterwards.
             }
           </div>
         </section>

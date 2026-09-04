@@ -22,4 +22,14 @@ public interface IAdminDashboardSettings
 
     /// <summary>The window used for the "resolved recently" dispute figure.</summary>
     int ResolvedDisputeWindowDays { get; }
+
+    /// <summary>
+    /// The IANA zone an admin reads the platform in, e.g. "Asia/Amman".
+    ///
+    /// Exposed so a screen can RENDER an instant in the same calendar its date filters are resolved
+    /// against. The audit log stamped rows in the browser's zone while filtering by Amman's days, so
+    /// an admin in UTC filtering "to 3 September" watched an entry labelled "03 Sep 22:00" vanish —
+    /// correctly, because in Amman that was the 4th, and inexplicably, because nothing said so.
+    /// </summary>
+    string ReportingTimeZone { get; }
 }

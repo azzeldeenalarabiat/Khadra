@@ -30,7 +30,7 @@ public sealed class AuditLogQueryTests
     }
 
     private static ListAuditLogQuery Query(DateOnly? from = null, DateOnly? to = null) =>
-        new(null, null, null, null, from, to, null, null, null);
+        new(null, null, null, null, from, to, null, null, null, null);
 
     /// <summary>
     /// "To 3 September" means the whole of 3 September.
@@ -86,7 +86,7 @@ public sealed class AuditLogQueryTests
         var validator = new ListAuditLogQueryValidator();
 
         var result = validator.Validate(new ListAuditLogQuery(
-            action, entityType, null, null, null, null, null, null, null));
+            action, entityType, null, null, null, null, null, null, null, null));
 
         // Rejected, not dropped. A filter that silently does nothing lets an auditor believe they
         // have seen everything of a kind when they are looking at the unfiltered log.
@@ -115,14 +115,14 @@ public sealed class AuditLogQueryTests
         foreach (var action in Khadra.Domain.Common.Enumeration.GetAll<Khadra.Domain.Auditing.AuditAction>())
         {
             var result = validator.Validate(new ListAuditLogQuery(
-                action.Name, null, null, null, null, null, null, null, null));
+                action.Name, null, null, null, null, null, null, null, null, null));
             Assert.True(result.IsValid, $"The validator rejected {action.Name}, which the vocabulary offers.");
         }
 
         foreach (var entityType in Khadra.Domain.Common.Enumeration.GetAll<Khadra.Domain.Auditing.AuditEntityType>())
         {
             var result = validator.Validate(new ListAuditLogQuery(
-                null, entityType.Name, null, null, null, null, null, null, null));
+                null, entityType.Name, null, null, null, null, null, null, null, null));
             Assert.True(result.IsValid, $"The validator rejected {entityType.Name}, which the vocabulary offers.");
         }
     }

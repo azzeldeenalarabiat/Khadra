@@ -43,6 +43,12 @@ export interface AuditVocabulary {
   readonly actions: readonly string[];
   readonly entityTypes: readonly string[];
   readonly actors: readonly AuditActor[];
+  /**
+   * The zone the date filters are resolved in. Rows are stamped in it too, so the calendar an admin
+   * filters by is the calendar they read -- otherwise an entry near midnight appears to vanish for
+   * anyone not sitting in Amman.
+   */
+  readonly reportingTimeZone: string;
 }
 
 export interface AuditActor {

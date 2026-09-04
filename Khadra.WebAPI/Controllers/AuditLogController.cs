@@ -41,12 +41,13 @@ public sealed class AuditLogController : ApiControllerBase
         [FromQuery] DateOnly? from,
         [FromQuery] DateOnly? to,
         [FromQuery] string? search,
+        [FromQuery] bool? systemOnly,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
         CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
-            new ListAuditLogQuery(action, entityType, actorUserId, entityId, from, to, search, page, pageSize),
+            new ListAuditLogQuery(action, entityType, actorUserId, entityId, from, to, search, systemOnly, page, pageSize),
             cancellationToken);
 
         return FromResult(result);

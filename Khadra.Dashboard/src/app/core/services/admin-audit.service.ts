@@ -24,6 +24,10 @@ export class AdminAuditService {
   readonly from = signal<string | null>(null);
   readonly to = signal<string | null>(null);
   readonly search = signal<string>('');
+  /** Only unattended actions -- sweeps and expiries. The absence of an actor, not an actor id. */
+  readonly systemOnly = signal(false);
+  /** Everything recorded against one record, for the deep link from that record's own screen. */
+  readonly entityId = signal<string | null>(null);
   readonly page = signal<number>(1);
 
   readonly vocabulary = httpResource<AuditVocabulary>(() => `${this.base}/vocabulary`);
@@ -45,6 +49,9 @@ export class AdminAuditService {
     if (to) params['to'] = to;
     const search = this.search().trim();
     if (search) params['search'] = search;
+    if (this.systemOnly()) params['systemOnly'] = 'true';
+    const entityId = this.entityId();
+    if (entityId) params['entityId'] = entityId;
 
     return { url: this.base, params };
   });
@@ -57,6 +64,8 @@ export class AdminAuditService {
     this.from.set(null);
     this.to.set(null);
     this.search.set('');
+    this.systemOnly.set(false);
+    this.entityId.set(null);
     this.page.set(1);
   }
 

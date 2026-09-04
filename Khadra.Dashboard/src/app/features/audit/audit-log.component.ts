@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { AdminAuditService } from '../../core/services/admin-audit.service';
 import { AuditLogEntry } from '../../core/models/audit.api';
 import { Tone } from '../../core/models/console.models';
@@ -35,7 +36,20 @@ export class AuditLogComponent {
   protected readonly from = this.service.from;
   protected readonly to = this.service.to;
   protected readonly search = this.service.search;
+  protected readonly systemOnly = this.service.systemOnly;
+  protected readonly entityId = this.service.entityId;
   protected readonly page = this.service.page;
+
+  constructor() {
+    // A record's own screen links here with its type and id, so "everything that has happened to
+    // this dealer" is one click from the dealer. Read once on entry: the filters are the screen's
+    // state after that, and re-reading would fight the admin's own changes.
+    const params = inject(ActivatedRoute).snapshot.queryParamMap;
+    const entityType = params.get('entityType');
+    const entityId = params.get('entityId');
+    if (entityType) this.service.entityType.set(entityType);
+    if (entityId) this.service.entityId.set(entityId);
+  }
 
   /** Which row is open. One at a time: this is a reading screen, not a comparison one. */
   protected readonly expanded = signal<string | null>(null);
@@ -53,7 +67,9 @@ export class AuditLogComponent {
       !!this.actorUserId() ||
       !!this.from() ||
       !!this.to() ||
-      !!this.search().trim(),
+      !!this.search().trim() ||
+      this.systemOnly() ||
+      !!this.entityId(),
   );
 
   protected readonly summary = computed(() => {
@@ -73,9 +89,24 @@ export class AuditLogComponent {
     return 'The audit log could not be loaded. Nothing has been changed.';
   });
 
-  protected setFilter(key: 'action' | 'entityType' | 'actorUserId', value: string): void {
+  protected setFilter(key: 'action' | 'entityType', value: string): void {
     // The blank option means "no filter", not a filter whose value is empty.
     this[key].set(value || null);
+    this.page.set(1);
+  }
+
+  /**
+   * The Who dropdown carries one option that is not a person.
+   *
+   * "System" cannot be an actor id, because the System IS the absence of one — so it selects a
+   * different filter entirely. Without this, sweeps and expiries are the single class of entry an
+   * auditor cannot isolate, which is backwards: an action nobody was present for is the one most
+   * worth being able to review.
+   */
+  protected setActor(value: string): void {
+    const system = value === 'system';
+    this.systemOnly.set(system);
+    this.actorUserId.set(system || !value ? null : value);
     this.page.set(1);
   }
 
@@ -143,6 +174,17 @@ export class AuditLogComponent {
       .join('');
   }
 
+  /**
+   * An instant, stamped in the calendar this screen FILTERS by.
+   *
+   * Not the browser's. The date pickers resolve against the platform's reporting zone, so rendering
+   * in the reader's own zone made an entry near midnight appear to vanish: an admin in London
+   * filtering "to 3 September" would see a row labelled "03 Sep 22:00" disappear, correctly — it is
+   * the 4th in Amman — and inexplicably, because nothing on the screen said which calendar it meant.
+   *
+   * Seconds are shown because entries are strictly ordered and two in the same minute are common;
+   * without them the log looks simultaneous where it is sequential.
+   */
   protected when(iso: string): string {
     return new Date(iso).toLocaleString('en-GB', {
       day: '2-digit',
@@ -150,8 +192,19 @@ export class AuditLogComponent {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
+      timeZone: this.timeZone(),
     });
   }
+
+  /** The zone the server resolves this log in. Undefined until it answers — never assumed. */
+  protected readonly timeZone = computed(() => this.vocabulary.value()?.reportingTimeZone);
+
+  /** Spelled out beside the table, so nobody has to guess whose midnight a day ends at. */
+  protected readonly timeZoneNote = computed(() => {
+    const zone = this.timeZone();
+    return zone ? `Times and dates in ${zone.replace('_', ' ')}` : '';
+  });
 
   /** True when the entry records a change of value, rather than just that something happened. */
   protected hasChange(entry: AuditLogEntry): boolean {

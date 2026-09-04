@@ -39,15 +39,19 @@
 
       <label class="field-inline">
         <span class="k">Who</span>
-        <select
-          class="input input-sm"
-          (change)="setFilter('actorUserId', $any($event.target).value)"
-        >
-          <option value="" [selected]="!actorUserId()">Anyone</option>
-          @for (actor of vocabulary.value()?.actors ?? []; track actor.name) {
+        <select class="input input-sm" (change)="setActor($any($event.target).value)">
+          <option value="" [selected]="!actorUserId() && !systemOnly()">Anyone</option>
+          <!-- Tracked by id, not name: two people can share one, and someone renamed between two
+               actions appears under both. "System" is a mode rather than an id — it is the absence
+               of an actor — so it selects a different filter. -->
+          @for (actor of vocabulary.value()?.actors ?? []; track actor.userId ?? actor.name) {
             @if (actor.userId) {
               <option [value]="actor.userId" [selected]="actorUserId() === actor.userId">
                 {{ actor.name }} ({{ actor.entryCount }})
+              </option>
+            } @else {
+              <option value="system" [selected]="systemOnly()">
+                {{ actor.name }} — automated ({{ actor.entryCount }})
               </option>
             }
           }
@@ -130,6 +134,9 @@
     } @else {
       <div class="list-toolbar">
         <span class="page-sub">{{ summary() }}</span>
+        <!-- Which calendar a day ends at, spelled out. The date pickers filter by it and
+             the rows are stamped in it, so nobody has to guess whose midnight applies. -->
+        <span class="page-sub">{{ timeZoneNote() }}</span>
       </div>
 
       <div class="table-wrap">
@@ -174,9 +181,14 @@
                     label(row.action)
                   }}</span>
                 </td>
-                <td class="td">
+                <td class="td td-clip-320">
                   <div class="entity-name">{{ row.subjectLabel }}</div>
-                  <div class="td-sub">{{ row.entityType }}</div>
+                  <!-- The reason is inline, clipped, not only behind the expander. It is the field
+                       that settles the argument, and an auditor scanning for "why" should not have
+                       to open every row to find out which ones have one. -->
+                  <div class="td-sub">
+                    {{ row.reason ?? row.entityType }}
+                  </div>
                 </td>
                 <td class="td">
                   @if (hasChange(row)) {
