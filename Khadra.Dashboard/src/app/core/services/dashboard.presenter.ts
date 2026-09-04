@@ -28,12 +28,18 @@ const UNAVAILABLE = '—';
 
 const formatCount = (value: number): string => value.toLocaleString('en-US');
 
-/** The four count responses, each present only once its own request has answered. */
+/**
+ * The four count responses, each present only once its own request has answered.
+ *
+ * Null as well as undefined: the screen reads each resource through `loaded()`, which answers null
+ * both while a request is in flight and after one has failed. Either way there is no figure, and a
+ * card without a figure is not drawn.
+ */
 export interface KpiSources {
-  readonly dealers: DealerCounts | undefined;
-  readonly bookings: BookingCounts | undefined;
-  readonly customers: CustomerCounts | undefined;
-  readonly disputes: DisputeCounts | undefined;
+  readonly dealers: DealerCounts | null | undefined;
+  readonly bookings: BookingCounts | null | undefined;
+  readonly customers: CustomerCounts | null | undefined;
+  readonly disputes: DisputeCounts | null | undefined;
 }
 
 /**
@@ -127,17 +133,26 @@ const severityTone = (severity: string): Tone => {
 };
 
 /**
- * Where a row leads and what its button says. An unknown kind still renders — it just opens the
- * dashboard's own queue instead of a screen we have not been told about — which is what lets the
- * Payments kinds arrive later without a frontend release.
+ * Where a row leads and what its button says.
+ *
+ * Straight to the RECORD, not to the list it lives in. The queue exists so an admin can act on the
+ * thing in front of them, and every button used to land on `/disputes` — six rows each naming a
+ * different ticket, all six leading to the same page, where the ticket had to be found again. The
+ * API sends the ids in `subjectIds`; this uses them.
+ *
+ * A row standing for SEVERAL records (a dealer row can carry a count) still opens the list, because
+ * there is no single record to open. An unknown kind still renders — it just opens the dashboard's
+ * own queue instead of a screen we have not been told about — which is what lets the Payments kinds
+ * arrive later without a frontend release.
  */
-const kindTarget = (kind: string): { route: string; action: string } => {
-  switch (kind) {
+const kindTarget = (item: AttentionItem): { route: string; action: string } => {
+  const only = item.subjectIds?.length === 1 ? item.subjectIds[0] : null;
+  switch (item.kind) {
     case 'DisputeOverdue':
     case 'DisputeOpen':
-      return { route: '/disputes', action: 'Resolve' };
+      return { route: only ? `/disputes/${only}` : '/disputes', action: 'Resolve' };
     case 'DealerApplicationsAtRisk':
-      return { route: '/dealers', action: 'Review' };
+      return { route: only ? `/dealers/${only}` : '/dealers', action: 'Review' };
     default:
       return { route: '/dashboard', action: 'Open' };
   }
@@ -189,8 +204,9 @@ const queueTitle = (item: AttentionItem, now: number): string => {
 
 export function toQueueItems(queue: AttentionQueue, now: number): readonly QueueItem[] {
   return queue.items.map((item) => {
-    const target = kindTarget(item.kind);
+    const target = kindTarget(item);
     return {
+      id: item.id,
       severity: severityLabel(item, now),
       tone: severityTone(item.severity),
       title: queueTitle(item, now),

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { SessionService } from '../core/services/session.service';
 import { AdminDashboardService } from '../core/services/admin-dashboard.service';
+import { loaded } from '../core/services/loaded';
 import { DEALER_NAV, NAV_GROUPS } from '../core/data/nav.data';
 import { NavCount } from '../core/models/console.models';
 import { initialsOf, roleLabel } from '../core/models/user-display';
@@ -37,11 +38,17 @@ export class AdminSidebarComponent {
    * endpoint being small.
    *
    * Nothing is shown until the answer arrives: a zero would claim the queue is empty when the truth
-   * is that nobody has looked yet.
+   * is that nobody has looked yet. Nothing is shown when the answer never arrives either — and it
+   * has to be `loaded()` rather than `value()` for that, because `value()` throws on a failed
+   * request. This runs from the shell template on EVERY admin screen, so the throw took change
+   * detection down with it and froze the whole console on its loading skeleton: no error anywhere,
+   * and each screen's own "couldn't load this" block never got the chance to render.
    */
+  private readonly workload = loaded(this.dashboard.workload);
+
   protected badge(count: NavCount | undefined): string | null {
     if (!count) return null;
-    const workload = this.dashboard.workload.value();
+    const workload = this.workload();
     if (!workload) return null;
 
     const value =

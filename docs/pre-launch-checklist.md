@@ -314,3 +314,60 @@ An auditor asked for "everything about this dealer for the year" can filter to i
 cannot take it away. Not built because nobody has asked yet, and the shape is already there when
 they do: `GET /admin/audit-logs/export` streaming `text/csv` over the same `AuditLogFilter`, via
 `IAsyncEnumerable` so a large range does not materialise in memory.
+
+### 21. The dealer console still reads `Resource.value()` unguarded
+
+**Status:** open · **Raised:** 2026-09-04
+
+`httpResource.value()` **throws** while a resource is in an error state; it does not return
+undefined, so `value() ?? null` is not a guard. Reading it outside the branch that already proved the
+request succeeded takes change detection down with it.
+
+Observed on the Admin side and fixed there: a 502 on `GET /admin/workload` made the sidebar's
+`badge()` throw, and because the sidebar wraps every admin screen, the console froze on its loading
+skeleton — no error, no Retry — while each screen's own "couldn't load this" block sat unrendered
+behind it. `core/services/loaded.ts` now stands between every admin screen and its resource.
+
+The dealer console has the identical pattern and has not been changed, because it was outside the
+pass that found this and nothing here has been driven end to end since. `dealer-gate.component.ts`
+(`locked()`, lines 65 and 74) is the dangerous one: it wraps every dealer screen exactly as the
+sidebar wraps every admin one, so a failed `GET /dealers/me` freezes the whole dealer console. The
+effects in `car-form.component.ts` and `vehicle-wizard.component.ts` fail the same way for a vehicle
+that 404s, as `dispute-detail` did before the fix. `dealer-bookings`, `dealer-delivery`,
+`dealer-profile`, `dealer-reports`, `dealer-activity`, `dealer-employees` and `booking-detail` all
+read `value()` unguarded too, and are protected only by the order of their template branches.
+
+**To close:** route every root derivation in `features/dealer/` and `features/fleet/` through
+`loaded()`, then drive the dealer console end to end with the API stopped and confirm each screen
+shows its own failure and a Retry rather than a skeleton.
+
+### 22. A dealer suspension is missing from the application timeline
+
+**Status:** open by design · **Raised:** 2026-09-04
+
+`GetDealerForReviewQuery.BuildTimeline` derives the trail from the aggregate, and `Dealer` records
+`SuspensionReason` but no `SuspendedAt` — so a suspension has no instant to sit on and does not
+appear. The reason itself is now shown under "Decision on record", and who suspended the dealership
+and when is one click away in the audit log, which the screen links to filtered to that dealer.
+
+Not fixed by adding `SuspendedAt`: one column cannot represent suspend → reactivate → suspend again,
+so it would be a partial mirror of what the audit trail already holds completely, and `BuildTimeline`
+exists precisely to avoid a second source of truth.
+
+**To close:** if the trail is wanted on the screen, read it from `IAuditLogReader` for
+`(Dealer, dealerId)` in the query handler. Not a column.
+
+### 23. The seeded audit entries are not derived from the aggregates they describe
+
+**Status:** open · **Raised:** 2026-09-04
+
+`DevelopmentSeeder` writes the aggregates and the audit rows from separate literals, so the two
+disagree: entries name actors and instants that the tickets and dealerships they refer to do not
+have. It did not matter while the audit log was a glance on the dashboard; it does now that the
+dealer review and dispute screens deep-link the log filtered to one record, because the two views of
+the same event are read side by side.
+
+Development data only — no production impact.
+
+**To close:** seed each audit entry from the aggregate it describes, taking the actor, the instant
+and the before/after states from the object rather than restating them.

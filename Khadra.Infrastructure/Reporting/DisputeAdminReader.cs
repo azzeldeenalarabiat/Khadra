@@ -100,11 +100,16 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
                 ticket.SlaDeadline,
                 (ticket.Status == open || ticket.Status == underReview) && ticket.SlaDeadline <= now,
                 ticket.AssignedAdminId != null ? ticket.AssignedAdminId.Value.Value : null,
+                // An assigned ticket whose admin cannot be named is still assigned. Falling through
+                // to null let the queue print "Unassigned" against a ticket someone already holds --
+                // contradicting both its own "N unassigned" summary and the workspace, which says
+                // "Account closed" for exactly this case. The dealer and customer above take the
+                // same shape for the same reason.
                 ticket.AssignedAdminId != null
                     ? context.Users
                         .Where(user => user.Id == ticket.AssignedAdminId.Value)
                         .Select(user => user.Name.Value)
-                        .FirstOrDefault()
+                        .FirstOrDefault() ?? "Account closed"
                     : null,
                 ticket.ClosedAt,
                 ticket.Statements.Count))

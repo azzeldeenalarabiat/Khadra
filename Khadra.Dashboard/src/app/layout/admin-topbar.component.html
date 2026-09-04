@@ -21,10 +21,19 @@
     reads a reporting period, and the "9" beside the bell was a number that was never counted. A
     control that does nothing when clicked costs an administrator more than a missing one does.
   -->
+  <!--
+    The chip names who is signed in; it is not a button.
+
+    It was one, with a caret-down promising a menu and no handler behind it, which is the very thing
+    the note above says costs an administrator more than a missing control does. The account actions
+    it seemed to promise are in the sidebar footer, where they work. When there is something to put
+    here -- the language switcher the frontend rules still list as outstanding -- it becomes a
+    control again, with the menu it implies.
+  -->
   <div class="topbar-actions">
-    <button type="button" class="user-chip">
-      <span class="avatar avatar-26">{{ initials() }}</span>
-      <kh-icon name="caret-down" />
-    </button>
+    <span class="user-chip">
+      <span class="avatar avatar-26" aria-hidden="true">{{ initials() }}</span>
+      <span class="visually-hidden">Signed in as {{ name() }}</span>
+    </span>
   </div>
 </div>

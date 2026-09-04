@@ -19,6 +19,13 @@ export interface KpiCard {
 }
 
 export interface QueueItem {
+  /**
+   * The API's own key for this item.
+   *
+   * The rows were tracked by title + entity, which collides for two disputes of the same age between
+   * the same dealer and customer — and a colliding track key makes Angular reuse the wrong row.
+   */
+  readonly id: string;
   readonly severity: string;
   readonly tone: Tone;
   readonly title: string;

@@ -41,10 +41,11 @@
         <div class="sidebar-user-role">{{ role() }}</div>
       </div>
     </div>
-    <button type="button" class="sidebar-link">
-      <kh-icon name="gear-six" />
-      Account settings
-    </button>
+    <!-- "Account settings" stood here as a button with no handler: it looked like the way to change
+         your own password and did nothing at all when clicked. There is no account screen to send it
+         to either -- Security and Admin users are both in the rail already, and both say they are
+         not built -- so routing it there would be the same dead click at the end of a longer path.
+         It comes back with the screen, not before. -->
     <button type="button" class="sidebar-link" (click)="signOut()">
       <kh-icon name="sign-out" />
       Logout

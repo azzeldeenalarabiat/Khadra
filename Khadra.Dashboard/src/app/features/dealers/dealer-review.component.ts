@@ -11,6 +11,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { AdminDealersService } from '../../core/services/admin-dealers.service';
+import { loaded } from '../../core/services/loaded';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { isAtRisk } from '../../core/services/sla';
 import { DocumentTile, KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
@@ -41,6 +42,10 @@ export class DealerReviewComponent {
 
   protected readonly resource = this.service.review;
 
+  // Resource.value() throws while a request has failed, so nothing reads it directly; failure()
+  // below goes on reading error(), which does not throw.
+  private readonly review = loaded(this.resource);
+
   // Angular reuses this component when only the route parameter changes, so reading the snapshot once
   // in the constructor would leave the screen showing the previous dealer. Nothing links one dealer
   // to another today, which is why it has never shown -- but it would be a silent wrong-record bug
@@ -58,7 +63,7 @@ export class DealerReviewComponent {
     effect((onCleanup) => onCleanup(() => clearInterval(ticker)));
   }
 
-  protected readonly dealer = computed(() => this.resource.value()?.dealer ?? null);
+  protected readonly dealer = computed(() => this.review()?.dealer ?? null);
 
   protected readonly initials = computed(() => {
     const name = this.dealer()?.businessName ?? '';
@@ -96,7 +101,7 @@ export class DealerReviewComponent {
    * have started contradicting the countdown printed beside it.
    */
   protected readonly sla = computed(() => {
-    const review = this.resource.value();
+    const review = this.review();
     if (!review) return { figure: '—', note: '', tone: 'dim' as Tone };
     if (review.dealer.verificationStatus !== 'PendingReview') {
       return { figure: 'Settled', note: 'No decision outstanding.', tone: 'ok' as Tone };
@@ -125,7 +130,7 @@ export class DealerReviewComponent {
   });
 
   protected readonly businessRows = computed<readonly KeyValue[]>(() => {
-    const review = this.resource.value();
+    const review = this.review();
     if (!review) return [];
     return [
       { k: 'Business name', v: review.dealer.businessName },
@@ -143,7 +148,7 @@ export class DealerReviewComponent {
   });
 
   protected readonly documents = computed<readonly DocumentTile[]>(() => {
-    const review = this.resource.value();
+    const review = this.review();
     if (!review) return [];
     return review.documents.map((document) => ({
       label: document.type.replace(/([a-z])([A-Z])/g, '$1 $2'),
@@ -173,8 +178,7 @@ export class DealerReviewComponent {
    * note about signed URLs above an empty section is a sentence about nothing.
    */
   protected readonly linkExpiry = computed<string | null>(() => {
-    const expiries = this.resource
-      .value()
+    const expiries = this.review()
       ?.documents.map((document) => Date.parse(document.expiresAt))
       .filter((value) => Number.isFinite(value));
     if (!expiries?.length) return null;
@@ -186,7 +190,7 @@ export class DealerReviewComponent {
   });
 
   protected readonly timeline = computed<readonly TimelineStep[]>(() => {
-    const review = this.resource.value();
+    const review = this.review();
     if (!review) return [];
     return review.timeline.map((entry) => ({
       label: entry.label,
@@ -229,8 +233,18 @@ export class DealerReviewComponent {
    *
    * Blank for an approval, which needs none: the note field carries a rejection reason or a
    * clarification request, and inventing prose for an approval would put words in an admin's mouth.
+   *
+   * A suspension keeps its reason in its OWN field, because it sits on top of an approval rather
+   * than replacing it. Reading reviewNote alone made the screen for a suspended dealership say "No
+   * reason was recorded with this decision" -- when the modal had refused to submit without one,
+   * and the audit log had it all along.
    */
-  protected readonly decisionNote = computed(() => this.dealer()?.reviewNote?.trim() || null);
+  protected readonly decisionNote = computed(() => {
+    const dealer = this.dealer();
+    if (!dealer) return null;
+    if (dealer.isSuspended) return dealer.suspensionReason?.trim() || null;
+    return dealer.reviewNote?.trim() || null;
+  });
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;

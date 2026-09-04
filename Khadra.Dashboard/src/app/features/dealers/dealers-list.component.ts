@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { AdminDealersService } from '../../core/services/admin-dealers.service';
+import { loaded } from '../../core/services/loaded';
 import { isAtRisk } from '../../core/services/sla';
 import { Cell, TableRow, Tone } from '../../core/models/console.models';
 import { DealerListItem } from '../../core/models/dealers.api';
@@ -23,7 +24,12 @@ export class DealersListComponent {
   private readonly service = inject(AdminDealersService);
 
   protected readonly resource = this.service.dealers;
+
+  // Resource.value() throws while a request has failed, so nothing reads it directly; failure()
+  // goes on reading error(), which does not throw.
+  private readonly loadedPage = loaded(this.resource);
   protected readonly status = this.service.status;
+  protected readonly suspendedOnly = this.service.suspendedOnly;
   protected readonly search = this.service.search;
 
   protected readonly statuses = [
@@ -49,22 +55,22 @@ export class DealersListComponent {
   ];
 
   protected readonly rows = computed<readonly TableRow[]>(() => {
-    const page = this.resource.value();
+    const page = this.loadedPage();
     return page ? page.items.map((dealer) => this.toRow(dealer)) : [];
   });
 
   protected readonly summary = computed(() => {
-    const page = this.resource.value();
+    const page = this.loadedPage();
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
     return `Showing ${from}–${to} of ${page.totalCount} dealers`;
   });
 
-  protected readonly page = computed(() => this.resource.value()?.page ?? 1);
-  protected readonly totalPages = computed(() => this.resource.value()?.totalPages ?? 0);
-  protected readonly hasPrevious = computed(() => this.resource.value()?.hasPrevious ?? false);
-  protected readonly hasNext = computed(() => this.resource.value()?.hasNext ?? false);
+  protected readonly page = computed(() => this.loadedPage()?.page ?? 1);
+  protected readonly totalPages = computed(() => this.loadedPage()?.totalPages ?? 0);
+  protected readonly hasPrevious = computed(() => this.loadedPage()?.hasPrevious ?? false);
+  protected readonly hasNext = computed(() => this.loadedPage()?.hasNext ?? false);
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
@@ -74,8 +80,21 @@ export class DealersListComponent {
     return 'The dealer queue could not be loaded. Nothing has been changed.';
   });
 
+  /**
+   * The two filters are one row of chips because they answer one question — "which dealerships am I
+   * looking at" — and are mutually exclusive in use: a suspended dealership is an approved one, so
+   * combining "Suspended" with "Pending review" asks for a set that cannot exist. Choosing either
+   * clears the other rather than offering a second axis of controls for one real need.
+   */
   protected setStatus(value: string | null): void {
     this.status.set(value);
+    this.service.suspendedOnly.set(false);
+    this.service.page.set(1);
+  }
+
+  protected showSuspended(): void {
+    this.status.set(null);
+    this.service.suspendedOnly.set(true);
     this.service.page.set(1);
   }
 

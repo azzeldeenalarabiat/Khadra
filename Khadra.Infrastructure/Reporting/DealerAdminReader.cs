@@ -53,11 +53,25 @@ internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminR
         // the "n of m" column honest without EF trying to translate the enumeration into SQL.
         var requiredDocuments = DealerDocumentType.Required.Count;
 
+        // Captured as a local for the same reason `approved` is: EF translates a comparison against
+        // a captured enumeration, but not a call to `VerificationStatus.IsAwaitingAdmin`.
+        var pending = DealerVerificationStatus.PendingReview;
+
         var items = await query
-            // Whatever is closest to breaching its review promise comes first; that is the order an
-            // admin working the queue actually wants.
-            .OrderBy(dealer => dealer.ReviewDueAt)
+            // Applications still owed a decision come first, closest to the deadline at the top;
+            // everything settled follows, newest first.
+            //
+            // Ordering the whole list by ReviewDueAt alone read as "closest to the deadline" but was
+            // not: ReviewDueAt is set on EVERY dealer at submission and never cleared, so a
+            // dealership approved in January sorted above the one application actually waiting --
+            // which sat thirteenth of fourteen, under twelve decisions taken months earlier. The
+            // deadline only means anything while a decision is outstanding, so it only sorts those.
+            .OrderByDescending(dealer => dealer.VerificationStatus == pending)
+            .ThenBy(dealer => dealer.VerificationStatus == pending ? dealer.ReviewDueAt : DateTimeOffset.MaxValue)
             .ThenByDescending(dealer => dealer.CreatedAt)
+            // A non-total order lets a page boundary drop or repeat a row, the same reason the audit
+            // reader breaks its ties on the id.
+            .ThenBy(dealer => dealer.Id)
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(dealer => new DealerListItem(

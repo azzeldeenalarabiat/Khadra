@@ -41,6 +41,8 @@ export class AdminTopbarComponent {
 
   protected readonly title = computed(() => SCREEN_TITLES[this.path()] ?? 'Dashboard');
   protected readonly initials = computed(() => initialsOf(this.session.user() ?? null));
+  // Two initials in a circle are not a name to a screen reader, so the chip carries the full one.
+  protected readonly name = computed(() => this.session.user()?.fullName ?? '');
 
   protected readonly crumbs = computed<Crumb[]>(() => {
     const key = this.path();

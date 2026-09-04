@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AdminAuditService } from '../../core/services/admin-audit.service';
+import { loaded } from '../../core/services/loaded';
 import { AuditLogEntry } from '../../core/models/audit.api';
 import { Tone } from '../../core/models/console.models';
 import { IconComponent } from '../../shared/icon/icon.component';
@@ -28,7 +29,12 @@ export class AuditLogComponent {
   private readonly service = inject(AdminAuditService);
 
   protected readonly resource = this.service.entries;
+
+  // Resource.value() throws while a request has failed, so nothing reads it directly; failure()
+  // goes on reading error(), which does not throw.
+  private readonly loadedPage = loaded(this.resource);
   protected readonly vocabulary = this.service.vocabulary;
+  private readonly vocabularyData = loaded(this.vocabulary);
 
   protected readonly action = this.service.action;
   protected readonly entityType = this.service.entityType;
@@ -54,11 +60,11 @@ export class AuditLogComponent {
   /** Which row is open. One at a time: this is a reading screen, not a comparison one. */
   protected readonly expanded = signal<string | null>(null);
 
-  protected readonly rows = computed(() => this.resource.value()?.items ?? []);
-  protected readonly total = computed(() => this.resource.value()?.totalCount ?? 0);
-  protected readonly totalPages = computed(() => this.resource.value()?.totalPages ?? 0);
-  protected readonly hasPrevious = computed(() => this.resource.value()?.hasPrevious ?? false);
-  protected readonly hasNext = computed(() => this.resource.value()?.hasNext ?? false);
+  protected readonly rows = computed(() => this.loadedPage()?.items ?? []);
+  protected readonly total = computed(() => this.loadedPage()?.totalCount ?? 0);
+  protected readonly totalPages = computed(() => this.loadedPage()?.totalPages ?? 0);
+  protected readonly hasPrevious = computed(() => this.loadedPage()?.hasPrevious ?? false);
+  protected readonly hasNext = computed(() => this.loadedPage()?.hasNext ?? false);
 
   protected readonly anyFilter = computed(
     () =>
@@ -73,7 +79,7 @@ export class AuditLogComponent {
   );
 
   protected readonly summary = computed(() => {
-    const page = this.resource.value();
+    const page = this.loadedPage();
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
@@ -198,7 +204,7 @@ export class AuditLogComponent {
   }
 
   /** The zone the server resolves this log in. Undefined until it answers — never assumed. */
-  protected readonly timeZone = computed(() => this.vocabulary.value()?.reportingTimeZone);
+  protected readonly timeZone = computed(() => this.vocabularyData()?.reportingTimeZone);
 
   /** Spelled out beside the table, so nobody has to guess whose midnight a day ends at. */
   protected readonly timeZoneNote = computed(() => {

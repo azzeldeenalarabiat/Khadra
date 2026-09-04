@@ -16,6 +16,7 @@ import {
   toTrendHeights,
 } from '../../core/services/dashboard.presenter';
 import { Tone, toneClass } from '../../core/models/console.models';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -44,6 +45,16 @@ export class DashboardComponent {
   protected readonly trendResource = this.service.bookingTrend;
   protected readonly activityResource = this.service.activity;
 
+  // Every panel reads its data through loaded(): Resource.value() throws while a request has
+  // failed, and one broken panel must not take the row -- or the shell around it -- down with it.
+  private readonly dealerCounts = loaded(this.dealers);
+  private readonly bookingCounts = loaded(this.bookings);
+  private readonly customerCounts = loaded(this.customers);
+  private readonly disputeCounts = loaded(this.disputes);
+  private readonly queueData = loaded(this.queueResource);
+  private readonly trendData = loaded(this.trendResource);
+  private readonly activityData = loaded(this.activityResource);
+
   protected readonly toneClass = toneClass;
 
   constructor() {
@@ -65,10 +76,10 @@ export class DashboardComponent {
    */
   protected readonly kpis = computed(() =>
     toKpiCards({
-      dealers: this.dealers.value(),
-      bookings: this.bookings.value(),
-      customers: this.customers.value(),
-      disputes: this.disputes.value(),
+      dealers: this.dealerCounts(),
+      bookings: this.bookingCounts(),
+      customers: this.customerCounts(),
+      disputes: this.disputeCounts(),
     }),
   );
 
@@ -81,22 +92,22 @@ export class DashboardComponent {
   );
 
   protected readonly queue = computed(() => {
-    const data = this.queueResource.value();
+    const data = this.queueData();
     return data ? toQueueItems(data, this.now()) : [];
   });
 
   protected readonly trend = computed(() => {
-    const data = this.trendResource.value();
+    const data = this.trendData();
     return data ? toTrendHeights(data) : [];
   });
 
   protected readonly activity = computed(() => {
-    const data = this.activityResource.value();
+    const data = this.activityData();
     return data ? toActivityRows(data.entries, this.now()) : [];
   });
 
   protected readonly trendChange = computed(() =>
-    formatChangePercent(this.trendResource.value()?.changePercent ?? null),
+    formatChangePercent(this.trendData()?.changePercent ?? null),
   );
 
   /**
@@ -107,23 +118,23 @@ export class DashboardComponent {
    * is neither, and reads as neither.
    */
   protected readonly trendTone = computed<Tone | null>(() => {
-    const change = this.trendResource.value()?.changePercent ?? null;
+    const change = this.trendData()?.changePercent ?? null;
     if (change === null) return 'dim';
     if (change > 0) return 'ok';
     if (change < 0) return 'bad';
     return null;
   });
 
-  protected readonly trendDays = computed(() => this.trendResource.value()?.points.length ?? 0);
+  protected readonly trendDays = computed(() => this.trendData()?.points.length ?? 0);
 
   protected readonly queueSummary = computed(() => {
-    const queue = this.queueResource.value();
+    const queue = this.queueData();
     return queue ? `${queue.openCount} open · ${queue.overdueCount} overdue` : '';
   });
 
   /** The SLA in force today, labelled as such — each row is judged against its own frozen window. */
   protected readonly slaNote = computed(() => {
-    const hours = this.queueResource.value()?.slaHours;
+    const hours = this.queueData()?.slaHours;
     return hours ? `Current SLA ${hours}h` : '';
   });
 
@@ -152,6 +163,18 @@ export class DashboardComponent {
   protected panelFailed(resource: { error: () => unknown }): boolean {
     return !!resource.error() && !this.failure();
   }
+
+  /**
+   * Every count is missing and none of them is still coming.
+   *
+   * A card is simply omitted until its own answer lands, which is right while one is in flight and
+   * wrong once it has failed: four omitted cards leave an empty band where the platform's figures
+   * belong, and an empty band reads as a platform with nothing on it rather than a question nobody
+   * could answer.
+   */
+  protected readonly countsFailed = computed(
+    () => this.kpis().length === 0 && !this.countsLoading() && !this.failure(),
+  );
 
   protected reload(): void {
     this.service.reload();

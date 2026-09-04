@@ -88,23 +88,16 @@
             <span class="sect-t">Statements</span>
             <span class="sect-hint">Both parties and the platform read everything here</span>
           </div>
+          <!--
+            One card per statement, and the FIRST one wears the "opened it" pill.
+
+            DisputeTicket.Open records the reason as statement #1, so a separate card built from
+            d.reason printed the opening complaint twice over: same words, same author, same
+            timestamp, one above the other. Marking the real statement instead keeps the evidence
+            that came attached to it with the words it was sent to support.
+          -->
           <div class="sect-pad stack stack-12">
-            <div class="row row-gap-12">
-              <div class="customer-avatar" [class.s-accent]="d.openedByParty === 'Dealer'">
-                {{ initials(d.openedByName) }}
-              </div>
-              <div class="grow">
-                <div class="row row-gap-8">
-                  <span class="handover-title">{{ d.openedByName }}</span>
-                  <span class="pill" [class]="d.openedByParty === 'Dealer' ? 's-accent' : 's-dim'">
-                    {{ d.openedByParty }} · opened it
-                  </span>
-                  <span class="page-sub push">{{ when(d.openedAt) }}</span>
-                </div>
-                <div class="queue-desc">{{ d.reason }}</div>
-              </div>
-            </div>
-            @for (s of d.statements; track s.statementId) {
+            @for (s of d.statements; track s.statementId; let first = $first) {
               <div class="row row-gap-12">
                 <div class="customer-avatar" [class.s-accent]="s.party === 'Dealer'">
                   {{ initials(s.authorName) }}
@@ -113,7 +106,7 @@
                   <div class="row row-gap-8">
                     <span class="handover-title">{{ s.authorName }}</span>
                     <span class="pill" [class]="s.party === 'Dealer' ? 's-accent' : 's-dim'">
-                      {{ s.party }}
+                      {{ s.party }}{{ first ? ' · opened it' : '' }}
                     </span>
                     <span class="page-sub push">{{ when(s.createdAt) }}</span>
                   </div>
@@ -121,7 +114,9 @@
                 </div>
               </div>
             } @empty {
-              <div class="page-sub">No statement has been added since the ticket was opened.</div>
+              <!-- Unreachable while Open() writes the first statement, but a ticket with no
+                   statement at all must not render an empty panel with no explanation. -->
+              <div class="page-sub">{{ d.reason }}</div>
             }
           </div>
         </section>
@@ -246,7 +241,7 @@
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="refund()"
                 (input)="setLeg('refund', $event)"
               />
@@ -258,7 +253,7 @@
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="platform()"
                 (input)="setLeg('platform', $event)"
               />
@@ -270,7 +265,7 @@
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="dealer()"
                 (input)="setLeg('dealer', $event)"
               />
@@ -295,7 +290,7 @@
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="dealerCharge()"
                 (input)="dealerCharge.set(text($event))"
               />

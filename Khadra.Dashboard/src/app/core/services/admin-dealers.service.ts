@@ -18,13 +18,25 @@ export class AdminDealersService {
 
   /** Filter state the list resource reacts to. */
   readonly status = signal<string | null>(null);
+
+  /**
+   * Suspended is its own axis, not one more verification status.
+   *
+   * A suspension sits on TOP of an approval — the licence check is not undone by it — so it cannot
+   * be a value of `status`. The dashboard counts suspended dealerships and the list badges them, but
+   * until this there was no way to ask for them: an admin who read "Suspended 2" on the dashboard
+   * had to scan every row to find which two. Sent on its own it counts exactly what that KPI counts,
+   * so the figure and the list cannot disagree.
+   */
+  readonly suspendedOnly = signal<boolean>(false);
   readonly search = signal<string>('');
   readonly page = signal<number>(1);
 
   readonly dealers = httpResource<PagedResult<DealerListItem>>(() => {
-    const params: Record<string, string | number> = { page: this.page(), pageSize: 20 };
+    const params: Record<string, string | number | boolean> = { page: this.page(), pageSize: 20 };
     const status = this.status();
     if (status) params['status'] = status;
+    if (this.suspendedOnly()) params['suspendedOnly'] = true;
     const search = this.search().trim();
     if (search) params['search'] = search;
     return { url: '/api/v1/admin/dealers', params };

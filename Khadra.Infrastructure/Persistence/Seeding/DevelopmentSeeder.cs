@@ -693,9 +693,12 @@ internal sealed partial class DevelopmentSeeder(
             if (ticket.IsFailure)
                 continue;
 
-            // A couple have been picked up by an admin but not yet decided.
+            // A couple have been picked up by an admin but not yet decided. It has to be a REAL
+            // admin: Id.New() here assigned them to an account that was never created, so every
+            // reader that resolves the id to a name found nothing and the queue reported the
+            // tickets as unassigned while their status said Under review.
             if (index is 2 or 4)
-                ticket.Value.AssignToAdmin(Id.New());
+                ticket.Value.AssignToAdmin(adminId);
 
             tickets.Add(ticket.Value);
         }

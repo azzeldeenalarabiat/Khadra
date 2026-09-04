@@ -262,6 +262,7 @@
   height: 33px;
 }
 
+/* Who is signed in. A label, not a control, so no pointer cursor promising a click. */
 .user-chip {
   display: flex;
   align-items: center;
@@ -270,7 +271,6 @@
   padding-inline: 3px 7px;
   border: 1px solid var(--color-divider);
   border-radius: 20px;
-  cursor: pointer;
   background: none;
   color: inherit;
 }

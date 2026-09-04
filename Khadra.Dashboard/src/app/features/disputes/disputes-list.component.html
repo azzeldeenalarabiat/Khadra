@@ -137,8 +137,16 @@
                 </td>
                 <td class="td">
                   <span [class]="row.isOverdue ? 's-bad' : ''">{{ sla(row) }}</span>
+                  <!-- Whether a ticket is taken is the ID's answer, not the name's. Keying this on
+                       the name printed "Unassigned" against a ticket whose admin could not be named
+                       -- so the queue contradicted its own "N unassigned" count above, which keys on
+                       the id, and told a second admin the work was free. -->
                   <div class="td-sub">
-                    {{ row.assignedAdminName ? 'With ' + row.assignedAdminName : 'Unassigned' }}
+                    {{
+                      row.assignedAdminId
+                        ? 'With ' + (row.assignedAdminName ?? 'an admin')
+                        : 'Unassigned'
+                    }}
                   </div>
                 </td>
                 <td class="td">

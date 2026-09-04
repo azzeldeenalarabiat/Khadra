@@ -3,8 +3,8 @@
     <div>
       <h1 class="page-title">Dealers</h1>
       <div class="page-sub">
-        Rental offices on the platform. Applications are ordered by how close they are to the review
-        deadline.
+        Rental offices on the platform. Applications awaiting a decision come first, closest to the
+        review deadline at the top.
       </div>
     </div>
   </div>
@@ -40,13 +40,24 @@
           <button
             type="button"
             class="btn btn-sm"
-            [class.btn-primary]="status() === option.value"
-            [class.btn-secondary]="status() !== option.value"
+            [class.btn-primary]="status() === option.value && !suspendedOnly()"
+            [class.btn-secondary]="status() !== option.value || suspendedOnly()"
             (click)="setStatus(option.value)"
           >
             {{ option.label }}
           </button>
         }
+        <!-- Suspension is orthogonal to the verification statuses above, which is why it is its own
+             chip rather than one more of them. -->
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="suspendedOnly()"
+          [class.btn-secondary]="!suspendedOnly()"
+          (click)="showSuspended()"
+        >
+          Suspended
+        </button>
       </div>
 
       @if (resource.isLoading()) {

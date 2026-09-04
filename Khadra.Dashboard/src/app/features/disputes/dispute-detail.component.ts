@@ -12,6 +12,7 @@ import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
 import { Dispute } from '../../core/models/disputes.api';
 import { AdminDisputesService } from '../../core/services/admin-disputes.service';
+import { roundTo, scaleOf } from '../../core/services/money';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
@@ -45,17 +46,39 @@ export class DisputeDetailComponent {
     { initialValue: this.route.snapshot.paramMap.get('ticketId') },
   );
 
+  /**
+   * The ticket the split on screen was seeded for.
+   *
+   * The router reuses this component between /disputes/A and /disputes/B, and the resource reloads
+   * whenever the ticket is taken on, so "have I seeded yet" cannot be a boolean.
+   */
+  private seededFor: string | null = null;
+
   constructor() {
     effect(() => this.service.viewing.set(this.ticketId()));
-    // The split is seeded from the ticket, so it always starts balanced against this booking.
+    // The split is seeded ONCE per ticket, from the ticket, so it starts balanced against this
+    // booking. It deliberately reads nothing but the loaded dispute: seeding used to call
+    // apply('partial'), which reads allocated(), so the effect took a dependency on the three legs
+    // -- every keystroke re-ran it and reset the admin's split back to a full refund, while the
+    // boxes kept showing what had been typed and the total kept claiming it balanced.
     effect(() => {
       const d = this.dispute();
-      if (d && !d.resolution) this.apply('partial', d);
+      if (!d || d.resolution || this.seededFor === d.ticketId) return;
+      this.seededFor = d.ticketId;
+      this.seed(d);
     });
   }
 
   protected readonly resource = this.service.dispute;
-  protected readonly dispute = computed(() => this.resource.value() ?? null);
+
+  /**
+   * `httpResource.value()` THROWS while the resource is in an error state, so it cannot be read
+   * unguarded from an effect: the throw escapes, change detection stops, and a ticket that 404s
+   * renders a blank page instead of the "Couldn't load this dispute" block the template already has.
+   */
+  protected readonly dispute = computed(() =>
+    this.resource.hasValue() ? this.resource.value() : null,
+  );
 
   protected readonly preset = signal<Preset>('partial');
   protected readonly refund = signal(0);
@@ -104,10 +127,21 @@ export class DisputeDetailComponent {
    */
   protected readonly currency = computed(() => this.dispute()?.depositHeld.currency ?? '');
   protected readonly held = computed(() => this.dispute()?.depositHeld.amount ?? 0);
-  protected readonly allocated = computed(() =>
-    round(this.refund() + this.platform() + this.dealer()),
+
+  /** The precision this ticket's money is held at, read off the figures rather than assumed. */
+  private readonly scale = computed(() =>
+    scaleOf(this.held(), this.refund(), this.platform(), this.dealer()),
   );
-  protected readonly remainder = computed(() => round(this.held() - this.allocated()));
+
+  /** What one press of an input's spinner is worth, at the deposit's own precision. */
+  protected readonly step = computed(() => 10 ** -scaleOf(this.held()));
+
+  protected readonly allocated = computed(() =>
+    roundTo(this.refund() + this.platform() + this.dealer(), this.scale()),
+  );
+  protected readonly remainder = computed(() =>
+    roundTo(this.held() - this.allocated(), this.scale()),
+  );
   protected readonly balanced = computed(() => this.remainder() === 0);
   protected readonly canResolve = computed(
     () =>
@@ -200,18 +234,21 @@ export class DisputeDetailComponent {
   protected readonly timeline = computed<readonly TimelineStep[]>(() => {
     const d = this.dispute();
     if (!d) return [];
-    const steps: TimelineStep[] = [
-      {
+    // The opening statement IS statement #1 -- Open() writes it from the reason -- so it is labelled
+    // as the opening rather than added a second time above the list. Listing both put the same
+    // sentence on the trail twice and made a one-statement ticket read as two.
+    const steps: TimelineStep[] = d.statements.map((s, index) => ({
+      label: index === 0 ? `Opened by ${s.authorName}` : `${s.authorName} answered`,
+      meta: `${this.when(s.createdAt)} · ${s.party}${s.evidence.length ? ` · ${s.evidence.length} file(s)` : ''}`,
+      tone: (index === 0 ? 'warn' : s.party === 'Dealer' ? 'accent' : 'dim') as Tone,
+    }));
+    if (steps.length === 0) {
+      steps.push({
         label: `Opened by ${d.openedByName}`,
         meta: `${this.when(d.openedAt)} · ${d.openedByParty} · “${d.reason}”`,
         tone: 'warn',
-      },
-      ...d.statements.map((s) => ({
-        label: `${s.authorName} answered`,
-        meta: `${this.when(s.createdAt)} · ${s.party}${s.evidence.length ? ` · ${s.evidence.length} file(s)` : ''}`,
-        tone: (s.party === 'Dealer' ? 'accent' : 'dim') as Tone,
-      })),
-    ];
+      });
+    }
     if (d.assignedAdminName && !d.resolution) {
       steps.push({
         label: `Taken on by ${d.assignedAdminName}`,
@@ -256,6 +293,22 @@ export class DisputeDetailComponent {
     if (d) this.apply(preset, d);
   }
 
+  /**
+   * The opening position for a ticket: the whole deposit back to the customer, which balances.
+   *
+   * Writes only. Nothing here reads a signal, so the effect that calls it cannot end up depending
+   * on the very fields an admin is typing into.
+   */
+  private seed(d: Dispute): void {
+    this.preset.set('partial');
+    this.refund.set(d.depositHeld.amount);
+    this.platform.set(0);
+    this.dealer.set(0);
+    this.dealerCharge.set('');
+    this.note.set('');
+    this.problem.set(null);
+  }
+
   /** Seeds the three legs from a preset. Partial keeps whatever is already there to edit. */
   private apply(preset: Preset, d: Dispute): void {
     this.preset.set(preset);
@@ -275,17 +328,17 @@ export class DisputeDetailComponent {
           d.booking.penalty && !d.booking.penalty.isNothingOwed ? d.booking.penalty : null;
         const toDealer =
           owed?.attributedTo === 'Customer' ? Math.min(held, owed.minAmount.amount) : 0;
-        this.dealer.set(round(toDealer));
-        this.refund.set(round(held - toDealer));
+        const places = scaleOf(held, toDealer);
+        this.dealer.set(roundTo(toDealer, places));
+        this.refund.set(roundTo(held - toDealer, places));
         this.platform.set(0);
         break;
       }
       case 'partial':
-        if (this.allocated() !== held) {
-          this.refund.set(held);
-          this.platform.set(0);
-          this.dealer.set(0);
-        }
+        // Nothing. "Partial" means the admin sets each leg themselves, so choosing it must not
+        // overwrite the legs they are already setting -- it used to reset an unbalanced split back
+        // to a full refund, which is the one thing an admin part-way through a split has not asked
+        // for. The opening position is seeded once when the ticket loads; see seed().
         break;
     }
   }
@@ -379,11 +432,6 @@ export class DisputeDetailComponent {
       .map((part) => part[0] ?? '')
       .join('');
   }
-}
-
-/** Money here is only ever compared, never accumulated across bookings; 2dp keeps the sum honest. */
-function round(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 function describe(error: unknown): string {

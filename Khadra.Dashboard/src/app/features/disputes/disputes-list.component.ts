@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Tone } from '../../core/models/console.models';
 import { DisputeListItem } from '../../core/models/disputes.api';
 import { AdminDisputesService, DisputeQueue } from '../../core/services/admin-disputes.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -36,9 +37,13 @@ export class DisputesListComponent {
   protected readonly page = this.service.page;
   protected readonly resource = this.service.list;
 
-  protected readonly rows = computed(() => this.resource.value()?.items ?? []);
-  protected readonly total = computed(() => this.resource.value()?.totalCount ?? 0);
-  protected readonly totalPages = computed(() => this.resource.value()?.totalPages ?? 1);
+  // Resource.value() throws while a request has failed, so nothing reads it directly; failure()
+  // goes on reading error(), which does not throw.
+  private readonly loadedPage = loaded(this.resource);
+
+  protected readonly rows = computed(() => this.loadedPage()?.items ?? []);
+  protected readonly total = computed(() => this.loadedPage()?.totalCount ?? 0);
+  protected readonly totalPages = computed(() => this.loadedPage()?.totalPages ?? 1);
   protected readonly overdue = computed(() => this.rows().filter((row) => row.isOverdue).length);
   protected readonly unassigned = computed(
     () => this.rows().filter((row) => !row.assignedAdminId && row.closedAt === null).length,

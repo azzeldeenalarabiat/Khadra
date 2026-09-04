@@ -46,6 +46,16 @@
             <div class="skel-row"><div class="skel" [style.width.%]="80"></div></div>
           </div>
         }
+      } @else if (countsFailed()) {
+        <!-- A card that cannot be drawn leaves a hole, and a row of holes reads as a platform with
+             nothing on it. It says so instead, once, like every other panel here. -->
+        <div class="sect kpi-card">
+          <div class="state-title">Platform figures could not be loaded</div>
+          <div class="state-text">Nothing has been changed.</div>
+          <div class="state-actions">
+            <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">Retry</button>
+          </div>
+        </div>
       }
     </div>
 
@@ -78,7 +88,7 @@
             }
           </div>
         } @else {
-          @for (item of queue(); track item.title + item.entity) {
+          @for (item of queue(); track item.id) {
             <div class="queue-row" [class]="toneClass(item.tone)">
               <div class="queue-rail"></div>
               <div class="queue-body">
