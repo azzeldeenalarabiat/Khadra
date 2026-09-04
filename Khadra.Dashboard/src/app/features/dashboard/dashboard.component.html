@@ -98,7 +98,11 @@
         <section class="sect sect-pad stack stack-10">
           <div class="sla-head">
             <span class="k">Bookings · last {{ trendDays() }} days</span>
-            <span class="num trend-up">{{ trendChange() }}</span>
+            <span
+              class="num trend-change status-text"
+              [class]="trendTone() ? toneClass(trendTone()!) : ''"
+              >{{ trendChange() }}</span
+            >
           </div>
           <div
             class="chart-bars"

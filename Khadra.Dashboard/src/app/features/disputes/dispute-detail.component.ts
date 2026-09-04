@@ -97,7 +97,12 @@ export class DisputeDetailComponent {
     return 'The dispute could not be loaded. Nothing has been changed.';
   });
 
-  protected readonly currency = computed(() => this.dispute()?.depositHeld.currency ?? 'JOD');
+  /**
+   * The currency the deposit is actually held in. Only ever read inside the loaded-dispute branch of
+   * the template, so the empty fallback cannot reach the screen -- and an assumed 'JOD' would be a
+   * currency code printed beside three amounts on the one screen where the platform moves money.
+   */
+  protected readonly currency = computed(() => this.dispute()?.depositHeld.currency ?? '');
   protected readonly held = computed(() => this.dispute()?.depositHeld.amount ?? 0);
   protected readonly allocated = computed(() =>
     round(this.refund() + this.platform() + this.dealer()),

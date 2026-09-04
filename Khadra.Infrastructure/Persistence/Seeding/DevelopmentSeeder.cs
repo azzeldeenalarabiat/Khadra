@@ -43,6 +43,35 @@ internal sealed partial class DevelopmentSeeder(
 
     private readonly Random _random = new(20260903);
 
+    // The smallest structurally valid PDF: one blank page. A dealer's licence papers have to open
+    // when an Admin clicks "Open secure preview" -- the review screen's whole purpose is looking at
+    // them -- and a blank page is an honest stand-in where an invented scan would not be.
+    private static readonly byte[] PlaceholderPdf = System.Text.Encoding.ASCII.GetBytes(
+        "%PDF-1.4\n" +
+        "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+        "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+        "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\n" +
+        "trailer<</Root 1 0 R>>\n" +
+        "%%EOF\n");
+
+    /// <summary>
+    /// A storage key the storage layer will actually accept.
+    ///
+    /// LocalDocumentStorage.KeyPattern is case-sensitive (`[0-9a-z-]+` for the stem), so the earlier
+    /// "{DealerId}/CommercialRegistration.pdf" matched nothing and ResolveWithinRoot THREW: every
+    /// "Open secure preview" on every seeded application answered 500. Lowercased and hyphenated,
+    /// the key is valid and the file below is written at it.
+    /// </summary>
+    internal static string DocumentKey(Id dealerId, DealerDocumentType type) =>
+        $"dealers/{dealerId.Value}/{Slug(type.Name)}.pdf";
+
+    /// <summary>"CommercialRegistration" -> "commercial-registration".</summary>
+    private static string Slug(string name) =>
+        string.Concat(name.Select((character, index) =>
+            char.IsUpper(character) && index > 0
+                ? $"-{char.ToLowerInvariant(character)}"
+                : char.ToLowerInvariant(character).ToString()));
+
     // A valid 8x8 JPEG, plain grey. Enough for an <img> to load; not pretending to be a car.
     private static readonly byte[] PlaceholderJpeg = Convert.FromBase64String(
         "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAAIAAgBAREA/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/9oACAEBAAA/APn+iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiv/Z");
@@ -108,6 +137,14 @@ internal sealed partial class DevelopmentSeeder(
                 using var bytes = new MemoryStream(PlaceholderJpeg);
                 await storage.SaveAtAsync(image.StorageKey, "image/jpeg", bytes, cancellationToken);
             }
+        }
+
+        // Same reasoning for the licence papers behind every dealer application: the Admin's review
+        // screen exists to open these, so they have to be there to open.
+        foreach (var document in dealers.SelectMany(dealer => dealer.Documents))
+        {
+            using var bytes = new MemoryStream(PlaceholderPdf);
+            await storage.SaveAtAsync(document.StorageKey, "application/pdf", bytes, cancellationToken);
         }
 
         var vehicleCount = fleets.Sum(fleet => fleet.Value.Count);
@@ -248,7 +285,7 @@ internal sealed partial class DevelopmentSeeder(
                 reviewSla);
 
             foreach (var type in DealerDocumentType.Required)
-                dealer.AttachDocument(type, $"dealers/{dealer.Id.Value}/{type.Name}.pdf", registeredAt.AddMinutes(20));
+                dealer.AttachDocument(type, DocumentKey(dealer.Id, type), registeredAt.AddMinutes(20));
 
             switch (definition.Outcome)
             {

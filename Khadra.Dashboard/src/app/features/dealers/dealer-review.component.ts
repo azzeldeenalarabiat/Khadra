@@ -12,6 +12,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { AdminDealersService } from '../../core/services/admin-dealers.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { isAtRisk } from '../../core/services/sla';
 import { DocumentTile, KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
 import { DealerReview } from '../../core/models/dealers.api';
 import { DocTileComponent } from '../../shared/doc-tile/doc-tile.component';
@@ -84,7 +85,16 @@ export class DealerReviewComponent {
     return dealer.verificationStatus.replace(/([a-z])([A-Z])/g, '$1 $2');
   });
 
-  /** How long is left on the 48-hour promise, or how far past it this application already is. */
+  /**
+   * How long is left on the review promise, or how far past it this application already is.
+   *
+   * The length of that promise is measured from the application itself — `reviewDueAt` minus
+   * `submittedAt` — not from the SLA the platform happens to be running today. `Dealer.Register`
+   * freezes `reviewDueAt` at submission for exactly this reason: an application submitted under a
+   * 48-hour promise is still owed 48 hours after the owner lowers the setting to 24. The screen used
+   * to read "the 48-hour review SLA" from a literal, which was right only by coincidence and would
+   * have started contradicting the countdown printed beside it.
+   */
   protected readonly sla = computed(() => {
     const review = this.resource.value();
     if (!review) return { figure: '—', note: '', tone: 'dim' as Tone };
@@ -92,14 +102,25 @@ export class DealerReviewComponent {
       return { figure: 'Settled', note: 'No decision outstanding.', tone: 'ok' as Tone };
     }
 
+    const now = this.now();
+    const started = Date.parse(review.dealer.submittedAt);
     const due = Date.parse(review.dealer.reviewDueAt);
-    const hours = Math.round(Math.abs(due - this.now()) / 3_600_000);
-    return review.isBreachingSla
-      ? { figure: `${hours}h over`, note: 'Past the 48-hour review SLA.', tone: 'bad' as Tone }
+    const promised = Math.round((due - started) / 3_600_000);
+    const promise = `${promised}-hour review SLA`;
+    const hours = Math.round(Math.abs(due - now) / 3_600_000);
+
+    // `isBreachingSla` is the server's answer, frozen when this was fetched; the ticker below moves
+    // on without it. Both are consulted, or a tab left open through the deadline reads the growing
+    // overrun as time REMAINING -- "1h left", in the colour of good news, an hour after the promise
+    // was broken. Same rule the list uses, so the two screens cannot disagree about one application.
+    const breached = review.isBreachingSla || due <= now;
+
+    return breached
+      ? { figure: `${hours}h over`, note: `Past the ${promise}.`, tone: 'bad' as Tone }
       : {
           figure: `${hours}h left`,
-          note: 'Until the 48-hour review SLA.',
-          tone: hours < 12 ? ('warn' as Tone) : ('ok' as Tone),
+          note: `Until the ${promise}.`,
+          tone: isAtRisk(started, due, now) ? ('warn' as Tone) : ('ok' as Tone),
         };
   });
 
@@ -113,7 +134,10 @@ export class DealerReviewComponent {
       { k: 'Description', v: review.description ?? '—' },
       { k: 'Submitted', v: new Date(review.dealer.submittedAt).toLocaleString('en-GB') },
       { k: 'Review due', v: new Date(review.dealer.reviewDueAt).toLocaleString('en-GB') },
-      { k: 'Employees', v: String(review.employeeCount) },
+      // Active staff only — the same number the dealership sees on its own profile. The review
+      // response used to carry a second count that included deactivated rows, so one dealership
+      // had two staff figures depending on which screen an admin was looking at.
+      { k: 'Employees', v: String(review.dealer.employeeCount) },
       ...(review.dealer.reviewNote ? [{ k: 'Last review note', v: review.dealer.reviewNote }] : []),
     ];
   });
@@ -125,14 +149,41 @@ export class DealerReviewComponent {
       label: document.type.replace(/([a-z])([A-Z])/g, '$1 $2'),
       status: 'Provided',
       tone: 'ok' as Tone,
-      // A name, not the signed URL: the URL is a credential and has no business being on screen.
-      file: `${document.type}.jpg`,
+      // The format the server will actually serve this file as -- not a filename, and certainly not
+      // the signed URL, which is a credential. This tile read `${type}.jpg` for every document until
+      // it turned out the registrations on file are PDFs: it was telling an Admin doing a licence
+      // check that they were about to open a photograph. A real upload is keyed by a generated guid,
+      // so there is no filename worth showing either; the format is the part that is true and useful.
+      file: formatLabel(document.contentType),
       meta: `Link expires ${new Date(document.expiresAt).toLocaleTimeString('en-GB')}`,
       href: document.url,
     }));
   });
 
   protected readonly missing = computed(() => this.dealer()?.missingDocuments ?? []);
+
+  /**
+   * When these links stop working, as an instant rather than a duration.
+   *
+   * The earliest of them, because that is when the section stops being usable. Once it is past, the
+   * note says so: the 60-second ticker re-evaluates this, so an admin who left the tab open is told
+   * to reload rather than clicking three buttons that have quietly become 404s.
+   *
+   * Null when the application has no documents at all — there are then no links to describe, and a
+   * note about signed URLs above an empty section is a sentence about nothing.
+   */
+  protected readonly linkExpiry = computed<string | null>(() => {
+    const expiries = this.resource
+      .value()
+      ?.documents.map((document) => Date.parse(document.expiresAt))
+      .filter((value) => Number.isFinite(value));
+    if (!expiries?.length) return null;
+
+    const earliest = Math.min(...expiries);
+    return earliest <= this.now()
+      ? 'expired — reload the page'
+      : `expire at ${new Date(earliest).toLocaleTimeString('en-GB')}`;
+  });
 
   protected readonly timeline = computed<readonly TimelineStep[]>(() => {
     const review = this.resource.value();
@@ -154,6 +205,17 @@ export class DealerReviewComponent {
       dealer.verificationStatus !== 'Rejected'
     );
   });
+
+  /**
+   * Clarification can only be asked of an application that is actually waiting on an Admin.
+   *
+   * `Dealer.RequestClarification` requires `IsAwaitingAdmin`, which is PendingReview alone — so on
+   * an application already sent back, this button was offered and answered `dealer.not_awaiting_review`.
+   * The ball is with the dealer until they resubmit; there is nothing to ask twice.
+   */
+  protected readonly canClarify = computed(
+    () => this.dealer()?.verificationStatus === 'PendingReview',
+  );
 
   protected readonly canSuspend = computed(() => {
     const dealer = this.dealer();
@@ -311,4 +373,21 @@ export class DealerReviewComponent {
   protected reload(): void {
     this.resource.reload();
   }
+}
+
+/**
+ * "application/pdf" -> "PDF". What the reviewer is about to open, in a word.
+ *
+ * An unrecognised type is shown as it arrived rather than guessed at: the Admin can still read it,
+ * and the tile does not claim a format nobody vouched for.
+ */
+function formatLabel(contentType: string): string {
+  return (
+    {
+      'application/pdf': 'PDF',
+      'image/jpeg': 'JPEG image',
+      'image/png': 'PNG image',
+      'image/webp': 'WebP image',
+    }[contentType] ?? contentType
+  );
 }

@@ -25,6 +25,10 @@ public sealed record DealerProfileDto(
     bool IsSuspended,
     IReadOnlyList<string> SubmittedDocuments,
     IReadOnlyList<string> MissingDocuments,
+    // Every document type an approval requires (spec 3.1). Sent rather than counted in the browser:
+    // the console printed "of 3" in prose, so adding a fourth required type would have left it
+    // telling an Admin the application was complete while approval kept failing.
+    IReadOnlyList<string> RequiredDocuments,
     // Spec 4.1: what the dealer page shows. Editable by the owner, read by everyone else.
     string? Description,
     double Latitude,
@@ -60,6 +64,7 @@ public sealed record DealerProfileDto(
             dealer.IsSuspended,
             [.. held.OrderBy(type => type.Id).Select(type => type.Name)],
             [.. DealerDocumentType.Required.Where(required => !held.Contains(required)).Select(type => type.Name)],
+            [.. DealerDocumentType.Required.Select(type => type.Name)],
             dealer.Description,
             dealer.Location.Latitude,
             dealer.Location.Longitude,

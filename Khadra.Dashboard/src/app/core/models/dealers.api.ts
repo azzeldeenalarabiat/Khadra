@@ -27,6 +27,8 @@ export interface DealerListItem {
   readonly reviewDueAt: string;
   readonly createdAt: string;
   readonly documentCount: number;
+  /** What documentCount is out of. From the server, so the column cannot quote a stale total. */
+  readonly requiredDocumentCount: number;
   readonly employeeCount: number;
   readonly carCount: number;
   /** Null means no reviews yet — render that, never a zero rating. */
@@ -48,6 +50,8 @@ export interface DealerProfile {
   readonly isSuspended: boolean;
   readonly submittedDocuments: readonly string[];
   readonly missingDocuments: readonly string[];
+  /** Every type an approval requires (spec 3.1). The console counts these, it never assumes three. */
+  readonly requiredDocuments: readonly string[];
   /** Spec 4.1: the dealer page. Editable by the owner. */
   readonly description: string | null;
   readonly latitude: number;
@@ -79,6 +83,8 @@ export interface DeliverySettings {
 /** Spec 7: a short-lived signed link, minted per request and never stored. */
 export interface DealerDocumentLink {
   readonly type: string;
+  /** What the download will actually be served as. The console never guesses this from the type. */
+  readonly contentType: string;
   readonly url: string;
   readonly expiresAt: string;
 }
@@ -98,5 +104,4 @@ export interface DealerReview {
   readonly documents: readonly DealerDocumentLink[];
   readonly timeline: readonly DealerReviewTimelineEntry[];
   readonly isBreachingSla: boolean;
-  readonly employeeCount: number;
 }

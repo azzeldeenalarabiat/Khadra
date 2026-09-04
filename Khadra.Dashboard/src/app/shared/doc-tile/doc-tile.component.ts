@@ -6,8 +6,9 @@ import { IconComponent } from '../icon/icon.component';
  * A private document (dealer licence, customer ID, dispute evidence).
  *
  * The file itself is never inlined: these are access-controlled objects served
- * through short-lived signed URLs, and every view is logged. The tile shows only
- * the filename and a button that would request one.
+ * through short-lived signed URLs. The tile shows what the caller put in `file` — the document's
+ * format on the dealer review screen, the stored name on dispute evidence — and a button that
+ * requests the link. Never the URL itself, which is a credential.
  */
 @Component({
   selector: 'kh-doc-tile',

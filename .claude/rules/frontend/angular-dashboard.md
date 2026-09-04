@@ -56,8 +56,34 @@ reverting the whole console.
 
 - Support English and Arabic, LTR and RTL. The CSS is direction-agnostic; Arabic copy and a language
   switcher are still outstanding.
-- Every money value shows its currency code (JOD), either on the value or in the panel header.
+- Every money value shows its currency code, taken from the value's own `currency` — never a literal
+  `'JOD'` default. The platform's own figures carry theirs; a hard-coded code is a claim about a
+  number that came from somewhere else.
 - Restricted actions stay visible but disabled with a tooltip explaining why.
+
+### No business number is written into a screen
+
+The backend rule (business numbers come only from `IBusinessRulesProvider`) has a counterpart here:
+**a number an administrator could act on is never a literal in a component or a template.** Not the
+review SLA, not how many documents an approval needs, not how long a signed link lasts, not the
+threshold at which something counts as "at risk". Each of these was in the console and each was
+right only by coincidence — "the 48-hour review SLA", "3 of 3 documents", "expire in 5 minutes",
+`hours < 12` — and each would have gone on being printed unchanged after the configuration behind it
+moved.
+
+Two ways to get the number honestly, in this order:
+
+1. **Derive it from the record**, when the record froze it. An application's promised window is
+   `reviewDueAt - submittedAt`, because `Dealer.Register` freezes `reviewDueAt` at submission
+   precisely so a later settings change cannot re-judge it. Reading the *current* setting here would
+   be a different lie, not a fix: the sentence would contradict the countdown beside it.
+2. **Ask the API**, when it is current policy rather than a frozen fact — `requiredDocuments`,
+   `requiredDocumentCount`, `adminSlaHours` on the dashboard snapshot.
+
+The same goes for anything invented per record: a filename, an extension, a currency, a rating. If
+the server does not send it, the screen does not know it. Show what is true (the document's format)
+or show nothing — never a plausible-looking placeholder, which is indistinguishable from real data
+to the person acting on it.
 
 ## Before reporting completion
 

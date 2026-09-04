@@ -187,3 +187,86 @@ tstzrange(period_start, period_end) WITH &&)` limited to the statuses where `Hol
 and call the guard in the booking-creation handler for a friendly error before the constraint fires.
 The seeder must stop generating overlaps first, or the migration will not apply to an existing
 development database.
+
+## Admin console static data (2026-09-04)
+
+### 13. The console and the API each hold their own SLA warning threshold
+
+**Status:** open · **Raised:** 2026-09-04 (found while removing static data from the admin screens)
+
+The dealer list and the dealer review screen call an application "at risk" from
+`Khadra.Dashboard/src/app/core/services/sla.ts`, which uses 0.75 of the window the application froze.
+The dashboard makes the same judgement server-side in `AttentionQueueBuilder`, from
+`AdminDashboard:SlaWarningThreshold`, which is also 0.75.
+
+Two copies of one number. They agree today because both say 0.75; nothing keeps them in step, so the
+sidebar's queue and the dealer list can start disagreeing about which applications need attention
+without anything failing.
+
+This is already better than what it replaced — the console had a literal `hours < 12`, which was
+0.75 of a 48-hour SLA and would have gone on meaning 12 hours after the SLA changed — but it is not
+finished.
+
+**To close:** send the severity from the API, as `AttentionItemDto` already does: a `ReviewSeverity`
+(or an `IsAtRisk` flag) on `DealerListItem` and `DealerReviewDto`, computed from the frozen window
+and the configured threshold. Then delete `sla.ts`.
+
+### 14. A signed document link is not bound to the admin who minted it
+
+**Status:** open · **Raised:** 2026-09-04
+
+`GetDealerForReviewQuery` says a signed link "cannot outlive the session that legitimately produced
+it", and the review screen tells the admin the links are "admin only". Neither is quite true.
+`HmacDocumentLinkSigner` binds the signature to `storageKey|expires` and nothing else, and
+`DocumentsController` carries no policy attribute, so it inherits the authenticated-only fallback.
+Within its lifetime a minted link works for **any** signed-in session, including a customer's.
+
+The exposure is small — the link is short-lived and never leaves the admin's browser — but the claim
+on screen is wider than the check behind it, and licence documents are spec 7 private data.
+
+**To close:** bind the signature to the minting actor (`Sign(storageKey, actorUserId, now)`, verified
+against `ICurrentActor` on the way back in), and put an admin policy on the endpoints that serve
+dealer and customer documents.
+
+### 15. An upload ticket can be replayed and will overwrite the file it names
+
+**Status:** open · **Raised:** 2026-09-04
+
+`LocalDocumentStorage.SaveAtAsync` carries the comment "Create rather than overwrite: a ticket is
+meant to be spent once, and silently replacing an existing file would make a replayed ticket look
+successful" — and then opens the file with `FileMode.Create`, which overwrites. `SaveAsync`, on the
+path where the key is generated fresh, correctly uses `FileMode.CreateNew`.
+
+`HmacUploadTicketService` is stateless, so a ticket is genuinely replayable inside its lifetime, and
+a replay does exactly what the comment says must not happen.
+
+Harmless today because every key in play carries a fresh GUID. It stops being harmless the moment a
+key is predictable or a ticket names a key twice.
+
+**To close:** use `FileMode.CreateNew` and let the second write fail, or record spent tickets.
+
+### 16. The dispute console rounds money to two decimals; JOD has three
+
+**Status:** open · **Raised:** 2026-09-04
+
+`Money` persists at `(18,3)` and rounds to three places — JOD's minor unit is the fils, a thousandth.
+The dispute resolution screen's `round()` works at two. A deposit with a non-zero third decimal
+cannot be split into three legs that add up to it, so the Resolve button stays disabled with no
+explanation the admin can act on.
+
+Latent: every seeded amount comes from integer rates and a 20% deposit, so no such figure exists yet.
+It becomes reachable as soon as Payments produces real amounts.
+
+**To close:** round to three places in the console, or have the API state the currency's minor units
+and follow it.
+
+### 17. "Account settings" in the sidebar is wired to nothing
+
+**Status:** open · **Raised:** 2026-09-04
+
+`admin-sidebar.component.html` renders an "Account settings" button with no click handler. The
+topbar's own comment states the principle it breaks: "A control that does nothing when clicked costs
+an administrator more than a missing one does" — which is why the search box, period picker and
+notification count were removed rather than left inert.
+
+**To close:** build the screen, or remove the button until there is one.

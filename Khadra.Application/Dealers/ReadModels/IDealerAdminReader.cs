@@ -21,6 +21,10 @@ public sealed record DealerListItem(
     DateTimeOffset ReviewDueAt,
     DateTimeOffset CreatedAt,
     int DocumentCount,
+    // How many DocumentCount is measured against. It is the same number on every row, and it is on
+    // the row anyway: the list column reads "2 of 3", and a denominator the client supplies from
+    // memory is one that goes stale silently the day a fourth document becomes required.
+    int RequiredDocumentCount,
     int EmployeeCount,
     // Cars still listed, deleted ones excluded. Counted across every status, not just the published
     // ones: a dealer with eleven cars in draft has a fleet, and an admin reading the list wants to

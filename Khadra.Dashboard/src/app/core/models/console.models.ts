@@ -84,10 +84,15 @@ export interface DocumentTile {
   readonly label: string;
   readonly status: string;
   readonly tone: Tone;
-  /** The file name as an admin would recognise it, never the URL. */
+  /**
+   * The one line of identity above the button: a format ("PDF") or a stored file name. Whatever it
+   * is, the SERVER said it — never something the console worked out from the document's type, which
+   * is how every dealer licence came to be labelled ".jpg" regardless of what was actually on file.
+   * Never the URL, which is a credential.
+   */
   readonly file: string;
   readonly meta: string;
-  /** A short-lived signed link, when one exists. Absent on sample tiles. */
+  /** A short-lived signed link. Absent when the caller has no link to offer. */
   readonly href?: string;
 }
 

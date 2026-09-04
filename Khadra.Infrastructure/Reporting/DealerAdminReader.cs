@@ -49,6 +49,9 @@ internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminR
             return PagedResult.Empty<DealerListItem>(page.Page, page.PageSize);
 
         var approved = DealerVerificationStatus.Approved;
+        // Read once out here: it is a domain constant, not a column, and projecting it per row keeps
+        // the "n of m" column honest without EF trying to translate the enumeration into SQL.
+        var requiredDocuments = DealerDocumentType.Required.Count;
 
         var items = await query
             // Whatever is closest to breaching its review promise comes first; that is the order an
@@ -68,7 +71,10 @@ internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminR
                 dealer.ReviewDueAt,
                 dealer.CreatedAt,
                 dealer.Documents.Count,
-                dealer.Employees.Count,
+                requiredDocuments,
+                // Active staff, matching DealerProfileDto. Counting every row here would give the
+                // list a different staff figure from the dealer's own page for the same dealership.
+                dealer.Employees.Count(employee => employee.IsActive),
                 // Correlated rather than joined: Fleet is another bounded context, so there is no
                 // navigation property from Dealer to Vehicle and there deliberately never will be.
                 // The vehicles' own soft-delete filter removes deleted listings from this count.

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { AdminDealersService } from '../../core/services/admin-dealers.service';
+import { isAtRisk } from '../../core/services/sla';
 import { Cell, TableRow, Tone } from '../../core/models/console.models';
 import { DealerListItem } from '../../core/models/dealers.api';
 import { DataTableComponent } from '../../shared/data-table/data-table.component';
@@ -8,9 +9,9 @@ import { IconComponent } from '../../shared/icon/icon.component';
 /**
  * The Admin's dealer queue, reading `GET /api/v1/admin/dealers`.
  *
- * Its own component rather than the generic sample-data list screen: this one pages and filters
- * against the server, and the row a click opens is a real application. The other list screens still
- * run on fixtures and keep the generic component until their endpoints exist.
+ * Its own component because it pages and filters against the server, and the row a click opens is a
+ * real application. Every figure in a row comes from that response, the "n of m" denominator
+ * included: nothing on this screen is a number the console decided for itself.
  */
 @Component({
   selector: 'kh-dealers-list',
@@ -108,12 +109,14 @@ export class DealersListComponent {
         variant: dealer.carCount === 0 ? 'dim' : undefined,
       },
       this.ratingCell(dealer),
-      // The count an admin actually cares about is whether all three are in (spec 3.1).
+      // The count an admin actually cares about is whether they are all in (spec 3.1). Both the
+      // total and the threshold come from the row: they were the literal 3 until it became clear
+      // the console would keep printing "of 3" after a fourth document type was required.
       {
         kind: 'text',
-        value: `${dealer.documentCount} of 3`,
+        value: `${dealer.documentCount} of ${dealer.requiredDocumentCount}`,
         align: 'right',
-        tone: dealer.documentCount < 3 ? 'warn' : undefined,
+        tone: dealer.documentCount < dealer.requiredDocumentCount ? 'warn' : undefined,
       },
       { kind: 'text', value: this.date(dealer.createdAt) },
       this.reviewDueCell(dealer),
@@ -180,13 +183,17 @@ export class DealersListComponent {
     const awaiting = dealer.verificationStatus === 'PendingReview';
     if (!awaiting) return { kind: 'text', value: '—', variant: 'dim' };
 
+    const now = Date.now();
+    const started = Date.parse(dealer.submittedAt);
     const due = Date.parse(dealer.reviewDueAt);
-    const overdue = due <= Date.now();
-    const hours = Math.round(Math.abs(due - Date.now()) / 3_600_000);
+    const overdue = due <= now;
+    const hours = Math.round(Math.abs(due - now) / 3_600_000);
     return {
       kind: 'text',
       value: overdue ? `${hours}h over` : `${hours}h left`,
-      tone: overdue ? 'bad' : hours < 12 ? 'warn' : undefined,
+      // At risk as a fraction of the window this application froze, not a literal 12 hours. The 12
+      // was 0.75 of a 48-hour SLA and would have stopped meaning anything the moment the SLA moved.
+      tone: overdue ? 'bad' : isAtRisk(started, due, now) ? 'warn' : undefined,
     };
   }
 

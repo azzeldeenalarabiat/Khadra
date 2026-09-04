@@ -30,7 +30,8 @@
         </div>
         <div class="detail-meta">
           CR {{ application.commercialRegistrationNumber }} ·
-          {{ application.submittedDocuments.length }} of 3 documents · submitted
+          {{ application.submittedDocuments.length }} of
+          {{ application.requiredDocuments.length }} documents · submitted
           {{ application.submittedAt | date: 'dd MMM yyyy, HH:mm' }}
         </div>
       </div>
@@ -62,7 +63,17 @@
           <div class="sect-h">
             <kh-icon name="lock-key" class="kpi-icon" />
             <span class="sect-t">Verification documents</span>
-            <span class="sect-note">Signed URLs · expire in 5 minutes · admin only</span>
+            <!-- The instant these links actually die, as the server minted them. This said "expire
+                 in 5 minutes", a duration read from nowhere: it would have gone on saying five the
+                 day Documents:LinkLifetimeMinutes changed. Absent when there are no documents,
+                 rather than describing links that were never minted.
+
+                 It used to end "· admin only", which is wider than the check behind it: the
+                 signature binds the file and the expiry, not the admin who minted it, so within its
+                 lifetime the link works for any signed-in session. Pre-launch checklist item 14. -->
+            @if (linkExpiry(); as expiry) {
+              <span class="sect-note">Signed URLs · {{ expiry }}</span>
+            }
           </div>
           @if (documents().length > 0) {
             <div class="doc-grid-3">
@@ -75,8 +86,10 @@
             <div class="sect-pad">
               <div class="banner s-bad">
                 <kh-icon name="warning" class="banner-icon" />
+                <!-- No count in the sentence: the header above already reads "n of m documents",
+                     and "all three" was a number this screen had no way to know. -->
                 <span class="banner-body">
-                  Missing: {{ missing().join(', ') }}. All three are required before this
+                  Missing: {{ missing().join(', ') }}. Every one of these is required before this
                   application can be approved.
                 </span>
               </div>
@@ -115,10 +128,12 @@
               <kh-icon name="check-circle" />
               Approve dealer
             </button>
-            <button type="button" class="btn btn-secondary btn-lg-row" (click)="clarify()">
-              <kh-icon name="question" />
-              Request clarification
-            </button>
+            @if (canClarify()) {
+              <button type="button" class="btn btn-secondary btn-lg-row" (click)="clarify()">
+                <kh-icon name="question" />
+                Request clarification
+              </button>
+            }
             <button type="button" class="btn btn-danger btn-lg-row" (click)="reject()">
               <kh-icon name="x-circle" />
               Reject application

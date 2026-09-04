@@ -1,6 +1,9 @@
 using System.Text;
+using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
+using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Tests.Support;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -136,6 +139,44 @@ public sealed class DocumentStorageTests : IDisposable
     public void A_token_that_is_not_valid_base64url_is_rejected_rather_than_throwing()
     {
         Assert.False(Signer().TryDecodeToken("!!!not-base64!!!", out _));
+    }
+
+    /// <summary>
+    /// Every dealer document the development seeder writes has to be openable.
+    ///
+    /// It was not: the seeder attached keys like "dealers/{guid}/CommercialRegistration.pdf", and
+    /// KeyPattern's stem is `[0-9a-z-]+`, which is case-SENSITIVE. The key matched nothing,
+    /// ResolveWithinRoot threw, and every "Open secure preview" on the Admin's review screen answered
+    /// 500 -- on the one screen whose whole purpose is reading those documents.
+    /// </summary>
+    [Fact]
+    public async Task Every_seeded_dealer_document_key_is_one_storage_will_serve()
+    {
+        var storage = Storage();
+        var dealerId = Id.New();
+
+        // The seeder's OWN key builder, over every required document type -- not a hand-typed list,
+        // which would keep passing after a fourth type or a rename put the seeder back out of step
+        // with the storage layer.
+        foreach (var type in DealerDocumentType.Required)
+        {
+            var key = DevelopmentSeeder.DocumentKey(dealerId, type);
+
+            await storage.SaveAtAsync(key, "application/pdf", new MemoryStream([1, 2, 3]));
+
+            await using var read = await storage.OpenAsync(key);
+            Assert.NotNull(read);
+        }
+    }
+
+    [Fact]
+    public async Task An_upper_case_stem_is_refused_rather_than_quietly_serving_nothing()
+    {
+        var storage = Storage();
+        var key = $"dealers/{Guid.CreateVersion7()}/CommercialRegistration.pdf";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.SaveAtAsync(key, "application/pdf", new MemoryStream([1, 2, 3])));
     }
 
     private static (string Key, long Expires, string Signature) Parse(HmacDocumentLinkSigner signer, string url)

@@ -16,7 +16,7 @@ import {
   toQueueItems,
   toTrendHeights,
 } from '../../core/services/dashboard.presenter';
-import { toneClass } from '../../core/models/console.models';
+import { Tone, toneClass } from '../../core/models/console.models';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -73,6 +73,21 @@ export class DashboardComponent {
     formatChangePercent(this.resource.value()?.bookingTrend.changePercent ?? null),
   );
 
+  /**
+   * The colour follows the number.
+   *
+   * This figure was painted green by a fixed `.trend-up` class, so a fortnight in which bookings
+   * fell announced the fall in the colour the console uses for good news. A flat or unknown period
+   * is neither, and reads as neither.
+   */
+  protected readonly trendTone = computed<Tone | null>(() => {
+    const change = this.resource.value()?.bookingTrend.changePercent ?? null;
+    if (change === null) return 'dim';
+    if (change > 0) return 'ok';
+    if (change < 0) return 'bad';
+    return null;
+  });
+
   protected readonly trendDays = computed(
     () => this.resource.value()?.bookingTrend.points.length ?? 0,
   );
@@ -82,9 +97,16 @@ export class DashboardComponent {
     return queue ? `${queue.openCount} open · ${queue.overdueCount} overdue` : '';
   });
 
+  /**
+   * The SLA in force today, labelled as such.
+   *
+   * It sat above the queue reading "48-hour SLA", which invited the reading that every row below was
+   * measured against 48 hours. They are not: each row is judged against the window its own record
+   * froze, which for anything submitted before a settings change is a different number.
+   */
   protected readonly slaNote = computed(() => {
     const hours = this.resource.value()?.adminSlaHours;
-    return hours ? `${hours}-hour SLA` : '';
+    return hours ? `Current SLA ${hours}h` : '';
   });
 
   /**

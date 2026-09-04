@@ -185,9 +185,11 @@
   background: var(--color-accent-700);
 }
 
-.trend-up {
+/* The period-on-period change. Size only: the colour is a status tone the template picks from the
+   sign of the number, because this rule used to hard-code the "good news" green onto a figure that
+   is just as often negative. */
+.trend-change {
   font-size: 12px;
-  color: var(--status-ok);
 }
 
 .money-head {
