@@ -3,6 +3,7 @@ import { Employee } from '../../core/models/dealer-console.api';
 import { Tone } from '../../core/models/console.models';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -27,12 +28,15 @@ export class DealerEmployeesComponent {
   private readonly ui = inject(ConsoleUiService);
 
   protected readonly resource = this.service.employees;
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
   protected readonly me = this.service.me;
+  private readonly dealer = loaded(this.me);
   protected readonly busy = signal<string | null>(null);
 
-  protected readonly employees = computed(() => this.resource.value() ?? []);
-  protected readonly isOwner = computed(() => !!this.me.value()?.isOwner);
-  protected readonly canInvite = computed(() => this.isOwner() && !!this.me.value()?.canTrade);
+  protected readonly employees = computed(() => this.data() ?? []);
+  protected readonly isOwner = computed(() => !!this.dealer()?.isOwner);
+  protected readonly canInvite = computed(() => this.isOwner() && !!this.dealer()?.canTrade);
 
   protected readonly counts = computed(() => {
     const all = this.employees();
@@ -168,11 +172,18 @@ export class DealerEmployeesComponent {
   }
 
   protected async reactivate(e: Employee): Promise<void> {
+    // Someone deactivated before they ever accepted their invitation has no password to sign in
+    // with, and telling them to use it sends the owner looking for a problem that is not there.
+    // `status` is on the record, so the sentence can say which of the two this is.
+    const back =
+      e.status === 'Invited'
+        ? `${e.fullName} still needs to accept their invitation and set a password.`
+        : `${e.fullName} can sign in again with their existing password.`;
     await this.run(
       e.employeeId,
       () => this.service.reactivate(e.employeeId),
       'Staff member reactivated',
-      `${e.fullName} can sign in again with their existing password.`,
+      back,
     );
   }
 

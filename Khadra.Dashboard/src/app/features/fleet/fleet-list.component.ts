@@ -7,6 +7,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Tone } from '../../core/models/console.models';
 import { BookingListItem, PagedResult } from '../../core/models/bookings.api';
 import { Vehicle, VehicleStatusAction } from '../../core/models/fleet.api';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 
@@ -36,6 +37,8 @@ export class FleetListComponent {
   private readonly consoleData = inject(DealerConsoleService);
 
   protected readonly resource = this.service.vehicles;
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
   protected readonly busy = signal<string | null>(null);
   protected readonly state = signal<StateFilter>('all');
   protected readonly search = signal('');
@@ -45,6 +48,8 @@ export class FleetListComponent {
     url: '/api/v1/bookings',
     params: { tab: 'active', page: 1, pageSize: 100 },
   }));
+  private readonly hires = loaded(this.onHire);
+  private readonly dealer = loaded(this.consoleData.me);
 
   protected readonly states: readonly { key: StateFilter; label: string }[] = [
     { key: 'all', label: 'All' },
@@ -54,12 +59,12 @@ export class FleetListComponent {
     { key: 'Draft', label: 'Draft' },
   ];
 
-  protected readonly cars = computed(() => this.resource.value() ?? []);
+  protected readonly cars = computed(() => this.data() ?? []);
   /** Adding a car is the owner's (the API's ApprovedDealer policy); staff manage what exists. */
-  protected readonly canAdd = computed(() => !!this.consoleData.me.value()?.isOwner);
+  protected readonly canAdd = computed(() => !!this.dealer()?.isOwner);
 
   private readonly hiredVehicleIds = computed(() => {
-    const items = this.onHire.value()?.items ?? [];
+    const items = this.hires()?.items ?? [];
     return new Set(items.map((b) => b.vehicle?.vehicleId).filter((id): id is string => !!id));
   });
 

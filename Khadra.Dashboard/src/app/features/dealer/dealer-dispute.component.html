@@ -62,15 +62,21 @@
           </div>
           <div class="history-line">
             <span class="k-label">Refunded to the customer</span
-            ><span class="num">{{ r.refundToCustomer.amount }}</span>
+            ><span class="num"
+              >{{ r.refundToCustomer.amount }} {{ r.refundToCustomer.currency }}</span
+            >
           </div>
           <div class="history-line">
             <span class="k-label">Kept by the platform</span
-            ><span class="num">{{ r.retainedByPlatform.amount }}</span>
+            ><span class="num"
+              >{{ r.retainedByPlatform.amount }} {{ r.retainedByPlatform.currency }}</span
+            >
           </div>
           <div class="history-line">
             <span class="k-label">Transferred to you</span
-            ><span class="num">{{ r.transferredToDealer.amount }}</span>
+            ><span class="num"
+              >{{ r.transferredToDealer.amount }} {{ r.transferredToDealer.currency }}</span
+            >
           </div>
           @if (r.dealerCharge) {
             <div class="history-line s-bad">

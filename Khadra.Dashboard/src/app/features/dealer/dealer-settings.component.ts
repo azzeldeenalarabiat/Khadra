@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { SessionService } from '../../core/services/session.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -24,7 +25,7 @@ export class DealerSettingsComponent {
   private readonly ui = inject(ConsoleUiService);
 
   protected readonly user = this.session.user;
-  protected readonly dealer = computed(() => this.console.me.value() ?? null);
+  protected readonly dealer = loaded(this.console.me);
 
   protected readonly current = signal('');
   protected readonly next = signal('');

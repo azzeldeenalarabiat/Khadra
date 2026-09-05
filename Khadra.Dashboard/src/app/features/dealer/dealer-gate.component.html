@@ -1,4 +1,33 @@
-@if (locked() && copy(); as block) {
+@if (waiting()) {
+  <div class="locked-wrap">
+    <div class="sect locked-card">
+      <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      <div class="skel-row"><div class="skel" [style.width.%]="60"></div></div>
+    </div>
+  </div>
+} @else if (unreachable()) {
+  <!-- The standing could not be read. Showing the console here would be a guess, and every action
+       in it would fail server-side anyway; this says which call failed and offers it again. -->
+  <div class="locked-wrap">
+    <div class="sect locked-card">
+      <div class="locked-head s-bad">
+        <div class="locked-icon"><kh-icon name="warning-circle" /></div>
+        <div>
+          <div class="locked-title">We could not load your dealership</div>
+          <span class="pill s-bad">Unavailable</span>
+        </div>
+      </div>
+      <div class="locked-body">
+        Your console is not showing because the platform could not confirm your dealership's
+        standing just now. Nothing about your bookings or your fleet has changed.
+      </div>
+      <div class="row row-gap-8">
+        <button type="button" class="btn btn-primary btn-md" (click)="retry()">Try again</button>
+      </div>
+      <div class="mono">GET /api/v1/dealers/me</div>
+    </div>
+  </div>
+} @else if (locked() && copy(); as block) {
   <div class="locked-wrap">
     <div class="sect locked-card">
       <div class="locked-head" [class]="'s-' + block.tone">

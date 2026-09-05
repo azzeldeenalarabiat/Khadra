@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { DealerActivityEntry } from '../../core/models/dealer-console.api';
 import { Tone } from '../../core/models/console.models';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -21,9 +22,17 @@ export class DealerActivityComponent {
 
   protected readonly page = this.service.activityPage;
   protected readonly resource = this.service.activity;
-  protected readonly entries = computed(() => this.resource.value()?.items ?? []);
-  protected readonly total = computed(() => this.resource.value()?.totalCount ?? 0);
-  protected readonly totalPages = computed(() => this.resource.value()?.totalPages ?? 1);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly entries = computed(() => this.data()?.items ?? []);
+  protected readonly total = computed(() => this.data()?.totalCount ?? 0);
+
+  /** One change is a change, not "1 changes". */
+  protected readonly summary = computed(() => {
+    const total = this.total();
+    return `${this.entries().length} of ${total} ${total === 1 ? 'change' : 'changes'}`;
+  });
+  protected readonly totalPages = computed(() => this.data()?.totalPages ?? 1);
 
   protected readonly failure = computed(() =>
     this.resource.error() ? 'Activity could not be loaded. Nothing has been changed.' : null,

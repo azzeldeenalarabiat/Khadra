@@ -6,6 +6,7 @@ import { Tone } from '../../core/models/console.models';
 import { BookingListItem } from '../../core/models/bookings.api';
 import { BookingTab, DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { BookingDecisions } from './booking-decisions';
 
@@ -31,6 +32,9 @@ export class DealerBookingsComponent {
 
   protected readonly list = this.service.list;
   protected readonly counts = this.service.counts;
+  /** Guarded: `value()` throws in the error state. */
+  private readonly listPage = loaded(this.list);
+  private readonly tabCounts = loaded(this.counts);
   protected readonly tab = this.service.tab;
 
   protected readonly tabs: readonly { readonly key: BookingTab; readonly label: string }[] = [
@@ -59,9 +63,15 @@ export class DealerBookingsComponent {
     });
   }
 
-  protected readonly rows = computed(() => this.list.value()?.items ?? []);
-  protected readonly total = computed(() => this.list.value()?.totalCount ?? 0);
-  protected readonly totalPages = computed(() => this.list.value()?.totalPages ?? 1);
+  protected readonly rows = computed(() => this.listPage()?.items ?? []);
+  protected readonly total = computed(() => this.listPage()?.totalCount ?? 0);
+  protected readonly totalPages = computed(() => this.listPage()?.totalPages ?? 1);
+
+  /** "1 bookings" is the sort of thing that makes a screen look generated. */
+  protected readonly summary = computed(() => {
+    const total = this.total();
+    return `${this.rows().length} of ${total} ${total === 1 ? 'booking' : 'bookings'}`;
+  });
   protected readonly page = this.service.page;
 
   protected readonly failure = computed(() => {
@@ -73,7 +83,7 @@ export class DealerBookingsComponent {
   });
 
   protected count(tab: BookingTab): number | null {
-    return this.counts.value()?.[tab] ?? null;
+    return this.tabCounts()?.[tab] ?? null;
   }
 
   protected select(tab: BookingTab): void {

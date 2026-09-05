@@ -205,7 +205,10 @@ public sealed class VehicleHandlers(
             return FleetErrors.PlateNumberTaken;
         }
 
-        var updated = vehicle.UpdateDetails(parsed.Value.Details, parsed.Value.Plate);
+        var updated = vehicle.UpdateDetails(
+            Id.From(request.Details.CarTypeId),
+            parsed.Value.Details,
+            parsed.Value.Plate);
         if (updated.IsFailure)
             return updated.Error;
 

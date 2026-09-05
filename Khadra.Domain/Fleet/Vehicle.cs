@@ -185,11 +185,24 @@ public sealed class Vehicle : AggregateRoot, ISoftDeletable
         FuelPolicy = fuelPolicy;
     }
 
-    public UnitResult<Error> UpdateDetails(VehicleDetails details, PlateNumber plateNumber)
+    /// <summary>
+    /// Corrects what the car IS: its category, its specification, its plate.
+    ///
+    /// The category is editable and deliberately so — a dealer who filed an SUV as a sedan has to be
+    /// able to put it right, and re-categorising cannot re-judge anything that already happened,
+    /// because a booking freezes its own terms and pricing at the moment it is made. It used to be
+    /// settable only at <see cref="Add"/>: the update command took a CarTypeId, the API advertised
+    /// it, and the handler dropped it on the floor — the dealer got a 200 and no change.
+    /// </summary>
+    public UnitResult<Error> UpdateDetails(
+        Id carTypeId,
+        VehicleDetails details,
+        PlateNumber plateNumber)
     {
         ArgumentNullException.ThrowIfNull(details);
         ArgumentNullException.ThrowIfNull(plateNumber);
 
+        CarTypeId = carTypeId;
         Details = details;
         PlateNumber = plateNumber;
         return UnitResult.Success<Error>();

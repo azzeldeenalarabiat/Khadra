@@ -13,6 +13,7 @@ import { Tone } from '../../core/models/console.models';
 import { DealerDisputesService } from '../../core/services/dealer-disputes.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { SessionService } from '../../core/services/session.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -44,7 +45,9 @@ export class DealerDisputeComponent {
   }
 
   protected readonly resource = this.service.dispute;
-  protected readonly dispute = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly dispute = computed(() => this.data() ?? null);
   protected readonly body = signal('');
   protected readonly busy = signal(false);
   protected readonly problem = signal<string | null>(null);

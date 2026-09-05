@@ -17,6 +17,7 @@ import { DealerActivityEntry } from '../../core/models/dealer-console.api';
 import { FleetService } from '../../core/services/fleet.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 
@@ -61,7 +62,9 @@ export class VehicleDetailComponent {
   }
 
   protected readonly resource = this.service.vehicle;
-  protected readonly car = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly car = computed(() => this.data() ?? null);
   protected readonly tab = signal<Tab>('overview');
   protected readonly busy = signal(false);
   protected readonly month = signal(startOfMonth(new Date()));
@@ -80,9 +83,12 @@ export class VehicleDetailComponent {
       ? { url: '/api/v1/bookings', params: { vehicleId: id, page: 1, pageSize: 100 } }
       : undefined;
   });
-  protected readonly bookings = computed(() => this.bookingsResource.value()?.items ?? []);
+  protected readonly bookings = computed(() => this.hires()?.items ?? []);
 
   private readonly activity = this.consoleData.activity;
+  private readonly activityPage = loaded(this.activity);
+  private readonly hires = loaded(this.bookingsResource);
+  private readonly dealer = loaded(this.consoleData.me);
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
@@ -143,7 +149,7 @@ export class VehicleDetailComponent {
   protected readonly pricing = computed<readonly KeyValue[]>(() => {
     const c = this.car();
     if (!c) return [];
-    const delivery = this.consoleData.me.value()?.delivery;
+    const delivery = this.dealer()?.delivery;
     return [
       { k: 'Daily price', v: `${c.dailyRate.amount} ${c.dailyRate.currency}` },
       { k: 'Security deposit', v: `${c.securityDeposit.amount} ${c.securityDeposit.currency}` },
@@ -216,7 +222,7 @@ export class VehicleDetailComponent {
   /** Booking changes on this car, from the dealership's activity feed. */
   protected readonly log = computed<readonly DealerActivityEntry[]>(() => {
     const ids = new Set(this.bookings().map((b) => b.bookingId));
-    return (this.activity.value()?.items ?? []).filter((e) => ids.has(e.bookingId));
+    return (this.activityPage()?.items ?? []).filter((e) => ids.has(e.bookingId));
   });
 
   protected shiftMonth(delta: number): void {

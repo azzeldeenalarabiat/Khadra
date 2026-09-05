@@ -25,6 +25,16 @@ export class LookupsService {
   /** Which list the screen is showing. Set by the route, so the two screens share one resource. */
   readonly kind = signal<LookupKind | null>(null);
 
+  /**
+   * The car types a dealer can list a car under.
+   *
+   * A different endpoint from the admin one above and deliberately so: this is the plain
+   * `GET /api/v1/car-types`, open to any signed-in client and returning only the ACTIVE entries, so
+   * a type an administrator has retired stops being offered on new cars while every car already
+   * pointing at it keeps reading correctly.
+   */
+  readonly carTypes = httpResource<readonly LookupEntry[]>(() => '/api/v1/car-types');
+
   readonly entries = httpResource<readonly LookupEntry[]>(() => {
     const kind = this.kind();
     return kind ? `${this.base}/${kind}` : undefined;

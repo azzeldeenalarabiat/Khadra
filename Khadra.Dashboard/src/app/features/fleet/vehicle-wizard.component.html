@@ -106,9 +106,21 @@
                   [value]="form().color ?? ''"
                   (input)="patch({ color: text($event) || null })"
                 />
-                <div class="field-hint">
-                  Vehicle type (sedan, SUV…) is a platform lookup that is not live yet.
-                </div>
+              </div>
+              <div class="field">
+                <label for="w-type">Vehicle type</label>
+                <select id="w-type" class="input" (change)="patch({ carTypeId: text($event) })">
+                  @for (type of carTypes(); track type.id) {
+                    <option [value]="type.id" [selected]="type.id === form().carTypeId">
+                      {{ type.nameEn }}
+                    </option>
+                  }
+                </select>
+                @if (carTypesFailure(); as e) {
+                  <div class="field-error">{{ e }}</div>
+                } @else {
+                  <div class="field-hint">The platform's categories, used by customer search.</div>
+                }
               </div>
             </div>
           }

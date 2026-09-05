@@ -13,6 +13,8 @@ import { map } from 'rxjs';
 import { FleetService } from '../../core/services/fleet.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fleet.api';
+import { LookupsService } from '../../core/services/lookups.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -39,6 +41,8 @@ export class CarFormComponent {
     { initialValue: this.route.snapshot.paramMap.get('vehicleId') },
   );
   protected readonly resource = this.service.vehicle;
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
   protected readonly saving = signal(false);
   protected readonly uploading = signal(false);
   protected readonly problem = signal<string | null>(null);
@@ -47,9 +51,22 @@ export class CarFormComponent {
   protected readonly fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
   protected readonly fuelPolicies = ['FullToFull', 'SameToSame'];
 
+  /**
+   * The vehicle types, from the platform's own list.
+   *
+   * This field used to be absent and the id below was a literal: every car saved from this form
+   * claimed a type nobody had chosen and which nothing guaranteed existed. There is no foreign key
+   * on `vehicles.car_type_id` to have caught it either.
+   */
+  private readonly lookups = inject(LookupsService);
+  protected readonly carTypes = loaded(this.lookups.carTypes);
+  protected readonly carTypesFailure = computed(() =>
+    this.lookups.carTypes.error() ? 'Vehicle types could not be loaded.' : null,
+  );
+
   // The form's own state. Seeded from the server when editing, defaulted when adding.
   protected readonly form = signal<VehicleRequest>({
-    carTypeId: '01a06675-0000-7000-8000-000000000001',
+    carTypeId: '',
     make: '',
     model: '',
     year: new Date().getFullYear(),
@@ -71,12 +88,18 @@ export class CarFormComponent {
   constructor() {
     effect(() => this.service.editing.set(this.vehicleId()));
     effect(() => {
-      const car = this.resource.value();
+      const car = this.data();
       if (car) this.form.set(toVehicleRequest(car));
+    });
+    // A `<select>` shows its first option whatever the model says, so an unset id would look chosen
+    // and save as an empty string. Only fills a blank -- an existing car keeps the type it has.
+    effect(() => {
+      const first = this.carTypes()?.[0];
+      if (first && !this.form().carTypeId) this.set('carTypeId', first.id);
     });
   }
 
-  protected readonly car = computed(() => this.resource.value() ?? null);
+  protected readonly car = computed(() => this.data() ?? null);
   protected readonly isEditing = computed(() => this.vehicleId() !== null);
   protected readonly images = computed(() => this.car()?.images ?? []);
 
@@ -108,6 +131,10 @@ export class CarFormComponent {
 
   protected async save(): Promise<void> {
     if (this.saving()) return;
+    if (!this.form().carTypeId) {
+      this.problem.set('Choose a vehicle type before saving this car.');
+      return;
+    }
     this.saving.set(true);
     this.problem.set(null);
 

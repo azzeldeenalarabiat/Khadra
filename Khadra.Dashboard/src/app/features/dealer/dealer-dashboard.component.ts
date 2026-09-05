@@ -6,6 +6,7 @@ import { DealerBookingsService } from '../../core/services/dealer-bookings.servi
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { SessionService } from '../../core/services/session.service';
 import { IconName } from '../../shared/icon/icon-paths';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 interface Kpi {
@@ -49,7 +50,9 @@ export class DealerDashboardComponent {
   private readonly session = inject(SessionService);
 
   protected readonly resource = this.console.dashboard;
-  protected readonly dashboard = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly dashboard = computed(() => this.data() ?? null);
 
   protected readonly greeting = computed(() => {
     const hour = new Date().getHours();

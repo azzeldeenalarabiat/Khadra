@@ -83,6 +83,31 @@ public sealed class FleetManagementTests
         Mileage: new MileagePolicyInput(IsUnlimited: false, DailyLimitKm: 200, ExcessFeePerKm: 0.15m),
         FuelPolicy: "FullToFull");
 
+    /// <summary>
+    /// A dealer who filed a car under the wrong category can put it right.
+    ///
+    /// The update command has always carried a CarTypeId and the handler always ignored it: the
+    /// dealer picked a type, got a 200 and a "Car updated" toast, and the car kept the category it
+    /// had. Nothing failed, which is exactly why nobody noticed.
+    /// </summary>
+    [Fact]
+    public async Task Editing_a_car_changes_the_category_it_is_listed_under()
+    {
+        var context = new Context();
+        var dealer = context.GivenDealer(Build.ApprovedDealer(ownerUserId: OwnerId), OwnerId);
+        var car = context.GivenVehicle(Build.Vehicle(dealerId: dealer.Id));
+        var wasType = car.CarTypeId;
+        var nowType = Guid.CreateVersion7();
+
+        var result = await context.Handlers().Handle(
+            new UpdateVehicleCommand(OwnerId, car.Id, Details() with { CarTypeId = nowType }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(nowType, car.CarTypeId.Value);
+        Assert.NotEqual(wasType, car.CarTypeId);
+    }
+
     [Fact]
     public async Task A_new_car_starts_as_a_draft_and_is_not_yet_bookable()
     {

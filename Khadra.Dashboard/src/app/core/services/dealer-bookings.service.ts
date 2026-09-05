@@ -2,6 +2,7 @@ import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { Booking, BookingListItem, PagedResult } from '../models/bookings.api';
+import { DealerConsoleService } from './dealer-console.service';
 
 /**
  * The dealer's bookings tab, as the API sees it (Khadra.Application/Bookings/ReadBookings).
@@ -25,6 +26,7 @@ export interface HandoverInput {
 @Injectable({ providedIn: 'root' })
 export class DealerBookingsService {
   private readonly http = inject(HttpClient);
+  private readonly console = inject(DealerConsoleService);
   private readonly base = '/api/v1/bookings';
 
   readonly tab = signal<BookingTab>('all');
@@ -69,5 +71,8 @@ export class DealerBookingsService {
     this.list.reload();
     this.counts.reload();
     this.booking.reload();
+    // The dashboard tiles and the activity trail are read from bookings too, and neither belongs to
+    // this service; without this the dealer's own decision is missing from both until a page reload.
+    this.console.refreshDerived();
   }
 }

@@ -5,6 +5,7 @@ import { filter, map, startWith } from 'rxjs';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { Tone } from '../../core/models/console.models';
 import { IconName } from '../../shared/icon/icon-paths';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 interface LockedCopy {
@@ -40,7 +41,12 @@ export class DealerGateComponent {
   private readonly console = inject(DealerConsoleService);
   private readonly router = inject(Router);
 
-  protected readonly me = this.console.me;
+  /**
+   * Never `me.value()` directly: it THROWS in the error state, and this component wraps EVERY dealer
+   * screen, so the throw took the whole console down with it — the same failure `loaded()` was
+   * written for on the admin side.
+   */
+  protected readonly dealer = loaded(this.console.me);
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -61,8 +67,23 @@ export class DealerGateComponent {
    */
   private readonly openWhileSuspended = ['/dealer/bookings', '/dealer/disputes'];
 
+  /**
+   * Whether the dealership's standing is known yet.
+   *
+   * Three answers, not two. This used to have only "locked" and "not locked", and an unanswered
+   * `GET /dealers/me` counted as not locked: a dealer whose standing could not be read was handed
+   * the whole console, where every action then failed server-side with a 403 it could not explain.
+   * A gate that cannot see has to say so, not wave everyone through.
+   */
+  protected readonly waiting = computed(() => !this.dealer() && !this.console.me.error());
+  protected readonly unreachable = computed(() => !this.dealer() && !!this.console.me.error());
+
+  protected retry(): void {
+    this.console.me.reload();
+  }
+
   protected readonly locked = computed(() => {
-    const dealer = this.me.value();
+    const dealer = this.dealer();
     if (!dealer || dealer.canTrade) return false;
     const open = dealer.isSuspended
       ? [...this.openWhileLocked, ...this.openWhileSuspended]
@@ -71,7 +92,7 @@ export class DealerGateComponent {
   });
 
   protected readonly copy = computed<LockedCopy | null>(() => {
-    const dealer = this.me.value();
+    const dealer = this.dealer();
     if (!dealer) return null;
     const name = dealer.businessName;
 

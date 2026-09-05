@@ -54,8 +54,16 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
 
     public async Task<IReadOnlyList<Guid>> HeldVehicleIdsAsync(Id dealerId, DateTimeOffset now, CancellationToken cancellationToken = default)
     {
-        // BookingStatus.HoldsVehicle spelled out, and "now" inside the period: a booking next month
-        // holds the car next month, not today.
+        // BookingStatus.HoldsVehicle spelled out. A RESERVATION holds the car only while now is
+        // inside its period -- a booking next month holds the car next month, not today.
+        //
+        // A COLLECTED car is a different question, and the period test used to be applied to it too.
+        // The car is physically with the customer, so the dates cannot decide it:
+        //   * an overdue return (End < now) dropped out and the dashboard called the car available,
+        //     on the same payload that was reporting it under "1 overdue";
+        //   * a car handed over the evening before its period starts (Start > now -- RecordPickup
+        //     has no time guard, deliberately) dropped out the same way.
+        // Both are exactly the days a dealer looks at this figure. PickedUp holds, full stop.
         var pendingPayment = BookingStatus.PendingPayment;
         var requested = BookingStatus.Requested;
         var approved = BookingStatus.Approved;
@@ -63,9 +71,10 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
 
         return await context.Bookings
             .Where(booking => booking.DealerId == dealerId &&
-                              (booking.Status == pendingPayment || booking.Status == requested ||
-                               booking.Status == approved || booking.Status == pickedUp) &&
-                              booking.Period.Start <= now && booking.Period.End > now)
+                              (booking.Status == pickedUp ||
+                               ((booking.Status == pendingPayment || booking.Status == requested ||
+                                 booking.Status == approved) &&
+                                booking.Period.Start <= now && booking.Period.End > now)))
             .Select(booking => booking.VehicleId.Value)
             .Distinct()
             .ToListAsync(cancellationToken);

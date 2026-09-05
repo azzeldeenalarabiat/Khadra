@@ -130,6 +130,7 @@ export const SCREEN_TITLES: Readonly<Record<string, string>> = {
   'dealer/fleet': 'Fleet',
   'dealer/fleet/new': 'Add vehicle',
   'dealer/fleet/:id': 'Vehicle details',
+  'dealer/fleet/:id/edit': 'Edit vehicle',
   'dealer/employees': 'Employees',
   'dealer/profile': 'Dealer profile',
   'dealer/profile/preview': 'Public page preview',
@@ -152,6 +153,7 @@ export const SCREEN_PARENTS: Readonly<Record<string, string>> = {
   'dealer/bookings/:id': 'dealer/bookings',
   'dealer/fleet/new': 'dealer/fleet',
   'dealer/fleet/:id': 'dealer/fleet',
+  'dealer/fleet/:id/edit': 'dealer/fleet',
   'dealer/profile/preview': 'dealer/profile',
   'dealer/disputes/:id': 'dealer/bookings',
 };

@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -28,8 +29,11 @@ export class DealerDeliveryComponent {
   private readonly ui = inject(ConsoleUiService);
 
   protected readonly resource = this.service.delivery;
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
   protected readonly me = this.service.me;
-  protected readonly settings = computed(() => this.resource.value() ?? null);
+  private readonly dealer = loaded(this.me);
+  protected readonly settings = computed(() => this.data() ?? null);
 
   protected readonly enabled = signal(false);
   protected readonly radius = signal(0);
@@ -47,7 +51,7 @@ export class DealerDeliveryComponent {
   }
 
   protected readonly canEdit = computed(
-    () => !!this.me.value()?.isOwner && !!this.me.value()?.canTrade,
+    () => !!this.dealer()?.isOwner && !!this.dealer()?.canTrade,
   );
 
   protected readonly dirty = computed(() => {

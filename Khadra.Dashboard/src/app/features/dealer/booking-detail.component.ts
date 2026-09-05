@@ -15,6 +15,7 @@ import { DealerBookingsService } from '../../core/services/dealer-bookings.servi
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { DealerDisputesService } from '../../core/services/dealer-disputes.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { BookingDecisions } from './booking-decisions';
@@ -52,8 +53,11 @@ export class DealerBookingDetailComponent {
   }
 
   protected readonly resource = this.service.booking;
-  protected readonly booking = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly booking = computed(() => this.data() ?? null);
   protected readonly me = this.console.me;
+  private readonly dealer = loaded(this.me);
   protected readonly disputeReason = signal('');
   protected readonly disputeBusy = signal(false);
   protected readonly evidenceKeys = signal<readonly string[]>([]);
@@ -267,7 +271,7 @@ export class DealerBookingDetailComponent {
   });
 
   protected readonly canDecide = computed(
-    () => this.booking()?.status === 'Requested' && !!this.me.value()?.canTrade,
+    () => this.booking()?.status === 'Requested' && !!this.dealer()?.canTrade,
   );
   protected readonly canPickUp = computed(() => this.booking()?.status === 'Approved');
   protected readonly canReturn = computed(() => this.booking()?.status === 'PickedUp');

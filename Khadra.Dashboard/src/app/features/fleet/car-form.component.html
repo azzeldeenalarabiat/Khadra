@@ -56,6 +56,22 @@
 
       <div class="form-row">
         <div class="field">
+          <label for="car-type">Vehicle type</label>
+          <select id="car-type" class="input" (change)="set('carTypeId', text($event))">
+            @for (type of carTypes(); track type.id) {
+              <option [value]="type.id" [selected]="form().carTypeId === type.id">
+                {{ type.nameEn }}
+              </option>
+            }
+          </select>
+          @if (carTypesFailure(); as message) {
+            <span class="hint s-bad">{{ message }}</span>
+          }
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
           <label for="car-year">Year</label>
           <input
             id="car-year"

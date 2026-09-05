@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { ReportPeriod } from '../../core/models/dealer-console.api';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -28,7 +29,9 @@ export class DealerReportsComponent {
 
   protected readonly period = this.service.period;
   protected readonly resource = this.service.report;
-  protected readonly report = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly report = computed(() => this.data() ?? null);
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as

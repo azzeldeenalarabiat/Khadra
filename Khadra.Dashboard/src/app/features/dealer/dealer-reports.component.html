@@ -85,11 +85,11 @@
           <span class="k">Money in this period</span>
           <div class="money-line">
             <span class="k-label">Rental revenue</span
-            ><span class="num">{{ r.revenue.amount }}</span>
+            ><span class="num">{{ r.revenue.amount }} {{ r.revenue.currency }}</span>
           </div>
           <div class="money-line">
             <span class="k-label">Platform commission</span
-            ><span class="num">−{{ r.commission.amount }}</span>
+            ><span class="num">−{{ r.commission.amount }} {{ r.commission.currency }}</span>
           </div>
           <div class="money-line is-hi">
             <span class="k-label">Revenue after commission</span

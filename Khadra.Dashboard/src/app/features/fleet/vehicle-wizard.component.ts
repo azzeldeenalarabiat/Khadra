@@ -12,6 +12,8 @@ import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fle
 import { FleetService } from '../../core/services/fleet.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { LookupsService } from '../../core/services/lookups.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 import { IconName } from '../../shared/icon/icon-paths';
@@ -75,9 +77,15 @@ export class VehicleWizardComponent {
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) this.service.editing.set(draftId);
     effect(() => {
-      const existing = this.service.vehicle.value();
+      const existing = this.draftCar();
       if (draftId && existing && existing.vehicleId === draftId && !this.draft())
         this.hydrate(existing);
+    });
+    // The `<select>` displays its first option regardless of the model, so an unset id would look
+    // chosen and step 1 would pass with nothing selected. Fills a blank only.
+    effect(() => {
+      const first = this.carTypes()?.[0];
+      if (first && !this.form().carTypeId) this.patch({ carTypeId: first.id });
     });
   }
 
@@ -98,7 +106,7 @@ export class VehicleWizardComponent {
   protected readonly years = Array.from({ length: 12 }, (_, i) => new Date().getFullYear() + 1 - i);
 
   protected readonly form = signal<VehicleRequest>({
-    carTypeId: '01a06675-0000-7000-8000-000000000001',
+    carTypeId: '',
     make: 'Toyota',
     model: '',
     year: new Date().getFullYear(),
@@ -119,6 +127,16 @@ export class VehicleWizardComponent {
 
   protected readonly me = this.consoleData.me;
   protected readonly delivery = this.consoleData.delivery;
+  private readonly dealer = loaded(this.me);
+  private readonly deliverySettings = loaded(this.delivery);
+  private readonly draftCar = loaded(this.service.vehicle);
+  private readonly ownFleet = loaded(this.service.vehicles);
+  /** The platform's vehicle categories. The id was a literal here too, chosen by nobody. */
+  private readonly lookups = inject(LookupsService);
+  protected readonly carTypes = loaded(this.lookups.carTypes);
+  protected readonly carTypesFailure = computed(() =>
+    this.lookups.carTypes.error() ? 'Vehicle types could not be loaded.' : null,
+  );
   protected readonly current = computed(() => this.steps[this.step() - 1]);
   protected readonly photos = computed(() => this.draft()?.images ?? []);
 
@@ -127,6 +145,7 @@ export class VehicleWizardComponent {
     switch (this.step()) {
       case 1:
         return (
+          f.carTypeId.length > 0 &&
           f.make.trim().length > 0 &&
           f.model.trim().length > 0 &&
           f.year >= 1990 &&
@@ -148,8 +167,8 @@ export class VehicleWizardComponent {
 
   protected readonly review = computed<readonly KeyValue[]>(() => {
     const f = this.form();
-    const me = this.me.value();
-    const fee = this.delivery.value()?.platformDeliveryFee;
+    const me = this.dealer();
+    const fee = this.deliverySettings()?.platformDeliveryFee;
     return [
       { k: 'Plate', v: f.plateNumber || '—' },
       { k: 'Colour', v: f.color || '—' },
@@ -370,7 +389,7 @@ export class VehicleWizardComponent {
   /** A "taken" plate is very often the dealer's own abandoned draft; say so and point at it. */
   private plateTakenMessage(): string {
     const plate = this.form().plateNumber.trim();
-    const own = (this.service.vehicles.value() ?? []).find((car) => car.plateNumber === plate);
+    const own = (this.ownFleet() ?? []).find((car) => car.plateNumber === plate);
     if (own?.status === 'Draft') {
       this.resumable.set(own);
       return `${plate} is on a draft you already started (${own.make} ${own.model} ${own.year}). Continue that draft instead of creating another.`;

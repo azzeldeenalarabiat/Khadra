@@ -10,6 +10,7 @@ import { DayScheduleInput } from '../../core/models/dealer-console.api';
 import { DealerProfile } from '../../core/models/dealers.api';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 const DAYS = [
@@ -45,7 +46,9 @@ export class DealerProfileComponent {
   private readonly ui = inject(ConsoleUiService);
 
   protected readonly resource = this.service.me;
-  protected readonly dealer = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly dealer = computed(() => this.data() ?? null);
   protected readonly days = DAYS;
 
   protected readonly businessName = signal('');

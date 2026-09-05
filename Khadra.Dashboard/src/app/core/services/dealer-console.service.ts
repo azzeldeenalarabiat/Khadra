@@ -114,4 +114,20 @@ export class DealerConsoleService {
   refreshMe(): void {
     this.me.reload();
   }
+
+  /**
+   * Re-reads the two resources here that are derived from OTHER screens' data.
+   *
+   * The dashboard's tiles and the activity trail are built from bookings and the fleet, and both are
+   * fetched once when their screen first loads. Nothing reloaded them after a decision taken
+   * elsewhere in the console, so an owner who approved a request was still told "8 pending" by their
+   * own dashboard, and the Activity screen still omitted the approval, for the rest of the session:
+   * their own action, missing from their own audit trail. Called by the bookings and fleet services
+   * after any write, because a figure on a screen you are not looking at is the one that goes stale
+   * unnoticed.
+   */
+  refreshDerived(): void {
+    this.dashboard.reload();
+    this.activity.reload();
+  }
 }
