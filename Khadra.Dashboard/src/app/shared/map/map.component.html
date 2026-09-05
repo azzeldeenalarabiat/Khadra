@@ -7,7 +7,17 @@
     {{ latitude().toFixed(4) }}, {{ longitude().toFixed(4) }}
   </span>
 
-  @if (editable()) {
+  <!-- Puts the pin back in the middle. The map can be panned away from it, and after a new pair of
+       coordinates is typed the old view is the one still on screen. -->
+  <button type="button" class="kh-map-recentre" (click)="recentre()" title="Centre on the pin">
+    <kh-icon name="map-pin" />
+  </button>
+
+  @if (tilesFailed()) {
+    <span class="kh-map-warning">
+      Map imagery unavailable — the location below is still correct.
+    </span>
+  } @else if (editable()) {
     <span class="kh-map-hint">Drag the pin, or click the map, to move your location.</span>
   }
 </div>

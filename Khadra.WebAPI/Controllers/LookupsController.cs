@@ -34,6 +34,17 @@ public sealed class LookupsController : ApiControllerBase
         var result = await Mediator.Send(new ListCitiesQuery(ActiveOnly: true), cancellationToken);
         return FromResult(result);
     }
+
+    /// <summary>
+    /// The model years a car may be listed under, so a form does not have to guess the range.
+    /// </summary>
+    [HttpGet("vehicle-model-years")]
+    [ProducesResponseType<VehicleModelYearRange>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> VehicleModelYears(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetVehicleModelYearsQuery(), cancellationToken);
+        return FromResult(result);
+    }
 }
 
 /// <summary>

@@ -17,6 +17,12 @@ export interface LookupEntry {
 
 export type LookupKind = 'car-types' | 'cities';
 
+/** The inclusive bounds a vehicle's model year must fall within. `latest` is next year. */
+export interface VehicleModelYearRange {
+  readonly earliest: number;
+  readonly latest: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class LookupsService {
   private readonly http = inject(HttpClient);
@@ -34,6 +40,15 @@ export class LookupsService {
    * pointing at it keeps reading correctly.
    */
   readonly carTypes = httpResource<readonly LookupEntry[]>(() => '/api/v1/car-types');
+
+  /**
+   * The model years a car may be listed under.
+   *
+   * From the server, because the bound is the platform's (`BusinessRules.EarliestVehicleModelYear`)
+   * and the domain enforces it. The wizard used to build twelve years ending at the current one,
+   * which offered nothing older than 2016 and would have been refused at 1990 anyway.
+   */
+  readonly modelYears = httpResource<VehicleModelYearRange>(() => '/api/v1/vehicle-model-years');
 
   readonly entries = httpResource<readonly LookupEntry[]>(() => {
     const kind = this.kind();

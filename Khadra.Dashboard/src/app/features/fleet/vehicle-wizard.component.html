@@ -89,7 +89,7 @@
                   [value]="form().year"
                   (change)="patch({ year: number($event) })"
                 >
-                  @for (y of years; track y) {
+                  @for (y of years(); track y) {
                     <option [value]="y" [selected]="y === form().year">{{ y }}</option>
                   }
                 </select>

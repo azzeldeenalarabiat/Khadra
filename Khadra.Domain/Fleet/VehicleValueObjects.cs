@@ -41,7 +41,16 @@ public sealed class PlateNumber : ValueObject
 
 public sealed class VehicleDetails : ValueObject
 {
-    public const int EarliestModelYear = 1990;
+    /// <summary>
+    /// The floor used when a caller does not supply one.
+    ///
+    /// The real bound is <c>BusinessRules.EarliestVehicleModelYear</c> and every caller in the
+    /// application passes it. This exists only so the invariant has a value it can refuse nonsense
+    /// with — a car cannot predate the car — and is deliberately far below anything an owner would
+    /// configure. It used to be 1990 and it was the ONLY bound, which quietly refused every vehicle
+    /// older than that with "the model year is not valid".
+    /// </summary>
+    public const int EarliestPossibleModelYear = 1900;
 
     public const int MaxDescriptionLength = 2000;
 
@@ -86,7 +95,8 @@ public sealed class VehicleDetails : ValueObject
         FuelType fuelType,
         int currentYear,
         string? color = null,
-        string? description = null)
+        string? description = null,
+        int? earliestModelYear = null)
     {
         ArgumentNullException.ThrowIfNull(transmission);
         ArgumentNullException.ThrowIfNull(fuelType);
@@ -97,8 +107,11 @@ public sealed class VehicleDetails : ValueObject
             return FleetErrors.InvalidMakeOrModel;
         }
 
-        // Next year's models go on sale during the current year, so allow one year ahead.
-        if (year < EarliestModelYear || year > currentYear + 1)
+        // Next year's models go on sale during the current year, so allow one year ahead. The floor
+        // is the platform's, passed in like `currentYear` so the domain stays free of both ambient
+        // time and ambient configuration.
+        var floor = Math.Max(earliestModelYear ?? EarliestPossibleModelYear, EarliestPossibleModelYear);
+        if (year < floor || year > currentYear + 1)
             return FleetErrors.InvalidYear;
 
         if (seats is < 1 or > 20)

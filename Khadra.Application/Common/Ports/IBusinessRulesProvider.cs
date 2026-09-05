@@ -26,7 +26,10 @@ public sealed record BusinessRules(
     int PostReturnSettlementHours,
     // Spec 5.1: enforced at registration. Null means the owner has not set one, and nobody is
     // refused on age -- a real shipping state, not a missing value.
-    int? MinimumRenterAge);
+    int? MinimumRenterAge,
+    // The oldest model year a dealer may list. A guard against a mistyped year, not a statement
+    // about what is worth renting; the console builds its year list from it so the two cannot drift.
+    int EarliestVehicleModelYear);
 
 public interface IBusinessRulesProvider
 {

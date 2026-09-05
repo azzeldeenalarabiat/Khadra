@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
 using Khadra.Domain.PlatformSettings;
 using Khadra.Domain.PlatformSettings.Repositories;
@@ -236,4 +237,30 @@ public sealed class LookupHandlers(
     public const string CarTypesKind = "car-types";
 
     public const string CitiesKind = "cities";
+}
+
+/// <summary>
+/// The model years a car may be listed under.
+///
+/// The console builds its year field from this rather than from a range written into a component.
+/// It used to offer twelve years ending at the current one, which quietly refused every older car
+/// on the market — and the domain refused anything before 1990 regardless, from a `const`, so
+/// widening the dropdown alone would have moved the rejection from the form to the server.
+///
+/// `Latest` is next year: a 2027 model goes on sale during 2026.
+/// </summary>
+public sealed record VehicleModelYearRange(int Earliest, int Latest);
+
+public sealed record GetVehicleModelYearsQuery : IQuery<Result<VehicleModelYearRange, Error>>;
+
+public sealed class GetVehicleModelYearsHandler(IBusinessRulesProvider businessRules, IClock clock)
+    : IRequestHandler<GetVehicleModelYearsQuery, Result<VehicleModelYearRange, Error>>
+{
+    public async Task<Result<VehicleModelYearRange, Error>> Handle(
+        GetVehicleModelYearsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var rules = await businessRules.GetAsync(cancellationToken);
+        return new VehicleModelYearRange(rules.EarliestVehicleModelYear, clock.UtcNow.Year + 1);
+    }
 }

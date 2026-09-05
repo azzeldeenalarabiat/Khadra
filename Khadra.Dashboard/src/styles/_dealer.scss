@@ -690,10 +690,11 @@ kh-map {
   pointer-events: none;
 }
 
-.kh-map-hint {
+.kh-map-hint,
+.kh-map-warning {
   position: absolute;
   top: 9px;
-  inset-inline-end: 11px;
+  inset-inline-end: 44px; /* Clear of the recentre button. */
   z-index: 500;
   padding: 3px 8px;
   border-radius: 5px;
@@ -702,6 +703,34 @@ kh-map {
   background: color-mix(in srgb, var(--color-bg) 82%, transparent);
   border: 1px solid var(--color-divider);
   pointer-events: none;
+}
+
+.kh-map-warning {
+  color: var(--status-warn);
+  border-color: color-mix(in srgb, var(--status-warn) 40%, transparent);
+}
+
+/* Puts the pin back in the middle after the map has been panned away from it. */
+.kh-map-recentre {
+  position: absolute;
+  top: 9px;
+  inset-inline-end: 11px;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-70);
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  border: 1px solid var(--color-divider);
+}
+
+.kh-map-recentre:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
 }
 
 /* The pin. A div icon, so no bundled PNG path to break. */

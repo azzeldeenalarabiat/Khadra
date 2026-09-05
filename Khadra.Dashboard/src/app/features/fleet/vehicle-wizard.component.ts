@@ -104,7 +104,6 @@ export class VehicleWizardComponent {
   protected readonly transmissions = ['Automatic', 'Manual'];
   protected readonly fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
   protected readonly seatOptions = [2, 4, 5, 7, 8];
-  protected readonly years = Array.from({ length: 12 }, (_, i) => new Date().getFullYear() + 1 - i);
 
   protected readonly form = signal<VehicleRequest>({
     carTypeId: '',
@@ -138,6 +137,27 @@ export class VehicleWizardComponent {
   protected readonly carTypesFailure = computed(() =>
     this.lookups.carTypes.error() ? 'Vehicle types could not be loaded.' : null,
   );
+
+  /**
+   * Newest first, from the platform's own bounds.
+   *
+   * This was `Array.from({ length: 12 }, …)` — twelve years ending at the current one — so the
+   * oldest car anyone could list was 2016, and the domain would have refused anything before 1990
+   * regardless. Empty until the range arrives rather than guessing one.
+   */
+  private readonly yearRange = loaded(this.lookups.modelYears);
+  protected readonly years = computed(() => {
+    const range = this.yearRange();
+    if (!range) return [];
+    const count = range.latest - range.earliest + 1;
+    return count > 0 ? Array.from({ length: count }, (_, i) => range.latest - i) : [];
+  });
+  /** Against the server's bounds, so the form refuses exactly what the API would refuse. */
+  private yearAllowed(year: number): boolean {
+    const range = this.yearRange();
+    return !!range && year >= range.earliest && year <= range.latest;
+  }
+
   protected readonly current = computed(() => this.steps[this.step() - 1]);
   protected readonly photos = computed(() => this.draft()?.images ?? []);
 
@@ -149,8 +169,7 @@ export class VehicleWizardComponent {
           f.carTypeId.length > 0 &&
           f.make.trim().length > 0 &&
           f.model.trim().length > 0 &&
-          f.year >= 1990 &&
-          f.year <= new Date().getFullYear() + 1
+          this.yearAllowed(f.year)
         );
       case 2:
         return f.plateNumber.trim().length > 0 && f.seats > 0;

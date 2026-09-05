@@ -146,15 +146,40 @@ public sealed class VehicleTests
 
 public sealed class VehicleDetailsTests
 {
+    /// <summary>
+    /// Nonsense is refused whatever the platform has configured: a car cannot predate the car, and
+    /// nothing is a model two years from now.
+    /// </summary>
     [Theory]
-    [InlineData(1989)]
+    [InlineData(1899)]
+    [InlineData(19)]
     [InlineData(2028)]
-    public void Rejects_an_implausible_model_year(int year)
+    public void Rejects_an_impossible_model_year(int year)
     {
         var details = VehicleDetails.Create(
             "Toyota", "Corolla", year, 5, TransmissionType.Automatic, FuelType.Petrol, currentYear: 2026);
 
         Assert.Equal("vehicle.invalid_year", details.Error.Code);
+    }
+
+    /// <summary>
+    /// The floor a caller passes is the platform's, and it is what decides an older car.
+    ///
+    /// This was a `const EarliestModelYear = 1990` and the only bound there was, so a 1988 car was
+    /// refused everywhere with no way to allow it short of a deploy.
+    /// </summary>
+    [Theory]
+    [InlineData(1988, 1970, true)]
+    [InlineData(1988, 1990, false)]
+    [InlineData(1972, 1970, true)]
+    [InlineData(1969, 1970, false)]
+    public void The_configured_floor_decides_an_older_model_year(int year, int floor, bool allowed)
+    {
+        var details = VehicleDetails.Create(
+            "Toyota", "Corolla", year, 5, TransmissionType.Automatic, FuelType.Petrol,
+            currentYear: 2026, earliestModelYear: floor);
+
+        Assert.Equal(allowed, details.IsSuccess);
     }
 
     [Fact]

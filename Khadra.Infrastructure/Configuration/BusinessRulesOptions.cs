@@ -46,4 +46,12 @@ public sealed class BusinessRulesOptions
     // rule can be switched off deliberately rather than by deleting a line.
     [Range(18, 30)]
     public int? MinimumRenterAge { get; init; }
+
+    // The oldest model year a dealer may list. This is a guard against a typo — "1200", "19" — not a
+    // judgement about what is rentable: an older car in sound condition is an ordinary listing on
+    // this market, and the owner can lower it without a deploy. It was a `const` in the domain,
+    // which this project's own rule forbids for a number a screen shows and an owner may want to
+    // move.
+    [Range(1900, 2100)]
+    public int EarliestVehicleModelYear { get; init; }
 }

@@ -47,8 +47,19 @@ public sealed class FleetManagementTests
             return vehicle;
         }
 
-        public VehicleHandlers Handlers() =>
-            new(Vehicles, Dealers, new DealerMembershipResolver(Dealers), Clock, UnitOfWork);
+        /// <summary>
+        /// <paramref name="earliestModelYear"/> is the platform's configured floor, so a test can
+        /// prove that moving it changes which cars are accepted.
+        /// </summary>
+        public VehicleHandlers Handlers(
+            int earliestModelYear = TestBusinessRules.EarliestVehicleModelYear) =>
+            new(
+                Vehicles,
+                Dealers,
+                new DealerMembershipResolver(Dealers),
+                Clock,
+                TestBusinessRules.Provider(earliestVehicleModelYear: earliestModelYear),
+                UnitOfWork);
 
         public VehicleImageHandlers Images() => new(
             Vehicles, Dealers, new StubUploadTickets(), Storage, FakeDocumentPolicy.Default, Clock, UnitOfWork);
@@ -82,6 +93,67 @@ public sealed class FleetManagementTests
         IsDeliveryEligible: true,
         Mileage: new MileagePolicyInput(IsUnlimited: false, DailyLimitKm: 200, ExcessFeePerKm: 0.15m),
         FuelPolicy: "FullToFull");
+
+    /// <summary>
+    /// An older car is an ordinary listing.
+    ///
+    /// The year was bounded by a `const` of 1990 in the domain and a twelve-entry dropdown in the
+    /// console, so a 1988 car could be neither chosen nor saved — and nothing said why it was 1990.
+    /// The floor is <c>BusinessRules.EarliestVehicleModelYear</c> now, which is why this test can
+    /// set it.
+    /// </summary>
+    [Theory]
+    [InlineData(1972)]
+    [InlineData(1988)]
+    [InlineData(1995)]
+    public async Task A_car_older_than_the_old_hardcoded_floor_can_be_listed(int year)
+    {
+        var context = new Context();
+        context.GivenDealer(Build.ApprovedDealer(ownerUserId: OwnerId), OwnerId);
+
+        var result = await context.Handlers(earliestModelYear: 1970).Handle(
+            new AddVehicleCommand(OwnerId, Details() with { Year = year }),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(year, result.Value.Year);
+    }
+
+    /// <summary>The floor is a real bound, not decoration: below it the car is refused.</summary>
+    [Fact]
+    public async Task A_year_below_the_platforms_floor_is_refused()
+    {
+        var context = new Context();
+        context.GivenDealer(Build.ApprovedDealer(ownerUserId: OwnerId), OwnerId);
+
+        var result = await context.Handlers(earliestModelYear: 1990).Handle(
+            new AddVehicleCommand(OwnerId, Details() with { Year = 1989 }),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("vehicle.invalid_year", result.Error.Code);
+    }
+
+    /// <summary>
+    /// Moving the configured floor moves what is accepted — which is the whole point of it being
+    /// configuration rather than a constant.
+    /// </summary>
+    [Fact]
+    public async Task Lowering_the_floor_admits_a_year_that_was_refused_before()
+    {
+        var context = new Context();
+        context.GivenDealer(Build.ApprovedDealer(ownerUserId: OwnerId), OwnerId);
+
+        var refused = await context.Handlers(earliestModelYear: 1990).Handle(
+            new AddVehicleCommand(OwnerId, Details() with { Year = 1975 }),
+            CancellationToken.None);
+        var admitted = await context.Handlers(earliestModelYear: 1970).Handle(
+            new AddVehicleCommand(OwnerId, Details(plate: "7654321") with { Year = 1975 }),
+            CancellationToken.None);
+
+        Assert.True(refused.IsFailure);
+        Assert.True(admitted.IsSuccess);
+    }
 
     /// <summary>
     /// A dealer who filed a car under the wrong category can put it right.

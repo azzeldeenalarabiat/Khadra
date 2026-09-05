@@ -74,7 +74,10 @@ public sealed class VehicleDetailsInputValidator : AbstractValidator<VehicleDeta
     {
         RuleFor(input => input.Make).NotEmpty().MaximumLength(60);
         RuleFor(input => input.Model).NotEmpty().MaximumLength(60);
-        RuleFor(input => input.Year).InclusiveBetween(VehicleDetails.EarliestModelYear, DateTime.UtcNow.Year + 1);
+        // Only the bound that can never move. The platform's own floor is BusinessRules
+        // .EarliestVehicleModelYear and VehicleDetails enforces it, so there is one authority for it
+        // rather than a copy here that would go stale the day the owner changes it.
+        RuleFor(input => input.Year).InclusiveBetween(VehicleDetails.EarliestPossibleModelYear, DateTime.UtcNow.Year + 1);
         RuleFor(input => input.Seats).InclusiveBetween(1, 20);
         RuleFor(input => input.PlateNumber).NotEmpty().MaximumLength(20);
         RuleFor(input => input.DailyRate).GreaterThan(0m);
@@ -104,6 +107,7 @@ public sealed class VehicleHandlers(
     IDealerRepository dealers,
     DealerMembershipResolver membership,
     IClock clock,
+    IBusinessRulesProvider businessRules,
     IUnitOfWork unitOfWork) :
     IRequestHandler<ListMyVehiclesQuery, Result<IReadOnlyList<VehicleDto>, Error>>,
     IRequestHandler<GetMyVehicleQuery, Result<VehicleDto, Error>>,
@@ -154,7 +158,8 @@ public sealed class VehicleHandlers(
         if (dealer is null)
             return DealerErrors.NotRegistered;
 
-        var parsed = ParseDetails(request.Details);
+        var rules = await businessRules.GetAsync(cancellationToken);
+        var parsed = ParseDetails(request.Details, rules.EarliestVehicleModelYear);
         if (parsed.IsFailure)
             return parsed.Error;
 
@@ -194,7 +199,8 @@ public sealed class VehicleHandlers(
             return owned.Error;
 
         var (dealer, vehicle) = owned.Value;
-        var parsed = ParseDetails(request.Details);
+        var rules = await businessRules.GetAsync(cancellationToken);
+        var parsed = ParseDetails(request.Details, rules.EarliestVehicleModelYear);
         if (parsed.IsFailure)
             return parsed.Error;
 
@@ -297,7 +303,7 @@ public sealed class VehicleHandlers(
         return (dealer, vehicle);
     }
 
-    private static Result<ParsedVehicle, Error> ParseDetails(VehicleDetailsInput input)
+    private static Result<ParsedVehicle, Error> ParseDetails(VehicleDetailsInput input, int earliestModelYear)
     {
         var transmission = Enumeration.GetAll<TransmissionType>()
             .SingleOrDefault(type => string.Equals(type.Name, input.Transmission, StringComparison.OrdinalIgnoreCase));
@@ -316,7 +322,7 @@ public sealed class VehicleHandlers(
 
         var details = VehicleDetails.Create(
             input.Make, input.Model, input.Year, input.Seats, transmission, fuelType,
-            currentYear: DateTime.UtcNow.Year, input.Color, input.Description);
+            currentYear: DateTime.UtcNow.Year, input.Color, input.Description, earliestModelYear);
         if (details.IsFailure)
             return details.Error;
 

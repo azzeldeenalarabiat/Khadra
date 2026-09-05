@@ -10,7 +10,13 @@ internal static class TestBusinessRules
 {
     public const int MinimumRenterAge = 21;
 
-    public static BusinessRules Values(int? minimumRenterAge = MinimumRenterAge) => new(
+    // Wide enough that a test picking a plausible model year is never refused on the floor; a test
+    // that cares about the bound passes its own.
+    public const int EarliestVehicleModelYear = 1970;
+
+    public static BusinessRules Values(
+        int? minimumRenterAge = MinimumRenterAge,
+        int earliestVehicleModelYear = EarliestVehicleModelYear) => new(
         CommissionPercent: 20m,
         DepositPercent: 20m,
         NoShowTimeoutHours: 8,
@@ -22,12 +28,16 @@ internal static class TestBusinessRules
         CustomerCancellationPenaltyPercent: 100m,
         PaymentWindowMinutes: 20,
         PostReturnSettlementHours: 48,
-        MinimumRenterAge: minimumRenterAge);
+        MinimumRenterAge: minimumRenterAge,
+        EarliestVehicleModelYear: earliestVehicleModelYear);
 
-    public static IBusinessRulesProvider Provider(int? minimumRenterAge = MinimumRenterAge)
+    public static IBusinessRulesProvider Provider(
+        int? minimumRenterAge = MinimumRenterAge,
+        int earliestVehicleModelYear = EarliestVehicleModelYear)
     {
         var provider = Substitute.For<IBusinessRulesProvider>();
-        provider.GetAsync(Arg.Any<CancellationToken>()).Returns(Values(minimumRenterAge));
+        provider.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(Values(minimumRenterAge, earliestVehicleModelYear));
         return provider;
     }
 

@@ -63,6 +63,8 @@ export class CarFormComponent {
   protected readonly carTypesFailure = computed(() =>
     this.lookups.carTypes.error() ? 'Vehicle types could not be loaded.' : null,
   );
+  /** The platform's model-year bounds. This input had none at all, so it took anything. */
+  protected readonly yearRange = loaded(this.lookups.modelYears);
 
   // The form's own state. Seeded from the server when editing, defaulted when adding.
   protected readonly form = signal<VehicleRequest>({

@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import * as L from 'leaflet';
+import { IconComponent } from '../icon/icon.component';
 
 /** A point on the map, in the order the API and the domain use. */
 export interface MapPoint {
@@ -41,6 +42,7 @@ export interface MapPoint {
   selector: 'kh-map',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './map.component.html',
+  imports: [IconComponent],
 })
 export class MapComponent implements OnDestroy {
   private readonly host = inject(ElementRef<HTMLElement>);
@@ -75,6 +77,8 @@ export class MapComponent implements OnDestroy {
   private selfMove = false;
 
   protected readonly ready = signal(false);
+  /** Set when the tile server refuses or fails; the map still shows the pin and the coordinates. */
+  protected readonly tilesFailed = signal(false);
 
   constructor() {
     afterNextRender(() => this.build());
@@ -130,11 +134,17 @@ export class MapComponent implements OnDestroy {
     //
     // OSM's tile policy covers a console at this scale and requires the attribution below. Moving to
     // a keyed provider or self-hosted tiles before real traffic is in docs/pre-launch-checklist.md.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map);
+
+    // A map that cannot fetch its tiles must say so. OSM's servers throttle by client, and a
+    // throttled map is a half-drawn picture that looks like a bug in this console rather than what
+    // it is; the coordinates and the pin underneath are still true and still readable.
+    tiles.on('tileerror', () => this.tilesFailed.set(true));
+    tiles.on('tileload', () => this.tilesFailed.set(false));
 
     // A div icon rather than Leaflet's default PNG: the bundler rewrites the image paths that the
     // default icon looks for, which is the classic "marker is a broken image" bug, and this way the
@@ -164,13 +174,53 @@ export class MapComponent implements OnDestroy {
     this.drawRadius(at, this.radiusKm());
     this.ready.set(true);
 
-    // Leaflet measures its container once and caches that size, so a map built while its section is
-    // still laying out — or one whose column changes width later — renders tiles into a strip and
-    // leaves the rest blank. A one-shot timeout only covered the first case.
+    // Leaflet measures its container once and caches that size. Two different things can go wrong,
+    // and the first version only handled the second:
+    //
+    //  1. The map is BUILT before the browser has laid the container out, so Leaflet reads 0×0 and
+    //     draws one tile where it thinks the middle is. The box has a fixed height in CSS, so it is
+    //     already the right size on the first layout and NEVER changes — meaning a ResizeObserver
+    //     fires once with the same 0×0 and then stays silent forever. The map is wrong for good.
+    //     That is the strip-of-tiles-in-an-empty-box this shipped with.
+    //  2. The container changes width later — a window resize, a column reflowing.
+    //
+    // `settle()` covers the first, the observer covers the second.
+    this.settle(map);
+
     // The host, not the canvas: the canvas is what Leaflet resizes, and observing it would be
     // watching this component's own output.
     this.resize = new ResizeObserver(() => map.invalidateSize());
     this.resize.observe(this.host.nativeElement);
+  }
+
+  /**
+   * Re-measures until the container has a real size and Leaflet agrees with it.
+   *
+   * Bounded by frames rather than looping forever: a map inside a collapsed section legitimately has
+   * no size, and this must not spin behind it.
+   */
+  private settle(map: L.Map, framesLeft = 20): void {
+    if (this.map !== map) return; // Destroyed, or rebuilt, while we were waiting.
+
+    const box = this.canvas().nativeElement;
+    const width = box.clientWidth;
+    const height = box.clientHeight;
+    const size = map.getSize();
+
+    if (width > 0 && height > 0) {
+      if (size.x !== width || size.y !== height) {
+        map.invalidateSize({ animate: false });
+        // Re-centre: invalidateSize keeps the top-left corner, which leaves the pin off-centre when
+        // the correction is large — and the whole point of this map is where the pin is.
+        map.setView(L.latLng(this.latitude(), this.longitude()), this.zoom(), { animate: false });
+      } else {
+        return; // Leaflet and the DOM agree; nothing left to fix.
+      }
+    }
+
+    if (framesLeft > 0) {
+      requestAnimationFrame(() => this.settle(map, framesLeft - 1));
+    }
   }
 
   private drawRadius(at: L.LatLng, radiusKm: number | null): void {

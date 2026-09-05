@@ -77,9 +77,14 @@
             id="car-year"
             class="input"
             type="number"
+            [min]="yearRange()?.earliest ?? null"
+            [max]="yearRange()?.latest ?? null"
             [value]="form().year"
             (input)="set('year', numeric($event))"
           />
+          @if (yearRange(); as range) {
+            <span class="field-hint">{{ range.earliest }}–{{ range.latest }}</span>
+          }
         </div>
         <div class="field">
           <label for="car-seats">Seats</label>
