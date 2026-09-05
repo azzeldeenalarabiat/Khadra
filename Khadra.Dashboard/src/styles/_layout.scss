@@ -70,7 +70,7 @@
   font-size: 9.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 34%, transparent);
+  color: color-mix(in srgb, var(--color-text) 56%, transparent);
   padding: 14px 8px 5px;
 }
 
@@ -91,7 +91,7 @@
 
 .nav-item.is-active {
   color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
@@ -110,8 +110,8 @@
   text-align: center;
   padding: 1px 5px;
   border-radius: 9px;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-100);
+  background: var(--chip-bg);
+  color: var(--chip-text);
 }
 
 .nav-item.is-active .nav-badge {
@@ -153,7 +153,7 @@
 
 .sidebar-user-role {
   font-size: 10px;
-  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
 }
 
 .sidebar-link {
@@ -229,7 +229,7 @@
   padding-inline-start: 31px;
   min-height: 33px;
   font-size: 12.5px;
-  background: var(--input-bg-dark);
+  background: var(--input-bg);
 }
 
 .search-icon {
@@ -301,7 +301,7 @@
   border: 1px solid var(--color-divider);
   border-radius: 10px;
   background: var(--color-surface);
-  box-shadow: 0 12px 28px rgb(0 0 0 / 45%);
+  box-shadow: var(--shadow-md);
 }
 
 .user-menu-head {
@@ -335,14 +335,14 @@
   width: 48px;
   height: 48px;
   font-size: 14px;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-200);
+  background: var(--chip-bg);
+  color: var(--chip-text);
 }
 
 .avatar-square {
   border-radius: 10px;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-200);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   display: grid;
   place-items: center;
   font-weight: 600;

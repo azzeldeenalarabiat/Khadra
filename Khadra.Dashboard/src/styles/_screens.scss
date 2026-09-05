@@ -95,7 +95,7 @@
   padding: 2px 7px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--status-bad) 16%, transparent);
-  color: #e0a292;
+  color: var(--status-bad);
 }
 
 .queue-row {
@@ -105,7 +105,7 @@
 }
 
 .queue-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--tint-1);
 }
 
 .queue-rail {
@@ -142,7 +142,7 @@
   width: 184px;
   flex: none;
   padding: 12px 14px;
-  border-inline-start: 1px solid rgba(255, 255, 255, 0.06);
+  border-inline-start: 1px solid var(--tint-2);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -241,7 +241,7 @@
 .money-meter {
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tint-3);
   margin-top: 5px;
   overflow: hidden;
 }
@@ -341,7 +341,7 @@
   color: var(--text-50);
 }
 .td-accent {
-  color: var(--color-accent-300);
+  color: var(--status-accent);
 }
 .td-sub {
   font-size: 10.5px;
@@ -363,8 +363,8 @@
   place-items: center;
   font-size: 10px;
   font-weight: 600;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-200);
+  background: var(--chip-bg);
+  color: var(--chip-text);
 }
 
 .entity-name {
@@ -560,7 +560,7 @@
 .sla-divider {
   width: 1px;
   height: 34px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--tint-4);
 }
 
 .split-15 {
@@ -757,7 +757,7 @@
 
 .past-resolution {
   padding: 9px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--tint-2);
 }
 .past-res-title {
   font-size: 12.5px;
@@ -841,8 +841,8 @@
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 8px;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-100);
+  background: var(--chip-bg);
+  color: var(--chip-text);
 }
 
 .btn-primary .notif-count {
@@ -858,10 +858,10 @@
 }
 
 .notif-row.is-unread {
-  background: rgba(145, 132, 217, 0.05);
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
 }
 .notif-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--tint-1);
 }
 
 .notif-icon-wrap {

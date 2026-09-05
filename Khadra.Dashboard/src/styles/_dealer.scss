@@ -86,8 +86,8 @@
 
 .thumb {
   border-radius: 6px;
-  background: linear-gradient(150deg, #22243244, #2b2d3d);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--tint-3);
   display: grid;
   place-items: center;
   flex: none;
@@ -162,7 +162,7 @@
   width: 82px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tint-3);
   overflow: hidden;
 }
 
@@ -212,7 +212,7 @@
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--tint-3);
   color: var(--text-55);
 }
 
@@ -290,7 +290,7 @@
 }
 
 .note-box.is-plain {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--tint-1);
   color: var(--text-55);
   line-height: 1.5;
 }
@@ -299,8 +299,8 @@
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-200);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   display: grid;
   place-items: center;
   font-size: 14px;
@@ -509,13 +509,13 @@
   place-items: center;
   font-size: 10.5px;
   font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--tint-5);
   color: var(--text-45);
 }
 
 .wiz-step.is-active .wiz-dot {
   background: var(--color-accent);
-  color: #161826;
+  color: var(--color-surface);
   border-color: transparent;
 }
 
@@ -659,13 +659,13 @@ kh-map {
   background: var(--color-bg);
 }
 
-/* OpenStreetMap ships one light raster style and no dark one, and a white slab in
-   the middle of this console reads as a foreign object. Inverting flips the land
-   dark and the labels light; the hue rotation puts the colours back the right way
-   round afterwards, so water is blue rather than orange. Applied to the tile pane
-   only — the pin, the radius and Leaflet's controls must not be inverted with it. */
+/* OpenStreetMap ships one light raster style, which is the right one now. The dark
+   theme had to invert it — `invert(1) hue-rotate(180deg) …` — to stop a white slab
+   sitting in the middle of a dark console; on a white page that inversion would put
+   a black slab there instead. The tiles are left as the server draws them, muted a
+   little so the green pin stays the loudest thing in the box. */
 .kh-map .leaflet-tile-pane {
-  filter: invert(1) hue-rotate(180deg) brightness(0.86) contrast(0.95) saturate(0.35);
+  filter: saturate(0.72) contrast(0.96);
 }
 
 .kh-map.is-tall {
@@ -826,10 +826,10 @@ kh-map {
 .public-cover {
   position: relative;
   height: 168px;
-  background: linear-gradient(160deg, #2a2d40, #191b28);
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-100));
   display: grid;
   place-items: center;
-  color: rgba(233, 233, 237, 0.16);
+  color: var(--tint-5);
   font-size: 30px;
   overflow: hidden;
 }
@@ -852,8 +852,8 @@ kh-map {
   width: 76px;
   height: 76px;
   border-radius: 14px;
-  background: #20222f;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--tint-3);
   display: grid;
   place-items: center;
   flex: none;
@@ -952,7 +952,7 @@ kh-map {
   width: 160px;
   height: 5px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--tint-3);
   overflow: hidden;
 }
 
@@ -1244,7 +1244,7 @@ button.cal-day[disabled] {
 }
 
 .photo-strip .thumb-add {
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed var(--tint-5);
   background: none;
   cursor: pointer;
   display: flex;
