@@ -17,6 +17,21 @@ export function homeRouteFor(user: SessionUser | null): string {
 }
 
 /**
+ * Where "your account" goes.
+ *
+ * The rail and the topbar are shared by both sides of the console, so a single `/security` link
+ * would send dealer staff at an admin-only route and bounce them straight back to their dashboard —
+ * a dead click that looks exactly like a broken one. Same reasoning as `homeRouteFor`, and answered
+ * in the same place so the two cannot drift apart.
+ */
+export function accountRouteFor(user: SessionUser | null): string {
+  if (!user) return '/sign-in';
+  return user.role === 'DealerOwner' || user.role === 'DealerEmployee'
+    ? '/dealer/settings'
+    : '/security';
+}
+
+/**
  * Dealer staff only.
  *
  * A convenience, not a security boundary: the API refuses every dealer route to anyone else

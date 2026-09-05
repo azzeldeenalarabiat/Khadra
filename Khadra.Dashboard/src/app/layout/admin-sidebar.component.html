@@ -34,13 +34,16 @@
   </nav>
 
   <div class="sidebar-foot">
-    <div class="sidebar-user">
+    <!-- Who is signed in, and the way to their own account. It was a static block that looked
+         exactly like the clickable row above it and did nothing when clicked. -->
+    <a class="sidebar-user" [routerLink]="accountRoute()" routerLinkActive="is-active">
       <div class="avatar avatar-28">{{ initials() }}</div>
       <div class="grow">
         <div class="sidebar-user-name">{{ name() }}</div>
         <div class="sidebar-user-role">{{ role() }}</div>
       </div>
-    </div>
+      <kh-icon name="caret-right" />
+    </a>
     <!-- "Account settings" stood here as a button with no handler: it looked like the way to change
          your own password and did nothing at all when clicked. There is no account screen to send it
          to either -- Security and Admin users are both in the rail already, and both say they are

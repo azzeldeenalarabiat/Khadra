@@ -13,7 +13,8 @@ import {
   toActivityRows,
   toKpiCards,
   toQueueItems,
-  toTrendHeights,
+  busiestDay,
+  toTrendBars,
 } from '../../core/services/dashboard.presenter';
 import { Tone, toneClass } from '../../core/models/console.models';
 import { loaded } from '../../core/services/loaded';
@@ -102,7 +103,7 @@ export class DashboardComponent {
 
   protected readonly trend = computed(() => {
     const data = this.trendData();
-    return data ? toTrendHeights(data) : [];
+    return data ? toTrendBars(data) : [];
   });
 
   protected readonly activity = computed(() => {
@@ -130,6 +131,29 @@ export class DashboardComponent {
   });
 
   protected readonly trendDays = computed(() => this.trendData()?.points.length ?? 0);
+
+  /**
+   * The number every bar is drawn as a proportion of, so the scale is stated rather than implied.
+   * Null until the answer arrives — a 0 printed here would read as "no bookings in a fortnight".
+   */
+  protected readonly trendPeak = computed(() => {
+    const data = this.trendData();
+    return data ? busiestDay(data) : null;
+  });
+
+  /** The window the chart covers, taken from the response rather than worked out locally. */
+  protected readonly trendRange = computed(() => {
+    const data = this.trendData();
+    if (!data) return '';
+    return `${this.day(data.from)} – ${this.day(data.to)}`;
+  });
+
+  private day(iso: string): string {
+    return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+    });
+  }
 
   protected readonly queueSummary = computed(() => {
     const queue = this.queueData();

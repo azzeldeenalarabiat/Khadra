@@ -5,6 +5,7 @@ import { AdminDashboardService } from '../core/services/admin-dashboard.service'
 import { loaded } from '../core/services/loaded';
 import { DEALER_NAV, NAV_GROUPS } from '../core/data/nav.data';
 import { NavCount } from '../core/models/console.models';
+import { accountRouteFor } from '../core/guards/role.guards';
 import { initialsOf, roleLabel } from '../core/models/user-display';
 import { IconComponent } from '../shared/icon/icon.component';
 
@@ -27,6 +28,9 @@ export class AdminSidebarComponent {
   });
 
   protected readonly groups = computed(() => (this.isDealer() ? DEALER_NAV : NAV_GROUPS));
+
+  // Both sides share this rail, so the account link has to answer for whichever side is reading it.
+  protected readonly accountRoute = computed(() => accountRouteFor(this.session.user() ?? null));
 
   /**
    * A badge is a live count or it is nothing.

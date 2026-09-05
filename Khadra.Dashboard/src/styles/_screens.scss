@@ -179,10 +179,42 @@
   height: 58px;
 }
 
-.chart-bar {
+/* One day. The column is the hit area the tooltip hangs off, so a reader can put a figure to any
+   bar without leaving the dashboard. */
+.chart-col {
   flex: 1;
+  height: 100%;
+  cursor: default;
+}
+
+/* The day itself, always drawn. A day with no bookings is a fact, and a missing bar would leave the
+   reader counting gaps to work out which day it was. */
+.chart-track {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--hairline-strong);
+}
+
+.chart-bar {
+  width: 100%;
   border-radius: 2px 2px 0 0;
   background: var(--color-accent-700);
+}
+
+.chart-axis {
+  display: flex;
+  gap: 4px;
+  margin-block-start: 6px;
+}
+
+.chart-tick {
+  flex: 1;
+  font-size: 10px;
+  color: var(--text-40);
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* The period-on-period change. Size only: the colour is a status tone the template picks from the

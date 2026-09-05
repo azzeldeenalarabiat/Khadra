@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { AttentionItem, AttentionQueue } from '../models/dashboard.api';
-import { toQueueItems } from './dashboard.presenter';
+import { AttentionItem, AttentionQueue, BookingTrend } from '../models/dashboard.api';
+import { busiestDay, toQueueItems, toTrendBars } from './dashboard.presenter';
 
 /**
  * Where a "Requires attention" row leads.
@@ -103,5 +103,78 @@ describe('toQueueItems', () => {
     const [row] = toQueueItems(queue(item({ subjectIds: [] })), now);
 
     expect(row.route).toBe('/disputes');
+  });
+});
+
+/**
+ * The fortnight chart.
+ *
+ * It used to return bare heights, and a reader had no way to tell it apart from decoration: no
+ * dates, no counts, no scale, and a quiet day rendered as nothing at all so a fortnight showed
+ * twelve bars. The figures were real the whole time and looked invented, which is the one thing this
+ * console must not do. These pin that every bar carries the day and the count it was drawn from.
+ */
+describe('toTrendBars', () => {
+  const trend = (counts: readonly number[], changePercent: number | null = 0): BookingTrend => ({
+    generatedAt: '2026-09-05T00:00:00Z',
+    from: '2026-09-01',
+    to: '2026-09-01',
+    changePercent,
+    points: counts.map((count, index) => ({
+      date: `2026-09-${String(index + 1).padStart(2, '0')}`,
+      count,
+    })),
+  });
+
+  it('draws a bar for every day, including the ones with no bookings', () => {
+    const bars = toTrendBars(trend([5, 0, 3]));
+
+    expect(bars).toHaveLength(3);
+    expect(bars.map((bar) => bar.count)).toEqual([5, 0, 3]);
+    // The quiet day is still a day. Its height is zero; its bar is not missing.
+    expect(bars[1].height).toBe(0);
+    expect(bars[1].date).toBe('2026-09-02');
+  });
+
+  it('scales every bar against the busiest day', () => {
+    const bars = toTrendBars(trend([10, 5]));
+
+    expect(bars[0].height).toBe(88);
+    expect(bars[1].height).toBe(44);
+  });
+
+  it('keeps a single booking visible rather than rounding it away', () => {
+    const bars = toTrendBars(trend([100, 1]));
+
+    expect(bars[1].height).toBeGreaterThanOrEqual(6);
+  });
+
+  it('says what each bar is, so a figure can be checked against the bookings', () => {
+    const bars = toTrendBars(trend([17, 1]));
+
+    expect(bars[0].label).toContain('17 bookings');
+    expect(bars[1].label).toContain('1 booking');
+    expect(bars[1].label).not.toContain('1 bookings');
+  });
+
+  /** A fortnight of daily ticks would be a smear, so only some bars are labelled. */
+  it('labels the ends of the window and thins the rest', () => {
+    const bars = toTrendBars(trend(Array.from({ length: 14 }, () => 1)));
+    const labelled = bars.filter((bar) => bar.tick !== '');
+
+    expect(bars[0].tick).not.toBe('');
+    expect(bars[13].tick).not.toBe('');
+    expect(labelled.length).toBeLessThan(bars.length);
+  });
+
+  it('draws no bars at all rather than a flat row when nothing was booked', () => {
+    const bars = toTrendBars(trend([0, 0, 0]));
+
+    expect(bars.every((bar) => bar.height === 0)).toBe(true);
+    expect(busiestDay(trend([0, 0, 0]))).toBe(0);
+  });
+
+  it('reports the busiest day, which is what the scale is stated against', () => {
+    expect(busiestDay(trend([4, 19, 7]))).toBe(19);
   });
 });

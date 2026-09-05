@@ -221,15 +221,56 @@ export function toQueueItems(queue: AttentionQueue, now: number): readonly Queue
 }
 
 /**
- * Bar heights as a percentage of the busiest day. The design's tallest bar sits at 88%, so the scale
- * stops there rather than at 100 and the chart keeps the headroom it was drawn with. A day with no
- * bookings gets no bar, which is the honest reading; a day with one gets a visible stub.
+ * One bar per day, carrying the figures it was drawn from.
+ *
+ * This used to return heights alone — fourteen bare percentages — and a reader had no way to tell
+ * the chart apart from decoration: no dates, no counts, no scale, and the two quiet days rendered as
+ * nothing at all, so a fortnight showed twelve bars. It was real data the whole time and looked
+ * exactly like invented data, which is the thing this console is not allowed to do.
+ *
+ * Each bar now says which day it is and how many bookings that day had, so any figure on the chart
+ * can be checked against the list behind it.
  */
-export function toTrendHeights(trend: BookingTrend): readonly number[] {
+export interface TrendBar {
+  readonly date: string;
+  readonly count: number;
+  /** Percentage of the busiest day. The design's tallest bar sits at 88%, so the scale stops there. */
+  readonly height: number;
+  /** "Tue 2 Sept: 17 bookings" — what the bar is, in words, for a tooltip and a screen reader. */
+  readonly label: string;
+  /** The short axis tick under the bar. Only some bars get one; the rest would be a smear. */
+  readonly tick: string;
+}
+
+export function toTrendBars(trend: BookingTrend): readonly TrendBar[] {
   const counts = trend.points.map((point) => point.count);
   const busiest = Math.max(0, ...counts);
-  if (busiest === 0) return counts.map(() => 0);
-  return counts.map((count) => (count === 0 ? 0 : Math.max(6, Math.round((count / busiest) * 88))));
+
+  return trend.points.map((point, index) => {
+    const day = new Date(point.date + 'T00:00:00');
+    const height =
+      busiest === 0 || point.count === 0
+        ? 0
+        : Math.max(6, Math.round((point.count / busiest) * 88));
+
+    return {
+      date: point.date,
+      count: point.count,
+      height,
+      label: `${day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}: ${point.count} ${point.count === 1 ? 'booking' : 'bookings'}`,
+      // First, last, and roughly every fourth day between: enough to place a bar in the fortnight
+      // without the labels running into each other.
+      tick:
+        index === 0 || index === trend.points.length - 1 || index % 4 === 0
+          ? day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+          : '',
+    };
+  });
+}
+
+/** The busiest day in the window, which is what every bar is drawn as a proportion of. */
+export function busiestDay(trend: BookingTrend): number {
+  return Math.max(0, ...trend.points.map((point) => point.count));
 }
 
 // toMoneyRows is gone with the composite's null finance slice. It mapped three permanently-null

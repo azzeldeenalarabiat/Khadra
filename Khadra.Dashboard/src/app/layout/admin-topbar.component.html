@@ -22,18 +22,42 @@
     control that does nothing when clicked costs an administrator more than a missing one does.
   -->
   <!--
-    The chip names who is signed in; it is not a button.
+    The account menu.
 
-    It was one, with a caret-down promising a menu and no handler behind it, which is the very thing
-    the note above says costs an administrator more than a missing control does. The account actions
-    it seemed to promise are in the sidebar footer, where they work. When there is something to put
-    here -- the language switcher the frontend rules still list as outstanding -- it becomes a
-    control again, with the menu it implies.
+    This was a dead button with a caret promising a menu, then a plain label once the button was
+    removed, because there was no account screen to send anyone to. There is one now, so the caret
+    is honest again and the chip opens the two things it always looked like it should.
   -->
   <div class="topbar-actions">
-    <span class="user-chip">
-      <span class="avatar avatar-26" aria-hidden="true">{{ initials() }}</span>
-      <span class="visually-hidden">Signed in as {{ name() }}</span>
-    </span>
+    <div class="user-menu">
+      <button
+        type="button"
+        class="user-chip"
+        [attr.aria-expanded]="open()"
+        aria-haspopup="menu"
+        [attr.aria-label]="'Account menu for ' + name()"
+        (click)="toggle($event)"
+      >
+        <span class="avatar avatar-26" aria-hidden="true">{{ initials() }}</span>
+        <kh-icon name="caret-down" />
+      </button>
+
+      @if (open()) {
+        <div class="user-menu-panel" role="menu">
+          <div class="user-menu-head">
+            <div class="sidebar-user-name">{{ name() }}</div>
+            <div class="sidebar-user-role">{{ email() }}</div>
+          </div>
+          <a class="sidebar-link" role="menuitem" [routerLink]="accountRoute()" (click)="close()">
+            <kh-icon name="shield-check" />
+            Your account
+          </a>
+          <button type="button" class="sidebar-link" role="menuitem" (click)="signOut()">
+            <kh-icon name="sign-out" />
+            Sign out
+          </button>
+        </div>
+      }
+    </div>
   </div>
 </div>

@@ -145,15 +145,38 @@
             </div>
           } @else if (trendResource.isLoading()) {
             <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          } @else if (trend().length === 0) {
+            <div class="state-text">No bookings were made in this period.</div>
           } @else {
-            <div
-              class="chart-bars"
-              role="img"
-              [attr.aria-label]="'Daily bookings over the last ' + trendDays() + ' days'"
-            >
-              @for (height of trend(); track $index) {
-                <div class="chart-bar" [style.height.%]="height"></div>
+            <!--
+              Every bar carries the day and the count it was drawn from.
+
+              It used to be fourteen bare heights: no dates, no counts, no scale, and a quiet day
+              rendered as nothing at all, so a fortnight showed twelve bars. The figures were real
+              and the chart looked exactly like decoration, which is the one thing this console must
+              never do — a reader has to be able to check a number against the records behind it.
+            -->
+            <div class="chart-bars">
+              @for (bar of trend(); track bar.date) {
+                <div class="chart-col" [title]="bar.label">
+                  <!-- The track keeps a zero day visible as a day with no bookings, rather than a
+                       gap the reader has to guess the meaning of. -->
+                  <div class="chart-track">
+                    <div class="chart-bar" [style.height.%]="bar.height"></div>
+                  </div>
+                  <span class="visually-hidden">{{ bar.label }}</span>
+                </div>
               }
+            </div>
+            <div class="chart-axis" aria-hidden="true">
+              @for (bar of trend(); track bar.date) {
+                <span class="chart-tick">{{ bar.tick }}</span>
+              }
+            </div>
+            <div class="page-sub">
+              {{ trendRange() }} · busiest day {{ trendPeak() }}
+              {{ trendPeak() === 1 ? 'booking' : 'bookings' }} ·
+              <a class="row-link" routerLink="/bookings">see the bookings</a>
             </div>
           }
         </section>

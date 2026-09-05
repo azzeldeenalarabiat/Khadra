@@ -1,11 +1,20 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  HostListener,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import { SCREEN_PARENTS, SCREEN_TITLES } from '../core/data/nav.data';
 import { areaLabel, initialsOf } from '../core/models/user-display';
-import { homeRouteFor } from '../core/guards/role.guards';
+import { accountRouteFor, homeRouteFor } from '../core/guards/role.guards';
 import { SessionService } from '../core/services/session.service';
+import { IconComponent } from '../shared/icon/icon.component';
 
 interface Crumb {
   readonly label: string;
@@ -23,11 +32,14 @@ interface Crumb {
   selector: 'kh-admin-topbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-topbar.component.html',
-  imports: [RouterLink],
+  imports: [RouterLink, IconComponent],
 })
 export class AdminTopbarComponent {
   private readonly router = inject(Router);
   private readonly session = inject(SessionService);
+
+  /** Whether the account menu is showing. */
+  protected readonly open = signal(false);
 
   private readonly path = toSignal(
     this.router.events.pipe(
@@ -42,6 +54,44 @@ export class AdminTopbarComponent {
   protected readonly initials = computed(() => initialsOf(this.session.user() ?? null));
   // Two initials in a circle are not a name to a screen reader, so the chip carries the full one.
   protected readonly name = computed(() => this.session.user()?.fullName ?? '');
+  protected readonly email = computed(() => this.session.user()?.email ?? '');
+  protected readonly accountRoute = computed(() => accountRouteFor(this.session.user() ?? null));
+
+  constructor() {
+    // Navigating away closes it. A menu left open over the next screen is a menu the reader has to
+    // dismiss before they can do anything.
+    effect(() => {
+      this.path();
+      this.open.set(false);
+    });
+  }
+
+  protected toggle(event: Event): void {
+    // Stopped so the document listener below does not immediately close what this just opened.
+    event.stopPropagation();
+    this.open.update((open) => !open);
+  }
+
+  protected close(): void {
+    this.open.set(false);
+  }
+
+  /** Clicking anywhere else closes it, which is what every menu on every other site does. */
+  @HostListener('document:click')
+  protected onDocumentClick(): void {
+    if (this.open()) this.open.set(false);
+  }
+
+  @HostListener('document:keydown.escape')
+  protected onEscape(): void {
+    if (this.open()) this.open.set(false);
+  }
+
+  protected async signOut(): Promise<void> {
+    this.open.set(false);
+    await this.session.signOut();
+    await this.router.navigateByUrl('/sign-in');
+  }
 
   protected readonly crumbs = computed<Crumb[]>(() => {
     const key = this.path();
