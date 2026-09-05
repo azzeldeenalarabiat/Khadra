@@ -82,3 +82,10 @@ export interface DisputeListItem {
   readonly closedAt: string | null;
   readonly statementCount: number;
 }
+
+/** How the queue is shaped under the filters in force — all of it, not the page on screen. */
+export interface DisputeQueueCounts {
+  readonly total: number;
+  readonly overdue: number;
+  readonly unassigned: number;
+}

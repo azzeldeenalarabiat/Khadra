@@ -75,6 +75,8 @@
       </div>
     } @else {
       <div class="list-toolbar">
+        <!-- The two figures describe the whole filtered queue, not the page. They are only shown
+             once the server has answered: a zero the screen assumed would read as "none overdue". -->
         <span class="page-sub">
           {{ rows().length }} of {{ total() }} tickets
           @if (overdue()) {

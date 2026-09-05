@@ -44,10 +44,11 @@ export class DisputesListComponent {
   protected readonly rows = computed(() => this.loadedPage()?.items ?? []);
   protected readonly total = computed(() => this.loadedPage()?.totalCount ?? 0);
   protected readonly totalPages = computed(() => this.loadedPage()?.totalPages ?? 1);
-  protected readonly overdue = computed(() => this.rows().filter((row) => row.isOverdue).length);
-  protected readonly unassigned = computed(
-    () => this.rows().filter((row) => !row.assignedAdminId && row.closedAt === null).length,
-  );
+  // The server's, for the whole filtered queue. These were counted from the rows on screen and
+  // printed beside a platform total, which is right only while everything fits on one page.
+  private readonly loadedCounts = loaded(this.service.counts);
+  protected readonly overdue = computed(() => this.loadedCounts()?.overdue ?? null);
+  protected readonly unassigned = computed(() => this.loadedCounts()?.unassigned ?? null);
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;

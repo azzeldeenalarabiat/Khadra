@@ -20,47 +20,10 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
 
         var open = DisputeStatus.Open;
         var underReview = DisputeStatus.UnderReview;
-        var resolved = DisputeStatus.Resolved;
-        var withdrawn = DisputeStatus.Withdrawn;
 
-        var query = context.DisputeTickets.AsQueryable();
-        var live = true;
-
-        switch (filter.Status?.ToLowerInvariant())
-        {
-            case null or "live":
-                query = query.Where(ticket => ticket.Status == open || ticket.Status == underReview);
-                break;
-            case "open":
-                query = query.Where(ticket => ticket.Status == open);
-                break;
-            case "underreview":
-                query = query.Where(ticket => ticket.Status == underReview);
-                break;
-            case "resolved":
-                query = query.Where(ticket => ticket.Status == resolved);
-                live = false;
-                break;
-            case "withdrawn":
-                query = query.Where(ticket => ticket.Status == withdrawn);
-                live = false;
-                break;
-            case "closed":
-                query = query.Where(ticket => ticket.Status == resolved || ticket.Status == withdrawn);
-                live = false;
-                break;
-            case "all":
-                live = false;
-                break;
-            default:
-                return PagedResult.Empty<DisputeListItem>(page.Page, page.PageSize);
-        }
-
-        if (filter.OverdueOnly)
-        {
-            query = query.Where(ticket =>
-                (ticket.Status == open || ticket.Status == underReview) && ticket.SlaDeadline <= now);
-        }
+        var (query, live) = Filtered(filter, now);
+        if (query is null)
+            return PagedResult.Empty<DisputeListItem>(page.Page, page.PageSize);
 
         var total = await query.CountAsync(cancellationToken);
         if (total == 0)
@@ -111,6 +74,92 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
             .ToListAsync(cancellationToken);
 
         return new PagedResult<DisputeListItem>(items, page.Page, page.PageSize, total);
+    }
+
+    public async Task<DisputeQueueCounts> CountsAsync(
+        DisputeListFilter filter,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        var open = DisputeStatus.Open;
+        var underReview = DisputeStatus.UnderReview;
+
+        var (query, _) = Filtered(filter, now);
+        if (query is null)
+            return new DisputeQueueCounts(0, 0, 0);
+
+        // Three counts over the SAME filtered query the list uses, so the summary and the rows can
+        // never describe different sets of tickets.
+        return new DisputeQueueCounts(
+            await query.CountAsync(cancellationToken),
+            await query.CountAsync(
+                ticket => (ticket.Status == open || ticket.Status == underReview) && ticket.SlaDeadline <= now,
+                cancellationToken),
+            // Unassigned only counts a ticket somebody could still pick up: a closed one is nobody's
+            // work, however it ended.
+            await query.CountAsync(
+                ticket => ticket.AssignedAdminId == null && ticket.ClosedAt == null,
+                cancellationToken));
+    }
+
+    /// <summary>
+    /// The tickets this filter names, and whether they form a live queue.
+    /// </summary>
+    /// <remarks>
+    /// Shared by the list and its counts on purpose. Written twice, the summary above a page could
+    /// describe a different set of tickets from the rows beneath it, which is the whole failure the
+    /// counts endpoint exists to fix. A null query means an unrecognised status: nothing, not
+    /// everything, so a bad filter cannot read as "and it matched them all".
+    /// </remarks>
+    private (IQueryable<DisputeTicket>? Query, bool Live) Filtered(DisputeListFilter filter, DateTimeOffset now)
+    {
+        var open = DisputeStatus.Open;
+        var underReview = DisputeStatus.UnderReview;
+        var resolved = DisputeStatus.Resolved;
+        var withdrawn = DisputeStatus.Withdrawn;
+
+        var query = context.DisputeTickets.AsQueryable();
+        var live = true;
+
+        switch (filter.Status?.ToLowerInvariant())
+        {
+            case null or "live":
+                query = query.Where(ticket => ticket.Status == open || ticket.Status == underReview);
+                break;
+            case "open":
+                query = query.Where(ticket => ticket.Status == open);
+                break;
+            case "underreview":
+                query = query.Where(ticket => ticket.Status == underReview);
+                break;
+            case "resolved":
+                query = query.Where(ticket => ticket.Status == resolved);
+                live = false;
+                break;
+            case "withdrawn":
+                query = query.Where(ticket => ticket.Status == withdrawn);
+                live = false;
+                break;
+            case "closed":
+                query = query.Where(ticket => ticket.Status == resolved || ticket.Status == withdrawn);
+                live = false;
+                break;
+            case "all":
+                live = false;
+                break;
+            default:
+                return (null, false);
+        }
+
+        if (filter.OverdueOnly)
+        {
+            query = query.Where(ticket =>
+                (ticket.Status == open || ticket.Status == underReview) && ticket.SlaDeadline <= now);
+        }
+
+        return (query, live);
     }
 
     /// <summary>
