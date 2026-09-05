@@ -229,9 +229,9 @@ export class FleetListComponent {
     );
   }
 
-  protected open(car: Vehicle): void {
-    void this.router.navigate(['/dealer/fleet', car.vehicleId]);
-  }
+  // `open(car)` lived here for the table's whole-row click. The cards link to the car directly from
+  // the photo and the name, so the row-click indirection — and the stopPropagation it forced on
+  // every control inside it — is gone.
 
   protected reload(): void {
     this.resource.reload();

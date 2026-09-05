@@ -15,6 +15,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { LookupsService } from '../../core/services/lookups.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { MapComponent } from '../../shared/map/map.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 import { IconName } from '../../shared/icon/icon-paths';
 
@@ -41,7 +42,7 @@ interface Step {
   selector: 'kh-vehicle-wizard',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './vehicle-wizard.component.html',
-  imports: [RouterLink, IconComponent, ImageFallbackDirective],
+  imports: [RouterLink, IconComponent, ImageFallbackDirective, MapComponent],
 })
 export class VehicleWizardComponent {
   private readonly service = inject(FleetService);
@@ -127,8 +128,8 @@ export class VehicleWizardComponent {
 
   protected readonly me = this.consoleData.me;
   protected readonly delivery = this.consoleData.delivery;
-  private readonly dealer = loaded(this.me);
-  private readonly deliverySettings = loaded(this.delivery);
+  protected readonly dealer = loaded(this.me);
+  protected readonly deliverySettings = loaded(this.delivery);
   private readonly draftCar = loaded(this.service.vehicle);
   private readonly ownFleet = loaded(this.service.vehicles);
   /** The platform's vehicle categories. The id was a literal here too, chosen by nobody. */

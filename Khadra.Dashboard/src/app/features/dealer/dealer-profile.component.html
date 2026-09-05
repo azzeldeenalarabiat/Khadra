@@ -229,11 +229,26 @@
             >
           </div>
           <div class="sect-pad stack stack-12">
-            <div class="map-stub is-mid">
-              <span class="map-ring is-1" [style.width.px]="120" [style.height.px]="120"></span>
-              <span class="map-pin"></span>
-              <span class="map-coords mono">{{ latitude() }}, {{ longitude() }}</span>
-            </div>
+            @if (coordsInvalid()) {
+              <div class="banner s-warn">
+                <kh-icon name="warning-circle" class="banner-icon" />
+                <div class="banner-body">
+                  <div class="banner-text">
+                    The map is waiting for coordinates it can place. Correct the numbers below and
+                    it will follow.
+                  </div>
+                </div>
+              </div>
+            } @else {
+              <kh-map
+                [latitude]="latNumber()"
+                [longitude]="lngNumber()"
+                [editable]="isOwner()"
+                [radiusKm]="deliveryRadiusKm()"
+                [label]="'Your dealership location'"
+                (moved)="moveTo($event)"
+              />
+            }
             <div class="dc-split-even">
               <div class="field">
                 <label for="lat">Latitude</label>
@@ -268,10 +283,10 @@
               <div class="field-error">
                 Enter a latitude between −90 and 90 and a longitude between −180 and 180.
               </div>
-            } @else {
+            } @else if (isOwner()) {
               <div class="field-hint">
-                A map picker is not wired yet: paste the coordinates from your maps app (right-click
-                your location → copy).
+                Drag the pin, or click the map, to set where customers collect cars. Your delivery
+                radius is drawn around it to scale — zoom out to see the whole circle.
               </div>
             }
           </div>

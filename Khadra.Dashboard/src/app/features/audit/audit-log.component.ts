@@ -34,7 +34,7 @@ export class AuditLogComponent {
   // goes on reading error(), which does not throw.
   private readonly loadedPage = loaded(this.resource);
   protected readonly vocabulary = this.service.vocabulary;
-  private readonly vocabularyData = loaded(this.vocabulary);
+  protected readonly vocabularyData = loaded(this.vocabulary);
 
   protected readonly action = this.service.action;
   protected readonly entityType = this.service.entityType;

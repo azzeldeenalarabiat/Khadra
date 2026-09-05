@@ -1,0 +1,13 @@
+<div class="kh-map" [class.is-tall]="size() === 'tall'" [class.is-short]="size() === 'short'">
+  <div class="kh-map-canvas" #canvas [attr.aria-label]="label()" role="application"></div>
+
+  <!-- The coordinates the pin is actually on, over the map, so a reader can check the numbers
+       against the place without looking away from it. -->
+  <span class="kh-map-coords mono">
+    {{ latitude().toFixed(4) }}, {{ longitude().toFixed(4) }}
+  </span>
+
+  @if (editable()) {
+    <span class="kh-map-hint">Drag the pin, or click the map, to move your location.</span>
+  }
+</div>

@@ -18,7 +18,7 @@
         <span class="k">Action</span>
         <select class="input input-sm" (change)="setFilter('action', $any($event.target).value)">
           <option value="" [selected]="!action()">All actions</option>
-          @for (name of vocabulary.value()?.actions ?? []; track name) {
+          @for (name of vocabularyData()?.actions ?? []; track name) {
             <option [value]="name" [selected]="action() === name">{{ label(name) }}</option>
           }
         </select>
@@ -31,7 +31,7 @@
           (change)="setFilter('entityType', $any($event.target).value)"
         >
           <option value="" [selected]="!entityType()">All records</option>
-          @for (name of vocabulary.value()?.entityTypes ?? []; track name) {
+          @for (name of vocabularyData()?.entityTypes ?? []; track name) {
             <option [value]="name" [selected]="entityType() === name">{{ name }}</option>
           }
         </select>
@@ -44,7 +44,7 @@
           <!-- Tracked by id, not name: two people can share one, and someone renamed between two
                actions appears under both. "System" is a mode rather than an id — it is the absence
                of an actor — so it selects a different filter. -->
-          @for (actor of vocabulary.value()?.actors ?? []; track actor.userId ?? actor.name) {
+          @for (actor of vocabularyData()?.actors ?? []; track actor.userId ?? actor.name) {
             @if (actor.userId) {
               <option [value]="actor.userId" [selected]="actorUserId() === actor.userId">
                 {{ actor.name }} ({{ actor.entryCount }})

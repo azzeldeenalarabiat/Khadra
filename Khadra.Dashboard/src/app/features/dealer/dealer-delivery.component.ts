@@ -32,7 +32,7 @@ export class DealerDeliveryComponent {
   /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
   private readonly data = loaded(this.resource);
   protected readonly me = this.service.me;
-  private readonly dealer = loaded(this.me);
+  protected readonly dealer = loaded(this.me);
   protected readonly settings = computed(() => this.data() ?? null);
 
   protected readonly enabled = signal(false);

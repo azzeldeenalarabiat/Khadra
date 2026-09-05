@@ -451,17 +451,32 @@ show nothing rather than inventing a name.
 
 **To close:** reseed a development database, or add the row through the Car Types screen at that id.
 
-### 29. Vehicle forms still send a hardcoded car type id
+### 29. Nothing checks that a car's type is a real car type
 
-**Status:** open · **Raised:** 2026-09-04
+**Status:** open · **Raised:** 2026-09-04 · **Narrowed:** 2026-09-05
 
-`car-form.component.ts` and `vehicle-wizard.component.ts` post a literal
-`01a06675-0000-7000-8000-000000000001` for every car a dealer lists. That was the placeholder for a
-table that did not exist; the table exists now, and `GET /api/v1/car-types` serves it to any signed-in
-caller.
+Both forms now read `GET /api/v1/car-types` and offer a select, and neither will save without one, so
+the hardcoded id is gone from the console. The server-side half is not done: `VehicleHandlers` takes
+whatever `CarTypeId` it is given, and `vehicles.car_type_id` has no foreign key, so a request made
+outside the console can still point a car at a type that does not exist. That is how all 71 seeded
+vehicles came to carry a dangling id (item 28).
 
-Left alone because these are dealer-console screens, outside the admin pass that built the lookup,
-and changing a form nobody has re-driven end to end is how a working screen breaks quietly.
+**To close:** `AddVehicle` and `UpdateVehicle` reject a CarTypeId that is not an ACTIVE car type, and
+`vehicles.car_type_id` gets its FK.
 
-**To close:** both forms fetch the list and offer a select; `VehicleHandlers` rejects a CarTypeId that
-is not an active car type.
+### 30. Map tiles come from OpenStreetMap's public servers
+
+**Status:** open · **Raised:** 2026-09-05
+
+The dealer profile and the add-vehicle wizard draw a real map (`kh-map`, Leaflet) with raster tiles
+from `tile.openstreetmap.org`. That is free and needs no key, and the attribution the OSM Foundation
+requires is rendered on every map — but their tile usage policy is for modest traffic and explicitly
+not for production applications at scale. CARTO's dark basemap was tried first and rejected: an
+unkeyed request there returns HTTP 200 with an "API KEY REQUIRED" watermark painted into the tile,
+which is a broken map that looks like a working one.
+
+There is also no address search. Geocoding is an XHR to a third party and the BFF sends
+`connect-src 'self'`, so it needs a server-side proxy before the screen can offer it.
+
+**To close:** a keyed tile provider or self-hosted tiles, with the key held server-side; and a
+decision on whether address search is wanted.

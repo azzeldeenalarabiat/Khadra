@@ -276,14 +276,14 @@
             </div>
           }
           @case (4) {
-            @if (me.value(); as d) {
-              <div class="map-stub is-tall">
-                <span class="map-ring is-1" [style.width.px]="120" [style.height.px]="120"></span>
-                <span class="map-pin"></span>
-                <span class="map-coords mono"
-                  >{{ d.latitude.toFixed(4) }}, {{ d.longitude.toFixed(4) }}</span
-                >
-              </div>
+            @if (dealer(); as d) {
+              <kh-map
+                size="tall"
+                [latitude]="d.latitude"
+                [longitude]="d.longitude"
+                [radiusKm]="d.delivery.isEnabled ? d.delivery.radiusKm : null"
+                [label]="d.businessName + ' — pickup location'"
+              />
               <div class="kv-narrow">
                 <div class="kv">
                   <span class="kv-key">Pickup location</span
@@ -404,7 +404,7 @@
               <div class="grow">
                 <div class="toggle-title">Eligible for delivery</div>
                 <div class="toggle-desc">
-                  @if (delivery.value(); as ds) {
+                  @if (deliverySettings(); as ds) {
                     @if (ds.isEnabled) {
                       Customers within your {{ ds.radiusKm }} km radius can ask for this car to be
                       delivered.
@@ -427,7 +427,7 @@
                 <div class="toggle-desc">Set platform-wide. Dealers cannot change it.</div>
               </div>
               <span class="pill s-dim num">
-                @if (delivery.value(); as ds) {
+                @if (deliverySettings(); as ds) {
                   Fixed · {{ ds.platformDeliveryFee.amount }} {{ ds.platformDeliveryFee.currency }}
                 } @else {
                   Platform-wide
