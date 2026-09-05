@@ -98,7 +98,19 @@ export class AdminDashboardService {
   readonly bookingCounts = httpResource<BookingCounts>(() => this.adminUrl('booking-counts'));
   readonly customerCounts = httpResource<CustomerCounts>(() => this.adminUrl('customer-counts'));
   readonly disputeCounts = httpResource<DisputeCounts>(() => this.adminUrl('dispute-counts'));
-  readonly attentionQueue = httpResource<AttentionQueue>(() => this.adminUrl('attention-queue'));
+  /**
+   * The one dashboard panel that is also SHELL data.
+   *
+   * The other six are gated by `showing()` so that opening the audit log does not fetch the whole
+   * landing screen. This one is not, because the topbar's notification bell is on every admin screen
+   * and lists exactly these items — the count beside the bell and the rows inside it come from this
+   * single payload, so they cannot contradict each other. Re-read on navigation for the same reason
+   * `workload` is: a badge advertising work that is already done is worse than no badge.
+   */
+  readonly attentionQueue = httpResource<AttentionQueue>(() => {
+    this.navigation();
+    return this.isAdmin() ? '/api/v1/admin/dashboard/attention-queue' : undefined;
+  });
   readonly bookingTrend = httpResource<BookingTrend>(() => this.adminUrl('booking-trend'));
   readonly activity = httpResource<ActivityFeed>(() => this.adminUrl('activity'));
 

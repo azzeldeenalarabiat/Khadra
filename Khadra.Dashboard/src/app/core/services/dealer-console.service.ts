@@ -1,5 +1,5 @@
 import { HttpClient, httpResource } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
 import {
@@ -14,6 +14,7 @@ import {
   UpdateProfileRequest,
 } from '../models/dealer-console.api';
 import { DealerProfile } from '../models/dealers.api';
+import { SessionService } from './session.service';
 
 /**
  * The dealer console's data (design: Dealer Console.dc.html).
@@ -27,26 +28,45 @@ export class DealerConsoleService {
   private readonly http = inject(HttpClient);
   private readonly base = '/api/v1/dealers/me';
 
-  /** The dealership. Loaded once per shell; every dealer screen reads it (locked state, owner-ness). */
-  readonly me = httpResource<DealerProfile>(() => this.base);
+  /**
+   * Only dealer staff may ask these questions.
+   *
+   * Not a nicety, and the same trap `AdminDashboardService` documents from the other direction: an
+   * `httpResource` fires the moment it is created, and this service is now injected by the TOPBAR,
+   * which every signed-in user sees. Without this gate an administrator opening any screen fired six
+   * `/api/v1/dealers/me/*` requests and swallowed six 403s — the interceptor only acts on 401, so
+   * they would have failed silently.
+   */
+  private readonly session = inject(SessionService);
+  private readonly isDealer = computed(() => {
+    const role = this.session.user()?.role;
+    return role === 'DealerOwner' || role === 'DealerEmployee';
+  });
 
-  readonly dashboard = httpResource<DealerDashboard>(() => `${this.base}/dashboard`);
+  private dealerUrl(path = ''): string | undefined {
+    return this.isDealer() ? `${this.base}${path}` : undefined;
+  }
+
+  /** The dealership. Loaded once per shell; every dealer screen reads it (locked state, owner-ness). */
+  readonly me = httpResource<DealerProfile>(() => this.dealerUrl());
+
+  readonly dashboard = httpResource<DealerDashboard>(() => this.dealerUrl('/dashboard'));
 
   readonly period = signal<ReportPeriod>('monthly');
-  readonly report = httpResource<DealerReport>(() => ({
-    url: `${this.base}/reports`,
-    params: { period: this.period() },
-  }));
+  readonly report = httpResource<DealerReport>(() => {
+    const url = this.dealerUrl('/reports');
+    return url ? { url, params: { period: this.period() } } : undefined;
+  });
 
   readonly activityPage = signal(1);
-  readonly activity = httpResource<PagedResult<DealerActivityEntry>>(() => ({
-    url: `${this.base}/activity`,
-    params: { page: this.activityPage(), pageSize: 25 },
-  }));
+  readonly activity = httpResource<PagedResult<DealerActivityEntry>>(() => {
+    const url = this.dealerUrl('/activity');
+    return url ? { url, params: { page: this.activityPage(), pageSize: 25 } } : undefined;
+  });
 
-  readonly employees = httpResource<readonly Employee[]>(() => `${this.base}/employees`);
+  readonly employees = httpResource<readonly Employee[]>(() => this.dealerUrl('/employees'));
 
-  readonly delivery = httpResource<DeliverySettingsView>(() => `${this.base}/delivery`);
+  readonly delivery = httpResource<DeliverySettingsView>(() => this.dealerUrl('/delivery'));
 
   // ── Staff (spec 4.2) ──
 
