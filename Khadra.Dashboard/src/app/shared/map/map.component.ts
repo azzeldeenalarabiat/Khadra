@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import * as L from 'leaflet';
 import { IconComponent } from '../icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /** A point on the map, in the order the API and the domain use. */
 export interface MapPoint {
@@ -45,6 +46,7 @@ export interface MapPoint {
   imports: [IconComponent],
 })
 export class MapComponent implements OnDestroy {
+  protected readonly t = inject(I18nService).t;
   private readonly host = inject(ElementRef<HTMLElement>);
 
   readonly latitude = input.required<number>();

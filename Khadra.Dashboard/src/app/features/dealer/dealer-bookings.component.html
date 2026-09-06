@@ -1,28 +1,28 @@
 <div class="stack stack-14">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Bookings</h1>
+      <h1 class="page-title">{{ t('common.bookings') }}</h1>
       <div class="page-sub">
-        Every booking for your dealership. Scoped server-side to your dealer.
+        {{ t('dealerBookings.everyBookingForYour') }}
       </div>
     </div>
   </div>
 
   <section class="sect stack sect-clip">
     <div class="tabs" role="tablist">
-      @for (t of tabs; track t.key) {
+      @for (option of tabs; track option.key) {
         <button
           type="button"
           class="tab"
           role="tab"
-          [class.is-active]="tab() === t.key"
-          [attr.aria-selected]="tab() === t.key"
-          (click)="select(t.key)"
+          [class.is-active]="tab() === option.key"
+          [attr.aria-selected]="tab() === option.key"
+          (click)="select(option.key)"
         >
-          {{ t.label }}
-          @if (count(t.key); as n) {
+          {{ option.label }}
+          @if (count(option.key); as n) {
             <span class="tab-count">{{ n }}</span>
-          } @else if (count(t.key) === 0) {
+          } @else if (count(option.key) === 0) {
             <span class="tab-count">0</span>
           }
         </button>
@@ -32,10 +32,10 @@
     @if (failure(); as message) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load your bookings</div>
+        <div class="state-title">{{ t('dealerBookings.couldntLoadYourBookings') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     } @else if (list.isLoading()) {
@@ -61,18 +61,17 @@
         </div>
         <div class="state-text">
           @if (tab() === 'all') {
-            Once your vehicles are published, customer booking requests land here. Answer a request
-            before its rental date arrives, or it expires.
+            {{ t('dealerBookings.onceYourVehiclesAre') }}
           } @else {
-            No bookings match this tab right now.
+            {{ t('dealerBookings.noBookingsMatchThis') }}
           }
         </div>
         <div class="state-actions">
           @if (tab() === 'all') {
-            <a class="btn btn-primary btn-sm" routerLink="/dealer/fleet">View fleet</a>
+            <a class="btn btn-primary btn-sm" routerLink="/dealer/fleet">{{ t('dealerBookings.viewFleet') }}</a>
           } @else {
             <button type="button" class="btn btn-secondary btn-sm" (click)="select('all')">
-              Show all
+              {{ t('common.showAll') }}
             </button>
           }
         </div>
@@ -82,12 +81,12 @@
         <table class="table table-wide">
           <thead>
             <tr>
-              <th>Booking</th>
-              <th>Customer</th>
-              <th>Vehicle</th>
-              <th>Rental period</th>
-              <th class="td-num">Value</th>
-              <th>Status</th>
+              <th>{{ t('common.booking') }}</th>
+              <th>{{ t('dealerBookings.customer') }}</th>
+              <th>{{ t('dealerBookings.vehicle') }}</th>
+              <th>{{ t('dealerBookings.rentalPeriod') }}</th>
+              <th class="td-num">{{ t('common.value') }}</th>
+              <th>{{ t('common.status') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -132,7 +131,7 @@
                 </td>
                 <td class="td td-num">
                   <span class="num">{{ b.currency }} {{ b.totalPrice }}</span>
-                  <div class="td-sub">customer's total</div>
+                  <div class="td-sub">{{ t('dealerBookings.customersTotal') }}</div>
                 </td>
                 <td class="td">
                   <span class="pill" [class]="'s-' + tone(b)">{{ label(b) }}</span>
@@ -145,21 +144,21 @@
                         class="btn btn-primary btn-xs"
                         (click)="approve($event, b)"
                       >
-                        Approve
+                        {{ t('common.approve') }}
                       </button>
                       <button
                         type="button"
                         class="btn btn-ghost btn-xs s-bad"
                         (click)="reject($event, b)"
                       >
-                        Reject
+                        {{ t('common.reject') }}
                       </button>
                     } @else {
                       <a
                         class="btn btn-secondary btn-xs"
                         [routerLink]="['/dealer/bookings', b.bookingId]"
                         (click)="$event.stopPropagation()"
-                        >View</a
+                        >{{ t('dealerBookings.view') }}</a
                       >
                     }
                   </div>
@@ -178,16 +177,16 @@
             [disabled]="page() <= 1"
             (click)="goTo(page() - 1)"
           >
-            Previous
+            {{ t('common.previous') }}
           </button>
-          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
           <button
             type="button"
             class="btn btn-secondary btn-page"
             [disabled]="page() >= totalPages()"
             (click)="goTo(page() + 1)"
           >
-            Next
+            {{ t('common.next') }}
           </button>
         </div>
       </div>

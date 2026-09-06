@@ -6,10 +6,10 @@
       <div>
         @if (doc().href; as href) {
           <a class="btn btn-primary btn-xs" [href]="href" target="_blank" rel="noopener">
-            Open secure preview
+            {{ t('docTile.openSecurePreview') }}
           </a>
         } @else {
-          <button type="button" class="btn btn-primary btn-xs">Open secure preview</button>
+          <button type="button" class="btn btn-primary btn-xs">{{ t('docTile.openSecurePreview') }}</button>
         }
       </div>
     }

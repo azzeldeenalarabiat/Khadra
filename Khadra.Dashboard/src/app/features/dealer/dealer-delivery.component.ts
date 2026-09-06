@@ -10,6 +10,7 @@ import { DealerConsoleService } from '../../core/services/dealer-console.service
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Delivery (spec 4.4, design `isDelivery`).
@@ -28,6 +29,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [IconComponent],
 })
 export class DealerDeliveryComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
 

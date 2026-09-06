@@ -7,6 +7,7 @@ using Khadra.Domain.Auditing;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.Notifications;
 using MediatR;
 
 namespace Khadra.Application.Dealers.ReviewDealer;
@@ -56,6 +57,7 @@ public sealed class SuspendDealerCommandValidator : AbstractValidator<SuspendDea
 public sealed class ReviewDealerHandlers(
     IDealerRepository dealers,
     DealerReviewAuditor auditor,
+    Notifications.DealerTeamNotifier team,
     IClock clock,
     IUnitOfWork unitOfWork,
     ICurrentActor actor) :
@@ -72,6 +74,7 @@ public sealed class ReviewDealerHandlers(
             request.DealerId,
             (dealer, adminId, now) => dealer.Approve(adminId, now),
             AuditAction.DealerApproved,
+            NotificationKind.DealerApproved,
             reason: null,
             cancellationToken);
     }
@@ -83,6 +86,7 @@ public sealed class ReviewDealerHandlers(
             request.DealerId,
             (dealer, adminId, now) => dealer.Reject(adminId, request.Reason, now),
             AuditAction.DealerRejected,
+            NotificationKind.DealerRejected,
             request.Reason,
             cancellationToken);
     }
@@ -96,6 +100,7 @@ public sealed class ReviewDealerHandlers(
             request.DealerId,
             (dealer, adminId, now) => dealer.RequestClarification(adminId, request.Note, now),
             AuditAction.DealerClarificationRequested,
+            NotificationKind.DealerClarificationRequested,
             request.Note,
             cancellationToken);
     }
@@ -107,6 +112,7 @@ public sealed class ReviewDealerHandlers(
             request.DealerId,
             (dealer, adminId, now) => dealer.Suspend(adminId, request.Reason, now),
             AuditAction.DealerSuspended,
+            NotificationKind.DealerSuspended,
             request.Reason,
             cancellationToken);
     }
@@ -124,6 +130,7 @@ public sealed class ReviewDealerHandlers(
                 return UnitResult.Success<Error>();
             },
             AuditAction.DealerReactivated,
+            NotificationKind.DealerReactivated,
             reason: null,
             cancellationToken);
     }
@@ -132,6 +139,7 @@ public sealed class ReviewDealerHandlers(
         Id dealerId,
         Func<Dealer, Id, DateTimeOffset, UnitResult<Error>> decide,
         AuditAction action,
+        NotificationKind kind,
         string? reason,
         CancellationToken cancellationToken)
     {
@@ -150,6 +158,19 @@ public sealed class ReviewDealerHandlers(
             return decision.Error;
 
         auditor.Record(dealer, action, previousStatus, reason);
+
+        // The whole dealership is affected: an approval opens every screen, a suspension closes most
+        // of them. Told to the owner AND to every active member of staff, because an employee's
+        // console changes shape too and nothing else would explain why. Staged before the save, so
+        // the decision and the notice commit in one transaction.
+        await team.NotifyTeamAsync(
+            dealer,
+            actor.UserId ?? Id.Empty,
+            kind,
+            clock.UtcNow,
+            dealer.Id,
+            cancellationToken: cancellationToken);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return DealerProfileDto.From(dealer);

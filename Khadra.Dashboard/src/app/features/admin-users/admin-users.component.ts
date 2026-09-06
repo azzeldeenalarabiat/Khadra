@@ -6,6 +6,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { SessionService } from '../../core/services/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Who may administer the platform.
@@ -25,6 +26,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class AdminUsersComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminUsersService);
   private readonly session = inject(SessionService);
   private readonly ui = inject(ConsoleUiService);
@@ -77,22 +79,22 @@ export class AdminUsersComponent {
       {
         icon: 'user-plus',
         tone: 'accent',
-        title: 'Invite an administrator',
-        body: 'They get a one-time link to choose their own password. Nothing about the account works until they accept it.',
-        note: 'There is one administrator role, and it can do everything this console can: review dealerships, decide disputes and see every booking.',
+        title: this.t('adminUsers.inviteAnAdministrator'),
+        body: this.t('adminUsers.theyGetAOne'),
+        note: this.t('adminUsers.thereIsOneAdministrator'),
         fields: [
-          { label: 'Full name', type: 'text', placeholder: 'e.g. Yousef Barakat' },
-          { label: 'Email', type: 'text', placeholder: 'name@khadra.jo' },
-          { label: 'Phone', type: 'text', placeholder: '07XXXXXXXX' },
+          { name: 'fullName', label: this.t('adminUsers.fullName'), type: 'text', placeholder: this.t('adminUsers.eGYousefBarakat') },
+          { name: 'email', label: 'Email', type: 'text', placeholder: 'name@khadra.jo' },
+          { name: 'phone', label: 'Phone', type: 'text', placeholder: '07XXXXXXXX' },
         ],
-        confirm: 'Send invitation',
-        result: { title: 'Invitation sent', body: '', tone: 'ok' },
+        confirm: this.t('adminUsers.sendInvitation'),
+        result: { title: this.t('adminUsers.invitationSent'), body: '', tone: 'ok' },
       },
       async (values) => {
         const invited = await this.service.invite(
-          values['Email'] ?? '',
-          values['Phone'] ?? '',
-          values['Full name'] ?? '',
+          values['email'] ?? '',
+          values['phone'] ?? '',
+          values['fullName'] ?? '',
         );
         this.service.refresh();
         // The expiry is the token's, not a literal: the lifetime is configuration.
@@ -101,7 +103,7 @@ export class AdminUsersComponent {
           `${invited.email} can accept until ${new Date(invited.expiresAt).toLocaleString('en-GB')}.`,
         );
       },
-      { title: 'Invitation sent', body: '' },
+      { title: this.t('adminUsers.invitationSent'), body: '' },
     );
   }
 
@@ -112,19 +114,19 @@ export class AdminUsersComponent {
         tone: 'bad',
         danger: true,
         title: `Deactivate ${admin.fullName}?`,
-        body: 'They are signed out everywhere and cannot administer the platform until reactivated. Everything they have already done stays on the record.',
-        note: 'Reversible. The account is not deleted — deleting it would burn the email address permanently.',
+        body: this.t('adminUsers.theyAreSignedOut'),
+        note: this.t('adminUsers.reversibleTheAccountIs'),
         fields: [
-          { label: 'Reason', type: 'text', placeholder: 'Why is this account being deactivated?' },
+          { name: 'reason', label: 'Reason', type: 'text', placeholder: this.t('adminUsers.whyIsThisAccount') },
         ],
         confirm: 'Deactivate',
-        result: { title: 'Administrator deactivated', body: '', tone: 'bad' },
+        result: { title: this.t('adminUsers.administratorDeactivated'), body: '', tone: 'bad' },
       },
       async (values) => {
-        await this.service.deactivate(admin.userId, values['Reason'] ?? '');
+        await this.service.deactivate(admin.userId, values['reason'] ?? '');
         this.service.refresh();
       },
-      { title: 'Administrator deactivated', body: 'Their sessions ended immediately.' },
+      { title: this.t('adminUsers.administratorDeactivated'), body: this.t('adminUsers.theirSessionsEndedImmediately') },
     );
   }
 
@@ -134,15 +136,15 @@ export class AdminUsersComponent {
         icon: 'check-circle',
         tone: 'ok',
         title: `Reactivate ${admin.fullName}?`,
-        body: 'They can sign in and administer the platform again straight away.',
+        body: this.t('adminUsers.theyCanSignIn'),
         confirm: 'Reactivate',
-        result: { title: 'Administrator reactivated', body: '', tone: 'ok' },
+        result: { title: this.t('adminUsers.administratorReactivated'), body: '', tone: 'ok' },
       },
       async () => {
         await this.service.reactivate(admin.userId);
         this.service.refresh();
       },
-      { title: 'Administrator reactivated', body: '' },
+      { title: this.t('adminUsers.administratorReactivated'), body: '' },
     );
   }
 

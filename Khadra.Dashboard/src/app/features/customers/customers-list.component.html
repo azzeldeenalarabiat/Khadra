@@ -1,9 +1,9 @@
 <div class="stack stack-14">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Customers</h1>
+      <h1 class="page-title">{{ t('customersList.customers') }}</h1>
       <div class="page-sub">
-        The people who rent, their verification state and their history with the platform.
+        {{ t('customersList.thePeopleWhoRent') }}
       </div>
     </div>
   </div>
@@ -12,11 +12,11 @@
     <div class="list-toolbar">
       <div class="list-search">
         <kh-icon name="magnifying-glass" class="search-icon" />
-        <label class="visually-hidden" for="customer-search">Search name, email or phone</label>
+        <label class="visually-hidden" for="customer-search">{{ t('customersList.searchNameEmailOr') }}</label>
         <input
           id="customer-search"
           class="input input-sm"
-          placeholder="Search name, email or phone"
+          [placeholder]="t('customersList.searchNameEmailOr')"
           [value]="search()"
           (input)="setSearch($event)"
         />
@@ -41,10 +41,10 @@
     @if (failure(); as message) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the customers</div>
+        <div class="state-title">{{ t('customersList.couldntLoadTheCustomers') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     } @else if (resource.isLoading() && rows().length === 0) {
@@ -56,10 +56,9 @@
     } @else if (rows().length === 0) {
       <div class="state-block is-empty">
         <div class="state-icon is-outline"><kh-icon name="users-three" /></div>
-        <div class="state-title">No customer matches this view</div>
+        <div class="state-title">{{ t('customersList.noCustomerMatchesThis') }}</div>
         <div class="state-text">
-          Clear the search or choose a different filter. Customers register in the app; the platform
-          does not create them.
+          {{ t('customersList.clearTheSearchOr') }}
         </div>
       </div>
     } @else {
@@ -67,12 +66,12 @@
         <table class="table table-wide">
           <thead>
             <tr>
-              <th>Customer</th>
-              <th>Contact</th>
-              <th>Status</th>
-              <th>Documents</th>
-              <th>Bookings</th>
-              <th>Last seen</th>
+              <th>{{ t('customersList.customer') }}</th>
+              <th>{{ t('common.contact') }}</th>
+              <th>{{ t('common.status') }}</th>
+              <th>{{ t('customersList.documents') }}</th>
+              <th>{{ t('common.bookings') }}</th>
+              <th>{{ t('customersList.lastSeen') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -86,7 +85,7 @@
                       <a class="row-link" [routerLink]="['/customers', row.userId]">
                         {{ row.fullName }}
                       </a>
-                      <div class="entity-sub">Joined {{ when(row.createdAt) }}</div>
+                      <div class="entity-sub">{{ t('customersList.joined') }} {{ when(row.createdAt) }}</div>
                     </div>
                   </div>
                 </td>
@@ -98,7 +97,7 @@
                   <span class="pill" [class]="'s-' + tone(row)">{{ statusLabel(row) }}</span>
                 </td>
                 <td class="td">
-                  {{ row.documentCount }} on file
+                  {{ row.documentCount }} {{ t('customersList.onFile') }}
                   <div class="td-sub" [class.s-ok]="row.hasCompleteRenterDocuments">
                     {{ row.hasCompleteRenterDocuments ? 'Complete to rent' : 'Incomplete' }}
                   </div>
@@ -107,7 +106,7 @@
                 <td class="td">{{ when(row.lastLoginAt) }}</td>
                 <td class="td td-num">
                   <a class="btn btn-secondary btn-xs" [routerLink]="['/customers', row.userId]">
-                    Open
+                    {{ t('customersList.open') }}
                   </a>
                 </td>
               </tr>
@@ -125,16 +124,16 @@
             [disabled]="page() <= 1"
             (click)="goTo(page() - 1)"
           >
-            Previous
+            {{ t('common.previous') }}
           </button>
-          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
           <button
             type="button"
             class="btn btn-secondary btn-page"
             [disabled]="page() >= totalPages()"
             (click)="goTo(page() + 1)"
           >
-            Next
+            {{ t('common.next') }}
           </button>
         </div>
       </div>

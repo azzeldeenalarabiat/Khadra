@@ -3,11 +3,11 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load this customer</div>
+        <div class="state-title">{{ t('customerProfile.couldntLoadThisCustomer') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/customers">Back to customers</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/customers">{{ t('customerProfile.backToCustomers') }}</a>
         </div>
       </div>
     </section>
@@ -37,7 +37,7 @@
           routerLink="/bookings"
           [queryParams]="{ customerId: c.userId }"
         >
-          Their bookings
+          {{ t('customerProfile.theirBookings') }}
         </a>
       </div>
     </header>
@@ -47,7 +47,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="user-circle-plus" class="kpi-icon" />
-            <span class="sect-t">Account</span>
+            <span class="sect-t">{{ t('common.account') }}</span>
           </div>
           <div class="kv-body">
             @for (row of accountRows(); track row.k) {
@@ -62,7 +62,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="identification-card" class="kpi-icon" />
-            <span class="sect-t">Documents on file</span>
+            <span class="sect-t">{{ t('common.documentsOnFile') }}</span>
             <span class="sect-hint" [class.s-ok]="c.hasCompleteRenterDocuments">
               {{ c.hasCompleteRenterDocuments ? 'Complete to rent' : 'Incomplete' }}
             </span>
@@ -88,19 +88,15 @@
               <!-- Why there is no "view" here. This is a limit of what has been decided, not an
                    oversight, so the screen says which decision is missing rather than going quiet. -->
               <div class="note-box is-plain">
-                The platform holds these but does not open them here. Identity papers are private
-                (spec 7) and the domain lets only the customer and a dealer with an active request
-                see one; whether an administrator may, and whether admin review is how a document
-                becomes verified, is an owner decision that has not been made.
+                {{ t('customerProfile.thePlatformHoldsThese') }}
               </div>
             </div>
           } @else {
             <div class="state-block is-empty">
               <div class="state-icon is-outline"><kh-icon name="identification-card" /></div>
-              <div class="state-title">Nothing uploaded yet</div>
+              <div class="state-title">{{ t('customerProfile.nothingUploadedYet') }}</div>
               <div class="state-text">
-                This customer cannot complete a booking until their licence and identity are on
-                file.
+                {{ t('customerProfile.thisCustomerCannotComplete') }}
               </div>
             </div>
           }
@@ -111,7 +107,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="calendar-check" class="kpi-icon" />
-            <span class="sect-t">Bookings</span>
+            <span class="sect-t">{{ t('common.bookings') }}</span>
           </div>
           <div class="kv-body">
             @for (row of bookingRows(); track row.k) {
@@ -124,31 +120,30 @@
         </section>
 
         <section class="sect sect-pad stack stack-9">
-          <span class="k">Account status</span>
+          <span class="k">{{ t('customerProfile.accountStatus') }}</span>
           @if (c.suspensionReason) {
             <div class="decision-record">{{ c.suspensionReason }}</div>
           }
           @if (canSuspend()) {
             <button type="button" class="btn btn-danger btn-lg-row" (click)="suspend()">
               <kh-icon name="prohibit" />
-              Suspend account
+              {{ t('customerProfile.suspendAccount') }}
             </button>
           }
           @if (canReactivate()) {
             <button type="button" class="btn btn-primary btn-lg-row" (click)="reactivate()">
               <kh-icon name="check-circle" />
-              Reactivate account
+              {{ t('customerProfile.reactivateAccount') }}
             </button>
           }
           <div class="decision-note">
-            Suspending ends every session at once. It does not cancel bookings already made, and it
-            moves no money. The decision is attributed to you in the
+            {{ t('customerProfile.suspendingEndsEverySession') }}
             <a
               routerLink="/audit-logs"
               [queryParams]="{ entityType: 'Customer', entityId: c.userId }"
             >
-              audit log</a
-            >, which records the account by reference rather than by name.
+              {{ t('common.auditLog') }}</a
+            >{{ t('customerProfile.whichRecordsTheAccount') }}
           </div>
         </section>
       </div>

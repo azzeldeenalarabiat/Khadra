@@ -1,3 +1,4 @@
+import { TranslationKey } from '../i18n/en';
 import { IconName } from '../../shared/icon/icon-paths';
 
 /**
@@ -97,10 +98,28 @@ export interface DocumentTile {
 }
 
 /** Which live count a nav item carries, if any. The number itself is never written here. */
-export type NavCount = 'dealers-pending' | 'disputes-live';
+export type NavCount = 'dealers-pending' | 'disputes-live' | 'notifications-unread';
+
+/**
+ * Which permission a nav item needs, if any. It NAMES the permission; it never decides one.
+ *
+ * Same discipline as `NavCount`: the sidebar looks the answer up in `DealerPermissions`, which comes
+ * from `GET /dealers/me`. Writing "employees are shown this, owners are shown that" into the
+ * structure would be a claim about a person that only the server can make — and it could not express
+ * Reports at all, where an employee WITH the owner's grant must see the link and one without it
+ * must not.
+ */
+export type NavRequirement = 'manage-staff' | 'view-reports';
 
 export interface NavItem {
-  readonly label: string;
+  /**
+   * A translation key, not words.
+   *
+   * The sidebar is structure, and structure has no language. Holding the English here would mean
+   * one of the two sidebars is always wrong, and the labels would be the one part of the console a
+   * switch could not reach.
+   */
+  readonly labelKey: TranslationKey;
   readonly icon: IconName;
   readonly route: string;
   /**
@@ -109,10 +128,12 @@ export interface NavItem {
    * wrong from the moment it was typed.
    */
   readonly count?: NavCount;
+  /** Absent means every member of staff may open it. */
+  readonly requires?: NavRequirement;
 }
 
 export interface NavGroup {
-  readonly group?: string;
+  readonly groupKey?: TranslationKey;
   readonly items: readonly NavItem[];
 }
 
@@ -130,7 +151,23 @@ export interface ModalConfig {
   readonly result: { readonly title: string; readonly body: string; readonly tone?: Tone };
 }
 
+/** One choice in a `select` field: a stable value to send, and a label to show. */
+export interface ModalOption {
+  readonly value: string;
+  readonly label: string;
+}
+
 export interface ModalField {
+  /**
+   * Stable identifier for the answer. NOT the label.
+   *
+   * The dialog returns what was typed keyed by this, and callers read it back by the same name. It
+   * used to be the label -- the visible English text -- which meant translating a caption silently
+   * broke the read: `values['Odometer (km)']` on an Arabic dialog is `undefined`, and a pickup was
+   * recorded with no odometer, no fuel and no cash, with no error anywhere. On the one record that
+   * settles a dispute. A name is invisible, so nothing a translator does can move it.
+   */
+  readonly name: string;
   readonly label: string;
   /**
    * `text` is a textarea — these are reasons and notes, which run to sentences.
@@ -140,7 +177,12 @@ export interface ModalField {
    * person typing it.
    */
   readonly type: 'select' | 'text' | 'password';
-  readonly options?: readonly string[];
+  /**
+   * Choices for a `select`. Value and label are separate for the same reason `name` exists: the
+   * rejection dialog used to map the chosen LABEL back to a reason code by string comparison, so an
+   * Arabic label matched nothing and every rejection was filed as 'Other'.
+   */
+  readonly options?: readonly ModalOption[];
   readonly placeholder?: string;
   /** Pre-filled value. A select without one starts on its first option. */
   readonly value?: string;

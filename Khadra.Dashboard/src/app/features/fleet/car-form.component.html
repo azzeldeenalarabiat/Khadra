@@ -3,10 +3,10 @@
     <div>
       <h1 class="page-title">{{ isEditing() ? 'Edit car' : 'Add a car' }}</h1>
       <div class="page-sub">
-        Brand, model, price and the policies that travel with every booking of this car.
+        {{ t('carForm.brandModelPriceAnd') }}
       </div>
     </div>
-    <a class="btn btn-secondary btn-md push" routerLink="/dealer/fleet">Back to fleet</a>
+    <a class="btn btn-secondary btn-md push" routerLink="/dealer/fleet">{{ t('common.backToFleet') }}</a>
   </div>
 
   @if (problem(); as message) {
@@ -29,11 +29,11 @@
 
   <div class="split-15">
     <form class="sect sect-pad stack stack-12" (ngSubmit)="save()">
-      <span class="sect-t">The car</span>
+      <span class="sect-t">{{ t('carForm.theCar') }}</span>
 
       <div class="form-row">
         <div class="field">
-          <label for="car-make">Brand</label>
+          <label for="car-make">{{ t('carForm.brand') }}</label>
           <input
             id="car-make"
             class="input"
@@ -43,7 +43,7 @@
           />
         </div>
         <div class="field">
-          <label for="car-model">Model</label>
+          <label for="car-model">{{ t('common.model') }}</label>
           <input
             id="car-model"
             class="input"
@@ -56,7 +56,7 @@
 
       <div class="form-row">
         <div class="field">
-          <label for="car-type">Vehicle type</label>
+          <label for="car-type">{{ t('common.vehicleType') }}</label>
           <select id="car-type" class="input" (change)="set('carTypeId', text($event))">
             @for (type of carTypes(); track type.id) {
               <option [value]="type.id" [selected]="form().carTypeId === type.id">
@@ -72,7 +72,7 @@
 
       <div class="form-row">
         <div class="field">
-          <label for="car-year">Year</label>
+          <label for="car-year">{{ t('common.year') }}</label>
           <input
             id="car-year"
             class="input"
@@ -87,7 +87,7 @@
           }
         </div>
         <div class="field">
-          <label for="car-seats">Seats</label>
+          <label for="car-seats">{{ t('common.seats') }}</label>
           <input
             id="car-seats"
             class="input"
@@ -97,7 +97,7 @@
           />
         </div>
         <div class="field">
-          <label for="car-colour">Colour</label>
+          <label for="car-colour">{{ t('common.colour') }}</label>
           <input
             id="car-colour"
             class="input"
@@ -109,7 +109,7 @@
 
       <div class="form-row">
         <div class="field">
-          <label for="car-transmission">Transmission</label>
+          <label for="car-transmission">{{ t('common.transmission') }}</label>
           <select id="car-transmission" class="input" (change)="set('transmission', text($event))">
             @for (option of transmissions; track option) {
               <option [value]="option" [selected]="form().transmission === option">
@@ -119,7 +119,7 @@
           </select>
         </div>
         <div class="field">
-          <label for="car-fuel">Fuel</label>
+          <label for="car-fuel">{{ t('common.fuel') }}</label>
           <select id="car-fuel" class="input" (change)="set('fuelType', text($event))">
             @for (option of fuelTypes; track option) {
               <option [value]="option" [selected]="form().fuelType === option">{{ option }}</option>
@@ -127,7 +127,7 @@
           </select>
         </div>
         <div class="field">
-          <label for="car-plate">Plate number</label>
+          <label for="car-plate">{{ t('common.plateNumber') }}</label>
           <input
             id="car-plate"
             class="input"
@@ -136,27 +136,27 @@
             (input)="set('plateNumber', text($event))"
           />
           <div class="field-hint">
-            Green-plate digits. One car, one listing across the platform.
+            {{ t('carForm.greenPlateDigitsOne') }}
           </div>
         </div>
       </div>
 
       <div class="field">
-        <label for="car-description">Description</label>
+        <label for="car-description">{{ t('common.description') }}</label>
         <textarea
           id="car-description"
           class="input"
           [value]="form().description ?? ''"
           (input)="set('description', text($event))"
-          placeholder="What a customer should know about this car."
+          [placeholder]="t('carForm.whatACustomerShould')"
         ></textarea>
       </div>
 
-      <span class="sect-t">Price and policies</span>
+      <span class="sect-t">{{ t('carForm.priceAndPolicies') }}</span>
 
       <div class="form-row">
         <div class="field">
-          <label for="car-rate">Daily price (JOD)</label>
+          <label for="car-rate">{{ t('carForm.dailyPriceJod') }}</label>
           <input
             id="car-rate"
             class="input input-num"
@@ -167,7 +167,7 @@
           />
         </div>
         <div class="field">
-          <label for="car-deposit">Security deposit (JOD)</label>
+          <label for="car-deposit">{{ t('common.securityDepositJod') }}</label>
           <input
             id="car-deposit"
             class="input input-num"
@@ -177,11 +177,11 @@
             (input)="set('securityDeposit', numeric($event))"
           />
           <div class="field-hint">
-            The damage deposit for this car, separate from the booking deposit.
+            {{ t('carForm.theDamageDepositFor') }}
           </div>
         </div>
         <div class="field">
-          <label for="car-fuel-policy">Fuel policy</label>
+          <label for="car-fuel-policy">{{ t('common.fuelPolicy') }}</label>
           <select id="car-fuel-policy" class="input" (change)="set('fuelPolicy', text($event))">
             @for (option of fuelPolicies; track option) {
               <option [value]="option" [selected]="form().fuelPolicy === option">
@@ -199,11 +199,10 @@
             [checked]="form().isDeliveryEligible"
             (change)="set('isDeliveryEligible', checked($event))"
           />
-          Available for delivery
+          {{ t('carForm.availableForDelivery') }}
         </label>
         <div class="field-hint">
-          Only within your dealership's delivery radius. The delivery fee is platform-wide, not
-          yours to set.
+          {{ t('carForm.onlyWithinYourDealerships') }}
         </div>
       </div>
 
@@ -214,14 +213,14 @@
             [checked]="form().mileageUnlimited"
             (change)="set('mileageUnlimited', checked($event))"
           />
-          Unlimited mileage
+          {{ t('carForm.unlimitedMileage') }}
         </label>
       </div>
 
       @if (!form().mileageUnlimited) {
         <div class="form-row">
           <div class="field">
-            <label for="car-km">Daily allowance (km)</label>
+            <label for="car-km">{{ t('carForm.dailyAllowanceKm') }}</label>
             <input
               id="car-km"
               class="input input-num"
@@ -231,7 +230,7 @@
             />
           </div>
           <div class="field">
-            <label for="car-excess">Excess fee per km (JOD)</label>
+            <label for="car-excess">{{ t('carForm.excessFeePerKm') }}</label>
             <input
               id="car-excess"
               class="input input-num"
@@ -240,7 +239,7 @@
               [value]="form().mileageExcessFeePerKm ?? 0.15"
               (input)="set('mileageExcessFeePerKm', numeric($event))"
             />
-            <div class="field-hint">Charged against the whole rental's allowance, not per day.</div>
+            <div class="field-hint">{{ t('carForm.chargedAgainstTheWhole') }}</div>
           </div>
         </div>
       }
@@ -251,24 +250,24 @@
     </form>
 
     <section class="sect sect-pad stack stack-12">
-      <span class="sect-t">Photos</span>
+      <span class="sect-t">{{ t('carForm.photos') }}</span>
 
       @if (!isEditing()) {
         <div class="field-hint">
-          Save the car first — a photo needs a car to belong to. You will come straight back here.
+          {{ t('carForm.saveTheCarFirst') }}
         </div>
       } @else {
         <div class="field-hint">
-          The first photo becomes the cover. A car needs at least one before it can be published.
+          {{ t('carForm.theFirstPhotoBecomes') }}
         </div>
 
         @if (images().length > 0) {
           <div class="photo-grid">
             @for (image of images(); track image.imageId) {
               <div class="photo-tile">
-                <img [src]="image.url" alt="Car photo" />
+                <img [src]="image.url" [alt]="t('carForm.carPhoto')" />
                 @if (image.isPrimary) {
-                  <span class="pill s-ok photo-badge">Cover</span>
+                  <span class="pill s-ok photo-badge">{{ t('carForm.cover') }}</span>
                 }
                 <div class="photo-actions">
                   @if (!image.isPrimary) {
@@ -277,7 +276,7 @@
                       class="btn btn-secondary btn-xs"
                       (click)="makePrimary(image.imageId)"
                     >
-                      Make cover
+                      {{ t('common.makeCover') }}
                     </button>
                   }
                   <button
@@ -285,7 +284,7 @@
                     class="btn btn-ghost btn-xs"
                     (click)="removeImage(image.imageId)"
                   >
-                    Remove
+                    {{ t('common.remove') }}
                   </button>
                 </div>
               </div>
@@ -294,7 +293,7 @@
         }
 
         <div class="field">
-          <label for="car-photo">Add a photo</label>
+          <label for="car-photo">{{ t('carForm.addAPhoto') }}</label>
           <input
             id="car-photo"
             class="input"

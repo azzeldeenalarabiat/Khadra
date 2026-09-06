@@ -1,68 +1,86 @@
 <div class="stack stack-14 page-wide">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Reports</h1>
-      <div class="page-sub">Your dealership's numbers, at the rates frozen on each booking.</div>
+      <h1 class="page-title">{{ t('dealerReports.reports') }}</h1>
+      <div class="page-sub">{{ t('dealerReports.yourDealershipsNumbersAt') }}</div>
     </div>
-    <div class="tabs" role="tablist" aria-label="Period">
-      @for (p of periods; track p.key) {
-        <button
-          type="button"
-          class="tab"
-          role="tab"
-          [class.is-active]="period() === p.key"
-          [attr.aria-selected]="period() === p.key"
-          (click)="select(p.key)"
-        >
-          {{ p.label }}
-        </button>
-      }
-    </div>
+    <!-- A period to choose is only worth offering when there is a report behind it. -->
+    @if (granted() !== false) {
+      <div class="tabs" role="tablist" [attr.aria-label]="t('common.period')">
+        @for (p of periods; track p.key) {
+          <button
+            type="button"
+            class="tab"
+            role="tab"
+            [class.is-active]="period() === p.key"
+            [attr.aria-selected]="period() === p.key"
+            (click)="select(p.key)"
+          >
+            {{ p.label }}
+          </button>
+        }
+      </div>
+    }
   </div>
 
-  @if (failure(); as message) {
+  <!-- Said from the permission, not from a refusal: without the grant the request is never sent, so
+       no 403 will arrive to trigger the failure branch below. -->
+  @if (granted() === false) {
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-outline"><kh-icon name="lock-simple" /></div>
-        <div class="state-title">Reports are not available to you</div>
+        <div class="state-title">{{ t('dealerReports.reportsAreNotPart') }}</div>
+        <div class="state-text">
+          {{ t('dealerReports.revenueCommissionAndOccupancy') }}
+        </div>
+        <div class="state-actions">
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/dashboard">{{ t('dealerReports.backToDashboard') }}</a>
+        </div>
+      </div>
+    </section>
+  } @else if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-outline"><kh-icon name="lock-simple" /></div>
+        <div class="state-title">{{ t('dealerReports.reportsAreNotAvailable') }}</div>
         <div class="state-text">{{ message }}</div>
       </div>
     </section>
   } @else if (report(); as r) {
-    <div class="page-sub">{{ range() }} · Amman time</div>
+    <div class="page-sub">{{ range() }} {{ t('dealerReports.ammanTime') }}</div>
 
     <div class="stat-grid">
       <div class="stat-card">
-        <span class="k">Bookings returned</span>
+        <span class="k">{{ t('dealerReports.bookingsReturned') }}</span>
         <span class="stat-v num">{{ r.bookings }}</span>
-        <span class="page-sub">Returned or completed in the period</span>
+        <span class="page-sub">{{ t('dealerReports.returnedOrCompletedIn') }}</span>
       </div>
       <div class="stat-card">
-        <span class="k">Rental revenue</span>
+        <span class="k">{{ t('dealerReports.rentalRevenue') }}</span>
         <span class="stat-v num"
           >{{ r.revenue.amount }} <small>{{ r.revenue.currency }}</small></span
         >
-        <span class="page-sub">Rental totals of those bookings</span>
+        <span class="page-sub">{{ t('dealerReports.rentalTotalsOfThose') }}</span>
       </div>
       <div class="stat-card">
-        <span class="k">Platform commission</span>
+        <span class="k">{{ t('dealerReports.platformCommission') }}</span>
         <span class="stat-v num"
           >−{{ r.commission.amount }} <small>{{ r.commission.currency }}</small></span
         >
-        <span class="page-sub">At each booking's frozen rate</span>
+        <span class="page-sub">{{ t('dealerReports.atEachBookingsFrozen') }}</span>
       </div>
       <div class="stat-card">
-        <span class="k">Occupancy</span>
+        <span class="k">{{ t('dealerReports.occupancy') }}</span>
         <span class="stat-v num">{{ r.occupancyPercent }}%</span>
-        <span class="page-sub">Rented days over listed cars</span>
+        <span class="page-sub">{{ t('dealerReports.rentedDaysOverListed') }}</span>
       </div>
     </div>
 
     <div class="dc-split-155">
       <section class="sect">
         <div class="sect-h">
-          <span class="sect-t">Occupancy by vehicle</span
-          ><span class="sect-hint">Days rented in the period</span>
+          <span class="sect-t">{{ t('dealerReports.occupancyByVehicle') }}</span
+          ><span class="sect-hint">{{ t('dealerReports.daysRentedInThe') }}</span>
         </div>
         <div class="sect-pad stack stack-9">
           @for (v of r.occupancyByVehicle; track v.vehicleId) {
@@ -75,48 +93,47 @@
               <span class="occ-days">{{ v.rentedDays }}d</span>
             </div>
           } @empty {
-            <div class="page-sub">No listed vehicles in this period.</div>
+            <div class="page-sub">{{ t('dealerReports.noListedVehiclesIn') }}</div>
           }
         </div>
       </section>
 
       <div class="stack stack-14">
         <section class="sect sect-pad stack stack-9">
-          <span class="k">Money in this period</span>
+          <span class="k">{{ t('dealerReports.moneyInThisPeriod') }}</span>
           <div class="money-line">
-            <span class="k-label">Rental revenue</span
+            <span class="k-label">{{ t('dealerReports.rentalRevenue') }}</span
             ><span class="num">{{ r.revenue.amount }} {{ r.revenue.currency }}</span>
           </div>
           <div class="money-line">
-            <span class="k-label">Platform commission</span
+            <span class="k-label">{{ t('dealerReports.platformCommission') }}</span
             ><span class="num">−{{ r.commission.amount }} {{ r.commission.currency }}</span>
           </div>
           <div class="money-line is-hi">
-            <span class="k-label">Revenue after commission</span
+            <span class="k-label">{{ t('dealerReports.revenueAfterCommission') }}</span
             ><span class="num"
               >{{ r.netAfterCommission.amount }} {{ r.netAfterCommission.currency }}</span
             >
           </div>
           <div class="money-line is-dim">
-            <span class="k-label">Net payout</span><span>Not available yet</span>
+            <span class="k-label">{{ t('dealerReports.netPayout') }}</span><span>{{ t('dealerReports.notAvailableYet') }}</span>
           </div>
           <div class="note-box is-plain">
             <kh-icon name="info" />
-            Payouts are not live. Commission is deducted from the card deposit; the balance is
-            collected in cash at handover.
+            {{ t('dealerReports.payoutsAreNotLive') }}
           </div>
         </section>
         <section class="sect sect-pad stack stack-9">
-          <span class="k">Still out</span>
+          <span class="k">{{ t('dealerReports.stillOut') }}</span>
           <div class="money-line">
-            <span class="k-label">Cars currently rented</span
+            <span class="k-label">{{ t('dealerReports.carsCurrentlyRented') }}</span
             ><span class="num">{{ r.inProgressCount }}</span>
           </div>
           <div class="money-line">
-            <span class="k-label">Rental value in progress</span
+            <span class="k-label">{{ t('dealerReports.rentalValueInProgress') }}</span
             ><span class="num">{{ r.inProgress.amount }} {{ r.inProgress.currency }}</span>
           </div>
-          <div class="page-sub">Counted as revenue once the car is back.</div>
+          <div class="page-sub">{{ t('dealerReports.countedAsRevenueOnce') }}</div>
         </section>
       </div>
     </div>

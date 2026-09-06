@@ -16,6 +16,21 @@ namespace Khadra.Application.IdentityAccess;
 /// happened, and the one thing they needed to know — that nothing was coming and they should ask for
 /// another — was in a server log they cannot read. A false confirmation is worse than an error: it
 /// sends someone to wait at an empty inbox.
+///
+/// Callers pick one of THREE shapes, and picking at random is how false confirmations get back in:
+///
+/// <list type="bullet">
+/// <item>The commit created something the caller must know about (an account, an employee): return
+/// success WITH an <c>…EmailSent</c> flag. Failing would discard a real record over a mail hiccup,
+/// and the caller still needs to be told nobody was written to.</item>
+/// <item>The commit created only a replaceable token (a reset link, a re-sent invitation): return a
+/// FAILURE. Trying again is harmless — it reissues — and is exactly what the message asks for.</item>
+/// <item>A notice with nothing for the caller to do differently ("your password changed"): discard
+/// the result. It is logged at Error and that is the whole remedy.</item>
+/// </list>
+///
+/// And: nothing calls <see cref="IEmailSender"/> directly after a commit. An unhandled send is how
+/// the bootstrapper used to kill the process on first boot with a misconfigured relay.
 /// </summary>
 public sealed partial class AuthEmailDispatcher(
     IAuthEmailComposer composer,
@@ -34,6 +49,9 @@ public sealed partial class AuthEmailDispatcher(
 
     public Task<bool> SendPasswordChangedAsync(User user, CancellationToken cancellationToken) =>
         TrySendAsync(user, () => composer.PasswordChanged(user), "password changed", cancellationToken);
+
+    public Task<bool> SendAdminInvitationAsync(User user, string rawToken, CancellationToken cancellationToken) =>
+        TrySendAsync(user, () => composer.AdminInvitation(user, rawToken), "admin invitation", cancellationToken);
 
     private async Task<bool> TrySendAsync(
         User user,

@@ -1,10 +1,9 @@
 <div class="stack stack-14 page-wide">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Platform settings</h1>
+      <h1 class="page-title">{{ t('platformSettings.platformSettings') }}</h1>
       <div class="page-sub">
-        The numbers the whole platform runs on. Every booking freezes the ones in force when it was
-        made, so changing one here can never re-judge a booking that already exists.
+        {{ t('platformSettings.theNumbersTheWhole') }}
       </div>
     </div>
   </div>
@@ -13,10 +12,10 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the settings</div>
+        <div class="state-title">{{ t('platformSettings.couldntLoadTheSettings') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     </section>
@@ -30,10 +29,8 @@
     <section class="sect sect-pad">
       <!-- Why there is no Save button. This is a limit of what has been decided, not an oversight. -->
       <div class="note-box is-plain">
-        These values are read-only here. They come from <strong>{{ source() }}</strong
-        >, not from a record an administrator can edit: the settings aggregate is not wired to a
-        table yet, and two of the penalties below are still open business decisions. A form here
-        would let an administrator settle one of those by typing into a box.
+        {{ t('platformSettings.theseValuesAreRead') }} <strong>{{ source() }}</strong
+        >{{ t('platformSettings.notFromARecord') }}
       </div>
     </section>
 
@@ -42,7 +39,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="currency-circle-dollar" class="kpi-icon" />
-            <span class="sect-t">Money</span>
+            <span class="sect-t">{{ t('common.money') }}</span>
           </div>
           <div class="kv-body">
             @for (row of moneyRows(); track row.k) {
@@ -57,8 +54,8 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="warning-diamond" class="kpi-icon" />
-            <span class="sect-t">Penalties</span>
-            <span class="sect-hint">Assessed, never charged</span>
+            <span class="sect-t">{{ t('platformSettings.penalties') }}</span>
+            <span class="sect-hint">{{ t('platformSettings.assessedNeverCharged') }}</span>
           </div>
           <div class="kv-body">
             @for (row of penaltyRows(); track row.k) {
@@ -70,9 +67,7 @@
           </div>
           <div class="sect-pad">
             <div class="decision-note">
-              A penalty is what the platform records as owed. Nothing is taken from anyone until an
-              administrator resolves a dispute, and the dealer tier above is one of the figures the
-              owner has still to settle.
+              {{ t('platformSettings.aPenaltyIsWhat') }}
             </div>
           </div>
         </section>
@@ -82,7 +77,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="clock-counter-clockwise" class="kpi-icon" />
-            <span class="sect-t">Windows and deadlines</span>
+            <span class="sect-t">{{ t('platformSettings.windowsAndDeadlines') }}</span>
           </div>
           <div class="kv-body">
             @for (row of windowRows(); track row.k) {
@@ -97,7 +92,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="identification-card" class="kpi-icon" />
-            <span class="sect-t">Who may rent</span>
+            <span class="sect-t">{{ t('platformSettings.whoMayRent') }}</span>
           </div>
           <div class="kv-body">
             @for (row of renterRows(); track row.k) {

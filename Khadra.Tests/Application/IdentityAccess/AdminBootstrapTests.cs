@@ -1,4 +1,5 @@
 using Khadra.Application.Common.Ports;
+using Khadra.Application.IdentityAccess;
 using Khadra.Application.IdentityAccess.AdminUsers;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Auditing.Repositories;
@@ -64,8 +65,7 @@ public sealed class AdminBootstrapTests
             OpaqueTokens,
             TestAuthPolicy.Default,
             settings,
-            Email,
-            Composer,
+            new AuthEmailDispatcher(Composer, Email, NullLogger<AuthEmailDispatcher>.Instance),
             AuditTrail,
             UnitOfWork,
             Clock,
@@ -284,5 +284,40 @@ public sealed class AdminBootstrapTests
 
         // No exception, and no email promising an account that was not saved.
         await context.Email.DidNotReceive().SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>());
+    }
+    /// <summary>
+    /// A relay that refuses the invitation must not take the process down with it, or strand the
+    /// platform for a week.
+    ///
+    /// Startup awaits EnsureAsync with no catch of its own, and does so BEFORE the line that reports
+    /// whether mail works, so an unhandled send meant a first boot against a misconfigured relay died
+    /// silently — after committing the administrator and its token. The restart was the real damage:
+    /// the row now satisfies "an administrator exists", and ReissueIfStrandedAsync declines while a
+    /// live token is outstanding, so nobody could get in until it expired seven days later.
+    ///
+    /// Retiring the token on a refused send turns that week into the next restart.
+    /// </summary>
+    [Fact]
+    public async Task An_invitation_the_mail_server_refused_retires_its_token_instead_of_killing_startup()
+    {
+        var context = new Context();
+        context.Users.AnyAdminExistsAsync(Arg.Any<CancellationToken>()).Returns(false);
+        context.Email.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new InvalidOperationException("The mail server refused the message."));
+
+        // Startup does not get an exception...
+        await context.Bootstrapper(Settings.Configured).EnsureAsync();
+
+        // ...the administrator and the audit entry still stand...
+        var invited = Assert.Single(context.Added);
+        Assert.Single(context.Recorded);
+
+        // ...and the link nobody received was retired, so the next start issues another rather than
+        // seeing a live token and doing nothing.
+        await context.Tokens.Received(1).InvalidateActiveAsync(
+            invited.Id,
+            VerificationPurpose.AdminInvitation,
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
     }
 }

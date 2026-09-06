@@ -46,7 +46,7 @@ public sealed class DealerConsoleTests
                 .Returns([]);
             Bookings.HeldVehicleIdsAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
                 .Returns([CarA]);
-            Bookings.ActivityAsync(Arg.Any<Id>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            Bookings.ActivityAsync(Arg.Any<Id>(), Arg.Any<PageRequest>(), Arg.Any<Id?>(), Arg.Any<CancellationToken>())
                 .Returns(PagedResult.Empty<DealerActivityEntry>(1, 6));
             // Two returned bookings at different frozen rates, and one still out.
             Bookings.RevenueAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())

@@ -2,11 +2,14 @@ using Khadra.Application.Bookings.DecideBooking;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers;
+using Khadra.Application.Notifications;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -26,6 +29,8 @@ public sealed class BookingDecisionTests
         public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
         public IBookingReader Reader { get; } = Substitute.For<IBookingReader>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
+        public INotifier Notifier { get; } = Substitute.For<INotifier>();
+        public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
         public TestClock Clock { get; } = new(Build.Now);
         public Dealer Dealer { get; }
 
@@ -55,7 +60,7 @@ public sealed class BookingDecisionTests
         }
 
         public BookingDecisionHandlers Handlers() =>
-            new(Bookings, new DealerMembershipResolver(Dealers), Reader, Clock, UnitOfWork);
+            new(Bookings, new DealerMembershipResolver(Dealers), Reader, new DealerTeamNotifier(Notifier, Users), Clock, UnitOfWork);
     }
 
     [Fact]

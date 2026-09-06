@@ -12,31 +12,35 @@
           <kh-icon [name]="m.icon" />
         </div>
         <div class="grow">
-          <div class="dialog-title">{{ m.title }}</div>
-          <div class="dialog-body">{{ m.body }}</div>
+          <div class="dialog-title user-text">{{ m.title }}</div>
+          <div class="dialog-body user-text">{{ m.body }}</div>
         </div>
         <button
           type="button"
           class="btn btn-icon btn-secondary btn-28"
-          aria-label="Close"
+          [attr.aria-label]="t('common.close')"
           (click)="close()"
         >
           <kh-icon name="x" />
         </button>
       </div>
 
-      @for (field of m.fields ?? []; track field.label) {
+      @for (field of m.fields ?? []; track field.name) {
         <div class="field">
           <label [attr.for]="'modal-field-' + $index">{{ field.label }}</label>
           @if (field.type === 'select') {
             <select
               class="input"
               [id]="'modal-field-' + $index"
-              (change)="setField(field.label, $event)"
+              (change)="setField(field.name, $event)"
             >
-              @for (option of field.options ?? []; track option) {
-                <option [selected]="option === (field.value ?? field.options?.[0])">
-                  {{ option }}
+              <!-- The VALUE is what the caller reads back; the label is only what is read. -->
+              @for (option of field.options ?? []; track option.value) {
+                <option
+                  [value]="option.value"
+                  [selected]="option.value === (field.value ?? field.options?.[0]?.value)"
+                >
+                  {{ option.label }}
                 </option>
               }
             </select>
@@ -48,7 +52,7 @@
               autocomplete="off"
               [id]="'modal-field-' + $index"
               [placeholder]="field.placeholder ?? ''"
-              (input)="setField(field.label, $event)"
+              (input)="setField(field.name, $event)"
             />
           } @else {
             <textarea
@@ -56,7 +60,7 @@
               [id]="'modal-field-' + $index"
               [placeholder]="field.placeholder ?? ''"
               [value]="field.value ?? ''"
-              (input)="setField(field.label, $event)"
+              (input)="setField(field.name, $event)"
             ></textarea>
           }
           @if (field.hint) {
@@ -80,7 +84,7 @@
           [disabled]="busy()"
           (click)="close()"
         >
-          Cancel
+          {{ t('common.cancel') }}
         </button>
         <button
           type="button"
@@ -90,7 +94,7 @@
           [disabled]="busy() || !canConfirm()"
           (click)="confirm()"
         >
-          {{ busy() ? 'Working…' : m.confirm }}
+          {{ busy() ? t('common.working') : m.confirm }}
         </button>
       </div>
     </div>

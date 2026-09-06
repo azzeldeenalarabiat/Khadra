@@ -9,6 +9,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { BookingDecisions } from './booking-decisions';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * The dealer's bookings (design: Dealer Console, `isList` for bookings).
@@ -24,6 +25,7 @@ import { BookingDecisions } from './booking-decisions';
   imports: [RouterLink, IconComponent],
 })
 export class DealerBookingsComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerBookingsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);

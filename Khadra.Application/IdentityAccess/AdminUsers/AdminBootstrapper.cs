@@ -37,8 +37,7 @@ public sealed partial class AdminBootstrapper(
     IOpaqueTokenService opaqueTokens,
     IAuthPolicySettings policy,
     IAdminBootstrapSettings settings,
-    IEmailSender email,
-    IAuthEmailComposer composer,
+    AuthEmailDispatcher emails,
     IAuditTrail auditTrail,
     IUnitOfWork unitOfWork,
     IClock clock,
@@ -116,8 +115,8 @@ public sealed partial class AdminBootstrapper(
         }
 
         // After the commit: an email promising an account that failed to save is worse than none.
-        await email.SendAsync(composer.AdminInvitation(invited, invitation.Value), cancellationToken);
-        LogInvited(logger, invited.Email.Value);
+        if (await DeliverAsync(invited, invitation.Value, cancellationToken))
+            LogInvited(logger, invited.Email.Value);
     }
 
     /// <summary>
@@ -166,9 +165,44 @@ public sealed partial class AdminBootstrapper(
             cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await email.SendAsync(composer.AdminInvitation(existing, invitation.Value), cancellationToken);
-        LogReissued(logger, existing.Email.Value);
+        if (await DeliverAsync(existing, invitation.Value, cancellationToken))
+            LogReissued(logger, existing.Email.Value);
     }
+
+    /// <summary>
+    /// Sends the invitation, and makes sure a refused one does not strand the platform.
+    /// </summary>
+    /// <remarks>
+    /// This used to be a bare <c>IEmailSender.SendAsync</c>, and startup awaits this method with no
+    /// catch of its own, BEFORE the line that reports whether mail works at all. So a first boot with
+    /// a misconfigured relay committed the administrator and its token, threw on the send, and killed
+    /// the process without ever printing why.
+    ///
+    /// The restart was worse than the crash. The account row now satisfies "an administrator exists",
+    /// so only <see cref="ReissueIfStrandedAsync"/> can help — and it declines while a live token is
+    /// outstanding, which this one is. Nobody holds the link, nobody can sign in to issue another, and
+    /// the platform has no usable administrator until the token expires a week later.
+    ///
+    /// So a refused send RETIRES the token it just issued. The next start finds an unverified
+    /// administrator with no live link, which is precisely the stranded case, and tries again. The
+    /// platform retries every boot until the mail path works, instead of once a week.
+    /// </remarks>
+    private async Task<bool> DeliverAsync(User admin, string rawToken, CancellationToken cancellationToken)
+    {
+        if (await emails.SendAdminInvitationAsync(admin, rawToken, cancellationToken))
+            return true;
+
+        await verificationTokens.InvalidateActiveAsync(
+            admin.Id, VerificationPurpose.AdminInvitation, clock.UtcNow, cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        LogInvitationNotSent(logger, admin.Email.Value);
+        return false;
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "The bootstrap administrator invitation for {Email} could not be sent, so the platform still has no usable administrator. The link was retired; the next start will issue another. Fix the Email configuration first.")]
+    private static partial void LogInvitationNotSent(ILogger logger, string email);
 
     [LoggerMessage(
         Level = LogLevel.Information,

@@ -68,5 +68,6 @@ public interface IDealerBookingReader
     /// <summary>Rentals (PickedUp, Returned, Completed) whose period overlaps [from, to).</summary>
     Task<IReadOnlyList<OccupancyFact>> OccupancyAsync(Id dealerId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
 
-    Task<PagedResult<DealerActivityEntry>> ActivityAsync(Id dealerId, PageRequest page, CancellationToken cancellationToken = default);
+    /// <summary>The dealership's trail, or one person's within it when <paramref name="actorUserId"/> is given.</summary>
+    Task<PagedResult<DealerActivityEntry>> ActivityAsync(Id dealerId, PageRequest page, Id? actorUserId = null, CancellationToken cancellationToken = default);
 }

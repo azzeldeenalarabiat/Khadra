@@ -5,6 +5,7 @@ import { Tone } from '../../core/models/console.models';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Activity (design `isActivity`): every status change on the dealership's bookings, newest first,
@@ -18,6 +19,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class DealerActivityComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
 
   protected readonly page = this.service.activityPage;

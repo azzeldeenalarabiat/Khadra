@@ -1,7 +1,7 @@
 <div class="stack stack-14">
   <div>
-    <h1 class="page-title">Dashboard</h1>
-    <div class="page-sub">Overview of platform activity and items requiring attention.</div>
+    <h1 class="page-title">{{ t('adminDashboard.dashboard') }}</h1>
+    <div class="page-sub">{{ t('adminDashboard.overviewOfPlatformActivity') }}</div>
   </div>
 
   <!-- One message for the whole page only when the session itself is the problem. Anything else is a
@@ -14,7 +14,7 @@
         <div class="state-title">{{ problem.title }}</div>
         <div class="state-text">{{ problem.body }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('adminDashboard.retry') }}</button>
         </div>
       </div>
     </section>
@@ -50,10 +50,10 @@
         <!-- A card that cannot be drawn leaves a hole, and a row of holes reads as a platform with
              nothing on it. It says so instead, once, like every other panel here. -->
         <div class="sect kpi-card">
-          <div class="state-title">Platform figures could not be loaded</div>
-          <div class="state-text">Nothing has been changed.</div>
+          <div class="state-title">{{ t('adminDashboard.platformFiguresCouldNot') }}</div>
+          <div class="state-text">{{ t('adminDashboard.nothingHasBeenChanged') }}</div>
           <div class="state-actions">
-            <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">Retry</button>
+            <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">{{ t('adminDashboard.retry') }}</button>
           </div>
         </div>
       }
@@ -63,7 +63,7 @@
       <section class="sect stack sect-clip">
         <div class="sect-h">
           <kh-icon name="warning-diamond" class="s-bad status-text" />
-          <span class="sect-t">Requires attention</span>
+          <span class="sect-t">{{ t('adminDashboard.requiresAttention') }}</span>
           <span class="queue-count">{{ queueSummary() }}</span>
           <span class="sect-note">{{ slaNote() }}</span>
         </div>
@@ -71,13 +71,13 @@
         @if (panelFailed(queueResource)) {
           <div class="state-block">
             <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-            <div class="state-title">The work queue could not be loaded</div>
+            <div class="state-title">{{ t('adminDashboard.theWorkQueueCould') }}</div>
             <div class="state-text">
-              Nothing has been changed. The rest of the page is unaffected.
+              {{ t('adminDashboard.nothingHasBeenChanged2') }}
             </div>
             <div class="state-actions">
               <button type="button" class="btn btn-primary btn-sm" (click)="queueResource.reload()">
-                Retry
+                {{ t('adminDashboard.retry') }}
               </button>
             </div>
           </div>
@@ -101,7 +101,7 @@
               </div>
               <div class="queue-side">
                 <div class="sla-head">
-                  <span class="k">SLA</span>
+                  <span class="k">{{ t('adminDashboard.sla') }}</span>
                   <span class="num sla-value">{{ item.sla }}</span>
                 </div>
                 <div class="meter">
@@ -113,9 +113,9 @@
           } @empty {
             <div class="state-block is-empty">
               <div class="state-icon is-outline"><kh-icon name="check-circle" /></div>
-              <div class="state-title">Nothing needs attention</div>
+              <div class="state-title">{{ t('adminDashboard.nothingNeedsAttention') }}</div>
               <div class="state-text">
-                No dispute or dealer application is approaching its review deadline.
+                {{ t('adminDashboard.noDisputeOrDealer') }}
               </div>
             </div>
           }
@@ -125,7 +125,7 @@
       <div class="stack stack-14">
         <section class="sect sect-pad stack stack-10">
           <div class="sla-head">
-            <span class="k">Bookings · last {{ trendDays() }} days</span>
+            <span class="k">{{ t('adminDashboard.bookingsLastDays', { days: trendDays() }) }}</span>
             <span
               class="num trend-change status-text"
               [class]="trendTone() ? toneClass(trendTone()!) : ''"
@@ -134,19 +134,19 @@
           </div>
           @if (panelFailed(trendResource)) {
             <div class="state-text">
-              The booking trend could not be loaded.
+              {{ t('adminDashboard.theBookingTrendCould') }}
               <button
                 type="button"
                 class="btn btn-secondary btn-xs"
                 (click)="trendResource.reload()"
               >
-                Retry
+                {{ t('adminDashboard.retry') }}
               </button>
             </div>
           } @else if (trendResource.isLoading()) {
             <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
           } @else if (trend().length === 0) {
-            <div class="state-text">No bookings were made in this period.</div>
+            <div class="state-text">{{ t('adminDashboard.noBookingsWereMade') }}</div>
           } @else {
             <!--
               Every bar carries the day and the count it was drawn from.
@@ -174,9 +174,9 @@
               }
             </div>
             <div class="page-sub">
-              {{ trendRange() }} · busiest day {{ trendPeak() }}
-              {{ trendPeak() === 1 ? 'booking' : 'bookings' }} ·
-              <a class="row-link" routerLink="/bookings">see the bookings</a>
+              {{ trendRange() }} ·
+              {{ t('adminDashboard.busiestDayWith', { count: trendPeak() ?? 0 }) }} ·
+              <a class="row-link" routerLink="/bookings">{{ t('adminDashboard.seeTheBookings') }}</a>
             </div>
           }
         </section>
@@ -186,32 +186,30 @@
              the waste this split removed. It says it once, plainly, the way `features/not-built/`
              speaks for a whole screen. -->
         <section class="sect sect-pad stack stack-10">
-          <span class="k">Money in motion</span>
+          <span class="k">{{ t('adminDashboard.moneyInMotion') }}</span>
           <div class="state-block is-empty">
             <div class="state-icon is-outline"><kh-icon name="currency-circle-dollar" /></div>
-            <div class="state-title">No money has moved through the platform</div>
+            <div class="state-title">{{ t('adminDashboard.noMoneyHasMoved') }}</div>
             <div class="state-text">
-              Gross booking value, commission and dealer payouts all come from the Payments context,
-              which is not built. Commission is computed and frozen on every booking at the rate
-              that booking was made under — but nothing has been charged, held or paid out.
+              {{ t('adminDashboard.grossBookingValueCommission') }}
             </div>
             <div class="state-actions">
-              <a class="btn btn-secondary btn-sm" routerLink="/finance">What this will show</a>
+              <a class="btn btn-secondary btn-sm" routerLink="/finance">{{ t('adminDashboard.whatThisWillShow') }}</a>
             </div>
           </div>
         </section>
 
         <section class="sect sect-clip">
-          <div class="activity-head"><span class="k">Recent activity</span></div>
+          <div class="activity-head"><span class="k">{{ t('adminDashboard.recentActivity') }}</span></div>
           @if (panelFailed(activityResource)) {
             <div class="sect-pad state-text">
-              The activity feed could not be loaded.
+              {{ t('adminDashboard.theActivityFeedCould') }}
               <button
                 type="button"
                 class="btn btn-secondary btn-xs"
                 (click)="activityResource.reload()"
               >
-                Retry
+                {{ t('adminDashboard.retry') }}
               </button>
             </div>
           } @else if (activityResource.isLoading()) {
@@ -233,7 +231,7 @@
               } @empty {
                 <div class="activity-row">
                   <div class="grow">
-                    <div class="activity-text">No recorded activity yet.</div>
+                    <div class="activity-text">{{ t('adminDashboard.noRecordedActivityYet') }}</div>
                   </div>
                 </div>
               }

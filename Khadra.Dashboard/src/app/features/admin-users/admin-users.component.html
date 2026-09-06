@@ -1,16 +1,15 @@
 <div class="stack stack-14">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Admin users</h1>
+      <h1 class="page-title">{{ t('adminUsers.adminUsers') }}</h1>
       <div class="page-sub">
-        Who can administer the platform. There is one administrator role, and it can do everything
-        this console can.
+        {{ t('adminUsers.whoCanAdministerThe') }}
       </div>
     </div>
     <div class="dc-head-actions">
       <button type="button" class="btn btn-primary btn-md" (click)="invite()">
         <kh-icon name="user-plus" />
-        Invite administrator
+        {{ t('adminUsers.inviteAdministrator') }}
       </button>
     </div>
   </div>
@@ -19,10 +18,10 @@
     @if (failure(); as message) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the administrators</div>
+        <div class="state-title">{{ t('adminUsers.couldntLoadTheAdministrators') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     } @else if (resource.isLoading() && admins().length === 0) {
@@ -36,11 +35,11 @@
         <table class="table table-wide">
           <thead>
             <tr>
-              <th>Administrator</th>
-              <th>Contact</th>
-              <th>Status</th>
-              <th>Recorded actions</th>
-              <th>Last signed in</th>
+              <th>{{ t('adminUsers.administrator') }}</th>
+              <th>{{ t('common.contact') }}</th>
+              <th>{{ t('common.status') }}</th>
+              <th>{{ t('adminUsers.recordedActions') }}</th>
+              <th>{{ t('adminUsers.lastSignedIn') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -54,10 +53,10 @@
                       <div class="entity-name">
                         {{ admin.fullName }}
                         @if (isSelf(admin)) {
-                          <span class="pill s-dim">You</span>
+                          <span class="pill s-dim">{{ t('adminUsers.you') }}</span>
                         }
                       </div>
-                      <div class="entity-sub">Added {{ when(admin.createdAt) }}</div>
+                      <div class="entity-sub">{{ t('adminUsers.added') }} {{ when(admin.createdAt) }}</div>
                     </div>
                   </div>
                 </td>
@@ -90,7 +89,7 @@
                       class="btn btn-secondary btn-xs"
                       (click)="reactivate(admin)"
                     >
-                      Reactivate
+                      {{ t('common.reactivate') }}
                     </button>
                   } @else {
                     <!-- Restricted actions stay visible but disabled, with the reason attached,
@@ -102,7 +101,7 @@
                       [attr.title]="blockedReason(admin)"
                       (click)="deactivate(admin)"
                     >
-                      Deactivate
+                      {{ t('common.deactivate') }}
                     </button>
                   }
                 </td>
@@ -114,10 +113,7 @@
 
       <div class="sect-pad">
         <div class="note-box is-plain">
-          The last active administrator cannot be deactivated, and nobody can deactivate their own
-          account: nothing in the platform creates an administrator except another administrator, so
-          an empty list would be permanent. Deactivating does not delete the account — that would
-          burn the email address for ever.
+          {{ t('adminUsers.theLastActiveAdministrator') }}
         </div>
       </div>
     }

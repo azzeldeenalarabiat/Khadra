@@ -1,29 +1,29 @@
 <div class="stack stack-14">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Bookings</h1>
+      <h1 class="page-title">{{ t('common.bookings') }}</h1>
       <div class="page-sub">
-        Every booking on the platform, with the price and terms each one was made under.
+        {{ t('bookingsList.everyBookingOnThe') }}
       </div>
     </div>
   </div>
 
   <section class="sect sect-clip">
     <div class="tabs" role="tablist">
-      @for (t of tabs; track t.key) {
+      @for (option of tabs; track option.key) {
         <button
           type="button"
           class="tab"
           role="tab"
-          [class.is-active]="tab() === t.key"
-          [attr.aria-selected]="tab() === t.key"
-          (click)="select(t.key)"
+          [class.is-active]="tab() === option.key"
+          [attr.aria-selected]="tab() === option.key"
+          (click)="select(option.key)"
         >
-          {{ t.label }}
+          {{ option.label }}
           <!-- A count appears only once the server has answered. A zero here before then would
                claim a tab is empty when the truth is that nobody has asked yet. -->
-          @if (count(t.key) !== null) {
-            <span class="tab-count">{{ count(t.key) }}</span>
+          @if (count(option.key) !== null) {
+            <span class="tab-count">{{ count(option.key) }}</span>
           }
         </button>
       }
@@ -32,29 +32,29 @@
     @if (failure(); as message) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the bookings</div>
+        <div class="state-title">{{ t('bookingsList.couldntLoadTheBookings') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     } @else {
       <div class="list-toolbar">
         <div class="list-search">
           <kh-icon name="magnifying-glass" class="search-icon" />
-          <label class="visually-hidden" for="booking-search">Search by booking reference</label>
+          <label class="visually-hidden" for="booking-search">{{ t('bookingsList.searchByBookingReference') }}</label>
           <input
             id="booking-search"
             class="input input-sm"
-            placeholder="Booking reference, e.g. KH-3G96Q4L8"
+            [placeholder]="t('bookingsList.bookingReferenceEG')"
             [value]="search()"
             (input)="setSearch($event)"
           />
         </div>
         @if (scopedTo(); as scope) {
-          <span class="page-sub">Showing one {{ scope }}</span>
+          <span class="page-sub">{{ t('bookingsList.showingOne') }} {{ scope }}</span>
           <button type="button" class="btn btn-secondary btn-sm" (click)="clearScope()">
-            Show all bookings
+            {{ t('bookingsList.showAllBookings') }}
           </button>
         }
       </div>
@@ -68,10 +68,9 @@
       } @else if (rows().length === 0) {
         <div class="state-block is-empty">
           <div class="state-icon is-outline"><kh-icon name="calendar-blank" /></div>
-          <div class="state-title">No booking matches this view</div>
+          <div class="state-title">{{ t('bookingsList.noBookingMatchesThis') }}</div>
           <div class="state-text">
-            Clear the search or choose a different tab. Bookings are made by customers in the app;
-            the platform does not create them.
+            {{ t('bookingsList.clearTheSearchOr') }}
           </div>
         </div>
       } @else {
@@ -79,12 +78,12 @@
           <table class="table table-wide">
             <thead>
               <tr>
-                <th>Reference</th>
-                <th>Vehicle</th>
-                <th>Parties</th>
-                <th>Rental</th>
-                <th>Total</th>
-                <th>Status</th>
+                <th>{{ t('bookingsList.reference') }}</th>
+                <th>{{ t('bookingsList.vehicle') }}</th>
+                <th>{{ t('bookingsList.parties') }}</th>
+                <th>{{ t('bookingsList.rental') }}</th>
+                <th>{{ t('bookingsList.total') }}</th>
+                <th>{{ t('common.status') }}</th>
                 <th></th>
               </tr>
             </thead>
@@ -95,7 +94,7 @@
                     <a class="row-link mono" [routerLink]="['/bookings', row.bookingId]">
                       {{ row.reference }}
                     </a>
-                    <div class="td-sub">Booked {{ when(row.createdAt) }}</div>
+                    <div class="td-sub">{{ t('bookingsList.booked') }} {{ when(row.createdAt) }}</div>
                   </td>
                   <td class="td">
                     <div class="entity-name">{{ vehicleLabel(row) }}</div>
@@ -128,12 +127,12 @@
                   <td class="td">
                     <span class="pill" [class]="'s-' + tone(row)">{{ label(row.status) }}</span>
                     @if (row.hasLiveDispute) {
-                      <div class="td-sub s-bad">Disputed</div>
+                      <div class="td-sub s-bad">{{ t('common.disputed') }}</div>
                     }
                   </td>
                   <td class="td td-num">
                     <a class="btn btn-secondary btn-xs" [routerLink]="['/bookings', row.bookingId]">
-                      Open
+                      {{ t('bookingsList.open') }}
                     </a>
                   </td>
                 </tr>
@@ -151,16 +150,16 @@
               [disabled]="page() <= 1"
               (click)="goTo(page() - 1)"
             >
-              Previous
+              {{ t('common.previous') }}
             </button>
-            <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+            <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
             <button
               type="button"
               class="btn btn-secondary btn-page"
               [disabled]="page() >= totalPages()"
               (click)="goTo(page() + 1)"
             >
-              Next
+              {{ t('common.next') }}
             </button>
           </div>
         </div>

@@ -1,9 +1,9 @@
 <div class="stack stack-14 page-wide">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Dealer profile</h1>
+      <h1 class="page-title">{{ t('dealerProfile.dealerProfile') }}</h1>
       <div class="page-sub">
-        What customers see about your dealership, and where and when to find you.
+        {{ t('dealerProfile.whatCustomersSeeAbout') }}
       </div>
     </div>
     @if (isOwner() && dealer()) {
@@ -15,7 +15,7 @@
             [disabled]="busy()"
             (click)="reset(dealer()!)"
           >
-            Discard
+            {{ t('dealerProfile.discard') }}
           </button>
         }
         <button
@@ -34,11 +34,11 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load your dealer page</div>
+        <div class="state-title">{{ t('dealerProfile.couldntLoadYourDealer') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
           <button type="button" class="btn btn-primary btn-sm" (click)="resource.reload()">
-            Retry
+            {{ t('common.retry') }}
           </button>
         </div>
       </div>
@@ -48,7 +48,7 @@
       <div class="banner s-warn" role="status">
         <kh-icon name="info" class="banner-icon" />
         <div class="banner-body">
-          <div class="banner-text">Only the dealer owner can edit this page. You can read it.</div>
+          <div class="banner-text">{{ t('dealerProfile.onlyTheDealerOwner') }}</div>
         </div>
       </div>
     }
@@ -65,19 +65,19 @@
       <div class="stack stack-14">
         <section class="sect">
           <div class="sect-h">
-            <span class="sect-t">Branding</span
-            ><span class="sect-hint">JPEG, PNG or WebP · shown on your public page</span>
+            <span class="sect-t">{{ t('dealerProfile.branding') }}</span
+            ><span class="sect-hint">{{ t('dealerProfile.jpegPngOrWebp') }}</span>
           </div>
           <div class="sect-pad brand-row">
             <div class="brand-logo">
               <div class="thumb">
                 @if (d.logoUrl; as url) {
-                  <img [src]="url" alt="Logo" />
+                  <img [src]="url" [alt]="t('dealerProfile.logo')" />
                 } @else {
                   <span class="entity-avatar">{{ initials(d.businessName) }}</span>
                 }
               </div>
-              <span class="photo-label">Logo</span>
+              <span class="photo-label">{{ t('dealerProfile.logo') }}</span>
               @if (isOwner()) {
                 <label class="btn btn-secondary btn-xs">
                   {{ uploading() === 'logo' ? 'Uploading…' : 'Change' }}
@@ -94,13 +94,13 @@
             <div class="brand-cover">
               <div class="thumb">
                 @if (d.coverUrl; as url) {
-                  <img [src]="url" alt="Cover" />
+                  <img [src]="url" [alt]="t('dealerProfile.cover')" />
                 } @else {
                   <kh-icon name="image" />
                 }
               </div>
               <div class="row row-gap-8">
-                <span class="photo-label">Cover image</span>
+                <span class="photo-label">{{ t('dealerProfile.coverImage') }}</span>
                 @if (isOwner()) {
                   <label class="btn btn-secondary btn-xs push">
                     {{ uploading() === 'cover' ? 'Uploading…' : 'Change' }}
@@ -119,10 +119,10 @@
         </section>
 
         <section class="sect">
-          <div class="sect-h"><span class="sect-t">Business information</span></div>
+          <div class="sect-h"><span class="sect-t">{{ t('common.businessInformation') }}</span></div>
           <div class="sect-pad stack stack-12">
             <div class="field">
-              <label for="business-name">Business name</label>
+              <label for="business-name">{{ t('dealerProfile.businessName') }}</label>
               <input
                 id="business-name"
                 class="input"
@@ -132,25 +132,24 @@
               />
               @if (nameLocked()) {
                 <div class="field-hint">
-                  <kh-icon name="lock-simple" /> Locked after approval — this is the name your
-                  licence was verified against. Ask the platform to change it.
+                  <kh-icon name="lock-simple" /> {{ t('dealerProfile.lockedAfterApprovalThis') }}
                 </div>
               } @else if (fieldError('businessName'); as e) {
                 <div class="field-error">{{ e }}</div>
               }
             </div>
             <div class="field">
-              <label for="cr-number">Commercial registration</label>
+              <label for="cr-number">{{ t('dealerProfile.commercialRegistration') }}</label>
               <input
                 id="cr-number"
                 class="input"
                 [value]="d.commercialRegistrationNumber"
                 disabled
               />
-              <div class="field-hint">From your licence. Not editable.</div>
+              <div class="field-hint">{{ t('dealerProfile.fromYourLicenceNot') }}</div>
             </div>
             <div class="field">
-              <label for="description">Description</label>
+              <label for="description">{{ t('common.description') }}</label>
               <textarea
                 id="description"
                 class="input"
@@ -158,7 +157,7 @@
                 [value]="description()"
                 [disabled]="!isOwner()"
                 (input)="description.set(value($event))"
-                placeholder="What you rent, what you are known for, anything a customer should know before booking."
+                [placeholder]="t('dealerProfile.whatYouRentWhat')"
               ></textarea>
               @if (fieldError('description'); as e) {
                 <div class="field-error">{{ e }}</div>
@@ -169,7 +168,7 @@
 
         <section class="sect">
           <div class="sect-h">
-            <span class="sect-t">Operating hours</span
+            <span class="sect-t">{{ t('dealerProfile.operatingHours') }}</span
             ><span class="sect-hint">{{ hoursSummary() }}</span>
           </div>
           <div class="sect-pad">
@@ -192,16 +191,16 @@
                     [value]="h.opensAt"
                     [disabled]="!isOwner()"
                     (change)="setDay(h.day, { opensAt: value($event) })"
-                    aria-label="Opens at"
+                    [attr.aria-label]="t('common.opensAt')"
                   />
-                  <span class="hours-to">to</span>
+                  <span class="hours-to">{{ t('dealerProfile.to') }}</span>
                   <input
                     class="input hours-time"
                     type="time"
                     [value]="h.closesAt"
                     [disabled]="!isOwner()"
                     (change)="setDay(h.day, { closesAt: value($event) })"
-                    aria-label="Closes at"
+                    [attr.aria-label]="t('common.closesAt')"
                   />
                 }
                 @if (isOwner()) {
@@ -210,7 +209,7 @@
                     class="btn btn-ghost btn-xs push"
                     (click)="copyToAll(h.day)"
                   >
-                    Apply to all
+                    {{ t('dealerProfile.applyToAll') }}
                   </button>
                 }
               </div>
@@ -223,9 +222,9 @@
 
         <section class="sect">
           <div class="sect-h">
-            <span class="sect-t">Location</span
+            <span class="sect-t">{{ t('dealerProfile.location') }}</span
             ><span class="sect-hint"
-              >Where customers collect cars, and the centre of your delivery radius</span
+              >{{ t('dealerProfile.whereCustomersCollectCars') }}</span
             >
           </div>
           <div class="sect-pad stack stack-12">
@@ -234,8 +233,7 @@
                 <kh-icon name="warning-circle" class="banner-icon" />
                 <div class="banner-body">
                   <div class="banner-text">
-                    The map is waiting for coordinates it can place. Correct the numbers below and
-                    it will follow.
+                    {{ t('dealerProfile.theMapIsWaiting') }}
                   </div>
                 </div>
               </div>
@@ -251,7 +249,7 @@
             }
             <div class="dc-split-even">
               <div class="field">
-                <label for="lat">Latitude</label>
+                <label for="lat">{{ t('common.latitude') }}</label>
                 <input
                   id="lat"
                   class="input"
@@ -265,7 +263,7 @@
                 />
               </div>
               <div class="field">
-                <label for="lng">Longitude</label>
+                <label for="lng">{{ t('common.longitude') }}</label>
                 <input
                   id="lng"
                   class="input"
@@ -281,12 +279,11 @@
             </div>
             @if (coordsInvalid()) {
               <div class="field-error">
-                Enter a latitude between −90 and 90 and a longitude between −180 and 180.
+                {{ t('dealerProfile.enterALatitudeBetween') }}
               </div>
             } @else if (isOwner()) {
               <div class="field-hint">
-                Drag the pin, or click the map, to set where customers collect cars. Your delivery
-                radius is drawn around it to scale — zoom out to see the whole circle.
+                {{ t('dealerProfile.dragThePinOr') }}
               </div>
             }
           </div>
@@ -296,8 +293,8 @@
       <div class="stack stack-14">
         <section class="sect">
           <div class="sect-h">
-            <span class="sect-t">Public preview</span
-            ><span class="sect-hint">As a customer sees it</span>
+            <span class="sect-t">{{ t('dealerProfile.publicPreview') }}</span
+            ><span class="sect-hint">{{ t('dealerProfile.asACustomerSees') }}</span>
           </div>
           <div class="public-cover">
             @if (d.coverUrl; as url) {
@@ -316,7 +313,7 @@
               <div>
                 <div class="public-name">{{ businessName() || d.businessName }}</div>
                 <div class="public-meta">
-                  No reviews yet ·
+                  {{ t('dealerProfile.noReviewsYet') }}
                   {{
                     d.delivery.isEnabled
                       ? 'Delivers up to ' + d.delivery.radiusKm + ' km'
@@ -327,38 +324,38 @@
             </div>
             <div class="page-sub">{{ description() || 'No description yet.' }}</div>
             <div class="history-line">
-              <span class="k-label">Hours</span><span>{{ hoursSummary() }}</span>
+              <span class="k-label">{{ t('dealerProfile.hours') }}</span><span>{{ hoursSummary() }}</span>
             </div>
             <div class="history-line">
-              <span class="k-label">Status</span
+              <span class="k-label">{{ t('common.status') }}</span
               ><span class="pill" [class]="d.canTrade ? 's-ok' : 's-warn'">{{
                 d.canTrade ? 'Listed' : 'Not listed'
               }}</span>
             </div>
             <div class="note-box is-plain">
               <kh-icon name="info" />
-              Customer reviews are not live yet; the page says so rather than showing a rating.
+              {{ t('dealerProfile.customerReviewsAreNot') }}
             </div>
           </div>
         </section>
 
         <section class="sect sect-pad stack stack-9">
-          <span class="k">Verification</span>
+          <span class="k">{{ t('dealerProfile.verification') }}</span>
           <div class="history-line">
-            <span class="k-label">Status</span
+            <span class="k-label">{{ t('common.status') }}</span
             ><span class="pill" [class]="d.canTrade ? 's-ok' : 's-warn'">{{
               d.verificationStatus
             }}</span>
           </div>
           <div class="history-line">
-            <span class="k-label">Documents on file</span
+            <span class="k-label">{{ t('common.documentsOnFile') }}</span
             ><span class="num">{{ d.submittedDocuments.length }}</span>
           </div>
           @if (d.reviewNote) {
-            <div class="page-sub">Platform note: “{{ d.reviewNote }}”</div>
+            <div class="page-sub">{{ t('dealerProfile.platformNote') }}{{ d.reviewNote }}”</div>
           }
           <div class="history-line">
-            <span class="k-label">Staff</span><span class="num">{{ d.employeeCount }}</span>
+            <span class="k-label">{{ t('dealerProfile.staff') }}</span><span class="num">{{ d.employeeCount }}</span>
           </div>
         </section>
       </div>

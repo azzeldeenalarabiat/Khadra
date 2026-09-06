@@ -84,6 +84,13 @@ public static class DealerErrors
     public static readonly Error InvitationAlreadyAccepted =
         Error.Conflict("dealer.invitation_accepted", "This employee has already accepted their invitation.");
 
+    // The mail server refused the invitation. The employee record and the fresh token both stand,
+    // so this reports the one thing the owner cannot see for themselves: nobody was written to.
+    public static readonly Error InvitationEmailNotSent =
+        Error.Unavailable(
+            "dealer.invitation_email_not_sent",
+            "We could not email the invitation just now. The employee is saved — try sending it again in a few minutes.");
+
     public static readonly Error EmployeeAlreadyActive =
         Error.Conflict("dealer.employee_already_active", "This employee is already active.");
 

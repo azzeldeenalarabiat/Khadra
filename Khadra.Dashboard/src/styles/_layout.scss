@@ -156,6 +156,52 @@
   color: color-mix(in srgb, var(--color-text) 62%, transparent);
 }
 
+/* What an employee holds, stated in the rail (design: Employee Console, "YOUR PERMISSIONS").
+   Status colour comes from --c, set by the .s-* class on each row, never written literally here. */
+.perm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 10px;
+  margin-block-end: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 12%, transparent);
+  border-radius: 8px;
+}
+
+.perm-title {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+.perm-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--c);
+}
+
+.perm-icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.perm-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perm-note {
+  margin-block-start: 2px;
+  font-size: 10px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--color-text) 52%, transparent);
+}
+
 .sidebar-link {
   display: flex;
   align-items: center;

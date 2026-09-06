@@ -7,25 +7,27 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { MapComponent } from '../../shared/map/map.component';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /** The three papers spec 3.1 requires. The keys are the form field names the API binds. */
 const REQUIRED_DOCUMENTS = [
   {
     key: 'commercialRegistration',
-    label: 'Commercial registration',
-    hint: 'The registration certificate for the business.',
+    labelKey: 'dealerProfile.commercialRegistration',
+    hintKey: 'dealerApply.theRegistrationCertificateFor',
   },
   {
     key: 'vehicleRegistration',
-    label: 'Green-plate vehicle registration',
-    hint: 'Proof that your cars are registered as licensed rental vehicles.',
+    labelKey: 'dealerApply.greenPlateVehicleRegistration',
+    hintKey: 'dealerApply.proofThatYourCars',
   },
   {
     key: 'ownerIdentity',
-    label: 'The owner’s ID',
-    hint: 'Your national ID or passport.',
+    labelKey: 'dealerApply.theOwnersId',
+    hintKey: 'dealerApply.yourNationalIdOr',
   },
-] as const;
+] as const satisfies readonly { key: string; labelKey: TranslationKey; hintKey: TranslationKey }[];
 
 type DocumentKey = (typeof REQUIRED_DOCUMENTS)[number]['key'];
 
@@ -50,6 +52,7 @@ type DocumentKey = (typeof REQUIRED_DOCUMENTS)[number]['key'];
   imports: [IconComponent, MapComponent],
 })
 export class DealerApplyComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly console = inject(DealerConsoleService);
   private readonly lookups = inject(LookupsService);
   private readonly ui = inject(ConsoleUiService);
@@ -100,7 +103,7 @@ export class DealerApplyComponent {
 
   protected readonly missingDocuments = computed(() =>
     REQUIRED_DOCUMENTS.filter((document) => !this.files()[document.key]).map(
-      (document) => document.label,
+      (document) => this.t(document.labelKey),
     ),
   );
 

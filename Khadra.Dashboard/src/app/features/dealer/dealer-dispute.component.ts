@@ -15,6 +15,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { SessionService } from '../../core/services/session.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * A dispute from the dealer's side (spec 3.3).
@@ -30,6 +31,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class DealerDisputeComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerDisputesService);
   private readonly ui = inject(ConsoleUiService);
   private readonly session = inject(SessionService);
@@ -127,16 +129,16 @@ export class DealerDisputeComponent {
       {
         icon: 'x-circle',
         tone: 'warn',
-        title: 'Withdraw this dispute?',
-        body: 'The amicable path: the ticket closes, nothing is charged to anyone, and the booking settles as if no dispute had been raised. You can open a new one while the window is still open.',
-        confirm: 'Withdraw dispute',
-        result: { title: 'Dispute withdrawn', body: 'Nothing is charged to anyone.', tone: 'warn' },
+        title: this.t('dealerDispute.withdrawThisDispute'),
+        body: this.t('dealerDispute.theAmicablePathThe'),
+        confirm: this.t('dealerDispute.withdrawDispute'),
+        result: { title: this.t('dealerDispute.disputeWithdrawn'), body: this.t('dealerDispute.nothingIsChargedTo'), tone: 'warn' },
       },
       async () => {
         await this.service.withdraw(d.ticketId);
         this.service.refresh();
       },
-      { title: 'Dispute withdrawn', body: 'Nothing is charged to anyone.', tone: 'warn' },
+      { title: this.t('dealerDispute.disputeWithdrawn'), body: this.t('dealerDispute.nothingIsChargedTo'), tone: 'warn' },
     );
   }
 

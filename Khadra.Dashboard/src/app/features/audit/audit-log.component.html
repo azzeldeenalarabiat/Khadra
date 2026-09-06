@@ -1,10 +1,9 @@
 <div class="stack stack-14">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Audit logs</h1>
+      <h1 class="page-title">{{ t('auditLog.auditLogs') }}</h1>
       <div class="page-sub">
-        Every privileged action on the platform, who took it, and on what grounds. Entries cannot be
-        edited or removed — by anyone, including an administrator.
+        {{ t('auditLog.everyPrivilegedActionOn') }}
       </div>
     </div>
   </div>
@@ -15,9 +14,9 @@
          failure the audit log cannot have. -->
     <div class="list-toolbar filters-row">
       <label class="field-inline">
-        <span class="k">Action</span>
+        <span class="k">{{ t('auditLog.action') }}</span>
         <select class="input input-sm" (change)="setFilter('action', $any($event.target).value)">
-          <option value="" [selected]="!action()">All actions</option>
+          <option value="" [selected]="!action()">{{ t('auditLog.allActions') }}</option>
           @for (name of vocabularyData()?.actions ?? []; track name) {
             <option [value]="name" [selected]="action() === name">{{ label(name) }}</option>
           }
@@ -25,12 +24,12 @@
       </label>
 
       <label class="field-inline">
-        <span class="k">Record</span>
+        <span class="k">{{ t('auditLog.record') }}</span>
         <select
           class="input input-sm"
           (change)="setFilter('entityType', $any($event.target).value)"
         >
-          <option value="" [selected]="!entityType()">All records</option>
+          <option value="" [selected]="!entityType()">{{ t('auditLog.allRecords') }}</option>
           @for (name of vocabularyData()?.entityTypes ?? []; track name) {
             <option [value]="name" [selected]="entityType() === name">{{ name }}</option>
           }
@@ -38,9 +37,9 @@
       </label>
 
       <label class="field-inline">
-        <span class="k">Who</span>
+        <span class="k">{{ t('auditLog.who') }}</span>
         <select class="input input-sm" (change)="setActor($any($event.target).value)">
-          <option value="" [selected]="!actorUserId() && !systemOnly()">Anyone</option>
+          <option value="" [selected]="!actorUserId() && !systemOnly()">{{ t('auditLog.anyone') }}</option>
           <!-- Tracked by id, not name: two people can share one, and someone renamed between two
                actions appears under both. "System" is a mode rather than an id — it is the absence
                of an actor — so it selects a different filter. -->
@@ -51,7 +50,7 @@
               </option>
             } @else {
               <option value="system" [selected]="systemOnly()">
-                {{ actor.name }} — automated ({{ actor.entryCount }})
+                {{ actor.name }} {{ t('auditLog.automated') }}{{ actor.entryCount }})
               </option>
             }
           }
@@ -59,7 +58,7 @@
       </label>
 
       <label class="field-inline">
-        <span class="k">From</span>
+        <span class="k">{{ t('auditLog.from') }}</span>
         <input
           class="input input-sm"
           type="date"
@@ -69,7 +68,7 @@
       </label>
 
       <label class="field-inline">
-        <span class="k">To</span>
+        <span class="k">{{ t('auditLog.to') }}</span>
         <input
           class="input input-sm"
           type="date"
@@ -79,28 +78,28 @@
       </label>
 
       <label class="field-inline grow">
-        <span class="k">Search</span>
+        <span class="k">{{ t('auditLog.search') }}</span>
         <input
           class="input input-sm"
           type="search"
-          placeholder="Dealer, booking reference or person…"
+          [placeholder]="t('auditLog.dealerBookingReferenceOr')"
           [value]="search()"
           (input)="setSearch($event)"
         />
       </label>
 
       @if (anyFilter()) {
-        <button type="button" class="btn btn-secondary btn-sm" (click)="clear()">Clear</button>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="clear()">{{ t('auditLog.clear') }}</button>
       }
     </div>
 
     @if (failure(); as message) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the audit log</div>
+        <div class="state-title">{{ t('auditLog.couldntLoadTheAudit') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     } @else if (resource.isLoading() && rows().length === 0) {
@@ -117,16 +116,15 @@
         </div>
         <div class="state-text">
           @if (anyFilter()) {
-            No entry matches this combination. Widen the range or clear the filters.
+            {{ t('auditLog.noEntryMatchesThis') }}
           } @else {
-            The log fills as administrators act: approving a dealer, resolving a dispute, changing a
-            platform setting. Each entry is written in the same transaction as the action itself.
+            {{ t('auditLog.theLogFillsAs') }}
           }
         </div>
         @if (anyFilter()) {
           <div class="state-actions">
             <button type="button" class="btn btn-secondary btn-sm" (click)="clear()">
-              Clear filters
+              {{ t('auditLog.clearFilters') }}
             </button>
           </div>
         }
@@ -143,11 +141,11 @@
         <table class="table table-wide">
           <thead>
             <tr>
-              <th>When</th>
-              <th>Who</th>
-              <th>Action</th>
-              <th>Record</th>
-              <th>Change</th>
+              <th>{{ t('auditLog.when') }}</th>
+              <th>{{ t('auditLog.who') }}</th>
+              <th>{{ t('auditLog.action') }}</th>
+              <th>{{ t('auditLog.record') }}</th>
+              <th>{{ t('auditLog.change') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -213,28 +211,28 @@
                       <!-- The reason is why this screen exists. Without it the log records that a
                            dealer was suspended and not why, which settles nothing. -->
                       <div class="kv">
-                        <div class="kv-key">Reason given</div>
+                        <div class="kv-key">{{ t('auditLog.reasonGiven') }}</div>
                         <div class="kv-val">
                           {{ row.reason ?? 'No reason was recorded with this action.' }}
                         </div>
                       </div>
                       @if (hasChange(row)) {
                         <div class="kv">
-                          <div class="kv-key">Previous value</div>
+                          <div class="kv-key">{{ t('auditLog.previousValue') }}</div>
                           <div class="kv-val">{{ row.previousValue ?? '—' }}</div>
                         </div>
                         <div class="kv">
-                          <div class="kv-key">New value</div>
+                          <div class="kv-key">{{ t('auditLog.newValue') }}</div>
                           <div class="kv-val">{{ row.newValue ?? '—' }}</div>
                         </div>
                       }
                       <div class="kv">
-                        <div class="kv-key">Recorded at</div>
+                        <div class="kv-key">{{ t('auditLog.recordedAt') }}</div>
                         <div class="kv-val">{{ when(row.occurredAt) }}</div>
                       </div>
                       @if (row.correlationId) {
                         <div class="kv">
-                          <div class="kv-key">Correlation</div>
+                          <div class="kv-key">{{ t('auditLog.correlation') }}</div>
                           <!-- Everything one request did shares this, so a support question about
                                one incident can be followed across the entries it produced. -->
                           <div class="kv-val mono">{{ row.correlationId }}</div>
@@ -258,16 +256,16 @@
             [disabled]="!hasPrevious()"
             (click)="goTo(page() - 1)"
           >
-            Previous
+            {{ t('common.previous') }}
           </button>
-          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
           <button
             type="button"
             class="btn btn-secondary btn-page"
             [disabled]="!hasNext()"
             (click)="goTo(page() + 1)"
           >
-            Next
+            {{ t('common.next') }}
           </button>
         </div>
       </div>

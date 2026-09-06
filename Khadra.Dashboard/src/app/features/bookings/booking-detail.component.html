@@ -3,11 +3,11 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load this booking</div>
+        <div class="state-title">{{ t('common.couldntLoadThisBooking') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/bookings">Back to bookings</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/bookings">{{ t('common.backToBookings') }}</a>
         </div>
       </div>
     </section>
@@ -28,21 +28,21 @@
           <h1 class="page-title mono">{{ b.reference }}</h1>
           <span class="pill" [class]="'s-' + tone()">{{ statusLabel() }}</span>
           @if (b.liveDisputeId) {
-            <span class="pill s-bad">Disputed</span>
+            <span class="pill s-bad">{{ t('common.disputed') }}</span>
           }
         </div>
         <div class="page-sub">
-          Booked {{ when(b.createdAt) }} · {{ when(b.periodStart) }} to {{ when(b.periodEnd) }}
+          {{ t('adminBooking.booked') }} {{ when(b.createdAt) }} · {{ when(b.periodStart) }} to {{ when(b.periodEnd) }}
         </div>
       </div>
       <div class="dc-head-actions">
-        <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', b.dealerId]">Open dealer</a>
+        <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', b.dealerId]">{{ t('common.openDealer') }}</a>
         <a class="btn btn-secondary btn-md" [routerLink]="['/customers', b.customerId]">
-          Open customer
+          {{ t('adminBooking.openCustomer') }}
         </a>
         @if (b.liveDisputeId) {
           <a class="btn btn-primary btn-md" [routerLink]="['/disputes', b.liveDisputeId]">
-            Open dispute
+            {{ t('common.openDispute') }}
           </a>
         }
       </div>
@@ -53,7 +53,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="users-three" class="kpi-icon" />
-            <span class="sect-t">Parties</span>
+            <span class="sect-t">{{ t('adminBooking.parties') }}</span>
           </div>
           <div class="kv-body">
             @for (row of partyRows(); track row.k) {
@@ -68,8 +68,8 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="currency-circle-dollar" class="kpi-icon" />
-            <span class="sect-t">Money</span>
-            <span class="sect-hint">Frozen when the booking was made</span>
+            <span class="sect-t">{{ t('common.money') }}</span>
+            <span class="sect-hint">{{ t('adminBooking.frozenWhenTheBooking') }}</span>
           </div>
           <div class="kv-body">
             @for (row of moneyRows(); track row.k) {
@@ -85,16 +85,16 @@
           <section class="sect">
             <div class="sect-h">
               <kh-icon name="warning-diamond" class="kpi-icon" />
-              <span class="sect-t">Penalty assessed</span>
+              <span class="sect-t">{{ t('common.penaltyAssessed') }}</span>
             </div>
             <div class="sect-pad stack stack-9">
               @if (penalty.isNothingOwed) {
                 <div class="money-line">
-                  <span class="k-label">Nothing is owed</span>
+                  <span class="k-label">{{ t('adminBooking.nothingIsOwed') }}</span>
                 </div>
               } @else {
                 <div class="money-line">
-                  <span class="k-label">Against {{ penalty.attributedTo }}</span>
+                  <span class="k-label">{{ t('adminBooking.against') }} {{ penalty.attributedTo }}</span>
                   <span class="num">
                     @if (penalty.isRange) {
                       {{ penalty.minAmount.amount }}–{{ penalty.maxAmount.amount }}
@@ -107,7 +107,7 @@
               }
               <div class="page-sub">{{ penalty.reason }}</div>
               <div class="note-box is-plain">
-                Assessed, not charged. Money moves only when an administrator resolves a dispute.
+                {{ t('adminBooking.assessedNotChargedMoney') }}
               </div>
             </div>
           </section>
@@ -117,7 +117,7 @@
           <section class="sect">
             <div class="sect-h">
               <kh-icon name="steering-wheel" class="kpi-icon" />
-              <span class="sect-t">Handovers</span>
+              <span class="sect-t">{{ t('common.handovers') }}</span>
             </div>
             <div class="sect-pad stack stack-12">
               @for (h of b.handovers; track h.recordedAt) {
@@ -127,20 +127,20 @@
                     <span class="page-sub push">{{ when(h.recordedAt) }}</span>
                   </div>
                   <div class="page-sub">
-                    Recorded by {{ h.recordedBy }}
+                    {{ t('adminBooking.recordedBy') }} {{ h.recordedBy }}
                     @if (h.odometerKm !== null) {
                       · {{ h.odometerKm }} km
                     }
                     @if (h.fuelLevel !== null) {
-                      · fuel {{ h.fuelLevel }}
+                      {{ t('adminBooking.fuel') }} {{ h.fuelLevel }}
                     }
                     @if (h.photoCount) {
-                      · {{ h.photoCount }} photo(s)
+                      · {{ h.photoCount }} {{ t('adminBooking.photoS') }}
                     }
                   </div>
                   @if (h.cashCollected) {
                     <div class="page-sub">
-                      Cash collected: {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
+                      {{ t('adminBooking.cashCollected') }} {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
                     </div>
                   }
                   @if (h.notes) {
@@ -153,7 +153,7 @@
         }
 
         <section class="sect">
-          <div class="sect-h"><span class="sect-t">History</span></div>
+          <div class="sect-h"><span class="sect-t">{{ t('adminBooking.history') }}</span></div>
           <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
         </section>
       </div>
@@ -162,7 +162,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="file-lock" class="kpi-icon" />
-            <span class="sect-t">Terms it was made under</span>
+            <span class="sect-t">{{ t('adminBooking.termsItWasMade') }}</span>
           </div>
           <div class="kv-body">
             @for (row of termsRows(); track row.k) {
@@ -175,46 +175,43 @@
         </section>
 
         <section class="sect sect-pad stack stack-9">
-          <span class="k">Platform actions</span>
+          <span class="k">{{ t('adminBooking.platformActions') }}</span>
           @if (hasAnyAction()) {
             @if (canCancel()) {
               <button type="button" class="btn btn-danger btn-lg-row" (click)="cancel()">
                 <kh-icon name="x-circle" />
-                Cancel booking
+                {{ t('adminBooking.cancelBooking') }}
               </button>
             }
             @if (canExpire()) {
               <button type="button" class="btn btn-secondary btn-lg-row" (click)="expire()">
                 <kh-icon name="clock-counter-clockwise" />
-                Expire booking
+                {{ t('adminBooking.expireBooking') }}
               </button>
             }
             @if (canMarkNoShow()) {
               <button type="button" class="btn btn-danger btn-lg-row" (click)="markNoShow()">
                 <kh-icon name="prohibit" />
-                Mark as no-show
+                {{ t('adminBooking.markAsNoShow') }}
               </button>
             }
             <div class="decision-note">
-              None of these moves money. A cancellation by the platform assesses no penalty against
-              either party; the two deadline actions are refused while this booking's own window
-              still has time in it. Every one is attributed to you in the
+              {{ t('adminBooking.noneOfTheseMoves') }}
               <a
                 routerLink="/audit-logs"
                 [queryParams]="{ entityType: 'Booking', entityId: b.bookingId }"
               >
-                audit log</a
+                {{ t('common.auditLog') }}</a
               >.
             </div>
           } @else {
             <div class="decision-note">
-              This booking has reached a state the platform does not step into. Its record stays
-              exactly as it is; what happened to it is in the
+              {{ t('adminBooking.thisBookingHasReached') }}
               <a
                 routerLink="/audit-logs"
                 [queryParams]="{ entityType: 'Booking', entityId: b.bookingId }"
               >
-                audit log</a
+                {{ t('common.auditLog') }}</a
               >.
             </div>
           }

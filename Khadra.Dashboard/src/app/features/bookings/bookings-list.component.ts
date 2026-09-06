@@ -8,6 +8,7 @@ import { AdminBookingsService } from '../../core/services/admin-bookings.service
 import { BookingTab } from '../../core/services/dealer-bookings.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /** The dealer's tabs, plus the one status the platform needs that they cannot express. */
 type AdminBookingTab = BookingTab | 'unpaid';
@@ -27,6 +28,7 @@ type AdminBookingTab = BookingTab | 'unpaid';
   imports: [RouterLink, IconComponent],
 })
 export class BookingsListComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminBookingsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);

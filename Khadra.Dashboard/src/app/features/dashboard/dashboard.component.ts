@@ -19,6 +19,7 @@ import {
 import { Tone, toneClass } from '../../core/models/console.models';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Landing screen: platform figures, the work queue that drives the admin SLA, and a short activity
@@ -35,6 +36,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class DashboardComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminDashboardService);
   private readonly now = signal(Date.now());
 
@@ -80,12 +82,15 @@ export class DashboardComponent {
    * once, in words.
    */
   protected readonly kpis = computed(() =>
-    toKpiCards({
-      dealers: this.dealerCounts(),
-      bookings: this.bookingCounts(),
-      customers: this.customerCounts(),
-      disputes: this.disputeCounts(),
-    }),
+    toKpiCards(
+      {
+        dealers: this.dealerCounts(),
+        bookings: this.bookingCounts(),
+        customers: this.customerCounts(),
+        disputes: this.disputeCounts(),
+      },
+      this.t,
+    ),
   );
 
   protected readonly countsLoading = computed(
@@ -98,7 +103,7 @@ export class DashboardComponent {
 
   protected readonly queue = computed(() => {
     const data = this.queueData();
-    return data ? toQueueItems(data, this.now()) : [];
+    return data ? toQueueItems(data, this.now(), this.t) : [];
   });
 
   protected readonly trend = computed(() => {
@@ -108,7 +113,7 @@ export class DashboardComponent {
 
   protected readonly activity = computed(() => {
     const data = this.activityData();
-    return data ? toActivityRows(data.entries, this.now()) : [];
+    return data ? toActivityRows(data.entries, this.now(), this.t) : [];
   });
 
   protected readonly trendChange = computed(() =>
@@ -176,12 +181,12 @@ export class DashboardComponent {
   protected readonly failure = computed(() => {
     const status = (this.dealers.error() as { status?: number } | undefined)?.status ?? 0;
     if (status === 401) {
-      return { title: 'Your session has expired', body: 'Sign in again to see platform figures.' };
+      return { title: this.t('adminDashboard.yourSessionHasExpired'), body: this.t('adminDashboard.signInAgainTo') };
     }
     if (status === 403) {
       return {
-        title: 'This account cannot see the platform dashboard',
-        body: 'Platform figures are restricted to administrators.',
+        title: this.t('adminDashboard.thisAccountCannotSee'),
+        body: this.t('adminDashboard.platformFiguresAreRestricted'),
       };
     }
     return null;

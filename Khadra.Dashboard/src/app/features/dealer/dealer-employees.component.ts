@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Employee } from '../../core/models/dealer-console.api';
 import { Tone } from '../../core/models/console.models';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Staff (spec 4.2, design `isEmployees`).
@@ -13,17 +15,23 @@ import { IconComponent } from '../../shared/icon/icon.component';
  * or types a password for them. Deactivating signs them out everywhere at once. The only permission
  * beyond "can act on bookings" is report access, and it is a switch the owner flips per person.
  *
- * Owner-only, and the API enforces that; an employee opening this page reads the list and nothing
- * else. Phone is required by the API (it is how a dealer reaches staff about a handover), which the
- * design left optional -- recorded as a deviation.
+ * Owner-only, and not partly: `DealerEmployeesController` carries `ApprovedDealer` on the CLASS, so
+ * an employee is refused this list even to read it, and so is an owner whose dealership cannot yet
+ * trade. Both are told which of those two they are, before the request rather than after it — the
+ * list is not asked for at all without `canManageStaff`, because a role refusal comes back as a
+ * bodiless 403 that no screen can turn into a sentence.
+ *
+ * Phone is required by the API (it is how a dealer reaches staff about a handover), which the design
+ * left optional -- recorded as a deviation.
  */
 @Component({
   selector: 'kh-dealer-employees',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dealer-employees.component.html',
-  imports: [IconComponent],
+  imports: [IconComponent, RouterLink],
 })
 export class DealerEmployeesComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
 
@@ -36,7 +44,13 @@ export class DealerEmployeesComponent {
 
   protected readonly employees = computed(() => this.data() ?? []);
   protected readonly isOwner = computed(() => !!this.dealer()?.isOwner);
-  protected readonly canInvite = computed(() => this.isOwner() && !!this.dealer()?.canTrade);
+
+  /**
+   * Whether the list is this person's to read at all. `null` until `GET /dealers/me` answers, so
+   * nothing claims anything in the window before the console knows who is asking.
+   */
+  protected readonly canManage = computed(() => this.service.permissions()?.canManageStaff ?? null);
+  protected readonly canInvite = computed(() => this.canManage() === true);
 
   protected readonly counts = computed(() => {
     const all = this.employees();
@@ -47,11 +61,34 @@ export class DealerEmployeesComponent {
     };
   });
 
+  /**
+   * Why the list is closed to the person reading, in their own terms.
+   *
+   * The same 403 used to answer both of them with "only the dealer owner can manage staff", which is
+   * the one sentence that cannot be true of the owner it was shown to. Now the answer comes from
+   * `me`: not the owner, or the owner of a dealership that may not trade yet.
+   */
+  protected readonly denial = computed<{ title: string; body: string } | null>(() => {
+    if (this.canManage() !== false) return null;
+
+    if (!this.isOwner()) {
+      return {
+        title: this.t('dealerEmployees.staffIsTheOwners'),
+        body: this.t('dealerEmployees.whoWorksHereWhat'),
+      };
+    }
+    return {
+      title: this.t('dealerEmployees.staffOpensOnceYour'),
+      body: this.t('dealerEmployees.invitingPeopleGrantingReport'),
+    };
+  });
+
   protected readonly failure = computed(() => {
     const error = this.resource.error() as
       { status?: number; error?: { code?: string } } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'Only the dealer owner can manage staff.';
+    // Reachable when standing changes under an open screen -- a suspension landing mid-session.
+    if (error.status === 403) return 'Your dealership can no longer manage staff just now.';
     return 'Your staff list could not be loaded. Nothing has been changed.';
   });
 
@@ -82,43 +119,48 @@ export class DealerEmployeesComponent {
       {
         icon: 'user-plus',
         tone: 'accent',
-        title: 'Invite a staff member',
-        body: 'They get an email with a link to set their own password. The link works for a limited time; you can resend it from this page.',
-        confirm: 'Send invitation',
+        title: this.t('dealerEmployees.inviteAStaffMember'),
+        body: this.t('dealerEmployees.theyGetAnEmail'),
+        confirm: this.t('dealerEmployees.sendInvitation'),
         fields: [
-          { label: 'Full name', type: 'text', placeholder: 'e.g. Ahmad Zaid' },
-          { label: 'Email', type: 'text', placeholder: 'name@example.jo' },
+          { name: 'fullName', label: this.t('employeeSettings.fullName'), type: 'text', placeholder: this.t('dealerEmployees.eGAhmadZaid') },
+          { name: 'email', label: 'Email', type: 'text', placeholder: 'name@example.jo' },
           {
+            name: 'phone',
             label: 'Phone',
             type: 'text',
             placeholder: '07XXXXXXXX',
-            hint: 'Required. How you reach them about a handover.',
+            hint: this.t('dealerEmployees.requiredHowYouReach'),
           },
           {
-            label: 'Report access',
+            name: 'reportAccess',
+            label: this.t('dealerEmployees.reportAccess'),
             type: 'select',
-            options: ['No', 'Yes'],
-            value: 'No',
-            hint: 'Whether they can see revenue and the reports page. Bookings are always theirs to handle.',
+            options: [
+              { value: 'no', label: 'No' },
+              { value: 'yes', label: 'Yes' },
+            ],
+            value: 'no',
+            hint: this.t('dealerEmployees.whetherTheyCanSee'),
           },
         ],
-        result: { title: 'Invitation sent', body: 'They will find the link in their inbox.' },
+        result: { title: this.t('dealerEmployees.invitationSent'), body: this.t('dealerEmployees.theyWillFindThe') },
       },
       async (values) => {
-        const fullName = (values['Full name'] ?? '').trim();
-        const email = (values['Email'] ?? '').trim();
-        const phone = (values['Phone'] ?? '').trim();
+        const fullName = (values['fullName'] ?? '').trim();
+        const email = (values['email'] ?? '').trim();
+        const phone = (values['phone'] ?? '').trim();
         if (!fullName || !email || !phone) throw invalid('Name, email and phone are all required.');
         await this.service.invite({
           fullName,
           email,
           phone,
-          canViewReports: values['Report access'] === 'Yes',
+          canViewReports: values['reportAccess'] === 'yes',
         });
         this.resource.reload();
         this.service.refreshMe();
       },
-      { title: 'Invitation sent', body: 'They will find the link in their inbox.' },
+      { title: this.t('dealerEmployees.invitationSent'), body: this.t('dealerEmployees.theyWillFindThe') },
     );
   }
 
@@ -150,10 +192,10 @@ export class DealerEmployeesComponent {
         tone: 'bad',
         danger: true,
         title: `Deactivate ${e.fullName}?`,
-        body: 'They are signed out everywhere immediately and can no longer open the console or act on bookings. Everything they did stays on record under their name. You can reactivate them later.',
+        body: this.t('dealerEmployees.theyAreSignedOut'),
         confirm: 'Deactivate',
         result: {
-          title: 'Staff member deactivated',
+          title: this.t('dealerEmployees.staffMemberDeactivated'),
           body: `${e.fullName} no longer has access.`,
           tone: 'warn',
         },
@@ -164,7 +206,7 @@ export class DealerEmployeesComponent {
         this.service.refreshMe();
       },
       {
-        title: 'Staff member deactivated',
+        title: this.t('dealerEmployees.staffMemberDeactivated'),
         body: `${e.fullName} no longer has access.`,
         tone: 'warn',
       },

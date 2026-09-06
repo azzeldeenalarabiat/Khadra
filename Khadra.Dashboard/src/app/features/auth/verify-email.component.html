@@ -1,8 +1,9 @@
 <div class="auth-shell">
+  <div class="auth-lang"><kh-language-switch /></div>
   <div class="sect auth-card stack stack-14">
     <div class="auth-head">
       <div class="sidebar-mark"><kh-icon name="steering-wheel" /></div>
-      <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+      <div class="sidebar-brand">{{ t('brand.line1') }}<br />{{ t('brand.line2') }}</div>
     </div>
 
     @switch (state()) {
@@ -11,22 +12,16 @@
              verified yet. They do not have a link to open — so this screen's job is to send one,
              not to explain that the link they never received is malformed. -->
         <div>
-          <h1 class="auth-title">Verify your email address</h1>
-          <div class="page-sub">
-            You cannot sign in until the address on your account is confirmed. If the link never
-            arrived or has since expired, we will send another.
-          </div>
+          <h1 class="auth-title">{{ t('auth.verify.title') }}</h1>
+          <div class="page-sub">{{ t('auth.verify.subtitle') }}</div>
         </div>
 
         @if (resent()) {
           <div class="banner s-ok" role="status">
             <kh-icon name="check-circle" class="banner-icon" />
             <div class="banner-body">
-              <div class="banner-title">Check your inbox</div>
-              <div class="banner-text">
-                If an unverified account exists for that address, a new verification link is on its
-                way.
-              </div>
+              <div class="banner-title">{{ t('auth.verify.inboxTitle') }}</div>
+              <div class="banner-text">{{ t('auth.verify.inboxBody') }}</div>
             </div>
           </div>
         } @else {
@@ -41,7 +36,7 @@
 
           <form class="stack stack-14" (ngSubmit)="resend()">
             <div class="field">
-              <label for="verify-email-request">Your email address</label>
+              <label for="verify-email-request">{{ t('auth.field.yourEmail') }}</label>
               <input
                 id="verify-email-request"
                 class="input"
@@ -50,6 +45,7 @@
                 autocomplete="username"
                 autocapitalize="none"
                 spellcheck="false"
+                dir="ltr"
                 required
                 [disabled]="resending()"
                 [value]="email()"
@@ -58,7 +54,7 @@
             </div>
 
             <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="resending()">
-              {{ resending() ? 'Sending…' : 'Send a verification link' }}
+              {{ resending() ? t('auth.verify.busy') : t('auth.verify.submit') }}
             </button>
           </form>
         }
@@ -66,23 +62,23 @@
 
       @case ('verifying') {
         <div>
-          <h1 class="auth-title">Verifying your email…</h1>
-          <div class="page-sub">This takes a moment.</div>
+          <h1 class="auth-title">{{ t('auth.verify.verifyingTitle') }}</h1>
+          <div class="page-sub">{{ t('auth.verify.verifyingBody') }}</div>
         </div>
       }
 
       @case ('verified') {
         <div>
-          <h1 class="auth-title">Your email address is verified</h1>
-          <div class="page-sub">You can sign in now.</div>
+          <h1 class="auth-title">{{ t('auth.verify.verifiedTitle') }}</h1>
+          <div class="page-sub">{{ t('auth.verify.verifiedBody') }}</div>
         </div>
 
-        <a class="btn btn-primary btn-md btn-block" routerLink="/sign-in">Sign in</a>
+        <a class="btn btn-primary btn-md btn-block" routerLink="/sign-in">{{ t('auth.signIn.submit') }}</a>
       }
 
       @case ('failed') {
         <div>
-          <h1 class="auth-title">That link did not work</h1>
+          <h1 class="auth-title">{{ t('auth.verify.failedTitle') }}</h1>
           <div class="page-sub">{{ problem() }}</div>
         </div>
 
@@ -90,17 +86,14 @@
           <div class="banner s-ok" role="status">
             <kh-icon name="check-circle" class="banner-icon" />
             <div class="banner-body">
-              <div class="banner-title">Check your inbox</div>
-              <div class="banner-text">
-                If an unverified account exists for that address, a new verification link is on its
-                way.
-              </div>
+              <div class="banner-title">{{ t('auth.verify.inboxTitle') }}</div>
+              <div class="banner-text">{{ t('auth.verify.inboxBody') }}</div>
             </div>
           </div>
         } @else {
           <form class="stack stack-14" (ngSubmit)="resend()">
             <div class="field">
-              <label for="verify-email-address">Send a new link to</label>
+              <label for="verify-email-address">{{ t('auth.verify.sendNewTo') }}</label>
               <input
                 id="verify-email-address"
                 class="input"
@@ -109,6 +102,7 @@
                 autocomplete="username"
                 autocapitalize="none"
                 spellcheck="false"
+                dir="ltr"
                 required
                 [disabled]="resending()"
                 [value]="email()"
@@ -117,7 +111,7 @@
             </div>
 
             <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="resending()">
-              {{ resending() ? 'Sending…' : 'Send a new link' }}
+              {{ resending() ? t('auth.verify.busy') : t('auth.verify.sendNew') }}
             </button>
           </form>
         }
@@ -125,7 +119,7 @@
     }
 
     <div class="auth-foot">
-      <a class="auth-link" routerLink="/sign-in">Back to sign in</a>
+      <a class="auth-link" routerLink="/sign-in">{{ t('auth.backToSignIn') }}</a>
     </div>
   </div>
 </div>

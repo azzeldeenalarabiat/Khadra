@@ -19,6 +19,7 @@ import { DealerReview } from '../../core/models/dealers.api';
 import { DocTileComponent } from '../../shared/doc-tile/doc-tile.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Dealer application review: the Admin's licence check (spec 3.1).
@@ -35,6 +36,7 @@ import { TimelineComponent } from '../../shared/timeline/timeline.component';
   imports: [DatePipe, RouterLink, IconComponent, DocTileComponent, TimelineComponent],
 })
 export class DealerReviewComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminDealersService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -104,7 +106,7 @@ export class DealerReviewComponent {
     const review = this.review();
     if (!review) return { figure: '—', note: '', tone: 'dim' as Tone };
     if (review.dealer.verificationStatus !== 'PendingReview') {
-      return { figure: 'Settled', note: 'No decision outstanding.', tone: 'ok' as Tone };
+      return { figure: 'Settled', note: this.t('dealerReview.noDecisionOutstanding'), tone: 'ok' as Tone };
     }
 
     const now = this.now();
@@ -262,16 +264,16 @@ export class DealerReviewComponent {
         icon: 'check-circle',
         tone: 'ok',
         title: `Approve ${dealer.businessName}?`,
-        body: 'The dealer will be able to publish cars and receive bookings immediately.',
-        note: 'This decision is recorded against your account in the audit log.',
-        confirm: 'Approve dealer',
-        result: { title: 'Dealer approved', body: `${dealer.businessName} can now trade.` },
+        body: this.t('dealerReview.theDealerWillBe'),
+        note: this.t('dealerReview.thisDecisionIsRecorded'),
+        confirm: this.t('dealerReview.approveDealer'),
+        result: { title: this.t('dealerReview.dealerApproved'), body: `${dealer.businessName} can now trade.` },
       },
       async () => {
         await this.service.approve(dealer.dealerId);
         this.service.refresh();
       },
-      { title: 'Dealer approved', body: `${dealer.businessName} can now trade.` },
+      { title: this.t('dealerReview.dealerApproved'), body: `${dealer.businessName} can now trade.` },
     );
   }
 
@@ -284,23 +286,24 @@ export class DealerReviewComponent {
         tone: 'bad',
         danger: true,
         title: `Reject ${dealer.businessName}?`,
-        body: 'The application is closed. The dealer can correct it and resubmit.',
+        body: this.t('dealerReview.theApplicationIsClosed'),
         fields: [
           {
+            name: 'reason',
             label: 'Reason',
             type: 'text',
-            placeholder: 'What is wrong with the application?',
-            hint: 'The dealer sees this. Be specific enough to act on.',
+            placeholder: this.t('dealerReview.whatIsWrongWith'),
+            hint: this.t('dealerReview.theDealerSeesThis'),
           },
         ],
-        confirm: 'Reject application',
-        result: { title: 'Application rejected', body: '', tone: 'bad' },
+        confirm: this.t('dealerReview.rejectApplication'),
+        result: { title: this.t('dealerReview.applicationRejected'), body: '', tone: 'bad' },
       },
       async (values) => {
-        await this.service.reject(dealer.dealerId, values['Reason'] ?? '');
+        await this.service.reject(dealer.dealerId, values['reason'] ?? '');
         this.service.refresh();
       },
-      { title: 'Application rejected', body: `${dealer.businessName} was told why.`, tone: 'bad' },
+      { title: this.t('dealerReview.applicationRejected'), body: `${dealer.businessName} was told why.`, tone: 'bad' },
     );
   }
 
@@ -311,26 +314,27 @@ export class DealerReviewComponent {
       {
         icon: 'question',
         tone: 'warn',
-        title: 'Request clarification',
-        body: 'The application goes back to the dealer with your note. They fix it and resubmit.',
+        title: this.t('dealerReview.requestClarification'),
+        body: this.t('dealerReview.theApplicationGoesBack'),
         fields: [
           {
+            name: 'note',
             label: 'Note',
             type: 'text',
-            placeholder: 'e.g. the vehicle registration photo is unreadable',
-            hint: 'Name the one thing to fix.',
+            placeholder: this.t('dealerReview.eGTheVehicle'),
+            hint: this.t('dealerReview.nameTheOneThing'),
           },
         ],
-        confirm: 'Send back',
-        result: { title: 'Sent back to the dealer', body: '', tone: 'warn' },
+        confirm: this.t('dealerReview.sendBack'),
+        result: { title: this.t('dealerReview.sentBackToThe'), body: '', tone: 'warn' },
       },
       async (values) => {
-        await this.service.requestClarification(dealer.dealerId, values['Note'] ?? '');
+        await this.service.requestClarification(dealer.dealerId, values['note'] ?? '');
         this.service.refresh();
       },
       {
-        title: 'Sent back to the dealer',
-        body: 'The review clock restarts when they resubmit.',
+        title: this.t('dealerReview.sentBackToThe'),
+        body: this.t('dealerReview.theReviewClockRestarts'),
         tone: 'warn',
       },
     );
@@ -345,19 +349,19 @@ export class DealerReviewComponent {
         tone: 'bad',
         danger: true,
         title: `Suspend ${dealer.businessName}?`,
-        body: 'They stop trading immediately. The licence check is not undone, so reactivating does not send them back through review.',
+        body: this.t('dealerReview.theyStopTradingImmediately'),
         fields: [
-          { label: 'Reason', type: 'text', placeholder: 'Why is this dealer being suspended?' },
+          { name: 'reason', label: 'Reason', type: 'text', placeholder: this.t('dealerReview.whyIsThisDealer') },
         ],
-        confirm: 'Suspend dealer',
-        result: { title: 'Dealer suspended', body: '', tone: 'bad' },
+        confirm: this.t('dealerReview.suspendDealer'),
+        result: { title: this.t('dealerReview.dealerSuspended'), body: '', tone: 'bad' },
       },
       async (values) => {
-        await this.service.suspend(dealer.dealerId, values['Reason'] ?? '');
+        await this.service.suspend(dealer.dealerId, values['reason'] ?? '');
         this.service.refresh();
       },
       {
-        title: 'Dealer suspended',
+        title: this.t('dealerReview.dealerSuspended'),
         body: `${dealer.businessName} can no longer trade.`,
         tone: 'bad',
       },
@@ -372,15 +376,15 @@ export class DealerReviewComponent {
         icon: 'check-circle',
         tone: 'ok',
         title: `Reactivate ${dealer.businessName}?`,
-        body: 'They can trade again straight away; their approval was never withdrawn.',
+        body: this.t('dealerReview.theyCanTradeAgain'),
         confirm: 'Reactivate',
-        result: { title: 'Dealer reactivated', body: '' },
+        result: { title: this.t('dealerReview.dealerReactivated'), body: '' },
       },
       async () => {
         await this.service.reactivate(dealer.dealerId);
         this.service.refresh();
       },
-      { title: 'Dealer reactivated', body: `${dealer.businessName} can trade again.` },
+      { title: this.t('dealerReview.dealerReactivated'), body: `${dealer.businessName} can trade again.` },
     );
   }
 

@@ -18,6 +18,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { MapComponent } from '../../shared/map/map.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 import { IconName } from '../../shared/icon/icon-paths';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 interface Step {
   readonly n: number;
@@ -83,6 +84,7 @@ function toRequest(form: WizardForm): VehicleRequest {
   imports: [RouterLink, IconComponent, ImageFallbackDirective, MapComponent],
 })
 export class VehicleWizardComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(FleetService);
   private readonly consoleData = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
@@ -90,7 +92,7 @@ export class VehicleWizardComponent {
   private readonly route = inject(ActivatedRoute);
 
   protected readonly steps: readonly Step[] = [
-    { n: 1, title: 'Basic information', icon: 'info' },
+    { n: 1, title: this.t('vehicleWizard.basicInformation'), icon: 'info' },
     { n: 2, title: 'Specifications', icon: 'gear' },
     { n: 3, title: 'Pricing', icon: 'currency-circle-dollar' },
     { n: 4, title: 'Location', icon: 'map-pin' },

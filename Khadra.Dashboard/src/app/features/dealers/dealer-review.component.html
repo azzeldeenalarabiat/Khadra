@@ -3,10 +3,10 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load this application</div>
+        <div class="state-title">{{ t('dealerReview.couldntLoadThisApplication') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     </section>
@@ -31,12 +31,12 @@
         <div class="detail-meta">
           CR {{ application.commercialRegistrationNumber }} ·
           {{ application.submittedDocuments.length }} of
-          {{ application.requiredDocuments.length }} documents · submitted
+          {{ application.requiredDocuments.length }} {{ t('dealerReview.documentsSubmitted') }}
           {{ application.submittedAt | date: 'dd MMM yyyy, HH:mm' }}
         </div>
       </div>
       <div class="sla-box" [class]="'s-' + sla().tone">
-        <div class="k">Approval SLA</div>
+        <div class="k">{{ t('dealerReview.approvalSla') }}</div>
         <div class="num sla-figure">{{ sla().figure }}</div>
         <div class="sla-note">{{ sla().note }}</div>
       </div>
@@ -47,7 +47,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="buildings" class="kpi-icon" />
-            <span class="sect-t">Business information</span>
+            <span class="sect-t">{{ t('common.businessInformation') }}</span>
           </div>
           <div class="kv-body">
             @for (row of businessRows(); track row.k) {
@@ -62,7 +62,7 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="lock-key" class="kpi-icon" />
-            <span class="sect-t">Verification documents</span>
+            <span class="sect-t">{{ t('dealerReview.verificationDocuments') }}</span>
             <!-- The instant these links actually die, as the server minted them. This said "expire
                  in 5 minutes", a duration read from nowhere: it would have gone on saying five the
                  day Documents:LinkLifetimeMinutes changed. Absent when there are no documents,
@@ -72,7 +72,7 @@
                  signature binds the file and the expiry, not the admin who minted it, so within its
                  lifetime the link works for any signed-in session. Pre-launch checklist item 14. -->
             @if (linkExpiry(); as expiry) {
-              <span class="sect-note">Signed URLs · {{ expiry }}</span>
+              <span class="sect-note">{{ t('dealerReview.signedUrls') }} {{ expiry }}</span>
             }
           </div>
           @if (documents().length > 0) {
@@ -89,8 +89,7 @@
                 <!-- No count in the sentence: the header above already reads "n of m documents",
                      and "all three" was a number this screen had no way to know. -->
                 <span class="banner-body">
-                  Missing: {{ missing().join(', ') }}. Every one of these is required before this
-                  application can be approved.
+                  {{ t('dealerReview.missing') }} {{ missing().join(', ') }}{{ t('dealerReview.everyOneOfThese') }}
                 </span>
               </div>
             </div>
@@ -100,7 +99,7 @@
 
       <div class="stack stack-14">
         <section class="sect">
-          <div class="sect-h"><span class="sect-t">Application timeline</span></div>
+          <div class="sect-h"><span class="sect-t">{{ t('dealerReview.applicationTimeline') }}</span></div>
           <div class="sect-pad">
             <kh-timeline [steps]="timeline()" />
           </div>
@@ -119,52 +118,51 @@
             @if (decisionNote(); as note) {
               <div class="decision-record">{{ note }}</div>
             } @else {
-              <div class="decision-note">No reason was recorded with this decision.</div>
+              <div class="decision-note">{{ t('dealerReview.noReasonWasRecorded') }}</div>
             }
           }
 
           @if (canDecide()) {
             <button type="button" class="btn btn-primary btn-lg-row" (click)="approve()">
               <kh-icon name="check-circle" />
-              Approve dealer
+              {{ t('dealerReview.approveDealer') }}
             </button>
             @if (canClarify()) {
               <button type="button" class="btn btn-secondary btn-lg-row" (click)="clarify()">
                 <kh-icon name="question" />
-                Request clarification
+                {{ t('dealerReview.requestClarification') }}
               </button>
             }
             <button type="button" class="btn btn-danger btn-lg-row" (click)="reject()">
               <kh-icon name="x-circle" />
-              Reject application
+              {{ t('dealerReview.rejectApplication') }}
             </button>
           }
           @if (canSuspend()) {
             <button type="button" class="btn btn-danger btn-lg-row" (click)="suspend()">
               <kh-icon name="prohibit" />
-              Suspend dealer
+              {{ t('dealerReview.suspendDealer') }}
             </button>
           }
           @if (canReactivate()) {
             <button type="button" class="btn btn-primary btn-lg-row" (click)="reactivate()">
               <kh-icon name="check-circle" />
-              Reactivate dealer
+              {{ t('dealerReview.reactivateDealer') }}
             </button>
           }
           <div class="decision-note">
             @if (canDecide()) {
-              Rejection, clarification and suspension all require a written reason. Every decision
-              is attributed to you in the audit log, which cannot be edited afterwards.
+              {{ t('dealerReview.rejectionClarificationAndSuspensio') }}
             } @else {
-              Who decided this and when is in the
+              {{ t('dealerReview.whoDecidedThisAnd') }}
               <!-- Straight to THIS dealer's history, not the whole platform's. The audit log takes
                    the record's type and id as filters, so "everything that has happened to this
                    dealership" is one click rather than a search through everyone's decisions. -->
               <a
                 routerLink="/audit-logs"
                 [queryParams]="{ entityType: 'Dealer', entityId: application.dealerId }"
-                >audit log</a
-              >, which cannot be edited afterwards.
+                >{{ t('common.auditLog') }}</a
+              >{{ t('dealerReview.whichCannotBeEdited') }}
             }
           </div>
         </section>

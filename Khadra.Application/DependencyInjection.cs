@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<Bookings.BookingPartyResolver>();
         services.AddScoped<Disputes.DisputeAuditor>();
         services.AddScoped<Disputes.DisputeViewComposer>();
+        services.AddScoped<Notifications.DealerTeamNotifier>();
         services.AddScoped<AuthEmailDispatcher>();
 
         var eventHandlerRegistrations = assembly

@@ -1432,3 +1432,17 @@ button.cal-day[disabled] {
 .car-card-actions .s-bad {
   margin-inline-start: auto;
 }
+
+/* An unread notification row. The tint comes from --c, which the row's own .s-* class sets, so no
+   status colour is written here (see the design-system rule in the frontend rules file). */
+.queue-row.is-unread {
+  background: color-mix(in srgb, var(--c) 5%, transparent);
+}
+
+.unread-dot {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--c);
+  flex: none;
+}

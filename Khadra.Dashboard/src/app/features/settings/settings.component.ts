@@ -1,8 +1,9 @@
 import { httpResource } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { KeyValue } from '../../core/models/console.models';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 interface BusinessRules {
   readonly commissionPercent: number;
@@ -43,6 +44,7 @@ interface BusinessRulesView {
   imports: [IconComponent],
 })
 export class SettingsComponent {
+  protected readonly t = inject(I18nService).t;
   protected readonly resource = httpResource<BusinessRulesView>(
     () => '/api/v1/admin/settings/business-rules',
   );

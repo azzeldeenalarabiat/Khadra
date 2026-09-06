@@ -16,6 +16,7 @@ import { roundTo, scaleOf } from '../../core/services/money';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /** The four shapes spec 3.3 names, each one a preset split of the deposit the booking holds. */
 type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
@@ -37,6 +38,7 @@ type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
   imports: [RouterLink, IconComponent, TimelineComponent],
 })
 export class DisputeDetailComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminDisputesService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -92,12 +94,12 @@ export class DisputeDetailComponent {
   protected readonly presets: readonly { key: Preset; label: string; desc: string }[] = [
     {
       key: 'refund',
-      label: 'Refund the customer',
+      label: this.t('disputeDetail.refundTheCustomer'),
       desc: 'The whole deposit goes back. Nothing is kept and nothing reaches the dealer.',
     },
     {
       key: 'penalty',
-      label: 'Apply the penalty in full',
+      label: this.t('disputeDetail.applyThePenaltyIn'),
       desc: 'The deposit is split the way the booking assessed it, against the party at fault.',
     },
     {
@@ -107,7 +109,7 @@ export class DisputeDetailComponent {
     },
     {
       key: 'waive',
-      label: 'Waive everything',
+      label: this.t('disputeDetail.waiveEverything'),
       desc: 'No penalty. The deposit returns to the customer and the booking closes clean.',
     },
   ];
@@ -212,7 +214,7 @@ export class DisputeDetailComponent {
         ],
       },
       {
-        title: 'Money on this booking',
+        title: this.t('disputeDetail.moneyOnThisBooking'),
         icon: 'currency-circle-dollar',
         rows: [
           { k: 'Rental total', v: `${b.pricing.rentalTotal.amount} ${cur}` },
@@ -383,11 +385,11 @@ export class DisputeDetailComponent {
         icon: 'scales',
         tone: 'warn',
         danger: true,
-        title: 'Record this decision?',
+        title: this.t('disputeDetail.recordThisDecision'),
         body: `${this.refund()} ${cur} back to ${d.booking.customerName}, ${this.platform()} ${cur} kept by the platform, ${this.dealer()} ${cur} to ${d.booking.dealerName}${charge ? `, and ${charge} ${cur} charged to the dealer` : ''}. Both parties see the decision, your note and your name, and it is written to the audit log.`,
-        note: 'Decision recorded — no funds moved. Payments is not live, so nothing is transferred yet.',
-        confirm: 'Resolve dispute',
-        result: { title: 'Dispute resolved', body: 'Decision recorded — no funds moved.' },
+        note: this.t('disputeDetail.decisionRecordedNoFunds'),
+        confirm: this.t('disputeDetail.resolveDispute'),
+        result: { title: this.t('disputeDetail.disputeResolved'), body: this.t('disputeDetail.decisionRecordedNoFunds2') },
       },
       async () => {
         await this.service.resolve(d.ticketId, {
@@ -400,7 +402,7 @@ export class DisputeDetailComponent {
         this.service.refresh();
         this.service.refreshList();
       },
-      { title: 'Dispute resolved', body: 'Decision recorded — no funds moved.' },
+      { title: this.t('disputeDetail.disputeResolved'), body: this.t('disputeDetail.decisionRecordedNoFunds2') },
     );
   }
 

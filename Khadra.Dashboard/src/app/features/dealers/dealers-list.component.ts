@@ -6,6 +6,7 @@ import { Cell, TableRow, Tone } from '../../core/models/console.models';
 import { DealerListItem } from '../../core/models/dealers.api';
 import { DataTableComponent } from '../../shared/data-table/data-table.component';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * The Admin's dealer queue, reading `GET /api/v1/admin/dealers`.
@@ -21,6 +22,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [DataTableComponent, IconComponent],
 })
 export class DealersListComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminDealersService);
 
   protected readonly resource = this.service.dealers;
@@ -33,26 +35,26 @@ export class DealersListComponent {
   protected readonly search = this.service.search;
 
   protected readonly statuses = [
-    { label: 'All', value: null },
-    { label: 'Pending review', value: 'PendingReview' },
-    { label: 'Clarification needed', value: 'ClarificationNeeded' },
-    { label: 'Approved', value: 'Approved' },
-    { label: 'Rejected', value: 'Rejected' },
+    { label: this.t('common.all'), value: null },
+    { label: this.t('kpi.pendingReview'), value: 'PendingReview' },
+    { label: this.t('gate.clarification.badge'), value: 'ClarificationNeeded' },
+    { label: this.t('status.approved'), value: 'Approved' },
+    { label: this.t('status.rejected'), value: 'Rejected' },
   ];
 
   // "Registration" used to have its own column while also sitting under the dealer's name; the
   // duplicate went so that fleet size and rating -- what an admin judges a trading dealer on -- fit
   // without crowding the queue columns a pending application needs.
-  protected readonly columns = [
-    'Dealer',
-    'Status',
-    'Cars',
-    'Rating',
-    'Documents',
-    'Joined',
-    'Review due',
-    'Actions',
-  ];
+  protected readonly columns = computed(() => [
+    this.t('dealersList.colDealer'),
+    this.t('common.status'),
+    this.t('dealersList.colCars'),
+    this.t('dealersList.colRating'),
+    this.t('customersList.documents'),
+    this.t('customersList.joined'),
+    this.t('dealersList.colReviewDue'),
+    this.t('dealersList.colActions'),
+  ]);
 
   protected readonly rows = computed<readonly TableRow[]>(() => {
     const page = this.loadedPage();
@@ -64,7 +66,7 @@ export class DealersListComponent {
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
-    return `Showing ${from}–${to} of ${page.totalCount} dealers`;
+    return this.t('dealersList.showing', { from, to, total: page.totalCount });
   });
 
   protected readonly page = computed(() => this.loadedPage()?.page ?? 1);
@@ -75,9 +77,9 @@ export class DealersListComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 401) return 'Your session has expired. Sign in again.';
-    if (error.status === 403) return 'Only administrators can see the dealer queue.';
-    return 'The dealer queue could not be loaded. Nothing has been changed.';
+    if (error.status === 401) return this.t('common.sessionExpired');
+    if (error.status === 403) return this.t('dealersList.adminOnly');
+    return this.t('dealersList.loadFailed');
   });
 
   /**

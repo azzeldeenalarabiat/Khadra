@@ -4,17 +4,17 @@
       <kh-icon name="steering-wheel" />
     </div>
     <div>
-      <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
-      @if (isDealer()) {
-        <div class="sidebar-caption">Dealer</div>
+      <div class="sidebar-brand">{{ t('brand.line1') }}<br />{{ t('brand.line2') }}</div>
+      @if (caption(); as label) {
+        <div class="sidebar-caption">{{ label }}</div>
       }
     </div>
   </div>
 
-  <nav class="sidebar-nav" aria-label="Admin sections">
+  <nav class="sidebar-nav" [attr.aria-label]="t('sidebar.sections')">
     @for (group of groups(); track $index) {
-      @if (group.group) {
-        <div class="nav-group">{{ group.group }}</div>
+      @if (group.groupKey; as groupKey) {
+        <div class="nav-group">{{ t(groupKey) }}</div>
       }
       @for (item of group.items; track item.route) {
         <a
@@ -24,7 +24,7 @@
           [routerLinkActiveOptions]="{ exact: false }"
         >
           <kh-icon [name]="item.icon" class="nav-item-icon" />
-          <span class="nav-item-label">{{ item.label }}</span>
+          <span class="nav-item-label">{{ t(item.labelKey) }}</span>
           @if (badge(item.count); as n) {
             <span class="nav-badge">{{ n }}</span>
           }
@@ -34,15 +34,34 @@
   </nav>
 
   <div class="sidebar-foot">
+    <!-- What this member of staff holds, said outright rather than left to be inferred from which
+         buttons are missing (design: Employee Console, "YOUR PERMISSIONS"). Every line is a real
+         answer from `GET /dealers/me`; nothing renders until that call has answered, because a
+         permissions panel that guesses is worse than no panel at all. -->
+    @if (isEmployee() && grants(); as rows) {
+      <div class="perm-card">
+        <div class="perm-title">{{ t('sidebar.permissions') }}</div>
+        @for (row of rows; track row.labelKey) {
+          <div class="perm-row" [class]="'s-' + row.tone">
+            <kh-icon [name]="row.held ? 'check-circle' : 'prohibit'" class="perm-icon" />
+            <span class="perm-label">{{ t(row.labelKey) }}</span>
+          </div>
+        }
+        <div class="perm-note">{{ t('sidebar.permNote') }}</div>
+      </div>
+    }
+
     <!-- Who is signed in, and the way to their own account. It was a static block that looked
          exactly like the clickable row above it and did nothing when clicked. -->
     <a class="sidebar-user" [routerLink]="accountRoute()" routerLinkActive="is-active">
       <div class="avatar avatar-28">{{ initials() }}</div>
       <div class="grow">
-        <div class="sidebar-user-name">{{ name() }}</div>
-        <div class="sidebar-user-role">{{ role() }}</div>
+        <div class="sidebar-user-name user-text">{{ name() }}</div>
+        <!-- An employee is told WHERE they work, which is the fact that matters to them and the one
+             they can check. "Dealer employee" they already know. -->
+        <div class="sidebar-user-role user-text">{{ subtitle() }}</div>
       </div>
-      <kh-icon name="caret-right" />
+      <kh-icon name="caret-right" class="icon-mirrored" />
     </a>
     <!-- "Account settings" stood here as a button with no handler: it looked like the way to change
          your own password and did nothing at all when clicked. There is no account screen to send it
@@ -50,8 +69,8 @@
          not built -- so routing it there would be the same dead click at the end of a longer path.
          It comes back with the screen, not before. -->
     <button type="button" class="sidebar-link" (click)="signOut()">
-      <kh-icon name="sign-out" />
-      Logout
+      <kh-icon name="sign-out" class="icon-mirrored" />
+      {{ t('sidebar.logout') }}
     </button>
   </div>
 </div>

@@ -5,6 +5,7 @@ import { loaded } from '../../core/services/loaded';
 import { MySecurityService, SessionSummary } from '../../core/services/my-security.service';
 import { SessionService } from '../../core/services/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Your own account security.
@@ -23,6 +24,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [IconComponent],
 })
 export class SecurityComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(MySecurityService);
   private readonly session = inject(SessionService);
   private readonly ui = inject(ConsoleUiService);
@@ -60,23 +62,23 @@ export class SecurityComponent {
       {
         icon: 'lock-key',
         tone: 'accent',
-        title: 'Change your password',
-        body: 'Every other session is signed out when the password changes. The one you are using now stays.',
+        title: this.t('security.changeYourPassword'),
+        body: this.t('security.everyOtherSessionIs'),
         fields: [
-          { label: 'Current password', type: 'password', placeholder: '' },
-          { label: 'New password', type: 'password', placeholder: 'Your new password' },
+          { name: 'currentPassword', label: this.t('common.currentPassword'), type: 'password', placeholder: '' },
+          { name: 'newPassword', label: this.t('common.newPassword'), type: 'password', placeholder: this.t('security.yourNewPassword') },
         ],
-        confirm: 'Change password',
-        result: { title: 'Password changed', body: '', tone: 'ok' },
+        confirm: this.t('common.changePassword'),
+        result: { title: this.t('auth.reset.doneTitle'), body: '', tone: 'ok' },
       },
       async (values) => {
         await this.service.changePassword(
-          values['Current password'] ?? '',
-          values['New password'] ?? '',
+          values['currentPassword'] ?? '',
+          values['newPassword'] ?? '',
         );
         this.service.refresh();
       },
-      { title: 'Password changed', body: 'Your other sessions were signed out.' },
+      { title: this.t('auth.reset.doneTitle'), body: this.t('security.yourOtherSessionsWere') },
     );
   }
 
@@ -87,21 +89,21 @@ export class SecurityComponent {
         icon: 'sign-out',
         tone: 'bad',
         danger: true,
-        title: 'End this session?',
+        title: this.t('security.endThisSession'),
         body: `Signed in ${this.when(session.signedInAt)}${session.createdByIp ? ` from ${session.createdByIp}` : ''}. It cannot be refreshed after this.`,
         // The honest figure, from the server. "Signed out immediately" would be untrue for as long
         // as the access token it already holds has left to live.
         note: minutes
           ? `A session already in flight can keep working for up to ${minutes} minutes before it has to refresh. If this is the session you are using now, you will be signed out.`
           : 'If this is the session you are using now, you will be signed out.',
-        confirm: 'End session',
-        result: { title: 'Session ended', body: '', tone: 'bad' },
+        confirm: this.t('security.endSession'),
+        result: { title: this.t('security.sessionEnded'), body: '', tone: 'bad' },
       },
       async () => {
         await this.service.revoke(session.familyId);
         this.service.refresh();
       },
-      { title: 'Session ended', body: '' },
+      { title: this.t('security.sessionEnded'), body: '' },
     );
   }
 

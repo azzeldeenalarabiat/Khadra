@@ -19,6 +19,7 @@ import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { BookingDecisions } from './booking-decisions';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * One booking, from the dealer's side (design: Dealer Console, `isBooking`).
@@ -35,6 +36,7 @@ import { BookingDecisions } from './booking-decisions';
   imports: [RouterLink, IconComponent, TimelineComponent],
 })
 export class DealerBookingDetailComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerBookingsService);
   private readonly console = inject(DealerConsoleService);
   private readonly disputes = inject(DealerDisputesService);
@@ -112,7 +114,7 @@ export class DealerBookingDetailComponent {
     const b = this.booking();
     if (!b || b.status !== 'Requested') return null;
     const hours = Math.round((Date.parse(b.periodStart) - Date.now()) / 3_600_000);
-    if (hours <= 0) return { figure: 'Expiring', note: 'The rental date has arrived.' };
+    if (hours <= 0) return { figure: 'Expiring', note: this.t('dealerBooking.theRentalDateHas') };
     return {
       figure: hours >= 48 ? `${Math.round(hours / 24)}d left` : `${hours}h left`,
       note: `Expires at pickup time, ${this.dateTime(b.periodStart)}.`,
@@ -270,8 +272,13 @@ export class DealerBookingDetailComponent {
     return [...done, ...future];
   });
 
+  // `canDecideBookings` is `ApprovedDealerStaff` — an employee decides requests, that being their
+  // default permission (spec 4.2). Read from the permissions table rather than re-deriving
+  // `canTrade` here, so the one place the API's rule is written down stays the only place.
   protected readonly canDecide = computed(
-    () => this.booking()?.status === 'Requested' && !!this.dealer()?.canTrade,
+    () =>
+      this.booking()?.status === 'Requested' &&
+      this.console.permissions()?.canDecideBookings === true,
   );
   protected readonly canPickUp = computed(() => this.booking()?.status === 'Approved');
   protected readonly canReturn = computed(() => this.booking()?.status === 'PickedUp');

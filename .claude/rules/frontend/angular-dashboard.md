@@ -54,12 +54,45 @@ reverting the whole console.
 
 ## Content
 
-- Support English and Arabic, LTR and RTL. The CSS is direction-agnostic; Arabic copy and a language
-  switcher are still outstanding.
+- **English and Arabic, LTR and RTL, switched at runtime.** `core/i18n/` holds it: `I18nService`
+  exposes `t(key, params)`, `FormatService` every number and date. Both read a signal, so a switch
+  re-renders everything -- including copy built inside `computed()`s, which most of this console is.
+  - **No user-facing string literal in a component or a template.** Add the key to `en.ts` (which
+    defines the key type) and to `ar.ts` (typed against it, so a missing key fails the build).
+  - **Hold KEYS in state, never resolved words.** A banner set at submit time and stored as a
+    sentence stays in the language it was written in when someone switches; store the key.
+  - Presenters and other pure functions take `t` as a parameter rather than injecting it.
+  - Never `toLocaleString('en-GB')`; go through `FormatService`. Digits are Latin under `ar-JO`
+    (`-u-nu-latn`) on purpose -- Jordanian commercial software uses them, and the server's own
+    references and plates are Latin.
+  - Arabic plurals need all six categories. `Intl.PluralRules` picks; the dictionary supplies.
+  - Wrap Latin runs inside Arabic text -- emails, `+962` numbers, plates, references, signed amounts
+    -- in `.ltr`, and text somebody typed in `.user-text`, or bidi reorders them.
+  - `letter-spacing` breaks Arabic's cursive joins; `_rtl.scss` zeroes it under `:lang(ar)`.
+  - Mirror only direction-carrying icons, with `class="icon-mirrored"`. Not clocks, cars or charts.
 - Every money value shows its currency code, taken from the value's own `currency` — never a literal
   `'JOD'` default. The platform's own figures carry theirs; a hard-coded code is a claim about a
   number that came from somewhere else.
-- Restricted actions stay visible but disabled with a tooltip explaining why.
+- Restricted actions depend on WHY they are restricted, and the two are not the same restriction:
+  - **A state you are waiting out** — a dealership not yet approved, a suspension, a booking in the
+    wrong status — keeps its control, disabled, with a `title` naming what unlocks it. The action is
+    yours; it is not available *yet*.
+  - **A role that is not yours** — the fleet for an employee, staff management, the dealer page —
+    drops the controls entirely and says once, in a `banner s-warn` at the top of the screen, whose
+    they are. Four dead buttons per card is noise, and half of them cannot be disabled anyway: an
+    `<a routerLink>` ignores `[disabled]` and stays clickable.
+- **Never decide a permission from a failed request.** A role failure returns a *bodiless* 403 —
+  `ProblemDetailsAuthorizationResultHandler` writes ProblemDetails only when the approved-dealer
+  handler is the one that failed — and every screen renders a bodiless failure as "the service did
+  not respond", which reads as a broken platform to someone who is simply not the owner. Ask
+  `GET /dealers/me` instead and decide before the click: `DealerConsoleService.permissions` holds one
+  field per API policy. It is three-valued — `null` until that call answers — and every consumer
+  branches on `null` separately, or an owner's own controls flash in a beat late and a guard bounces
+  them off their own form on a cold load.
+- **A resource you gate must not strand its screen.** Once a request is not sent, no 403 ever
+  arrives, so a screen that derives "you may not see this" from `error()` waits on a skeleton
+  forever. Render the denied state from the same permission that suppressed the request, and keep
+  the 403 branch for the grant that is revoked while the screen is open.
 
 ### No business number is written into a screen
 

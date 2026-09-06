@@ -8,6 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { toneClass } from '../../core/models/console.models';
 import { IconComponent } from '../icon/icon.component';
@@ -31,13 +32,14 @@ import { IconComponent } from '../icon/icon.component';
   imports: [IconComponent],
 })
 export class ConfirmModalComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly ui = inject(ConsoleUiService);
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dlg');
 
   protected readonly modal = this.ui.modal;
   protected readonly busy = this.ui.modalBusy;
 
-  /** What the admin typed or chose, keyed by field label. Rebuilt for every dialog. */
+  /** What the admin typed or chose, keyed by field NAME. Rebuilt for every dialog. */
   private readonly values = signal<Record<string, string>>({});
   protected readonly toneClass = toneClass;
 
@@ -56,13 +58,13 @@ export class ConfirmModalComponent {
     // their mind and cancelled, then opened "Request clarification" on any dealer would silently
     // send that stale rejection text as the clarification note — and it lands in an append-only
     // audit log against their name. Keying by field label made it worse: two dialogs that both say
-    // "Note" shared the same entry.
+    // "Note" shared the same entry. Both are keyed by `name` now.
     effect(() => {
       const config = this.modal();
       const seeded: Record<string, string> = {};
       for (const field of config?.fields ?? []) {
-        seeded[field.label] =
-          field.value ?? (field.type === 'select' ? (field.options?.[0] ?? '') : '');
+        seeded[field.name] =
+          field.value ?? (field.type === 'select' ? (field.options?.[0]?.value ?? '') : '');
       }
       this.values.set(seeded);
     });
@@ -76,7 +78,7 @@ export class ConfirmModalComponent {
   protected readonly canConfirm = computed(() => {
     const fields = this.modal()?.fields ?? [];
     const values = this.values();
-    return fields.every((field) => field.optional || (values[field.label] ?? '').trim().length > 0);
+    return fields.every((field) => field.optional || (values[field.name] ?? '').trim().length > 0);
   });
 
   protected close(): void {
@@ -98,10 +100,10 @@ export class ConfirmModalComponent {
     this.close();
   }
 
-  protected setField(label: string, event: Event): void {
+  protected setField(name: string, event: Event): void {
     const value = (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement)
       .value;
-    this.values.update((current) => ({ ...current, [label]: value }));
+    this.values.update((current) => ({ ...current, [name]: value }));
   }
 
   protected confirm(): void {

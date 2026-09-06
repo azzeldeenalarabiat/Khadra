@@ -65,9 +65,16 @@ public static class IdentityErrors
     // The mail server refused the message. The account is untouched and the link is still valid, so
     // this asks the person to try again rather than telling them anything is wrong with their account.
     public static readonly Error VerificationEmailNotSent =
-        Error.Failure(
+        Error.Unavailable(
             "auth.verification_email_not_sent",
             "We could not send the verification email just now. Please try again in a few minutes.");
+
+    // Same shape, different sentence: a person who asked for a reset link is watching a screen that
+    // used to promise one was coming whatever the relay said.
+    public static readonly Error PasswordResetEmailNotSent =
+        Error.Unavailable(
+            "auth.password_reset_email_not_sent",
+            "We could not send the reset link just now. Please try again in a few minutes.");
 
     public static readonly Error UserNotFound =
         Error.NotFound("auth.user_not_found", "The user was not found.");

@@ -1,0 +1,156 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('common.settings') }}</h1>
+      <div class="page-sub">{{ t('employeeSettings.yourOwnAccountPermissions') }}</div>
+    </div>
+    <div class="tabs" role="tablist" [attr.aria-label]="t('employeeSettings.settingsSection')">
+      @for (option of tabs; track option.key) {
+        <button
+          type="button"
+          class="tab"
+          role="tab"
+          [class.is-active]="tab() === option.key"
+          [attr.aria-selected]="tab() === option.key"
+          (click)="tab.set(option.key)"
+        >
+          {{ option.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @switch (tab()) {
+    @case ('profile') {
+      <section class="sect">
+        <div class="sect-h">
+          <span class="sect-t">{{ t('employeeSettings.profile') }}</span>
+          @if (dealer(); as d) {
+            <span class="sect-hint">{{ t('employeeSettings.employeeOf') }} {{ d.businessName }}</span>
+          }
+        </div>
+        <div class="sect-pad kv-narrow">
+          <div class="kv">
+            <span class="kv-key">{{ t('employeeSettings.fullName') }}</span><span class="kv-val">{{ user()?.fullName }}</span>
+          </div>
+          <div class="kv">
+            <span class="kv-key">{{ t('employeeSettings.workEmail') }}</span><span class="kv-val">{{ user()?.email }}</span>
+          </div>
+          <div class="kv">
+            <span class="kv-key">{{ t('common.role') }}</span><span class="kv-val">{{ t('employeeSettings.dealerEmployee') }}</span>
+          </div>
+          <!-- The design draws these as editable. Nothing on the API accepts them, and the email is
+               both the sign-in identifier and where a password reset is sent, so it is not a field
+               to hand over without re-verification. Stated rather than drawn as a dead form. -->
+          <div class="field-hint">
+            {{ t('employeeSettings.yourNameAndWork') }}
+          </div>
+        </div>
+      </section>
+
+      <section class="sect">
+        <div class="sect-h">
+          <span class="sect-t">{{ t('employeeSettings.yourPermissions') }}</span>
+          <span class="sect-hint">{{ t('employeeSettings.grantedByTheDealer') }}</span>
+        </div>
+        <div class="sect-pad stack stack-10">
+          @if (grants(); as rows) {
+            @for (row of rows; track row.label) {
+              <div class="toggle-card" [class.is-off]="!row.held">
+                <kh-icon
+                  [name]="row.held ? 'check-circle' : 'prohibit'"
+                  [class]="'s-' + row.tone"
+                />
+                <div class="grow">
+                  <div class="toggle-title">{{ row.label }}</div>
+                  <div class="toggle-desc">{{ row.detail }}</div>
+                </div>
+                <span class="pill" [class]="'s-' + row.tone">{{ row.held ? 'On' : 'Off' }}</span>
+              </div>
+            }
+            <div class="field-hint">
+              {{ t('employeeSettings.onlyTheDealerOwner') }}
+            </div>
+          } @else {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          }
+        </div>
+      </section>
+    }
+
+    @case ('security') {
+      <section class="sect">
+        <div class="sect-h">
+          <span class="sect-t">{{ t('common.changePassword') }}</span>
+          <span class="sect-hint">{{ t('common.signsOutEveryOther') }}</span>
+        </div>
+        <div class="sect-pad stack stack-10">
+          @if (problem(); as message) {
+            <div class="banner s-bad" role="alert">
+              <kh-icon name="warning-circle" class="banner-icon" />
+              <div class="banner-body">
+                <div class="banner-text">{{ message }}</div>
+              </div>
+            </div>
+          }
+          <div class="field">
+            <label for="pw-current">{{ t('common.currentPassword') }}</label>
+            <input
+              id="pw-current"
+              class="input"
+              type="password"
+              autocomplete="current-password"
+              [value]="current()"
+              (input)="current.set(value($event))"
+            />
+          </div>
+          <div class="field">
+            <label for="pw-new">{{ t('common.newPassword') }}</label>
+            <input
+              id="pw-new"
+              class="input"
+              type="password"
+              autocomplete="new-password"
+              [value]="next()"
+              (input)="next.set(value($event))"
+            />
+            <div class="field-hint">{{ t('common.changingItSignsYou') }}</div>
+          </div>
+          <div class="field">
+            <label for="pw-confirm">{{ t('common.confirmNewPassword') }}</label>
+            <input
+              id="pw-confirm"
+              class="input"
+              type="password"
+              autocomplete="new-password"
+              [value]="confirm()"
+              (input)="confirm.set(value($event))"
+            />
+            @if (mismatch()) {
+              <div class="field-error">{{ t('common.theTwoPasswordsDo') }}</div>
+            }
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary btn-md self-start"
+            [disabled]="!canSubmit()"
+            (click)="changePassword()"
+          >
+            {{ busy() ? 'Changing…' : 'Change password' }}
+          </button>
+        </div>
+      </section>
+    }
+
+    @case ('notifications') {
+      <section class="sect">
+        <div class="sect-h"><span class="sect-t">{{ t('employeeSettings.notificationPreferences') }}</span></div>
+        <div class="sect-pad">
+          <div class="page-sub">
+            {{ t('employeeSettings.notLiveYetThere') }}
+          </div>
+        </div>
+      </section>
+    }
+  }
+</div>

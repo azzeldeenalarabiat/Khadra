@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, inject } from '@angular/core';
 import { DocumentTile, toneClass } from '../../core/models/console.models';
 import { IconComponent } from '../icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * A private document (dealer licence, customer ID, dispute evidence).
@@ -17,6 +18,7 @@ import { IconComponent } from '../icon/icon.component';
   imports: [IconComponent],
 })
 export class DocTileComponent {
+  protected readonly t = inject(I18nService).t;
   readonly doc = input.required<DocumentTile>();
   /** Evidence tiles in the dispute screen show no preview button. */
   readonly showPreview = input<boolean>(true);

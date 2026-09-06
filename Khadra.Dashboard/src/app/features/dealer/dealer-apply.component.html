@@ -1,10 +1,9 @@
 <div class="stack stack-14 page-mid">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Submit your gallery</h1>
+      <h1 class="page-title">{{ t('dealerApply.submitYourGallery') }}</h1>
       <div class="page-sub">
-        The platform checks that every gallery is a licensed rental office before it can list cars.
-        Nothing here is published until an administrator approves it.
+        {{ t('dealerApply.thePlatformChecksThat') }}
       </div>
     </div>
   </div>
@@ -13,17 +12,17 @@
     <div class="banner s-bad" role="alert">
       <kh-icon name="warning-circle" class="banner-icon" />
       <div class="banner-body">
-        <div class="banner-title">The application was not submitted</div>
+        <div class="banner-title">{{ t('dealerApply.theApplicationWasNot') }}</div>
         <div class="banner-text">{{ message }}</div>
       </div>
     </div>
   }
 
   <section class="sect sect-pad stack stack-14">
-    <div class="k">The business</div>
+    <div class="k">{{ t('dealerApply.theBusiness') }}</div>
 
     <div class="field">
-      <label for="apply-name">Gallery name</label>
+      <label for="apply-name">{{ t('dealerApply.galleryName') }}</label>
       <input
         id="apply-name"
         class="input"
@@ -34,13 +33,12 @@
         (input)="businessName.set(fieldValue($event))"
       />
       <div class="field-hint">
-        The name on the licence. It is locked once the gallery is approved, because it is the name
-        the licence was checked against.
+        {{ t('dealerApply.theNameOnThe') }}
       </div>
     </div>
 
     <div class="field">
-      <label for="apply-registration">Commercial registration number</label>
+      <label for="apply-registration">{{ t('dealerApply.commercialRegistrationNumber') }}</label>
       <input
         id="apply-registration"
         class="input"
@@ -53,7 +51,7 @@
     </div>
 
     <div class="field">
-      <label for="apply-description">Description <span class="field-hint">(optional)</span></label>
+      <label for="apply-description">{{ t('common.description') }} <span class="field-hint">{{ t('dealerApply.optional') }}</span></label>
       <textarea
         id="apply-description"
         class="input"
@@ -63,15 +61,15 @@
         [value]="description()"
         (input)="description.set(fieldValue($event))"
       ></textarea>
-      <div class="field-hint">What customers read on your gallery page.</div>
+      <div class="field-hint">{{ t('dealerApply.whatCustomersReadOn') }}</div>
     </div>
   </section>
 
   <section class="sect sect-pad stack stack-14">
-    <div class="k">Where it is</div>
+    <div class="k">{{ t('common.whereItIs') }}</div>
 
     <div class="field">
-      <label for="apply-city">City</label>
+      <label for="apply-city">{{ t('dealerApply.city') }}</label>
       <select
         id="apply-city"
         class="input"
@@ -79,18 +77,17 @@
         [value]="cityId()"
         (change)="chooseCity(fieldValue($event))"
       >
-        <option value="">Choose a city…</option>
+        <option value="">{{ t('dealerApply.chooseACity') }}</option>
         @for (city of cities(); track city.id) {
           <option [value]="city.id">{{ city.nameEn }}</option>
         }
       </select>
       @if (cityHasNoCentre()) {
         <div class="field-hint">
-          The platform has not pinned this city yet, so the map cannot start there. Place the pin
-          yourself, or type the coordinates.
+          {{ t('dealerApply.thePlatformHasNot') }}
         </div>
       } @else {
-        <div class="field-hint">Picking a city moves the map there. Then drag the pin to the door.</div>
+        <div class="field-hint">{{ t('dealerApply.pickingACityMoves') }}</div>
       }
     </div>
 
@@ -107,8 +104,7 @@
         <kh-icon name="map-pin" class="banner-icon" />
         <div class="banner-body">
           <div class="banner-text">
-            Choose a city, or type a latitude and longitude, and the map will appear so you can place
-            the pin exactly.
+            {{ t('dealerApply.chooseACityOr') }}
           </div>
         </div>
       </div>
@@ -116,7 +112,7 @@
 
     <div class="dc-split-even">
       <div class="field">
-        <label for="apply-lat">Latitude</label>
+        <label for="apply-lat">{{ t('common.latitude') }}</label>
         <input
           id="apply-lat"
           class="input"
@@ -128,7 +124,7 @@
         />
       </div>
       <div class="field">
-        <label for="apply-lng">Longitude</label>
+        <label for="apply-lng">{{ t('common.longitude') }}</label>
         <input
           id="apply-lng"
           class="input"
@@ -143,10 +139,10 @@
   </section>
 
   <section class="sect sect-pad stack stack-14">
-    <div class="k">When it opens</div>
+    <div class="k">{{ t('dealerApply.whenItOpens') }}</div>
     <div class="dc-split-even">
       <div class="field">
-        <label for="apply-opens">Opens at</label>
+        <label for="apply-opens">{{ t('common.opensAt') }}</label>
         <input
           id="apply-opens"
           class="input"
@@ -157,7 +153,7 @@
         />
       </div>
       <div class="field">
-        <label for="apply-closes">Closes at</label>
+        <label for="apply-closes">{{ t('common.closesAt') }}</label>
         <input
           id="apply-closes"
           class="input"
@@ -169,21 +165,19 @@
       </div>
     </div>
     <div class="field-hint">
-      One window, applied to every day. You can set different hours per day on your gallery page once
-      you are approved.
+      {{ t('dealerApply.oneWindowAppliedTo') }}
     </div>
   </section>
 
   <section class="sect sect-pad stack stack-14">
-    <div class="k">Your papers</div>
+    <div class="k">{{ t('dealerApply.yourPapers') }}</div>
     <div class="field-hint">
-      All three are required. JPEG, PNG or PDF. They are stored privately and only the administrator
-      reviewing your application can open them.
+      {{ t('dealerApply.allThreeAreRequired') }}
     </div>
 
     @for (document of documents; track document.key) {
       <div class="field">
-        <label [attr.for]="'apply-file-' + document.key">{{ document.label }}</label>
+        <label [attr.for]="'apply-file-' + document.key">{{ t(document.labelKey) }}</label>
         <input
           [id]="'apply-file-' + document.key"
           class="input"
@@ -193,9 +187,9 @@
           (change)="attach(document.key, $event)"
         />
         @if (fileName(document.key); as name) {
-          <div class="field-hint">Attached: {{ name }}</div>
+          <div class="field-hint">{{ t('dealerApply.attached') }} {{ name }}</div>
         } @else {
-          <div class="field-hint">{{ document.hint }}</div>
+          <div class="field-hint">{{ t(document.hintKey) }}</div>
         }
       </div>
     }
@@ -207,7 +201,7 @@
         <kh-icon name="warning-circle" class="banner-icon" />
         <div class="banner-body">
           <div class="banner-text">
-            Still needed: {{ missingDocuments().join(', ') }}.
+            {{ t('dealerApply.stillNeeded') }} {{ missingDocuments().join(', ') }}.
           </div>
         </div>
       </div>
@@ -223,8 +217,7 @@
         {{ busy() ? 'Submitting…' : 'Submit for review' }}
       </button>
       <span class="page-sub">
-        Submitting starts the platform's licence check. You can still edit your gallery page while it
-        is under review.
+        {{ t('dealerApply.submittingStartsThePlatforms') }}
       </span>
     </div>
   </section>

@@ -116,7 +116,7 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<PagedResult<DealerActivityEntry>> ActivityAsync(Id dealerId, PageRequest page, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<DealerActivityEntry>> ActivityAsync(Id dealerId, PageRequest page, Id? actorUserId = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(page);
 
@@ -127,12 +127,22 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
             where booking.DealerId == dealerId && change.ActorParty == dealerParty
             select new { change, booking };
 
+        // "What I did", filtered in SQL rather than over a page. Filtering the fetched page in the
+        // client would silently drop everything past the first 25 rows -- a personal record that is
+        // quietly incomplete is worse than a shared one that is honest.
+        if (actorUserId is { } actor)
+            query = query.Where(row => row.change.ActorUserId == actor);
+
         var total = await query.CountAsync(cancellationToken);
         if (total == 0)
             return PagedResult.Empty<DealerActivityEntry>(page.Page, page.PageSize);
 
         var items = await query
+            // (occurred_at DESC, id DESC): occurred_at alone is not a total order, and a non-total
+            // order lets a page boundary drop an entry -- the defect the audit log documents. The id
+            // is UUIDv7, so it agrees with time rather than fighting it.
             .OrderByDescending(row => row.change.OccurredAt)
+            .ThenByDescending(row => row.change.Id)
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(row => new DealerActivityEntry(

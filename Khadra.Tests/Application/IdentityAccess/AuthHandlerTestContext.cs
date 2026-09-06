@@ -1,5 +1,6 @@
 using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess;
+using Khadra.Application.IdentityAccess.ForgotPassword;
 using Khadra.Application.IdentityAccess.ResendVerification;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
@@ -60,6 +61,9 @@ internal sealed class AuthHandlerTestContext
     public AuthEmailDispatcher Emails => new(EmailComposer, EmailSender, NullLogger<AuthEmailDispatcher>.Instance);
 
     public ResendVerificationHandler ResendVerification() => new(
+        UserRepository, VerificationTokens, OpaqueTokens, Policy, Clock, UnitOfWork, Emails);
+
+    public ForgotPasswordHandler ForgotPassword() => new(
         UserRepository, VerificationTokens, OpaqueTokens, Policy, Clock, UnitOfWork, Emails);
 
     public User KnownUser(User user)

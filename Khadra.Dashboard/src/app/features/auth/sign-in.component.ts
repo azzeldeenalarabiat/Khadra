@@ -3,14 +3,26 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { homeRouteFor } from '../../core/guards/role.guards';
 import { SessionService, SignInFailure } from '../../core/services/session.service';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { MessageParams } from '../../core/i18n/language';
+import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 
+/**
+ * A refusal, held as KEYS rather than as words.
+ *
+ * The banner outlives the click that produced it: someone can fail to sign in and then reach for
+ * the language switch precisely because they could not read what went wrong. Storing the finished
+ * sentence would leave that banner in the language they just rejected.
+ */
 interface Notice {
   readonly tone: 's-bad' | 's-warn';
-  readonly title: string;
-  readonly text: string;
+  readonly titleKey: TranslationKey;
+  readonly textKey: TranslationKey;
+  readonly textParams?: MessageParams;
   /** Where the reader can go to fix it, when there is somewhere. */
-  readonly action?: { readonly label: string; readonly route: string };
+  readonly action?: { readonly labelKey: TranslationKey; readonly route: string };
 }
 
 /**
@@ -25,9 +37,10 @@ interface Notice {
   selector: 'kh-sign-in',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sign-in.component.html',
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent],
 })
 export class SignInComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -50,8 +63,8 @@ export class SignInComponent {
     if (!email || !password) {
       this.notice.set({
         tone: 's-warn',
-        title: 'Enter your email and password',
-        text: 'Both are needed to sign in.',
+        titleKey: 'auth.signIn.needBoth.title',
+        textKey: 'auth.signIn.needBoth.text',
       });
       return;
     }
@@ -80,39 +93,39 @@ function describe(failure: SignInFailure): Notice {
     case 'invalid-credentials':
       return {
         tone: 's-bad',
-        title: 'Invalid email or password',
-        text: 'Check both and try again.',
+        titleKey: 'auth.signIn.invalid.title',
+        textKey: 'auth.signIn.invalid.text',
       };
 
     case 'suspended':
       return {
         tone: 's-bad',
-        title: 'Your account has been suspended',
-        text: 'Contact support to have it reviewed. Resetting your password will not restore access.',
+        titleKey: 'auth.signIn.suspended.title',
+        textKey: 'auth.signIn.suspended.text',
       };
 
     case 'email-not-verified':
       return {
         tone: 's-warn',
-        title: 'Verify your email address first',
-        text: 'We sent a verification link when the account was created. Open it, then sign in.',
+        titleKey: 'auth.signIn.unverified.title',
+        textKey: 'auth.signIn.unverified.text',
         // The link may have expired or never arrived, and this is the only screen that can send
         // another: no session exists to reach it any other way.
-        action: { label: 'Send a new link', route: '/verify-email' },
+        action: { labelKey: 'auth.signIn.unverified.action', route: '/verify-email' },
       };
 
     case 'rate-limited':
       return {
         tone: 's-warn',
-        title: 'Too many attempts',
-        text: retryText(failure.retryAfterSeconds),
+        titleKey: 'auth.signIn.rateLimited.title',
+        ...retryMessage(failure.retryAfterSeconds),
       };
 
     default:
       return {
         tone: 's-bad',
-        title: 'Sign-in is unavailable',
-        text: 'The service did not respond. Nothing about your account has changed; try again shortly.',
+        titleKey: 'auth.signIn.unavailable.title',
+        textKey: 'auth.signIn.unavailable.text',
       };
   }
 }
@@ -122,12 +135,13 @@ function describe(failure: SignInFailure): Notice {
  * than a number invented in the browser: someone who hit the limit fourteen minutes ago would be
  * told to wait another fifteen. If the header appears, this says exactly how long.
  */
-function retryText(retryAfterSeconds: number | null): string {
+function retryMessage(
+  retryAfterSeconds: number | null,
+): { textKey: TranslationKey; textParams?: MessageParams } {
   if (retryAfterSeconds === null) {
-    return 'Too many sign-in attempts from this network. Wait a few minutes before trying again.';
+    return { textKey: 'auth.signIn.rateLimited.vague' };
   }
 
   const minutes = Math.ceil(retryAfterSeconds / 60);
-  if (minutes <= 1) return 'Try again in about a minute.';
-  return `Try again in about ${minutes} minutes.`;
+  return { textKey: 'auth.signIn.rateLimited.minutes', textParams: { count: minutes } };
 }

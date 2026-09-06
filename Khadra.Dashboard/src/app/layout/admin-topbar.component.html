@@ -1,6 +1,6 @@
 <div class="topbar">
   <div class="grow">
-    <nav class="topbar-crumbs" aria-label="Breadcrumb">
+    <nav class="topbar-crumbs" [attr.aria-label]="t('topbar.breadcrumb')">
       @for (crumb of crumbs(); track $index) {
         @if ($index > 0) {
           <span aria-hidden="true">/</span>
@@ -29,6 +29,7 @@
     is honest again and the chip opens the two things it always looked like it should.
   -->
   <div class="topbar-actions">
+    <kh-language-switch />
     <kh-notifications />
 
     <div class="user-menu">
@@ -37,7 +38,7 @@
         class="user-chip"
         [attr.aria-expanded]="open()"
         aria-haspopup="menu"
-        [attr.aria-label]="'Account menu for ' + name()"
+        [attr.aria-label]="t('topbar.accountMenu', { name: name() })"
         (click)="toggle($event)"
       >
         <span class="avatar avatar-26" aria-hidden="true">{{ initials() }}</span>
@@ -47,16 +48,16 @@
       @if (open()) {
         <div class="user-menu-panel" role="menu">
           <div class="user-menu-head">
-            <div class="sidebar-user-name">{{ name() }}</div>
-            <div class="sidebar-user-role">{{ email() }}</div>
+            <div class="sidebar-user-name user-text">{{ name() }}</div>
+            <div class="sidebar-user-role ltr">{{ email() }}</div>
           </div>
           <a class="sidebar-link" role="menuitem" [routerLink]="accountRoute()" (click)="close()">
             <kh-icon name="shield-check" />
-            Your account
+            {{ t('topbar.yourAccount') }}
           </a>
           <button type="button" class="sidebar-link" role="menuitem" (click)="signOut()">
-            <kh-icon name="sign-out" />
-            Sign out
+            <kh-icon name="sign-out" class="icon-mirrored" />
+            {{ t('topbar.signOut') }}
           </button>
         </div>
       }

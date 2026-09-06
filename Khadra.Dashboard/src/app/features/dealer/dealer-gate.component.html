@@ -15,35 +15,29 @@
       <div class="locked-head s-accent">
         <div class="locked-icon"><kh-icon name="storefront" /></div>
         <div>
-          <div class="locked-title">Tell us about your gallery</div>
-          <span class="pill s-accent">Not submitted</span>
+          <div class="locked-title">{{ t('gate.notSubmitted.title') }}</div>
+          <span class="pill s-accent">{{ t('gate.notSubmitted.badge') }}</span>
         </div>
       </div>
-      <div class="locked-body">
-        Your owner account is ready. Before you can list cars, the platform has to check that the
-        gallery is a licensed rental office — so we need its details and its papers.
-      </div>
+      <div class="locked-body">{{ t('gate.notSubmitted.body') }}</div>
       <div class="locked-points">
-        <span class="k">What you will need</span>
+        <span class="k">{{ t('gate.notSubmitted.listTitle') }}</span>
         <div class="locked-point s-accent">
           <kh-icon name="identification-card" />
-          <span>The gallery's name and commercial registration number.</span>
+          <span>{{ t('gate.notSubmitted.point1') }}</span>
         </div>
         <div class="locked-point s-accent">
           <kh-icon name="map-pin" />
-          <span>Where it is, and the hours it opens.</span>
+          <span>{{ t('gate.notSubmitted.point2') }}</span>
         </div>
         <div class="locked-point s-accent">
           <kh-icon name="file-lock" />
-          <span>
-            Three documents: the commercial registration, proof of green-plate vehicle registration,
-            and your own ID.
-          </span>
+          <span>{{ t('gate.notSubmitted.point3') }}</span>
         </div>
       </div>
       <div class="row row-gap-8">
-        <a class="btn btn-primary btn-md" routerLink="/dealer/apply">Submit my gallery</a>
-        <a class="btn btn-secondary btn-md" routerLink="/dealer/settings">Account settings</a>
+        <a class="btn btn-primary btn-md" routerLink="/dealer/apply">{{ t('gate.notSubmitted.submit') }}</a>
+        <a class="btn btn-secondary btn-md" [routerLink]="accountRoute()">{{ t('gate.accountSettings') }}</a>
       </div>
     </div>
   </div>
@@ -55,16 +49,13 @@
       <div class="locked-head s-warn">
         <div class="locked-icon"><kh-icon name="user-minus" /></div>
         <div>
-          <div class="locked-title">You are not part of a dealership</div>
-          <span class="pill s-warn">No access</span>
+          <div class="locked-title">{{ t('gate.noDealership.title') }}</div>
+          <span class="pill s-warn">{{ t('gate.noDealership.badge') }}</span>
         </div>
       </div>
-      <div class="locked-body">
-        No dealership on the platform currently lists you as a member of staff. If you were expecting
-        access, the owner of the gallery you work for can restore it from their Employees screen.
-      </div>
+      <div class="locked-body">{{ t('gate.noDealership.body') }}</div>
       <div class="row row-gap-8">
-        <a class="btn btn-secondary btn-md" routerLink="/dealer/settings">Account settings</a>
+        <a class="btn btn-secondary btn-md" [routerLink]="accountRoute()">{{ t('gate.accountSettings') }}</a>
       </div>
     </div>
   </div>
@@ -76,16 +67,13 @@
       <div class="locked-head s-bad">
         <div class="locked-icon"><kh-icon name="warning-circle" /></div>
         <div>
-          <div class="locked-title">We could not load your dealership</div>
-          <span class="pill s-bad">Unavailable</span>
+          <div class="locked-title">{{ t('gate.unreachable.title') }}</div>
+          <span class="pill s-bad">{{ t('gate.unreachable.badge') }}</span>
         </div>
       </div>
-      <div class="locked-body">
-        Your console is not showing because the platform could not confirm your dealership's
-        standing just now. Nothing about your bookings or your fleet has changed.
-      </div>
+      <div class="locked-body">{{ t('gate.unreachable.body') }}</div>
       <div class="row row-gap-8">
-        <button type="button" class="btn btn-primary btn-md" (click)="retry()">Try again</button>
+        <button type="button" class="btn btn-primary btn-md" (click)="retry()">{{ t('common.tryAgain') }}</button>
       </div>
       <div class="mono">GET /api/v1/dealers/me</div>
     </div>
@@ -96,23 +84,30 @@
       <div class="locked-head" [class]="'s-' + block.tone">
         <div class="locked-icon"><kh-icon [name]="block.icon" /></div>
         <div>
-          <div class="locked-title">{{ block.title }}</div>
+          <div class="locked-title user-text">{{ block.title }}</div>
           <span class="pill" [class]="'s-' + block.tone">{{ block.badge }}</span>
         </div>
       </div>
-      <div class="locked-body">{{ block.body }}</div>
+      <div class="locked-body user-text">{{ block.body }}</div>
       <div class="locked-points">
         <span class="k">{{ block.listTitle }}</span>
         @for (point of block.points; track point.text) {
           <div class="locked-point" [class]="'s-' + point.tone">
             <kh-icon [name]="point.icon" />
-            <span>{{ point.text }}</span>
+            <span class="user-text">{{ point.text }}</span>
           </div>
         }
       </div>
+      <!-- The application is the owner's to fix, so the dealer page is their next step. An employee
+           can do nothing about it, and under a suspension still has real work: the cars already out
+           have to come back and be recorded. Send each of them where they can act. -->
       <div class="row row-gap-8">
-        <a class="btn btn-primary btn-md" routerLink="/dealer/profile">Open my dealer page</a>
-        <a class="btn btn-secondary btn-md" routerLink="/dealer/settings">Account settings</a>
+        @if (isOwner()) {
+          <a class="btn btn-primary btn-md" routerLink="/dealer/profile">{{ t('gate.openDealerPage') }}</a>
+        } @else if (suspended()) {
+          <a class="btn btn-primary btn-md" [routerLink]="bookingsRoute()">{{ t('gate.suspended.goToBookings') }}</a>
+        }
+        <a class="btn btn-secondary btn-md" [routerLink]="accountRoute()">{{ t('gate.accountSettings') }}</a>
       </div>
       <div class="mono">RequireApprovedDealer · enforced server-side on every call</div>
     </div>

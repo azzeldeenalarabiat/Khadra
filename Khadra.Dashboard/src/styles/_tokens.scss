@@ -48,9 +48,17 @@
   --color-accent-2-800: #116936;
   --color-accent-2-900: #0c4423;
 
-  --font-heading: 'Inter', system-ui, sans-serif;
+  // Arabic faces are appended, not substituted. Font fallback is per GLYPH, so Latin still renders
+  // in Inter while Arabic -- which Inter does not cover at all -- picks the first face here that
+  // does. Without this, Arabic falls back to whatever the browser has last, which on Windows is
+  // usually a serif Naskh that does not sit level with the Latin around it.
+  //
+  // All system faces on purpose: nothing here is bundled or fetched, and the console has no webfont
+  // to lose. Segoe UI covers Windows, SF Arabic and Geeza Pro cover Apple, Noto covers the rest.
+  --font-arabic: 'Segoe UI', 'SF Arabic', 'Geeza Pro', 'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma;
+  --font-heading: 'Inter', var(--font-arabic), system-ui, sans-serif;
   --font-heading-weight: 500;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', var(--font-arabic), system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, Consolas, monospace;
 
   --space-1: 2.8px;

@@ -5,6 +5,7 @@ import { DisputeListItem } from '../../core/models/disputes.api';
 import { AdminDisputesService, DisputeQueue } from '../../core/services/admin-disputes.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * The Admin's dispute queue (spec 3.3).
@@ -21,13 +22,14 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class DisputesListComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminDisputesService);
   private readonly router = inject(Router);
 
   protected readonly queues: readonly { key: DisputeQueue; label: string }[] = [
-    { key: 'live', label: 'Live queue' },
+    { key: 'live', label: this.t('disputesList.liveQueue') },
     { key: 'Open', label: 'Open' },
-    { key: 'UnderReview', label: 'Under review' },
+    { key: 'UnderReview', label: this.t('disputesList.underReview') },
     { key: 'Resolved', label: 'Resolved' },
     { key: 'Withdrawn', label: 'Withdrawn' },
   ];

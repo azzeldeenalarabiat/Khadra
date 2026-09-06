@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { AttentionItem, AttentionQueue } from '../models/dashboard.api';
 import { DealerDashboard, UpcomingHandover } from '../models/dealer-console.api';
 import { toAdminNotifications, toDealerNotifications } from './notifications.presenter';
+import { EN } from '../i18n/en';
+import { resolveMessage } from '../i18n/resolve';
+import { Translate } from './dashboard.presenter';
+
+/** Resolves real English, so these assertions still read as the words an admin sees. */
+const t: Translate = (key, params) =>
+  resolveMessage(EN[key], params, 'en-GB', false) ?? key;
+
 
 const NOW = Date.parse('2026-09-05T12:00:00Z');
 
@@ -37,27 +45,28 @@ describe('toAdminNotifications', () => {
   });
 
   it('shows nothing at all before the queue has answered', () => {
-    expect(toAdminNotifications(null, NOW)).toEqual([]);
+    expect(toAdminNotifications(null, NOW, t)).toEqual([]);
   });
 
   it('opens the record a row is about, not the list it sits in', () => {
-    const [row] = toAdminNotifications(queue(item()), NOW);
+    const [row] = toAdminNotifications(queue(item()), NOW, t);
 
     expect(row.route).toBe('/disputes/t1');
   });
 
   it('names the record in the detail line, so a row can be recognised', () => {
-    const [row] = toAdminNotifications(queue(item()), NOW);
+    const [row] = toAdminNotifications(queue(item()), NOW, t);
 
     expect(row.detail).toContain('KH-XE5NTW3U');
   });
 
   /** An overdue row has to look different from one merely approaching its deadline. */
   it('carries the severity through as the row tone', () => {
-    const [late] = toAdminNotifications(queue(item({ isOverdue: true, severity: 'Overdue' })), NOW);
+    const [late] = toAdminNotifications(queue(item({ isOverdue: true, severity: 'Overdue' })), NOW, t);
     const [soon] = toAdminNotifications(
       queue(item({ isOverdue: false, severity: 'Warning', slaDeadlineAt: '2026-09-06T12:00:00Z' })),
       NOW,
+      t,
     );
 
     expect(late.tone).toBe('bad');
@@ -68,6 +77,7 @@ describe('toAdminNotifications', () => {
     const rows = toAdminNotifications(
       queue(item({ id: 'a', subjectIds: ['a'] }), item({ id: 'b', subjectIds: ['b'] })),
       NOW,
+      t,
     );
 
     expect(rows).toHaveLength(2);
@@ -113,12 +123,12 @@ describe('toDealerNotifications', () => {
     }) as DealerDashboard;
 
   it('shows nothing at all before the dashboard has answered', () => {
-    expect(toDealerNotifications(null, NOW)).toEqual([]);
+    expect(toDealerNotifications(null, NOW, t)).toEqual([]);
   });
 
   /** "0 requests waiting" is not news, and a badge of 0 is worse than no badge. */
   it('says nothing when there is nothing waiting', () => {
-    expect(toDealerNotifications(dashboard(), NOW)).toEqual([]);
+    expect(toDealerNotifications(dashboard(), NOW, t)).toEqual([]);
   });
 
   it('puts what is already late above what is merely due', () => {
@@ -134,6 +144,7 @@ describe('toDealerNotifications', () => {
         upcomingPickups: [handover()],
       }),
       NOW,
+      t,
     );
 
     expect(rows[0].id).toBe('overdue-returns');
@@ -153,6 +164,7 @@ describe('toDealerNotifications', () => {
         },
       }),
       NOW,
+      t,
     );
 
     expect(one[0].title).toBe('1 car is overdue back');
@@ -171,6 +183,7 @@ describe('toDealerNotifications', () => {
         },
       }),
       NOW,
+      t,
     );
 
     expect(row.detail).toContain('4d');
@@ -180,6 +193,7 @@ describe('toDealerNotifications', () => {
     const rows = toDealerNotifications(
       dashboard({ upcomingReturns: [handover({ bookingId: 'b9', reference: 'KH-ZZZ999' })] }),
       NOW,
+      t,
     );
 
     expect(rows[0].route).toBe('/dealer/bookings/b9');
@@ -191,10 +205,12 @@ describe('toDealerNotifications', () => {
     const [delivery] = toDealerNotifications(
       dashboard({ upcomingPickups: [handover({ pickupMethod: 'Delivery' })] }),
       NOW,
+      t,
     );
     const [collect] = toDealerNotifications(
       dashboard({ upcomingPickups: [handover({ pickupMethod: 'SelfPickup' })] }),
       NOW,
+      t,
     );
 
     expect(delivery.icon).toBe('moped');
@@ -205,6 +221,7 @@ describe('toDealerNotifications', () => {
     const [row] = toDealerNotifications(
       dashboard({ upcomingReturns: [handover({ isOverdue: true })] }),
       NOW,
+      t,
     );
 
     expect(row.tone).toBe('bad');
@@ -225,6 +242,7 @@ describe('toDealerNotifications', () => {
         upcomingReturns: [handover({ bookingId: 'r1' })],
       }),
       NOW,
+      t,
     );
 
     // Two counts collapse to one row each; the five handovers-in-window are listed individually.

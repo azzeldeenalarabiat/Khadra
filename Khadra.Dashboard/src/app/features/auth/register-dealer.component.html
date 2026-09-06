@@ -1,68 +1,55 @@
 <div class="auth-shell">
+  <div class="auth-lang"><kh-language-switch /></div>
   <form class="sect auth-card stack stack-14" (ngSubmit)="submit()">
     <div class="auth-head">
       <div class="sidebar-mark"><kh-icon name="steering-wheel" /></div>
-      <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+      <div class="sidebar-brand">{{ t('brand.line1') }}<br />{{ t('brand.line2') }}</div>
     </div>
 
     @if (registered(); as address) {
       @if (emailSent()) {
         <div>
-          <h1 class="auth-title">Confirm your email address</h1>
-          <div class="page-sub">
-            Your account is created. We sent a verification link to
-            <strong>{{ address }}</strong> — open it, and you can sign in.
-          </div>
+          <h1 class="auth-title">{{ t('auth.register.sentTitle') }}</h1>
+          <div class="page-sub">{{ t('auth.register.sentBody', { email: address }) }}</div>
         </div>
       } @else {
         <!-- The account is saved and the link is valid; only the delivery failed. Saying "we sent
              it" here would send them to wait at an inbox nothing is coming to. -->
         <div>
-          <h1 class="auth-title">Your account is created</h1>
-          <div class="page-sub">
-            We could not send the verification email to <strong>{{ address }}</strong> just now.
-            Nothing is wrong with your account — it is saved and waiting.
-          </div>
+          <h1 class="auth-title">{{ t('auth.register.notSentTitle') }}</h1>
+          <div class="page-sub">{{ t('auth.register.notSentBody', { email: address }) }}</div>
         </div>
 
         <div class="banner s-warn banner-tall" role="alert">
           <kh-icon name="warning-circle" class="banner-icon" />
           <div class="banner-body">
-            <div class="banner-title">No email was sent</div>
-            <div class="banner-text">
-              Check the address is right, then ask for a new link. You cannot sign in until the
-              address is confirmed.
-            </div>
+            <div class="banner-title">{{ t('auth.register.notSentBanner') }}</div>
+            <div class="banner-text">{{ t('auth.register.notSentHint') }}</div>
           </div>
         </div>
 
         <a class="btn btn-primary btn-md btn-block" routerLink="/verify-email">
-          Send a verification link
+          {{ t('auth.register.sendLink') }}
         </a>
       }
 
       <div class="banner s-accent banner-tall" role="status">
         <kh-icon name="storefront" class="banner-icon" />
         <div class="banner-body">
-          <div class="banner-title">Your gallery comes next</div>
-          <div class="banner-text">
-            Once you sign in, you submit the gallery itself — its name, its commercial registration
-            and its licence papers. An administrator checks them before you can list cars.
-          </div>
+          <div class="banner-title">{{ t('auth.register.galleryNextTitle') }}</div>
+          <div class="banner-text">{{ t('auth.register.galleryNextBody') }}</div>
         </div>
       </div>
 
       <!-- Only offered when a link is actually on its way. Sending someone to sign in when no email
            was delivered walks them straight into "verify your email address first". -->
       @if (emailSent()) {
-        <a class="btn btn-primary btn-md btn-block" routerLink="/sign-in">Go to sign in</a>
+        <a class="btn btn-primary btn-md btn-block" routerLink="/sign-in">{{ t('auth.register.goToSignIn') }}</a>
       }
     } @else {
       <div>
-        <h1 class="auth-title">Register your gallery</h1>
-        <div class="page-sub">
-          This creates your owner account. You submit the gallery and its papers after signing in.
-        </div>
+        <h1 class="auth-title">{{ t('auth.register.title') }}</h1>
+        <div class="page-sub">{{ t('auth.register.subtitle') }}</div>
       </div>
 
       @if (problem(); as message) {
@@ -75,7 +62,7 @@
       }
 
       <div class="field">
-        <label for="register-name">Full name</label>
+        <label for="register-name">{{ t('auth.field.fullName') }}</label>
         <input
           id="register-name"
           class="input"
@@ -90,7 +77,7 @@
       </div>
 
       <div class="field">
-        <label for="register-email">Email</label>
+        <label for="register-email">{{ t('auth.field.email') }}</label>
         <input
           id="register-email"
           class="input"
@@ -99,6 +86,7 @@
           autocomplete="email"
           autocapitalize="none"
           spellcheck="false"
+          dir="ltr"
           required
           [disabled]="busy()"
           [value]="email()"
@@ -107,7 +95,7 @@
       </div>
 
       <div class="field">
-        <label for="register-phone">Mobile number</label>
+        <label for="register-phone">{{ t('auth.field.mobile') }}</label>
         <input
           id="register-phone"
           class="input"
@@ -115,6 +103,7 @@
           name="phone"
           autocomplete="tel"
           placeholder="07XXXXXXXX"
+          dir="ltr"
           required
           [disabled]="busy()"
           [value]="phone()"
@@ -123,7 +112,7 @@
       </div>
 
       <div class="field">
-        <label for="register-password">Password</label>
+        <label for="register-password">{{ t('auth.field.password') }}</label>
         <input
           id="register-password"
           class="input"
@@ -138,12 +127,12 @@
       </div>
 
       <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="busy()">
-        {{ busy() ? 'Creating your account…' : 'Create account' }}
+        {{ busy() ? t('auth.register.busy') : t('auth.register.submit') }}
       </button>
     }
 
     <div class="auth-foot">
-      <a class="auth-link" routerLink="/sign-in">Already have an account? Sign in</a>
+      <a class="auth-link" routerLink="/sign-in">{{ t('auth.register.alreadyHave') }}</a>
     </div>
   </form>
 </div>

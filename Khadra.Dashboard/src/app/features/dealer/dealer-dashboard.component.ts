@@ -8,13 +8,20 @@ import { SessionService } from '../../core/services/session.service';
 import { IconName } from '../../shared/icon/icon-paths';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 interface Kpi {
   readonly label: string;
   readonly main: string;
   readonly note: string;
   readonly icon: IconName;
-  readonly route: string;
+  /**
+   * Null where the tile has nowhere to send this reader.
+   *
+   * A withheld figure links to Reports, which is exactly the screen the person it was withheld from
+   * cannot open — a tile that says "not granted" and then offers to show you it anyway.
+   */
+  readonly route: string | null;
   readonly query?: Record<string, string>;
 }
 
@@ -45,6 +52,7 @@ interface Attention {
   imports: [RouterLink, IconComponent],
 })
 export class DealerDashboardComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly console = inject(DealerConsoleService);
   private readonly bookings = inject(DealerBookingsService);
   private readonly session = inject(SessionService);
@@ -53,6 +61,11 @@ export class DealerDashboardComponent {
   /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
   private readonly data = loaded(this.resource);
   protected readonly dashboard = computed(() => this.data() ?? null);
+
+  /** Both "add a car" entry points on this screen lead into an owner-only form. */
+  protected readonly canManageFleet = computed(
+    () => this.console.permissions()?.canManageFleet === true,
+  );
 
   protected readonly greeting = computed(() => {
     const hour = new Date().getHours();
@@ -78,7 +91,7 @@ export class DealerDashboardComponent {
       : 'nothing waiting';
     return [
       {
-        label: 'Pending requests',
+        label: this.t('dealerDashboard.pendingRequests'),
         main: String(d.bookings.requested),
         note: `${oldest} · answer before pickup`,
         icon: 'bell-ringing',
@@ -86,7 +99,7 @@ export class DealerDashboardComponent {
         query: { tab: 'pending' },
       },
       {
-        label: 'Active rentals',
+        label: this.t('dealerDashboard.activeRentals'),
         main: String(d.bookings.pickedUp),
         note: d.bookings.overdueReturns
           ? `${d.bookings.overdueReturns} overdue`
@@ -96,14 +109,14 @@ export class DealerDashboardComponent {
         query: { tab: 'active' },
       },
       {
-        label: 'Available vehicles',
+        label: this.t('dealerDashboard.availableVehicles'),
         main: String(d.availableVehicles),
         note: `of ${d.publishedVehicles} published · ${d.totalVehicles} in your fleet`,
         icon: 'check-square',
         route: '/dealer/fleet',
       },
       {
-        label: 'Upcoming pickups',
+        label: this.t('dealerDashboard.upcomingPickups'),
         main: String(d.upcomingPickups.length),
         note: d.upcomingPickups[0]
           ? `next: ${this.when(d.upcomingPickups[0].when)}`
@@ -113,7 +126,7 @@ export class DealerDashboardComponent {
         query: { tab: 'upcoming' },
       },
       {
-        label: 'Upcoming returns',
+        label: this.t('dealerDashboard.upcomingReturns'),
         main: String(d.upcomingReturns.length),
         note: d.upcomingReturns[0]
           ? `next: ${this.when(d.upcomingReturns[0].when)}`
@@ -123,33 +136,35 @@ export class DealerDashboardComponent {
         query: { tab: 'active' },
       },
       {
-        label: 'Approved, not yet collected',
+        label: this.t('dealerDashboard.approvedNotYetCollected'),
         main: String(d.bookings.approved),
-        note: 'held for their dates',
+        note: this.t('dealerDashboard.heldForTheirDates'),
         icon: 'calendar-check',
         route: '/dealer/bookings',
         query: { tab: 'upcoming' },
       },
+      // The server withholds these two rather than zeroing them, and a withheld tile leads nowhere:
+      // Reports is the screen the same grant closes.
       {
-        label: 'Revenue · this month',
+        label: this.t('dealerDashboard.revenueThisMonth'),
         main: d.revenueThisMonth
           ? `${d.revenueThisMonth.amount.toLocaleString('en-GB')} ${d.revenueThisMonth.currency}`
           : '—',
         note: d.revenueThisMonth
           ? 'rentals returned this month, before commission'
-          : 'financial reports not granted',
+          : 'not part of your access',
         icon: 'currency-circle-dollar',
-        route: '/dealer/reports',
+        route: d.revenueThisMonth ? '/dealer/reports' : null,
       },
       {
-        label: 'Occupancy rate',
+        label: this.t('dealerDashboard.occupancyRate'),
         main: d.occupancyPercentLast30Days === null ? '—' : `${d.occupancyPercentLast30Days}%`,
         note:
           d.occupancyPercentLast30Days === null
-            ? 'financial reports not granted'
+            ? 'not part of your access'
             : 'fleet utilisation, last 30 days',
         icon: 'gauge',
-        route: '/dealer/reports',
+        route: d.occupancyPercentLast30Days === null ? null : '/dealer/reports',
       },
     ];
   });

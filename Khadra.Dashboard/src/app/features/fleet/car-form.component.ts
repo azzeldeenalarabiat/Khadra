@@ -16,6 +16,7 @@ import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fle
 import { LookupsService } from '../../core/services/lookups.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Add or edit one car (spec 4.3).
@@ -31,6 +32,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [FormsModule, RouterLink, IconComponent],
 })
 export class CarFormComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(FleetService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);

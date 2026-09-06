@@ -1,6 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { DealerBookingsService, HandoverInput } from '../../core/services/dealer-bookings.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
+
+/** The three handover figures, by the stable name the dialog returns them under. */
+const ODOMETER = 'odometerKm';
+const FUEL = 'fuelLevel';
+const CASH = 'cashCollected';
 
 /**
  * The dealer's decisions on a booking, each behind the console's confirmation dialog so the
@@ -12,81 +19,105 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 export class BookingDecisions {
   private readonly service = inject(DealerBookingsService);
   private readonly ui = inject(ConsoleUiService);
+  private readonly t = inject(I18nService).t;
 
-  /** Codes the API accepts (RejectionReasons.Labels), with the words the dealer picks from. */
-  readonly rejectionReasons: readonly { readonly code: string; readonly label: string }[] = [
-    { code: 'VehicleUnavailable', label: 'Vehicle no longer available' },
-    { code: 'DatesConflict', label: 'Dates conflict with another booking' },
-    { code: 'OutsideDeliveryRadius', label: 'Delivery location outside radius' },
-    { code: 'CustomerVerificationIncomplete', label: 'Customer verification incomplete' },
-    { code: 'Other', label: 'Other' },
-  ];
+  /**
+   * Codes the API accepts (RejectionReasons.Labels), with the words the dealer picks from.
+   *
+   * The code is what travels; the label is only what is read, and it is resolved fresh so the list
+   * follows the language. They were the same string once, and the dialog matched the chosen WORDS
+   * back to a code — which meant an Arabic label matched nothing and every rejection was filed as
+   * 'Other'.
+   */
+  get rejectionReasons(): readonly { readonly code: string; readonly label: string }[] {
+    return [
+      { code: 'VehicleUnavailable', label: this.t('dealerDecide.reason.vehicleUnavailable') },
+      { code: 'DatesConflict', label: this.t('dealerDecide.reason.datesConflict') },
+      { code: 'OutsideDeliveryRadius', label: this.t('dealerDecide.reason.outsideRadius') },
+      {
+        code: 'CustomerVerificationIncomplete',
+        label: this.t('dealerDecide.reason.verificationIncomplete'),
+      },
+      { code: 'Other', label: this.t('dealerDecide.reason.other') },
+    ];
+  }
 
   approve(bookingId: string, reference: string, customer: string, done: () => void): void {
     this.ui.openAction(
       {
         icon: 'check-circle',
         tone: 'ok',
-        title: `Approve booking ${reference}?`,
-        body: `${customer} is notified and the vehicle is held for these dates. The customer's free-cancellation window starts now.`,
+        title: this.t('dealerDecide.approve.title', { reference }),
+        body: this.t('dealerDecide.approve.body', { customer }),
         fields: [
           {
-            label: 'Note to customer (optional)',
+            name: 'noteToCustomer',
+            label: this.t('dealerDecide.approve.noteLabel'),
             type: 'text',
             optional: true,
-            placeholder: 'Pickup instructions, delivery window…',
-            hint: 'Recorded on the booking with you as the actor; the customer can read it.',
+            placeholder: this.t('dealerDecide.approve.notePlaceholder'),
+            hint: this.t('dealerDecide.approve.noteHint'),
           },
         ],
-        note: 'Recorded against your account on the booking history.',
-        confirm: 'Approve booking',
-        result: { title: 'Booking approved', body: `${reference} · customer notified` },
+        note: this.t('dealerDecide.approve.note'),
+        confirm: this.t('dealerDecide.approve.confirm'),
+        result: {
+          title: this.t('dealerDecide.approve.doneTitle'),
+          body: this.t('dealerDecide.approve.doneBody', { reference }),
+        },
       },
       async (values) => {
-        await this.service.approve(
-          bookingId,
-          values['Note to customer (optional)']?.trim() || null,
-        );
+        await this.service.approve(bookingId, values['noteToCustomer']?.trim() || null);
         done();
       },
-      { title: 'Booking approved', body: `${reference} is held for its dates.` },
+      {
+        title: this.t('dealerDecide.approve.doneTitle'),
+        body: this.t('dealerDecide.approve.doneToast', { reference }),
+      },
     );
   }
 
   reject(bookingId: string, reference: string, done: () => void): void {
+    const reasons = this.rejectionReasons;
     this.ui.openAction(
       {
         icon: 'x-circle',
         tone: 'bad',
         danger: true,
-        title: `Reject booking ${reference}?`,
-        body: 'The customer is notified immediately and the dates are released. Rejection never costs the customer anything. This cannot be undone.',
+        title: this.t('dealerDecide.reject.title', { reference }),
+        body: this.t('dealerDecide.reject.body'),
         fields: [
-          { label: 'Reason', type: 'select', options: this.rejectionReasons.map((r) => r.label) },
           {
-            label: 'Details for the customer',
+            name: 'reason',
+            label: this.t('dealerDecide.reject.reasonLabel'),
+            type: 'select',
+            // The API code IS the option value, so nothing has to be matched back from the words.
+            options: reasons.map((r) => ({ value: r.code, label: r.label })),
+          },
+          {
+            name: 'details',
+            label: this.t('dealerDecide.reject.detailsLabel'),
             type: 'text',
-            placeholder: 'Required — shown to the customer and kept on the booking.',
+            placeholder: this.t('dealerDecide.reject.detailsPlaceholder'),
           },
         ],
-        confirm: 'Reject booking',
+        confirm: this.t('dealerDecide.reject.confirm'),
         result: {
-          title: 'Booking rejected',
-          body: 'Dates released · reason sent to customer',
+          title: this.t('dealerDecide.reject.doneTitle'),
+          body: this.t('dealerDecide.reject.doneBody'),
           tone: 'warn',
         },
       },
       async (values) => {
-        const label = values['Reason'] ?? this.rejectionReasons[0].label;
-        const code = this.rejectionReasons.find((r) => r.label === label)?.code ?? 'Other';
-        const details = values['Details for the customer']?.trim();
-        if (!details) throw { error: { title: 'Tell the customer why. The reason is required.' } };
+        const code = values['reason'] ?? reasons[0].code;
+        const details = values['details']?.trim();
+        if (!details) throw { error: { title: this.t('dealerDecide.reject.needDetails') } };
         await this.service.reject(bookingId, code, details);
         done();
       },
       {
-        title: 'Booking rejected',
-        body: `${reference} · dates released, reason sent to the customer`,
+        title: this.t('dealerDecide.reject.doneTitle'),
+        body: this.t('dealerDecide.reject.doneToast', { reference }),
         tone: 'warn',
       },
     );
@@ -97,38 +128,53 @@ export class BookingDecisions {
       {
         icon: 'key',
         tone: 'ok',
-        title: `Hand over ${vehicle}?`,
-        body: `Records that ${reference} started and the keys changed hands. The odometer and fuel level protect both sides if the return is disputed.`,
+        title: this.t('dealerDecide.pickup.title', { vehicle }),
+        body: this.t('dealerDecide.pickup.body', { reference }),
         fields: [
-          { label: 'Odometer (km)', type: 'text', optional: true, placeholder: 'e.g. 41200' },
           {
-            label: 'Fuel level (0–1)',
+            name: ODOMETER,
+            label: this.t('dealerDecide.odometerLabel'),
             type: 'text',
             optional: true,
-            placeholder: 'e.g. 1 for a full tank, 0.5 for half',
+            placeholder: this.t('dealerDecide.pickup.odometerPlaceholder'),
           },
           {
-            label: 'Cash collected (JOD)',
+            name: FUEL,
+            label: this.t('dealerDecide.fuelLabel'),
             type: 'text',
             optional: true,
-            placeholder: 'The balance paid in cash at handover, if any',
+            placeholder: this.t('dealerDecide.pickup.fuelPlaceholder'),
           },
           {
-            label: 'Notes',
+            name: CASH,
+            label: this.t('dealerDecide.cashLabel'),
             type: 'text',
             optional: true,
-            placeholder: 'Condition, accessories, anything worth writing down',
+            placeholder: this.t('dealerDecide.pickup.cashPlaceholder'),
+          },
+          {
+            name: 'notes',
+            label: this.t('dealerDecide.notesLabel'),
+            type: 'text',
+            optional: true,
+            placeholder: this.t('dealerDecide.pickup.notesPlaceholder'),
           },
         ],
-        note: 'Recorded with you as the person who handed over the car.',
-        confirm: 'Record pickup',
-        result: { title: 'Pickup recorded', body: `${reference} is now an active rental.` },
+        note: this.t('dealerDecide.pickup.note'),
+        confirm: this.t('dealerDecide.pickup.confirm'),
+        result: {
+          title: this.t('dealerDecide.pickup.doneTitle'),
+          body: this.t('dealerDecide.pickup.doneBody', { reference }),
+        },
       },
       async (values) => {
         await this.service.recordPickup(bookingId, this.handover(values));
         done();
       },
-      { title: 'Pickup recorded', body: `${reference} is now an active rental.` },
+      {
+        title: this.t('dealerDecide.pickup.doneTitle'),
+        body: this.t('dealerDecide.pickup.doneBody', { reference }),
+      },
     );
   }
 
@@ -137,29 +183,43 @@ export class BookingDecisions {
       {
         icon: 'arrow-square-in',
         tone: 'ok',
-        title: `Take ${vehicle} back?`,
-        body: `Records that ${reference} ended and the car is back with you. The settlement window starts from this moment; either side can open a dispute inside it.`,
+        title: this.t('dealerDecide.return.title', { vehicle }),
+        body: this.t('dealerDecide.return.body', { reference }),
         fields: [
-          { label: 'Odometer (km)', type: 'text', optional: true, placeholder: 'e.g. 41650' },
-          { label: 'Fuel level (0–1)', type: 'text', optional: true, placeholder: 'e.g. 0.75' },
           {
-            label: 'Cash collected (JOD)',
+            name: ODOMETER,
+            label: this.t('dealerDecide.odometerLabel'),
             type: 'text',
             optional: true,
-            placeholder: 'Any balance settled in cash at return',
+            placeholder: this.t('dealerDecide.return.odometerPlaceholder'),
           },
           {
-            label: 'Notes',
+            name: FUEL,
+            label: this.t('dealerDecide.fuelLabel'),
             type: 'text',
             optional: true,
-            placeholder: 'Damage, cleanliness, missing items',
+            placeholder: this.t('dealerDecide.return.fuelPlaceholder'),
+          },
+          {
+            name: CASH,
+            label: this.t('dealerDecide.cashLabel'),
+            type: 'text',
+            optional: true,
+            placeholder: this.t('dealerDecide.return.cashPlaceholder'),
+          },
+          {
+            name: 'notes',
+            label: this.t('dealerDecide.notesLabel'),
+            type: 'text',
+            optional: true,
+            placeholder: this.t('dealerDecide.return.notesPlaceholder'),
           },
         ],
-        note: 'Recorded with you as the person who took the car back.',
-        confirm: 'Record return',
+        note: this.t('dealerDecide.return.note'),
+        confirm: this.t('dealerDecide.return.confirm'),
         result: {
-          title: 'Return recorded',
-          body: `${reference} is back; the settlement window has started.`,
+          title: this.t('dealerDecide.return.doneTitle'),
+          body: this.t('dealerDecide.return.doneBody', { reference }),
         },
       },
       async (values) => {
@@ -167,25 +227,35 @@ export class BookingDecisions {
         done();
       },
       {
-        title: 'Return recorded',
-        body: `${reference} is back; the settlement window has started.`,
+        title: this.t('dealerDecide.return.doneTitle'),
+        body: this.t('dealerDecide.return.doneBody', { reference }),
       },
     );
   }
 
+  /**
+   * The three figures that decide a disputed return, read back by NAME.
+   *
+   * They were read back by the visible label — `values['Odometer (km)']` — which meant translating
+   * the caption returned `undefined` for all three, `number()` turned that into `null`, and the
+   * handover was recorded with no odometer, no fuel and no cash, silently. The constants above are
+   * the same ones the fields are declared with, so the two cannot drift apart again.
+   */
   private handover(values: Record<string, string>): HandoverInput {
-    const number = (key: string): number | null => {
-      const raw = values[key]?.trim();
+    const number = (name: string, labelKey: TranslationKey): number | null => {
+      const raw = values[name]?.trim();
       if (!raw) return null;
       const parsed = Number(raw);
-      if (!Number.isFinite(parsed)) throw { error: { title: `${key} must be a number.` } };
+      if (!Number.isFinite(parsed)) {
+        throw { error: { title: this.t('dealerDecide.mustBeANumber', { field: this.t(labelKey) }) } };
+      }
       return parsed;
     };
     return {
-      odometerKm: number('Odometer (km)'),
-      fuelLevel: number('Fuel level (0–1)'),
-      cashCollected: number('Cash collected (JOD)'),
-      notes: values['Notes']?.trim() || null,
+      odometerKm: number(ODOMETER, 'dealerDecide.odometerLabel'),
+      fuelLevel: number(FUEL, 'dealerDecide.fuelLabel'),
+      cashCollected: number(CASH, 'dealerDecide.cashLabel'),
+      notes: values['notes']?.trim() || null,
     };
   }
 }

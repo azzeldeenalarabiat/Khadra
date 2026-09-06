@@ -1,4 +1,9 @@
+import { TranslationKey } from '../i18n/en';
+import { MessageParams } from '../i18n/language';
 import { SessionUser } from '../services/session.service';
+
+/** The lookup, passed in rather than injected, so these stay pure functions a test can call. */
+type Translate = (key: TranslationKey, params?: MessageParams) => string;
 
 /**
  * How the signed-in person is shown in the frame.
@@ -20,22 +25,29 @@ export function initialsOf(user: SessionUser | null): string {
 }
 
 /** The role in the words a person would use, not the enum name. */
-export function roleLabel(role: string | undefined): string {
+export function roleLabel(role: string | undefined, t: Translate): string {
   switch (role) {
     case 'Admin':
-      return 'Administrator';
+      return t('role.admin');
     case 'DealerOwner':
-      return 'Dealer owner';
+      return t('role.dealerOwner');
     case 'DealerEmployee':
-      return 'Dealer employee';
+      return t('role.dealerEmployee');
     case 'Customer':
-      return 'Customer';
+      return t('role.customer');
     default:
       return '';
   }
 }
 
-/** The first breadcrumb: which side of the platform you are standing on. */
-export function areaLabel(role: string | undefined): string {
-  return role === 'DealerOwner' || role === 'DealerEmployee' ? 'My dealership' : 'Admin';
+/**
+ * The first breadcrumb: which side of the platform you are standing on.
+ *
+ * An employee stands somewhere of their own. "My dealership" is the owner's phrase — the business is
+ * theirs — and it was being said to staff who work there, about screens that are mostly not about
+ * the business at all but about the day's handovers.
+ */
+export function areaLabel(role: string | undefined, t: Translate): string {
+  if (role === 'DealerEmployee') return t('area.employee');
+  return role === 'DealerOwner' ? t('topbar.myDealership') : t('topbar.admin');
 }

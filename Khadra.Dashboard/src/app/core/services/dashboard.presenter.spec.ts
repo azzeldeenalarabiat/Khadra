@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { AttentionItem, AttentionQueue, BookingTrend } from '../models/dashboard.api';
 import { busiestDay, toQueueItems, toTrendBars } from './dashboard.presenter';
+import { EN } from '../i18n/en';
+import { resolveMessage } from '../i18n/resolve';
+import { Translate } from './dashboard.presenter';
+
+/** Resolves real English, so these assertions still read as the words an admin sees. */
+const t: Translate = (key, params) =>
+  resolveMessage(EN[key], params, 'en-GB', false) ?? key;
+
 
 /**
  * Where a "Requires attention" row leads.
@@ -37,7 +45,7 @@ describe('toQueueItems', () => {
   });
 
   it('opens the ticket a dispute row is about, not the queue it sits in', () => {
-    const [row] = toQueueItems(queue(item({})), now);
+    const [row] = toQueueItems(queue(item({})), now, t);
 
     expect(row.route).toBe('/disputes/t1');
     expect(row.action).toBe('Resolve');
@@ -47,6 +55,7 @@ describe('toQueueItems', () => {
     const [row] = toQueueItems(
       queue(item({ kind: 'DealerApplicationsAtRisk', subjectIds: ['d9'], id: 'dealer:d9' })),
       now,
+      t,
     );
 
     expect(row.route).toBe('/dealers/d9');
@@ -65,6 +74,7 @@ describe('toQueueItems', () => {
         }),
       ),
       now,
+      t,
     );
 
     expect(row.route).toBe('/dealers');
@@ -72,7 +82,7 @@ describe('toQueueItems', () => {
 
   /** A kind that ships before the frontend knows it still renders; it just cannot deep-link. */
   it('renders an unknown kind without inventing a destination for it', () => {
-    const [row] = toQueueItems(queue(item({ kind: 'PayoutOverdue', subjectIds: ['p1'] })), now);
+    const [row] = toQueueItems(queue(item({ kind: 'PayoutOverdue', subjectIds: ['p1'] })), now, t);
 
     expect(row.route).toBe('/dashboard');
     expect(row.action).toBe('Open');
@@ -92,6 +102,7 @@ describe('toQueueItems', () => {
         item({ id: 'dispute:b', subjectIds: ['b'], ...twin }),
       ),
       now,
+      t,
     );
 
     expect(rows.map((row) => row.id)).toEqual(['dispute:a', 'dispute:b']);
@@ -100,7 +111,7 @@ describe('toQueueItems', () => {
 
   /** No id to follow is not a reason to render a broken link. */
   it('opens the list when a row carries no subject at all', () => {
-    const [row] = toQueueItems(queue(item({ subjectIds: [] })), now);
+    const [row] = toQueueItems(queue(item({ subjectIds: [] })), now, t);
 
     expect(row.route).toBe('/disputes');
   });

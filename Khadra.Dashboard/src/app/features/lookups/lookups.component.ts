@@ -6,6 +6,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { LookupEntry, LookupKind, LookupsService } from '../../core/services/lookups.service';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * The two lists an administrator curates: car types and cities (spec 3.2).
@@ -25,6 +26,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [IconComponent],
 })
 export class LookupsComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(LookupsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -74,26 +76,30 @@ export class LookupsComponent {
           : 'Dealers choose from this list when they list a car, and customers filter by it.',
         fields: [
           {
+            name: 'nameEn',
             label: 'Name (English)',
             type: 'text',
             placeholder: cities ? 'e.g. Amman' : 'e.g. Sedan',
           },
           {
+            name: 'nameAr',
             label: 'Name (Arabic)',
             type: 'text',
             placeholder: cities ? 'مثال: عمّان' : 'مثال: سيدان',
           },
-          { label: 'Display order', type: 'text', placeholder: '0' },
+          { name: 'displayOrder', label: this.t('lookups.displayOrder'), type: 'text', placeholder: '0' },
           ...(cities
             ? [
                 {
-                  label: 'Centre latitude',
+                  name: 'centreLat',
+                  label: this.t('lookups.centreLatitude'),
                   type: 'text' as const,
                   placeholder: 'Optional, e.g. 31.9539',
                   optional: true,
                 },
                 {
-                  label: 'Centre longitude',
+                  name: 'centreLng',
+                  label: this.t('lookups.centreLongitude'),
                   type: 'text' as const,
                   placeholder: 'Optional, e.g. 35.9106',
                   optional: true,
@@ -106,14 +112,14 @@ export class LookupsComponent {
       },
       async (values) => {
         const body: Record<string, unknown> = {
-          nameEn: values['Name (English)'] ?? '',
-          nameAr: values['Name (Arabic)'] ?? '',
-          displayOrder: Number(values['Display order'] ?? '0') || 0,
+          nameEn: values['nameEn'] ?? '',
+          nameAr: values['nameAr'] ?? '',
+          displayOrder: Number(values['displayOrder'] ?? '0') || 0,
         };
         if (cities) {
           // Both or neither: half a coordinate is not a place, and the server refuses one alone.
-          const latitude = values['Centre latitude']?.trim();
-          const longitude = values['Centre longitude']?.trim();
+          const latitude = values['centreLat']?.trim();
+          const longitude = values['centreLng']?.trim();
           if (latitude && longitude) {
             body['latitude'] = Number(latitude);
             body['longitude'] = Number(longitude);
@@ -132,10 +138,10 @@ export class LookupsComponent {
         icon: 'pencil-simple',
         tone: 'accent',
         title: `Rename ${entry.nameEn}`,
-        body: 'Both names change together. Everything already pointing at this entry follows the new name.',
+        body: this.t('lookups.bothNamesChangeTogether'),
         fields: [
-          { label: 'Name (English)', type: 'text', placeholder: '', value: entry.nameEn },
-          { label: 'Name (Arabic)', type: 'text', placeholder: '', value: entry.nameAr },
+          { name: 'nameEn', label: 'Name (English)', type: 'text', placeholder: '', value: entry.nameEn },
+          { name: 'nameAr', label: 'Name (Arabic)', type: 'text', placeholder: '', value: entry.nameAr },
         ],
         confirm: 'Rename',
         result: { title: 'Renamed', body: '', tone: 'ok' },
@@ -144,8 +150,8 @@ export class LookupsComponent {
         await this.service.rename(
           this.kind(),
           entry.id,
-          values['Name (English)'] ?? '',
-          values['Name (Arabic)'] ?? '',
+          values['nameEn'] ?? '',
+          values['nameAr'] ?? '',
         );
         this.service.refresh();
       },

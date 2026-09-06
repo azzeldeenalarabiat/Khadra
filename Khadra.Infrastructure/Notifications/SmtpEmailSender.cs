@@ -32,7 +32,30 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
         mime.Subject = message.Subject;
         mime.Body = new BodyBuilder { HtmlBody = message.HtmlBody, TextBody = message.TextBody }.ToMessageBody();
 
-        using var client = new SmtpClient();
+        // The attempts SHARE the timeout budget, so more attempts never mean a longer wait for the
+        // person watching the form. See EmailOptions.MaxAttempts for why one attempt is not enough.
+        var attempts = Math.Max(1, _options.MaxAttempts);
+        var perAttemptMs = Math.Max(1000, _options.TimeoutSeconds * 1000 / attempts);
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await SendOnceAsync(mime, perAttemptMs, cancellationToken);
+                return;
+            }
+            catch (Exception exception) when (attempt < attempts && IsTransient(exception))
+            {
+                // Deliberately no logging here: the dispatcher reports the final outcome, and a line
+                // per retry would make a recovered send look like a failure to anyone reading the log.
+                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+            }
+        }
+    }
+
+    private async Task SendOnceAsync(MimeMessage mime, int timeoutMs, CancellationToken cancellationToken)
+    {
+        using var client = new SmtpClient { Timeout = timeoutMs };
         var socketOptions = _options.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
         await client.ConnectAsync(_options.Host, _options.Port, socketOptions, cancellationToken);
         if (!string.IsNullOrEmpty(_options.Username))
@@ -40,4 +63,20 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
         await client.SendAsync(mime, cancellationToken);
         await client.DisconnectAsync(quit: true, cancellationToken);
     }
+
+    /// <summary>
+    /// Whether trying the same message again could plausibly get a different answer.
+    /// </summary>
+    /// <remarks>
+    /// Credentials the server refused, and a sender or recipient it rejected outright, are settled:
+    /// retrying them only spends the caller's budget to be told the same thing three times. Anything
+    /// else -- a stalled greeting, a dropped socket, a 4xx "try later" -- is worth another go.
+    /// </remarks>
+    private static bool IsTransient(Exception exception) => exception switch
+    {
+        AuthenticationException => false,
+        SmtpCommandException { StatusCode: >= (SmtpStatusCode)500 } => false,
+        OperationCanceledException => false,
+        _ => true,
+    };
 }

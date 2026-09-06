@@ -36,7 +36,8 @@ internal sealed class SmtpTransportProbe(IOptions<EmailOptions> options) : IEmai
                 "Gmail needs a Google App Password (myaccount.google.com/apppasswords), not the account password.");
         }
 
-        using var client = new SmtpClient();
+        // Startup must not stall behind a relay that never answers; the verdict is what matters.
+        using var client = new SmtpClient { Timeout = _options.TimeoutSeconds * 1000 };
         var socketOptions = _options.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
         try
         {

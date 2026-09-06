@@ -34,9 +34,17 @@ public sealed class DealerConsoleController(ICurrentActor actor) : ApiController
 
     [HttpGet("activity")]
     [ProducesResponseType<PagedResult<DealerActivityEntry>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult> Activity([FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken)
+    public async Task<ActionResult> Activity(
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        [FromQuery(Name = "actor")] string? actorFilter,
+        CancellationToken cancellationToken)
     {
-        var result = await Mediator.Send(new ListDealerActivityQuery(actor.UserId!.Value, page, pageSize), cancellationToken);
+        // `?actor=me` and nothing else. Accepting a user id here would turn the dealership's trail
+        // into a way to page a colleague's record one id at a time.
+        var result = await Mediator.Send(
+            new ListDealerActivityQuery(actor.UserId!.Value, page, pageSize, MineOnly: actorFilter == "me"),
+            cancellationToken);
         return FromResult(result);
     }
 }

@@ -1,29 +1,25 @@
 <div class="auth-shell">
+  <div class="auth-lang"><kh-language-switch /></div>
   <form class="sect auth-card stack stack-14" (ngSubmit)="submit()">
     <div class="auth-head">
       <div class="sidebar-mark"><kh-icon name="steering-wheel" /></div>
-      <div class="sidebar-brand">CAR RENTAL<br />SYSTEM</div>
+      <div class="sidebar-brand">{{ t('brand.line1') }}<br />{{ t('brand.line2') }}</div>
     </div>
 
     @if (!token) {
       <div>
-        <h1 class="auth-title">This link is incomplete</h1>
-        <div class="page-sub">
-          Open the invitation link straight from the email, or ask the dealer owner to send it
-          again.
-        </div>
+        <h1 class="auth-title">{{ t('auth.invite.incompleteTitle') }}</h1>
+        <div class="page-sub">{{ t('auth.invite.incompleteBody') }}</div>
       </div>
     } @else if (done()) {
       <div>
-        <h1 class="auth-title">You're in</h1>
-        <div class="page-sub">Your account is ready. Taking you to sign in…</div>
+        <h1 class="auth-title">{{ t('auth.invite.doneTitle') }}</h1>
+        <div class="page-sub">{{ t('auth.invite.doneBody') }}</div>
       </div>
     } @else {
       <div>
-        <h1 class="auth-title">Accept your invitation</h1>
-        <div class="page-sub">
-          Choose the password you will sign in with.
-        </div>
+        <h1 class="auth-title">{{ t('auth.invite.title') }}</h1>
+        <div class="page-sub">{{ t('auth.invite.subtitle') }}</div>
       </div>
 
       @if (problem(); as message) {
@@ -36,7 +32,7 @@
       }
 
       <div class="field">
-        <label for="invite-password">Password</label>
+        <label for="invite-password">{{ t('auth.field.password') }}</label>
         <input
           id="invite-password"
           class="input"
@@ -51,12 +47,12 @@
       </div>
 
       <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="busy()">
-        {{ busy() ? 'Setting up…' : 'Accept and continue' }}
+        {{ busy() ? t('auth.invite.busy') : t('auth.invite.submit') }}
       </button>
     }
 
     <div class="auth-foot">
-      <a class="auth-link" routerLink="/sign-in">Back to sign in</a>
+      <a class="auth-link" routerLink="/sign-in">{{ t('auth.backToSignIn') }}</a>
     </div>
   </form>
 </div>

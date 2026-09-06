@@ -16,10 +16,10 @@
     @if (failure(); as message) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the list</div>
+        <div class="state-title">{{ t('lookups.couldntLoadTheList') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     } @else if (resource.isLoading() && entries().length === 0) {
@@ -33,15 +33,12 @@
         <div class="state-icon is-outline">
           <kh-icon [name]="isCities() ? 'map-pin' : 'car-simple'" />
         </div>
-        <div class="state-title">Nothing on this list yet</div>
+        <div class="state-title">{{ t('lookups.nothingOnThisList') }}</div>
         <div class="state-text">
           @if (isCities()) {
-            Dealers pin their location on a map, and distance is measured from the coordinates, so
-            the platform works without this list. Adding cities gives customers something to filter
-            by.
+            {{ t('lookups.dealersPinTheirLocation') }}
           } @else {
-            Every car currently carries a placeholder type. Adding real types here gives dealers
-            something to choose from and customers something to filter by.
+            {{ t('lookups.everyCarCurrentlyCarries') }}
           }
         </div>
         <div class="state-actions">
@@ -53,7 +50,7 @@
     } @else {
       <div class="list-toolbar">
         <span class="page-sub">
-          {{ entries().length }} in the list · {{ activeCount() }} offered on new listings
+          {{ entries().length }} {{ t('lookups.inTheList') }} {{ activeCount() }} {{ t('lookups.offeredOnNewListings') }}
         </span>
       </div>
 
@@ -61,13 +58,13 @@
         <table class="table table-wide">
           <thead>
             <tr>
-              <th>Order</th>
-              <th>English</th>
-              <th>Arabic</th>
+              <th>{{ t('lookups.order') }}</th>
+              <th>{{ t('lookups.english') }}</th>
+              <th>{{ t('lookups.arabic') }}</th>
               @if (isCities()) {
-                <th>Centre</th>
+                <th>{{ t('lookups.centre') }}</th>
               }
-              <th>State</th>
+              <th>{{ t('common.state') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -92,7 +89,7 @@
                 </td>
                 <td class="td td-num">
                   <button type="button" class="btn btn-secondary btn-xs" (click)="rename(entry)">
-                    Rename
+                    {{ t('lookups.rename') }}
                   </button>
                   @if (entry.isActive) {
                     <button
@@ -100,7 +97,7 @@
                       class="btn btn-secondary btn-xs"
                       (click)="setActive(entry, false)"
                     >
-                      Retire
+                      {{ t('lookups.retire') }}
                     </button>
                   } @else {
                     <button
@@ -108,7 +105,7 @@
                       class="btn btn-secondary btn-xs"
                       (click)="setActive(entry, true)"
                     >
-                      Restore
+                      {{ t('lookups.restore') }}
                     </button>
                   }
                 </td>
@@ -120,9 +117,7 @@
 
       <div class="sect-pad">
         <div class="note-box is-plain">
-          There is no delete. Vehicles and bookings reference these entries by id across bounded
-          contexts, so nothing can warn you what removing one would break; retiring keeps every
-          existing record readable while taking the entry off new listings and searches.
+          {{ t('lookups.thereIsNoDelete') }}
         </div>
       </div>
     }

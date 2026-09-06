@@ -2,18 +2,25 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { IconName } from '../../shared/icon/icon-paths';
 import { IconComponent } from '../../shared/icon/icon.component';
 
+/** Keys, not words: this screen explains itself in whichever language the console is speaking. */
 interface Missing {
-  readonly title: string;
+  readonly titleKey: TranslationKey;
   readonly icon: IconName;
   /** What this screen will show once the data behind it exists. */
-  readonly purpose: string;
+  readonly purposeKey: TranslationKey;
   /** What is actually missing, named precisely enough to act on. */
-  readonly blocked: string;
+  readonly blockedKey: TranslationKey;
   /** What already exists in its place today, if anything. */
-  readonly instead?: { readonly text: string; readonly label: string; readonly route: string };
+  readonly instead?: {
+    readonly textKey: TranslationKey;
+    readonly labelKey: TranslationKey;
+    readonly route: string;
+  };
 }
 
 /**
@@ -40,14 +47,16 @@ export class NotBuiltComponent {
     initialValue: this.route.snapshot.data['missing'] as string,
   });
 
+  protected readonly t = inject(I18nService).t;
+
   protected readonly copy = computed<Missing>(() => SCREENS[this.key()] ?? FALLBACK);
 }
 
 const FALLBACK: Missing = {
-  title: 'Not built yet',
+  titleKey: 'notBuilt.fallback.title',
   icon: 'info',
-  purpose: 'This screen is part of the design but has no data behind it yet.',
-  blocked: 'The context that would supply it has not been built.',
+  purposeKey: 'notBuilt.fallback.purpose',
+  blockedKey: 'notBuilt.fallback.blocked',
 };
 
 /**
@@ -56,55 +65,48 @@ const FALLBACK: Missing = {
  */
 const SCREENS: Readonly<Record<string, Missing>> = {
   payments: {
-    title: 'Payments',
+    titleKey: 'nav.payments',
     icon: 'currency-circle-dollar',
-    purpose: 'Every deposit, balance, refund and penalty the platform has processed.',
-    blocked:
-      'The Payments context is not built. It is blocked on owner decisions (provider, the non-delivery penalty tier, the quick-cancellation fee), and no money has ever moved through the platform.',
+    purposeKey: 'notBuilt.payments.purpose',
+    blockedKey: 'notBuilt.payments.blocked',
   },
   'payment-detail': {
-    title: 'Payment details',
+    titleKey: 'screen.paymentDetails',
     icon: 'currency-circle-dollar',
-    purpose: 'One transaction, its provider reference, and the booking it belongs to.',
-    blocked: 'The Payments context is not built, so there are no transactions to show.',
+    purposeKey: 'notBuilt.paymentDetail.purpose',
+    blockedKey: 'notBuilt.paymentDetail.blocked',
   },
   payouts: {
-    title: 'Payouts',
+    titleKey: 'nav.payouts',
     icon: 'currency-circle-dollar',
-    purpose: 'What each dealer is owed after commission, and the runs that paid them.',
-    blocked:
-      'Payouts need the Payments context, which is not built. Commission is computed and shown per booking at the rate each booking froze, but nothing schedules or records a payment to a dealer.',
+    purposeKey: 'notBuilt.payouts.purpose',
+    blockedKey: 'notBuilt.payouts.blocked',
     instead: {
-      text: 'A dealer already sees their own revenue and commission at frozen rates on their reports screen.',
-      label: 'Dealers',
+      textKey: 'notBuilt.payouts.instead',
+      labelKey: 'nav.dealers',
       route: '/dealers',
     },
   },
   finance: {
-    title: 'Finance',
+    titleKey: 'nav.finance',
     icon: 'chart-line-up',
-    purpose:
-      'Platform revenue: commission earned, deposits held, refunds issued, and what is owed out.',
-    blocked:
-      'Every figure on this screen would come from the Payments context, which is not built. Showing commission alone would read as money received, and none has been.',
+    purposeKey: 'notBuilt.finance.purpose',
+    blockedKey: 'notBuilt.finance.blocked',
   },
   reviews: {
-    title: 'Reviews',
+    titleKey: 'nav.reviews',
     icon: 'star',
-    purpose:
-      'Ratings customers leave for dealers and dealers leave for customers, and the moderation queue for them.',
-    blocked:
-      'The Review aggregate exists in the domain but has no table, no repository and no data. Until it does, a dealer with no reviews reads "No reviews yet" rather than showing a rating nobody gave.',
+    purposeKey: 'notBuilt.reviews.purpose',
+    blockedKey: 'notBuilt.reviews.blocked',
   },
   notifications: {
-    title: 'Notifications',
+    titleKey: 'nav.notifications',
     icon: 'bell',
-    purpose: 'A feed of what needs an administrator: overdue reviews, breached SLAs, failed jobs.',
-    blocked:
-      'No notification feed has been built. Email is the only channel the platform sends on today.',
+    purposeKey: 'notBuilt.notifications.purpose',
+    blockedKey: 'notBuilt.notifications.blocked',
     instead: {
-      text: 'The dashboard already ranks what needs attention, by the deadline each item froze.',
-      label: 'Dashboard',
+      textKey: 'notBuilt.notifications.instead',
+      labelKey: 'nav.dashboard',
       route: '/dashboard',
     },
   },

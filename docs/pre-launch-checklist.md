@@ -580,7 +580,7 @@ types, or delete the list and leave the field free text.
 
 ## Delivery fee and email delivery (2026-09-06)
 
-### 37. A resend that fails reveals that the address is registered
+### 37. A resend or a reset that fails reveals that the address is registered
 
 **Status:** open · **Raised:** 2026-09-06
 
@@ -593,11 +593,24 @@ The leak is narrow: it only appears when mail delivery is actually failing, and 
 telling someone a link is on its way when the server rejected it. But an attacker who can provoke a
 per-recipient failure (a bounce, a suppression list) can use it as an oracle.
 
+`ForgotPasswordHandler` now does the same, for the same reason and at a slightly wider cost: its
+failure implies ANY account, not only an unverified one. Extended here rather than filed separately,
+because it is one leak with one close.
+
+The marginal cost today is nil. `POST /auth/register` already answers 409 `auth.email_taken` to
+anyone, always (item 31), so an attacker wanting to know whether an address is registered uses that
+instead -- it works whether or not mail is healthy. Whatever closes item 31 closes this.
+
 Same class as items 9 and 31, and all three should be settled together.
 
 **To close:** decide the platform's enumeration policy once. If failures must stay invisible, queue
 the message and answer 202 uniformly, reporting delivery problems out of band rather than in the
 response.
+
+Settle one tension with the owner at the same time: that close and the standing rule -- never say
+"sent" unless it was sent -- cannot both hold literally. With a queue the honest sentence becomes
+"queued; if nothing arrives in N minutes, ask for another", and any endpoint reporting a queued
+message's fate is the oracle again.
 
 ### 38. Mail delivery has no queue, no retry and no bounce handling
 
@@ -657,3 +670,187 @@ verified…`), so it cannot be discovered late by accident.
 
 A verified domain is the better answer regardless: mail from your own domain with SPF and DKIM is far
 less likely to land in spam than mail from a shared testing sender.
+
+### 41. The Employee Console design is not in `docs/design/`
+
+`Employee Console.dc.html` is the source of truth for how the employee's screens look, and it is
+cited from `nav.data.ts` and every component under `features/employee/`, but it was never exported
+into `docs/design/` — the console was implemented from screenshots. The frontend rules say to diff
+against the export before changing a screen's appearance, and right now there is nothing to diff
+against.
+
+That is not a cosmetic gap. Diffing the export is exactly what would have caught the design's "48h
+limit" copy (item 42), and the next person to touch these screens has no way to tell a deliberate
+deviation from a mistake.
+
+**To close:** export the project at `https://claude.ai/design/p/abfd4b04-c3e3-43e6-99c8-747bf8e2ebb0`
+into `docs/design/`, add the file to the table in `docs/design/README.md`, and diff the four
+deviations recorded in the components' own comments.
+
+### 42. The design promises a 48-hour answer window that the platform does not keep
+
+`Employee Console.dc.html` shows "Requests expire 48h after they arrive", "48h limit" beside the
+pending-requests tile, and "answer within 34h" on notification rows. No such rule exists.
+`Booking.ExpireUnanswered` refuses until `now >= Period.Start` — a request expires when the RENTAL
+DATE arrives unanswered, not on a clock from when it was made — and `BookingTerms` freezes no answer
+window. `BusinessRules.AdminSlaHours: 48` is the admin's clock for reviewing a dealer application and
+a dispute, an unrelated thing that happens to share the number.
+
+The copy is not in the built console: the employee dashboard shows the age of the oldest request and
+claims no deadline. But the design still says it, and the same line was already struck once from the
+Dealer design.
+
+**To close:** decide whether a booking answer window is wanted. If it is, it is a business rule
+(`BusinessRules:BookingAnswerWindowHours`) frozen onto `BookingTerms` at request time as
+`min(RequestedAt + window, Period.Start)`, judged in `ExpireUnanswered`, with the deposit refund
+consequences worked out — it is a refund promise to a customer, not a label. If it is not, correct
+the design. Either way the two must agree.
+
+### 43. Three notification kinds have handlers but no producer
+
+`NotificationKind` deliberately carries only kinds something raises. Three more are worth having and
+their handlers already exist: `BookingCancelledByAdmin` (`AdminBookingCommands`), `DisputeOpened` and
+`DisputeResolved` (`DisputeCommands`). Each is a few lines — resolve the dealership, call
+`DealerTeamNotifier.NotifyTeamAsync` before the handler's own `SaveChangesAsync` — and each is
+something a dealership currently finds out about only by looking.
+
+**To close:** wire the three, add the kinds back, and extend the console's `describe`/`icon`/`tone`
+maps. Add the kind WITH its producer, never before it.
+
+### 44. An employee cannot change their own name, email or phone
+
+The Employee Console design draws all three as editable on the Settings screen. They are shown
+read-only, because no endpoint accepts them and because email is not a cosmetic field: it is the
+sign-in identifier AND the password-reset destination, so a session alone must not be enough to move
+it — a stolen BFF cookie could redirect recovery to an attacker's mailbox and take the account
+permanently. Name and phone were also entered by the OWNER at invitation and appear on the owner's
+staff list, so an employee renaming themselves silently changes what their owner sees.
+
+**To close (an IdentityAccess feature for every role, not an employee-console one):** current password
+required; a `VerificationPurpose.EmailChange` token carrying the pending address, applied only when
+the new mailbox is proved; notice to the old address; `RevokeAllSessions` on completion with fresh
+tokens issued through the BFF's change-password path so the cookie's name/email claims are re-signed.
+Settle the enumeration-oracle policy (items 9, 31, 37) at the same time, since a 409 `email_taken`
+from an authenticated endpoint is a fourth one.
+
+### 45. The dealership has no contact details, and My Business says so
+
+The employee's "My business" screen shows the dealership's name, description, map pin, opening hours,
+delivery settings, registration and verification status — and states plainly that a street address, a
+dealership phone number and a public email are not recorded, because `Dealer` holds a `GeoPoint` and
+nothing else. The design shows all three, plus the owner's name and a "4.8 · 96 reviews" rating.
+
+The owner's name has a legitimate source and was deliberately NOT bolted onto `DealerProfileDto`,
+which is built from the aggregate alone in five handlers and cannot reach IdentityAccess; it needs its
+own query composing the two through a reader. The rating needs the Reviews context, which is not built.
+
+**To close:** a `ContactDetails` value object on `Dealer`, collected by the application form and
+editable from `/dealer/profile`; a `GetMyBusinessQuery` returning the profile plus the owner's name
+through a reader correlated by id. A street address stays display-only — every distance calculation
+is haversine on the pin.
+
+
+### 46. `BusinessRuleSettings` still carries a platform-wide delivery fee
+
+The owner moved the delivery fee onto the dealership on 2026-09-06: each gallery sets its own on
+`DeliverySettings`, and there is no platform-wide figure any more. `BusinessRules` (the configuration
+snapshot actually in force) and `BusinessRulesDto` were both cleaned out, and nothing reads a central
+fee today.
+
+But the `BusinessRuleSettings` aggregate — the admin-editable version of the rules, not yet wired to a
+table — still has a required `Money DeliveryFee` threaded through `Create`, `Update` and `Apply`. It is
+dormant, so it changes no behaviour now. It is a trap for later: whoever wires that aggregate up gets a
+platform-wide delivery fee back, sitting beside the per-dealer one, with nothing to say which wins.
+
+**To close:** drop `DeliveryFee` from the aggregate and its factory/update signatures, and from
+`BusinessRuleSettingsTests`. Nothing else references it. Do it before the editable-settings screen is
+built, not after.
+
+### 47. A first staff invitation that is never delivered looks identical to one that is
+
+`InviteEmployeeCommand` sends the invitation after commit and discards the result, on purpose: the
+employee record is already saved and discarding it because a relay hiccuped would be the worse
+outcome. But the owner is never told. The row reads `INVITED - Has not set a password yet` whether
+the mail went out or was refused, so the owner waits for something nobody sent. This happened on
+2026-09-06: an invitation to a real address failed at the relay, the owner saw nothing, and reached
+for Forgot Password on the invitee behalf -- which failed the same way and also claimed success.
+
+`ResendEmployeeInvitationCommand` now reports the failure (that button exists only to send an email,
+so success there is a lie with no upside). The first invitation cannot use the same fix: it returns
+`EmployeeListItem`, a READ MODEL the reader rebuilds from the database, and "was this one message
+accepted" is not a persisted fact it can carry.
+
+**To close:** return `InviteEmployeeResult(EmployeeListItem Employee, bool InvitationEmailSent)` from
+the command, and have the Employees screen mark that row `email not sent - resend` instead of plain
+`Invited`. Four layers: command result, controller, Angular service, template.
+
+### 48. An administrator invitation whose email fails cannot be re-sent, ever
+
+`InviteAdminCommand` now reports delivery on `InviteAdminResult.InvitationEmailSent` instead of
+throwing out of an unhandled send (which answered 500 for an invitation that had in fact been
+created, so the obvious retry met 409 `auth.email_taken`). The console does not read the flag yet.
+
+The deeper gap is that there is no way to try again. Dealer employees have
+`POST /dealers/me/employees/{id}/resend-invitation`; administrators have no equivalent. Once an
+invitation is created and its email refused, that address is spent: re-inviting hits the unique
+index, deactivating is not deleting, and the account cannot sign in to fix itself. The only routes
+back are waiting for the token to expire with nothing to re-trigger it, or editing the database.
+
+**To close:** a `ResendAdminInvitationCommand` mirroring the employee one (reissue the token, report
+delivery, audit it), and an Admin users screen that marks a row `email not sent` and offers the
+button. Until then, an administrator invited while mail is down is stuck.
+
+### 49. Arabic covers every template; some component copy is still English
+
+`core/i18n/` holds 1,181 keys in both languages. EVERY template is keyed -- all 54 of them -- along
+with the shell, the auth screens, the dealer gate, both not-built placeholders, the dashboard KPI
+cards and attention queue, the activity verbs, relative time, the confirmation dialogs, list columns
+and the pagination. `ar.ts` is typed against `en.ts`, so a missing translation fails the build, and
+`dictionaries.spec.ts` also fails on a key that drifts, a dropped placeholder, or an Arabic plural
+missing one of its six forms.
+
+What is still English, measured by `node scan-i18n.js` in `Khadra.Dashboard` (413 hits, 59 files --
+the scan is deliberately noisy, so perhaps 300 are real):
+
+- **Copy in component TypeScript that is not a dialog field.** The codemod covered `title`, `body`,
+  `confirm`, `note`, `label`, `placeholder` and `hint`. Copy assembled in other shapes -- KPI
+  sub-labels, greetings, row actions, `describe()` failure sentences -- is still English. The
+  heaviest are `dealer/booking-detail`, `dealer/dealer-dashboard`, `disputes/dispute-detail`,
+  `fleet/vehicle-wizard`, `bookings/booking-detail`, `employee/employee-dashboard`.
+- **Status pills.** `status.*` keys exist for every enum member the console shows, but the pills
+  still render the server's raw `Enumeration.Name`. They need one `statusLabel(name)` helper applied
+  at each render site, with the CamelCase-split fallback the audit screen already uses.
+- **Route `title` literals in `app.routes.ts`.** Dead weight rather than a bug: `TranslatedTitleStrategy`
+  resolves every mapped route from `SCREEN_TITLES`, and these are only the fallback for one it does
+  not know.
+- **Server sentences.** Unchanged from before: `Error.Message` and ProblemDetails `title` are English,
+  and FluentValidation messages cannot be keyed client-side at all. See the note below.
+- **`toLocaleString('en-GB')` sites on feature screens.** `FormatService` exists and the gate and the
+  dashboards use it; the rest have not moved onto it, so some dates stay English under Arabic.
+- **`strictTemplates` is off.** The Angular compiler does still check `t()` key arguments against the
+  union -- that caught real mistakes during this work -- but turning it on would catch more.
+
+**To close:** run `node scan-i18n.js --detail <path>` per screen and key what it lists. The tooling
+used for the bulk pass is in `Khadra.Dashboard/`: `scan-i18n.js` (audit), `key-templates.js` and
+`key-components.js` (codemods), `add-en.js` / `add-ar.js` (append a batch to a dictionary).
+
+The backend half is unchanged and still the bigger job: `UseRequestLocalization(en, ar)` with an `ar`
+resource keyed by error code, applied in `ApiControllerBase.Failure`, the authorization result handler
+and the exception handler; `AuthApiClient` forwarding `Accept-Language`, since the BFF's own auth calls
+are not proxied; and `PreferredLanguage` on `User`, because emails are composed without a request.
+Doing it server-side also spares the Flutter app a third copy of the same 140 codes.
+
+### 50. `DisputeAuditor` writes an English sentence into an append-only table
+
+`DisputeAuditor.Describe` composes `"Resolved: of {amount} {currency} held, refund …, platform …,
+dealer …"` and stores it in `audit_entries.new_value`. That table refuses UPDATE by trigger and by
+a `SaveChanges` guard, so every dispute resolved from now on is an English-only row for ever -- and
+the audit screen is one of the screens due to be translated.
+
+Every other call site stores a machine name (`Status.Name`, `Role.Name`) that the screen phrases, so
+this one is the outlier rather than the pattern. Nothing is lost yet: no dispute has ever been
+resolved on this platform.
+
+**To close:** store the parts (`refund=80;platform=20;dealer=20;charge=30;currency=JOD`, or compact
+JSON inside `MaxValueLength`) and let the audit screen compose the sentence from
+`AuditAction.DisputeResolved`. Do it before the first real dispute, not after.

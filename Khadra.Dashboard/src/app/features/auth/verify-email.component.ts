@@ -3,6 +3,9 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 type State = 'no-token' | 'verifying' | 'verified' | 'failed';
@@ -28,9 +31,10 @@ type State = 'no-token' | 'verifying' | 'verified' | 'failed';
   selector: 'kh-verify-email',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './verify-email.component.html',
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent],
 })
 export class VerifyEmailComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly http = inject(HttpClient);
 
   private readonly token = inject(ActivatedRoute).snapshot.queryParamMap.get('token') ?? '';
@@ -62,7 +66,7 @@ export class VerifyEmailComponent {
       );
       this.state.set('verified');
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
       this.state.set('failed');
     }
   }
@@ -71,7 +75,7 @@ export class VerifyEmailComponent {
     if (this.resending()) return;
     const email = this.email().trim();
     if (!email) {
-      this.problem.set('Enter the email address you registered with.');
+      this.problem.set(this.t('auth.verify.needEmail'));
       return;
     }
 
@@ -92,7 +96,7 @@ export class VerifyEmailComponent {
       // rejected it is the false confirmation this change exists to remove.
       this.resent.set(true);
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.resending.set(false);
     }
@@ -107,19 +111,21 @@ export class VerifyEmailComponent {
   }
 }
 
-function describe(error: unknown): string {
+type Translate = (key: TranslationKey) => string;
+
+function describe(error: unknown, t: Translate): string {
   if (!(error instanceof HttpErrorResponse)) {
-    return 'The service did not respond. Try again shortly.';
+    return t('common.noResponse');
   }
   const code: string | undefined = error.error?.code;
   if (code === 'auth.invalid_token') {
-    return 'This link is no longer valid. A verification link can only be used once, and expires if it is left too long.';
+    return t('auth.verify.err.invalidToken');
   }
   if (code === 'auth.verification_email_not_sent') {
-    return 'We could not send the email just now — the mail service refused it. Nothing is wrong with your account; try again in a few minutes.';
+    return t('auth.verify.err.notSent');
   }
   if (error.status === 429) {
-    return 'Too many attempts. Wait a few minutes before trying again.';
+    return t('common.tooManyAttempts');
   }
-  return error.error?.title ?? 'The service did not respond. Try again shortly.';
+  return error.error?.title ?? t('common.noResponse');
 }

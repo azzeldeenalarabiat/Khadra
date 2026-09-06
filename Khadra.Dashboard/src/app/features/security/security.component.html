@@ -1,13 +1,13 @@
 <div class="stack stack-14 page-wide">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Security</h1>
-      <div class="page-sub">Your own account: your password and where you are signed in.</div>
+      <h1 class="page-title">{{ t('security.security') }}</h1>
+      <div class="page-sub">{{ t('security.yourOwnAccountYour') }}</div>
     </div>
     <div class="dc-head-actions">
       <button type="button" class="btn btn-primary btn-md" (click)="changePassword()">
         <kh-icon name="lock-key" />
-        Change password
+        {{ t('common.changePassword') }}
       </button>
     </div>
   </div>
@@ -17,19 +17,19 @@
       <section class="sect">
         <div class="sect-h">
           <kh-icon name="device-mobile" class="kpi-icon" />
-          <span class="sect-t">Signed in on</span>
+          <span class="sect-t">{{ t('security.signedInOn') }}</span>
           <span class="sect-hint">
-            {{ activeCount() }} active {{ activeCount() === 1 ? 'session' : 'sessions' }}
+            {{ activeCount() }} {{ t('security.active') }} {{ activeCount() === 1 ? 'session' : 'sessions' }}
           </span>
         </div>
 
         @if (failure(); as message) {
           <div class="state-block">
             <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-            <div class="state-title">Couldn't load your sessions</div>
+            <div class="state-title">{{ t('security.couldntLoadYourSessions') }}</div>
             <div class="state-text">{{ message }}</div>
             <div class="state-actions">
-              <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+              <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
             </div>
           </div>
         } @else if (resource.isLoading() && sessions().length === 0) {
@@ -41,8 +41,8 @@
         } @else if (sessions().length === 0) {
           <div class="state-block is-empty">
             <div class="state-icon is-outline"><kh-icon name="device-mobile" /></div>
-            <div class="state-title">No sessions on record</div>
-            <div class="state-text">Sessions appear here once you have signed in.</div>
+            <div class="state-title">{{ t('security.noSessionsOnRecord') }}</div>
+            <div class="state-text">{{ t('security.sessionsAppearHereOnce') }}</div>
           </div>
         } @else {
           <div class="sect-pad stack stack-12">
@@ -56,16 +56,16 @@
                     </span>
                   </div>
                   <div class="page-sub">
-                    Signed in {{ when(session.signedInAt) }}
+                    {{ t('security.signedIn') }} {{ when(session.signedInAt) }}
                     @if (session.createdByIp) {
                       · {{ session.createdByIp }}
                     }
                   </div>
-                  <div class="page-sub">Last used {{ when(session.lastUsedAt) }}</div>
+                  <div class="page-sub">{{ t('security.lastUsed') }} {{ when(session.lastUsedAt) }}</div>
                 </div>
                 @if (session.isActive) {
                   <button type="button" class="btn btn-danger btn-xs" (click)="revoke(session)">
-                    End session
+                    {{ t('security.endSession') }}
                   </button>
                 }
               </div>
@@ -75,8 +75,7 @@
               <!-- The figure is the server's. Revoking stops the refresh, not a token already in
                    flight, and the design's "signed out immediately" would be untrue for this long. -->
               <div class="note-box is-plain">
-                Ending a session stops it being refreshed. A request already holding a valid token
-                can keep working for up to {{ minutes }} minutes after that.
+                {{ t('security.endingASessionStops') }} {{ minutes }} {{ t('security.minutesAfterThat') }}
               </div>
             }
           </div>
@@ -86,22 +85,19 @@
       <section class="sect">
         <div class="sect-h">
           <kh-icon name="shield-check" class="kpi-icon" />
-          <span class="sect-t">Not built</span>
+          <span class="sect-t">{{ t('security.notBuilt') }}</span>
         </div>
         <div class="sect-pad stack stack-9">
           <!-- Named individually rather than left as blank panels: each is a different missing
                thing, and an admin should know which protections they do not have. -->
           <div class="page-sub">
-            <strong>Sign-in history.</strong> Sessions are recorded; individual sign-in attempts,
-            successful or not, are not logged anywhere, so there is no history to show.
+            <strong>{{ t('security.signInHistory') }}</strong> {{ t('security.sessionsAreRecordedIndividual') }}
           </div>
           <div class="page-sub">
-            <strong>Two-factor authentication.</strong> Not built. A password and the email that
-            proves the address are the only factors today.
+            <strong>{{ t('security.twoFactorAuthentication') }}</strong> {{ t('security.notBuiltAPassword') }}
           </div>
           <div class="page-sub">
-            <strong>Blocked sign-ins.</strong> There is no lockout and no attempt log, so nothing
-            counts failed attempts or blocks an address.
+            <strong>{{ t('security.blockedSignIns') }}</strong> {{ t('security.thereIsNoLockout') }}
           </div>
         </div>
       </section>
@@ -111,7 +107,7 @@
       <section class="sect">
         <div class="sect-h">
           <kh-icon name="user-circle-plus" class="kpi-icon" />
-          <span class="sect-t">Your account</span>
+          <span class="sect-t">{{ t('security.yourAccount') }}</span>
         </div>
         <div class="kv-body">
           @for (row of accountRows(); track row.k) {
@@ -125,8 +121,7 @@
 
       <section class="sect sect-pad">
         <div class="decision-note">
-          This screen shows your own account only. Another administrator's devices and addresses are
-          not something the platform lets anyone read.
+          {{ t('security.thisScreenShowsYour') }}
         </div>
       </section>
     </div>

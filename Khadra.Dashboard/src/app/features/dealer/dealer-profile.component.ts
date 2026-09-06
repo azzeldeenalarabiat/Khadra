@@ -13,6 +13,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { MapComponent } from '../../shared/map/map.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 const DAYS = [
   'Sunday',
@@ -46,6 +47,7 @@ const DAYS = [
   imports: [IconComponent, MapComponent],
 })
 export class DealerProfileComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
 

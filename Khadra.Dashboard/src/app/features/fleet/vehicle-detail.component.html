@@ -3,11 +3,11 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load this car</div>
+        <div class="state-title">{{ t('vehicleDetail.couldntLoadThisCar') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/fleet">Back to fleet</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/fleet">{{ t('common.backToFleet') }}</a>
         </div>
       </div>
     </section>
@@ -20,35 +20,49 @@
         </div>
         <div class="page-sub">{{ subtitle() }}</div>
       </div>
-      <div class="dc-head-actions">
-        <a class="btn btn-primary btn-md" [routerLink]="['/dealer/fleet', c.vehicleId, 'edit']">
-          <kh-icon name="pencil-simple" />
-          Edit vehicle
-        </a>
-        @if (primaryAction(); as action) {
-          <button
-            type="button"
-            class="btn btn-secondary btn-md"
-            [disabled]="busy()"
-            (click)="changeStatus(action.action)"
-          >
-            <kh-icon [name]="action.icon" />
-            {{ action.label }}
-          </button>
-        }
-        @if (c.status === 'Active' || c.status === 'Hidden') {
-          <button
-            type="button"
-            class="btn btn-ghost btn-md"
-            [disabled]="busy()"
-            (click)="takeOffRoad()"
-          >
-            <kh-icon name="gear" />
-            Take off the road
-          </button>
-        }
-      </div>
+      <!-- Every action here is an owner's write; the banner below says so once. -->
+      @if (canManage()) {
+        <div class="dc-head-actions">
+          <a class="btn btn-primary btn-md" [routerLink]="['/dealer/fleet', c.vehicleId, 'edit']">
+            <kh-icon name="pencil-simple" />
+            {{ t('vehicleDetail.editVehicle') }}
+          </a>
+          @if (primaryAction(); as action) {
+            <button
+              type="button"
+              class="btn btn-secondary btn-md"
+              [disabled]="busy()"
+              (click)="changeStatus(action.action)"
+            >
+              <kh-icon [name]="action.icon" />
+              {{ action.label }}
+            </button>
+          }
+          @if (c.status === 'Active' || c.status === 'Hidden') {
+            <button
+              type="button"
+              class="btn btn-ghost btn-md"
+              [disabled]="busy()"
+              (click)="takeOffRoad()"
+            >
+              <kh-icon name="gear" />
+              {{ t('fleetList.takeOffTheRoad') }}
+            </button>
+          }
+        </div>
+      }
     </div>
+
+    @if (readOnly()) {
+      <div class="banner s-warn" role="status">
+        <kh-icon name="info" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-text">
+            {{ t('vehicleDetail.changingThisCarIts') }}
+          </div>
+        </div>
+      </div>
+    }
 
     <div class="veh-photos">
       @for (photo of photos(); track photo.imageId) {
@@ -62,22 +76,25 @@
       } @empty {
         <div class="thumb veh-photo">
           <kh-icon name="car-simple" />
-          <span class="photo-label">No photos yet — add one before publishing</span>
+          <!-- "Add one" is an instruction only the owner can act on. -->
+          <span class="photo-label">
+            {{ readOnly() ? 'No photos yet' : 'No photos yet — add one before publishing' }}
+          </span>
         </div>
       }
     </div>
 
     <div class="tabs" role="tablist">
-      @for (t of tabs; track t.key) {
+      @for (option of tabs; track option.key) {
         <button
           type="button"
           class="tab"
           role="tab"
-          [class.is-active]="tab() === t.key"
-          [attr.aria-selected]="tab() === t.key"
-          (click)="tab.set(t.key)"
+          [class.is-active]="tab() === option.key"
+          [attr.aria-selected]="tab() === option.key"
+          (click)="tab.set(option.key)"
         >
-          {{ t.label }}
+          {{ option.label }}
         </button>
       }
     </div>
@@ -86,7 +103,7 @@
       @case ('overview') {
         <div class="dc-split-even">
           <section class="sect">
-            <div class="sect-h"><span class="sect-t">Information &amp; specifications</span></div>
+            <div class="sect-h"><span class="sect-t">{{ t('vehicleDetail.informationAmpSpecifications') }}</span></div>
             <div class="sect-pad kv-narrow">
               @for (row of info(); track row.k) {
                 <div class="kv">
@@ -101,7 +118,7 @@
           </section>
           <div class="stack stack-14">
             <section class="sect">
-              <div class="sect-h"><span class="sect-t">Pricing &amp; delivery</span></div>
+              <div class="sect-h"><span class="sect-t">{{ t('vehicleDetail.pricingAmpDelivery') }}</span></div>
               <div class="sect-pad kv-narrow">
                 @for (row of pricing(); track row.k) {
                   <div class="kv">
@@ -117,28 +134,28 @@
               <span class="k">{{ current() ? 'Current rental' : 'Next rental' }}</span>
               @if (current(); as b) {
                 <div class="queue-desc">
-                  Out on booking <span class="mono s-accent">{{ b.reference }}</span> —
+                  {{ t('vehicleDetail.outOnBooking') }} <span class="mono s-accent">{{ b.reference }}</span> —
                   {{ b.customerName }}, {{ period(b) }},
                   {{ b.pickupMethod === 'Delivery' ? 'delivered' : 'collected' }}.
                 </div>
                 <a
                   class="btn btn-secondary btn-sm self-start"
                   [routerLink]="['/dealer/bookings', b.bookingId]"
-                  >Open booking</a
+                  >{{ t('common.openBooking') }}</a
                 >
               } @else if (next(); as b) {
                 <div class="queue-desc">
-                  Held for booking <span class="mono s-accent">{{ b.reference }}</span> —
+                  {{ t('vehicleDetail.heldForBooking') }} <span class="mono s-accent">{{ b.reference }}</span> —
                   {{ b.customerName }}, {{ period(b) }},
                   {{ b.pickupMethod === 'Delivery' ? 'delivery' : 'pickup' }}.
                 </div>
                 <a
                   class="btn btn-secondary btn-sm self-start"
                   [routerLink]="['/dealer/bookings', b.bookingId]"
-                  >Open booking</a
+                  >{{ t('common.openBooking') }}</a
                 >
               } @else {
-                <div class="page-sub">No approved booking is holding this car.</div>
+                <div class="page-sub">{{ t('vehicleDetail.noApprovedBookingIs') }}</div>
               }
             </section>
           </div>
@@ -151,16 +168,16 @@
               type="button"
               class="btn btn-ghost btn-xs"
               (click)="shiftMonth(-1)"
-              aria-label="Previous month"
+              [attr.aria-label]="t('vehicleDetail.previousMonth')"
             >
               <kh-icon name="caret-left" />
             </button>
-            <span class="sect-t">Availability · {{ monthLabel() }}</span>
+            <span class="sect-t">{{ t('vehicleDetail.availability') }} {{ monthLabel() }}</span>
             <button
               type="button"
               class="btn btn-ghost btn-xs"
               (click)="shiftMonth(1)"
-              aria-label="Next month"
+              [attr.aria-label]="t('vehicleDetail.nextMonth')"
             >
               <kh-icon name="caret-right" />
             </button>
@@ -190,9 +207,7 @@
             </div>
             <div class="note-box is-plain">
               <kh-icon name="info" />
-              Derived from bookings: approved bookings hold their dates and a car out on hire is
-              marked as such. To block dates, take the car off the road; there is no separate
-              blocked-dates list.
+              {{ t('vehicleDetail.derivedFromBookingsApproved') }}
             </div>
           </div>
         </section>
@@ -200,23 +215,23 @@
       @case ('bookings') {
         <section class="sect sect-clip">
           <div class="sect-h">
-            <span class="sect-t">Booking history</span
+            <span class="sect-t">{{ t('vehicleDetail.bookingHistory') }}</span
             ><span class="sect-hint">{{ historyNote() }}</span>
           </div>
           @if (bookings().length === 0) {
             <div class="state-block is-empty">
-              <div class="state-title">No bookings on this car yet</div>
+              <div class="state-title">{{ t('vehicleDetail.noBookingsOnThis') }}</div>
             </div>
           } @else {
             <div class="table-wrap">
               <table class="table">
                 <thead>
                   <tr>
-                    <th>Booking</th>
-                    <th>Customer</th>
-                    <th>Period</th>
-                    <th class="td-num">Value</th>
-                    <th>Status</th>
+                    <th>{{ t('common.booking') }}</th>
+                    <th>{{ t('vehicleDetail.customer') }}</th>
+                    <th>{{ t('common.period') }}</th>
+                    <th class="td-num">{{ t('common.value') }}</th>
+                    <th>{{ t('common.status') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -242,8 +257,8 @@
       @case ('activity') {
         <section class="sect">
           <div class="sect-h">
-            <span class="sect-t">Vehicle activity</span
-            ><span class="sect-hint">Booking changes on this car</span>
+            <span class="sect-t">{{ t('vehicleDetail.vehicleActivity') }}</span
+            ><span class="sect-hint">{{ t('vehicleDetail.bookingChangesOnThis') }}</span>
           </div>
           <div class="sect-pad">
             @for (e of log(); track e.bookingId + e.occurredAt) {
@@ -261,14 +276,13 @@
             <div class="veh-log-row">
               <kh-icon name="plus-circle" />
               <div>
-                <div>Vehicle added</div>
+                <div>{{ t('vehicleDetail.vehicleAdded') }}</div>
                 <div class="veh-log-ts">{{ when(c.createdAt) }}</div>
               </div>
             </div>
             <div class="note-box is-plain">
               <kh-icon name="info" />
-              Edits to the listing itself (price, photos, delivery) are not logged yet. Booking
-              changes shown here are the most recent from your dealership's activity.
+              {{ t('vehicleDetail.editsToTheListing') }}
             </div>
           </div>
         </section>

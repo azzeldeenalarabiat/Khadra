@@ -19,6 +19,7 @@ import {
   toAdminNotifications,
   toDealerNotifications,
 } from '../core/services/notifications.presenter';
+import { I18nService } from '../core/i18n/i18n.service';
 import { IconComponent } from '../shared/icon/icon.component';
 
 /**
@@ -48,6 +49,7 @@ import { IconComponent } from '../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class NotificationsMenuComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly session = inject(SessionService);
   private readonly adminData = inject(AdminDashboardService);
   private readonly dealerData = inject(DealerConsoleService);
@@ -90,8 +92,8 @@ export class NotificationsMenuComponent {
    */
   protected readonly rows = computed<readonly NotificationRow[]>(() => {
     const now = Date.now();
-    if (this.isAdmin()) return toAdminNotifications(this.queue() ?? null, now);
-    if (this.isDealer()) return toDealerNotifications(this.dashboard() ?? null, now);
+    if (this.isAdmin()) return toAdminNotifications(this.queue() ?? null, now, this.t);
+    if (this.isDealer()) return toDealerNotifications(this.dashboard() ?? null, now, this.t);
     return [];
   });
 

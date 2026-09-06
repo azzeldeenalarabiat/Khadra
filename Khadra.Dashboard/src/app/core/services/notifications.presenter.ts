@@ -2,7 +2,7 @@ import { AttentionQueue } from '../models/dashboard.api';
 import { DealerDashboard } from '../models/dealer-console.api';
 import { Tone } from '../models/console.models';
 import { IconName } from '../../shared/icon/icon-paths';
-import { relativeTime, toQueueItems } from './dashboard.presenter';
+import { Translate, relativeTime, toQueueItems } from './dashboard.presenter';
 
 /** One line in the notifications panel. Every field is derived from a record the server sent. */
 export interface NotificationRow {
@@ -24,9 +24,10 @@ export interface NotificationRow {
 export function toAdminNotifications(
   queue: AttentionQueue | null,
   now: number,
+  t: Translate,
 ): readonly NotificationRow[] {
   if (!queue) return [];
-  return toQueueItems(queue, now).map((item) => ({
+  return toQueueItems(queue, now, t).map((item) => ({
     id: item.id,
     title: item.title,
     // The entity is the more useful of the two when both are present: it names the record.
@@ -48,6 +49,7 @@ export function toAdminNotifications(
 export function toDealerNotifications(
   dashboard: DealerDashboard | null,
   now: number,
+  t: Translate,
 ): readonly NotificationRow[] {
   if (!dashboard) return [];
   const rows: NotificationRow[] = [];
@@ -72,7 +74,7 @@ export function toDealerNotifications(
       title: `${n} booking ${n === 1 ? 'request is' : 'requests are'} waiting`,
       // The oldest is the one closest to expiring, so it is the fact worth carrying.
       detail: dashboard.bookings.oldestRequestedAt
-        ? `Oldest ${relativeTime(dashboard.bookings.oldestRequestedAt, now)}. A request expires when its rental date arrives unanswered.`
+        ? `Oldest ${relativeTime(dashboard.bookings.oldestRequestedAt, now, t)}. A request expires when its rental date arrives unanswered.`
         : 'A request expires when its rental date arrives unanswered.',
       when: 'To answer',
       tone: 'warn',
@@ -86,7 +88,7 @@ export function toDealerNotifications(
       id: `pickup:${pickup.bookingId}`,
       title: `Pickup — ${pickup.vehicleLabel}`,
       detail: `${pickup.customerName} · ${pickup.reference}`,
-      when: relativeTime(pickup.when, now),
+      when: relativeTime(pickup.when, now, t),
       tone: pickup.isOverdue ? 'bad' : 'accent',
       icon: pickup.pickupMethod === 'Delivery' ? 'moped' : 'map-pin',
       route: `/dealer/bookings/${pickup.bookingId}`,
@@ -98,7 +100,7 @@ export function toDealerNotifications(
       id: `return:${back.bookingId}`,
       title: `Return — ${back.vehicleLabel}`,
       detail: `${back.customerName} · ${back.reference}`,
-      when: relativeTime(back.when, now),
+      when: relativeTime(back.when, now, t),
       tone: back.isOverdue ? 'bad' : 'ok',
       icon: 'arrow-u-down-left',
       route: `/dealer/bookings/${back.bookingId}`,

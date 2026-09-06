@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core
 import { Router, RouterLink } from '@angular/router';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Cell, RowAction, TableRow, toneClass } from '../../core/models/console.models';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * The console's one table. Every list screen and every profile tab renders
@@ -20,6 +21,7 @@ import { Cell, RowAction, TableRow, toneClass } from '../../core/models/console.
   imports: [NgClass, RouterLink, DecimalPipe],
 })
 export class DataTableComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly router = inject(Router);
   private readonly ui = inject(ConsoleUiService);
 

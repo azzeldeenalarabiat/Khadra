@@ -10,6 +10,7 @@ import { Vehicle, VehicleStatusAction } from '../../core/models/fleet.api';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
 
@@ -31,6 +32,7 @@ type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
   imports: [RouterLink, IconComponent, ImageFallbackDirective],
 })
 export class FleetListComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(FleetService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);
@@ -55,13 +57,32 @@ export class FleetListComponent {
     { key: 'all', label: 'All' },
     { key: 'Active', label: 'Listed' },
     { key: 'Hidden', label: 'Hidden' },
-    { key: 'Maintenance', label: 'Off the road' },
+    { key: 'Maintenance', label: this.t('fleetList.offTheRoad') },
     { key: 'Draft', label: 'Draft' },
   ];
 
   protected readonly cars = computed(() => this.data() ?? []);
-  /** Adding a car is the owner's (the API's ApprovedDealer policy); staff manage what exists. */
-  protected readonly canAdd = computed(() => !!this.dealer()?.isOwner);
+
+  /**
+   * The fleet is the owner's to change; every member of staff may read it.
+   *
+   * `ApprovedDealer` sits on all ten writes in `DealerVehiclesController` — add, edit, publish,
+   * hide, take off the road, remove, and every image call — while the two GETs take `DealerStaff`.
+   * So an employee gets the whole screen and none of the buttons, and is told once, at the top, that
+   * this is deliberate. Leaving them on screen but disabled was the other option and is worse here:
+   * Edit is an anchor, which ignores `disabled`, and four dead controls repeated on every card is
+   * noise rather than information.
+   *
+   * `null` until `me` answers, so an owner's own buttons never blink out and back in.
+   */
+  protected readonly canManage = computed(
+    () => this.consoleData.permissions()?.canManageFleet ?? null,
+  );
+  protected readonly canAdd = computed(() => this.canManage() === true);
+  /** Said only once it is known to be true; "read-only" is a claim, not a default. */
+  protected readonly readOnly = computed(
+    () => this.canManage() === false && !this.dealer()?.isOwner,
+  );
 
   private readonly hiredVehicleIds = computed(() => {
     const items = this.hires()?.items ?? [];
@@ -149,7 +170,7 @@ export class FleetListComponent {
   protected primaryAction(car: Vehicle): { label: string; action: VehicleStatusAction } | null {
     if (car.status === 'Active') return { label: 'Hide', action: 'Hide' };
     if (car.status === 'Maintenance')
-      return { label: 'Back on the road', action: 'ReturnFromMaintenance' };
+      return { label: this.t('fleetList.backOnTheRoad'), action: 'ReturnFromMaintenance' };
     return { label: 'Publish', action: 'Publish' };
   }
 
@@ -188,10 +209,10 @@ export class FleetListComponent {
         icon: 'gear',
         tone: 'warn',
         title: `Take ${car.make} ${car.model} off the road?`,
-        body: 'It stops being offered to customers until you bring it back. Bookings already approved on it are not affected — tell those customers yourself if the car will not be ready.',
-        confirm: 'Take off the road',
+        body: this.t('fleetList.itStopsBeingOffered'),
+        confirm: this.t('fleetList.takeOffTheRoad'),
         result: {
-          title: 'Off the road',
+          title: this.t('fleetList.offTheRoad'),
           body: `${car.make} ${car.model} is not being offered.`,
           tone: 'warn',
         },
@@ -201,7 +222,7 @@ export class FleetListComponent {
         this.service.refresh();
       },
       {
-        title: 'Off the road',
+        title: this.t('fleetList.offTheRoad'),
         body: `${car.make} ${car.model} is not being offered.`,
         tone: 'warn',
       },
@@ -217,15 +238,15 @@ export class FleetListComponent {
         tone: 'bad',
         danger: true,
         title: `Remove ${car.make} ${car.model}?`,
-        body: 'It disappears from your fleet and from customer search. Bookings already made against it keep their history.',
-        confirm: 'Remove car',
-        result: { title: 'Car removed', body: '', tone: 'bad' },
+        body: this.t('fleetList.itDisappearsFromYour'),
+        confirm: this.t('fleetList.removeCar'),
+        result: { title: this.t('fleetList.carRemoved'), body: '', tone: 'bad' },
       },
       async () => {
         await this.service.remove(car.vehicleId);
         this.service.refresh();
       },
-      { title: 'Car removed', body: `${car.make} ${car.model} is no longer listed.`, tone: 'bad' },
+      { title: this.t('fleetList.carRemoved'), body: `${car.make} ${car.model} is no longer listed.`, tone: 'bad' },
     );
   }
 

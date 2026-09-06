@@ -7,7 +7,11 @@ public enum ErrorKind
     Forbidden = 3,
     NotFound = 4,
     Conflict = 5,
-    Failure = 6
+    Failure = 6,
+
+    // A dependency the platform needs was not answering. Distinct from Failure because the caller
+    // did nothing wrong and the same request may well succeed shortly -- 503, not 422.
+    Unavailable = 7
 }
 
 // The single error currency across Domain, Application and API. `Code` is a stable machine code
@@ -32,6 +36,8 @@ public sealed record Error(
     public static Error Conflict(string code, string message) => new(code, message, ErrorKind.Conflict);
 
     public static Error Failure(string code, string message) => new(code, message, ErrorKind.Failure);
+
+    public static Error Unavailable(string code, string message) => new(code, message, ErrorKind.Unavailable);
 
     public override string ToString() => $"{Code}: {Message}";
 }

@@ -20,6 +20,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 type Tab = 'overview' | 'availability' | 'bookings' | 'activity';
 
@@ -46,6 +47,7 @@ interface CalendarDay {
   imports: [RouterLink, IconComponent, ImageFallbackDirective],
 })
 export class VehicleDetailComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(FleetService);
   private readonly consoleData = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
@@ -90,6 +92,21 @@ export class VehicleDetailComponent {
   private readonly hires = loaded(this.bookingsResource);
   private readonly dealer = loaded(this.consoleData.me);
 
+  /**
+   * Editing, publishing, hiding, taking off the road and removing are all `ApprovedDealer`.
+   *
+   * Reading this car is not: any member of staff needs its plate, its photos, its calendar and its
+   * booking history to hand it over. So the page stays whole for an employee and loses only the
+   * controls — which is the honest shape, because none of those controls would work. `null` until
+   * `me` answers, so the owner's own buttons do not blink.
+   */
+  protected readonly canManage = computed(
+    () => this.consoleData.permissions()?.canManageFleet ?? null,
+  );
+  protected readonly readOnly = computed(
+    () => this.canManage() === false && !this.dealer()?.isOwner,
+  );
+
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
@@ -110,8 +127,8 @@ export class VehicleDetailComponent {
   protected readonly pill = computed<{ label: string; tone: Tone }>(() => {
     const c = this.car();
     if (!c) return { label: '', tone: 'dim' };
-    if (this.current()) return { label: 'On hire', tone: 'accent' };
-    if (c.status === 'Maintenance') return { label: 'Off the road', tone: 'bad' };
+    if (this.current()) return { label: this.t('vehicleDetail.onHire'), tone: 'accent' };
+    if (c.status === 'Maintenance') return { label: this.t('vehicleDetail.offTheRoad'), tone: 'bad' };
     if (c.status === 'Draft') return { label: 'Draft', tone: 'dim' };
     if (c.status === 'Hidden') return { label: 'Hidden', tone: 'dim' };
     return c.isBookable ? { label: 'Listed', tone: 'ok' } : { label: 'Blocked', tone: 'warn' };
@@ -207,9 +224,9 @@ export class VehicleDetailComponent {
   protected readonly legend: readonly { label: string; tone: Tone }[] = [
     { label: 'Free', tone: 'ok' },
     { label: 'Booked', tone: 'warn' },
-    { label: 'Requested (deposit paid)', tone: 'bad' },
-    { label: 'On hire', tone: 'accent' },
-    { label: 'Not offered', tone: 'dim' },
+    { label: this.t('vehicleDetail.requestedDepositPaid'), tone: 'bad' },
+    { label: this.t('vehicleDetail.onHire'), tone: 'accent' },
+    { label: this.t('vehicleWizard.notOffered'), tone: 'dim' },
   ];
 
   protected readonly historyNote = computed(() => {
@@ -289,7 +306,7 @@ export class VehicleDetailComponent {
     if (!c) return null;
     if (c.status === 'Active') return { label: 'Hide', action: 'Hide', icon: 'eye-slash' };
     if (c.status === 'Maintenance')
-      return { label: 'Back on the road', action: 'ReturnFromMaintenance', icon: 'check-circle' };
+      return { label: this.t('vehicleDetail.backOnTheRoad'), action: 'ReturnFromMaintenance', icon: 'check-circle' };
     return { label: 'Publish', action: 'Publish', icon: 'eye' };
   }
 
@@ -331,10 +348,10 @@ export class VehicleDetailComponent {
         icon: 'gear',
         tone: 'warn',
         title: `Take ${c.make} ${c.model} off the road?`,
-        body: 'Every day shows as not offered until you bring it back. Bookings already approved are not affected — tell those customers yourself if the car will not be ready.',
-        confirm: 'Take off the road',
+        body: this.t('vehicleDetail.everyDayShowsAs'),
+        confirm: this.t('fleetList.takeOffTheRoad'),
         result: {
-          title: 'Off the road',
+          title: this.t('vehicleDetail.offTheRoad'),
           body: `${c.make} ${c.model} is not being offered.`,
           tone: 'warn',
         },
@@ -344,7 +361,7 @@ export class VehicleDetailComponent {
         this.resource.reload();
         this.service.refresh();
       },
-      { title: 'Off the road', body: `${c.make} ${c.model} is not being offered.`, tone: 'warn' },
+      { title: this.t('vehicleDetail.offTheRoad'), body: `${c.make} ${c.model} is not being offered.`, tone: 'warn' },
     );
   }
 

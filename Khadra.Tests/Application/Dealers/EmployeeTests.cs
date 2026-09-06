@@ -1,3 +1,5 @@
+using Khadra.Application.Notifications;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers;
@@ -68,6 +70,7 @@ public sealed class EmployeeTests
             Users,
             Reader,
             new AuthEmailDispatcher(Composer, Sender, NullLogger<AuthEmailDispatcher>.Instance),
+            new DealerTeamNotifier(Substitute.For<INotifier>(), Users),
             Clock,
             UnitOfWork);
 

@@ -10,6 +10,11 @@ import {
   DealerCounts,
   DisputeCounts,
 } from '../models/dashboard.api';
+import { TranslationKey } from '../i18n/en';
+import { MessageParams } from '../i18n/language';
+
+/** Passed in rather than injected: these are pure functions, and their spec calls them directly. */
+export type Translate = (key: TranslationKey, params?: MessageParams) => string;
 import { KpiCard, QueueItem } from '../data/dashboard.data';
 
 /**
@@ -53,69 +58,69 @@ export interface KpiSources {
  * panel below states that once, in words; a KPI card of dashes said it four times and looked like a
  * figure that had failed to load.
  */
-export function toKpiCards(sources: KpiSources): readonly KpiCard[] {
+export function toKpiCards(sources: KpiSources, t: Translate): readonly KpiCard[] {
   const { dealers, bookings, customers, disputes } = sources;
   const cards: KpiCard[] = [];
 
   if (dealers) {
     cards.push({
-      label: 'Total dealers',
+      label: t('kpi.totalDealers'),
       icon: 'storefront',
       main: formatCount(dealers.total),
       route: '/dealers',
       subs: [
-        { k: 'Trading', v: formatCount(dealers.trading) },
-        { k: 'Pending review', v: formatCount(dealers.pendingReview), tone: 'warn' as Tone },
-        { k: 'Suspended', v: formatCount(dealers.suspended), tone: 'bad' as Tone },
+        { k: t('kpi.trading'), v: formatCount(dealers.trading) },
+        { k: t('kpi.pendingReview'), v: formatCount(dealers.pendingReview), tone: 'warn' as Tone },
+        { k: t('kpi.suspended'), v: formatCount(dealers.suspended), tone: 'bad' as Tone },
       ],
     });
   }
 
   if (bookings) {
     cards.push({
-      label: 'Bookings',
+      label: t('kpi.bookings'),
       icon: 'calendar-check',
       main: formatCount(bookings.total),
       route: '/bookings',
       subs: [
-        { k: 'Today', v: formatCount(bookings.today) },
-        { k: 'Active', v: formatCount(bookings.active) },
-        { k: 'Pending', v: formatCount(bookings.pendingApproval), tone: 'warn' as Tone },
+        { k: t('kpi.today'), v: formatCount(bookings.today) },
+        { k: t('kpi.active'), v: formatCount(bookings.active) },
+        { k: t('kpi.pending'), v: formatCount(bookings.pendingApproval), tone: 'warn' as Tone },
       ],
     });
   }
 
   if (customers) {
     cards.push({
-      label: 'Customers',
+      label: t('kpi.customers'),
       icon: 'users-three',
       main: formatCount(customers.total),
       route: '/customers',
       subs: [
-        { k: 'Verified', v: formatCount(customers.verified) },
+        { k: t('kpi.verified'), v: formatCount(customers.verified) },
         {
-          k: 'Pending verification',
+          k: t('kpi.pendingVerification'),
           v: formatCount(customers.pendingVerification),
           tone: 'warn' as Tone,
         },
-        { k: 'Suspended', v: formatCount(customers.suspended) },
+        { k: t('kpi.suspended'), v: formatCount(customers.suspended) },
       ],
     });
   }
 
   if (disputes) {
     cards.push({
-      label: 'Disputes',
+      label: t('kpi.disputes'),
       icon: 'scales',
       main: formatCount(disputes.open + disputes.underReview),
       route: '/disputes',
       subs: [
-        { k: 'Pending admin', v: formatCount(disputes.open), tone: 'warn' as Tone },
-        { k: 'Overdue', v: formatCount(disputes.overdue), tone: 'bad' as Tone },
+        { k: t('kpi.pendingAdmin'), v: formatCount(disputes.open), tone: 'warn' as Tone },
+        { k: t('kpi.overdue'), v: formatCount(disputes.overdue), tone: 'bad' as Tone },
         {
           // The window travels with the figure, from the server. "4 resolved" means nothing without
           // "in 30 days", and the console must not be the thing that remembers which 30.
-          k: `Resolved ${disputes.resolvedWindowDays}d`,
+          k: t('kpi.resolvedInDays', { days: disputes.resolvedWindowDays }),
           v: formatCount(disputes.resolvedRecently),
         },
       ],
@@ -187,29 +192,36 @@ export function slaPercent(item: AttentionItem, now: number): number {
 }
 
 /** The one-line summary the design shows in bold on each row. */
-const queueTitle = (item: AttentionItem, now: number): string => {
+const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
   if (item.kind === 'DealerApplicationsAtRisk') {
-    const noun = item.count === 1 ? 'dealer application is' : 'dealer applications are';
-    return item.isOverdue
-      ? `${item.count} ${noun} past the review SLA`
-      : `${item.count} ${noun} approaching the review SLA`;
+    // One message per plural category, because Arabic needs six where English needs two.
+    return t(
+      item.isOverdue ? 'queue.applicationsOverdue' : 'queue.applicationsApproaching',
+      { count: item.count },
+    );
   }
 
   const ageHours = Math.max(0, Math.round((now - Date.parse(item.slaStartedAt)) / 3_600_000));
   if (item.kind === 'DisputeOverdue' || item.kind === 'DisputeOpen') {
-    return ageHours < 1 ? 'New dispute opened' : `Dispute open for ${ageHours} hours`;
+    return ageHours < 1
+      ? t('queue.newDispute')
+      : t('queue.disputeOpenFor', { count: ageHours });
   }
-  return item.subtitle ?? 'Needs attention';
+  return item.subtitle ?? t('queue.needsAttention');
 };
 
-export function toQueueItems(queue: AttentionQueue, now: number): readonly QueueItem[] {
+export function toQueueItems(
+  queue: AttentionQueue,
+  now: number,
+  t: Translate,
+): readonly QueueItem[] {
   return queue.items.map((item) => {
     const target = kindTarget(item);
     return {
       id: item.id,
       severity: severityLabel(item, now),
       tone: severityTone(item.severity),
-      title: queueTitle(item, now),
+      title: queueTitle(item, now, t),
       description: item.description ?? '',
       entity: item.subtitle ?? '',
       sla: slaLabel(item, now),
@@ -301,36 +313,36 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
 
 // The sentence is composed here rather than on the server, so the wording (and one day the language)
 // stays with the interface that shows it.
-const ACTIVITY_VERBS: Readonly<Record<string, string>> = {
-  DealerApproved: 'approved dealer',
-  DealerRejected: 'rejected dealer',
-  DealerClarificationRequested: 'asked for clarification from',
-  DealerSuspended: 'suspended dealer',
-  DealerReactivated: 'reactivated dealer',
-  CustomerSuspended: 'suspended customer',
-  CustomerReactivated: 'reactivated customer',
-  DisputeOpened: 'opened dispute',
-  DisputeAssigned: 'took the dispute',
-  DisputeResolved: 'resolved dispute',
-  BusinessRuleChanged: 'changed setting',
-  ReviewHidden: 'hid review',
-  ReviewRestored: 'restored review',
-  AdminInvited: 'invited admin',
-  AdminDeactivated: 'deactivated admin',
-  BookingCancelledByAdmin: 'cancelled booking',
-  BookingExpired: 'expired booking',
-  BookingMarkedNoShow: 'recorded a no-show on',
+const ACTIVITY_VERBS: Readonly<Record<string, TranslationKey>> = {
+  DealerApproved: 'activity.dealerApproved',
+  DealerRejected: 'activity.dealerRejected',
+  DealerClarificationRequested: 'activity.dealerClarification',
+  DealerSuspended: 'activity.dealerSuspended',
+  DealerReactivated: 'activity.dealerReactivated',
+  CustomerSuspended: 'activity.customerSuspended',
+  CustomerReactivated: 'activity.customerReactivated',
+  DisputeOpened: 'activity.disputeOpened',
+  DisputeAssigned: 'activity.disputeAssigned',
+  DisputeResolved: 'activity.disputeResolved',
+  BusinessRuleChanged: 'activity.settingChanged',
+  ReviewHidden: 'activity.reviewHidden',
+  ReviewRestored: 'activity.reviewRestored',
+  AdminInvited: 'activity.adminInvited',
+  AdminDeactivated: 'activity.adminDeactivated',
+  BookingCancelledByAdmin: 'activity.bookingCancelled',
+  BookingExpired: 'activity.bookingExpired',
+  BookingMarkedNoShow: 'activity.bookingNoShow',
 };
 
-export function relativeTime(iso: string, now: number): string {
+export function relativeTime(iso: string, now: number, t: Translate): string {
   const minutes = Math.round((now - Date.parse(iso)) / 60_000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t('time.justNow');
+  if (minutes < 60) return t('time.minutesAgo', { count: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('time.hoursAgo', { count: hours });
   const days = Math.round(hours / 24);
-  if (days === 1) return 'Yesterday';
-  return `${days}d ago`;
+  if (days === 1) return t('time.yesterday');
+  return t('time.daysAgo', { count: days });
 }
 
 export interface ActivityRow {
@@ -342,14 +354,21 @@ export interface ActivityRow {
 export function toActivityRows(
   entries: readonly ActivityEntry[],
   now: number,
+  t: Translate,
 ): readonly ActivityRow[] {
   return entries.map((entry) => ({
     icon: ACTIVITY_ICONS[entry.action] ?? 'info',
     // An unmapped action still reads sensibly: the raw name is better than an empty line.
-    text: `${entry.actorName} ${ACTIVITY_VERBS[entry.action] ?? entry.action} ${entry.subjectLabel}`,
-    ts: relativeTime(entry.occurredAt, now),
+    text: `${entry.actorName} ${verb(entry.action, t)} ${entry.subjectLabel}`,
+    ts: relativeTime(entry.occurredAt, now, t),
   }));
 }
+
+/** An unmapped action still reads sensibly: the raw name beats an empty line. */
+const verb = (action: string, t: Translate): string => {
+  const key = ACTIVITY_VERBS[action];
+  return key ? t(key) : action;
+};
 
 export const formatChangePercent = (change: number | null): string =>
   change === null ? UNAVAILABLE : `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;

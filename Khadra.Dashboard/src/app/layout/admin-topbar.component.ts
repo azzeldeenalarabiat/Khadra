@@ -14,6 +14,9 @@ import { SCREEN_PARENTS, SCREEN_TITLES } from '../core/data/nav.data';
 import { areaLabel, initialsOf } from '../core/models/user-display';
 import { accountRouteFor, homeRouteFor } from '../core/guards/role.guards';
 import { SessionService } from '../core/services/session.service';
+import { I18nService } from '../core/i18n/i18n.service';
+import { TranslationKey } from '../core/i18n/en';
+import { LanguageSwitchComponent } from '../shared/language-switch/language-switch.component';
 import { IconComponent } from '../shared/icon/icon.component';
 import { NotificationsMenuComponent } from './notifications-menu.component';
 
@@ -33,10 +36,11 @@ interface Crumb {
   selector: 'kh-admin-topbar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './admin-topbar.component.html',
-  imports: [RouterLink, IconComponent, NotificationsMenuComponent],
+  imports: [RouterLink, IconComponent, NotificationsMenuComponent, LanguageSwitchComponent],
 })
 export class AdminTopbarComponent {
   private readonly router = inject(Router);
+  protected readonly t = inject(I18nService).t;
   private readonly session = inject(SessionService);
 
   /** Whether the account menu is showing. */
@@ -51,7 +55,19 @@ export class AdminTopbarComponent {
     { initialValue: 'dashboard' },
   );
 
-  protected readonly title = computed(() => SCREEN_TITLES[this.path()] ?? 'Dashboard');
+  protected readonly title = computed(() => this.titleOf(this.path()));
+
+  /**
+   * The screen name in the current language.
+   *
+   * A route with no entry falls back to the raw path rather than to the word Dashboard, which is
+   * what it did before: an unmapped screen used to claim to be the dashboard in the title bar and
+   * the breadcrumb both.
+   */
+  private titleOf(key: string, fallback?: string): string {
+    const titleKey: TranslationKey | undefined = SCREEN_TITLES[key];
+    return titleKey ? this.t(titleKey) : (fallback ?? key);
+  }
   protected readonly initials = computed(() => initialsOf(this.session.user() ?? null));
   // Two initials in a circle are not a name to a screen reader, so the chip carries the full one.
   protected readonly name = computed(() => this.session.user()?.fullName ?? '');
@@ -100,13 +116,13 @@ export class AdminTopbarComponent {
     // The root crumb names the side of the platform you are on, and links to the home your role
     // actually has — a dealer sent to /dashboard is only bounced straight back.
     const trail: Crumb[] = [
-      { label: areaLabel(user?.role), route: homeRouteFor(user), last: false },
+      { label: areaLabel(user?.role, this.t), route: homeRouteFor(user), last: false },
     ];
     const parent = SCREEN_PARENTS[key];
     if (parent) {
-      trail.push({ label: SCREEN_TITLES[parent] ?? parent, route: `/${parent}`, last: false });
+      trail.push({ label: this.titleOf(parent, parent), route: `/${parent}`, last: false });
     }
-    trail.push({ label: SCREEN_TITLES[key] ?? 'Dashboard', route: `/${key}`, last: true });
+    trail.push({ label: this.titleOf(key), route: `/${key}`, last: true });
     return trail;
   });
 

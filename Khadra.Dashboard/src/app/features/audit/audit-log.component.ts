@@ -5,6 +5,7 @@ import { loaded } from '../../core/services/loaded';
 import { AuditLogEntry } from '../../core/models/audit.api';
 import { Tone } from '../../core/models/console.models';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * The audit log (spec 7): every privileged action, who took it, and on what grounds.
@@ -26,6 +27,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [IconComponent],
 })
 export class AuditLogComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminAuditService);
 
   protected readonly resource = this.service.entries;

@@ -9,6 +9,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * One booking as the platform sees it.
@@ -28,6 +29,7 @@ import { TimelineComponent } from '../../shared/timeline/timeline.component';
   imports: [RouterLink, IconComponent, TimelineComponent],
 })
 export class AdminBookingDetailComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminBookingsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -167,22 +169,23 @@ export class AdminBookingDetailComponent {
         danger: true,
         title: `Cancel ${booking.reference}?`,
         body: `The booking ends now and the car is released. No penalty is assessed against ${booking.customerName} or ${booking.dealerName} — the platform is cancelling, not either party.`,
-        note: 'Nothing is refunded here. Money moves only through a dispute resolution, and Payments is not live.',
+        note: this.t('adminBooking.nothingIsRefundedHere'),
         fields: [
           {
+            name: 'reason',
             label: 'Reason',
             type: 'text',
-            placeholder: 'Why is the platform cancelling this booking?',
+            placeholder: this.t('adminBooking.whyIsThePlatform'),
           },
         ],
-        confirm: 'Cancel booking',
-        result: { title: 'Booking cancelled', body: '', tone: 'warn' },
+        confirm: this.t('adminBooking.cancelBooking'),
+        result: { title: this.t('adminBooking.bookingCancelled'), body: '', tone: 'warn' },
       },
       async (values) => {
-        await this.service.cancel(booking.bookingId, values['Reason'] ?? '');
+        await this.service.cancel(booking.bookingId, values['reason'] ?? '');
         this.service.refresh();
       },
-      { title: 'Booking cancelled', body: 'Recorded against your account in the audit log.' },
+      { title: this.t('adminBooking.bookingCancelled'), body: this.t('adminBooking.recordedAgainstYourAccount') },
     );
   }
 
@@ -199,15 +202,15 @@ export class AdminBookingDetailComponent {
         tone: 'warn',
         title: `Expire ${booking.reference}?`,
         body: `${which} Expiring releases the car. No penalty is assessed against anyone.`,
-        note: 'Refused if the booking’s own window has not run out yet — the deadline is the one it froze, not today’s setting.',
-        confirm: 'Expire booking',
-        result: { title: 'Booking expired', body: '', tone: 'warn' },
+        note: this.t('adminBooking.refusedIfTheBookings'),
+        confirm: this.t('adminBooking.expireBooking'),
+        result: { title: this.t('adminBooking.bookingExpired'), body: '', tone: 'warn' },
       },
       async () => {
         await this.service.expire(booking.bookingId);
         this.service.refresh();
       },
-      { title: 'Booking expired', body: 'Recorded against your account in the audit log.' },
+      { title: this.t('adminBooking.bookingExpired'), body: this.t('adminBooking.recordedAgainstYourAccount') },
     );
   }
 
@@ -221,15 +224,15 @@ export class AdminBookingDetailComponent {
         danger: true,
         title: `Mark ${booking.reference} as a no-show?`,
         body: `${booking.customerName} never collected the car. This assesses whatever this booking's own terms say is owed — nothing is charged.`,
-        note: 'Refused until the no-show window this booking froze has elapsed.',
-        confirm: 'Mark no-show',
-        result: { title: 'Recorded as a no-show', body: '', tone: 'bad' },
+        note: this.t('adminBooking.refusedUntilTheNo'),
+        confirm: this.t('adminBooking.markNoShow'),
+        result: { title: this.t('adminBooking.recordedAsANo'), body: '', tone: 'bad' },
       },
       async () => {
         await this.service.markNoShow(booking.bookingId);
         this.service.refresh();
       },
-      { title: 'Recorded as a no-show', body: 'A penalty is assessed, not charged.' },
+      { title: this.t('adminBooking.recordedAsANo'), body: this.t('adminBooking.aPenaltyIsAssessed') },
     );
   }
 

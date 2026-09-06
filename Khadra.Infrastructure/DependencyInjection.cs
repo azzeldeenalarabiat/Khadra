@@ -15,6 +15,7 @@ using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Notifications;
@@ -129,6 +130,8 @@ public static class DependencyInjection
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotifier, Notifier>();
 
         AddReporting(services);
     }
@@ -180,7 +183,7 @@ public static class DependencyInjection
 
     private static void AddNotifications(IServiceCollection services, IConfiguration configuration)
     {
-        // Three transports, one switch. `Resend` talks HTTPS and needs only an API key; `Smtp` covers
+        // Four transports, one switch. `Resend` talks HTTPS and needs only an API key; `Smtp` covers
         // Gmail and any relay that speaks it (Brevo: smtp-relay.brevo.com:587, username = your login,
         // password = an SMTP key), so a second provider needs no code, only configuration.
         var provider = configuration[$"{EmailOptions.SectionName}:Provider"] ?? EmailOptions.LoggingProvider;
@@ -194,6 +197,20 @@ public static class DependencyInjection
             });
             services.AddSingleton<IEmailSender, ResendEmailSender>();
             services.AddSingleton<IEmailTransportProbe, ResendTransportProbe>();
+        }
+        else if (string.Equals(provider, EmailOptions.BrevoProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient(BrevoEmailSender.HttpClientName, client =>
+            {
+                client.BaseAddress = new Uri("https://api.brevo.com/");
+                // A registration waits on this call, so it fails fast rather than hanging the form.
+                client.Timeout = TimeSpan.FromSeconds(15);
+                var apiKey = configuration[$"{EmailOptions.SectionName}:ApiKey"];
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                    client.DefaultRequestHeaders.Add(BrevoEmailSender.ApiKeyHeader, apiKey);
+            });
+            services.AddSingleton<IEmailSender, BrevoEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, BrevoTransportProbe>();
         }
         else if (string.Equals(provider, EmailOptions.SmtpProvider, StringComparison.OrdinalIgnoreCase))
         {

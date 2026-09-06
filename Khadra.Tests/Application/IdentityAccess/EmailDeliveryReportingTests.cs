@@ -1,6 +1,7 @@
 using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess;
 using Khadra.Application.IdentityAccess.RegisterDealerOwner;
+using Khadra.Application.IdentityAccess.ForgotPassword;
 using Khadra.Application.IdentityAccess.ResendVerification;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Tests.Support;
@@ -93,6 +94,44 @@ public sealed class EmailDeliveryReportingTests
 
         var result = await context.ResendVerification()
             .Handle(new ResendVerificationCommand("nobody@example.com"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+    /// <summary>
+    /// The screen behind this one said "a reset link is on its way" whatever the relay answered.
+    ///
+    /// On 2026-09-06 that was not hypothetical: two resets for a real address failed at the relay,
+    /// fifteen seconds each, and both times the browser was told to go and check its inbox.
+    /// </summary>
+    [Fact]
+    public async Task A_reset_link_the_mail_server_refused_is_reported_as_a_failure()
+    {
+        var context = new AuthHandlerTestContext { EmailSender = RefusingSender() };
+        var user = Users.Customer();
+        context.UserRepository.GetByEmailAsync(user.Email, Arg.Any<CancellationToken>()).Returns(user);
+
+        var result = await context.ForgotPassword()
+            .Handle(new ForgotPasswordCommand(user.Email.Value), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("auth.password_reset_email_not_sent", result.Error.Code);
+        // The token was still issued, so trying again costs the person nothing.
+        Assert.Single(context.AddedVerificationTokens);
+    }
+
+    /// <summary>
+    /// And the oracle stays shut for the case that matters: an address with no account gets the same
+    /// success as a real one even while every send is failing. Only an ATTEMPTED send reports.
+    /// </summary>
+    [Fact]
+    public async Task An_unknown_address_asking_for_a_reset_gets_the_same_answer_as_a_real_one()
+    {
+        var context = new AuthHandlerTestContext { EmailSender = RefusingSender() };
+        context.UserRepository.GetByEmailAsync(Arg.Any<EmailAddress>(), Arg.Any<CancellationToken>())
+            .Returns((User?)null);
+
+        var result = await context.ForgotPassword()
+            .Handle(new ForgotPasswordCommand("nobody@example.com"), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
     }

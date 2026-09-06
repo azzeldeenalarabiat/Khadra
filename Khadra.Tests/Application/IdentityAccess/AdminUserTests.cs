@@ -1,6 +1,7 @@
 using Khadra.Application.Auditing;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.IdentityAccess;
 using Khadra.Application.IdentityAccess.AdminUsers;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Auditing.Repositories;
@@ -8,6 +9,7 @@ using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Tests.Support;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Khadra.Tests.Application.IdentityAccess;
@@ -66,8 +68,7 @@ public sealed class AdminUserTests
             new FakePasswordHasher(),
             new FakeOpaqueTokens(),
             TestAuthPolicy.Default,
-            Email,
-            Composer,
+            new AuthEmailDispatcher(Composer, Email, NullLogger<AuthEmailDispatcher>.Instance),
             new AdminActionRecorder(AuditTrail, Actor, Clock),
             Actor,
             UnitOfWork,

@@ -3,6 +3,8 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -16,9 +18,10 @@ import { IconComponent } from '../../shared/icon/icon.component';
   selector: 'kh-accept-invitation',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './accept-invitation.component.html',
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent],
 })
 export class AcceptInvitationComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
 

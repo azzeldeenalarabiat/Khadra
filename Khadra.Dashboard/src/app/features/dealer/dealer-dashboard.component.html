@@ -3,10 +3,10 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load your dashboard</div>
+        <div class="state-title">{{ t('common.couldntLoadYourDashboard') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     </section>
@@ -27,27 +27,43 @@
         <div class="page-sub">{{ statusLine() }}</div>
       </div>
       <div class="dc-head-actions">
-        <a class="btn btn-primary btn-md" routerLink="/dealer/fleet/new">
-          <kh-icon name="plus" />
-          Add Vehicle
-        </a>
+        <!-- Adding a car is `ApprovedDealer`; for anyone else this was a link into a guarded form. -->
+        @if (canManageFleet()) {
+          <a class="btn btn-primary btn-md" routerLink="/dealer/fleet/new">
+            <kh-icon name="plus" />
+            {{ t('dealerDashboard.addVehicle') }}
+          </a>
+        }
         <a class="btn btn-secondary btn-md" routerLink="/dealer/bookings">
           <kh-icon name="calendar-check" />
-          View Bookings
+          {{ t('dealerDashboard.viewBookings') }}
         </a>
       </div>
     </div>
 
     <div class="dc-kpi-grid">
       @for (kpi of kpis(); track kpi.label) {
-        <a class="sect kpi-card" [routerLink]="kpi.route" [queryParams]="kpi.query ?? null">
-          <div class="kpi-head">
-            <span class="k">{{ kpi.label }}</span>
-            <kh-icon [name]="kpi.icon" class="kpi-icon" />
+        <!-- A withheld figure has nowhere to lead: the same grant closes the screen behind it. It
+             stays on the grid, saying plainly that it is not this reader's to see. -->
+        @if (kpi.route; as route) {
+          <a class="sect kpi-card" [routerLink]="route" [queryParams]="kpi.query ?? null">
+            <div class="kpi-head">
+              <span class="k">{{ kpi.label }}</span>
+              <kh-icon [name]="kpi.icon" class="kpi-icon" />
+            </div>
+            <div class="kpi-main num">{{ kpi.main }}</div>
+            <div class="kpi-sub-k">{{ kpi.note }}</div>
+          </a>
+        } @else {
+          <div class="sect kpi-card">
+            <div class="kpi-head">
+              <span class="k">{{ kpi.label }}</span>
+              <kh-icon name="lock-simple" class="kpi-icon" />
+            </div>
+            <div class="kpi-main num">{{ kpi.main }}</div>
+            <div class="kpi-sub-k">{{ kpi.note }}</div>
           </div>
-          <div class="kpi-main num">{{ kpi.main }}</div>
-          <div class="kpi-sub-k">{{ kpi.note }}</div>
-        </a>
+        }
       }
     </div>
 
@@ -56,16 +72,16 @@
         <section class="sect sect-clip">
           <div class="sect-h">
             <kh-icon name="warning-diamond" class="s-bad" />
-            <span class="sect-t">Requires attention</span>
+            <span class="sect-t">{{ t('employeeDashboard.requiresAttention') }}</span>
             <span class="queue-count">{{ attention().length }}</span>
-            <span class="sect-hint">A request expires when its rental date arrives unanswered</span>
+            <span class="sect-hint">{{ t('dealerDashboard.aRequestExpiresWhen') }}</span>
           </div>
           @if (attention().length === 0) {
             <div class="state-block">
               <div class="state-icon is-outline"><kh-icon name="check-circle" /></div>
-              <div class="state-title">Nothing needs you right now</div>
+              <div class="state-title">{{ t('employeeDashboard.nothingNeedsYouRight') }}</div>
               <div class="state-text">
-                No requests waiting, nothing due in the next {{ d.upcomingWindowHours }} hours.
+                {{ t('dealerDashboard.noRequestsWaitingNothing') }} {{ d.upcomingWindowHours }} {{ t('dealerDashboard.hours') }}
               </div>
             </div>
           }
@@ -98,12 +114,12 @@
           <section class="sect sect-clip">
             <div class="sect-h">
               <kh-icon name="arrow-square-out" class="kpi-icon" />
-              <span class="sect-t">Upcoming pickups</span>
-              <span class="sect-hint">Next {{ d.upcomingWindowHours }}h</span>
+              <span class="sect-t">{{ t('dealerDashboard.upcomingPickups') }}</span>
+              <span class="sect-hint">{{ t('common.next') }} {{ d.upcomingWindowHours }}h</span>
             </div>
             <div class="sect-pad">
               @if (d.upcomingPickups.length === 0) {
-                <div class="page-sub">No pickups due in this window.</div>
+                <div class="page-sub">{{ t('dealerDashboard.noPickupsDueIn') }}</div>
               }
               @for (p of d.upcomingPickups; track p.bookingId) {
                 <div class="handover">
@@ -119,7 +135,7 @@
                       <div class="handover-sub">{{ p.customerName }}</div>
                     </div>
                     <a class="btn btn-ghost btn-xs" [routerLink]="['/dealer/bookings', p.bookingId]"
-                      >View</a
+                      >{{ t('dealerBookings.view') }}</a
                     >
                   </div>
                   <div class="handover-loc">
@@ -130,7 +146,7 @@
                         : 'Collected from your location'
                     }}</span>
                     @if (p.pickupMethod === 'Delivery') {
-                      <span class="tag-delivery">Delivery</span>
+                      <span class="tag-delivery">{{ t('common.delivery') }}</span>
                     }
                   </div>
                 </div>
@@ -141,12 +157,12 @@
           <section class="sect sect-clip">
             <div class="sect-h">
               <kh-icon name="arrow-square-in" class="kpi-icon" />
-              <span class="sect-t">Upcoming returns</span>
-              <span class="sect-hint">Next {{ d.upcomingWindowHours }}h</span>
+              <span class="sect-t">{{ t('dealerDashboard.upcomingReturns') }}</span>
+              <span class="sect-hint">{{ t('common.next') }} {{ d.upcomingWindowHours }}h</span>
             </div>
             <div class="sect-pad">
               @if (d.upcomingReturns.length === 0) {
-                <div class="page-sub">No returns due in this window.</div>
+                <div class="page-sub">{{ t('dealerDashboard.noReturnsDueIn') }}</div>
               }
               @for (r of d.upcomingReturns; track r.bookingId) {
                 <div class="handover">
@@ -164,12 +180,12 @@
                       <div class="handover-sub">{{ r.customerName }}</div>
                     </div>
                     <a class="btn btn-ghost btn-xs" [routerLink]="['/dealer/bookings', r.bookingId]"
-                      >View</a
+                      >{{ t('dealerBookings.view') }}</a
                     >
                   </div>
                   <div class="handover-loc">
                     <kh-icon name="map-pin" />
-                    <span>Returned to your location</span>
+                    <span>{{ t('dealerDashboard.returnedToYourLocation') }}</span>
                   </div>
                 </div>
               }
@@ -181,8 +197,8 @@
       <div class="stack stack-14">
         <section class="sect sect-clip">
           <div class="sect-h">
-            <span class="sect-t">Fleet status</span>
-            <span class="sect-hint num">{{ d.totalVehicles }} vehicles</span>
+            <span class="sect-t">{{ t('dealerDashboard.fleetStatus') }}</span>
+            <span class="sect-hint num">{{ d.totalVehicles }} {{ t('dealerDashboard.vehicles') }}</span>
           </div>
           <div class="sect-pad">
             @for (row of fleetStatus(); track row.label) {
@@ -197,8 +213,10 @@
             }
             @if (fleetStatus().length === 0) {
               <div class="page-sub">
-                No vehicles yet.
-                <a class="auth-link" routerLink="/dealer/fleet/new">Add your first car.</a>
+                {{ t('dealerDashboard.noVehiclesYet') }}
+                @if (canManageFleet()) {
+                  <a class="auth-link" routerLink="/dealer/fleet/new">{{ t('dealerDashboard.addYourFirstCar') }}</a>
+                }
               </div>
             }
           </div>
@@ -206,13 +224,13 @@
 
         <section class="sect sect-clip">
           <div class="sect-h">
-            <span class="sect-t">Recent activity</span>
-            <a class="sect-hint auth-link" routerLink="/dealer/activity">View all</a>
+            <span class="sect-t">{{ t('dealerDashboard.recentActivity') }}</span>
+            <a class="sect-hint auth-link" routerLink="/dealer/activity">{{ t('dealerDashboard.viewAll') }}</a>
           </div>
           <div class="sect-pad">
             @if (d.recentActivity.length === 0) {
               <div class="page-sub">
-                Booking decisions and handovers by you and your staff will appear here.
+                {{ t('dealerDashboard.bookingDecisionsAndHandovers') }}
               </div>
             }
             @for (entry of d.recentActivity; track entry.occurredAt) {

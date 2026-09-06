@@ -1,8 +1,8 @@
 <div class="stack stack-14 page-mid">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Settings</h1>
-      <div class="page-sub">Your account. Dealership details live on the Dealer Profile page.</div>
+      <h1 class="page-title">{{ t('common.settings') }}</h1>
+      <div class="page-sub">{{ t('dealerSettings.yourAccountDealershipDetails') }}</div>
     </div>
   </div>
 
@@ -10,35 +10,34 @@
     <div class="stack stack-14">
       <section class="sect">
         <div class="sect-h">
-          <span class="sect-t">Account</span
-          ><span class="sect-hint">As the platform knows you</span>
+          <span class="sect-t">{{ t('common.account') }}</span
+          ><span class="sect-hint">{{ t('dealerSettings.asThePlatformKnows') }}</span>
         </div>
         <div class="sect-pad kv-narrow">
           <div class="kv">
-            <span class="kv-key">Name</span><span class="kv-val">{{ user()?.fullName }}</span>
+            <span class="kv-key">{{ t('dealerSettings.name') }}</span><span class="kv-val">{{ user()?.fullName }}</span>
           </div>
           <div class="kv">
-            <span class="kv-key">Email</span><span class="kv-val">{{ user()?.email }}</span>
+            <span class="kv-key">{{ t('dealerSettings.email') }}</span><span class="kv-val">{{ user()?.email }}</span>
           </div>
           <div class="kv">
-            <span class="kv-key">Role</span><span class="kv-val">{{ role() }}</span>
+            <span class="kv-key">{{ t('common.role') }}</span><span class="kv-val">{{ role() }}</span>
           </div>
           @if (dealer(); as d) {
             <div class="kv">
-              <span class="kv-key">Dealership</span><span class="kv-val">{{ d.businessName }}</span>
+              <span class="kv-key">{{ t('dealerSettings.dealership') }}</span><span class="kv-val">{{ d.businessName }}</span>
             </div>
           }
           <div class="field-hint">
-            Name and email are changed by the platform on request, so they always match your licence
-            and your sign-in.
+            {{ t('dealerSettings.nameAndEmailAre') }}
           </div>
         </div>
       </section>
 
       <section class="sect">
         <div class="sect-h">
-          <span class="sect-t">Change password</span
-          ><span class="sect-hint">Signs out every other session</span>
+          <span class="sect-t">{{ t('common.changePassword') }}</span
+          ><span class="sect-hint">{{ t('common.signsOutEveryOther') }}</span>
         </div>
         <div class="sect-pad stack stack-10">
           @if (problem(); as message) {
@@ -50,7 +49,7 @@
             </div>
           }
           <div class="field">
-            <label for="pw-current">Current password</label>
+            <label for="pw-current">{{ t('common.currentPassword') }}</label>
             <input
               id="pw-current"
               class="input"
@@ -61,7 +60,7 @@
             />
           </div>
           <div class="field">
-            <label for="pw-new">New password</label>
+            <label for="pw-new">{{ t('common.newPassword') }}</label>
             <input
               id="pw-new"
               class="input"
@@ -70,10 +69,10 @@
               [value]="next()"
               (input)="next.set(value($event))"
             />
-            <div class="field-hint">Changing it signs you out everywhere else.</div>
+            <div class="field-hint">{{ t('common.changingItSignsYou') }}</div>
           </div>
           <div class="field">
-            <label for="pw-confirm">Confirm new password</label>
+            <label for="pw-confirm">{{ t('common.confirmNewPassword') }}</label>
             <input
               id="pw-confirm"
               class="input"
@@ -83,7 +82,7 @@
               (input)="confirm.set(value($event))"
             />
             @if (mismatch()) {
-              <div class="field-error">The two passwords do not match.</div>
+              <div class="field-error">{{ t('common.theTwoPasswordsDo') }}</div>
             }
           </div>
           <button
@@ -99,7 +98,7 @@
     </div>
 
     <section class="sect">
-      <div class="sect-h"><span class="sect-t">Not live yet</span></div>
+      <div class="sect-h"><span class="sect-t">{{ t('dealerSettings.notLiveYet') }}</span></div>
       <div class="sect-pad stack stack-10">
         @for (item of notLive; track item.title) {
           <div class="toggle-card is-off">
@@ -107,7 +106,7 @@
               <div class="toggle-title">{{ item.title }}</div>
               <div class="toggle-desc">{{ item.body }}</div>
             </div>
-            <span class="pill s-dim">Not live</span>
+            <span class="pill s-dim">{{ t('dealerSettings.notLive') }}</span>
           </div>
         }
       </div>

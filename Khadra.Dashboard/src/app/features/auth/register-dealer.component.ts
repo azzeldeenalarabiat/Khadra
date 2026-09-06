@@ -3,6 +3,9 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -21,9 +24,10 @@ import { IconComponent } from '../../shared/icon/icon.component';
   selector: 'kh-register-dealer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './register-dealer.component.html',
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent],
 })
 export class RegisterDealerComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly http = inject(HttpClient);
 
   protected readonly fullName = signal('');
@@ -79,7 +83,7 @@ export class RegisterDealerComponent {
       this.registered.set(created.email);
       this.emailSent.set(created.verificationEmailSent);
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.busy.set(false);
     }
@@ -93,27 +97,32 @@ export class RegisterDealerComponent {
  * registration form has to say the address is taken or the person cannot proceed, whereas sign-in
  * saying it would hand an attacker a list of who holds an account.
  */
-function describe(error: unknown): string {
+type Translate = (key: TranslationKey) => string;
+
+function describe(error: unknown, t: Translate): string {
   if (!(error instanceof HttpErrorResponse)) {
-    return 'The service did not respond. Nothing was created; try again shortly.';
+    return t('auth.register.err.noResponse');
   }
 
   const code: string | undefined = error.error?.code;
   switch (code) {
     case 'auth.email_taken':
-      return 'An account already exists for this email address. Sign in instead, or use another address.';
+      return t('auth.register.err.emailTaken');
     case 'auth.phone_taken':
-      return 'An account already exists for this phone number.';
+      return t('auth.register.err.phoneTaken');
     case 'auth.invalid_phone':
-      return 'Enter a Jordanian mobile number, as 07XXXXXXXX or +9627XXXXXXXX.';
+      return t('auth.register.err.invalidPhone');
     default:
       break;
   }
 
   if (error.status === 429) {
-    return 'Too many attempts from this network. Wait a few minutes before trying again.';
+    return t('auth.register.err.rateLimited');
   }
   // A validation failure carries its own reason AND the configured figure behind it — the password
   // minimum, the name bounds — so the server's title beats anything invented here.
-  return error.error?.title ?? 'The details were rejected. Check them and try again.';
+  // The server's own title carries the configured figure behind the rule -- the password minimum,
+  // the name bounds -- so it beats anything invented here. It is still English until the API
+  // negotiates a language; see the checklist.
+  return error.error?.title ?? t('auth.register.err.rejected');
 }

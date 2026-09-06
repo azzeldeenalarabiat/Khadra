@@ -8,6 +8,7 @@ import { AdminCustomersService } from '../../core/services/admin-customers.servi
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * One customer: their account, what they have on file, and their history with the platform.
@@ -25,6 +26,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class CustomerProfileComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminCustomersService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -108,21 +110,21 @@ export class CustomerProfileComponent {
         tone: 'bad',
         danger: true,
         title: `Suspend ${customer.fullName}?`,
-        body: 'They are signed out of every device immediately and cannot book again until the account is reactivated. Bookings already made are not cancelled by this.',
+        body: this.t('customerProfile.theyAreSignedOut'),
         // Pre-launch item 18: the audit table is append-only and can never be erased, so an admin
         // must not type identity into a field that outlives every request to remove it.
-        note: 'The reason is recorded permanently in the audit log. Do not include personal details.',
+        note: this.t('customerProfile.theReasonIsRecorded'),
         fields: [
-          { label: 'Reason', type: 'text', placeholder: 'Why is this account being suspended?' },
+          { name: 'reason', label: 'Reason', type: 'text', placeholder: this.t('customerProfile.whyIsThisAccount') },
         ],
-        confirm: 'Suspend account',
-        result: { title: 'Account suspended', body: '', tone: 'bad' },
+        confirm: this.t('customerProfile.suspendAccount'),
+        result: { title: this.t('customerProfile.accountSuspended'), body: '', tone: 'bad' },
       },
       async (values) => {
-        await this.service.suspend(customer.userId, values['Reason'] ?? '');
+        await this.service.suspend(customer.userId, values['reason'] ?? '');
         this.service.refresh();
       },
-      { title: 'Account suspended', body: 'Their sessions ended immediately.' },
+      { title: this.t('customerProfile.accountSuspended'), body: this.t('customerProfile.theirSessionsEndedImmediately') },
     );
   }
 
@@ -134,15 +136,15 @@ export class CustomerProfileComponent {
         icon: 'check-circle',
         tone: 'ok',
         title: `Reactivate ${customer.fullName}?`,
-        body: 'They can sign in and book again straight away. Their verification state is unchanged.',
-        confirm: 'Reactivate account',
-        result: { title: 'Account reactivated', body: '', tone: 'ok' },
+        body: this.t('customerProfile.theyCanSignIn'),
+        confirm: this.t('customerProfile.reactivateAccount'),
+        result: { title: this.t('customerProfile.accountReactivated'), body: '', tone: 'ok' },
       },
       async () => {
         await this.service.reactivate(customer.userId);
         this.service.refresh();
       },
-      { title: 'Account reactivated', body: '' },
+      { title: this.t('customerProfile.accountReactivated'), body: '' },
     );
   }
 

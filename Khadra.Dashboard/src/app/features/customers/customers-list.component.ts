@@ -5,6 +5,7 @@ import { CustomerListItem } from '../../core/models/customers.api';
 import { AdminCustomersService } from '../../core/services/admin-customers.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /** A filter chip and the count behind it, both answered by the server. */
 type Chip = { readonly label: string; readonly key: 'all' | 'active' | 'suspended' | 'unverified' };
@@ -23,6 +24,7 @@ type Chip = { readonly label: string; readonly key: 'all' | 'active' | 'suspende
   imports: [RouterLink, IconComponent],
 })
 export class CustomersListComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminCustomersService);
 
   protected readonly resource = this.service.list;

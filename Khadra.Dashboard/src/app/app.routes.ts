@@ -1,7 +1,12 @@
 import { Routes } from '@angular/router';
 import { AdminShellComponent } from './layout/admin-shell.component';
 import { adminSessionGuard } from './core/guards/admin-session.guard';
-import { adminOnlyGuard, dealerStaffGuard } from './core/guards/role.guards';
+import {
+  adminOnlyGuard,
+  dealerEmployeeGuard,
+  dealerOwnerGuard,
+  dealerStaffGuard,
+} from './core/guards/role.guards';
 
 /**
  * Console routes.
@@ -341,9 +346,13 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
           },
+          // The two forms an employee may open but never submit: every vehicle write is owner-only
+          // (`ApprovedDealer`), and a role failure answers with a bodiless 403 that no screen can
+          // explain. Guarded so the trap is never entered, rather than sprung at the end of it.
           {
             path: 'fleet/new',
             title: 'Add vehicle · Khadra',
+            canActivate: [dealerOwnerGuard],
             loadComponent: () =>
               import('./features/fleet/vehicle-wizard.component').then(
                 (m) => m.VehicleWizardComponent,
@@ -360,8 +369,98 @@ export const routes: Routes = [
           {
             path: 'fleet/:vehicleId/edit',
             title: 'Edit vehicle · Khadra',
+            canActivate: [dealerOwnerGuard],
             loadComponent: () =>
               import('./features/fleet/car-form.component').then((m) => m.CarFormComponent),
+          },
+        ],
+      },
+
+      // ── The Employee console (design: Employee Console.dc.html).
+      //
+      // Its own tree, not a filtered view of /dealer. An employee's day is handovers, so the screens
+      // are arranged around those: the bookings they answer, the fleet they hand over, the one
+      // read-only page about the business, and their own account. It sits behind the same gate as
+      // the dealer console, because a dealership that cannot trade closes for its staff too.
+      {
+        path: 'employee',
+        canActivateChild: [dealerEmployeeGuard],
+        loadComponent: () =>
+          import('./features/dealer/dealer-gate.component').then((m) => m.DealerGateComponent),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+          {
+            path: 'dashboard',
+            title: 'Dashboard · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-dashboard.component').then(
+                (m) => m.EmployeeDashboardComponent,
+              ),
+          },
+          // The bookings screens are shared with the dealer console on purpose: they are the same
+          // bookings, the same decisions and the same API, and an employee is a first-class actor on
+          // all of it (spec 4.2). Forking them would be two copies of the console's hardest screen.
+          {
+            path: 'bookings',
+            title: 'Bookings · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-bookings.component').then(
+                (m) => m.DealerBookingsComponent,
+              ),
+          },
+          {
+            path: 'bookings/:bookingId',
+            title: 'Booking details · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/booking-detail.component').then(
+                (m) => m.DealerBookingDetailComponent,
+              ),
+          },
+          {
+            path: 'disputes/:ticketId',
+            title: 'Dispute · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-dispute.component').then(
+                (m) => m.DealerDisputeComponent,
+              ),
+          },
+          {
+            path: 'fleet',
+            title: 'Fleet · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
+          },
+          {
+            path: 'fleet/:vehicleId',
+            title: 'Vehicle · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/vehicle-detail.component').then(
+                (m) => m.VehicleDetailComponent,
+              ),
+          },
+          {
+            path: 'business',
+            title: 'My business · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-business.component').then(
+                (m) => m.EmployeeBusinessComponent,
+              ),
+          },
+          {
+            path: 'notifications',
+            title: 'Notifications · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-notifications.component').then(
+                (m) => m.EmployeeNotificationsComponent,
+              ),
+          },
+          {
+            path: 'settings',
+            title: 'Settings · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-settings.component').then(
+                (m) => m.EmployeeSettingsComponent,
+              ),
           },
         ],
       },

@@ -1,0 +1,102 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('employeeNotifications.notifications') }}</h1>
+      <div class="page-sub">
+        @if (unread() > 0) {
+          {{ unread() }} {{ t('employeeNotifications.unreadWhatHappenedAt') }}
+        } @else {
+          {{ t('employeeNotifications.whatHappenedAtYour') }}
+        }
+      </div>
+    </div>
+    <div class="dc-head-actions">
+      <button
+        type="button"
+        class="btn btn-secondary btn-md"
+        [disabled]="busy() || unread() === 0"
+        [title]="unread() === 0 ? 'Nothing unread' : ''"
+        (click)="markAllRead()"
+      >
+        {{ busy() ? 'Marking…' : 'Mark all read' }}
+      </button>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('employeeNotifications.couldntLoadYourNotifications') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="resource.reload()">
+            {{ t('common.retry') }}
+          </button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading() && items().length === 0) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else if (items().length === 0) {
+    <section class="sect">
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="bell" /></div>
+        <div class="state-title">{{ t('employeeNotifications.nothingYet') }}</div>
+        <div class="state-text">
+          {{ t('employeeNotifications.whenAColleagueAnswers') }}
+        </div>
+        <!-- Said plainly rather than left to be discovered: some of what a notification screen
+             usually carries has no source on this platform yet. -->
+        <div class="state-text">
+          {{ t('employeeNotifications.aCustomersRequestArriving') }}
+        </div>
+        <div class="state-actions">
+          <a class="btn btn-secondary btn-sm" routerLink="/employee/dashboard"
+            >{{ t('employeeNotifications.goToTheDashboard') }}</a
+          >
+        </div>
+      </div>
+    </section>
+  } @else {
+    <section class="sect sect-clip">
+      @for (item of items(); track item.notificationId) {
+        <div class="queue-row" [class]="'s-' + tone(item)" [class.is-unread]="!item.isRead">
+          <div class="queue-rail"></div>
+          <div class="queue-body">
+            <div class="row row-gap-8">
+              <span class="pill" [class]="'s-' + tone(item)">{{ label(item) }}</span>
+              @if (item.subjectReference) {
+                <span class="queue-entity">{{ item.subjectReference }}</span>
+              }
+              <span class="queue-entity push">{{ ago(item.occurredAt) }}</span>
+              @if (!item.isRead) {
+                <span class="unread-dot" [attr.aria-label]="t('employeeNotifications.unread')"></span>
+              }
+            </div>
+            <div class="queue-title">
+              <kh-icon [name]="icon(item)" />
+              {{ describe(item) }}
+            </div>
+          </div>
+          <div class="queue-side">
+            @if (routeFor(item); as route) {
+              <a class="btn btn-secondary btn-sm" [routerLink]="route" (click)="open(item)">
+                {{ t('employeeNotifications.open') }}
+              </a>
+            } @else if (!item.isRead) {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="open(item)">
+                {{ t('employeeNotifications.markRead') }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </section>
+    <div class="page-sub">{{ t('employeeNotifications.showing') }} {{ items().length }} of {{ total() }}.</div>
+  }
+</div>
