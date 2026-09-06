@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 
@@ -69,7 +70,10 @@ public sealed record DealerProfileDto(
             dealer.Location.Latitude,
             dealer.Location.Longitude,
             [.. dealer.OperatingHours.Days.Select(DayScheduleDto.From)],
-            new DeliverySettingsDto(dealer.Delivery.IsEnabled, dealer.Delivery.RadiusKm),
+            new DeliverySettingsDto(
+                dealer.Delivery.IsEnabled,
+                dealer.Delivery.RadiusKm,
+                MoneyDto.FromOptional(dealer.Delivery.Fee)),
             PublicImage(dealer.LogoStorageKey),
             PublicImage(dealer.CoverStorageKey),
             dealer.Employees.Count(employee => employee.IsActive),
@@ -98,4 +102,8 @@ public sealed record DayScheduleDto(string Day, bool IsClosed, string? OpensAt, 
     }
 }
 
-public sealed record DeliverySettingsDto(bool IsEnabled, decimal RadiusKm);
+/// <param name="Fee">
+/// What this gallery charges to deliver, null exactly when delivery is off. Each gallery sets its
+/// own; there is no platform figure behind it.
+/// </param>
+public sealed record DeliverySettingsDto(bool IsEnabled, decimal RadiusKm, MoneyDto? Fee);

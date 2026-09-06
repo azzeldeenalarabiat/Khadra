@@ -1,7 +1,6 @@
 import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed } from '@angular/core';
 import { KeyValue } from '../../core/models/console.models';
-import { Money } from '../../core/models/fleet.api';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 
@@ -9,7 +8,6 @@ interface BusinessRules {
   readonly commissionPercent: number;
   readonly depositPercent: number;
   readonly noShowTimeoutHours: number;
-  readonly deliveryFee: Money;
   readonly dealerNonDeliveryPenaltyMinPercent: number;
   readonly dealerNonDeliveryPenaltyMaxPercent: number;
   readonly freeCancellationWindowMinutes: number;
@@ -66,7 +64,8 @@ export class SettingsComponent {
     return [
       { k: 'Platform commission', v: `${rules.commissionPercent}%` },
       { k: 'Booking deposit', v: `${rules.depositPercent}% of the rental total` },
-      { k: 'Delivery fee', v: `${rules.deliveryFee.amount} ${rules.deliveryFee.currency}` },
+      // No delivery fee row: it is no longer a platform number. Each gallery sets its own on its
+      // Delivery page, so there is no single figure this screen could honestly print.
     ];
   });
 

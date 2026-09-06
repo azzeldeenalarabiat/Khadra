@@ -28,7 +28,8 @@ paths:
 - Email, phone, money, geo-coordinates, names, date ranges are value objects.
 - Aggregates return `Result` (CSharpFunctionalExtensions) for expected rule violations; throw `DomainException` only for programming errors / impossible states.
 - Soft delete: aggregates that users can "delete" implement `ISoftDeletable`. Never hard-delete.
-- Business numbers (commission %, deposit %, no-show hours, delivery fee, penalties, cancellation window, SLA) are NEVER constants. They flow in through `IBusinessRulesProvider` / policy parameters.
+- Business numbers (commission %, deposit %, no-show hours, penalties, cancellation window, SLA) are NEVER constants. They flow in through `IBusinessRulesProvider` / policy parameters.
+- The delivery fee is the exception, and deliberately so: it belongs to the dealership (`DeliverySettings.Fee`), not the platform. See CLAUDE.md.
 
 ## Application (MUST)
 - One folder per use case: `<UseCase>Command.cs` or `<UseCase>Query.cs` plus `<UseCase>Handler.cs` implementing `ICommand<T>` / `IQuery<T>` (MediatR-backed).

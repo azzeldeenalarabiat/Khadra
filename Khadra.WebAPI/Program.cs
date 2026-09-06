@@ -3,12 +3,13 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Khadra.Application;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Ports;
+using Khadra.Application.IdentityAccess.AdminUsers;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Infrastructure;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Persistence;
-using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Infrastructure.Security;
 using Khadra.WebAPI;
 using Khadra.WebAPI.Security;
@@ -189,17 +190,35 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference(options => options.WithTitle("Khadra API")).AllowAnonymous();
 
+    // Nothing is seeded. There used to be a DevelopmentSeeder here that invented administrators,
+    // galleries, customers and bookings so the console had something to show; it is gone. Fabricated
+    // accounts are not a development convenience — a seeded administrator can approve a real gallery,
+    // its password was a working credential in source, and it counted towards the guard that is
+    // supposed to stop the last real administrator being deactivated. Every account and every
+    // gallery now arrives the way a real one does: through the screens.
     if (app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value.AutoMigrate)
     {
         using var scope = app.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<KhadraDbContext>().Database.MigrateAsync();
-
-        // Development only, and a no-op once the database holds users. An empty admin console cannot
-        // be reviewed: every figure reads zero and every query looks like it works.
-        if (app.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value.SeedDevelopmentData)
-            await scope.ServiceProvider.SeedDevelopmentDataAsync();
     }
 }
+
+// Every environment, not just Development, and after any migration: this is the only way a platform
+// that has never had an administrator gets one, because inviting an administrator requires being
+// one. A no-op unless Admin:Bootstrap is configured AND no administrator has ever existed.
+using (var bootstrapScope = app.Services.CreateScope())
+{
+    await bootstrapScope.ServiceProvider
+        .GetRequiredService<AdminBootstrapper>()
+        .EnsureAsync();
+}
+
+// Says, on every start, whether mail will actually be delivered.
+//
+// Registration, the administrator invitation and every password reset depend on it, and until now
+// the only way to find out it was misconfigured was for someone to register and wait at an inbox
+// nothing was coming to. Never fatal: a mail outage must not stop the API serving everything else.
+await MailStartupCheck.ReportAsync(app.Services);
 
 app.UseHttpsRedirection();
 app.UseCors();

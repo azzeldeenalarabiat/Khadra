@@ -3,7 +3,6 @@ using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
-using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Tests.Support;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -142,29 +141,34 @@ public sealed class DocumentStorageTests : IDisposable
     }
 
     /// <summary>
-    /// Every dealer document the development seeder writes has to be openable.
+    /// Every licence document a gallery application stores has to be openable again.
     ///
-    /// It was not: the seeder attached keys like "dealers/{guid}/CommercialRegistration.pdf", and
-    /// KeyPattern's stem is `[0-9a-z-]+`, which is case-SENSITIVE. The key matched nothing,
+    /// Once it was not. Keys of the shape "dealers/{guid}/CommercialRegistration.pdf" were written,
+    /// and KeyPattern's stem is `[0-9a-z-]+`, which is case-SENSITIVE: the key matched nothing,
     /// ResolveWithinRoot threw, and every "Open secure preview" on the Admin's review screen answered
     /// 500 -- on the one screen whose whole purpose is reading those documents.
+    ///
+    /// Driven through SaveAsync, the call SubmitDealerProfileHandler actually makes, so the key under
+    /// test is the one the platform will really hold. The uploaded file name is deliberately hostile:
+    /// keys are generated, never derived from what the applicant called their scan.
     /// </summary>
     [Fact]
-    public async Task Every_seeded_dealer_document_key_is_one_storage_will_serve()
+    public async Task Every_stored_dealer_document_key_is_one_storage_will_serve()
     {
         var storage = Storage();
         var dealerId = Id.New();
 
-        // The seeder's OWN key builder, over every required document type -- not a hand-typed list,
-        // which would keep passing after a fourth type or a rename put the seeder back out of step
-        // with the storage layer.
+        // Over every required type rather than a hand-typed list, so a fourth document or a rename
+        // cannot leave this passing while the real thing is broken.
         foreach (var type in DealerDocumentType.Required)
         {
-            var key = DevelopmentSeeder.DocumentKey(dealerId, type);
+            var stored = await storage.SaveAsync(
+                $"dealers/{dealerId.Value}",
+                $"{type.Name} SCAN (final).PDF",
+                "application/pdf",
+                new MemoryStream([1, 2, 3]));
 
-            await storage.SaveAtAsync(key, "application/pdf", new MemoryStream([1, 2, 3]));
-
-            await using var read = await storage.OpenAsync(key);
+            await using var read = await storage.OpenAsync(stored.StorageKey);
             Assert.NotNull(read);
         }
     }

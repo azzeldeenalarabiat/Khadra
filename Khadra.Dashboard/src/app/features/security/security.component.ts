@@ -64,7 +64,7 @@ export class SecurityComponent {
         body: 'Every other session is signed out when the password changes. The one you are using now stays.',
         fields: [
           { label: 'Current password', type: 'password', placeholder: '' },
-          { label: 'New password', type: 'password', placeholder: 'At least 8 characters' },
+          { label: 'New password', type: 'password', placeholder: 'Your new password' },
         ],
         confirm: 'Change password',
         result: { title: 'Password changed', body: '', tone: 'ok' },

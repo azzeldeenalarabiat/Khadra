@@ -20,7 +20,6 @@ using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Notifications;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
-using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Infrastructure.PlatformSettings;
 using Khadra.Infrastructure.Reporting;
 using Khadra.Infrastructure.Security;
@@ -72,6 +71,9 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddOptions<DatabaseOptions>()
             .Bind(configuration.GetSection(DatabaseOptions.SectionName));
+        // No validation: an empty section is the normal state once the platform has an administrator.
+        services.AddOptions<AdminBootstrapOptions>()
+            .Bind(configuration.GetSection(AdminBootstrapOptions.SectionName));
         services.AddOptions<DocumentStorageOptions>()
             .Bind(configuration.GetSection(DocumentStorageOptions.SectionName))
             .ValidateDataAnnotations()
@@ -127,7 +129,6 @@ public static class DependencyInjection
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
-        services.AddScoped<DevelopmentSeeder>();
 
         AddReporting(services);
     }
@@ -169,6 +170,7 @@ public static class DependencyInjection
         services.AddSingleton<IOpaqueTokenService, OpaqueTokenService>();
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
         services.AddSingleton<IAuthPolicySettings, AuthPolicySettings>();
+        services.AddSingleton<IAdminBootstrapSettings, AdminBootstrapSettings>();
         services.AddSingleton<IAccessTokenSettings, AccessTokenSettings>();
         services.AddSingleton<IDocumentPolicySettings, DocumentPolicySettings>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
@@ -178,11 +180,31 @@ public static class DependencyInjection
 
     private static void AddNotifications(IServiceCollection services, IConfiguration configuration)
     {
+        // Three transports, one switch. `Resend` talks HTTPS and needs only an API key; `Smtp` covers
+        // Gmail and any relay that speaks it (Brevo: smtp-relay.brevo.com:587, username = your login,
+        // password = an SMTP key), so a second provider needs no code, only configuration.
         var provider = configuration[$"{EmailOptions.SectionName}:Provider"] ?? EmailOptions.LoggingProvider;
-        if (string.Equals(provider, EmailOptions.SmtpProvider, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(provider, EmailOptions.ResendProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient(ResendEmailSender.HttpClientName, client =>
+            {
+                client.BaseAddress = new Uri("https://api.resend.com/");
+                // A registration waits on this call, so it fails fast rather than hanging the form.
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
+            services.AddSingleton<IEmailSender, ResendEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, ResendTransportProbe>();
+        }
+        else if (string.Equals(provider, EmailOptions.SmtpProvider, StringComparison.OrdinalIgnoreCase))
+        {
             services.AddSingleton<IEmailSender, SmtpEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, SmtpTransportProbe>();
+        }
         else
+        {
             services.AddSingleton<IEmailSender, LoggingEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, LoggingTransportProbe>();
+        }
 
         services.AddSingleton<IAuthEmailComposer, AuthEmailComposer>();
     }

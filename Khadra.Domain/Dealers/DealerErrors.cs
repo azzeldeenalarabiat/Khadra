@@ -13,6 +13,10 @@ public static class DealerErrors
     public static readonly Error InvalidDeliveryRadius =
         Error.Validation("dealer.invalid_delivery_radius", "The delivery radius must be greater than 0 and at most 200 km.");
 
+    // A ceiling, not a price: what a delivery is worth is the gallery’s decision.
+    public static readonly Error InvalidDeliveryFee =
+        Error.Validation("dealer.invalid_delivery_fee", "The delivery fee must be between 0 and 1000 JOD.");
+
     public static readonly Error InvalidOperatingHours =
         Error.Validation("dealer.invalid_operating_hours", "Operating hours must cover all seven days, and closing time must be after opening time.");
 

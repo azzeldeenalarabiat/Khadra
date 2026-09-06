@@ -5,6 +5,69 @@
       <div class="skel-row"><div class="skel" [style.width.%]="60"></div></div>
     </div>
   </div>
+} @else if (notRegistered() && isOwner() && applying()) {
+  <router-outlet />
+} @else if (notRegistered() && isOwner()) {
+  <!-- Step one is done, step two has not started. Not an error, and not a locked console: there is
+       nothing yet to lock. The only thing to offer is the form that creates the dealership. -->
+  <div class="locked-wrap">
+    <div class="sect locked-card">
+      <div class="locked-head s-accent">
+        <div class="locked-icon"><kh-icon name="storefront" /></div>
+        <div>
+          <div class="locked-title">Tell us about your gallery</div>
+          <span class="pill s-accent">Not submitted</span>
+        </div>
+      </div>
+      <div class="locked-body">
+        Your owner account is ready. Before you can list cars, the platform has to check that the
+        gallery is a licensed rental office — so we need its details and its papers.
+      </div>
+      <div class="locked-points">
+        <span class="k">What you will need</span>
+        <div class="locked-point s-accent">
+          <kh-icon name="identification-card" />
+          <span>The gallery's name and commercial registration number.</span>
+        </div>
+        <div class="locked-point s-accent">
+          <kh-icon name="map-pin" />
+          <span>Where it is, and the hours it opens.</span>
+        </div>
+        <div class="locked-point s-accent">
+          <kh-icon name="file-lock" />
+          <span>
+            Three documents: the commercial registration, proof of green-plate vehicle registration,
+            and your own ID.
+          </span>
+        </div>
+      </div>
+      <div class="row row-gap-8">
+        <a class="btn btn-primary btn-md" routerLink="/dealer/apply">Submit my gallery</a>
+        <a class="btn btn-secondary btn-md" routerLink="/dealer/settings">Account settings</a>
+      </div>
+    </div>
+  </div>
+} @else if (notRegistered()) {
+  <!-- The same 404, read for an employee: spec 4.2's "their login stops working immediately". They
+       have no gallery to file, so there is nothing to offer them but the explanation. -->
+  <div class="locked-wrap">
+    <div class="sect locked-card">
+      <div class="locked-head s-warn">
+        <div class="locked-icon"><kh-icon name="user-minus" /></div>
+        <div>
+          <div class="locked-title">You are not part of a dealership</div>
+          <span class="pill s-warn">No access</span>
+        </div>
+      </div>
+      <div class="locked-body">
+        No dealership on the platform currently lists you as a member of staff. If you were expecting
+        access, the owner of the gallery you work for can restore it from their Employees screen.
+      </div>
+      <div class="row row-gap-8">
+        <a class="btn btn-secondary btn-md" routerLink="/dealer/settings">Account settings</a>
+      </div>
+    </div>
+  </div>
 } @else if (unreachable()) {
   <!-- The standing could not be read. Showing the console here would be a guess, and every action
        in it would fail server-side anyway; this says which call failed and offers it again. -->

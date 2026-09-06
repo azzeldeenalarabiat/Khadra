@@ -35,10 +35,9 @@ export class AcceptInvitationComponent {
   protected async submit(): Promise<void> {
     if (this.busy()) return;
     const password = this.password();
-    if (password.length < 8) {
-      this.problem.set('Use at least 8 characters, including a letter and a digit.');
-      return;
-    }
+    // Length is not checked here. PasswordPolicy runs against the CONFIGURED minimum and its
+    // refusal already names the figure; a literal 8 in the browser would state a rule the platform
+    // may not be running and would silently stop matching the day it changes.
 
     this.busy.set(true);
     this.problem.set(null);

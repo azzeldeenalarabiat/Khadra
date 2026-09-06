@@ -173,7 +173,7 @@ export class DealerBookingDetailComponent {
       },
       {
         k: 'Delivery fee',
-        v: `${b.pricing.deliveryFee.amount} ${b.pricing.deliveryFee.currency} · platform-wide`,
+        v: `${b.pricing.deliveryFee.amount} ${b.pricing.deliveryFee.currency} · frozen on this booking`,
       },
     ];
   });
@@ -194,7 +194,7 @@ export class DealerBookingDetailComponent {
         k: `Rental · ${b.pricing.days} × ${b.pricing.dailyRate.amount} ${cur}`,
         v: `${b.pricing.rentalTotal.amount}`,
       },
-      { k: 'Delivery fee (platform)', v: `${b.pricing.deliveryFee.amount}` },
+      { k: 'Delivery fee (yours)', v: `${b.pricing.deliveryFee.amount}` },
       { k: 'Security deposit (held per car)', v: `${b.pricing.securityDeposit.amount}` },
       {
         k: `Deposit paid by card (${b.pricing.depositPercent}%)`,

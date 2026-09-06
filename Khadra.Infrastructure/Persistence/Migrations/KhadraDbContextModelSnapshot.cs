@@ -464,7 +464,9 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_dealers_commercial_registration");
 
                     b.HasIndex("OwnerUserId")
-                        .HasDatabaseName("ix_dealers_owner_user_id");
+                        .IsUnique()
+                        .HasDatabaseName("ix_dealers_owner_user_id")
+                        .HasFilter("is_deleted = false");
 
                     b.HasIndex("ReviewDueAt")
                         .HasDatabaseName("ix_dealers_review_due_at");
@@ -1809,6 +1811,34 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                             b1.WithOwner()
                                 .HasForeignKey("DealerId")
                                 .HasConstraintName("fk_dealers_dealers_id");
+
+                            b1.OwnsOne("Khadra.Domain.Common.Money", "Fee", b2 =>
+                                {
+                                    b2.Property<Guid>("DeliverySettingsDealerId")
+                                        .HasColumnType("uuid")
+                                        .HasColumnName("id");
+
+                                    b2.Property<decimal>("Amount")
+                                        .HasPrecision(18, 3)
+                                        .HasColumnType("numeric(18,3)")
+                                        .HasColumnName("delivery_fee_amount");
+
+                                    b2.Property<string>("CurrencyCode")
+                                        .IsRequired()
+                                        .HasMaxLength(3)
+                                        .HasColumnType("character varying(3)")
+                                        .HasColumnName("delivery_fee_currency");
+
+                                    b2.HasKey("DeliverySettingsDealerId");
+
+                                    b2.ToTable("dealers");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("DeliverySettingsDealerId")
+                                        .HasConstraintName("fk_dealers_dealers_id");
+                                });
+
+                            b1.Navigation("Fee");
                         });
 
                     b.Navigation("Delivery")

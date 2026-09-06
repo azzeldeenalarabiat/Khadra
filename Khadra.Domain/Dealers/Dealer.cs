@@ -202,21 +202,28 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         SuspensionReason = null;
     }
 
-    public UnitResult<Error> EnableDelivery(decimal radiusKm, DateTimeOffset now)
+    /// <summary>
+    /// Switches delivery on, over a radius, at a price this gallery sets (spec 4.4).
+    ///
+    /// The fee is required, not optional with a fallback. There is no platform figure to fall back
+    /// to any more, and a delivery offered at a price nobody stated is exactly the invented number
+    /// this change exists to remove.
+    /// </summary>
+    public UnitResult<Error> EnableDelivery(decimal radiusKm, Money fee, DateTimeOffset now)
     {
-        var settings = DeliverySettings.Enabled(radiusKm);
+        var settings = DeliverySettings.Enabled(radiusKm, fee);
         if (settings.IsFailure)
             return UnitResult.Failure(settings.Error);
 
         Delivery = settings.Value;
-        AddDomainEvent(new DealerDeliveryChanged(Id, true, Delivery.RadiusKm, now));
+        AddDomainEvent(new DealerDeliveryChanged(Id, true, Delivery.RadiusKm, Delivery.Fee, now));
         return UnitResult.Success<Error>();
     }
 
     public void DisableDelivery(DateTimeOffset now)
     {
         Delivery = DeliverySettings.Disabled;
-        AddDomainEvent(new DealerDeliveryChanged(Id, false, 0m, now));
+        AddDomainEvent(new DealerDeliveryChanged(Id, false, 0m, null, now));
     }
 
     // Spec 5.2: a delivery booking is only offered when the pin falls inside the dealer's radius.

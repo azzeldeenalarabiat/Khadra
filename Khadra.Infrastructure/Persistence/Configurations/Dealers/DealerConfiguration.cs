@@ -54,6 +54,17 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
             delivery.Property(settings => settings.IsEnabled).HasColumnName("delivery_enabled").IsRequired();
             delivery.Property(settings => settings.RadiusKm).HasColumnName("delivery_radius_km")
                 .HasPrecision(6, 2).IsRequired();
+            // The gallery’s own price for a delivery. Optional, because it exists exactly while
+            // delivery is on — a disabled dealership is not quoting anything. Mapped explicitly
+            // like every other Money on the platform: these are get-only properties, and anything
+            // left to convention is silently dropped.
+            delivery.OwnsOne(settings => settings.Fee, fee =>
+            {
+                fee.Property(value => value.Amount).HasColumnName("delivery_fee_amount")
+                    .HasPrecision(18, 3);
+                fee.Property(value => value.CurrencyCode).HasColumnName("delivery_fee_currency")
+                    .HasMaxLength(3);
+            });
         });
         entity.Navigation(dealer => dealer.Delivery).IsRequired();
 
@@ -73,7 +84,20 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
         entity.Metadata.FindNavigation(nameof(Dealer.Documents))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
-        entity.HasIndex(dealer => dealer.OwnerUserId);
+        // One live dealership per owner, enforced by the database and not only by the handler.
+        //
+        // SubmitDealerProfileHandler checks ExistsForOwnerAsync first, but a check and an insert in
+        // separate statements is a race: two clicks on the same 24 MB multipart, or the same form in
+        // two tabs, both pass the check and both insert. The damage is not a duplicate row — it is
+        // that GetByOwnerUserIdAsync uses SingleOrDefaultAsync, so from that moment every dealer
+        // request for that owner throws, and their console answers 500 for ever.
+        //
+        // Filtered on is_deleted, deliberately: the handler's check runs behind the soft-delete query
+        // filter, so an owner whose dealership was soft-deleted is allowed to apply again, and a
+        // total unique index would silently refuse them.
+        entity.HasIndex(dealer => dealer.OwnerUserId)
+            .IsUnique()
+            .HasFilter("is_deleted = false");
         entity.HasIndex(dealer => dealer.VerificationStatus);
         // The admin queue asks "which pending applications are past their promise" on every dashboard
         // load; this makes that an index scan rather than a table scan plus arithmetic.

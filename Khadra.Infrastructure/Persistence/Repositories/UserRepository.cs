@@ -35,6 +35,14 @@ internal sealed class UserRepository(KhadraDbContext context) : IUserRepository
             cancellationToken);
     }
 
+    // IgnoreQueryFilters, unlike the count above, and for the opposite reason: this asks whether the
+    // seat was EVER filled, so a soft-deleted administrator counts. See the interface for why.
+    public Task<bool> AnyAdminExistsAsync(CancellationToken cancellationToken = default)
+    {
+        var admin = UserRole.Admin;
+        return context.Users.IgnoreQueryFilters().AnyAsync(user => user.Role == admin, cancellationToken);
+    }
+
     public async Task AddAsync(User user, CancellationToken cancellationToken = default) =>
         await context.Users.AddAsync(user, cancellationToken);
 }

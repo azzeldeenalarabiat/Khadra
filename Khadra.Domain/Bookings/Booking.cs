@@ -93,6 +93,12 @@ public sealed class Booking : AggregateRoot
             return BookingErrors.DeliveryLocationRequired;
         if (pickupMethod == PickupMethod.SelfPickup && deliveryLocation is not null)
             return BookingErrors.DeliveryLocationNotAllowed;
+        // A customer collecting the car themselves is never charged for delivery. Worth stating here
+        // rather than trusting the caller: the fee is now each gallery's own figure, so the handler
+        // that creates a booking has to decide when it applies, and this is the aggregate refusing
+        // the one combination that can only be a mistake.
+        if (pickupMethod == PickupMethod.SelfPickup && !pricing.DeliveryFee.IsZero)
+            return BookingErrors.DeliveryFeeNotAllowed;
 
         var booking = new Booking(Id.New())
         {

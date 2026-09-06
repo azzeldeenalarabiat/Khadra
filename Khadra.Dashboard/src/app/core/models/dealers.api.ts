@@ -6,6 +6,8 @@
  * recomputing it in the browser is how one of them eventually gets forgotten.
  */
 
+import { Money } from './fleet.api';
+
 export interface PagedResult<T> {
   readonly items: readonly T[];
   readonly page: number;
@@ -78,6 +80,8 @@ export interface DaySchedule {
 export interface DeliverySettings {
   readonly isEnabled: boolean;
   readonly radiusKm: number;
+  /** The gallery’s own delivery price. Null exactly when delivery is off. */
+  readonly fee: Money | null;
 }
 
 /** Spec 7: a short-lived signed link, minted per request and never stored. */

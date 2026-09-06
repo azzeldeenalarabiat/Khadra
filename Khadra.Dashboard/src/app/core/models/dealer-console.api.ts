@@ -129,5 +129,9 @@ export interface DeliverySettingsView {
   readonly isEnabled: boolean;
   readonly radiusKm: number;
   readonly maxRadiusKm: number;
-  readonly platformDeliveryFee: Money;
+  /** This gallery’s own price for a delivery. Null exactly when delivery is off. */
+  readonly fee: Money | null;
+  /** The ceiling the server enforces, so the form can refuse what the server would. */
+  readonly maxFee: number;
+  readonly currencyCode: string;
 }

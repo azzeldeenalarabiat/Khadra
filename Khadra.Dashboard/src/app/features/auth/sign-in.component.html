@@ -18,6 +18,9 @@
         <div class="banner-body">
           <div class="banner-title">{{ problem.title }}</div>
           <div class="banner-text">{{ problem.text }}</div>
+          @if (problem.action; as action) {
+            <a class="auth-link" [routerLink]="action.route">{{ action.label }}</a>
+          }
         </div>
       </div>
     }
@@ -60,6 +63,11 @@
 
     <div class="auth-foot">
       <a class="auth-link" routerLink="/forgot-password">Forgot password?</a>
+    </div>
+
+    <!-- The only way onto the platform that does not start with someone else inviting you. -->
+    <div class="auth-foot">
+      <a class="auth-link" routerLink="/register">Run a rental office? Register your gallery</a>
     </div>
   </form>
 </div>

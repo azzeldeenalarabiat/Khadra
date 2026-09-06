@@ -20,7 +20,6 @@ internal static class TestBusinessRules
         CommissionPercent: 20m,
         DepositPercent: 20m,
         NoShowTimeoutHours: 8,
-        DeliveryFee: Money.Jod(10m),
         DealerNonDeliveryPenaltyMinPercent: 25m,
         DealerNonDeliveryPenaltyMaxPercent: 50m,
         FreeCancellationWindowMinutes: 60,

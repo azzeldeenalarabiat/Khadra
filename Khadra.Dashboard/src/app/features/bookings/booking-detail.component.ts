@@ -72,7 +72,9 @@ export class AdminBookingDetailComponent {
       { k: `Daily rate × ${pricing.days} days`, v: this.money(pricing.dailyRate) },
       { k: 'Rental total', v: this.money(pricing.rentalTotal) },
     ];
-    if (pricing.deliveryFee.amount > 0)
+    // Keyed on the pickup method, not the amount: 0 is now a real answer a gallery can give, and
+    // hiding the row would make free delivery indistinguishable from no delivery at all.
+    if (booking.pickupMethod === 'Delivery')
       rows.push({ k: 'Delivery fee', v: this.money(pricing.deliveryFee) });
     rows.push(
       { k: 'Total price', v: this.money(pricing.totalPrice) },

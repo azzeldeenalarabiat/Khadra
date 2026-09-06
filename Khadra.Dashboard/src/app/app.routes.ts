@@ -30,6 +30,14 @@ export const routes: Routes = [
     title: 'Sign in · Khadra Admin',
     loadComponent: () => import('./features/auth/sign-in.component').then((m) => m.SignInComponent),
   },
+  // Step one of spec 3.1. The only self-service account the console creates: administrators are
+  // invited by another administrator, employees by their owner, and customers register in the app.
+  {
+    path: 'register',
+    title: 'Register your gallery · Khadra',
+    loadComponent: () =>
+      import('./features/auth/register-dealer.component').then((m) => m.RegisterDealerComponent),
+  },
   {
     path: 'forgot-password',
     title: 'Reset your password · Khadra Admin',
@@ -41,6 +49,15 @@ export const routes: Routes = [
     title: 'Choose a new password · Khadra Admin',
     loadComponent: () =>
       import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent),
+  },
+  // Where a self-registered account proves its address: {base}/verify-email?token=. Without this
+  // route the emailed link fell into the console shell and the session guard bounced it to sign-in,
+  // which no self-registered account can pass — CanAuthenticate refuses an unverified address.
+  {
+    path: 'verify-email',
+    title: 'Verify your email · Khadra',
+    loadComponent: () =>
+      import('./features/auth/verify-email.component').then((m) => m.VerifyEmailComponent),
   },
   // The link an invited employee receives (spec 4.2): {base}/accept-invitation?token=
   {
@@ -214,6 +231,16 @@ export const routes: Routes = [
           import('./features/dealer/dealer-gate.component').then((m) => m.DealerGateComponent),
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+          // Spec 3.1 step two, and the one screen that belongs to an owner with no dealership yet.
+          // The gate lets this through while `GET /dealers/me` is answering dealer.not_registered.
+          {
+            path: 'apply',
+            title: 'Submit your gallery · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-apply.component').then(
+                (m) => m.DealerApplyComponent,
+              ),
+          },
           {
             path: 'dashboard',
             title: 'Dashboard · Khadra',

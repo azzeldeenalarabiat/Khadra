@@ -9,6 +9,8 @@ interface Notice {
   readonly tone: 's-bad' | 's-warn';
   readonly title: string;
   readonly text: string;
+  /** Where the reader can go to fix it, when there is somewhere. */
+  readonly action?: { readonly label: string; readonly route: string };
 }
 
 /**
@@ -94,6 +96,9 @@ function describe(failure: SignInFailure): Notice {
         tone: 's-warn',
         title: 'Verify your email address first',
         text: 'We sent a verification link when the account was created. Open it, then sign in.',
+        // The link may have expired or never arrived, and this is the only screen that can send
+        // another: no session exists to reach it any other way.
+        action: { label: 'Send a new link', route: '/verify-email' },
       };
 
     case 'rate-limited':

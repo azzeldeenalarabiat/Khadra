@@ -89,7 +89,7 @@ The same is true of the payment-expiry and no-show jobs.
 
 ### 5. Seeded vehicle photos are flat placeholders
 
-**Status:** open · **Raised:** 2026-09-03
+**Status:** closed · **Closed:** 2026-09-05 — the development seeder was deleted, so nothing fabricates this data any more.
 
 The development seeder writes a plain grey JPEG at every seeded car's image key so listings load
 without broken images. Before any demo to a real dealer, replace them with real photos or accept that
@@ -119,7 +119,7 @@ by hand for the location). None of them shows invented data.
 
 ### 8. Reseeding truncates the database by hand
 
-**Status:** open · **Raised:** 2026-09-03
+**Status:** closed · **Closed:** 2026-09-05 — the development seeder was deleted, so nothing fabricates this data any more.
 
 The seeder only runs on an empty `dealers` table, so applying seeder changes (the 2026-09-03 change
 that names the real dealer owner as the actor on seeded approvals, pickups and returns, and writes the
@@ -359,7 +359,7 @@ exists precisely to avoid a second source of truth.
 
 ### 23. The seeded audit entries are not derived from the aggregates they describe
 
-**Status:** open · **Raised:** 2026-09-04
+**Status:** closed · **Closed:** 2026-09-05 — the development seeder was deleted, so nothing fabricates this data any more.
 
 `DevelopmentSeeder` writes the aggregates and the audit rows from separate literals, so the two
 disagree: entries name actors and instants that the tickets and dealerships they refer to do not
@@ -440,7 +440,7 @@ document becomes verified. Then a signed link and the two review actions.
 
 ### 28. Seeded vehicles in an already-seeded database point at a car type that is not there
 
-**Status:** open · **Raised:** 2026-09-04 · Development data only
+**Status:** closed · **Closed:** 2026-09-05 — the development seeder was deleted, so nothing fabricates this data any more.
 
 `car_types` and `cities` ship empty; the seeder now writes one car type at the id every seeded
 vehicle carries, so a FRESH database is self-consistent. A database seeded before that migration has
@@ -480,3 +480,180 @@ There is also no address search. Geocoding is an XHR to a third party and the BF
 
 **To close:** a keyed tile provider or self-hosted tiles, with the key held server-side; and a
 decision on whether address search is wanted.
+
+---
+
+## Real account creation (2026-09-05)
+
+### 31. Registration is an anonymous oracle for both email and phone
+
+**Status:** open · **Raised:** 2026-09-05
+
+`POST /api/v1/auth/register` and `/register-dealer-owner` are anonymous, and both answer 409
+`auth.email_taken` or `auth.phone_taken`. A registration form has to say the address is already in
+use or the person cannot proceed, so this is a real trade-off rather than an oversight — but it
+lets anyone enumerate who holds an account. The phone case is worse than the email one: Jordanian
+mobile numbers are a small, dense space that can be walked exhaustively.
+
+Same class as item 9 (staff invitation), and the two should be closed together.
+
+**To close:** decide the policy once for every account-creating endpoint. The usual answer is to
+answer 202 uniformly and move the conflict into an email ("someone tried to register with your
+address"), which costs the applicant a round trip through their inbox.
+
+### 32. Rate limits are partitioned by the BFF's address in production
+
+**Status:** open · **Raised:** 2026-09-05
+
+The API partitions every rate limit by `ClientAddress(context)`, and `KnownProxies` is empty in
+`Khadra.WebAPI/appsettings.json`. In production every browser request arrives through the BFF, so
+they all share one partition: 10 registrations per minute **platform-wide**, and one abusive client
+exhausting the login policy locks every other user out of signing in for fifteen minutes.
+
+`docs/auth-and-sessions.md` already says to configure the trusted proxy; nothing enforces it, and
+nothing failed loudly when it was left empty.
+
+**To close:** set `KnownProxies` to the BFF's address in the production configuration, and fail
+startup outside Development when it is empty — a silent misconfiguration here is a denial of
+service that looks like the rate limiter working.
+
+### 33. The BFF's body limit is lower than the API's, and nothing keeps them in step
+
+**Status:** open · **Raised:** 2026-09-05
+
+`POST /api/v1/dealers` accepts 32 MiB (`[RequestSizeLimit]`) so a gallery can file three licence
+documents at the configured 8 MiB ceiling. The BFF in front of it runs on Kestrel's default
+30,000,000 bytes. Three 8 MiB documents plus the form fields is about 25.2 MB, so it fits today —
+and becomes a silent 413 from the proxy, before the API is ever reached, the moment
+`Documents:MaximumSizeBytes` is raised.
+
+**To close:** set the BFF's `MaxRequestBodySize` explicitly from the same figure the API derives its
+limit from, so raising one raises the other.
+
+### 34. The gallery application form states the document rules rather than reading them
+
+**Status:** open · **Raised:** 2026-09-05
+
+`dealer-apply.component.ts` holds the three required document types as a constant, and the template
+says "JPEG, PNG or PDF". All three are the server's: `DealerDocumentType.Required`,
+`Documents:AllowedContentTypes` and `Documents:MaximumSizeBytes`. The screen currently states no
+figure — no size, no count — so it cannot contradict the server on a number, but it can still offer
+the wrong set of document types or the wrong file formats if either is changed.
+
+**To close:** `GET /api/v1/dealers/application-requirements` (DealerOwner policy) returning the
+required types, the accepted content types and the size limit, and drive the form from it.
+
+### 35. A gallery application leaves its uploaded documents behind if the write fails
+
+**Status:** open · **Raised:** 2026-09-05
+
+`SubmitDealerProfileHandler` writes each document to storage and then calls `SaveChangesAsync`. If
+the commit fails — including on the new unique index when two submissions race — the files are
+already on disk with no record pointing at them, and nothing will ever clean them up. Identity
+documents are exactly the kind of litter that must not accumulate (spec 7).
+
+The pre-checks in the handler make this rare, and the unique index makes the race lose cleanly
+rather than corrupt anything, so this is untidiness rather than a defect.
+
+**To close:** delete the stored blobs when the commit fails, or move to the two-step upload ticket
+flow the branding and vehicle photos already use, where the bytes are written against a key the
+record commits to first.
+
+### 36. The vehicle form's manufacturer list is a literal
+
+**Status:** open · **Raised:** 2026-09-05
+
+`vehicle-wizard.component.ts` holds nine manufacturers (`makes`) as a hardcoded array. It feeds a
+`<datalist>`, so it only suggests — a dealer can type any make and the value on the record is always
+theirs — which is why this is a note rather than a defect. But it is still a list on a screen with
+nothing behind it, and a reader could easily mistake it for a lookup the platform curates.
+
+Raised while fixing the wizard's real defect: it also pre-filled `make: 'Toyota'`, `dailyRate: 30`
+and `securityDeposit: 150`, so a dealer who tabbed past those published a real car at a price the
+console invented. Those are gone; every field a dealer must state now starts empty and the step
+refuses to advance until it is answered.
+
+**To close:** either a `manufacturers` lookup an administrator curates alongside cities and car
+types, or delete the list and leave the field free text.
+
+---
+
+## Delivery fee and email delivery (2026-09-06)
+
+### 37. A resend that fails reveals that the address is registered
+
+**Status:** open · **Raised:** 2026-09-06
+
+`ResendVerificationHandler` answers 200 for an unknown address and for an already-verified one, so
+neither can be told apart from a real resend — that is deliberate anti-enumeration. It now also
+returns `auth.verification_email_not_sent` when a send was ATTEMPTED and the mail server refused it,
+which implies the address exists.
+
+The leak is narrow: it only appears when mail delivery is actually failing, and the alternative was
+telling someone a link is on its way when the server rejected it. But an attacker who can provoke a
+per-recipient failure (a bounce, a suppression list) can use it as an oracle.
+
+Same class as items 9 and 31, and all three should be settled together.
+
+**To close:** decide the platform's enumeration policy once. If failures must stay invisible, queue
+the message and answer 202 uniformly, reporting delivery problems out of band rather than in the
+response.
+
+### 38. Mail delivery has no queue, no retry and no bounce handling
+
+**Status:** open · **Raised:** 2026-09-06
+
+`SmtpEmailSender` connects, sends and disconnects inside the request. A slow relay slows the
+registration that triggered it, a transient failure is final, and a message the relay accepts but
+later bounces is never noticed — the platform believes it was delivered.
+
+`AuthEmailDispatcher` now reports the outcome rather than swallowing it, so the console stops
+claiming a send that did not happen. That is the honesty fix, not a delivery guarantee.
+
+**To close:** an outbox — persist the message, hand it to a background sender, retry with backoff,
+and record the terminal state. Bounce handling needs a provider with a webhook, which is also the
+point at which `Email:Provider` should stop being raw SMTP.
+
+### 39. The delivery fee has no history
+
+**Status:** open · **Raised:** 2026-09-06
+
+A gallery owner can change what they charge for delivery at any time, from `/dealer/delivery`.
+`DealerDeliveryChanged` carries the new amount, but nothing subscribes to it, so there is no record
+of what a gallery charged last week or who changed it. Bookings are safe — each freezes the fee it
+was made under — so this is about accountability, not correctness.
+
+Same gap as item 6 (listing edits are not logged), and the same fix serves both.
+
+**To close:** persist dealer-side changes to an activity trail the owner and an administrator can
+read, fed from the domain events these actions already raise.
+
+### 40. Email can only reach one address until a sender is verified
+
+**Status:** open · **Raised:** 2026-09-06 · **Blocks real users**
+
+The platform sends through Resend with `Email:FromAddress` = `onboarding@resend.dev`, Resend's shared
+testing sender. No domain is verified on the account, and Resend therefore refuses every recipient
+except the account owner with a 403:
+
+> "You can only send testing emails to your own email address … To send emails to other recipients,
+> please verify a domain at resend.com/domains, and change the `from` address to an email using this
+> domain."
+
+Nothing in the platform is wrong — registration, verification and resend all work, and a refusal is
+reported honestly rather than shown as success. But no customer or gallery owner other than the
+Resend account owner can receive a verification email, so **sign-up is effectively closed to
+everyone else** until this is closed.
+
+The API states it at startup (`Email ready. Resend accepted the API key, but NO domain is
+verified…`), so it cannot be discovered late by accident.
+
+**To close, either:**
+- Verify the platform's domain at resend.com/domains (three DNS records) and set
+  `Email:FromAddress` to something like `no-reply@khadra.jo`; or
+- Switch to a provider that verifies a single sender ADDRESS rather than a domain — Brevo's free tier
+  does this and needs no code change: `Email:Provider` `Smtp`, Host `smtp-relay.brevo.com`, Port 587,
+  `Email:Username` the Brevo login, `Email:Password` an SMTP key.
+
+A verified domain is the better answer regardless: mail from your own domain with SPF and DKIM is far
+less likely to land in spam than mail from a shared testing sender.

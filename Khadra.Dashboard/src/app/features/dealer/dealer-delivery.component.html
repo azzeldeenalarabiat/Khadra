@@ -2,7 +2,7 @@
   <div class="dc-head">
     <div>
       <h1 class="page-title">Delivery</h1>
-      <div class="page-sub">Whether you deliver, and how far. The fee is set by the platform.</div>
+      <div class="page-sub">Whether you deliver, how far, and what you charge for it.</div>
     </div>
   </div>
 
@@ -98,6 +98,30 @@
                 <div class="field-error">Enter a radius between 0 and {{ s.maxRadiusKm }} km.</div>
               }
             </div>
+
+            <div class="field">
+              <label for="delivery-fee">What you charge per delivery ({{ s.currencyCode }})</label>
+              <input
+                id="delivery-fee"
+                class="input"
+                type="number"
+                min="0"
+                [max]="s.maxFee"
+                step="0.5"
+                [value]="fee() ?? ''"
+                [disabled]="!canEdit() || !enabled()"
+                (input)="setFee($event)"
+              />
+              @if (feeInvalid()) {
+                <div class="field-error">
+                  Enter what you charge, between 0 and {{ s.maxFee }} {{ s.currencyCode }}.
+                </div>
+              } @else {
+                <div class="field-hint">
+                  Yours to set. Enter 0 if you deliver free of charge.
+                </div>
+              }
+            </div>
           </div>
         </section>
 
@@ -115,7 +139,7 @@
             <button
               type="button"
               class="btn btn-primary btn-md"
-              [disabled]="busy() || !dirty() || radiusInvalid()"
+              [disabled]="busy() || !dirty() || radiusInvalid() || feeInvalid()"
               (click)="save()"
             >
               {{ busy() ? 'Saving…' : 'Save delivery settings' }}
@@ -129,13 +153,19 @@
 
       <div class="stack stack-14">
         <section class="sect sect-pad stack stack-9">
-          <span class="k">Delivery fee</span>
-          <div class="stat-v num">
-            {{ s.platformDeliveryFee.amount }} {{ s.platformDeliveryFee.currency }}
-          </div>
+          <span class="k">Your delivery fee</span>
+          @if (s.fee; as fee) {
+            <div class="stat-v num">{{ fee.amount }} {{ fee.currency }}</div>
+          } @else {
+            <div class="stat-v num">—</div>
+          }
+          <!-- Corrected: the deposit is a percentage of the RENTAL and excludes this fee entirely,
+               which is why the platform takes no commission on it. BookingPricing puts the fee in
+               BalanceDue, the cash your driver collects on arrival. -->
           <div class="page-sub">
-            Charged to the customer on every delivery booking, platform-wide. It is added on top of
-            the rental and paid with the deposit; it is not yours to set.
+            Charged to the customer on every delivery booking you take. It is not part of the card
+            deposit and the platform takes no commission on it — your driver collects it in cash at
+            handover, on top of the rental balance.
           </div>
         </section>
         <section class="sect sect-pad stack stack-9">

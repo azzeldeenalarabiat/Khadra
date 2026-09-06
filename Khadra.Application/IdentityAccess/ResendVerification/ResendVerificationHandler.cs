@@ -43,7 +43,18 @@ public sealed class ResendVerificationHandler(
         await verificationTokens.AddAsync(token, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await emails.SendEmailVerificationAsync(user, rawToken.Value, cancellationToken);
-        return UnitResult.Success<Error>();
+        // The two "nothing to do" paths above return success on purpose: an unknown address and an
+        // already-verified one must be indistinguishable from a real resend, or this endpoint
+        // becomes a way to ask the platform who holds an account.
+        //
+        // A send that was ATTEMPTED and failed is different, and is reported. The narrow leak is
+        // real — a failure implies the address reached the mail server, so it exists here — but it
+        // only appears when the mail path is actually broken, and the alternative is telling someone
+        // a link is on its way when the server refused it. Recorded on the pre-launch checklist
+        // alongside the other enumeration items.
+        var delivered = await emails.SendEmailVerificationAsync(user, rawToken.Value, cancellationToken);
+        return delivered
+            ? UnitResult.Success<Error>()
+            : UnitResult.Failure(IdentityErrors.VerificationEmailNotSent);
     }
 }

@@ -15,9 +15,12 @@ namespace Khadra.Tests.Application.IdentityAccess;
 // Who may administer the platform, and the two ways the console could be locked out of itself.
 //
 // Nothing in the system creates an administrator except another administrator, so an empty set is
-// permanent: no back door, no seeding after the first run, no support tool. The domain cannot hold
-// either invariant, because both are about the SET of administrators rather than about any one of
-// them, so the handler does — and these are what keep it honest.
+// permanent: no support tool, and no seeder any more. The one exception is AdminBootstrapper, which
+// fires only on a database that has NEVER held an administrator — suspended and deleted ones count —
+// so it cannot be used to reopen a set that has been emptied. AdminBootstrapTests holds that half.
+//
+// The domain cannot hold either invariant, because both are about the SET of administrators rather
+// than about any one of them, so the handler does — and these are what keep it honest.
 public sealed class AdminUserTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 4, 10, 0, 0, TimeSpan.Zero);

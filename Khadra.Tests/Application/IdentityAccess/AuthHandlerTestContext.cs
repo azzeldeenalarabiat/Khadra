@@ -1,5 +1,6 @@
 using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess;
+using Khadra.Application.IdentityAccess.ResendVerification;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
@@ -21,7 +22,7 @@ internal sealed class AuthHandlerTestContext
     public IVerificationTokenRepository VerificationTokens { get; } = Substitute.For<IVerificationTokenRepository>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
     public IAuthEmailComposer EmailComposer { get; } = Substitute.For<IAuthEmailComposer>();
-    public IEmailSender EmailSender { get; } = Substitute.For<IEmailSender>();
+    public IEmailSender EmailSender { get; init; } = Substitute.For<IEmailSender>();
     public IBusinessRulesProvider BusinessRules { get; } = TestBusinessRules.Provider();
     public IReportingCalendar Calendar { get; } = TestBusinessRules.Calendar();
 
@@ -57,6 +58,9 @@ internal sealed class AuthHandlerTestContext
     public AuthTokenFactory TokenFactory => new(new StubAccessTokenIssuer(), OpaqueTokens, RefreshTokens, Policy);
 
     public AuthEmailDispatcher Emails => new(EmailComposer, EmailSender, NullLogger<AuthEmailDispatcher>.Instance);
+
+    public ResendVerificationHandler ResendVerification() => new(
+        UserRepository, VerificationTokens, OpaqueTokens, Policy, Clock, UnitOfWork, Emails);
 
     public User KnownUser(User user)
     {

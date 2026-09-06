@@ -42,6 +42,15 @@ export class LookupsService {
   readonly carTypes = httpResource<readonly LookupEntry[]>(() => '/api/v1/car-types');
 
   /**
+   * The cities a gallery can say it is in.
+   *
+   * The plain `GET /api/v1/cities` like `carTypes` above, not the admin list: any signed-in client
+   * may read it and it returns only the ACTIVE entries, so a city an administrator has retired stops
+   * being offered on a new application while every dealership already in it keeps reading correctly.
+   */
+  readonly cities = httpResource<readonly LookupEntry[]>(() => '/api/v1/cities');
+
+  /**
    * The model years a car may be listed under.
    *
    * From the server, because the bound is the platform's (`BusinessRules.EarliestVehicleModelYear`)

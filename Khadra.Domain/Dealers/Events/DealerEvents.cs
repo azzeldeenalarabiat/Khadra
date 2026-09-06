@@ -18,4 +18,11 @@ public sealed record DealerEmployeeHired(Id DealerId, Id EmployeeId, Id UserId, 
 
 public sealed record DealerEmployeeDeactivated(Id DealerId, Id EmployeeId, Id UserId, DateTimeOffset OccurredAt) : IDomainEvent;
 
-public sealed record DealerDeliveryChanged(Id DealerId, bool IsEnabled, decimal RadiusKm, DateTimeOffset OccurredAt) : IDomainEvent;
+// Carries the fee as well as the radius: with the price now the gallery’s to set, “delivery changed”
+// without the amount would leave a price change with nothing recording what it changed to.
+public sealed record DealerDeliveryChanged(
+    Id DealerId,
+    bool IsEnabled,
+    decimal RadiusKm,
+    Money? Fee,
+    DateTimeOffset OccurredAt) : IDomainEvent;

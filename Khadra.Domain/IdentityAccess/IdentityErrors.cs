@@ -62,6 +62,13 @@ public static class IdentityErrors
     public static readonly Error InvalidToken =
         Error.Validation("auth.invalid_token", "The link is invalid or has expired. Request a new one.");
 
+    // The mail server refused the message. The account is untouched and the link is still valid, so
+    // this asks the person to try again rather than telling them anything is wrong with their account.
+    public static readonly Error VerificationEmailNotSent =
+        Error.Failure(
+            "auth.verification_email_not_sent",
+            "We could not send the verification email just now. Please try again in a few minutes.");
+
     public static readonly Error UserNotFound =
         Error.NotFound("auth.user_not_found", "The user was not found.");
 
@@ -78,7 +85,9 @@ public static class IdentityErrors
     public static readonly Error CannotDeactivateSelf =
         Error.Conflict("admin.cannot_deactivate_self", "You cannot deactivate your own administrator account.");
 
-    // Nothing creates an administrator except another administrator, so an empty set is permanent.
+    // Nothing creates an administrator except another administrator — the one exception, the
+    // configured bootstrap, fires only on a database that has NEVER held one — so an empty set here
+    // is permanent, and the platform would be locked out of its own console.
     public static readonly Error LastAdministrator =
         Error.Conflict(
             "admin.last_administrator",

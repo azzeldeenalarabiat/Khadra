@@ -100,6 +100,33 @@ export class DealerConsoleService {
     );
   }
 
+  // ── The application itself (spec 3.1, step two) ──
+
+  /**
+   * Submits the gallery for the platform's licence check.
+   *
+   * `POST /api/v1/dealers`, not `/dealers/me`: there is no `me` to address yet — this is the call
+   * that brings the dealership into existence, against the owner id on the token. Multipart, because
+   * the three licence documents go up with the details in one request; the aggregate refuses a
+   * partial application, so there is no half-submitted state to recover from.
+   *
+   * `Content-Type` is deliberately unset. Naming it would send a multipart header with no boundary
+   * and the server would parse nothing.
+   */
+  async submitApplication(form: FormData): Promise<DealerProfile> {
+    const token = await firstValueFrom(
+      this.http.get<{ requestToken: string }>('/bff/antiforgery'),
+    );
+    const dealer = await firstValueFrom(
+      this.http.post<DealerProfile>('/api/v1/dealers', form, {
+        headers: { 'X-XSRF-TOKEN': token.requestToken },
+      }),
+    );
+    // The gate reads `me`, and it currently holds the 404 that sent the owner here.
+    this.me.reload();
+    return dealer;
+  }
+
   // ── The dealer page (spec 4.1) ──
 
   updateProfile(request: UpdateProfileRequest): Promise<DealerProfile> {
@@ -125,9 +152,10 @@ export class DealerConsoleService {
 
   // ── Delivery (spec 4.4) ──
 
-  updateDelivery(isEnabled: boolean, radiusKm: number): Promise<DealerProfile> {
+  /** `fee` is required to switch delivery on and ignored when switching it off. */
+  updateDelivery(isEnabled: boolean, radiusKm: number, fee: number | null): Promise<DealerProfile> {
     return firstValueFrom(
-      this.http.put<DealerProfile>(`${this.base}/delivery`, { isEnabled, radiusKm }),
+      this.http.put<DealerProfile>(`${this.base}/delivery`, { isEnabled, radiusKm, fee }),
     );
   }
 

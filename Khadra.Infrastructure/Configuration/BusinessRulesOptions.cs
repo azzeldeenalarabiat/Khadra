@@ -17,9 +17,6 @@ public sealed class BusinessRulesOptions
     [Range(1, 720)]
     public int NoShowTimeoutHours { get; init; }
 
-    [Range(0, 1000)]
-    public decimal DeliveryFeeJod { get; init; }
-
     [Range(0, 100)]
     public decimal DealerNonDeliveryPenaltyMinPercent { get; init; }
 

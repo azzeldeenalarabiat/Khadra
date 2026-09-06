@@ -98,7 +98,7 @@ public sealed class DeliverySettingsTests
     [Fact]
     public void Coverage_is_inclusive_of_the_radius_boundary()
     {
-        var settings = DeliverySettings.Enabled(25m).Value;
+        var settings = DeliverySettings.Enabled(25m, Money.Jod(8m)).Value;
 
         Assert.True(settings.Covers(Build.Amman, Build.Amman));
         Assert.True(settings.Covers(Build.Amman, Build.Zarqa));
@@ -110,7 +110,7 @@ public sealed class DeliverySettingsTests
     [InlineData(-5)]
     [InlineData(201)]
     public void Rejects_an_implausible_radius(decimal radiusKm) =>
-        Assert.True(DeliverySettings.Enabled(radiusKm).IsFailure);
+        Assert.True(DeliverySettings.Enabled(radiusKm, Money.Jod(8m)).IsFailure);
 }
 
 public sealed class PercentageTests

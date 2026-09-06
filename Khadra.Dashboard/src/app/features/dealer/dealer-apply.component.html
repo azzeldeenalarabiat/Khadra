@@ -1,0 +1,231 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">Submit your gallery</h1>
+      <div class="page-sub">
+        The platform checks that every gallery is a licensed rental office before it can list cars.
+        Nothing here is published until an administrator approves it.
+      </div>
+    </div>
+  </div>
+
+  @if (problem(); as message) {
+    <div class="banner s-bad" role="alert">
+      <kh-icon name="warning-circle" class="banner-icon" />
+      <div class="banner-body">
+        <div class="banner-title">The application was not submitted</div>
+        <div class="banner-text">{{ message }}</div>
+      </div>
+    </div>
+  }
+
+  <section class="sect sect-pad stack stack-14">
+    <div class="k">The business</div>
+
+    <div class="field">
+      <label for="apply-name">Gallery name</label>
+      <input
+        id="apply-name"
+        class="input"
+        type="text"
+        maxlength="150"
+        [disabled]="busy()"
+        [value]="businessName()"
+        (input)="businessName.set(fieldValue($event))"
+      />
+      <div class="field-hint">
+        The name on the licence. It is locked once the gallery is approved, because it is the name
+        the licence was checked against.
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="apply-registration">Commercial registration number</label>
+      <input
+        id="apply-registration"
+        class="input"
+        type="text"
+        maxlength="20"
+        [disabled]="busy()"
+        [value]="registrationNumber()"
+        (input)="registrationNumber.set(fieldValue($event))"
+      />
+    </div>
+
+    <div class="field">
+      <label for="apply-description">Description <span class="field-hint">(optional)</span></label>
+      <textarea
+        id="apply-description"
+        class="input"
+        rows="3"
+        maxlength="2000"
+        [disabled]="busy()"
+        [value]="description()"
+        (input)="description.set(fieldValue($event))"
+      ></textarea>
+      <div class="field-hint">What customers read on your gallery page.</div>
+    </div>
+  </section>
+
+  <section class="sect sect-pad stack stack-14">
+    <div class="k">Where it is</div>
+
+    <div class="field">
+      <label for="apply-city">City</label>
+      <select
+        id="apply-city"
+        class="input"
+        [disabled]="busy()"
+        [value]="cityId()"
+        (change)="chooseCity(fieldValue($event))"
+      >
+        <option value="">Choose a city…</option>
+        @for (city of cities(); track city.id) {
+          <option [value]="city.id">{{ city.nameEn }}</option>
+        }
+      </select>
+      @if (cityHasNoCentre()) {
+        <div class="field-hint">
+          The platform has not pinned this city yet, so the map cannot start there. Place the pin
+          yourself, or type the coordinates.
+        </div>
+      } @else {
+        <div class="field-hint">Picking a city moves the map there. Then drag the pin to the door.</div>
+      }
+    </div>
+
+    @if (coordsValid()) {
+      <kh-map
+        [latitude]="latNumber()"
+        [longitude]="lngNumber()"
+        [editable]="true"
+        [label]="'Where your gallery is'"
+        (moved)="moveTo($event)"
+      />
+    } @else {
+      <div class="banner s-accent" role="status">
+        <kh-icon name="map-pin" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-text">
+            Choose a city, or type a latitude and longitude, and the map will appear so you can place
+            the pin exactly.
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="dc-split-even">
+      <div class="field">
+        <label for="apply-lat">Latitude</label>
+        <input
+          id="apply-lat"
+          class="input"
+          type="text"
+          inputmode="decimal"
+          [disabled]="busy()"
+          [value]="latitude()"
+          (input)="latitude.set(fieldValue($event))"
+        />
+      </div>
+      <div class="field">
+        <label for="apply-lng">Longitude</label>
+        <input
+          id="apply-lng"
+          class="input"
+          type="text"
+          inputmode="decimal"
+          [disabled]="busy()"
+          [value]="longitude()"
+          (input)="longitude.set(fieldValue($event))"
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="sect sect-pad stack stack-14">
+    <div class="k">When it opens</div>
+    <div class="dc-split-even">
+      <div class="field">
+        <label for="apply-opens">Opens at</label>
+        <input
+          id="apply-opens"
+          class="input"
+          type="time"
+          [disabled]="busy()"
+          [value]="opensAt()"
+          (input)="opensAt.set(fieldValue($event))"
+        />
+      </div>
+      <div class="field">
+        <label for="apply-closes">Closes at</label>
+        <input
+          id="apply-closes"
+          class="input"
+          type="time"
+          [disabled]="busy()"
+          [value]="closesAt()"
+          (input)="closesAt.set(fieldValue($event))"
+        />
+      </div>
+    </div>
+    <div class="field-hint">
+      One window, applied to every day. You can set different hours per day on your gallery page once
+      you are approved.
+    </div>
+  </section>
+
+  <section class="sect sect-pad stack stack-14">
+    <div class="k">Your papers</div>
+    <div class="field-hint">
+      All three are required. JPEG, PNG or PDF. They are stored privately and only the administrator
+      reviewing your application can open them.
+    </div>
+
+    @for (document of documents; track document.key) {
+      <div class="field">
+        <label [attr.for]="'apply-file-' + document.key">{{ document.label }}</label>
+        <input
+          [id]="'apply-file-' + document.key"
+          class="input"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          [disabled]="busy()"
+          (change)="attach(document.key, $event)"
+        />
+        @if (fileName(document.key); as name) {
+          <div class="field-hint">Attached: {{ name }}</div>
+        } @else {
+          <div class="field-hint">{{ document.hint }}</div>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="sect sect-pad stack stack-14">
+    @if (missingDocuments().length) {
+      <div class="banner s-warn" role="status">
+        <kh-icon name="warning-circle" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-text">
+            Still needed: {{ missingDocuments().join(', ') }}.
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="row row-gap-8">
+      <button
+        type="button"
+        class="btn btn-primary btn-md"
+        [disabled]="!canSubmit()"
+        (click)="submit()"
+      >
+        {{ busy() ? 'Submitting…' : 'Submit for review' }}
+      </button>
+      <span class="page-sub">
+        Submitting starts the platform's licence check. You can still edit your gallery page while it
+        is under review.
+      </span>
+    </div>
+  </section>
+</div>

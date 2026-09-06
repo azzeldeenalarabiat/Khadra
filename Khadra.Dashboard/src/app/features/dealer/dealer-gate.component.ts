@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
+import { SessionService } from '../../core/services/session.service';
 import { Tone } from '../../core/models/console.models';
 import { IconName } from '../../shared/icon/icon-paths';
 import { loaded } from '../../core/services/loaded';
@@ -39,6 +40,7 @@ interface LockedCopy {
 })
 export class DealerGateComponent {
   private readonly console = inject(DealerConsoleService);
+  private readonly session = inject(SessionService);
   private readonly router = inject(Router);
 
   /**
@@ -70,13 +72,45 @@ export class DealerGateComponent {
   /**
    * Whether the dealership's standing is known yet.
    *
-   * Three answers, not two. This used to have only "locked" and "not locked", and an unanswered
+   * Four answers, not two. This used to have only "locked" and "not locked", and an unanswered
    * `GET /dealers/me` counted as not locked: a dealer whose standing could not be read was handed
    * the whole console, where every action then failed server-side with a 403 it could not explain.
    * A gate that cannot see has to say so, not wave everyone through.
+   *
+   * The fourth is an owner who has registered but not yet submitted a gallery — spec 3.1's gap
+   * between step one and step two. The server says exactly that, `dealer.not_registered` on a 404,
+   * and it is not a failure: it is the state every new owner starts in. Reading it as "unreachable"
+   * told them the platform was broken and offered them a Try again that could never succeed.
    */
-  protected readonly waiting = computed(() => !this.dealer() && !this.console.me.error());
-  protected readonly unreachable = computed(() => !this.dealer() && !!this.console.me.error());
+  private readonly failure = computed(
+    () => this.console.me.error() as { status?: number; error?: { code?: string } } | undefined,
+  );
+
+  protected readonly waiting = computed(() => !this.dealer() && !this.failure());
+
+  /** No dealership answers to this account. What that MEANS depends on who is asking. */
+  protected readonly notRegistered = computed(() => {
+    const error = this.failure();
+    return !!error && error.status === 404 && error.error?.code === 'dealer.not_registered';
+  });
+
+  /**
+   * The same 404 tells two different people two different things.
+   *
+   * For an owner it is "you have not filed your gallery yet", and the answer is the application
+   * form. For an employee it is "the dealership that employed you has deactivated you" — spec 4.2
+   * says their access ends immediately, and `DealerMembershipResolver` returns exactly this code for
+   * them. Offering an employee a "submit your gallery" button would be wrong twice over: it is not
+   * their business to file, and `POST /dealers` is owner-only, so the button could only ever 403.
+   */
+  protected readonly isOwner = computed(() => this.session.user()?.role === 'DealerOwner');
+
+  protected readonly unreachable = computed(
+    () => !this.dealer() && !!this.failure() && !this.notRegistered(),
+  );
+
+  /** The application form is the one screen that belongs to an owner with no dealership. */
+  protected readonly applying = computed(() => this.url().startsWith('/dealer/apply'));
 
   protected retry(): void {
     this.console.me.reload();

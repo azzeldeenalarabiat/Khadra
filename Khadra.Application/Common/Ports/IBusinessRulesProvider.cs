@@ -7,11 +7,14 @@ namespace Khadra.Application.Common.Ports;
 //
 // A booking freezes these values onto itself at creation (BookingTerms), so tuning a number here
 // never changes the terms of a booking that was already made.
+// The delivery fee is deliberately NOT here. It used to be: one configured figure every gallery had
+// to charge. The owner moved it onto the dealership that performs the delivery, so it now lives on
+// `DeliverySettings` and varies by gallery — which means there is no platform-wide answer to “what
+// does delivery cost”, and a caller that wants one has to name whose delivery it is asking about.
 public sealed record BusinessRules(
     decimal CommissionPercent,
     decimal DepositPercent,
     int NoShowTimeoutHours,
-    Money DeliveryFee,
     decimal DealerNonDeliveryPenaltyMinPercent,
     decimal DealerNonDeliveryPenaltyMaxPercent,
     int FreeCancellationWindowMinutes,

@@ -18,8 +18,17 @@ namespace Khadra.Application.Dealers.UpdateDeliverySettings;
 /// <c>dealer.not_approved</c> instead of a bare 403, and the rule can be unit-tested without an HTTP
 /// pipeline. Every dealer-only action added later calls the same method.
 /// </summary>
-public sealed record UpdateDeliverySettingsCommand(Id ActorUserId, bool IsEnabled, decimal RadiusKm)
-    : ICommand<Result<DealerProfileDto, Error>>;
+/// <param name="Fee">
+/// What this gallery charges for a delivery, in JOD. Required when switching delivery on and
+/// ignored when switching it off. The currency is never taken from the caller: there is one
+/// currency on this platform and letting a client name it would be an invitation to price a
+/// booking in something the rest of the system cannot add up.
+/// </param>
+public sealed record UpdateDeliverySettingsCommand(
+    Id ActorUserId,
+    bool IsEnabled,
+    decimal RadiusKm,
+    decimal? Fee) : ICommand<Result<DealerProfileDto, Error>>;
 
 public sealed class UpdateDeliverySettingsCommandValidator : AbstractValidator<UpdateDeliverySettingsCommand>
 {
@@ -27,6 +36,15 @@ public sealed class UpdateDeliverySettingsCommandValidator : AbstractValidator<U
     {
         RuleFor(command => command.RadiusKm)
             .InclusiveBetween(0m, DeliverySettings.MaxRadiusKm);
+        // Only when delivery is being switched ON: the amount is meaningless otherwise, and
+        // demanding one to switch delivery OFF would be a rule with no purpose.
+        RuleFor(command => command.Fee)
+            .NotNull()
+            .When(command => command.IsEnabled)
+            .WithMessage("A delivery fee is required to offer delivery.");
+        RuleFor(command => command.Fee!.Value)
+            .InclusiveBetween(0m, DeliverySettings.MaxFee)
+            .When(command => command.IsEnabled && command.Fee is not null);
     }
 }
 
@@ -54,7 +72,10 @@ public sealed class UpdateDeliverySettingsHandler(
         var now = clock.UtcNow;
         if (request.IsEnabled)
         {
-            var enabled = dealer.EnableDelivery(request.RadiusKm, now);
+            // The validator has already refused a null fee here; the aggregate checks the bound
+            // again, because it is the aggregate that owns what a delivery may cost.
+            var enabled = dealer.EnableDelivery(
+                request.RadiusKm, Money.Jod(request.Fee!.Value), now);
             if (enabled.IsFailure)
                 return enabled.Error;
         }

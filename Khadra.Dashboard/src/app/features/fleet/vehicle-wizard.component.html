@@ -89,6 +89,7 @@
                   [value]="form().year"
                   (change)="patch({ year: number($event) })"
                 >
+                  <option value="" [selected]="form().year === null">Choose a year…</option>
                   @for (y of years(); track y) {
                     <option [value]="y" [selected]="y === form().year">{{ y }}</option>
                   }
@@ -129,6 +130,7 @@
               <div class="field">
                 <label for="w-trans">Transmission</label>
                 <select id="w-trans" class="input" (change)="patch({ transmission: text($event) })">
+                  <option value="" [selected]="!form().transmission">Choose…</option>
                   @for (t of transmissions; track t) {
                     <option [value]="t" [selected]="t === form().transmission">{{ t }}</option>
                   }
@@ -137,6 +139,7 @@
               <div class="field">
                 <label for="w-fuel">Fuel</label>
                 <select id="w-fuel" class="input" (change)="patch({ fuelType: text($event) })">
+                  <option value="" [selected]="!form().fuelType">Choose…</option>
                   @for (f of fuelTypes; track f) {
                     <option [value]="f" [selected]="f === form().fuelType">{{ f }}</option>
                   }
@@ -145,6 +148,7 @@
               <div class="field">
                 <label for="w-seats">Seats</label>
                 <select id="w-seats" class="input" (change)="patch({ seats: number($event) })">
+                  <option value="" [selected]="form().seats === null">Choose…</option>
                   @for (s of seatOptions; track s) {
                     <option [value]="s" [selected]="s === form().seats">{{ s }}</option>
                   }
@@ -178,7 +182,7 @@
                   type="number"
                   min="1"
                   step="1"
-                  [value]="form().dailyRate"
+                  [value]="form().dailyRate ?? ''"
                   (input)="patch({ dailyRate: number($event) })"
                 />
                 @if (fieldError('dailyRate'); as e) {
@@ -193,7 +197,7 @@
                   type="number"
                   min="0"
                   step="5"
-                  [value]="form().securityDeposit"
+                  [value]="form().securityDeposit ?? ''"
                   (input)="patch({ securityDeposit: number($event) })"
                 />
                 <div class="field-hint">
@@ -424,13 +428,15 @@
             <div class="toggle-card is-off">
               <div class="grow">
                 <div class="toggle-title">Delivery fee</div>
-                <div class="toggle-desc">Set platform-wide. Dealers cannot change it.</div>
+                <div class="toggle-desc">
+                  Your own, and the same for every car you deliver. Change it on your Delivery page.
+                </div>
               </div>
               <span class="pill s-dim num">
-                @if (deliverySettings(); as ds) {
-                  Fixed · {{ ds.platformDeliveryFee.amount }} {{ ds.platformDeliveryFee.currency }}
+                @if (deliverySettings()?.fee; as fee) {
+                  {{ fee.amount }} {{ fee.currency }}
                 } @else {
-                  Platform-wide
+                  Not set
                 }
               </span>
             </div>

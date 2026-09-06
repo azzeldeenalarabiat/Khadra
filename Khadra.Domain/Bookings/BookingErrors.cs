@@ -16,6 +16,9 @@ public static class BookingErrors
     public static readonly Error DeliveryLocationNotAllowed =
         Error.Validation("booking.delivery_location_not_allowed", "A self-pickup booking cannot carry a delivery location.");
 
+    public static readonly Error DeliveryFeeNotAllowed =
+        Error.Validation("booking.delivery_fee_not_allowed", "A self-pickup booking cannot carry a delivery fee.");
+
     public static readonly Error DeliveryOutOfRange =
         Error.Validation("booking.delivery_out_of_range", "The chosen location is outside this dealer's delivery area.");
 
