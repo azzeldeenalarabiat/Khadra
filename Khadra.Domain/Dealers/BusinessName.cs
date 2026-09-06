@@ -59,8 +59,11 @@ public sealed class CommercialRegistrationNumber : ValueObject
         if (string.IsNullOrWhiteSpace(raw))
             return DealerErrors.InvalidCommercialRegistration;
 
-        var compact = new string(raw.Where(char.IsAsciiDigit).ToArray());
-        if (compact.Length is < MinLength or > MaxLength)
+        // Separators are dropped because people type the number as it is printed. Anything else is
+        // refused rather than deleted: silently turning "E2E20260906" into "220260906" changed the
+        // licence of record, and this column is UNIQUE, so two different inputs could collide.
+        var compact = DigitIdentifier.Normalise(raw);
+        if (compact is null || compact.Length is < MinLength or > MaxLength)
             return DealerErrors.InvalidCommercialRegistration;
 
         return new CommercialRegistrationNumber(compact);

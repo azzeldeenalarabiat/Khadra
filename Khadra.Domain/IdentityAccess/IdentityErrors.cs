@@ -47,6 +47,14 @@ public static class IdentityErrors
         Error.Conflict("auth.phone_taken", "An account with this phone number already exists.");
 
     // Deliberately identical for unknown email, wrong password and deleted accounts (no enumeration).
+    /// <remarks>
+    /// A rotation that changes nothing is not a rotation. It cannot be caught by comparing hashes —
+    /// bcrypt salts every one, so the new hash never equals the stored one — which is why the check
+    /// lives in the Application layer beside IPasswordHasher.Verify rather than in the aggregate.
+    /// </remarks>
+    public static readonly Error PasswordUnchanged =
+        Error.Validation("auth.password_unchanged", "That is the password you already have. Choose a different one.");
+
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("auth.invalid_credentials", "The email or password is incorrect.");
 

@@ -24,8 +24,10 @@ public sealed class PlateNumber : ValueObject
         if (string.IsNullOrWhiteSpace(raw))
             return FleetErrors.InvalidPlateNumber;
 
-        var digits = new string(raw.Where(char.IsAsciiDigit).ToArray());
-        if (digits.Length is < MinDigits or > MaxDigits)
+        // Same rule as the commercial registration, and for the same reason: plate_number is UNIQUE,
+        // so quietly deleting letters let "AB1234" become "1234" and take another dealer's plate.
+        var digits = DigitIdentifier.Normalise(raw);
+        if (digits is null || digits.Length is < MinDigits or > MaxDigits)
             return FleetErrors.InvalidPlateNumber;
 
         return new PlateNumber(digits);

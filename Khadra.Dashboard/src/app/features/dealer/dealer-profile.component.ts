@@ -14,6 +14,7 @@ import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { MapComponent } from '../../shared/map/map.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 
 const DAYS = [
   'Sunday',
@@ -49,6 +50,7 @@ const DAYS = [
 export class DealerProfileComponent {
   protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
+  protected readonly fmt = inject(FormatService);
   private readonly ui = inject(ConsoleUiService);
 
   protected readonly resource = this.service.me;

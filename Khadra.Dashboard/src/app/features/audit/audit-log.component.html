@@ -93,13 +93,17 @@
       }
     </div>
 
-    @if (failure(); as message) {
+    @if (failure(); as problem) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">{{ t('auditLog.couldntLoadTheAudit') }}</div>
-        <div class="state-text">{{ message }}</div>
+        <div class="state-title">{{ problem.title }}</div>
+        <div class="state-text">{{ problem.message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          @if (problem.action === 'clear') {
+            <button type="button" class="btn btn-primary btn-sm" (click)="clear()">{{ t('auditLog.clearFilters') }}</button>
+          } @else if (problem.action === 'retry') {
+            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          }
         </div>
       </div>
     } @else if (resource.isLoading() && rows().length === 0) {

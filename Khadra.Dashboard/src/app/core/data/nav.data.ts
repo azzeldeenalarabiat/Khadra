@@ -190,6 +190,7 @@ export const SCREEN_TITLES: Readonly<Record<string, TranslationKey>> = {
   security: 'nav.security',
 
   // The Dealer console (design: Dealer Console.dc.html, SCREENS).
+  'dealer/apply': 'screen.submitYourGallery',
   'dealer/dashboard': 'nav.dashboard',
   'dealer/bookings': 'nav.bookings',
   'dealer/bookings/:id': 'screen.bookingDetails',

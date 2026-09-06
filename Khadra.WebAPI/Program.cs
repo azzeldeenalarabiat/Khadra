@@ -160,14 +160,40 @@ builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
         policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
 }));
 
+// The API answers the BFF, never a browser directly, so the address on the connection is always the
+// BFF's. The BFF forwards the real client in X-Forwarded-For and the rate limiter partitions on the
+// result (see ClientAddress below); without that, one caller's brute-force attempt would spend the
+// budget of every other tenant behind the same proxy.
+//
+// The header is therefore a SECURITY INPUT, and it is trusted only from the addresses named in
+// KnownProxies. The subtlety that made this a live vulnerability: ForwardedHeadersMiddleware only
+// verifies the sender when it has something to verify against —
+//     checkKnownIps = KnownNetworks.Count > 0 || KnownProxies.Count > 0
+// — so leaving BOTH lists empty does not mean "trust nobody", it means "trust anybody". With an
+// empty KnownProxies any caller could name its own partition key and walk around every limit by
+// rotating the header, including the 10-per-15-minutes cap that is the only brute-force protection
+// on password sign-in. Read once, here, so the pipeline below can decline to enable the middleware
+// at all rather than silently falling back into that state.
+var knownProxies = builder.Configuration.GetSection("KnownProxies").Get<string[]>() ?? [];
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // One hop. The BFF is the only proxy in front of the API, so only the address IT appends is
+    // read; anything the caller left further left in the header is ignored.
     options.ForwardLimit = 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
-    foreach (var proxy in builder.Configuration.GetSection("KnownProxies").Get<string[]>() ?? [])
-        options.KnownProxies.Add(IPAddress.Parse(proxy));
+    foreach (var entry in knownProxies)
+    {
+        // A container's address changes when it is recreated, so a range is often the only stable
+        // way to name one. Accept both, and name the offending entry rather than failing obscurely.
+        if (entry.Contains('/', StringComparison.Ordinal))
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(entry));
+        else if (IPAddress.TryParse(entry, out var address))
+            options.KnownProxies.Add(address);
+        else
+            throw new InvalidOperationException($"KnownProxies entry '{entry}' is not an IP address or CIDR range.");
+    }
 });
 
 builder.Services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
@@ -179,7 +205,32 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-app.UseForwardedHeaders();
+// Refuse to run in a state where the limiter cannot tell callers apart. With no trusted proxy there
+// are only two possible behaviours and both are wrong for production: enable the middleware and the
+// header is honoured from ANY caller (the bypass this guard exists to close), or leave it off and
+// every request partitions on the BFF's single address, so ten failed sign-ins anywhere lock the
+// whole platform out for fifteen minutes. Neither is a thing to discover after launch, so a
+// deployment that has not named its proxy does not start.
+if (knownProxies.Length == 0 && !app.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "KnownProxies is empty. The API must be told which address the BFF connects from, or it " +
+        "cannot trust X-Forwarded-For and cannot tell one client from another when rate limiting. " +
+        "Set the \"KnownProxies\" configuration array to the BFF's address(es).");
+}
+
+// Only when there is a proxy to trust. Left off, RemoteIpAddress stays the true connection address:
+// a poor partition key, but an honest one, and never one the caller chose.
+if (knownProxies.Length > 0)
+{
+    app.UseForwardedHeaders();
+    var trustedList = string.Join(", ", knownProxies);
+    Program.LogTrustedProxies(app.Logger, trustedList);
+}
+else
+{
+    Program.LogNoTrustedProxy(app.Logger);
+}
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment())
@@ -245,4 +296,18 @@ static FixedWindowRateLimiterOptions FixedWindow(int permitLimit, TimeSpan windo
 };
 
 // Exposes the entry point to WebApplicationFactory in Khadra.Tests.
-public partial class Program;
+public partial class Program
+{
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "KnownProxies is empty, so X-Forwarded-For is ignored and every request is rate " +
+                  "limited against the address it arrives from. Behind the BFF that is ONE address " +
+                  "shared by every client, so one caller's failed sign-ins spend everybody's budget. " +
+                  "Name the BFF in KnownProxies.")]
+    internal static partial void LogNoTrustedProxy(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Rate limiting will identify clients by X-Forwarded-For, trusted only from: {Proxies}.")]
+    internal static partial void LogTrustedProxies(ILogger logger, string proxies);
+}

@@ -183,12 +183,19 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     public bool IsBreachingReviewSla(DateTimeOffset now) =>
         VerificationStatus.IsAwaitingAdmin && now >= ReviewDueAt;
 
+    /// <remarks>
+    /// Suspending an already-suspended dealership is refused rather than shrugged off. It used to
+    /// return success without changing anything, and the handler then wrote an audit line saying the
+    /// dealership had been suspended, carrying the NEW reason — a reason that was never applied,
+    /// because SuspensionReason still held the old one — and notified the whole team a second time.
+    /// audit_entries is append-only, so that line could never be corrected.
+    /// </remarks>
     public UnitResult<Error> Suspend(Id adminUserId, string reason, DateTimeOffset now)
     {
         if (string.IsNullOrWhiteSpace(reason))
             return UnitResult.Failure(DealerErrors.ReasonRequired);
         if (IsSuspended)
-            return UnitResult.Success<Error>();
+            return UnitResult.Failure(DealerErrors.AlreadySuspended);
 
         IsSuspended = true;
         SuspensionReason = Trim(reason, 1000);
@@ -196,10 +203,19 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         return UnitResult.Success<Error>();
     }
 
-    public void Reactivate()
+    /// <remarks>
+    /// Likewise refused when there is nothing to undo: this returned void, so reactivating a
+    /// dealership that was never suspended still recorded DealerReactivated against it for ever.
+    /// User.Reactivate has always answered this way; the two aggregates now agree.
+    /// </remarks>
+    public UnitResult<Error> Reactivate()
     {
+        if (!IsSuspended)
+            return UnitResult.Failure(DealerErrors.NotSuspended);
+
         IsSuspended = false;
         SuspensionReason = null;
+        return UnitResult.Success<Error>();
     }
 
     /// <summary>

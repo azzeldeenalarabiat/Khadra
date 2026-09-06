@@ -30,6 +30,14 @@ public sealed class AuditAction : Enumeration
     // Deactivating an administrator has to be reversible, and the reversal has to be on the record.
     public static readonly AuditAction AdminReactivated = new(19, "AdminReactivated");
 
+    // Curating the cities and car types is a privileged admin action like any other: retiring a city
+    // takes it off every new listing and every customer search, and there is no delete to undo it.
+    // Generic on purpose — one set of verbs serves both lists, and the entity type says which.
+    public static readonly AuditAction LookupCreated = new(20, "LookupCreated");
+    public static readonly AuditAction LookupRenamed = new(21, "LookupRenamed");
+    public static readonly AuditAction LookupRetired = new(22, "LookupRetired");
+    public static readonly AuditAction LookupRestored = new(23, "LookupRestored");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }
@@ -44,6 +52,12 @@ public sealed class AuditEntityType : Enumeration
     public static readonly AuditEntityType Review = new(5, "Review");
     public static readonly AuditEntityType Setting = new(6, "Setting");
     public static readonly AuditEntityType AdminUser = new(7, "AdminUser");
+
+    // Their own types rather than reusing Setting, which is the business-rules subject: the audit
+    // screen filters and deep-links by (entity type, entity id), so "what happened to the cities
+    // list" has to be answerable without reading labels.
+    public static readonly AuditEntityType City = new(8, "City");
+    public static readonly AuditEntityType CarType = new(9, "CarType");
 
     private AuditEntityType(int id, string name) : base(id, name)
     {

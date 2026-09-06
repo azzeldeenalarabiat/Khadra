@@ -503,7 +503,41 @@ address"), which costs the applicant a round trip through their inbox.
 
 ### 32. Rate limits are partitioned by the BFF's address in production
 
-**Status:** open · **Raised:** 2026-09-05
+**Status:** CLOSED 2026-09-06 · **Raised:** 2026-09-05
+
+Closed, but the item had the failure mode backwards, and that is worth keeping: it read as an
+availability risk to schedule, when it was a live authentication bypass.
+
+An empty `KnownProxies` does not make everyone share one partition. ForwardedHeadersMiddleware only
+verifies the sender when it has something to verify against —
+`checkKnownIps = KnownNetworks.Count > 0 || KnownProxies.Count > 0` — so with both lists empty it
+skips the check and applies `X-Forwarded-For` from ANY caller. The partition key was therefore
+attacker-chosen, and every limit could be walked around by sending a fresh value per request.
+Measured before the fix, straight at the API: 15 `POST /api/v1/auth/login` with a rotating header
+were never limited, while 5 from the same connection with no header were all 429.
+
+The BFF had the same defect and it was the more serious half, because it sits on the production
+path. `Khadra.Bff/Program.cs` cleared both lists and read no configuration at all, so a browser's
+own `X-Forwarded-For` overwrote `RemoteIpAddress`, which `AuthApiClient.AddClientAddress` then
+forwarded to the API as the value the API trusts. Fixing only the API left the bypass fully open
+through `/bff/login` — verified before and after.
+
+**Closed by:** both hops now trust `X-Forwarded-For` only from addresses or CIDR ranges named in
+`KnownProxies`, and enable the middleware only when that list is non-empty. The API refuses to
+start outside Development when it is empty, because neither available behaviour is acceptable
+there; the BFF does not, because terminating TLS itself with no edge in front is an ordinary
+deployment and empty is the right answer for it. Both log what they trust at startup, and
+`appsettings.Development.json` names loopback so development takes the production path.
+Regression tests: `Khadra.Tests/Security/ForwardedHeaderTrustTests.cs` — five tests pinning both
+the trust refused and the trust intended, using an `IStartupFilter` to set a real client address,
+because `WebApplicationFactory` leaves `RemoteIpAddress` null and the middleware deliberately skips
+its check for a null address, which makes a naive test appear to prove the fix does not work.
+
+**Still open, tracked separately:** IP-partitioned limiting cannot see a botnet and punishes an
+office behind one NAT. Per-account lockout is the control that actually protects a single account,
+and is a schema and configuration change rather than a hotfix — see item 51.
+
+**Superseded detail below, kept for the record:**
 
 The API partitions every rate limit by `ClientAddress(context)`, and `KnownProxies` is empty in
 `Khadra.WebAPI/appsettings.json`. In production every browser request arrives through the BFF, so
@@ -802,7 +836,26 @@ button. Until then, an administrator invited while mail is down is stuck.
 
 ### 49. Arabic covers every template; some component copy is still English
 
-`core/i18n/` holds 1,181 keys in both languages. EVERY template is keyed -- all 54 of them -- along
+**Updated 2026-09-07.** Partly closed. An end-to-end pass in Arabic measured this on real screens
+rather than by grep, and the worst of it is fixed: the **fleet screen is now fully Arabic** (measured
+zero English strings on it, bar the JOD currency code, which is meant to stay Latin), and the
+**opening-hours tables** on /dealer/profile and /employee/business no longer read "Sunday … Saturday"
+down the side of a right-to-left page. Day names come from ICU via `FormatService.weekday()` now,
+rather than seven hand-written keys, so every locale gets its own.
+
+One fix worth repeating elsewhere: the fleet filter chips were a `readonly` FIELD initialised with
+`this.t(...)`, which resolves once at construction — switching language with the screen already open
+left them in the old one. They are a `computed` now. Any other chip or column list built the same way
+has the same latent bug.
+
+**Still open: roughly 330 strings across the other screens**, unchanged in nature from the list
+below. Heaviest are dealer/booking-detail, dealer/dealer-dashboard, disputes/dispute-detail,
+fleet/vehicle-wizard, bookings/booking-detail and employee/employee-dashboard — the last is the most
+visible, because every stat tile caption on an employee's landing screen is English. Deferred as its
+own piece of work, not a blocker: the mechanism (switch, RTL mirroring, persistence across reload and
+logout, switching back) is correct and was re-verified.
+
+`core/i18n/` holds 1,202 keys in both languages. EVERY template is keyed -- all 54 of them -- along
 with the shell, the auth screens, the dealer gate, both not-built placeholders, the dashboard KPI
 cards and attention queue, the activity verbs, relative time, the confirmation dialogs, list columns
 and the pagination. `ar.ts` is typed against `en.ts`, so a missing translation fails the build, and
@@ -854,3 +907,59 @@ resolved on this platform.
 **To close:** store the parts (`refund=80;platform=20;dealer=20;charge=30;currency=JOD`, or compact
 JSON inside `MaxValueLength`) and let the audit screen compose the sentence from
 `AuditAction.DisputeResolved`. Do it before the first real dispute, not after.
+
+
+### 51. Nothing throttles failed sign-ins for one account
+
+**Status:** open · **Raised:** 2026-09-06
+
+Item 32 closed the bypass that made the IP-based limiter ineffective, but the limiter it restored is
+still the only brake on password guessing, and it partitions by address. That has two ends it cannot
+cover: an attacker spread across many addresses is never slowed against a single account, and a
+dealership whose staff share one office NAT spend a single 10-per-15-minutes budget between them.
+
+**To close:** count consecutive failures on the user and refuse for a configured period.
+`MaxFailedLoginAttempts` and `LockoutMinutes` belong in `BusinessRules`/`AuthOptions`
+configuration, never as constants. Keep the rule the login path already follows — account state is
+disclosed only after the password proves out (`LoginHandler`) — so a wrong password during a
+lockout still answers `auth.invalid_credentials`, and only a CORRECT password during a lockout
+gets a distinct code with the remaining time. Do not extend the window on further failures, or an
+attacker can hold an account locked indefinitely; clear the counter on a successful password reset.
+The new error code has to reach the console in both languages.
+
+### 52. Lookup name uniqueness is enforced in the handler, not by an index
+
+**Status:** open · **Raised:** 2026-09-07
+
+Item closed alongside the duplicate-name fix, but only half of it. Creating, renaming and
+reactivating a city or car type all now refuse a name another OFFERED entry already uses
+(`lookup.name_taken`), with a comparison that folds case for English and tashkeel/tatweel for Arabic
+— the collision that actually happens there is the same word with and without its vowel marks.
+
+That is a handler check, so two simultaneous requests can still both pass it and both insert. The
+second layer is a partial unique index on `lower(name_en) WHERE is_active` and the same for
+`name_ar`, which EF cannot express in the model and needs raw SQL in a migration — the pattern
+`DealerConfiguration` already uses for one-dealer-per-owner. With it, the loser of a race fails as
+`data.conflict` 409 instead of creating a duplicate.
+
+**Note before writing it:** the migration will refuse to apply while any duplicate rows are active,
+so it must not attempt to fix data itself — retire the duplicates through `/cities` and `/car-types`
+first. The development database was cleaned this way on 2026-09-06.
+
+### 53. Value objects are re-parsed on read, and a failed parse throws
+
+**Status:** open · **Raised:** 2026-09-07
+
+`DealerConfiguration.cs:24` converts the stored commercial registration back with
+`CommercialRegistrationNumber.Create(value).Value`. `.Value` on a failed `Result` throws, so any
+future tightening of that rule which an already-stored row does not satisfy would make every dealer
+fail to load — not a validation error, a crash on read. `PlateNumber` and `BusinessName` have the
+same shape.
+
+Nothing is broken today: the rule was tightened on 2026-09-06 (letters are refused rather than
+silently deleted) and every stored value still parses, because they were all digits already. The
+risk is the NEXT change to one of these rules.
+
+**To close:** give each value object a trusted `FromPersisted(string)` that skips validation, and use
+it in the EF converters. Reading a row is not the moment to re-litigate whether it should have been
+allowed in.

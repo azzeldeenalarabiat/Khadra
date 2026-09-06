@@ -34,7 +34,7 @@ internal sealed partial class AuthApiClient(
             Content = JsonContent.Create(new { refreshToken, allDevices = false })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        AddClientAddress(request);
+        AddClientContext(request);
 
         using var response = await httpClientFactory.CreateClient(HttpClientName).SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -50,7 +50,7 @@ internal sealed partial class AuthApiClient(
         using var request = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(payload) };
         if (!string.IsNullOrEmpty(accessToken))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        AddClientAddress(request);
+        AddClientContext(request);
 
         using var response = await httpClientFactory.CreateClient(HttpClientName)
             .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
@@ -74,12 +74,30 @@ internal sealed partial class AuthApiClient(
         return new AuthApiResult(null, response.StatusCode, problem);
     }
 
-    // Lets the API's per-IP rate limiter see the real browser address (trusted only via KnownProxies).
-    private void AddClientAddress(HttpRequestMessage request)
+    /// <summary>
+    /// Passes on who the browser is: its address, so the API's rate limiter can tell one client from
+    /// another, and its user agent, so a session can be recognised on the security screen.
+    /// </summary>
+    /// <remarks>
+    /// Both are read from the connection, and the API accepts them only from an address named in its
+    /// KnownProxies — this is a claim about the caller, not something the caller may assert.
+    ///
+    /// The user agent was missing, and it mattered: YARP copies it on the routes it proxies, but the
+    /// calls that actually mint a refresh-token family are these, made by the BFF itself. So every
+    /// browser session recorded a null agent and /security listed all of them as "Device not
+    /// recorded" — a screen whose whole job is to let someone spot a session they do not recognise.
+    /// TryAddWithoutValidation because real agent strings routinely fail strict header parsing.
+    /// </remarks>
+    private void AddClientContext(HttpRequestMessage request)
     {
-        var address = httpContextAccessor.HttpContext?.Connection.RemoteIpAddress;
+        var context = httpContextAccessor.HttpContext;
+        var address = context?.Connection.RemoteIpAddress;
         if (address is not null)
             request.Headers.TryAddWithoutValidation("X-Forwarded-For", address.ToString());
+
+        var userAgent = context?.Request.Headers.UserAgent.ToString();
+        if (!string.IsNullOrWhiteSpace(userAgent))
+            request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
     }
 
     [LoggerMessage(3001, LogLevel.Warning, "API logout returned {StatusCode}; the refresh-token family stays live until expiry.")]

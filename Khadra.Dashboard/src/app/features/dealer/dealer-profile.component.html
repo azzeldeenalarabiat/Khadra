@@ -174,7 +174,7 @@
           <div class="sect-pad">
             @for (h of hours(); track h.day) {
               <div class="hours-row">
-                <span class="hours-day">{{ h.day }}</span>
+                <span class="hours-day">{{ fmt.weekday(h.day) }}</span>
                 <label class="toggle-inline">
                   <input
                     type="checkbox"

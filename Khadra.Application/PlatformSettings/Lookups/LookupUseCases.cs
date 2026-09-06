@@ -1,3 +1,5 @@
+using Khadra.Domain.Auditing;
+using Khadra.Application.Auditing;
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
@@ -31,6 +33,14 @@ public sealed record LookupEntryDto(
             carType.Id.Value, carType.NameEn, carType.NameAr, carType.IsActive,
             carType.DisplayOrder, carType.CreatedAt, null, null);
     }
+
+    /// <summary>Either kind, when the caller has the base type in hand.</summary>
+    public static LookupEntryDto From(LookupEntry entry) => entry switch
+    {
+        CarType carType => From(carType),
+        City city => From(city),
+        _ => throw new ArgumentOutOfRangeException(nameof(entry), entry?.GetType().Name, "Unknown lookup kind."),
+    };
 
     public static LookupEntryDto From(City city)
     {
@@ -120,6 +130,7 @@ public sealed class SetLookupActiveCommandValidator : AbstractValidator<SetLooku
 public sealed class LookupHandlers(
     ICarTypeRepository carTypes,
     ICityRepository cities,
+    AdminActionRecorder audit,
     IUnitOfWork unitOfWork,
     IClock clock) :
     IRequestHandler<ListCarTypesQuery, Result<IReadOnlyList<LookupEntryDto>, Error>>,
@@ -151,11 +162,15 @@ public sealed class LookupHandlers(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        if (await NameIsTakenAsync(CarTypesKind, request.NameEn, request.NameAr, exceptId: null, cancellationToken))
+            return PlatformSettingsErrors.LookupNameTaken;
+
         var created = CarType.Create(request.NameEn, request.NameAr, request.DisplayOrder, clock.UtcNow);
         if (created.IsFailure)
             return created.Error;
 
         await carTypes.AddAsync(created.Value, cancellationToken);
+        RecordLookup(AuditAction.LookupCreated, CarTypesKind, created.Value, previous: null, updated: Describe(created.Value));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return LookupEntryDto.From(created.Value);
     }
@@ -173,29 +188,84 @@ public sealed class LookupHandlers(
             centre = point.Value;
         }
 
+        if (await NameIsTakenAsync(CitiesKind, request.NameEn, request.NameAr, exceptId: null, cancellationToken))
+            return PlatformSettingsErrors.LookupNameTaken;
+
         var created = City.Create(request.NameEn, request.NameAr, request.DisplayOrder, clock.UtcNow, centre);
         if (created.IsFailure)
             return created.Error;
 
         await cities.AddAsync(created.Value, cancellationToken);
+        RecordLookup(AuditAction.LookupCreated, CitiesKind, created.Value, previous: null, updated: Describe(created.Value));
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return LookupEntryDto.From(created.Value);
     }
 
-    public Task<Result<LookupEntryDto, Error>> Handle(RenameLookupCommand request, CancellationToken cancellationToken)
+    public async Task<Result<LookupEntryDto, Error>> Handle(RenameLookupCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ActAsync(request.Id, request.Kind, entry => entry.Rename(request.NameEn, request.NameAr), cancellationToken);
+        if (await NameIsTakenAsync(request.Kind, request.NameEn, request.NameAr, request.Id, cancellationToken))
+            return PlatformSettingsErrors.LookupNameTaken;
+
+        return await ActAsync(
+            request.Id, request.Kind, AuditAction.LookupRenamed,
+            entry => entry.Rename(request.NameEn, request.NameAr), cancellationToken);
     }
 
-    public Task<Result<LookupEntryDto, Error>> Handle(SetLookupActiveCommand request, CancellationToken cancellationToken)
+    public async Task<Result<LookupEntryDto, Error>> Handle(SetLookupActiveCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return ActAsync(
+
+        // Bringing an entry back is the third way a name can enter the offered set, alongside
+        // creating and renaming. Retiring one cannot collide with anything, so it is not checked.
+        if (request.IsActive)
+        {
+            var entry = await FindAsync(request.Kind, request.Id, cancellationToken);
+            if (entry is not null &&
+                await NameIsTakenAsync(request.Kind, entry.NameEn, entry.NameAr, request.Id, cancellationToken))
+            {
+                return PlatformSettingsErrors.LookupNameTaken;
+            }
+        }
+
+        return await ActAsync(
             request.Id,
             request.Kind,
+            request.IsActive ? AuditAction.LookupRestored : AuditAction.LookupRetired,
             entry => request.IsActive ? entry.Activate() : entry.Deactivate(),
             cancellationToken);
+    }
+
+    private async Task<LookupEntry?> FindAsync(string kind, Id id, CancellationToken cancellationToken) =>
+        string.Equals(kind, CarTypesKind, StringComparison.OrdinalIgnoreCase)
+            ? await carTypes.GetByIdAsync(id, cancellationToken)
+            : await cities.GetByIdAsync(id, cancellationToken);
+
+    /// <summary>
+    /// Whether another OFFERED entry on the same list already reads the same, in either language.
+    /// </summary>
+    /// <remarks>
+    /// Offered only. Retiring is the nearest thing to a delete this list has, so reserving every
+    /// name a retired entry ever held would make one typo unusable for ever, and a retired entry is
+    /// in no dropdown to be confused with.
+    /// </remarks>
+    private async Task<bool> NameIsTakenAsync(
+        string kind,
+        string nameEn,
+        string nameAr,
+        Id? exceptId,
+        CancellationToken cancellationToken)
+    {
+        var offered = string.Equals(kind, CarTypesKind, StringComparison.OrdinalIgnoreCase)
+            ? (IReadOnlyList<LookupEntry>)await carTypes.ListAsync(activeOnly: true, cancellationToken)
+            : await cities.ListAsync(activeOnly: true, cancellationToken);
+
+        var wantedEn = LookupEntry.ComparisonKey(nameEn);
+        var wantedAr = LookupEntry.ComparisonKey(nameAr);
+        return offered.Any(entry =>
+            entry.Id != exceptId &&
+            (LookupEntry.ComparisonKey(entry.NameEn) == wantedEn ||
+             LookupEntry.ComparisonKey(entry.NameAr) == wantedAr));
     }
 
     /// <summary>
@@ -204,34 +274,48 @@ public sealed class LookupHandlers(
     private async Task<Result<LookupEntryDto, Error>> ActAsync(
         Id id,
         string kind,
+        AuditAction action,
         Func<LookupEntry, UnitResult<Error>> act,
         CancellationToken cancellationToken)
     {
-        if (string.Equals(kind, CarTypesKind, StringComparison.OrdinalIgnoreCase))
-        {
-            var carType = await carTypes.GetByIdAsync(id, cancellationToken);
-            if (carType is null)
-                return PlatformSettingsErrors.LookupNotFound;
-
-            var outcome = act(carType);
-            if (outcome.IsFailure)
-                return outcome.Error;
-
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            return LookupEntryDto.From(carType);
-        }
-
-        var city = await cities.GetByIdAsync(id, cancellationToken);
-        if (city is null)
+        var isCarType = string.Equals(kind, CarTypesKind, StringComparison.OrdinalIgnoreCase);
+        LookupEntry? entry = isCarType
+            ? await carTypes.GetByIdAsync(id, cancellationToken)
+            : await cities.GetByIdAsync(id, cancellationToken);
+        if (entry is null)
             return PlatformSettingsErrors.LookupNotFound;
 
-        var cityOutcome = act(city);
-        if (cityOutcome.IsFailure)
-            return cityOutcome.Error;
+        // Read before the change: a line that cannot say what the entry WAS is half a record.
+        var previous = Describe(entry);
 
+        var outcome = act(entry);
+        if (outcome.IsFailure)
+            return outcome.Error;
+
+        RecordLookup(action, kind, entry, previous, Describe(entry));
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return LookupEntryDto.From(city);
+        return LookupEntryDto.From(entry);
     }
+
+    /// <summary>What the entry read as, for the before/after columns on the audit screen.</summary>
+    private static string Describe(LookupEntry entry) =>
+        $"{entry.NameEn} / {entry.NameAr} · {(entry.IsActive ? "Offered" : "Retired")}";
+
+    private void RecordLookup(
+        AuditAction action,
+        string kind,
+        LookupEntry entry,
+        string? previous,
+        string? updated) =>
+        audit.Record(
+            action,
+            string.Equals(kind, CarTypesKind, StringComparison.OrdinalIgnoreCase)
+                ? AuditEntityType.CarType
+                : AuditEntityType.City,
+            entry.Id,
+            entry.NameEn,
+            previous,
+            updated);
 
     /// <summary>The route segment the controller uses, so the kind is never a loose string.</summary>
     public const string CarTypesKind = "car-types";

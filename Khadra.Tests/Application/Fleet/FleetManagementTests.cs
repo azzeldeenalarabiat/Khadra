@@ -1,3 +1,5 @@
+using Khadra.Domain.PlatformSettings.Repositories;
+using Khadra.Domain.PlatformSettings;
 using Khadra.Application.Dealers;
 using Khadra.Application.Common;
 using Khadra.Application.Fleet.ManageVehicles;
@@ -24,6 +26,7 @@ public sealed class FleetManagementTests
         public IVehicleRepository Vehicles { get; } = Substitute.For<IVehicleRepository>();
         public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
         public FakeDocumentStorage Storage { get; } = new();
+        public ICarTypeRepository CarTypes { get; } = Substitute.For<ICarTypeRepository>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public TestClock Clock { get; } = new(Users.Now);
         public List<Vehicle> Added { get; } = [];
@@ -31,6 +34,10 @@ public sealed class FleetManagementTests
         public Context()
         {
             UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
+            // Every car type these tests name is real and offered, unless a test says otherwise:
+            // they are about the fleet rules, not about the platform's category list.
+            CarTypes.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
+                .Returns(CarType.Create("Sedan", "سيدان", 1, Users.Now).Value);
             Vehicles.When(repository => repository.AddAsync(Arg.Any<Vehicle>(), Arg.Any<CancellationToken>()))
                 .Do(call => Added.Add(call.Arg<Vehicle>()));
         }
@@ -59,6 +66,7 @@ public sealed class FleetManagementTests
                 new DealerMembershipResolver(Dealers),
                 Clock,
                 TestBusinessRules.Provider(earliestVehicleModelYear: earliestModelYear),
+                CarTypes,
                 UnitOfWork);
 
         public VehicleImageHandlers Images() => new(

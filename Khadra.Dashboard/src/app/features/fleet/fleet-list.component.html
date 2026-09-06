@@ -8,7 +8,7 @@
     </div>
     <div class="dc-head-actions">
       <div class="tabs tabs-seg" role="tablist" [attr.aria-label]="t('common.state')">
-        @for (s of states; track s.key) {
+        @for (s of states(); track s.key) {
           <button
             type="button"
             class="tab"
@@ -104,7 +104,7 @@
             (input)="setSearch($event)"
           />
         </div>
-        <span class="page-sub push">{{ rows().length }} of {{ cars().length }} {{ t('fleetList.cars') }}</span>
+        <span class="page-sub push">{{ t('fleetList.showingOfCars', { shown: rows().length, total: cars().length }) }}</span>
       </div>
 
       @if (rows().length === 0) {

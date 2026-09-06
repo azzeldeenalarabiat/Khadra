@@ -318,14 +318,16 @@ export class VehicleDetailComponent {
       await this.service.changeStatus(c.vehicleId, action);
       this.resource.reload();
       this.service.refresh();
-      this.ui.showToast(
-        action === 'Publish' ? 'Published' : action === 'Hide' ? 'Hidden' : 'Back on the road',
-        action === 'Publish'
-          ? 'Customers can see it now.'
-          : action === 'Hide'
-            ? 'Customers no longer see it.'
-            : 'It is offered again.',
-      );
+      // Four actions, four outcomes. Returning from the garage lands on Hidden by design
+      // (Vehicle.ReturnFromMaintenance), so it must not claim the car is bookable again.
+      const told: Record<VehicleStatusAction, readonly [string, string]> = {
+        Publish: ['Published', 'Customers can see it now.'],
+        Hide: ['Hidden', 'Customers no longer see it.'],
+        SendToMaintenance: ['Off the road', 'It is not offered while it is off the road.'],
+        ReturnFromMaintenance: ['Back on the road', 'It is hidden until you publish it again.'],
+      };
+      const [title, body] = told[action];
+      this.ui.showToast(title, body);
     } catch (error) {
       const problem = error as { error?: { code?: string; title?: string } };
       this.ui.showToast(

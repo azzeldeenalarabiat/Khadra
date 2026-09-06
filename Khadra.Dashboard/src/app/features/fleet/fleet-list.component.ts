@@ -53,13 +53,16 @@ export class FleetListComponent {
   private readonly hires = loaded(this.onHire);
   private readonly dealer = loaded(this.consoleData.me);
 
-  protected readonly states: readonly { key: StateFilter; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'Active', label: 'Listed' },
-    { key: 'Hidden', label: 'Hidden' },
+  // Computed, not a field: a field initialiser resolves once at construction, so switching language
+  // while the screen is open left the chips in the old one — and only one of the five was keyed at
+  // all, which is how a row reading "All | Listed | Hidden | مسحوبة من الخدمة | Draft" happened.
+  protected readonly states = computed<readonly { key: StateFilter; label: string }[]>(() => [
+    { key: 'all', label: this.t('fleetList.all') },
+    { key: 'Active', label: this.t('fleetList.listed') },
+    { key: 'Hidden', label: this.t('fleetList.hidden') },
     { key: 'Maintenance', label: this.t('fleetList.offTheRoad') },
-    { key: 'Draft', label: 'Draft' },
-  ];
+    { key: 'Draft', label: this.t('fleetList.draft') },
+  ]);
 
   protected readonly cars = computed(() => this.data() ?? []);
 
@@ -106,14 +109,14 @@ export class FleetListComponent {
     const hired = this.hiredVehicleIds();
     const listed = cars.filter((c) => c.status === 'Active');
     return [
-      { k: 'In your fleet', v: cars.length },
-      { k: 'Listed', v: listed.length },
+      { k: this.t('fleetList.inYourFleet'), v: cars.length },
+      { k: this.t('fleetList.listed'), v: listed.length },
       {
-        k: 'Available now',
+        k: this.t('fleetList.availableNow'),
         v: listed.filter((c) => c.isBookable && !hired.has(c.vehicleId)).length,
       },
-      { k: 'On hire', v: cars.filter((c) => hired.has(c.vehicleId)).length },
-      { k: 'Off the road', v: cars.filter((c) => c.status === 'Maintenance').length },
+      { k: this.t('fleetList.onHire'), v: cars.filter((c) => hired.has(c.vehicleId)).length },
+      { k: this.t('fleetList.offTheRoad'), v: cars.filter((c) => c.status === 'Maintenance').length },
     ];
   });
 
@@ -151,27 +154,27 @@ export class FleetListComponent {
   }
 
   protected statusLabel(car: Vehicle): string {
-    if (this.isOnHire(car)) return 'On hire';
-    if (car.status === 'Draft') return 'Draft';
-    if (car.status === 'Maintenance') return 'Off the road';
-    if (car.status === 'Hidden') return 'Hidden';
-    return car.isBookable ? 'Listed' : 'Blocked';
+    if (this.isOnHire(car)) return this.t('fleetList.onHire');
+    if (car.status === 'Draft') return this.t('fleetList.draft');
+    if (car.status === 'Maintenance') return this.t('fleetList.offTheRoad');
+    if (car.status === 'Hidden') return this.t('fleetList.hidden');
+    return car.isBookable ? this.t('fleetList.listed') : this.t('fleetList.blocked');
   }
 
   /** Says what the state MEANS, not just what it is called. */
   protected statusNote(car: Vehicle): string {
-    if (this.isOnHire(car)) return 'Out with a customer';
-    if (car.status === 'Draft') return 'Not published yet';
-    if (car.status === 'Maintenance') return 'Not offered until it is back';
-    if (car.status === 'Hidden') return 'Not shown to customers';
-    return car.isBookable ? 'Visible to customers' : 'Your dealership cannot trade';
+    if (this.isOnHire(car)) return this.t('fleetList.outWithACustomer');
+    if (car.status === 'Draft') return this.t('fleetList.notPublishedYet');
+    if (car.status === 'Maintenance') return this.t('fleetList.notOfferedUntilBack');
+    if (car.status === 'Hidden') return this.t('fleetList.notShownToCustomers');
+    return car.isBookable ? this.t('fleetList.visibleToCustomers') : this.t('fleetList.cannotTrade');
   }
 
   protected primaryAction(car: Vehicle): { label: string; action: VehicleStatusAction } | null {
-    if (car.status === 'Active') return { label: 'Hide', action: 'Hide' };
+    if (car.status === 'Active') return { label: this.t('fleetList.hide'), action: 'Hide' };
     if (car.status === 'Maintenance')
       return { label: this.t('fleetList.backOnTheRoad'), action: 'ReturnFromMaintenance' };
-    return { label: 'Publish', action: 'Publish' };
+    return { label: this.t('fleetList.publish'), action: 'Publish' };
   }
 
   protected setSearch(event: Event): void {

@@ -66,6 +66,9 @@ export class DealersListComponent {
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
+    // One result reads 'Showing 1 of 1 dealer', not '1 dealers'. Every other list on the console
+    // already picks its noun by count; this one is phrased in the translation instead.
+    if (page.totalCount === 1) return this.t('dealersList.showingOne');
     return this.t('dealersList.showing', { from, to, total: page.totalCount });
   });
 

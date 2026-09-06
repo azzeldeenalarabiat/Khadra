@@ -27,17 +27,41 @@ public sealed class BusinessNameTests
 
 public sealed class CommercialRegistrationNumberTests
 {
-    [Fact]
-    public void Keeps_only_digits()
-    {
-        Assert.Equal("123456", CommercialRegistrationNumber.Create("CR-123 456").Value.Value);
-    }
+    /// <summary>
+    /// Separators come out because people type the number the way it is printed on the certificate.
+    /// </summary>
+    [Theory]
+    [InlineData("123 456", "123456")]
+    [InlineData("123-456", "123456")]
+    [InlineData("12/34/56", "123456")]
+    [InlineData("123.456", "123456")]
+    [InlineData("  123456  ", "123456")]
+    public void Drops_the_separators_people_type(string raw, string expected) =>
+        Assert.Equal(expected, CommercialRegistrationNumber.Create(raw).Value.Value);
+
+    /// <summary>
+    /// The regression. Letters used to be DELETED rather than refused, so "E2E20260906" was stored
+    /// and displayed as "220260906": a different number, accepted silently, checked by an
+    /// administrator against a certificate it no longer matches. The column is UNIQUE too, so
+    /// "AB-1234" and "1234" collapsed onto one another and the second applicant was turned away for
+    /// a number they had never typed.
+    /// </summary>
+    [Theory]
+    [InlineData("E2E20260906")]
+    [InlineData("CR-123 456")]
+    [InlineData("AB1234")]
+    [InlineData("1234x")]
+    public void Refuses_anything_that_is_not_a_digit_or_a_separator(string raw) =>
+        Assert.Equal(
+            "dealer.invalid_commercial_registration",
+            CommercialRegistrationNumber.Create(raw).Error.Code);
 
     [Theory]
     [InlineData(null)]
     [InlineData("12")]
     [InlineData("abc")]
     [InlineData("123456789012345678901")]
+    [InlineData("---")]
     public void Rejects_implausible_numbers(string? raw) =>
         Assert.True(CommercialRegistrationNumber.Create(raw).IsFailure);
 }

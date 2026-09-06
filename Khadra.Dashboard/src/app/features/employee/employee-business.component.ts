@@ -3,6 +3,7 @@ import { DealerConsoleService } from '../../core/services/dealer-console.service
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 
 interface OwnerOnlyRow {
   readonly label: string;
@@ -34,6 +35,7 @@ interface OwnerOnlyRow {
 export class EmployeeBusinessComponent {
   protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
+  protected readonly fmt = inject(FormatService);
 
   protected readonly resource = this.service.me;
   /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */

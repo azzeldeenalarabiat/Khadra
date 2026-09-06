@@ -8,7 +8,15 @@ public static class DealerErrors
         Error.Validation("dealer.invalid_business_name", "The business name must be between 2 and 150 characters.");
 
     public static readonly Error InvalidCommercialRegistration =
-        Error.Validation("dealer.invalid_commercial_registration", "The commercial registration number is not valid.");
+        Error.Validation(
+            "dealer.invalid_commercial_registration",
+            "The commercial registration number must be 4 to 20 digits. Spaces, dashes, slashes and dots are ignored; other characters are not allowed.");
+
+    public static readonly Error AlreadySuspended =
+        Error.Conflict("dealer.already_suspended", "This dealer is already suspended.");
+
+    public static readonly Error NotSuspended =
+        Error.Conflict("dealer.not_suspended", "This dealer is not suspended.");
 
     public static readonly Error InvalidDeliveryRadius =
         Error.Validation("dealer.invalid_delivery_radius", "The delivery radius must be greater than 0 and at most 200 km.");

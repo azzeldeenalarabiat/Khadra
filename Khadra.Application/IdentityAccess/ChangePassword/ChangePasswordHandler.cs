@@ -32,6 +32,11 @@ public sealed class ChangePasswordHandler(
         if (!passwordHasher.Verify(request.CurrentPassword, user.PasswordHash.Value))
             return IdentityErrors.InvalidCredentials;
 
+        // The console promises a new password, and a forced rotation is worthless if retyping the
+        // old one satisfies it — ChangePassword also clears MustChangePassword.
+        if (passwordHasher.Verify(request.NewPassword, user.PasswordHash.Value))
+            return IdentityErrors.PasswordUnchanged;
+
         var password = PasswordPolicy.Validate(request.NewPassword, policy.PasswordMinimumLength);
         if (password.IsFailure)
             return password.Error;

@@ -42,6 +42,35 @@ export class FormatService {
 
   private readonly locale = computed(() => this.i18n.localeTag());
 
+  /**
+   * A weekday name in the reader's language.
+   *
+   * The server sends operating hours keyed by the English day name ('Sunday' … 'Saturday'), which
+   * left an Arabic, right-to-left opening-hours table reading "Sunday". Rather than hand-translate
+   * seven words, the name is turned back into a position in the week and handed to ICU, which
+   * already knows what every locale calls its days. 2024-01-07 is a Sunday, so it anchors the week.
+   * An unrecognised value is returned untouched instead of guessed at.
+   */
+  weekday(englishName: string | null | undefined): string {
+    if (!englishName) return '';
+    const index = FormatService.WeekdayOrder.indexOf(englishName.trim().toLowerCase());
+    if (index < 0) return englishName;
+    const reference = new Date(Date.UTC(2024, 0, 7 + index));
+    return this.isolate(
+      new Intl.DateTimeFormat(this.locale(), { weekday: 'long', timeZone: 'UTC' }).format(reference),
+    );
+  }
+
+  private static readonly WeekdayOrder = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+  ];
+
   /** 06 Sept 2026 */
   date(value: string | number | Date | null | undefined): string {
     const date = this.parse(value);

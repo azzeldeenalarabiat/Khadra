@@ -72,7 +72,7 @@
           <div class="sect-pad kv-narrow">
             @for (day of hours(); track day.day) {
               <div class="kv">
-                <span class="kv-key">{{ day.day }}</span>
+                <span class="kv-key">{{ fmt.weekday(day.day) }}</span>
                 <span class="kv-val">{{ schedule(day) }}</span>
               </div>
             } @empty {

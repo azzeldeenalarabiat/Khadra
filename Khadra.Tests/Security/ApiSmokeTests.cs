@@ -19,6 +19,10 @@ public sealed class ApiSmokeTests : IDisposable
             builder.UseSetting("Authentication:Jwt:SigningKey", new string('k', 48));
             builder.UseSetting("Database:AutoMigrate", "false");
             builder.UseSetting("Email:Provider", "Logging");
+            // A deployment outside Development must name the proxy it trusts or the API refuses to
+            // start, so the harness names one too. It is deliberately NOT the address these requests
+            // arrive from: see ForwardedHeaderTests for why that distinction is the whole point.
+            builder.UseSetting("KnownProxies:0", "10.255.255.1");
         });
 
     public void Dispose() => _factory.Dispose();

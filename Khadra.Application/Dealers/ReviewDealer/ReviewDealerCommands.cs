@@ -124,11 +124,10 @@ public sealed class ReviewDealerHandlers(
         ArgumentNullException.ThrowIfNull(request);
         return DecideAsync(
             request.DealerId,
-            (dealer, _, _) =>
-            {
-                dealer.Reactivate();
-                return UnitResult.Success<Error>();
-            },
+            // Returns the aggregate's answer rather than discarding it: reactivating a dealership
+            // that was never suspended used to succeed and write DealerReactivated into an
+            // append-only table, where it can never be taken back.
+            (dealer, _, _) => dealer.Reactivate(),
             AuditAction.DealerReactivated,
             NotificationKind.DealerReactivated,
             reason: null,

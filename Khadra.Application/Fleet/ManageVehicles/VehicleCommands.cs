@@ -9,6 +9,7 @@ using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.Fleet.Repositories;
+using Khadra.Domain.PlatformSettings.Repositories;
 using MediatR;
 
 namespace Khadra.Application.Fleet.ManageVehicles;
@@ -79,7 +80,9 @@ public sealed class VehicleDetailsInputValidator : AbstractValidator<VehicleDeta
         // rather than a copy here that would go stale the day the owner changes it.
         RuleFor(input => input.Year).InclusiveBetween(VehicleDetails.EarliestPossibleModelYear, DateTime.UtcNow.Year + 1);
         RuleFor(input => input.Seats).InclusiveBetween(1, 20);
-        RuleFor(input => input.PlateNumber).NotEmpty().MaximumLength(20);
+        // Raw input, so it has room for the separators the value object strips; the digit count is
+        // PlateNumber's rule, not this one's.
+        RuleFor(input => input.PlateNumber).NotEmpty().MaximumLength(30);
         RuleFor(input => input.DailyRate).GreaterThan(0m);
         RuleFor(input => input.SecurityDeposit).GreaterThanOrEqualTo(0m);
         RuleFor(input => input.Description).MaximumLength(VehicleDetails.MaxDescriptionLength);
@@ -108,6 +111,7 @@ public sealed class VehicleHandlers(
     DealerMembershipResolver membership,
     IClock clock,
     IBusinessRulesProvider businessRules,
+    ICarTypeRepository carTypes,
     IUnitOfWork unitOfWork) :
     IRequestHandler<ListMyVehiclesQuery, Result<IReadOnlyList<VehicleDto>, Error>>,
     IRequestHandler<GetMyVehicleQuery, Result<VehicleDto, Error>>,
@@ -163,6 +167,13 @@ public sealed class VehicleHandlers(
         if (parsed.IsFailure)
             return parsed.Error;
 
+        // Nothing joins a vehicle to its car type — cross-context references are by id and carry no
+        // foreign key — so this check is the only thing standing between a typo and a car that
+        // points at a category which does not exist. A new listing must name a type that is offered.
+        var carTypeCheck = await RequireCarType(Id.From(request.Details.CarTypeId), mustBeOffered: true, cancellationToken);
+        if (carTypeCheck.IsFailure)
+            return carTypeCheck.Error;
+
         // Spec: one car, one listing. A plate already on the platform means either a duplicate or a
         // dealer listing a car that is not theirs.
         if (await vehicles.PlateNumberExistsAsync(parsed.Value.Plate, cancellationToken))
@@ -203,6 +214,15 @@ public sealed class VehicleHandlers(
         var parsed = ParseDetails(request.Details, rules.EarliestVehicleModelYear);
         if (parsed.IsFailure)
             return parsed.Error;
+
+        // A type the dealer is CHANGING to must still be offered; the one already on the car need
+        // only exist. Otherwise retiring a category would freeze every car in it — the owner could
+        // not correct a price until they had re-categorised, which is not a decision a price edit
+        // should force. Mirrors the plate rule just below.
+        var carTypeId = Id.From(request.Details.CarTypeId);
+        var carTypeCheck = await RequireCarType(carTypeId, mustBeOffered: carTypeId != vehicle.CarTypeId, cancellationToken);
+        if (carTypeCheck.IsFailure)
+            return carTypeCheck.Error;
 
         // Only worth a lookup if the plate actually changed; otherwise the car collides with itself.
         if (parsed.Value.Plate != vehicle.PlateNumber &&
@@ -303,22 +323,36 @@ public sealed class VehicleHandlers(
         return (dealer, vehicle);
     }
 
+    private async Task<UnitResult<Error>> RequireCarType(Id carTypeId, bool mustBeOffered, CancellationToken cancellationToken)
+    {
+        var carType = await carTypes.GetByIdAsync(carTypeId, cancellationToken);
+        if (carType is null)
+            return UnitResult.Failure(FleetErrors.UnknownCarType);
+        if (mustBeOffered && !carType.IsActive)
+            return UnitResult.Failure(FleetErrors.CarTypeRetired);
+
+        return UnitResult.Success<Error>();
+    }
+
     private static Result<ParsedVehicle, Error> ParseDetails(VehicleDetailsInput input, int earliestModelYear)
     {
+        // Each field answers for itself. All three used to fall through to InvalidMakeOrModel, so a
+        // bad fuel type told the caller — including the Flutter app — to fix the make and model,
+        // which were fine.
         var transmission = Enumeration.GetAll<TransmissionType>()
             .SingleOrDefault(type => string.Equals(type.Name, input.Transmission, StringComparison.OrdinalIgnoreCase));
         if (transmission is null)
-            return FleetErrors.InvalidMakeOrModel;
+            return FleetErrors.InvalidTransmission;
 
         var fuelType = Enumeration.GetAll<FuelType>()
             .SingleOrDefault(type => string.Equals(type.Name, input.FuelType, StringComparison.OrdinalIgnoreCase));
         if (fuelType is null)
-            return FleetErrors.InvalidMakeOrModel;
+            return FleetErrors.InvalidFuelType;
 
         var fuelPolicy = Enumeration.GetAll<FuelPolicy>()
             .SingleOrDefault(policy => string.Equals(policy.Name, input.FuelPolicy, StringComparison.OrdinalIgnoreCase));
         if (fuelPolicy is null)
-            return FleetErrors.InvalidMakeOrModel;
+            return FleetErrors.InvalidFuelPolicy;
 
         var details = VehicleDetails.Create(
             input.Make, input.Model, input.Year, input.Seats, transmission, fuelType,

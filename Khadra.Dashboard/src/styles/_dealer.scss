@@ -404,6 +404,8 @@
   object-fit: cover;
 }
 
+// Absolutely positioned, so its containers must establish a positioning context or it resolves
+// against a far ancestor and lands on the sidebar, on top of Logout. See .brand-logo/.brand-cover.
 .photo-label {
   position: absolute;
   bottom: 7px;
@@ -565,6 +567,7 @@
 }
 
 .brand-logo {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -579,6 +582,7 @@
 }
 
 .brand-cover {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;

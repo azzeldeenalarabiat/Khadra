@@ -93,12 +93,33 @@ export class AuditLogComponent {
     return `Showing ${from}–${to} of ${page.totalCount} ${noun}`;
   });
 
+  /**
+   * A refused request and an unusable filter set are not the same thing to the reader. A 400 is
+   * something they typed — a "to" date before the "from" — so it offers the filters back rather than
+   * a Retry that would fail identically. Only a genuine load failure is worth retrying.
+   */
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'The audit log is for administrators.';
-    if (error.status === 400) return 'That combination of filters is not valid.';
-    return 'The audit log could not be loaded. Nothing has been changed.';
+    if (error.status === 400) {
+      return {
+        title: this.t('auditLog.filtersDoNotWork'),
+        message: this.t('auditLog.checkTheDates'),
+        action: 'clear' as const,
+      };
+    }
+    if (error.status === 403) {
+      return {
+        title: this.t('auditLog.couldntLoadTheAudit'),
+        message: 'The audit log is for administrators.',
+        action: 'none' as const,
+      };
+    }
+    return {
+      title: this.t('auditLog.couldntLoadTheAudit'),
+      message: 'The audit log could not be loaded. Nothing has been changed.',
+      action: 'retry' as const,
+    };
   });
 
   protected setFilter(key: 'action' | 'entityType', value: string): void {

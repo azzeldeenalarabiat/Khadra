@@ -73,6 +73,7 @@ export const AR = {
   'screen.disputeResolution': 'تسوية النزاع',
   'screen.platformSettings': 'إعدادات المنصة',
   'screen.addVehicle': 'إضافة مركبة',
+  'screen.submitYourGallery': 'تقديم معرضك',
   'screen.vehicleDetails': 'تفاصيل المركبة',
   'screen.editVehicle': 'تعديل المركبة',
   'screen.publicPreview': 'معاينة الصفحة العامة',
@@ -82,10 +83,11 @@ export const AR = {
   'screen.auditLogs': 'سجل التدقيق',
   'screen.adminUsers': 'مستخدمو الإدارة',
 
-  // The break falls between "نظام تأجير" and "السيارات", which is not where the English breaks —
-  // hence two keys rather than one sentence with a <br> in the middle of it.
-  'brand.line1': 'نظام تأجير',
-  'brand.line2': 'السيارات',
+  // The name stays in Latin script, as 'app.name' already does: it is the brand, not a word to
+  // translate. Only the line under it is Arabic, and it stays whole — the English breaks that same
+  // description across both lines, which is why the wordmark is two keys and not one <br>.
+  'brand.line1': 'Khadra',
+  'brand.line2': 'نظام تأجير السيارات',
 
   'sidebar.sections': 'أقسام الإدارة',
   'sidebar.captionDealer': 'معرض',
@@ -293,7 +295,7 @@ export const AR = {
   'auth.reset.doneTitle': 'تم تغيير كلمة المرور',
   'auth.reset.doneBody': 'تم تسجيل الخروج من كل الجلسات الأخرى. جارٍ إعادتك إلى تسجيل الدخول…',
   'auth.reset.title': 'اختر كلمة مرور جديدة',
-  'auth.reset.subtitle': 'اختر كلمة لم تستخدمها هنا من قبل.',
+  'auth.reset.subtitle': 'اختر كلمة مختلفة عن كلمة المرور الحالية.',
   'auth.reset.submit': 'تعيين كلمة المرور',
   'auth.reset.busy': 'جارٍ الحفظ…',
 
@@ -579,6 +581,8 @@ export const AR = {
   'auditLog.change': 'التغيير',
   'auditLog.clear': 'مسح',
   'auditLog.clearFilters': 'مسح عوامل التصفية',
+  'auditLog.filtersDoNotWork': 'عوامل التصفية هذه لا تعمل معًا',
+  'auditLog.checkTheDates': 'تحقّق من التواريخ — نهاية المدى تسبق بدايتها.',
   'auditLog.correlation': 'معرّف الربط',
   'auditLog.couldntLoadTheAudit': 'تعذّر تحميل سجل التدقيق',
   'auditLog.dealerBookingReferenceOr': 'معرض، أو رقم حجز، أو شخص…',
@@ -1219,6 +1223,7 @@ export const AR = {
   'employeeNotifications.showing': 'يُعرض',
   'employeeSettings.employeeOf': 'موظف لدى',
   'fleetList.cars': 'مركبة',
+  'fleetList.showingOfCars': '{shown} من {total} مركبة',
   'fleetList.seats': 'مقعدًا',
   'lookups.dealersPinTheirLocation':
     'يحدّد المعارض مواقعهم على الخريطة، وتُقاس المسافة من الإحداثيات، فالمنصة تعمل بدون هذه القائمة. وإضافة المدن تمنح العملاء شيئًا يصفّون به.',
@@ -1403,6 +1408,22 @@ export const AR = {
   'employeeSettings.seeEveryCarIts':
     'الاطّلاع على كل مركبة وحالتها وتقويمها. أما الإضافة والتعديل والحذف فمن شأن صاحب المعرض.',
   'fleetList.offTheRoad': 'مسحوبة من الخدمة',
+  'fleetList.blocked': 'موقوفة',
+  'fleetList.hide': 'إخفاء',
+  'fleetList.publish': 'نشر',
+  'fleetList.all': 'الكل',
+  'fleetList.listed': 'معروضة',
+  'fleetList.hidden': 'مخفية',
+  'fleetList.draft': 'مسودة',
+  'fleetList.inYourFleet': 'في أسطولك',
+  'fleetList.availableNow': 'متاحة الآن',
+  'fleetList.onHire': 'مؤجَّرة حاليًا',
+  'fleetList.outWithACustomer': 'مع عميل',
+  'fleetList.notPublishedYet': 'لم تُنشر بعد',
+  'fleetList.notOfferedUntilBack': 'غير معروضة حتى عودتها',
+  'fleetList.notShownToCustomers': 'غير ظاهرة للعملاء',
+  'fleetList.visibleToCustomers': 'ظاهرة للعملاء',
+  'fleetList.cannotTrade': 'معرضك غير قادر على العمل حاليًا',
   'fleetList.backOnTheRoad': 'إعادة إلى الخدمة',
   'fleetList.itStopsBeingOffered':
     'تتوقف عن العرض على العملاء إلى أن تعيدها. ولا تتأثر الحجوزات المعتمدة عليها — أخبر أصحابها بنفسك إن كانت المركبة لن تكون جاهزة.',
@@ -1459,6 +1480,7 @@ export const AR = {
   'dealersList.colReviewDue': 'موعد المراجعة',
   'dealersList.colActions': 'إجراءات',
   'dealersList.showing': 'عرض {from}–{to} من {total} معرضًا',
+  'dealersList.showingOne': 'عرض معرض واحد',
   'dealersList.adminOnly': 'قائمة طلبات المعارض مقصورة على المشرفين.',
   'dealersList.loadFailed': 'تعذّر تحميل قائمة طلبات المعارض. ولم يتغيّر شيء.',
   'status.pendingReview': 'بانتظار المراجعة',

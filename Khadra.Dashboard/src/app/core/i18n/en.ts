@@ -77,6 +77,7 @@ export const EN = {
   'screen.disputeResolution': 'Dispute resolution',
   'screen.platformSettings': 'Platform settings',
   'screen.addVehicle': 'Add vehicle',
+  'screen.submitYourGallery': 'Submit your gallery',
   'screen.vehicleDetails': 'Vehicle details',
   'screen.editVehicle': 'Edit vehicle',
   'screen.publicPreview': 'Public page preview',
@@ -86,10 +87,11 @@ export const EN = {
   'screen.auditLogs': 'Audit logs',
   'screen.adminUsers': 'Admin users',
 
-  // The wordmark. Two lines because the design stacks it; Arabic breaks in a different place, which
-  // is exactly why the break is two keys rather than a <br> inside one sentence.
-  'brand.line1': 'CAR RENTAL',
-  'brand.line2': 'SYSTEM',
+  // The wordmark: the name on the first line, what the platform is on the second. Two keys rather
+  // than a <br> inside one sentence because Arabic breaks in a different place — and because the
+  // name itself is NOT translated (see 'app.name'), only the description under it is.
+  'brand.line1': 'KHADRA',
+  'brand.line2': 'CAR RENTAL SYSTEM',
 
   // Sidebar chrome.
   'sidebar.sections': 'Admin sections',
@@ -312,7 +314,7 @@ export const EN = {
   'auth.reset.doneTitle': 'Password changed',
   'auth.reset.doneBody': 'Every other session has been signed out. Taking you back to sign in…',
   'auth.reset.title': 'Choose a new password',
-  'auth.reset.subtitle': 'Pick something you have not used here before.',
+  'auth.reset.subtitle': 'Pick something other than the password you have now.',
   'auth.reset.submit': 'Set new password',
   'auth.reset.busy': 'Saving…',
 
@@ -592,6 +594,8 @@ export const EN = {
   'auditLog.change': 'Change',
   'auditLog.clear': 'Clear',
   'auditLog.clearFilters': 'Clear filters',
+  'auditLog.filtersDoNotWork': 'Those filters do not work together',
+  'auditLog.checkTheDates': 'Check the dates — the end of the range falls before the start.',
   'auditLog.correlation': 'Correlation',
   'auditLog.couldntLoadTheAudit': "Couldn't load the audit log",
   'auditLog.dealerBookingReferenceOr': 'Dealer, booking reference or person…',
@@ -920,13 +924,13 @@ export const EN = {
   'vehicleDetail.editsToTheListing':
     "Edits to the listing itself (price, photos, delivery) are not logged yet. Booking changes shown here are the most recent from your dealership's activity.",
   'vehicleDetail.heldForBooking': 'Held for booking',
-  'vehicleDetail.informationAmpSpecifications': 'Information &amp; specifications',
+  'vehicleDetail.informationAmpSpecifications': 'Information & specifications',
   'vehicleDetail.nextMonth': 'Next month',
   'vehicleDetail.noApprovedBookingIs': 'No approved booking is holding this car.',
   'vehicleDetail.noBookingsOnThis': 'No bookings on this car yet',
   'vehicleDetail.outOnBooking': 'Out on booking',
   'vehicleDetail.previousMonth': 'Previous month',
-  'vehicleDetail.pricingAmpDelivery': 'Pricing &amp; delivery',
+  'vehicleDetail.pricingAmpDelivery': 'Pricing & delivery',
   'vehicleDetail.vehicleActivity': 'Vehicle activity',
   'vehicleDetail.vehicleAdded': 'Vehicle added',
 
@@ -1323,6 +1327,7 @@ export const EN = {
   'employeeNotifications.whatHappenedAtYour': 'What happened at your dealership',
   'employeeNotifications.showing': 'Showing',
   'fleetList.cars': 'cars',
+  'fleetList.showingOfCars': '{shown} of {total} cars',
   'fleetList.seats': 'seats',
   'lookups.dealersPinTheirLocation':
     'Dealers pin their location on a map, and distance is measured from the coordinates, so the platform works without this list. Adding cities gives customers something to filter by.',
@@ -1448,6 +1453,22 @@ export const EN = {
   'vehicleDetail.everyDayShowsAs':
     'Every day shows as not offered until you bring it back. Bookings already approved are not affected — tell those customers yourself if the car will not be ready.',
   'fleetList.offTheRoad': 'Off the road',
+  'fleetList.blocked': 'Blocked',
+  'fleetList.hide': 'Hide',
+  'fleetList.publish': 'Publish',
+  'fleetList.all': 'All',
+  'fleetList.listed': 'Listed',
+  'fleetList.hidden': 'Hidden',
+  'fleetList.draft': 'Draft',
+  'fleetList.inYourFleet': 'In your fleet',
+  'fleetList.availableNow': 'Available now',
+  'fleetList.onHire': 'On hire',
+  'fleetList.outWithACustomer': 'Out with a customer',
+  'fleetList.notPublishedYet': 'Not published yet',
+  'fleetList.notOfferedUntilBack': 'Not offered until it is back',
+  'fleetList.notShownToCustomers': 'Not shown to customers',
+  'fleetList.visibleToCustomers': 'Visible to customers',
+  'fleetList.cannotTrade': 'Your dealership cannot trade',
   'fleetList.backOnTheRoad': 'Back on the road',
   'fleetList.itStopsBeingOffered':
     'It stops being offered to customers until you bring it back. Bookings already approved on it are not affected — tell those customers yourself if the car will not be ready.',
@@ -1550,6 +1571,7 @@ export const EN = {
   'dealersList.colReviewDue': 'Review due',
   'dealersList.colActions': 'Actions',
   'dealersList.showing': 'Showing {from}–{to} of {total} dealers',
+  'dealersList.showingOne': 'Showing 1 of 1 dealer',
   'dealersList.adminOnly': 'Only administrators can see the dealer queue.',
   'dealersList.loadFailed': 'The dealer queue could not be loaded. Nothing has been changed.',
   'status.pendingReview': 'Pending review',
