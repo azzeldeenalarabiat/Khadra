@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<Dealers.DealerMembershipResolver>();
         services.AddScoped<EmployeeAccountProvisioner>();
         services.AddScoped<Bookings.BookingPartyResolver>();
+        services.AddScoped<Bookings.BookingPricer>();
         services.AddScoped<Disputes.DisputeAuditor>();
         services.AddScoped<Disputes.DisputeViewComposer>();
         services.AddScoped<Notifications.DealerTeamNotifier>();

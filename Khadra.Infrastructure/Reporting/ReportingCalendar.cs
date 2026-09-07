@@ -20,6 +20,8 @@ internal sealed class ReportingCalendar : IReportingCalendar
         _zone = TimeZoneInfo.FindSystemTimeZoneById(options.Value.ReportingTimeZone);
     }
 
+    public string TimeZoneId => _zone.Id;
+
     public DateOnly DayOf(DateTimeOffset instant) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, _zone).DateTime);
 

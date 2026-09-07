@@ -151,6 +151,7 @@ public static class DependencyInjection
         services.AddScoped<IEmployeeReader, EmployeeReader>();
         services.AddScoped<IDealerBookingReader, DealerBookingReader>();
         services.AddScoped<IDealerFleetReader, DealerFleetReader>();
+        services.AddScoped<ICatalogueReader, CatalogueReader>();
         services.AddScoped<IBookingDashboardReader, BookingDashboardReader>();
         services.AddScoped<IBookingReader, BookingReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();

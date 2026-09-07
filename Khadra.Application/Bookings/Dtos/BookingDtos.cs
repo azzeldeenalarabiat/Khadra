@@ -97,6 +97,10 @@ public sealed record GeoPointDto(double Latitude, double Longitude);
 
 public sealed record BookingPricingDto(
     MoneyDto DailyRate,
+    // The Amman calendar dates the rental was priced between, and the days they produced. All three
+    // are frozen on the booking. A client renders these; it never counts days of its own.
+    DateOnly PickupDate,
+    DateOnly ReturnDate,
     int Days,
     MoneyDto RentalTotal,
     MoneyDto DeliveryFee,
@@ -115,6 +119,8 @@ public sealed record BookingPricingDto(
         ArgumentNullException.ThrowIfNull(pricing);
         return new BookingPricingDto(
             MoneyDto.From(pricing.DailyRate),
+            pricing.PickupDate,
+            pricing.ReturnDate,
             pricing.Days,
             MoneyDto.From(pricing.RentalTotal),
             MoneyDto.From(pricing.DeliveryFee),

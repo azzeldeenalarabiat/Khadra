@@ -35,13 +35,20 @@ internal static class Build
     public static OperatingHours NineToFive =>
         OperatingHours.Uniform(new TimeOnly(9, 0), new TimeOnly(17, 0)).Value;
 
-    public static Dealer Dealer(DateTimeOffset? now = null, Id? ownerUserId = null)
+    // The registration number is UNIQUE in the database, so a test that needs two galleries has to
+    // say so. Left as a fixed default rather than always generated, because several tests assert on
+    // "123456" and a random one would make their failures unreadable.
+    public static Dealer Dealer(
+        DateTimeOffset? now = null,
+        Id? ownerUserId = null,
+        string businessName = "Petra Rentals",
+        string commercialRegistration = "123456")
     {
         var moment = now ?? Now;
         return Khadra.Domain.Dealers.Dealer.Register(
             ownerUserId ?? Id.New(),
-            BusinessName.Create("Petra Rentals").Value,
-            CommercialRegistrationNumber.Create("123456").Value,
+            BusinessName.Create(businessName).Value,
+            CommercialRegistrationNumber.Create(commercialRegistration).Value,
             Amman,
             NineToFive,
             moment,
@@ -49,10 +56,14 @@ internal static class Build
     }
 
     // A dealer that has cleared the licence check and can trade.
-    public static Dealer ApprovedDealer(DateTimeOffset? now = null, Id? ownerUserId = null)
+    public static Dealer ApprovedDealer(
+        DateTimeOffset? now = null,
+        Id? ownerUserId = null,
+        string businessName = "Petra Rentals",
+        string commercialRegistration = "123456")
     {
         var moment = now ?? Now;
-        var dealer = Dealer(moment, ownerUserId);
+        var dealer = Dealer(moment, ownerUserId, businessName, commercialRegistration);
         AttachAllDocuments(dealer, moment);
         dealer.Approve(Id.New(), moment);
         dealer.ClearDomainEvents();
@@ -70,19 +81,27 @@ internal static class Build
         Khadra.Domain.Fleet.VehicleDetails.Create(
             "Toyota", "Corolla", year, 5, TransmissionType.Automatic, FuelType.Petrol, currentYear: 2026).Value;
 
-    public static Vehicle Vehicle(Id? dealerId = null, decimal dailyRate = 30m, DateTimeOffset? now = null)
+    public static Vehicle Vehicle(
+        Id? dealerId = null,
+        decimal dailyRate = 30m,
+        DateTimeOffset? now = null,
+        Id? carTypeId = null,
+        bool isDeliveryEligible = true,
+        // Unique in the database, like the gallery registration number: a test with two cars in it
+        // has to name them apart.
+        string plateNumber = "12-34567")
     {
         var moment = now ?? Now;
         var vehicle = Khadra.Domain.Fleet.Vehicle.Add(
             dealerId ?? Id.New(),
-            Id.New(),
+            carTypeId ?? Id.New(),
             VehicleDetails(),
-            PlateNumber.Create("12-34567").Value,
+            PlateNumber.Create(plateNumber).Value,
             Money.Jod(dailyRate),
             Money.Jod(200m),
             MileagePolicy.Unlimited(),
             FuelPolicy.FullToFull,
-            isDeliveryEligible: true,
+            isDeliveryEligible,
             moment).Value;
         vehicle.ClearDomainEvents();
         return vehicle;

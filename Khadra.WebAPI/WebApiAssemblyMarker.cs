@@ -25,4 +25,16 @@ public static class RateLimitPolicies
     public const string Auth = "auth";
     public const string Login = "login";
     public const string Refresh = "refresh";
+
+    /// <summary>
+    /// The anonymous catalogue: browsing, one listing, a quote, a gallery page, and the two lookups
+    /// the filter chips need.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately far looser than the auth limits. These are read-only public prices, and mobile
+    /// carriers NAT thousands of subscribers behind a single address — a tight per-IP window here
+    /// would shut out an entire network rather than one abuser. The global 600/minute still applies
+    /// above it, and checklist item 32 tracks the partitioning problem behind a proxy.
+    /// </remarks>
+    public const string Public = "public";
 }

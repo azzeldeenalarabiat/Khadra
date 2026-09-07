@@ -4,22 +4,31 @@ using Khadra.Application.PlatformSettings.Lookups;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Khadra.WebAPI.Controllers;
 
 /// <summary>
-/// The lookups every signed-in client reads: car types and cities (spec 3.2).
+/// The lookups every client reads: car types and cities (spec 3.2).
 ///
-/// Authenticated but not Admin-only. A dealer picking a category for a car and a customer filtering
-/// a search both need this list, and it contains nothing private. Only the ACTIVE entries: an entry
-/// an administrator has retired should not be offered on a new car or a new search, while the
-/// records that already reference it keep working.
+/// Only the ACTIVE entries: an entry an administrator has retired should not be offered on a new car
+/// or a new search, while the records that already reference it keep working.
+///
+/// Car types and cities are ANONYMOUS, because the customer catalogue is. They are the filter chips
+/// above a search anyone may run, and a browse screen that could list cars but not name their
+/// categories would be a strange kind of half-open. Neither list contains anything private — they
+/// are two columns of bilingual labels an administrator curates.
+///
+/// The model-year range stays behind a sign-in: it exists so the DEALER form does not have to guess
+/// its own bounds, and no customer screen asks for it.
 /// </summary>
 [Authorize]
 [Route("api/v1")]
 public sealed class LookupsController : ApiControllerBase
 {
     [HttpGet("car-types")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Public)]
     [ProducesResponseType<IReadOnlyList<LookupEntryDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult> CarTypes(CancellationToken cancellationToken)
     {
@@ -28,6 +37,8 @@ public sealed class LookupsController : ApiControllerBase
     }
 
     [HttpGet("cities")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Public)]
     [ProducesResponseType<IReadOnlyList<LookupEntryDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult> Cities(CancellationToken cancellationToken)
     {

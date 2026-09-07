@@ -10,6 +10,16 @@ namespace Khadra.Application.Common.Ports;
 // The zone is configured rather than assumed, so the first non-Jordan market is a settings change.
 public interface IReportingCalendar
 {
+    /// <summary>
+    /// The zone every calendar answer here is expressed in, as an IANA id ("Asia/Amman").
+    /// </summary>
+    /// <remarks>
+    /// Exposed because the customer app has to say it out loud. A traveller quoting a car from
+    /// London must be shown Amman pickup times, and a phone that formatted the instants in its own
+    /// zone would quietly offer them a car three hours early.
+    /// </remarks>
+    string TimeZoneId { get; }
+
     /// <summary>The local calendar day an instant falls on.</summary>
     DateOnly DayOf(DateTimeOffset instant);
 

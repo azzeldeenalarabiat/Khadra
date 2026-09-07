@@ -151,6 +151,10 @@ builder.Services.AddRateLimiter(options =>
         RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(10, TimeSpan.FromMinutes(15))));
     options.AddPolicy(RateLimitPolicies.Refresh, context =>
         RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(60, TimeSpan.FromMinutes(1))));
+    // Browsing is chatty and shared: a customer scrolling results and opening cars makes many reads,
+    // and a whole mobile network can arrive from one address.
+    options.AddPolicy(RateLimitPolicies.Public, context =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(120, TimeSpan.FromMinutes(1), queueLimit: 20)));
 });
 
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
