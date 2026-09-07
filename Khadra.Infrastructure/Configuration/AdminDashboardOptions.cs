@@ -44,4 +44,6 @@ internal sealed class AdminDashboardSettings(IOptions<AdminDashboardOptions> opt
     public int ActivityFeedSize => options.Value.ActivityFeedSize;
 
     public int ResolvedDisputeWindowDays => options.Value.ResolvedDisputeWindowDays;
+
+    public string ReportingTimeZone => options.Value.ReportingTimeZone;
 }

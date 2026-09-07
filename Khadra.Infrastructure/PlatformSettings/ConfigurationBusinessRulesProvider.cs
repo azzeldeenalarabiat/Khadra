@@ -1,5 +1,4 @@
 using Khadra.Application.Common.Ports;
-using Khadra.Domain.Common;
 using Khadra.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -17,14 +16,19 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
             current.CommissionPercent,
             current.DepositPercent,
             current.NoShowTimeoutHours,
-            Money.Jod(current.DeliveryFeeJod),
             current.DealerNonDeliveryPenaltyMinPercent,
             current.DealerNonDeliveryPenaltyMaxPercent,
             current.FreeCancellationWindowMinutes,
             current.AdminSlaHours,
             current.CustomerCancellationPenaltyPercent,
-            current.PaymentWindowMinutes,
+            current.PaymentWindowHours,
+            current.BookingAnswerWindowHours,
             current.PostReturnSettlementHours,
-            current.MinimumRenterAge));
+            current.MinimumRenterAge,
+            current.TurnaroundMinutes!.Value,
+            current.MaxAdvanceBookingDays!.Value,
+            current.MinimumBookingLeadTimeMinutes!.Value,
+            current.MaxRentalDays!.Value,
+            current.EarliestVehicleModelYear));
     }
 }

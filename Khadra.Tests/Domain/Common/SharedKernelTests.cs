@@ -117,14 +117,36 @@ public sealed class DateRangeTests
     }
 
     [Fact]
-    public void Whole_days_round_up_and_overlap_is_half_open()
+    public void Overlap_is_half_open_so_touching_periods_do_not_collide()
     {
         var rental = DateRange.Create(Start, Start.AddDays(2.5)).Value;
         var adjacent = DateRange.Create(Start.AddDays(2.5), Start.AddDays(4)).Value;
         var overlapping = DateRange.Create(Start.AddDays(1), Start.AddDays(3)).Value;
 
-        Assert.Equal(3, rental.WholeDays);
         Assert.False(rental.Overlaps(adjacent));
         Assert.True(rental.Overlaps(overlapping));
+    }
+
+    /// <summary>
+    /// A period keeps its instant but not its offset.
+    /// </summary>
+    /// <remarks>
+    /// Npgsql refuses any offset but zero on a `timestamptz`, and until the customer app existed
+    /// every period was built from clock.UtcNow, so nothing ever presented one. A phone in Amman
+    /// does: it sends +03:00, and without this the write fails deep in SaveChanges with a message
+    /// about offsets that says nothing about bookings.
+    /// </remarks>
+    [Fact]
+    public void Both_ends_are_normalised_to_utc()
+    {
+        var amman = TimeSpan.FromHours(3);
+        var period = DateRange.Create(
+            new DateTimeOffset(2026, 9, 10, 9, 0, 0, amman),
+            new DateTimeOffset(2026, 9, 13, 9, 0, 0, amman)).Value;
+
+        Assert.Equal(TimeSpan.Zero, period.Start.Offset);
+        Assert.Equal(TimeSpan.Zero, period.End.Offset);
+        // The same instant, only stated in the zone the database stores it in.
+        Assert.Equal(new DateTimeOffset(2026, 9, 10, 6, 0, 0, TimeSpan.Zero), period.Start);
     }
 }

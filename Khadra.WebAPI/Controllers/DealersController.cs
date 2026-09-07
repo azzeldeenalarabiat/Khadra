@@ -8,6 +8,7 @@ using Khadra.Application.Dealers.UpdateDeliverySettings;
 using Khadra.Application.Dealers.UpdateProfile;
 using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -38,6 +39,19 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     {
         ArgumentNullException.ThrowIfNull(form);
 
+        // Parsed here, and refused here. `TimeOnly.Parse` threw on anything that was not a time, so
+        // a mistyped opening hour answered 500 — an unhandled exception for what is plainly a bad
+        // request. The domain still decides whether the WINDOW makes sense (OperatingHours refuses a
+        // close before an open); this only decides whether these are times at all.
+        // Both shapes, because an <input type="time"> sends "HH:mm" and sends "HH:mm:ss" the moment
+        // a step in seconds is set; neither is the caller making a mistake.
+        string[] timeFormats = ["HH:mm", "HH:mm:ss"];
+        if (!TimeOnly.TryParseExact(form.OpensAt, timeFormats, out var opensAt) ||
+            !TimeOnly.TryParseExact(form.ClosesAt, timeFormats, out var closesAt))
+        {
+            return Failure(DealerErrors.InvalidOperatingHours);
+        }
+
         var uploads = new List<DealerDocumentUpload>();
         var streams = new List<Stream>();
         try
@@ -58,8 +72,8 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
                     form.CommercialRegistrationNumber,
                     form.Latitude,
                     form.Longitude,
-                    TimeOnly.Parse(form.OpensAt, System.Globalization.CultureInfo.InvariantCulture),
-                    TimeOnly.Parse(form.ClosesAt, System.Globalization.CultureInfo.InvariantCulture),
+                    opensAt,
+                    closesAt,
                     form.Description,
                     form.CityId is null ? null : Id.From(form.CityId.Value),
                     uploads),
@@ -139,7 +153,8 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     {
         ArgumentNullException.ThrowIfNull(request);
         var result = await Mediator.Send(
-            new UpdateDeliverySettingsCommand(actor.UserId!.Value, request.IsEnabled, request.RadiusKm),
+            new UpdateDeliverySettingsCommand(
+                actor.UserId!.Value, request.IsEnabled, request.RadiusKm, request.Fee),
             cancellationToken);
         return FromResult(result);
     }
@@ -292,4 +307,9 @@ public sealed class SubmitDealerForm
     }
 }
 
-public sealed record UpdateDeliveryRequest(bool IsEnabled, [param: Range(0, 200)] decimal RadiusKm);
+// The fee is the gallery’s own figure and required to switch delivery on; the currency is never
+// taken from the caller. The bound is the domain’s DeliverySettings.MaxFee.
+public sealed record UpdateDeliveryRequest(
+    bool IsEnabled,
+    [param: Range(0, 200)] decimal RadiusKm,
+    [param: Range(0, 1000)] decimal? Fee);

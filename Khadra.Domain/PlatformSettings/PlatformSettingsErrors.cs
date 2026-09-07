@@ -4,6 +4,14 @@ namespace Khadra.Domain.PlatformSettings;
 
 public static class PlatformSettingsErrors
 {
+    /// <remarks>
+    /// Two entries reading the same thing are indistinguishable in every dropdown and in customer
+    /// search, and there is no delete — only retire — so the mistake would be permanent. Only the
+    /// OFFERED entries are compared: a retired name is out of every list and may be reused.
+    /// </remarks>
+    public static readonly Error LookupNameTaken =
+        Error.Conflict("lookup.name_taken", "Another entry on this list already uses that name.");
+
     public static readonly Error PenaltyRangeInverted =
         Error.Validation("settings.penalty_range_inverted", "The maximum non-delivery penalty must be at least the minimum.");
 
@@ -30,4 +38,7 @@ public static class PlatformSettingsErrors
 
     public static readonly Error LookupAlreadyInactive =
         Error.Conflict("lookup.already_inactive", "This entry is already inactive.");
+
+    public static readonly Error LookupNotFound =
+        Error.NotFound("platform.lookup_not_found", "That entry was not found.");
 }

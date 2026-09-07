@@ -7,6 +7,7 @@ using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications;
 using MediatR;
 
 namespace Khadra.Application.Dealers.ManageEmployees;
@@ -45,6 +46,7 @@ public sealed class EmployeeHandlers(
     IUserRepository users,
     IEmployeeReader reader,
     AuthEmailDispatcher emails,
+    Notifications.DealerTeamNotifier team,
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<InviteEmployeeCommand, Result<EmployeeListItem, Error>>,
@@ -77,7 +79,14 @@ public sealed class EmployeeHandlers(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // After commit, and never a reason to fail: the invitation can be re-sent from the list.
+        // After commit, and deliberately not a reason to fail: the employee EXISTS now, and throwing
+        // that away because a relay hiccuped would be worse than an unsent email that can be re-sent
+        // from the list.
+        //
+        // The owner is nonetheless not told when it fails, and the row looks identical either way --
+        // "Invited, has not set a password yet" -- so they wait for an email nobody sent. Saying so
+        // needs a command result carrying the outcome beside the read model, which EmployeeListItem
+        // cannot hold because the reader rebuilds it from the database. Checklist item 47.
         await emails.SendEmployeeInvitationAsync(
             provisioned.Value.User, dealer.BusinessName.Value, provisioned.Value.RawInvitationToken, cancellationToken);
 
@@ -99,7 +108,15 @@ public sealed class EmployeeHandlers(
 
         var rawToken = await provisioner.ReissueInvitationAsync(user, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await emails.SendEmployeeInvitationAsync(user, dealer.BusinessName.Value, rawToken, cancellationToken);
+
+        // Unlike the first invitation, this one exists ONLY to put an email in front of someone: the
+        // employee already existed and the owner pressed the button precisely because nothing had
+        // arrived. Reporting success when the relay refused it would send them back to the same
+        // button, believing it had worked. The reissued token stands either way.
+        var delivered = await emails.SendEmployeeInvitationAsync(
+            user, dealer.BusinessName.Value, rawToken, cancellationToken);
+        if (!delivered)
+            return DealerErrors.InvitationEmailNotSent;
 
         return await ItemAsync(dealer.Id, employee.Id, cancellationToken);
     }
@@ -116,6 +133,18 @@ public sealed class EmployeeHandlers(
         var changed = dealer.SetEmployeeReportAccess(employee.Id, request.CanViewReports);
         if (changed.IsFailure)
             return changed.Error;
+
+        // Their console changes shape on the next navigation -- the Reports link appears or goes,
+        // and the permissions panel in their rail flips -- so they are told why rather than left to
+        // notice. Staged before the save so the grant and the notice commit together.
+        await team.NotifyPersonAsync(
+            employee.UserId,
+            request.OwnerUserId,
+            request.CanViewReports
+                ? NotificationKind.ReportAccessGranted
+                : NotificationKind.ReportAccessRevoked,
+            clock.UtcNow,
+            cancellationToken: cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return await ItemAsync(dealer.Id, employee.Id, cancellationToken);
@@ -158,6 +187,15 @@ public sealed class EmployeeHandlers(
         var reactivated = dealer.ReactivateEmployee(employee.Id);
         if (reactivated.IsFailure)
             return reactivated.Error;
+
+        // Waiting for them: they were signed out when they were deactivated, so this is the first
+        // thing they see when they sign back in — and it says who let them back in.
+        await team.NotifyPersonAsync(
+            employee.UserId,
+            request.OwnerUserId,
+            NotificationKind.StaffReactivated,
+            clock.UtcNow,
+            cancellationToken: cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return await ItemAsync(dealer.Id, employee.Id, cancellationToken);

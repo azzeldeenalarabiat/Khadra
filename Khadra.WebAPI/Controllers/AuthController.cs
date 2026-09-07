@@ -58,7 +58,7 @@ public sealed class AuthController(ICurrentActor currentActor) : ApiControllerBa
         ArgumentNullException.ThrowIfNull(request);
         var result = await Mediator.Send(
             new RegisterDealerOwnerCommand(
-                request.Email, request.Password, request.FullName, request.Phone, request.DateOfBirth),
+                request.Email, request.Password, request.FullName, request.Phone),
             cancellationToken);
         return FromResult(result, created => CreatedAtAction(nameof(Me), null, created));
     }
@@ -201,12 +201,13 @@ public sealed record RegisterRequest(
     // Spec 5.1: a foreign renter files a passport rather than a national ID.
     bool IsForeignNational = false);
 
+// No date of birth: spec 5.1's minimum age is a rule about renters, and this registers the person
+// who owns the rental office. Their identity is proved by the document an admin reviews (spec 3.1).
 public sealed record RegisterDealerOwnerRequest(
     [param: Required, StringLength(256)] string Email,
     [param: Required, StringLength(72)] string Password,
     [param: Required, StringLength(150)] string FullName,
-    [param: Required, StringLength(32)] string Phone,
-    DateOnly? DateOfBirth = null);
+    [param: Required, StringLength(32)] string Phone);
 
 public sealed record LoginRequest(
     [param: Required, StringLength(256)] string Email,

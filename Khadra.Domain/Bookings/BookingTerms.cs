@@ -15,12 +15,26 @@ public sealed class BookingTerms : ValueObject
     public Percentage DepositPercent { get; }
     // Recorded for traceability. Commission itself is calculated in the Payments context.
     public Percentage CommissionPercent { get; }
-    // Spec 2: no penalty for cancelling within this window after dealer approval.
+    // Spec 2: no penalty for cancelling within this window. Spec 5.5 measures it from approval; it
+    // has run from PAYMENT since 2026-09-07, because at approval nothing has been paid and there is
+    // nothing to be penalised on. The duration is unchanged.
     public TimeSpan FreeCancellationWindow { get; }
     // Spec 2: 8 hours after start with no pickup.
     public TimeSpan NoShowTimeout { get; }
     // How long the customer has to pay the deposit before the held vehicle is released.
     public TimeSpan PaymentWindow { get; }
+
+    /// <summary>How long the dealer has to answer a request before it expires.</summary>
+    /// <remarks>
+    /// Its own figure rather than the admin SLA it happens to match. They are different clocks
+    /// owned by different people -- one is how long an administrator may take over a gallery's
+    /// licence, the other how long a gallery may leave a customer waiting -- and sharing a key
+    /// would mean the owner could not move one without moving the other.
+    ///
+    /// It matters more than it used to. A request no longer costs a deposit, so this window is the
+    /// only thing between one account and a car held for the whole booking horizon.
+    /// </remarks>
+    public TimeSpan AnswerWindow { get; }
     // Quiet period after return; if nobody disputes, the booking completes on its own.
     public TimeSpan PostReturnSettlementWindow { get; }
     // Spec 2: penalty on a customer who cancels after the free window.
@@ -29,6 +43,13 @@ public sealed class BookingTerms : ValueObject
     // inside it when a ticket is actually opened.
     public Percentage DealerPenaltyMinPercent { get; }
     public Percentage DealerPenaltyMaxPercent { get; }
+    // The gap a gallery needs between one rental coming back and the next going out, to clean,
+    // refuel and inspect. Settled by the owner at two hours on 2026-09-07.
+    //
+    // Frozen like every other rule here, and for the same reason — but this one also has a physical
+    // consequence, because it is what Booking.HoldStart is derived from and the database enforces
+    // that hold. Zero is a legitimate value meaning back-to-back rentals are allowed.
+    public TimeSpan TurnaroundBuffer { get; }
     public int RulesVersion { get; }
 
 #pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
@@ -44,10 +65,12 @@ public sealed class BookingTerms : ValueObject
         TimeSpan freeCancellationWindow,
         TimeSpan noShowTimeout,
         TimeSpan paymentWindow,
+        TimeSpan answerWindow,
         TimeSpan postReturnSettlementWindow,
         Percentage customerCancellationPenaltyPercent,
         Percentage dealerPenaltyMinPercent,
         Percentage dealerPenaltyMaxPercent,
+        TimeSpan turnaroundBuffer,
         int rulesVersion)
     {
         DepositPercent = depositPercent;
@@ -55,10 +78,12 @@ public sealed class BookingTerms : ValueObject
         FreeCancellationWindow = freeCancellationWindow;
         NoShowTimeout = noShowTimeout;
         PaymentWindow = paymentWindow;
+        AnswerWindow = answerWindow;
         PostReturnSettlementWindow = postReturnSettlementWindow;
         CustomerCancellationPenaltyPercent = customerCancellationPenaltyPercent;
         DealerPenaltyMinPercent = dealerPenaltyMinPercent;
         DealerPenaltyMaxPercent = dealerPenaltyMaxPercent;
+        TurnaroundBuffer = turnaroundBuffer;
         RulesVersion = rulesVersion;
     }
 
@@ -68,10 +93,12 @@ public sealed class BookingTerms : ValueObject
         TimeSpan freeCancellationWindow,
         TimeSpan noShowTimeout,
         TimeSpan paymentWindow,
+        TimeSpan answerWindow,
         TimeSpan postReturnSettlementWindow,
         Percentage customerCancellationPenaltyPercent,
         Percentage dealerPenaltyMinPercent,
         Percentage dealerPenaltyMaxPercent,
+        TimeSpan turnaroundBuffer,
         int rulesVersion)
     {
         ArgumentNullException.ThrowIfNull(depositPercent);
@@ -95,7 +122,9 @@ public sealed class BookingTerms : ValueObject
         }
 
         if (freeCancellationWindow < TimeSpan.Zero || noShowTimeout <= TimeSpan.Zero ||
-            paymentWindow <= TimeSpan.Zero || postReturnSettlementWindow < TimeSpan.Zero)
+            paymentWindow <= TimeSpan.Zero || answerWindow <= TimeSpan.Zero ||
+            postReturnSettlementWindow < TimeSpan.Zero ||
+            turnaroundBuffer < TimeSpan.Zero)
         {
             return Error.Validation("booking.invalid_terms", "Booking terms carry an invalid time window.");
         }
@@ -106,10 +135,12 @@ public sealed class BookingTerms : ValueObject
             freeCancellationWindow,
             noShowTimeout,
             paymentWindow,
+            answerWindow,
             postReturnSettlementWindow,
             customerCancellationPenaltyPercent,
             dealerPenaltyMinPercent,
             dealerPenaltyMaxPercent,
+            turnaroundBuffer,
             rulesVersion);
     }
 
@@ -120,10 +151,12 @@ public sealed class BookingTerms : ValueObject
         yield return FreeCancellationWindow;
         yield return NoShowTimeout;
         yield return PaymentWindow;
+        yield return AnswerWindow;
         yield return PostReturnSettlementWindow;
         yield return CustomerCancellationPenaltyPercent;
         yield return DealerPenaltyMinPercent;
         yield return DealerPenaltyMaxPercent;
+        yield return TurnaroundBuffer;
         yield return RulesVersion;
     }
 }

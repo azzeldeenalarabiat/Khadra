@@ -3,11 +3,11 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load this booking</div>
+        <div class="state-title">{{ t('common.couldntLoadThisBooking') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">Back to bookings</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">{{ t('common.backToBookings') }}</a>
         </div>
       </div>
     </section>
@@ -21,14 +21,14 @@
     <div class="dc-head">
       <div class="grow">
         <div class="row row-gap-9">
-          <h1 class="page-title">Booking {{ b.reference }}</h1>
+          <h1 class="page-title">{{ t('common.booking') }} {{ b.reference }}</h1>
           <span class="pill" [class]="'s-' + tone()">{{ label() }}</span>
         </div>
         <div class="page-sub">{{ meta() }}</div>
       </div>
       @if (answerBy(); as sla) {
         <div class="sla-box">
-          <div class="k">Answer within</div>
+          <div class="k">{{ t('dealerBooking.answerWithin') }}</div>
           <div class="sla-figure num">{{ sla.figure }}</div>
           <div class="page-sub">{{ sla.note }}</div>
         </div>
@@ -37,33 +37,33 @@
         @if (canDecide()) {
           <button type="button" class="btn btn-primary btn-md" (click)="approve()">
             <kh-icon name="check" />
-            Approve
+            {{ t('common.approve') }}
           </button>
           <button type="button" class="btn btn-secondary btn-md s-bad" (click)="reject()">
             <kh-icon name="x" />
-            Reject
+            {{ t('common.reject') }}
           </button>
         } @else if (b.status === 'Requested') {
           <span class="page-sub"
-            >Your dealership cannot trade right now, so this request cannot be answered.</span
+            >{{ t('dealerBooking.yourDealershipCannotTrade') }}</span
           >
         }
         @if (canPickUp()) {
           <button type="button" class="btn btn-primary btn-md" (click)="pickUp()">
             <kh-icon name="key" />
-            Record pickup
+            {{ t('dealerBooking.recordPickup') }}
           </button>
         }
         @if (canReturn()) {
           <button type="button" class="btn btn-primary btn-md" (click)="takeBack()">
             <kh-icon name="arrow-square-in" />
-            Record return
+            {{ t('dealerBooking.recordReturn') }}
           </button>
         }
         @if (b.liveDisputeId; as ticketId) {
           <a class="btn btn-secondary btn-md s-bad" [routerLink]="['/dealer/disputes', ticketId]">
             <kh-icon name="scales" />
-            Open dispute
+            {{ t('common.openDispute') }}
           </a>
         }
       </div>
@@ -74,9 +74,9 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="user" class="kpi-icon" />
-            <span class="sect-t">Customer</span>
+            <span class="sect-t">{{ t('dealerBooking.customer') }}</span>
             <span class="sect-hint"
-              >Documents on file are checked by the platform, not shown here</span
+              >{{ t('dealerBooking.documentsOnFileAre') }}</span
             >
           </div>
           <div class="sect-pad row row-gap-14">
@@ -95,10 +95,10 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="car-simple" class="kpi-icon" />
-            <span class="sect-t">Vehicle</span>
+            <span class="sect-t">{{ t('dealerBooking.vehicle') }}</span>
             @if (b.vehicle) {
               <a class="sect-hint auth-link" [routerLink]="['/dealer/fleet', b.vehicle.vehicleId]"
-                >Open vehicle</a
+                >{{ t('dealerBooking.openVehicle') }}</a
               >
             }
           </div>
@@ -124,7 +124,7 @@
         <div class="dc-split-even">
           <section class="sect">
             <div class="sect-h">
-              <kh-icon name="calendar-blank" class="kpi-icon" /><span class="sect-t">Rental</span>
+              <kh-icon name="calendar-blank" class="kpi-icon" /><span class="sect-t">{{ t('dealerBooking.rental') }}</span>
             </div>
             <div class="sect-pad kv-narrow">
               @for (row of rentalRows(); track row.k) {
@@ -137,7 +137,7 @@
           </section>
           <section class="sect">
             <div class="sect-h">
-              <kh-icon name="moped" class="kpi-icon" /><span class="sect-t">Pickup</span>
+              <kh-icon name="moped" class="kpi-icon" /><span class="sect-t">{{ t('dealerBooking.pickup') }}</span>
             </div>
             <div class="sect-pad kv-narrow">
               @for (row of pickupRows(); track row.k) {
@@ -153,9 +153,9 @@
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="currency-circle-dollar" class="kpi-icon" />
-            <span class="sect-t">Financial</span>
+            <span class="sect-t">{{ t('dealerBooking.financial') }}</span>
             <span class="sect-hint"
-              >All amounts in {{ b.pricing.totalPrice.currency }} · frozen on this booking</span
+              >{{ t('dealerBooking.allAmountsIn') }} {{ b.pricing.totalPrice.currency }} {{ t('dealerBooking.frozenOnThisBooking') }}</span
             >
           </div>
           <div class="sect-pad">
@@ -167,8 +167,7 @@
             }
             <div class="note-box">
               <kh-icon name="info" />
-              Commission is deducted from the card deposit at the rate frozen when this booking was
-              made. Payout scheduling is not live yet, so no net figure is shown.
+              {{ t('dealerBooking.commissionIsDeductedFrom') }}
             </div>
           </div>
         </section>
@@ -177,9 +176,9 @@
           <section class="sect">
             <div class="sect-h">
               <kh-icon name="scales" class="kpi-icon" />
-              <span class="sect-t">Open a dispute</span>
+              <span class="sect-t">{{ t('dealerBooking.openADispute') }}</span>
               <span class="sect-hint"
-                >The platform answers within its SLA; nothing is charged without a ticket</span
+                >{{ t('dealerBooking.thePlatformAnswersWithin') }}</span
               >
             </div>
             <div class="sect-pad stack stack-10">
@@ -192,17 +191,17 @@
                 </div>
               }
               <div class="field">
-                <label for="dispute-reason">What went wrong</label>
+                <label for="dispute-reason">{{ t('dealerBooking.whatWentWrong') }}</label>
                 <textarea
                   id="dispute-reason"
                   class="input"
                   [value]="disputeReason()"
                   (input)="disputeReason.set(fieldValue($event))"
-                  placeholder="Say what happened, with times. Both parties and the platform will read this."
+                  [placeholder]="t('dealerBooking.sayWhatHappenedWith')"
                 ></textarea>
               </div>
               <div class="field">
-                <label for="dispute-evidence">Evidence (optional)</label>
+                <label for="dispute-evidence">{{ t('common.evidenceOptional') }}</label>
                 <input
                   id="dispute-evidence"
                   class="input"
@@ -212,11 +211,10 @@
                   (change)="attachEvidence($event)"
                 />
                 @if (evidenceNames().length) {
-                  <div class="field-hint">Attached: {{ evidenceNames().join(', ') }}</div>
+                  <div class="field-hint">{{ t('dealerBooking.attached') }} {{ evidenceNames().join(', ') }}</div>
                 } @else {
                   <div class="field-hint">
-                    Photos or a PDF. Stored privately; only the two parties and the platform can
-                    open them.
+                    {{ t('dealerBooking.photosOrAPdf') }}
                   </div>
                 }
               </div>
@@ -236,20 +234,20 @@
       <div class="stack stack-14">
         <section class="sect">
           <div class="sect-h">
-            <span class="sect-t">Timeline</span
-            ><span class="sect-hint">Actor recorded on every step</span>
+            <span class="sect-t">{{ t('dealerBooking.timeline') }}</span
+            ><span class="sect-hint">{{ t('dealerBooking.actorRecordedOnEvery') }}</span>
           </div>
           <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
         </section>
 
         @if (b.handovers.length) {
           <section class="sect sect-pad stack stack-9">
-            <span class="k">Handovers</span>
+            <span class="k">{{ t('common.handovers') }}</span>
             @for (h of b.handovers; track h.recordedAt) {
               <div class="history-line">
                 <span class="k-label">{{ h.type }} · {{ dateTime(h.recordedAt) }}</span
                 ><span class="num"
-                  >{{ h.odometerKm ?? '—' }} km · fuel {{ h.fuelLevel ?? '—' }}</span
+                  >{{ h.odometerKm ?? '—' }} {{ t('dealerBooking.kmFuel') }} {{ h.fuelLevel ?? '—' }}</span
                 >
               </div>
               @if (h.notes) {
@@ -257,7 +255,7 @@
               }
               @if (h.cashCollected) {
                 <div class="page-sub">
-                  Cash collected: {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
+                  {{ t('dealerBooking.cashCollected') }} {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
                 </div>
               }
             }
@@ -266,12 +264,12 @@
 
         @if (b.penalty && !b.penalty.isNothingOwed) {
           <section class="sect sect-pad stack stack-9">
-            <span class="k">Penalty assessed</span>
+            <span class="k">{{ t('common.penaltyAssessed') }}</span>
             <div class="history-line">
-              <span class="k-label">Attributed to</span><span>{{ b.penalty.attributedTo }}</span>
+              <span class="k-label">{{ t('dealerBooking.attributedTo') }}</span><span>{{ b.penalty.attributedTo }}</span>
             </div>
             <div class="history-line">
-              <span class="k-label">Amount</span
+              <span class="k-label">{{ t('dealerBooking.amount') }}</span
               ><span class="num"
                 >{{
                   b.penalty.isRange
@@ -283,31 +281,31 @@
             </div>
             <div class="page-sub">{{ b.penalty.reason }}</div>
             <div class="note-box is-plain">
-              Assessed, not charged. Money only moves when the platform resolves a dispute ticket.
+              {{ t('dealerBooking.assessedNotChargedMoney') }}
             </div>
           </section>
         }
 
         <section class="sect sect-pad stack stack-9">
-          <span class="k">Terms frozen on this booking</span>
+          <span class="k">{{ t('dealerBooking.termsFrozenOnThis') }}</span>
           <div class="history-line">
-            <span class="k-label">Deposit</span
+            <span class="k-label">{{ t('common.deposit') }}</span
             ><span class="num">{{ b.terms.depositPercent }}%</span>
           </div>
           <div class="history-line">
-            <span class="k-label">Commission</span
+            <span class="k-label">{{ t('dealerBooking.commission') }}</span
             ><span class="num">{{ b.terms.commissionPercent }}%</span>
           </div>
           <div class="history-line">
-            <span class="k-label">Free cancellation</span
-            ><span class="num">{{ b.terms.freeCancellationWindowHours }}h after approval</span>
+            <span class="k-label">{{ t('dealerBooking.freeCancellation') }}</span
+            ><span class="num">{{ b.terms.freeCancellationWindowHours }}{{ t('dealerBooking.hAfterApproval') }}</span>
           </div>
           <div class="history-line">
-            <span class="k-label">Settlement window</span
-            ><span class="num">{{ b.terms.postReturnSettlementWindowHours }}h after return</span>
+            <span class="k-label">{{ t('dealerBooking.settlementWindow') }}</span
+            ><span class="num">{{ b.terms.postReturnSettlementWindowHours }}{{ t('dealerBooking.hAfterReturn') }}</span>
           </div>
           <div class="history-line">
-            <span class="k-label">Rules version</span
+            <span class="k-label">{{ t('dealerBooking.rulesVersion') }}</span
             ><span class="num">{{ b.terms.rulesVersion }}</span>
           </div>
         </section>

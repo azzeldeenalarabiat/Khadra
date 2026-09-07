@@ -21,6 +21,23 @@ public abstract class LookupEntry : AggregateRoot
     {
     }
 
+    /// <summary>
+    /// The form two names are compared in when deciding whether they are the same name.
+    /// </summary>
+    /// <remarks>
+    /// Case folding answers English. It does nothing for Arabic, which has no case — there, the
+    /// collision that actually happens is the same word written with and without the vowel marks,
+    /// so tashkeel (U+064B–U+0652) and tatweel (U+0640) come out. Alef and yaa variants are left
+    /// alone deliberately: those change the word, not its decoration.
+    /// </remarks>
+    public static string ComparisonKey(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+
+        var kept = name.Where(character => character is not ((>= 'ً' and <= 'ْ') or 'ـ'));
+        return string.Concat(kept).Trim().ToLowerInvariant();
+    }
+
     protected static UnitResult<Error> ValidateNames(string? nameEn, string? nameAr)
     {
         if (string.IsNullOrWhiteSpace(nameEn) || nameEn.Trim().Length > 100 ||

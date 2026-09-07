@@ -164,15 +164,15 @@ public sealed class DealerDeliveryTests
         var dealer = Build.ApprovedDealer();
 
         Assert.False(dealer.CoversLocation(Build.Zarqa));
-        Assert.Equal("dealer.invalid_delivery_radius", dealer.EnableDelivery(0m, Now).Error.Code);
-        Assert.Equal("dealer.invalid_delivery_radius", dealer.EnableDelivery(500m, Now).Error.Code);
+        Assert.Equal("dealer.invalid_delivery_radius", dealer.EnableDelivery(0m, Money.Jod(8m), Now).Error.Code);
+        Assert.Equal("dealer.invalid_delivery_radius", dealer.EnableDelivery(500m, Money.Jod(8m), Now).Error.Code);
     }
 
     [Fact]
     public void Coverage_is_decided_by_real_distance_from_the_dealer()
     {
         var dealer = Build.ApprovedDealer();
-        dealer.EnableDelivery(30m, Now);
+        dealer.EnableDelivery(30m, Money.Jod(8m), Now);
 
         // Amman to Zarqa is roughly 20 km; Aqaba is several hundred.
         Assert.True(dealer.CoversLocation(Build.Zarqa));
@@ -183,7 +183,7 @@ public sealed class DealerDeliveryTests
     public void Disabling_delivery_revokes_coverage_everywhere()
     {
         var dealer = Build.ApprovedDealer();
-        dealer.EnableDelivery(30m, Now);
+        dealer.EnableDelivery(30m, Money.Jod(8m), Now);
 
         dealer.DisableDelivery(Now);
 

@@ -1,19 +1,135 @@
 import { httpResource } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { AdminDashboard } from '../models/dashboard.api';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter, map, startWith } from 'rxjs';
+import {
+  ActivityFeed,
+  AdminWorkload,
+  AttentionQueue,
+  BookingCounts,
+  BookingTrend,
+  CustomerCounts,
+  DealerCounts,
+  DisputeCounts,
+} from '../models/dashboard.api';
+import { SessionService } from './session.service';
 
 /**
- * The admin dashboard snapshot.
+ * The admin dashboard, one resource per panel.
  *
- * The URL is relative on purpose. Every call goes through the BFF, which holds the API token
- * server-side and proxies `/api/**`; the browser never sees a bearer token and no origin is hardcoded
- * anywhere in the console.
+ * Every URL is relative on purpose. Calls go through the BFF, which holds the API token server-side
+ * and proxies `/api/**`; the browser never sees a bearer token and no origin is hardcoded anywhere in
+ * the console.
+ *
+ * This was one `dashboard` resource returning the whole landing screen. Splitting it fixed three
+ * things at once:
+ *
+ *  - The rail read two numbers from it on EVERY screen, so opening the dealer queue fetched the work
+ *    queue, the fourteen-day trend and the audit feed to render two integers.
+ *  - Being one root resource with a constant URL, it fired once when the shell first injected this
+ *    service and never again. The badges were frozen at the first paint of the session: approving a
+ *    dealer left the rail still asking for it, until a full page reload.
+ *  - One failing reader blanked the entire screen. Now each panel fails, retries and reloads alone.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminDashboardService {
-  readonly dashboard = httpResource<AdminDashboard>(() => '/api/v1/admin/dashboard');
+  private readonly session = inject(SessionService);
 
+  /**
+   * Only an administrator may ask these questions.
+   *
+   * Not a nicety: this service is injected by the SIDEBAR, which every signed-in user sees, and an
+   * `httpResource` fires as soon as it is created. A dealer session was therefore firing
+   * `/api/v1/admin/dashboard` on every shell load and swallowing a 403 — the interceptor only acts on
+   * 401, so it failed silently and nobody noticed. Returning `undefined` from the URL factory leaves
+   * the resource idle instead of asking a question the caller has no business asking.
+   */
+  private readonly isAdmin = computed(() => this.session.user()?.role === 'Admin');
+
+  /**
+   * Bumped on every completed navigation.
+   *
+   * The workload figures are what the rail badges, and a badge is only worth having if it is true
+   * now. Re-reading them per screen is affordable precisely because this endpoint is two counts;
+   * the composite it replaced never could have been asked at this cadence.
+   */
+  private readonly navigation = toSignal(
+    inject(Router).events.pipe(
+      filter((event) => event instanceof NavigationEnd),
+      map((_, index) => index + 1),
+      startWith(0),
+    ),
+    { initialValue: 0 },
+  );
+
+  readonly workload = httpResource<AdminWorkload>(() => {
+    // Read so the resource re-runs when it changes; the value itself is not part of the request.
+    this.navigation();
+    return this.isAdmin() ? '/api/v1/admin/workload' : undefined;
+  });
+
+  /**
+   * Whether the dashboard SCREEN is the one on show.
+   *
+   * This service is injected by the sidebar, which every admin screen renders, and an `httpResource`
+   * fires the moment it is created — so opening the audit log fetched the dealer counts, the booking
+   * counts, the customer counts, the dispute counts, the work queue, the fourteen-day trend and the
+   * activity feed, seven requests for a screen that draws none of them. The rule is that a screen
+   * calls the APIs it needs and only those, and root-scoped resources quietly broke it for every
+   * screen at once.
+   *
+   * `workload` above is deliberately not behind this: two counts are what the rail badges, and the
+   * rail is on every screen.
+   */
+  private readonly showing = signal(false);
+
+  /** The dashboard screen owns this for as long as it is mounted. */
+  watch(): void {
+    this.showing.set(true);
+    inject(DestroyRef).onDestroy(() => this.showing.set(false));
+  }
+
+  private adminUrl(path: string): string | undefined {
+    return this.isAdmin() && this.showing() ? `/api/v1/admin/dashboard/${path}` : undefined;
+  }
+
+  readonly dealerCounts = httpResource<DealerCounts>(() => this.adminUrl('dealer-counts'));
+  readonly bookingCounts = httpResource<BookingCounts>(() => this.adminUrl('booking-counts'));
+  readonly customerCounts = httpResource<CustomerCounts>(() => this.adminUrl('customer-counts'));
+  readonly disputeCounts = httpResource<DisputeCounts>(() => this.adminUrl('dispute-counts'));
+  /**
+   * The one dashboard panel that is also SHELL data.
+   *
+   * The other six are gated by `showing()` so that opening the audit log does not fetch the whole
+   * landing screen. This one is not, because the topbar's notification bell is on every admin screen
+   * and lists exactly these items — the count beside the bell and the rows inside it come from this
+   * single payload, so they cannot contradict each other. Re-read on navigation for the same reason
+   * `workload` is: a badge advertising work that is already done is worse than no badge.
+   */
+  readonly attentionQueue = httpResource<AttentionQueue>(() => {
+    this.navigation();
+    return this.isAdmin() ? '/api/v1/admin/dashboard/attention-queue' : undefined;
+  });
+  readonly bookingTrend = httpResource<BookingTrend>(() => this.adminUrl('booking-trend'));
+  readonly activity = httpResource<ActivityFeed>(() => this.adminUrl('activity'));
+
+  /** Everything the dashboard screen draws. The rail's workload refreshes on its own cadence. */
   reload(): void {
-    this.dashboard.reload();
+    this.dealerCounts.reload();
+    this.bookingCounts.reload();
+    this.customerCounts.reload();
+    this.disputeCounts.reload();
+    this.attentionQueue.reload();
+    this.bookingTrend.reload();
+    this.activity.reload();
+  }
+
+  /**
+   * Called after any decision that changes what the platform owes: approving a dealer, resolving a
+   * dispute. Without this the rail goes on advertising work that is already done.
+   */
+  refreshWorkload(): void {
+    this.workload.reload();
   }
 }

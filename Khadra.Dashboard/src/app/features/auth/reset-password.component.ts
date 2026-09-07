@@ -3,6 +3,8 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 /**
@@ -16,9 +18,10 @@ import { IconComponent } from '../../shared/icon/icon.component';
   selector: 'kh-reset-password',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './reset-password.component.html',
-  imports: [FormsModule, RouterLink, IconComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent],
 })
 export class ResetPasswordComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
 
@@ -37,10 +40,9 @@ export class ResetPasswordComponent {
     if (this.busy()) return;
 
     const newPassword = this.password();
-    if (newPassword.length < 8) {
-      this.problem.set('Use at least 8 characters, including a letter and a digit.');
-      return;
-    }
+    // Length is not checked here. PasswordPolicy runs against the CONFIGURED minimum and its
+    // refusal already names the figure; a literal 8 in the browser would state a rule the platform
+    // may not be running and would silently stop matching the day it changes.
 
     this.busy.set(true);
     this.problem.set(null);

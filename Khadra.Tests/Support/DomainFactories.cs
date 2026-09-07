@@ -2,6 +2,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
+using Khadra.Domain.IdentityAccess;
 
 namespace Khadra.Tests.Support;
 
@@ -14,6 +15,16 @@ internal static class Build
     // The admin review SLA a test dealer is registered under (spec 3.1 uses 48 hours).
     public static readonly TimeSpan ReviewSla = TimeSpan.FromHours(48);
 
+    // The owner's confirmed turnaround gap between rentals (BusinessRules:TurnaroundMinutes = 120).
+    // Tests about the gap itself pass their own; everything else inherits the real number, so the
+    // suite exercises the rule the platform actually runs under.
+    public static readonly TimeSpan TurnaroundBuffer = TimeSpan.FromHours(2);
+
+    // Amman is UTC+3 with no daylight saving. The real handlers go through IReportingCalendar; a
+    // factory only needs the same answer, and stating it here keeps every test using one calendar.
+    public static DateOnly AmmanDate(DateTimeOffset instant) =>
+        DateOnly.FromDateTime(instant.ToOffset(TimeSpan.FromHours(3)).DateTime);
+
     public static GeoPoint Amman => GeoPoint.Create(31.9539, 35.9106).Value;
 
     public static GeoPoint Zarqa => GeoPoint.Create(32.0728, 36.0880).Value;
@@ -25,13 +36,20 @@ internal static class Build
     public static OperatingHours NineToFive =>
         OperatingHours.Uniform(new TimeOnly(9, 0), new TimeOnly(17, 0)).Value;
 
-    public static Dealer Dealer(DateTimeOffset? now = null, Id? ownerUserId = null)
+    // The registration number is UNIQUE in the database, so a test that needs two galleries has to
+    // say so. Left as a fixed default rather than always generated, because several tests assert on
+    // "123456" and a random one would make their failures unreadable.
+    public static Dealer Dealer(
+        DateTimeOffset? now = null,
+        Id? ownerUserId = null,
+        string businessName = "Petra Rentals",
+        string commercialRegistration = "123456")
     {
         var moment = now ?? Now;
         return Khadra.Domain.Dealers.Dealer.Register(
             ownerUserId ?? Id.New(),
-            BusinessName.Create("Petra Rentals").Value,
-            CommercialRegistrationNumber.Create("123456").Value,
+            BusinessName.Create(businessName).Value,
+            CommercialRegistrationNumber.Create(commercialRegistration).Value,
             Amman,
             NineToFive,
             moment,
@@ -39,10 +57,14 @@ internal static class Build
     }
 
     // A dealer that has cleared the licence check and can trade.
-    public static Dealer ApprovedDealer(DateTimeOffset? now = null, Id? ownerUserId = null)
+    public static Dealer ApprovedDealer(
+        DateTimeOffset? now = null,
+        Id? ownerUserId = null,
+        string businessName = "Petra Rentals",
+        string commercialRegistration = "123456")
     {
         var moment = now ?? Now;
-        var dealer = Dealer(moment, ownerUserId);
+        var dealer = Dealer(moment, ownerUserId, businessName, commercialRegistration);
         AttachAllDocuments(dealer, moment);
         dealer.Approve(Id.New(), moment);
         dealer.ClearDomainEvents();
@@ -56,23 +78,77 @@ internal static class Build
             dealer.AttachDocument(type, $"docs/{type.Name}.jpg", moment);
     }
 
+    /// <summary>
+    /// A customer as they arrive at the booking endpoint: email verified, both sides of a licence
+    /// and an identity document on file.
+    /// </summary>
+    /// <remarks>
+    /// Every flag is a parameter because each one is a separate refusal at booking time, and a test
+    /// about one of them should state only that one. The defaults are the customer who may book;
+    /// anything else is the exception a test is making.
+    /// </remarks>
+    public static User Customer(
+        DateTimeOffset? now = null,
+        bool emailVerified = true,
+        bool hasLicence = true,
+        bool hasIdentity = true,
+        string email = "rana@example.jo",
+        string phone = "0791234567")
+    {
+        var moment = now ?? Now;
+        var customer = User.RegisterCustomer(
+            EmailAddress.Create(email).Value,
+            PhoneNumber.Create(phone).Value,
+            PersonName.Create("Rana Sharif").Value,
+            PasswordHash.FromHash("hash"),
+            moment.AddYears(-1),
+            // Comfortably over the configured minimum of 21, which is enforced at registration.
+            new DateOnly(1995, 4, 12));
+
+        if (emailVerified)
+            customer.VerifyEmail(moment);
+
+        if (hasLicence)
+        {
+            AttachDocument(customer, CustomerDocumentType.DrivingLicenceFront, moment);
+            AttachDocument(customer, CustomerDocumentType.DrivingLicenceBack, moment);
+        }
+
+        if (hasIdentity)
+            AttachDocument(customer, CustomerDocumentType.NationalId, moment);
+
+        customer.ClearDomainEvents();
+        return customer;
+    }
+
+    private static void AttachDocument(User customer, CustomerDocumentType type, DateTimeOffset now) =>
+        customer.AttachDocument(type, $"customers/{type.Name}.jpg", "image/jpeg", 1024, now);
+
     public static VehicleDetails VehicleDetails(int year = 2024) =>
         Khadra.Domain.Fleet.VehicleDetails.Create(
             "Toyota", "Corolla", year, 5, TransmissionType.Automatic, FuelType.Petrol, currentYear: 2026).Value;
 
-    public static Vehicle Vehicle(Id? dealerId = null, decimal dailyRate = 30m, DateTimeOffset? now = null)
+    public static Vehicle Vehicle(
+        Id? dealerId = null,
+        decimal dailyRate = 30m,
+        DateTimeOffset? now = null,
+        Id? carTypeId = null,
+        bool isDeliveryEligible = true,
+        // Unique in the database, like the gallery registration number: a test with two cars in it
+        // has to name them apart.
+        string plateNumber = "12-34567")
     {
         var moment = now ?? Now;
         var vehicle = Khadra.Domain.Fleet.Vehicle.Add(
             dealerId ?? Id.New(),
-            Id.New(),
+            carTypeId ?? Id.New(),
             VehicleDetails(),
-            PlateNumber.Create("12-34567").Value,
+            PlateNumber.Create(plateNumber).Value,
             Money.Jod(dailyRate),
             Money.Jod(200m),
             MileagePolicy.Unlimited(),
             FuelPolicy.FullToFull,
-            isDeliveryEligible: true,
+            isDeliveryEligible,
             moment).Value;
         vehicle.ClearDomainEvents();
         return vehicle;
@@ -86,20 +162,24 @@ internal static class Build
         TimeSpan? freeCancellationWindow = null,
         TimeSpan? noShowTimeout = null,
         TimeSpan? paymentWindow = null,
+        TimeSpan? answerWindow = null,
         TimeSpan? settlementWindow = null,
         decimal customerPenaltyPercent = 100m,
         decimal dealerPenaltyMin = 25m,
-        decimal dealerPenaltyMax = 50m) =>
+        decimal dealerPenaltyMax = 50m,
+        TimeSpan? turnaroundBuffer = null) =>
         BookingTerms.Create(
             Percent(depositPercent),
             Percent(commissionPercent),
             freeCancellationWindow ?? TimeSpan.FromHours(1),
             noShowTimeout ?? TimeSpan.FromHours(8),
             paymentWindow ?? TimeSpan.FromMinutes(20),
+            answerWindow ?? TimeSpan.FromHours(48),
             settlementWindow ?? TimeSpan.FromHours(48),
             Percent(customerPenaltyPercent),
             Percent(dealerPenaltyMin),
             Percent(dealerPenaltyMax),
+            turnaroundBuffer ?? TurnaroundBuffer,
             rulesVersion: 1).Value;
 
     public static DateRange Period(DateTimeOffset? start = null, int days = 3)
@@ -108,19 +188,27 @@ internal static class Build
         return DateRange.Create(from, from.AddDays(days)).Value;
     }
 
+    // Priced between two Amman calendar dates, exactly as a handler does after converting the
+    // period through IReportingCalendar. `days` is the gap between the dates, not a number the
+    // caller gets to assert independently -- BookingPricing counts it, and nothing else may.
     public static BookingPricing Pricing(
         decimal dailyRate = 30m,
         int days = 3,
         decimal deliveryFee = 0m,
-        decimal depositPercent = 20m) =>
-        BookingPricing.Calculate(
+        decimal depositPercent = 20m,
+        DateOnly? pickupDate = null)
+    {
+        var from = pickupDate ?? AmmanDate(Now.AddDays(7));
+        return BookingPricing.Calculate(
             Money.Jod(dailyRate),
-            days,
+            from,
+            from.AddDays(days),
             Money.Jod(deliveryFee),
             Percent(depositPercent),
             Money.Jod(200m),
             MileagePolicy.Unlimited(),
             FuelPolicy.FullToFull).Value;
+    }
 
     public static Booking Booking(
         DateTimeOffset? now = null,
@@ -143,7 +231,12 @@ internal static class Build
             bookingPeriod,
             method,
             method == PickupMethod.Delivery ? deliveryLocation ?? Amman : null,
-            pricing ?? Pricing(days: bookingPeriod.WholeDays, deliveryFee: method == PickupMethod.Delivery ? 10m : 0m),
+            // The dates come from the period, the way a handler derives them, so the pricing the
+            // aggregate receives always describes the period being booked.
+            pricing ?? Pricing(
+                days: RentalDays.Between(AmmanDate(bookingPeriod.Start), AmmanDate(bookingPeriod.End)),
+                deliveryFee: method == PickupMethod.Delivery ? 10m : 0m,
+                pickupDate: AmmanDate(bookingPeriod.Start)),
             terms ?? Terms(),
             PaymentOption.DepositOnly,
             moment).Value;
@@ -151,13 +244,31 @@ internal static class Build
         return booking;
     }
 
-    // A booking the dealer has approved: the state most rules hang off.
+    // A booking as the customer first makes it: requested, unanswered, nothing paid. This is what
+    // Booking() already returns; the name exists so a test that cares about the state says so.
+    public static Booking RequestedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null) =>
+        Booking(now, pickupMethod: pickupMethod, terms: terms);
+
+    // Approved by the dealer and NOT yet paid: the window in which the customer owes a deposit and
+    // the car is held on nothing but a clock. Every expiry rule hangs off this one.
     public static Booking ApprovedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null)
     {
         var moment = now ?? Now;
         var booking = Booking(moment, pickupMethod: pickupMethod, terms: terms);
-        booking.ConfirmDepositPaid(Id.New(), moment);
         booking.Approve(Id.New(), moment);
+        booking.ClearDomainEvents();
+        return booking;
+    }
+
+    // Approved AND paid: the state most rules hang off, and what this file used to call an approved
+    // booking. Under the old order approval was the last step and the deposit came first, so the two
+    // names meant the same booking; since 2026-09-07 they are different states and a test asking for
+    // "approved" would silently get an unpaid one.
+    public static Booking ConfirmedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null)
+    {
+        var moment = now ?? Now;
+        var booking = ApprovedBooking(moment, pickupMethod, terms);
+        booking.ConfirmDepositPaid(Id.New(), moment);
         booking.ClearDomainEvents();
         return booking;
     }

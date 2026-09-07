@@ -10,6 +10,9 @@ internal sealed class RefreshTokenRepository(KhadraDbContext context) : IRefresh
     public Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
         context.RefreshTokens.SingleOrDefaultAsync(token => token.TokenHash == tokenHash, cancellationToken);
 
+    public Task<RefreshToken?> GetByIdAsync(Id id, CancellationToken cancellationToken = default) =>
+        context.RefreshTokens.SingleOrDefaultAsync(token => token.Id == id, cancellationToken);
+
     public async Task AddAsync(RefreshToken token, CancellationToken cancellationToken = default) =>
         await context.RefreshTokens.AddAsync(token, cancellationToken);
 

@@ -1,0 +1,125 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('employeeBusiness.myBusiness') }}</h1>
+      <div class="page-sub">{{ t('employeeBusiness.readOnlyTheseDetails') }}</div>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('employeeBusiness.couldntLoadYourDealership') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    </section>
+  } @else if (dealer(); as d) {
+    <section class="sect sect-pad">
+      <div class="row row-gap-8">
+        <div class="avatar avatar-40">
+          @if (d.logoUrl) {
+            <img [src]="d.logoUrl" alt="" />
+          } @else {
+            <kh-icon name="storefront" />
+          }
+        </div>
+        <div class="grow">
+          <div class="sect-t">{{ d.businessName }}</div>
+          <div class="page-sub">
+            {{ d.employeeCount }} {{ t('employeeBusiness.activeStaffDealerSince') }} {{ since() }}
+          </div>
+        </div>
+        <span class="pill" [class]="d.canTrade ? 's-ok' : 's-warn'">
+          {{ d.canTrade ? 'Trading' : d.verificationStatus }}
+        </span>
+      </div>
+    </section>
+
+    <div class="dc-split-155">
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <span class="sect-t">{{ t('common.whereItIs') }}</span>
+            <span class="sect-hint">{{ t('employeeBusiness.ownerMaintained') }}</span>
+          </div>
+          <div class="sect-pad kv-narrow">
+            <div class="kv">
+              <span class="kv-key">{{ t('common.coordinates') }}</span>
+              <span class="kv-val num">{{ d.latitude }}, {{ d.longitude }}</span>
+            </div>
+            @if (d.description) {
+              <div class="kv">
+                <span class="kv-key">{{ t('employeeBusiness.about') }}</span><span class="kv-val">{{ d.description }}</span>
+              </div>
+            }
+            <!-- The platform stores a map point, not a postal address, and the dealership has no
+                 phone or email of its own on the record. Saying so beats printing a plausible one. -->
+            <div class="field-hint">
+              {{ t('employeeBusiness.thePlatformHoldsThis') }}
+            </div>
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <span class="sect-t">{{ t('employeeBusiness.openingHours') }}</span>
+            <span class="sect-hint">{{ t('employeeBusiness.whenCustomersExpectYou') }}</span>
+          </div>
+          <div class="sect-pad kv-narrow">
+            @for (day of hours(); track day.day) {
+              <div class="kv">
+                <span class="kv-key">{{ fmt.weekday(day.day) }}</span>
+                <span class="kv-val">{{ schedule(day) }}</span>
+              </div>
+            } @empty {
+              <div class="page-sub">{{ t('employeeBusiness.noOpeningHoursHave') }}</div>
+            }
+          </div>
+        </section>
+      </div>
+
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="lock-simple" />
+            <span class="sect-t">{{ t('employeeBusiness.ownerOnlySettings') }}</span>
+          </div>
+          <div class="sect-pad kv-narrow">
+            @for (row of ownerOnly(); track row.label) {
+              <div class="kv">
+                <span class="kv-key">{{ row.label }}</span>
+                <span class="kv-val">{{ row.value }}</span>
+              </div>
+            }
+            <div class="field-hint">
+              {{ t('employeeBusiness.theseCannotBeChanged') }}
+            </div>
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <span class="sect-t">{{ t('employeeBusiness.customerRating') }}</span>
+          </div>
+          <div class="sect-pad">
+            <!-- The design shows "4.8 · 96 reviews". Reviews is not a built context, so there is no
+                 rating to show and none is invented. -->
+            <div class="page-sub">
+              {{ t('employeeBusiness.ratingsAndReviewsAre') }}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  } @else {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  }
+</div>

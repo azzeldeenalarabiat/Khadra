@@ -20,6 +20,7 @@ public sealed class RefreshTokensHandlerTests
         context.UserRepository,
         context.OpaqueTokens,
         context.TokenFactory,
+        context.Policy,
         context.Clock,
         context.UnitOfWork);
 
@@ -101,8 +102,18 @@ public sealed class RefreshTokensHandlerTests
         Assert.NotEqual(raw, result.Value.RefreshToken);
     }
 
+    /// <summary>
+    /// The loser of a race is refused, and the family survives.
+    /// </summary>
+    /// <remarks>
+    /// This used to kill the family, and that was backwards. Two refreshes of one token can only
+    /// race because a client sent both; the WINNER committed first and is holding a perfectly good
+    /// replacement, so revoking the family destroys a token the customer legitimately has, over a
+    /// bug on their own device. The loser is simply refused, and on its retry the reuse grace hands
+    /// it the winner's replacement.
+    /// </remarks>
     [Fact]
-    public async Task A_lost_race_on_the_same_token_is_treated_as_replay()
+    public async Task A_lost_race_refuses_the_loser_without_killing_the_winners_session()
     {
         var context = new AuthHandlerTestContext();
         var user = context.KnownUser(Users.Customer());
@@ -113,7 +124,88 @@ public sealed class RefreshTokensHandlerTests
         var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
 
         Assert.Equal("auth.invalid_refresh_token", result.Error.Code);
-        await context.RefreshTokens.Received(1).RevokeFamilyAsync(current.FamilyId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        await context.RefreshTokens.DidNotReceive()
+            .RevokeFamilyAsync(current.FamilyId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A refresh whose RESPONSE was lost is a retry, not a replay.
+    /// </summary>
+    /// <remarks>
+    /// The request arrived, the rotation committed, and the reply never reached the phone — a radio
+    /// handover, a tunnel, the app suspended. The customer still holds the old token. Presenting it
+    /// again is indistinguishable from an attack by shape, and distinguishable by two facts: it
+    /// happened seconds ago, and nobody has spent the replacement.
+    /// </remarks>
+    [Fact]
+    public async Task A_lost_response_hands_back_the_replacement_the_customer_never_received()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        var current = Stored(context, user, out var raw);
+
+        // The rotation that committed, and the replacement whose response was lost.
+        var replacement = Users.ActiveRefreshToken(user, context.OpaqueTokens, Users.Now, out _);
+        current.Rotate(Users.Now, replacement.Id);
+        context.RefreshTokens.GetByIdAsync(replacement.Id, Arg.Any<CancellationToken>()).Returns(replacement);
+        context.Clock.UtcNow = Users.Now.AddSeconds(5);
+
+        var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(raw, result.Value.RefreshToken);
+        // The session is intact: nothing was revoked wholesale.
+        await context.RefreshTokens.DidNotReceive()
+            .RevokeFamilyAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// Past the grace, replay detection is exactly as strict as it was.
+    /// </summary>
+    [Fact]
+    public async Task An_old_consumed_token_is_still_replay_and_still_kills_the_family()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        var current = Stored(context, user, out var raw);
+
+        var replacement = Users.ActiveRefreshToken(user, context.OpaqueTokens, Users.Now, out _);
+        current.Rotate(Users.Now, replacement.Id);
+        context.RefreshTokens.GetByIdAsync(replacement.Id, Arg.Any<CancellationToken>()).Returns(replacement);
+        // Well outside the sixty-second window: a client whose response was lost comes back in
+        // seconds, so an hour later this can only be someone else's copy.
+        context.Clock.UtcNow = Users.Now.AddHours(1);
+
+        var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
+
+        Assert.Equal("auth.invalid_refresh_token", result.Error.Code);
+        await context.RefreshTokens.Received(1)
+            .RevokeFamilyAsync(current.FamilyId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// If the replacement has been SPENT, two parties hold live tokens. That is the attack the
+    /// whole mechanism exists to catch, and the grace does not soften it.
+    /// </summary>
+    [Fact]
+    public async Task A_replacement_that_someone_has_already_used_is_a_real_replay()
+    {
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        var current = Stored(context, user, out var raw);
+
+        var replacement = Users.ActiveRefreshToken(user, context.OpaqueTokens, Users.Now, out _);
+        current.Rotate(Users.Now, replacement.Id);
+        // Spent, and with nothing after it: the chain ends at a used token.
+        replacement.Revoke(Users.Now);
+        context.RefreshTokens.GetByIdAsync(replacement.Id, Arg.Any<CancellationToken>()).Returns(replacement);
+        context.Clock.UtcNow = Users.Now.AddSeconds(5);
+
+        var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
+
+        Assert.Equal("auth.invalid_refresh_token", result.Error.Code);
+        await context.RefreshTokens.Received(1)
+            .RevokeFamilyAsync(current.FamilyId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
     }
 }
 

@@ -1,48 +1,64 @@
-/* Nocturne design-system tokens, ported verbatim from the Claude Design project
-   (ds/styles.css). This file is the source of truth for the console's look. */
+/* Design-system tokens. This file is the source of truth for the console's look.
+   Ported from the Claude Design project (ds/styles.css) and then re-themed, at the
+   owner's request, from the original dark "Nocturne" palette to white / green /
+   black. Only colour moved: every spacing, radius, font and shadow GEOMETRY is
+   the value the design shipped with.
+
+   Nothing outside this file should name a colour. Where a rule used to hardcode
+   one it now reads a token from here, so the console can be re-themed again by
+   editing this file alone -- which was not true before, because two dozen rules
+   assumed a dark ground and painted white over it at low alpha. */
 
 :root {
-  --color-bg: #161826;
-  --color-surface: #232532;
-  --color-text: #e9e9ed;
-  --color-accent: #9184d9;
-  --color-accent-2: #a7a1db;
-  --color-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
+  --color-bg: #f6f7f7;
+  --color-surface: #ffffff;
+  --color-text: #14181c;
+  --color-accent: #146c34;
+  --color-accent-2: #16a34a;
+  --color-divider: color-mix(in srgb, #14181c 14%, transparent);
 
-  /* Tonal ramps, generated in OKLCH on one shared lightness scale. */
-  --color-neutral-100: #f3f5fe;
-  --color-neutral-200: #e4e7f5;
-  --color-neutral-300: #cfd3e5;
-  --color-neutral-400: #b2b6ca;
-  --color-neutral-500: #9397ab;
-  --color-neutral-600: #75798c;
-  --color-neutral-700: #595d6c;
-  --color-neutral-800: #3f424d;
-  --color-neutral-900: #292b31;
+  /* Tonal ramps, 100 lightest to 900 darkest. */
+  --color-neutral-100: #f5f6f6;
+  --color-neutral-200: #e6e8e8;
+  --color-neutral-300: #d2d5d6;
+  --color-neutral-400: #b0b5b7;
+  --color-neutral-500: #8b9194;
+  --color-neutral-600: #6b7174;
+  --color-neutral-700: #4d5356;
+  --color-neutral-800: #32383b;
+  --color-neutral-900: #1c2124;
 
-  --color-accent-100: #f5f4ff;
-  --color-accent-200: #e7e5fe;
-  --color-accent-300: #d2cefd;
-  --color-accent-400: #b5abfc;
-  --color-accent-500: #968ae0;
-  --color-accent-600: #796cbf;
-  --color-accent-700: #5d5294;
-  --color-accent-800: #423a6a;
-  --color-accent-900: #2b2741;
+  --color-accent-100: #eef8f1;
+  --color-accent-200: #d6efdf;
+  --color-accent-300: #aadfbf;
+  --color-accent-400: #6ec894;
+  --color-accent-500: #35ab6c;
+  --color-accent-600: #1f8b52;
+  --color-accent-700: #146c34;
+  --color-accent-800: #10632f;
+  --color-accent-900: #0b3f1f;
 
-  --color-accent-2-100: #f5f4ff;
-  --color-accent-2-200: #e7e5fe;
-  --color-accent-2-300: #d2cefd;
-  --color-accent-2-400: #b5afe8;
-  --color-accent-2-500: #9690c9;
-  --color-accent-2-600: #7972a9;
-  --color-accent-2-700: #5c5783;
-  --color-accent-2-800: #423e5d;
-  --color-accent-2-900: #2b293a;
+  --color-accent-2-100: #eff9f3;
+  --color-accent-2-200: #d9f0e3;
+  --color-accent-2-300: #b0e2c6;
+  --color-accent-2-400: #76cd9c;
+  --color-accent-2-500: #3cb375;
+  --color-accent-2-600: #22935a;
+  --color-accent-2-700: #178745;
+  --color-accent-2-800: #116936;
+  --color-accent-2-900: #0c4423;
 
-  --font-heading: 'Inter', system-ui, sans-serif;
+  // Arabic faces are appended, not substituted. Font fallback is per GLYPH, so Latin still renders
+  // in Inter while Arabic -- which Inter does not cover at all -- picks the first face here that
+  // does. Without this, Arabic falls back to whatever the browser has last, which on Windows is
+  // usually a serif Naskh that does not sit level with the Latin around it.
+  //
+  // All system faces on purpose: nothing here is bundled or fetched, and the console has no webfont
+  // to lose. Segoe UI covers Windows, SF Arabic and Geeza Pro cover Apple, Noto covers the rest.
+  --font-arabic: 'Segoe UI', 'SF Arabic', 'Geeza Pro', 'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma;
+  --font-heading: 'Inter', var(--font-arabic), system-ui, sans-serif;
   --font-heading-weight: 500;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', var(--font-arabic), system-ui, sans-serif;
   --font-mono: ui-monospace, Menlo, Consolas, monospace;
 
   --space-1: 2.8px;
@@ -56,34 +72,55 @@
   --radius-md: 8px;
   --radius-lg: 14px;
 
-  --shadow-sm: 0 0 0 1px #3f424d;
-  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0, 0, 0, 0.65);
+  /* Same geometry as the dark theme; the colour is soft black rather than a ring
+     of lighter grey, because a raised surface on white casts a shadow. */
+  --shadow-sm: 0 0 0 1px rgba(20, 24, 28, 0.09);
+  --shadow-md: 0 0 0 1px rgba(20, 24, 28, 0.08), 0 6px 18px rgba(20, 24, 28, 0.1);
+  --shadow-lg: 0 0 0 1px rgba(20, 24, 28, 0.1), 0 16px 40px rgba(20, 24, 28, 0.16);
 
-  /* Semantic status colours. The design uses these five literals throughout;
-     naming them here is what lets the templates stay free of inline colour. */
-  --status-ok: #8fbfa6;
-  --status-warn: #d0ad74;
-  --status-bad: #d1806e;
-  /* The notification count sits on the topbar rather than in a table, and the
-     design gives it a deeper red so it reads at 9.5px against the dark bar. */
-  --status-bad-strong: #c96a5a;
-  --status-dim: rgba(233, 233, 237, 0.55);
-  --status-accent: var(--color-accent-300);
+  /* Semantic status colours, darkened from the dark theme's pastels so they carry
+     their meaning against white at the sizes the console uses (down to 9.5px). */
+  --status-ok: #146c34;
+  --status-warn: #b45309;
+  --status-bad: #b42318;
+  /* The notification count sits on the topbar rather than in a table, and needs to
+     read at 9.5px, so it is the strongest of the reds. */
+  --status-bad-strong: #d32f2f;
+  --status-dim: rgba(20, 24, 28, 0.62);
+  /* Was accent-300: a pale green that is legible ON a dark ground and invisible on
+     white. The accent used as text has to be the dark end of the ramp. */
+  --status-accent: var(--color-accent-700);
 
-  /* Text tints used repeatedly by the design. */
-  --text-70: rgba(233, 233, 237, 0.7);
-  --text-60: rgba(233, 233, 237, 0.6);
-  --text-55: rgba(233, 233, 237, 0.55);
-  --text-50: rgba(233, 233, 237, 0.5);
-  --text-45: rgba(233, 233, 237, 0.45);
-  --text-42: rgba(233, 233, 237, 0.42);
-  --text-40: rgba(233, 233, 237, 0.4);
-  --text-38: rgba(233, 233, 237, 0.38);
+  /* Text tints. Black-based now, so they darken toward the page rather than
+     fading into it. */
+  --text-70: rgba(20, 24, 28, 0.78);
+  --text-60: rgba(20, 24, 28, 0.72);
+  --text-55: rgba(20, 24, 28, 0.68);
+  --text-50: rgba(20, 24, 28, 0.64);
+  --text-45: rgba(20, 24, 28, 0.62);
+  --text-42: rgba(20, 24, 28, 0.6);
+  --text-40: rgba(20, 24, 28, 0.58);
+  --text-38: rgba(20, 24, 28, 0.56);
 
-  --hairline: rgba(255, 255, 255, 0.05);
-  --hairline-strong: rgba(255, 255, 255, 0.09);
-  --sidebar-bg: #12141f;
-  --topbar-bg: #12141f;
-  --input-bg-dark: #1b1d2a;
+  --hairline: color-mix(in srgb, var(--color-text) 7%, transparent);
+  --hairline-strong: color-mix(in srgb, var(--color-text) 12%, transparent);
+
+  /* Overlay tints, in place of the `rgba(255, 255, 255, x)` that rules used to
+     write inline. Mixed from the text colour, so they are a light film on a dark
+     theme and a dark one here -- a hover state that shows up either way. */
+  --tint-1: color-mix(in srgb, var(--color-text) 3%, transparent);
+  --tint-2: color-mix(in srgb, var(--color-text) 5%, transparent);
+  --tint-3: color-mix(in srgb, var(--color-text) 8%, transparent);
+  --tint-4: color-mix(in srgb, var(--color-text) 12%, transparent);
+  --tint-5: color-mix(in srgb, var(--color-text) 18%, transparent);
+
+  /* A muted chip: avatars, initials, small counts. Was neutral-800 behind
+     neutral-100/200 -- a dark tile with pale text, which only works on a dark
+     page. Named now, so the pair moves together. */
+  --chip-bg: var(--color-neutral-200);
+  --chip-text: var(--color-neutral-800);
+
+  --sidebar-bg: #ffffff;
+  --topbar-bg: #ffffff;
+  --input-bg: #ffffff;
 }

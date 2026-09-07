@@ -48,6 +48,7 @@ internal sealed class FakeOpaqueTokens : IOpaqueTokenService
 internal sealed record TestAuthPolicy(
     TimeSpan RefreshTokenLifetime,
     TimeSpan RefreshFamilyLifetime,
+    TimeSpan RefreshReuseGrace,
     TimeSpan EmailVerificationLifetime,
     TimeSpan PasswordResetLifetime,
     TimeSpan EmployeeInvitationLifetime,
@@ -56,6 +57,8 @@ internal sealed record TestAuthPolicy(
     public static TestAuthPolicy Default { get; } = new(
         TimeSpan.FromDays(14),
         TimeSpan.FromDays(30),
+        // The configured production value: tests exercise the rule the platform runs under.
+        TimeSpan.FromSeconds(60),
         TimeSpan.FromHours(24),
         TimeSpan.FromMinutes(60),
         TimeSpan.FromDays(7),

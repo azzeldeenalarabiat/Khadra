@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Khadra.Bff;
@@ -166,12 +167,35 @@ builder.Services.AddReverseProxy()
         });
     });
 
+// The BFF is the outermost hop: a browser connects to it directly, so the address on the connection
+// IS the client and X-Forwarded-For arriving here was written by that client. Honouring it would let
+// the browser rename itself — and because AddClientAddress passes RemoteIpAddress on to the API as
+// the API's own X-Forwarded-For, a value invented here is laundered into the value the API trusts,
+// putting the caller back in charge of its rate-limit partition one hop further along.
+//
+// So nothing is trusted unless it is named. The lists stay cleared (the framework default trusts
+// loopback, which is not a decision to inherit silently) and are filled only from configuration.
+// Unlike the API this does NOT refuse to start when empty: the BFF terminating TLS itself with no
+// edge in front is a perfectly ordinary deployment, and empty is the correct, safe answer for it.
+// Put a TLS-terminating edge in front and that edge belongs in this list and in the API's.
+var trustedProxies = builder.Configuration.GetSection("KnownProxies").Get<string[]>() ?? [];
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     options.ForwardLimit = 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
+    foreach (var entry in trustedProxies)
+    {
+        // A container's address changes when it is recreated, so a range is often the only stable
+        // way to name one. Accept both, and name the offending entry rather than failing obscurely.
+        if (entry.Contains('/', StringComparison.Ordinal))
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(entry));
+        else if (IPAddress.TryParse(entry, out var address))
+            options.KnownProxies.Add(address);
+        else
+            throw new InvalidOperationException($"KnownProxies entry '{entry}' is not an IP address or CIDR range.");
+    }
 });
 builder.Services.AddHsts(options =>
 {
@@ -182,7 +206,12 @@ builder.Services.AddHealthChecks().AddRedis(redis, name: "redis", tags: ["ready"
 
 var app = builder.Build();
 
-app.UseForwardedHeaders();
+// Only when there is something to trust. With nothing named, RemoteIpAddress stays the address the
+// request actually came from, which is exactly right for the outermost hop.
+if (trustedProxies.Length > 0)
+{
+    app.UseForwardedHeaders();
+}
 if (!app.Environment.IsDevelopment())
     app.UseHsts();
 app.UseExceptionHandler();

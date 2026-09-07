@@ -171,7 +171,7 @@ public sealed class DealerRegistrationTests
         context.Dealers.GetByOwnerUserIdAsync(Owner, Arg.Any<CancellationToken>()).Returns(dealer);
 
         var result = await context.Delivery().Handle(
-            new UpdateDeliverySettingsCommand(Owner, IsEnabled: true, RadiusKm: 30m), CancellationToken.None);
+            new UpdateDeliverySettingsCommand(Owner, IsEnabled: true, RadiusKm: 30m, Fee: 8m), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("dealer.not_approved", result.Error.Code);
@@ -186,7 +186,7 @@ public sealed class DealerRegistrationTests
         context.Dealers.GetByOwnerUserIdAsync(Owner, Arg.Any<CancellationToken>()).Returns(dealer);
 
         var result = await context.Delivery().Handle(
-            new UpdateDeliverySettingsCommand(Owner, IsEnabled: true, RadiusKm: 30m), CancellationToken.None);
+            new UpdateDeliverySettingsCommand(Owner, IsEnabled: true, RadiusKm: 30m, Fee: 8m), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.CanTrade);
@@ -202,7 +202,7 @@ public sealed class DealerRegistrationTests
         context.Dealers.GetByOwnerUserIdAsync(Owner, Arg.Any<CancellationToken>()).Returns(dealer);
 
         var result = await context.Delivery().Handle(
-            new UpdateDeliverySettingsCommand(Owner, IsEnabled: true, RadiusKm: 30m), CancellationToken.None);
+            new UpdateDeliverySettingsCommand(Owner, IsEnabled: true, RadiusKm: 30m, Fee: 8m), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("dealer.not_approved", result.Error.Code);

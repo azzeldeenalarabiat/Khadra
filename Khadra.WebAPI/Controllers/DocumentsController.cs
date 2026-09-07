@@ -42,15 +42,8 @@ public sealed class DocumentsController(
 
         // No-store: an identity document must not linger in a shared proxy or the browser cache.
         Response.Headers.CacheControl = "no-store, private";
-        return File(content, ContentTypeFor(storageKey));
+        // The same helper the review screen labels its tiles with, so what an Admin was told they
+        // were opening is what they actually receive.
+        return File(content, DocumentContentTypes.ForStorageKey(storageKey));
     }
-
-    private static string ContentTypeFor(string storageKey) =>
-        Path.GetExtension(storageKey).ToLowerInvariant() switch
-        {
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".pdf" => "application/pdf",
-            _ => "image/jpeg"
-        };
 }

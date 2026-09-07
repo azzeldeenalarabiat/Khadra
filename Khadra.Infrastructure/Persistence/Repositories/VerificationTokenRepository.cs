@@ -18,6 +18,18 @@ internal sealed class VerificationTokenRepository(KhadraDbContext context) : IVe
     public async Task AddAsync(VerificationToken token, CancellationToken cancellationToken = default) =>
         await context.VerificationTokens.AddAsync(token, cancellationToken);
 
+    public Task<bool> HasActiveAsync(
+        Id userId,
+        VerificationPurpose purpose,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        context.VerificationTokens.AnyAsync(
+            token => token.UserId == userId
+                && token.Purpose == purpose
+                && token.ConsumedAt == null
+                && token.ExpiresAt > now,
+            cancellationToken);
+
     // Marks every unconsumed token of that purpose as consumed (expired ones included; harmless).
     public Task<int> InvalidateActiveAsync(
         Id userId,

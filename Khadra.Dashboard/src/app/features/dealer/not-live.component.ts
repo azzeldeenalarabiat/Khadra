@@ -2,14 +2,16 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { IconName } from '../../shared/icon/icon-paths';
 import { IconComponent } from '../../shared/icon/icon.component';
 
 interface NotLiveCopy {
-  readonly title: string;
+  readonly titleKey: TranslationKey;
   readonly icon: IconName;
-  readonly body: string;
-  readonly points: readonly string[];
+  readonly bodyKey: TranslationKey;
+  readonly pointKeys: readonly TranslationKey[];
 }
 
 /**
@@ -32,26 +34,28 @@ export class NotLiveComponent {
     initialValue: this.route.snapshot.data['kind'] as string,
   });
 
+  protected readonly t = inject(I18nService).t;
+
   protected readonly copy = computed<NotLiveCopy>(() =>
     this.kind() === 'reviews'
       ? {
-          title: 'Reviews',
+          titleKey: 'nav.reviews',
           icon: 'star',
-          body: 'Customer reviews are not live yet. When they are, every completed booking lets the customer rate your dealership and lets you rate the customer, and the ratings appear here and on your public page.',
-          points: [
-            'Reviews are tied to completed bookings only — no anonymous ratings.',
-            'Until then, your public page says "No reviews yet" rather than showing a number.',
-            'Nothing you do now affects a future rating.',
+          bodyKey: 'notLive.reviews.body',
+          pointKeys: [
+            'notLive.reviews.point1',
+            'notLive.reviews.point2',
+            'notLive.reviews.point3',
           ],
         }
       : {
-          title: 'Notifications',
+          titleKey: 'nav.notifications',
           icon: 'bell',
-          body: 'A notification feed is not live yet. Today the dashboard already shows everything that needs your attention: pending requests, pickups and returns due, and overdue returns.',
-          points: [
-            'Booking requests appear on the dashboard the moment the customer pays the deposit.',
-            'Staff invitations and password links go by email.',
-            'Push and SMS alerts will arrive with the customer app.',
+          bodyKey: 'notLive.notifications.body',
+          pointKeys: [
+            'notLive.notifications.point1',
+            'notLive.notifications.point2',
+            'notLive.notifications.point3',
           ],
         },
   );

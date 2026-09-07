@@ -1,0 +1,129 @@
+<div class="stack stack-14 page-wide">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('security.security') }}</h1>
+      <div class="page-sub">{{ t('security.yourOwnAccountYour') }}</div>
+    </div>
+    <div class="dc-head-actions">
+      <button type="button" class="btn btn-primary btn-md" (click)="changePassword()">
+        <kh-icon name="lock-key" />
+        {{ t('common.changePassword') }}
+      </button>
+    </div>
+  </div>
+
+  <div class="split-16">
+    <div class="stack stack-14">
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="device-mobile" class="kpi-icon" />
+          <span class="sect-t">{{ t('security.signedInOn') }}</span>
+          <span class="sect-hint">
+            {{ activeCount() }} {{ t('security.active') }} {{ activeCount() === 1 ? 'session' : 'sessions' }}
+          </span>
+        </div>
+
+        @if (failure(); as message) {
+          <div class="state-block">
+            <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+            <div class="state-title">{{ t('security.couldntLoadYourSessions') }}</div>
+            <div class="state-text">{{ message }}</div>
+            <div class="state-actions">
+              <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+            </div>
+          </div>
+        } @else if (resource.isLoading() && sessions().length === 0) {
+          <div class="sect-pad" aria-busy="true" aria-live="polite">
+            @for (row of [0, 1]; track row) {
+              <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+            }
+          </div>
+        } @else if (sessions().length === 0) {
+          <div class="state-block is-empty">
+            <div class="state-icon is-outline"><kh-icon name="device-mobile" /></div>
+            <div class="state-title">{{ t('security.noSessionsOnRecord') }}</div>
+            <div class="state-text">{{ t('security.sessionsAppearHereOnce') }}</div>
+          </div>
+        } @else {
+          <div class="sect-pad stack stack-12">
+            @for (session of sessions(); track session.familyId) {
+              <div class="row row-gap-12">
+                <div class="grow">
+                  <div class="row row-gap-8">
+                    <span class="handover-title">{{ device(session) }}</span>
+                    <span class="pill" [class]="session.isActive ? 's-ok' : 's-dim'">
+                      {{ session.isActive ? 'Active' : 'Ended' }}
+                    </span>
+                  </div>
+                  <div class="page-sub">
+                    {{ t('security.signedIn') }} {{ when(session.signedInAt) }}
+                    @if (session.createdByIp) {
+                      · {{ session.createdByIp }}
+                    }
+                  </div>
+                  <div class="page-sub">{{ t('security.lastUsed') }} {{ when(session.lastUsedAt) }}</div>
+                </div>
+                @if (session.isActive) {
+                  <button type="button" class="btn btn-danger btn-xs" (click)="revoke(session)">
+                    {{ t('security.endSession') }}
+                  </button>
+                }
+              </div>
+            }
+
+            @if (accessTokenMinutes(); as minutes) {
+              <!-- The figure is the server's. Revoking stops the refresh, not a token already in
+                   flight, and the design's "signed out immediately" would be untrue for this long. -->
+              <div class="note-box is-plain">
+                {{ t('security.endingASessionStops') }} {{ minutes }} {{ t('security.minutesAfterThat') }}
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="shield-check" class="kpi-icon" />
+          <span class="sect-t">{{ t('security.notBuilt') }}</span>
+        </div>
+        <div class="sect-pad stack stack-9">
+          <!-- Named individually rather than left as blank panels: each is a different missing
+               thing, and an admin should know which protections they do not have. -->
+          <div class="page-sub">
+            <strong>{{ t('security.signInHistory') }}</strong> {{ t('security.sessionsAreRecordedIndividual') }}
+          </div>
+          <div class="page-sub">
+            <strong>{{ t('security.twoFactorAuthentication') }}</strong> {{ t('security.notBuiltAPassword') }}
+          </div>
+          <div class="page-sub">
+            <strong>{{ t('security.blockedSignIns') }}</strong> {{ t('security.thereIsNoLockout') }}
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="stack stack-14 resolve-panel">
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="user-circle-plus" class="kpi-icon" />
+          <span class="sect-t">{{ t('security.yourAccount') }}</span>
+        </div>
+        <div class="kv-body">
+          @for (row of accountRows(); track row.k) {
+            <div class="kv-split">
+              <div class="kv-key">{{ row.k }}</div>
+              <div class="kv-val">{{ row.v }}</div>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="sect sect-pad">
+        <div class="decision-note">
+          {{ t('security.thisScreenShowsYour') }}
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,121 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('adminUsers.adminUsers') }}</h1>
+      <div class="page-sub">
+        {{ t('adminUsers.whoCanAdministerThe') }}
+      </div>
+    </div>
+    <div class="dc-head-actions">
+      <button type="button" class="btn btn-primary btn-md" (click)="invite()">
+        <kh-icon name="user-plus" />
+        {{ t('adminUsers.inviteAdministrator') }}
+      </button>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('adminUsers.couldntLoadTheAdministrators') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    } @else if (resource.isLoading() && admins().length === 0) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        @for (row of [0, 1, 2]; track row) {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>{{ t('adminUsers.administrator') }}</th>
+              <th>{{ t('common.contact') }}</th>
+              <th>{{ t('common.status') }}</th>
+              <th>{{ t('adminUsers.recordedActions') }}</th>
+              <th>{{ t('adminUsers.lastSignedIn') }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (admin of admins(); track admin.userId) {
+              <tr>
+                <td class="td">
+                  <div class="entity">
+                    <div class="entity-avatar">{{ initials(admin.fullName) }}</div>
+                    <div>
+                      <div class="entity-name">
+                        {{ admin.fullName }}
+                        @if (isSelf(admin)) {
+                          <span class="pill s-dim">{{ t('adminUsers.you') }}</span>
+                        }
+                      </div>
+                      <div class="entity-sub">{{ t('adminUsers.added') }} {{ when(admin.createdAt) }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="td">
+                  {{ admin.email }}
+                  <div class="td-sub mono">{{ admin.phone }}</div>
+                </td>
+                <td class="td">
+                  <span class="pill" [class]="'s-' + tone(admin)">{{ statusLabel(admin) }}</span>
+                  @if (admin.suspensionReason) {
+                    <div class="td-sub">{{ admin.suspensionReason }}</div>
+                  }
+                </td>
+                <td class="td td-num">
+                  <!-- What the platform is accountable for under this name. Worth reading before
+                       deactivating somebody. -->
+                  <a
+                    class="row-link"
+                    routerLink="/audit-logs"
+                    [queryParams]="{ actorUserId: admin.userId }"
+                  >
+                    {{ admin.auditedActions }}
+                  </a>
+                </td>
+                <td class="td">{{ when(admin.lastLoginAt) }}</td>
+                <td class="td td-num">
+                  @if (admin.status === 'Suspended') {
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-xs"
+                      (click)="reactivate(admin)"
+                    >
+                      {{ t('common.reactivate') }}
+                    </button>
+                  } @else {
+                    <!-- Restricted actions stay visible but disabled, with the reason attached,
+                         rather than vanishing and leaving the admin to guess. -->
+                    <button
+                      type="button"
+                      class="btn btn-danger btn-xs"
+                      [disabled]="blockedReason(admin) !== null"
+                      [attr.title]="blockedReason(admin)"
+                      (click)="deactivate(admin)"
+                    >
+                      {{ t('common.deactivate') }}
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sect-pad">
+        <div class="note-box is-plain">
+          {{ t('adminUsers.theLastActiveAdministrator') }}
+        </div>
+      </div>
+    }
+  </section>
+</div>

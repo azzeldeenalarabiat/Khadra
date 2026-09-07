@@ -20,4 +20,7 @@ public interface IAuthEmailComposer
 
     /// <summary>Spec 4.2: a dealer owner invited this person to act for the business.</summary>
     EmailMessage EmployeeInvitation(User user, string dealerName, string rawToken);
+
+    /// <summary>An administrator invited by another. Same accept route, different words.</summary>
+    EmailMessage AdminInvitation(User user, string rawToken);
 }

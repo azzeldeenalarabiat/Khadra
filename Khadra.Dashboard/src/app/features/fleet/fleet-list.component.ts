@@ -7,8 +7,10 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Tone } from '../../core/models/console.models';
 import { BookingListItem, PagedResult } from '../../core/models/bookings.api';
 import { Vehicle, VehicleStatusAction } from '../../core/models/fleet.api';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
 
@@ -30,12 +32,15 @@ type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
   imports: [RouterLink, IconComponent, ImageFallbackDirective],
 })
 export class FleetListComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(FleetService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);
   private readonly consoleData = inject(DealerConsoleService);
 
   protected readonly resource = this.service.vehicles;
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
   protected readonly busy = signal<string | null>(null);
   protected readonly state = signal<StateFilter>('all');
   protected readonly search = signal('');
@@ -45,21 +50,45 @@ export class FleetListComponent {
     url: '/api/v1/bookings',
     params: { tab: 'active', page: 1, pageSize: 100 },
   }));
+  private readonly hires = loaded(this.onHire);
+  private readonly dealer = loaded(this.consoleData.me);
 
-  protected readonly states: readonly { key: StateFilter; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'Active', label: 'Listed' },
-    { key: 'Hidden', label: 'Hidden' },
-    { key: 'Maintenance', label: 'Off the road' },
-    { key: 'Draft', label: 'Draft' },
-  ];
+  // Computed, not a field: a field initialiser resolves once at construction, so switching language
+  // while the screen is open left the chips in the old one — and only one of the five was keyed at
+  // all, which is how a row reading "All | Listed | Hidden | مسحوبة من الخدمة | Draft" happened.
+  protected readonly states = computed<readonly { key: StateFilter; label: string }[]>(() => [
+    { key: 'all', label: this.t('fleetList.all') },
+    { key: 'Active', label: this.t('fleetList.listed') },
+    { key: 'Hidden', label: this.t('fleetList.hidden') },
+    { key: 'Maintenance', label: this.t('fleetList.offTheRoad') },
+    { key: 'Draft', label: this.t('fleetList.draft') },
+  ]);
 
-  protected readonly cars = computed(() => this.resource.value() ?? []);
-  /** Adding a car is the owner's (the API's ApprovedDealer policy); staff manage what exists. */
-  protected readonly canAdd = computed(() => !!this.consoleData.me.value()?.isOwner);
+  protected readonly cars = computed(() => this.data() ?? []);
+
+  /**
+   * The fleet is the owner's to change; every member of staff may read it.
+   *
+   * `ApprovedDealer` sits on all ten writes in `DealerVehiclesController` — add, edit, publish,
+   * hide, take off the road, remove, and every image call — while the two GETs take `DealerStaff`.
+   * So an employee gets the whole screen and none of the buttons, and is told once, at the top, that
+   * this is deliberate. Leaving them on screen but disabled was the other option and is worse here:
+   * Edit is an anchor, which ignores `disabled`, and four dead controls repeated on every card is
+   * noise rather than information.
+   *
+   * `null` until `me` answers, so an owner's own buttons never blink out and back in.
+   */
+  protected readonly canManage = computed(
+    () => this.consoleData.permissions()?.canManageFleet ?? null,
+  );
+  protected readonly canAdd = computed(() => this.canManage() === true);
+  /** Said only once it is known to be true; "read-only" is a claim, not a default. */
+  protected readonly readOnly = computed(
+    () => this.canManage() === false && !this.dealer()?.isOwner,
+  );
 
   private readonly hiredVehicleIds = computed(() => {
-    const items = this.onHire.value()?.items ?? [];
+    const items = this.hires()?.items ?? [];
     return new Set(items.map((b) => b.vehicle?.vehicleId).filter((id): id is string => !!id));
   });
 
@@ -80,14 +109,14 @@ export class FleetListComponent {
     const hired = this.hiredVehicleIds();
     const listed = cars.filter((c) => c.status === 'Active');
     return [
-      { k: 'In your fleet', v: cars.length },
-      { k: 'Listed', v: listed.length },
+      { k: this.t('fleetList.inYourFleet'), v: cars.length },
+      { k: this.t('fleetList.listed'), v: listed.length },
       {
-        k: 'Available now',
+        k: this.t('fleetList.availableNow'),
         v: listed.filter((c) => c.isBookable && !hired.has(c.vehicleId)).length,
       },
-      { k: 'On hire', v: cars.filter((c) => hired.has(c.vehicleId)).length },
-      { k: 'Off the road', v: cars.filter((c) => c.status === 'Maintenance').length },
+      { k: this.t('fleetList.onHire'), v: cars.filter((c) => hired.has(c.vehicleId)).length },
+      { k: this.t('fleetList.offTheRoad'), v: cars.filter((c) => c.status === 'Maintenance').length },
     ];
   });
 
@@ -125,27 +154,27 @@ export class FleetListComponent {
   }
 
   protected statusLabel(car: Vehicle): string {
-    if (this.isOnHire(car)) return 'On hire';
-    if (car.status === 'Draft') return 'Draft';
-    if (car.status === 'Maintenance') return 'Off the road';
-    if (car.status === 'Hidden') return 'Hidden';
-    return car.isBookable ? 'Listed' : 'Blocked';
+    if (this.isOnHire(car)) return this.t('fleetList.onHire');
+    if (car.status === 'Draft') return this.t('fleetList.draft');
+    if (car.status === 'Maintenance') return this.t('fleetList.offTheRoad');
+    if (car.status === 'Hidden') return this.t('fleetList.hidden');
+    return car.isBookable ? this.t('fleetList.listed') : this.t('fleetList.blocked');
   }
 
   /** Says what the state MEANS, not just what it is called. */
   protected statusNote(car: Vehicle): string {
-    if (this.isOnHire(car)) return 'Out with a customer';
-    if (car.status === 'Draft') return 'Not published yet';
-    if (car.status === 'Maintenance') return 'Not offered until it is back';
-    if (car.status === 'Hidden') return 'Not shown to customers';
-    return car.isBookable ? 'Visible to customers' : 'Your dealership cannot trade';
+    if (this.isOnHire(car)) return this.t('fleetList.outWithACustomer');
+    if (car.status === 'Draft') return this.t('fleetList.notPublishedYet');
+    if (car.status === 'Maintenance') return this.t('fleetList.notOfferedUntilBack');
+    if (car.status === 'Hidden') return this.t('fleetList.notShownToCustomers');
+    return car.isBookable ? this.t('fleetList.visibleToCustomers') : this.t('fleetList.cannotTrade');
   }
 
   protected primaryAction(car: Vehicle): { label: string; action: VehicleStatusAction } | null {
-    if (car.status === 'Active') return { label: 'Hide', action: 'Hide' };
+    if (car.status === 'Active') return { label: this.t('fleetList.hide'), action: 'Hide' };
     if (car.status === 'Maintenance')
-      return { label: 'Back on the road', action: 'ReturnFromMaintenance' };
-    return { label: 'Publish', action: 'Publish' };
+      return { label: this.t('fleetList.backOnTheRoad'), action: 'ReturnFromMaintenance' };
+    return { label: this.t('fleetList.publish'), action: 'Publish' };
   }
 
   protected setSearch(event: Event): void {
@@ -183,10 +212,10 @@ export class FleetListComponent {
         icon: 'gear',
         tone: 'warn',
         title: `Take ${car.make} ${car.model} off the road?`,
-        body: 'It stops being offered to customers until you bring it back. Bookings already approved on it are not affected — tell those customers yourself if the car will not be ready.',
-        confirm: 'Take off the road',
+        body: this.t('fleetList.itStopsBeingOffered'),
+        confirm: this.t('fleetList.takeOffTheRoad'),
         result: {
-          title: 'Off the road',
+          title: this.t('fleetList.offTheRoad'),
           body: `${car.make} ${car.model} is not being offered.`,
           tone: 'warn',
         },
@@ -196,7 +225,7 @@ export class FleetListComponent {
         this.service.refresh();
       },
       {
-        title: 'Off the road',
+        title: this.t('fleetList.offTheRoad'),
         body: `${car.make} ${car.model} is not being offered.`,
         tone: 'warn',
       },
@@ -212,21 +241,21 @@ export class FleetListComponent {
         tone: 'bad',
         danger: true,
         title: `Remove ${car.make} ${car.model}?`,
-        body: 'It disappears from your fleet and from customer search. Bookings already made against it keep their history.',
-        confirm: 'Remove car',
-        result: { title: 'Car removed', body: '', tone: 'bad' },
+        body: this.t('fleetList.itDisappearsFromYour'),
+        confirm: this.t('fleetList.removeCar'),
+        result: { title: this.t('fleetList.carRemoved'), body: '', tone: 'bad' },
       },
       async () => {
         await this.service.remove(car.vehicleId);
         this.service.refresh();
       },
-      { title: 'Car removed', body: `${car.make} ${car.model} is no longer listed.`, tone: 'bad' },
+      { title: this.t('fleetList.carRemoved'), body: `${car.make} ${car.model} is no longer listed.`, tone: 'bad' },
     );
   }
 
-  protected open(car: Vehicle): void {
-    void this.router.navigate(['/dealer/fleet', car.vehicleId]);
-  }
+  // `open(car)` lived here for the table's whole-row click. The cards link to the car directly from
+  // the photo and the name, so the row-click indirection — and the stopPropagation it forced on
+  // every control inside it — is gone.
 
   protected reload(): void {
     this.resource.reload();

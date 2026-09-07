@@ -1,0 +1,169 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('common.bookings') }}</h1>
+      <div class="page-sub">
+        {{ t('bookingsList.everyBookingOnThe') }}
+      </div>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    <div class="tabs" role="tablist">
+      @for (option of tabs; track option.key) {
+        <button
+          type="button"
+          class="tab"
+          role="tab"
+          [class.is-active]="tab() === option.key"
+          [attr.aria-selected]="tab() === option.key"
+          (click)="select(option.key)"
+        >
+          {{ option.label }}
+          <!-- A count appears only once the server has answered. A zero here before then would
+               claim a tab is empty when the truth is that nobody has asked yet. -->
+          @if (count(option.key) !== null) {
+            <span class="tab-count">{{ count(option.key) }}</span>
+          }
+        </button>
+      }
+    </div>
+
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('bookingsList.couldntLoadTheBookings') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    } @else {
+      <div class="list-toolbar">
+        <div class="list-search">
+          <kh-icon name="magnifying-glass" class="search-icon" />
+          <label class="visually-hidden" for="booking-search">{{ t('bookingsList.searchByBookingReference') }}</label>
+          <input
+            id="booking-search"
+            class="input input-sm"
+            [placeholder]="t('bookingsList.bookingReferenceEG')"
+            [value]="search()"
+            (input)="setSearch($event)"
+          />
+        </div>
+        @if (scopedTo(); as scope) {
+          <span class="page-sub">{{ t('bookingsList.showingOne') }} {{ scope }}</span>
+          <button type="button" class="btn btn-secondary btn-sm" (click)="clearScope()">
+            {{ t('bookingsList.showAllBookings') }}
+          </button>
+        }
+      </div>
+
+      @if (resource.isLoading() && rows().length === 0) {
+        <div class="sect-pad" aria-busy="true" aria-live="polite">
+          @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          }
+        </div>
+      } @else if (rows().length === 0) {
+        <div class="state-block is-empty">
+          <div class="state-icon is-outline"><kh-icon name="calendar-blank" /></div>
+          <div class="state-title">{{ t('bookingsList.noBookingMatchesThis') }}</div>
+          <div class="state-text">
+            {{ t('bookingsList.clearTheSearchOr') }}
+          </div>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table table-wide">
+            <thead>
+              <tr>
+                <th>{{ t('bookingsList.reference') }}</th>
+                <th>{{ t('bookingsList.vehicle') }}</th>
+                <th>{{ t('bookingsList.parties') }}</th>
+                <th>{{ t('bookingsList.rental') }}</th>
+                <th>{{ t('bookingsList.total') }}</th>
+                <th>{{ t('common.status') }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows(); track row.bookingId) {
+                <tr>
+                  <td class="td">
+                    <a class="row-link mono" [routerLink]="['/bookings', row.bookingId]">
+                      {{ row.reference }}
+                    </a>
+                    <div class="td-sub">{{ t('bookingsList.booked') }} {{ when(row.createdAt) }}</div>
+                  </td>
+                  <td class="td">
+                    <div class="entity-name">{{ vehicleLabel(row) }}</div>
+                    @if (row.vehicle) {
+                      <div class="td-sub mono">{{ row.vehicle.plateNumber }}</div>
+                    }
+                  </td>
+                  <td class="td">
+                    <!-- Both sides open from here: the Admin arrives at a booking knowing neither
+                         party, unlike the dealer and the customer reading their own lists. -->
+                    <a class="row-link" [routerLink]="['/dealers', row.dealerId]">
+                      {{ row.dealerName }}
+                    </a>
+                    <div class="td-sub">
+                      <a class="row-link" [routerLink]="['/customers', row.customerId]">
+                        {{ row.customerName }}
+                      </a>
+                    </div>
+                  </td>
+                  <td class="td">
+                    {{ when(row.periodStart) }}
+                    <div class="td-sub">to {{ when(row.periodEnd) }}</div>
+                  </td>
+                  <td class="td td-num">
+                    <span class="num">{{ row.totalPrice }} {{ row.currency }}</span>
+                    <div class="td-sub">
+                      {{ row.pickupMethod === 'Delivery' ? 'Delivery' : 'Self pickup' }}
+                    </div>
+                  </td>
+                  <td class="td">
+                    <span class="pill" [class]="'s-' + tone(row)">{{ label(row.status) }}</span>
+                    @if (row.hasLiveDispute) {
+                      <div class="td-sub s-bad">{{ t('common.disputed') }}</div>
+                    }
+                  </td>
+                  <td class="td td-num">
+                    <a class="btn btn-secondary btn-xs" [routerLink]="['/bookings', row.bookingId]">
+                      {{ t('bookingsList.open') }}
+                    </a>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pager">
+          <span class="pager-count">{{ summary() }}</span>
+          <div class="pager-nav">
+            <button
+              type="button"
+              class="btn btn-secondary btn-page"
+              [disabled]="page() <= 1"
+              (click)="goTo(page() - 1)"
+            >
+              {{ t('common.previous') }}
+            </button>
+            <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
+            <button
+              type="button"
+              class="btn btn-secondary btn-page"
+              [disabled]="page() >= totalPages()"
+              (click)="goTo(page() + 1)"
+            >
+              {{ t('common.next') }}
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+</div>

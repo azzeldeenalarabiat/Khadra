@@ -1,4 +1,6 @@
 using System.Text;
+using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Tests.Support;
@@ -136,6 +138,49 @@ public sealed class DocumentStorageTests : IDisposable
     public void A_token_that_is_not_valid_base64url_is_rejected_rather_than_throwing()
     {
         Assert.False(Signer().TryDecodeToken("!!!not-base64!!!", out _));
+    }
+
+    /// <summary>
+    /// Every licence document a gallery application stores has to be openable again.
+    ///
+    /// Once it was not. Keys of the shape "dealers/{guid}/CommercialRegistration.pdf" were written,
+    /// and KeyPattern's stem is `[0-9a-z-]+`, which is case-SENSITIVE: the key matched nothing,
+    /// ResolveWithinRoot threw, and every "Open secure preview" on the Admin's review screen answered
+    /// 500 -- on the one screen whose whole purpose is reading those documents.
+    ///
+    /// Driven through SaveAsync, the call SubmitDealerProfileHandler actually makes, so the key under
+    /// test is the one the platform will really hold. The uploaded file name is deliberately hostile:
+    /// keys are generated, never derived from what the applicant called their scan.
+    /// </summary>
+    [Fact]
+    public async Task Every_stored_dealer_document_key_is_one_storage_will_serve()
+    {
+        var storage = Storage();
+        var dealerId = Id.New();
+
+        // Over every required type rather than a hand-typed list, so a fourth document or a rename
+        // cannot leave this passing while the real thing is broken.
+        foreach (var type in DealerDocumentType.Required)
+        {
+            var stored = await storage.SaveAsync(
+                $"dealers/{dealerId.Value}",
+                $"{type.Name} SCAN (final).PDF",
+                "application/pdf",
+                new MemoryStream([1, 2, 3]));
+
+            await using var read = await storage.OpenAsync(stored.StorageKey);
+            Assert.NotNull(read);
+        }
+    }
+
+    [Fact]
+    public async Task An_upper_case_stem_is_refused_rather_than_quietly_serving_nothing()
+    {
+        var storage = Storage();
+        var key = $"dealers/{Guid.CreateVersion7()}/CommercialRegistration.pdf";
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.SaveAtAsync(key, "application/pdf", new MemoryStream([1, 2, 3])));
     }
 
     private static (string Key, long Expires, string Signature) Parse(HmacDocumentLinkSigner signer, string url)

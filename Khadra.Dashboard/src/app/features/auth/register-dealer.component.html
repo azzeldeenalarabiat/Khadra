@@ -1,0 +1,138 @@
+<div class="auth-shell">
+  <div class="auth-lang"><kh-language-switch /></div>
+  <form class="sect auth-card stack stack-14" (ngSubmit)="submit()">
+    <div class="auth-head">
+      <img class="sidebar-mark" src="khadra-logo-128.png" alt="" width="24" height="24" />
+      <div class="sidebar-brand">{{ t('brand.line1') }}<br />{{ t('brand.line2') }}</div>
+    </div>
+
+    @if (registered(); as address) {
+      @if (emailSent()) {
+        <div>
+          <h1 class="auth-title">{{ t('auth.register.sentTitle') }}</h1>
+          <div class="page-sub">{{ t('auth.register.sentBody', { email: address }) }}</div>
+        </div>
+      } @else {
+        <!-- The account is saved and the link is valid; only the delivery failed. Saying "we sent
+             it" here would send them to wait at an inbox nothing is coming to. -->
+        <div>
+          <h1 class="auth-title">{{ t('auth.register.notSentTitle') }}</h1>
+          <div class="page-sub">{{ t('auth.register.notSentBody', { email: address }) }}</div>
+        </div>
+
+        <div class="banner s-warn banner-tall" role="alert">
+          <kh-icon name="warning-circle" class="banner-icon" />
+          <div class="banner-body">
+            <div class="banner-title">{{ t('auth.register.notSentBanner') }}</div>
+            <div class="banner-text">{{ t('auth.register.notSentHint') }}</div>
+          </div>
+        </div>
+
+        <a class="btn btn-primary btn-md btn-block" routerLink="/verify-email">
+          {{ t('auth.register.sendLink') }}
+        </a>
+      }
+
+      <div class="banner s-accent banner-tall" role="status">
+        <kh-icon name="storefront" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-title">{{ t('auth.register.galleryNextTitle') }}</div>
+          <div class="banner-text">{{ t('auth.register.galleryNextBody') }}</div>
+        </div>
+      </div>
+
+      <!-- Only offered when a link is actually on its way. Sending someone to sign in when no email
+           was delivered walks them straight into "verify your email address first". -->
+      @if (emailSent()) {
+        <a class="btn btn-primary btn-md btn-block" routerLink="/sign-in">{{ t('auth.register.goToSignIn') }}</a>
+      }
+    } @else {
+      <div>
+        <h1 class="auth-title">{{ t('auth.register.title') }}</h1>
+        <div class="page-sub">{{ t('auth.register.subtitle') }}</div>
+      </div>
+
+      @if (problem(); as message) {
+        <div class="banner s-bad" role="alert">
+          <kh-icon name="warning-circle" class="banner-icon" />
+          <div class="banner-body">
+            <div class="banner-text">{{ message }}</div>
+          </div>
+        </div>
+      }
+
+      <div class="field">
+        <label for="register-name">{{ t('auth.field.fullName') }}</label>
+        <input
+          id="register-name"
+          class="input"
+          type="text"
+          name="fullName"
+          autocomplete="name"
+          required
+          [disabled]="busy()"
+          [value]="fullName()"
+          (input)="fullName.set(fieldValue($event))"
+        />
+      </div>
+
+      <div class="field">
+        <label for="register-email">{{ t('auth.field.email') }}</label>
+        <input
+          id="register-email"
+          class="input"
+          type="email"
+          name="email"
+          autocomplete="email"
+          autocapitalize="none"
+          spellcheck="false"
+          dir="ltr"
+          required
+          [disabled]="busy()"
+          [value]="email()"
+          (input)="email.set(fieldValue($event))"
+        />
+      </div>
+
+      <div class="field">
+        <label for="register-phone">{{ t('auth.field.mobile') }}</label>
+        <input
+          id="register-phone"
+          class="input"
+          type="tel"
+          name="phone"
+          autocomplete="tel"
+          placeholder="07XXXXXXXX"
+          dir="ltr"
+          required
+          [disabled]="busy()"
+          [value]="phone()"
+          (input)="phone.set(fieldValue($event))"
+        />
+      </div>
+
+      <div class="field">
+        <label for="register-password">{{ t('auth.field.password') }}</label>
+        <input
+          id="register-password"
+          class="input"
+          type="password"
+          name="password"
+          autocomplete="new-password"
+          required
+          [disabled]="busy()"
+          [value]="password()"
+          (input)="password.set(fieldValue($event))"
+        />
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-md btn-block" [disabled]="busy()">
+        {{ busy() ? t('auth.register.busy') : t('auth.register.submit') }}
+      </button>
+    }
+
+    <div class="auth-foot">
+      <a class="auth-link" routerLink="/sign-in">{{ t('auth.register.alreadyHave') }}</a>
+    </div>
+  </form>
+</div>

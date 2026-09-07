@@ -41,6 +41,8 @@ public abstract class ApiControllerBase : ControllerBase
             ErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             ErrorKind.NotFound => StatusCodes.Status404NotFound,
             ErrorKind.Conflict => StatusCodes.Status409Conflict,
+            // A mail relay that refused the message is not the caller getting the request wrong.
+            ErrorKind.Unavailable => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity
         };
 

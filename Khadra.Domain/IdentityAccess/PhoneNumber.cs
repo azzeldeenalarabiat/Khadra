@@ -18,6 +18,20 @@ public sealed partial class PhoneNumber : ValueObject
         Value = value;
     }
 
+    /// <summary>
+    /// A value already in the database, taken as-is.
+    /// </summary>
+    /// <remarks>
+    /// Reading a row is not the moment to re-litigate whether it should have been allowed in. The EF
+    /// converters used to rebuild these through <c>Create(...).Value</c>, and <c>.Value</c> on a
+    /// failed result THROWS — so the day a rule is tightened in a way some stored row no longer
+    /// satisfies, that row stops being readable at all. Not a validation error the caller could
+    /// handle: an exception on load, for every query that touches the aggregate.
+    ///
+    /// Writes still go through <see cref="Create"/>, which is where the rule belongs.
+    /// </remarks>
+    public static PhoneNumber FromPersisted(string value) => new(value);
+
     public bool IsJordanian => Value.StartsWith(JordanCountryCode, StringComparison.Ordinal);
 
     public static Result<PhoneNumber, Error> Create(string? raw)

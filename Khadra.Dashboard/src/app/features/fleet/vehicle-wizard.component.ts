@@ -12,14 +12,55 @@ import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fle
 import { FleetService } from '../../core/services/fleet.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { LookupsService } from '../../core/services/lookups.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { MapComponent } from '../../shared/map/map.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 import { IconName } from '../../shared/icon/icon-paths';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 interface Step {
   readonly n: number;
   readonly title: string;
   readonly icon: IconName;
+}
+
+/**
+ * The wizard's working copy of a vehicle.
+ *
+ * Identical to `VehicleRequest` except that the four facts a dealer must state about THIS car — its
+ * year, its seats, its price and its deposit — are nullable here, so "not answered yet" is a state
+ * the form can hold and refuse to advance past. `VehicleRequest` keeps them required, because by
+ * the time anything is sent they have all been answered.
+ */
+type WizardForm = Omit<VehicleRequest, 'year' | 'seats' | 'dailyRate' | 'securityDeposit'> & {
+  readonly year: number | null;
+  readonly seats: number | null;
+  readonly dailyRate: number | null;
+  readonly securityDeposit: number | null;
+};
+
+/**
+ * Every step has validated by the time this runs, so the four are answered; the guard is here
+ * because a future step reorder must fail loudly rather than post a null price to the API.
+ */
+function toRequest(form: WizardForm): VehicleRequest {
+  if (
+    form.year === null ||
+    form.seats === null ||
+    form.dailyRate === null ||
+    form.securityDeposit === null
+  ) {
+    throw new Error('The vehicle form was submitted before every required answer was given.');
+  }
+  return {
+    ...form,
+    year: form.year,
+    seats: form.seats,
+    dailyRate: form.dailyRate,
+    securityDeposit: form.securityDeposit,
+  };
 }
 
 /**
@@ -33,15 +74,17 @@ interface Step {
  * What the design shows and the platform decides differently: the pickup location is the
  * dealership's (spec 4.1, one location per dealer), so step 4 shows it read-only; "block specific
  * dates" is served by taking a car off the road, so it is not offered here; the delivery fee is the
- * platform's and is shown as a fact.
+ * dealership's own and the same for every car it delivers, so it is shown here as a fact and changed
+ * on the Delivery page.
  */
 @Component({
   selector: 'kh-vehicle-wizard',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './vehicle-wizard.component.html',
-  imports: [RouterLink, IconComponent, ImageFallbackDirective],
+  imports: [RouterLink, IconComponent, ImageFallbackDirective, MapComponent],
 })
 export class VehicleWizardComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(FleetService);
   private readonly consoleData = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
@@ -49,7 +92,7 @@ export class VehicleWizardComponent {
   private readonly route = inject(ActivatedRoute);
 
   protected readonly steps: readonly Step[] = [
-    { n: 1, title: 'Basic information', icon: 'info' },
+    { n: 1, title: this.t('vehicleWizard.basicInformation'), icon: 'info' },
     { n: 2, title: 'Specifications', icon: 'gear' },
     { n: 3, title: 'Pricing', icon: 'currency-circle-dollar' },
     { n: 4, title: 'Location', icon: 'map-pin' },
@@ -75,9 +118,15 @@ export class VehicleWizardComponent {
     const draftId = this.route.snapshot.queryParamMap.get('draft');
     if (draftId) this.service.editing.set(draftId);
     effect(() => {
-      const existing = this.service.vehicle.value();
+      const existing = this.draftCar();
       if (draftId && existing && existing.vehicleId === draftId && !this.draft())
         this.hydrate(existing);
+    });
+    // The `<select>` displays its first option regardless of the model, so an unset id would look
+    // chosen and step 1 would pass with nothing selected. Fills a blank only.
+    effect(() => {
+      const first = this.carTypes()?.[0];
+      if (first && !this.form().carTypeId) this.patch({ carTypeId: first.id });
     });
   }
 
@@ -95,21 +144,32 @@ export class VehicleWizardComponent {
   protected readonly transmissions = ['Automatic', 'Manual'];
   protected readonly fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
   protected readonly seatOptions = [2, 4, 5, 7, 8];
-  protected readonly years = Array.from({ length: 12 }, (_, i) => new Date().getFullYear() + 1 - i);
 
-  protected readonly form = signal<VehicleRequest>({
-    carTypeId: '01a06675-0000-7000-8000-000000000001',
-    make: 'Toyota',
+  /**
+   * Nothing about the car is pre-filled, and that is the point.
+   *
+   * This form used to open on make "Toyota", 30 JOD a day and a 150 JOD deposit — a make, a price
+   * and a deposit chosen by nobody. A dealer who tabbed past them published a real car at figures
+   * the console invented, and there was no way afterwards to tell an invented 30 from a deliberate
+   * one. Every field below starts empty and the step refuses to advance until the dealer answers.
+   *
+   * The numbers are nullable rather than zero so "not answered yet" and "answered zero" stay
+   * different questions: a dealer may legitimately ask for no deposit, and a 0 sitting in the box
+   * from the start would publish that choice on their behalf.
+   */
+  protected readonly form = signal<WizardForm>({
+    carTypeId: '',
+    make: '',
     model: '',
-    year: new Date().getFullYear(),
+    year: null,
     color: null,
-    seats: 5,
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
+    seats: null,
+    transmission: '',
+    fuelType: '',
     description: null,
     plateNumber: '',
-    dailyRate: 30,
-    securityDeposit: 150,
+    dailyRate: null,
+    securityDeposit: null,
     isDeliveryEligible: false,
     mileageUnlimited: true,
     mileageDailyLimitKm: null,
@@ -119,6 +179,37 @@ export class VehicleWizardComponent {
 
   protected readonly me = this.consoleData.me;
   protected readonly delivery = this.consoleData.delivery;
+  protected readonly dealer = loaded(this.me);
+  protected readonly deliverySettings = loaded(this.delivery);
+  private readonly draftCar = loaded(this.service.vehicle);
+  private readonly ownFleet = loaded(this.service.vehicles);
+  /** The platform's vehicle categories. The id was a literal here too, chosen by nobody. */
+  private readonly lookups = inject(LookupsService);
+  protected readonly carTypes = loaded(this.lookups.carTypes);
+  protected readonly carTypesFailure = computed(() =>
+    this.lookups.carTypes.error() ? 'Vehicle types could not be loaded.' : null,
+  );
+
+  /**
+   * Newest first, from the platform's own bounds.
+   *
+   * This was `Array.from({ length: 12 }, …)` — twelve years ending at the current one — so the
+   * oldest car anyone could list was 2016, and the domain would have refused anything before 1990
+   * regardless. Empty until the range arrives rather than guessing one.
+   */
+  private readonly yearRange = loaded(this.lookups.modelYears);
+  protected readonly years = computed(() => {
+    const range = this.yearRange();
+    if (!range) return [];
+    const count = range.latest - range.earliest + 1;
+    return count > 0 ? Array.from({ length: count }, (_, i) => range.latest - i) : [];
+  });
+  /** Against the server's bounds, so the form refuses exactly what the API would refuse. */
+  private yearAllowed(year: number | null): boolean {
+    const range = this.yearRange();
+    return year !== null && !!range && year >= range.earliest && year <= range.latest;
+  }
+
   protected readonly current = computed(() => this.steps[this.step() - 1]);
   protected readonly photos = computed(() => this.draft()?.images ?? []);
 
@@ -127,16 +218,22 @@ export class VehicleWizardComponent {
     switch (this.step()) {
       case 1:
         return (
+          f.carTypeId.length > 0 &&
           f.make.trim().length > 0 &&
           f.model.trim().length > 0 &&
-          f.year >= 1990 &&
-          f.year <= new Date().getFullYear() + 1
+          this.yearAllowed(f.year)
         );
       case 2:
-        return f.plateNumber.trim().length > 0 && f.seats > 0;
+        return (
+          f.plateNumber.trim().length > 0 &&
+          (f.seats ?? 0) > 0 &&
+          f.transmission.length > 0 &&
+          f.fuelType.length > 0
+        );
       case 3:
         return (
-          f.dailyRate > 0 &&
+          (f.dailyRate ?? 0) > 0 &&
+          f.securityDeposit !== null &&
           f.securityDeposit >= 0 &&
           (f.mileageUnlimited ||
             ((f.mileageDailyLimitKm ?? 0) > 0 && (f.mileageExcessFeePerKm ?? 0) >= 0))
@@ -148,8 +245,8 @@ export class VehicleWizardComponent {
 
   protected readonly review = computed<readonly KeyValue[]>(() => {
     const f = this.form();
-    const me = this.me.value();
-    const fee = this.delivery.value()?.platformDeliveryFee;
+    const me = this.dealer();
+    const fee = this.deliverySettings()?.fee;
     return [
       { k: 'Plate', v: f.plateNumber || '—' },
       { k: 'Colour', v: f.color || '—' },
@@ -168,7 +265,7 @@ export class VehicleWizardComponent {
       {
         k: 'Delivery',
         v: f.isDeliveryEligible
-          ? `Eligible${fee ? ` · fee ${fee.amount} ${fee.currency} (platform-wide)` : ''}`
+          ? `Eligible${fee ? ` · your fee ${fee.amount} ${fee.currency}` : ''}`
           : 'Pickup only',
       },
       { k: 'Photos', v: `${this.photos().length} uploaded` },
@@ -183,7 +280,7 @@ export class VehicleWizardComponent {
       : 'Becomes a draft once you reach Photos';
   });
 
-  protected patch(patch: Partial<VehicleRequest>): void {
+  protected patch(patch: Partial<WizardForm>): void {
     this.form.update((f) => ({ ...f, ...patch }));
   }
 
@@ -191,8 +288,10 @@ export class VehicleWizardComponent {
     return (event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value;
   }
 
-  protected number(event: Event): number {
-    return Number((event.target as HTMLInputElement).value);
+  /** An empty box is null, not 0: see the form above for why the difference matters. */
+  protected number(event: Event): number | null {
+    const raw = (event.target as HTMLInputElement).value;
+    return raw.trim() === '' ? null : Number(raw);
   }
 
   protected fieldError(name: string): string | null {
@@ -238,8 +337,8 @@ export class VehicleWizardComponent {
     try {
       const draft = this.draft();
       const saved = draft
-        ? await this.service.update(draft.vehicleId, this.form())
-        : await this.service.add(this.form());
+        ? await this.service.update(draft.vehicleId, toRequest(this.form()))
+        : await this.service.add(toRequest(this.form()));
       this.draft.set(saved);
       this.service.refresh();
       // The draft's id goes into the URL, so a refresh or a wrong turn brings the dealer back to
@@ -370,7 +469,7 @@ export class VehicleWizardComponent {
   /** A "taken" plate is very often the dealer's own abandoned draft; say so and point at it. */
   private plateTakenMessage(): string {
     const plate = this.form().plateNumber.trim();
-    const own = (this.service.vehicles.value() ?? []).find((car) => car.plateNumber === plate);
+    const own = (this.ownFleet() ?? []).find((car) => car.plateNumber === plate);
     if (own?.status === 'Draft') {
       this.resumable.set(own);
       return `${plate} is on a draft you already started (${own.make} ${own.model} ${own.year}). Continue that draft instead of creating another.`;

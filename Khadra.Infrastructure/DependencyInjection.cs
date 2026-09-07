@@ -1,3 +1,4 @@
+using Khadra.Domain.PlatformSettings.Repositories;
 using System.Text;
 using Khadra.Application.Auditing.ReadModels;
 using Khadra.Application.Bookings.ReadModels;
@@ -14,12 +15,12 @@ using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Notifications;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
-using Khadra.Infrastructure.Persistence.Seeding;
 using Khadra.Infrastructure.PlatformSettings;
 using Khadra.Infrastructure.Reporting;
 using Khadra.Infrastructure.Security;
@@ -71,6 +72,9 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddOptions<DatabaseOptions>()
             .Bind(configuration.GetSection(DatabaseOptions.SectionName));
+        // No validation: an empty section is the normal state once the platform has an administrator.
+        services.AddOptions<AdminBootstrapOptions>()
+            .Bind(configuration.GetSection(AdminBootstrapOptions.SectionName));
         services.AddOptions<DocumentStorageOptions>()
             .Bind(configuration.GetSection(DocumentStorageOptions.SectionName))
             .ValidateDataAnnotations()
@@ -103,6 +107,21 @@ public static class DependencyInjection
             // would leave the platform chasing every dealer for the difference on every booking.
             .Validate(options => options.DepositPercent >= options.CommissionPercent,
                 "BusinessRules: DepositPercent must be at least CommissionPercent.")
+            // Absence is a misconfiguration, not a default. Without this a deleted key binds to null,
+            // the provider would have to invent a number, and a car would go straight back out with
+            // no time to be cleaned. Zero remains a legitimate, deliberate value.
+            .Validate(options => options.TurnaroundMinutes is not null,
+                "BusinessRules: TurnaroundMinutes must be set. Use 0 to allow back-to-back rentals.")
+            .Validate(options => options.MaxAdvanceBookingDays is not null,
+                "BusinessRules: MaxAdvanceBookingDays must be set.")
+            // Not merely present but positive. Zero would mean a car could be booked for one minute
+            // from now, and every window on that booking -- the dealer's answer, the customer's
+            // payment, free cancellation -- is capped at the rental start, so all three would
+            // collapse while /app-config still advertised a 24-hour payment window.
+            .Validate(options => options.MinimumBookingLeadTimeMinutes is > 0,
+                "BusinessRules: MinimumBookingLeadTimeMinutes must be set to a positive number of minutes.")
+            .Validate(options => options.MaxRentalDays is > 0,
+                "BusinessRules: MaxRentalDays must be set to a positive number of days.")
             .ValidateOnStart();
     }
 
@@ -117,6 +136,7 @@ public static class DependencyInjection
                 .UseSnakeCaseNamingConvention());
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IVehicleHoldLock, VehicleHoldLock>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
@@ -126,7 +146,8 @@ public static class DependencyInjection
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
-        services.AddScoped<DevelopmentSeeder>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotifier, Notifier>();
 
         AddReporting(services);
     }
@@ -141,12 +162,22 @@ public static class DependencyInjection
         services.AddScoped<IEmployeeReader, EmployeeReader>();
         services.AddScoped<IDealerBookingReader, DealerBookingReader>();
         services.AddScoped<IDealerFleetReader, DealerFleetReader>();
+        services.AddScoped<ICatalogueReader, CatalogueReader>();
         services.AddScoped<IBookingDashboardReader, BookingDashboardReader>();
         services.AddScoped<IBookingReader, BookingReader>();
         services.AddScoped<ICustomerDashboardReader, CustomerDashboardReader>();
         services.AddScoped<IDisputeDashboardReader, DisputeDashboardReader>();
+        services.AddScoped<IAdminUserReader, AdminUserReader>();
+        services.AddScoped<ISessionReader, SessionReader>();
+        services.AddScoped<ICarTypeRepository, CarTypeRepository>();
+        services.AddScoped<ICityRepository, CityRepository>();
+        services.AddScoped<ICustomerAdminReader, CustomerAdminReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
+        // The dashboard glance and the audit screen read one table with different questions: a fixed
+        // seven-row feed, and a filtered, paged log. Two readers, deliberately.
+        services.AddScoped<IAuditLogReader, AuditLogReader>();
+        services.AddScoped<IAuditActorReader, AuditActorReader>();
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();
@@ -159,6 +190,8 @@ public static class DependencyInjection
         services.AddSingleton<IOpaqueTokenService, OpaqueTokenService>();
         services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
         services.AddSingleton<IAuthPolicySettings, AuthPolicySettings>();
+        services.AddSingleton<IAdminBootstrapSettings, AdminBootstrapSettings>();
+        services.AddSingleton<IAccessTokenSettings, AccessTokenSettings>();
         services.AddSingleton<IDocumentPolicySettings, DocumentPolicySettings>();
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddSingleton<IDocumentLinkSigner, HmacDocumentLinkSigner>();
@@ -167,11 +200,45 @@ public static class DependencyInjection
 
     private static void AddNotifications(IServiceCollection services, IConfiguration configuration)
     {
+        // Four transports, one switch. `Resend` talks HTTPS and needs only an API key; `Smtp` covers
+        // Gmail and any relay that speaks it (Brevo: smtp-relay.brevo.com:587, username = your login,
+        // password = an SMTP key), so a second provider needs no code, only configuration.
         var provider = configuration[$"{EmailOptions.SectionName}:Provider"] ?? EmailOptions.LoggingProvider;
-        if (string.Equals(provider, EmailOptions.SmtpProvider, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(provider, EmailOptions.ResendProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient(ResendEmailSender.HttpClientName, client =>
+            {
+                client.BaseAddress = new Uri("https://api.resend.com/");
+                // A registration waits on this call, so it fails fast rather than hanging the form.
+                client.Timeout = TimeSpan.FromSeconds(15);
+            });
+            services.AddSingleton<IEmailSender, ResendEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, ResendTransportProbe>();
+        }
+        else if (string.Equals(provider, EmailOptions.BrevoProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient(BrevoEmailSender.HttpClientName, client =>
+            {
+                client.BaseAddress = new Uri("https://api.brevo.com/");
+                // A registration waits on this call, so it fails fast rather than hanging the form.
+                client.Timeout = TimeSpan.FromSeconds(15);
+                var apiKey = configuration[$"{EmailOptions.SectionName}:ApiKey"];
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                    client.DefaultRequestHeaders.Add(BrevoEmailSender.ApiKeyHeader, apiKey);
+            });
+            services.AddSingleton<IEmailSender, BrevoEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, BrevoTransportProbe>();
+        }
+        else if (string.Equals(provider, EmailOptions.SmtpProvider, StringComparison.OrdinalIgnoreCase))
+        {
             services.AddSingleton<IEmailSender, SmtpEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, SmtpTransportProbe>();
+        }
         else
+        {
             services.AddSingleton<IEmailSender, LoggingEmailSender>();
+            services.AddSingleton<IEmailTransportProbe, LoggingTransportProbe>();
+        }
 
         services.AddSingleton<IAuthEmailComposer, AuthEmailComposer>();
     }

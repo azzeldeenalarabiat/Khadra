@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Khadra.Application.Bookings.CreateBooking;
 using Khadra.Application.Bookings.DecideBooking;
 using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadBookings;
@@ -10,13 +11,15 @@ using Microsoft.AspNetCore.Mvc;
 namespace Khadra.WebAPI.Controllers;
 
 /// <summary>
-/// A party's own bookings, read-only.
-///
-/// Customers see what they booked; dealer staff see what was booked from them. There is no POST
-/// here on purpose: creating a booking means choosing how payment, overlap and delivery are decided,
-/// and those decisions belong to the Booking module, not to a slice whose job is to let a dispute be
-/// opened FROM a booking (spec 3.3).
+/// A party's own bookings: what a customer booked, what was booked from a dealership, and the
+/// actions each party may take on one.
 /// </summary>
+/// <remarks>
+/// There was no POST here for a long time, on the grounds that creating a booking meant deciding how
+/// payment, overlap and delivery were settled. Those decisions have since been made -- the owner
+/// reordered the flow to "reserve now, pay after approval" on 2026-09-07 -- so a customer can now
+/// ask for a car without a card, and this is where they do it.
+/// </remarks>
 [ApiController]
 [Route("api/v1/bookings")]
 [Authorize]
@@ -61,6 +64,55 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
             new GetBookingQuery(actor.UserId!.Value, Id.From(bookingId)),
             cancellationToken);
         return FromResult(result);
+    }
+
+    /// <summary>What a customer sends to ask a gallery for a car.</summary>
+    /// <remarks>
+    /// No prices. Every figure on the resulting booking is computed and frozen server-side, because
+    /// a client that could name a total could name a cheaper one. The delivery location is a pair or
+    /// neither, and is only allowed with the Delivery method.
+    /// </remarks>
+    public sealed record CreateBookingRequest(
+        [Required] Guid VehicleId,
+        [Required] DateTimeOffset PickupAt,
+        [Required] DateTimeOffset ReturnAt,
+        [Required, MaxLength(20)] string PickupMethod,
+        [Range(-90, 90)] double? Latitude,
+        [Range(-180, 180)] double? Longitude);
+
+    /// <summary>
+    /// Asks a gallery for a car. Creates the booking in Requested; nothing is paid here.
+    /// </summary>
+    /// <remarks>
+    /// The deposit falls due only if the gallery approves, and the booking holds the car until their
+    /// answer window closes. 409 means somebody else took it -- either the guard saw a live hold, or
+    /// the database's exclusion constraint refused the write in a race the guard could not see.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.Customer)]
+    [HttpPost]
+    [ProducesResponseType<BookingDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> Create([FromBody] CreateBookingRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var result = await Mediator.Send(
+            new CreateBookingCommand(
+                actor.UserId!.Value,
+                Id.From(request.VehicleId),
+                request.PickupAt,
+                request.ReturnAt,
+                request.PickupMethod,
+                request.Latitude,
+                request.Longitude),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(Get), new { bookingId = result.Value.BookingId }, result.Value)
+            : Failure(result.Error);
     }
 
     // ── The dealer's decisions (spec 4.2, 5.4). Owner or ACTIVE employee; approve and reject also

@@ -1,15 +1,25 @@
 /**
- * The wire shape of `GET /api/v1/admin/dashboard`.
+ * The wire shapes of the admin dashboard endpoints — one per panel.
  *
- * A faithful mirror of AdminDashboardDto and nothing more: no colours, no icons, no routes and no
+ * A faithful mirror of the DTOs and nothing more: no colours, no icons, no routes and no
  * pre-formatted strings, because the API deliberately does not send any. Turning these facts into
  * something the design can render is the presenter's job, not this file's.
  *
- * `finance` and `moneyInMotion` are null until the Payments context exists. Null means "this
- * deployment cannot answer that", which is not the same as zero and must not render as zero.
+ * These used to be one `AdminDashboard` snapshot. It was split because the navigation rail reads two
+ * of these numbers on every admin screen and was paying for the work queue, the trend and the audit
+ * feed to get them — and because, being one root resource fetched once, those numbers were frozen at
+ * the first paint of the session.
+ *
+ * Every response carries `generatedAt`. With one snapshot there was one "now"; with several, each
+ * panel has its own, and a panel that is minutes stale can say so.
  */
 
-export interface DealerCounts {
+/** Every panel states the instant it speaks for. */
+interface PanelResponse {
+  readonly generatedAt: string;
+}
+
+export interface DealerCounts extends PanelResponse {
   readonly total: number;
   readonly trading: number;
   readonly pendingReview: number;
@@ -18,46 +28,39 @@ export interface DealerCounts {
   readonly suspended: number;
 }
 
-export interface BookingCounts {
+export interface BookingCounts extends PanelResponse {
   readonly total: number;
+  /** Bookings taken on the platform's local reporting day, not a UTC one. */
   readonly today: number;
   readonly active: number;
   readonly pendingApproval: number;
 }
 
-export interface CustomerCounts {
+export interface CustomerCounts extends PanelResponse {
   readonly total: number;
   readonly verified: number;
   readonly pendingVerification: number;
   readonly suspended: number;
 }
 
-export interface DisputeCounts {
+export interface DisputeCounts extends PanelResponse {
   readonly open: number;
   readonly underReview: number;
   readonly overdue: number;
   readonly resolvedRecently: number;
+  /** The window `resolvedRecently` was measured over. It travels with the figure, never assumed. */
   readonly resolvedWindowDays: number;
 }
 
-export interface Money {
-  readonly amount: number;
-  readonly currency: string;
-}
-
-export interface FinanceSummary {
-  readonly grossBookingValue: Money;
-  readonly commission: Money;
-  readonly dealerPayouts: Money;
-  readonly refunds: Money;
-  readonly periodFrom: string;
-  readonly periodTo: string;
-}
-
-export interface MoneyInMotion {
-  readonly gross: Money;
-  readonly commission: Money;
-  readonly dealerPayouts: Money;
+/**
+ * What is sitting with the platform: the rail badges it with, but it is not named for the rail.
+ * Fetched on every navigation and after every decision, which is what keeps a badge true rather than
+ * merely live-looking.
+ */
+export interface AdminWorkload extends PanelResponse {
+  /** PendingReview only. An application sent back for clarification is the dealer's move, not ours. */
+  readonly dealerApplicationsAwaitingReview: number;
+  readonly liveDisputes: number;
 }
 
 export interface DailyCount {
@@ -65,10 +68,11 @@ export interface DailyCount {
   readonly count: number;
 }
 
-export interface BookingTrend {
+export interface BookingTrend extends PanelResponse {
   readonly from: string;
   readonly to: string;
   readonly points: readonly DailyCount[];
+  /** Null when the preceding window was empty: "+100%" against zero is a made-up number. */
   readonly changePercent: number | null;
 }
 
@@ -86,7 +90,8 @@ export interface AttentionItem {
   readonly isOverdue: boolean;
 }
 
-export interface AttentionQueue {
+export interface AttentionQueue extends PanelResponse {
+  /** The SLA in force when this was generated. Each row is judged against its OWN frozen deadline. */
   readonly slaHours: number;
   readonly openCount: number;
   readonly overdueCount: number;
@@ -102,16 +107,6 @@ export interface ActivityEntry {
   readonly subjectLabel: string;
 }
 
-export interface AdminDashboard {
-  readonly generatedAt: string;
-  readonly adminSlaHours: number;
-  readonly dealers: DealerCounts;
-  readonly bookings: BookingCounts;
-  readonly customers: CustomerCounts;
-  readonly disputes: DisputeCounts;
-  readonly finance: FinanceSummary | null;
-  readonly moneyInMotion: MoneyInMotion | null;
-  readonly bookingTrend: BookingTrend;
-  readonly attentionQueue: AttentionQueue;
-  readonly recentActivity: readonly ActivityEntry[];
+export interface ActivityFeed extends PanelResponse {
+  readonly entries: readonly ActivityEntry[];
 }

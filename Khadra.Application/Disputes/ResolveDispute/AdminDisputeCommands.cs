@@ -20,6 +20,10 @@ namespace Khadra.Application.Disputes.ResolveDispute;
 public sealed record ListDisputesQuery(string? Status, bool OverdueOnly, int? Page, int? PageSize)
     : IQuery<Result<PagedResult<DisputeListItem>, Error>>;
 
+/// <summary>How the queue is shaped under the same filters, for all of it rather than one page.</summary>
+public sealed record GetDisputeQueueCountsQuery(string? Status, bool OverdueOnly)
+    : IQuery<Result<DisputeQueueCounts, Error>>;
+
 public sealed record GetDisputeForReviewQuery(Id TicketId) : IQuery<Result<DisputeDto, Error>>;
 
 public sealed record AssignDisputeCommand(Id TicketId) : ICommand<Result<DisputeDto, Error>>;
@@ -69,6 +73,7 @@ public sealed class AdminDisputeHandlers(
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<ListDisputesQuery, Result<PagedResult<DisputeListItem>, Error>>,
+    IRequestHandler<GetDisputeQueueCountsQuery, Result<DisputeQueueCounts, Error>>,
     IRequestHandler<GetDisputeForReviewQuery, Result<DisputeDto, Error>>,
     IRequestHandler<AssignDisputeCommand, Result<DisputeDto, Error>>,
     IRequestHandler<ResolveDisputeCommand, Result<DisputeDto, Error>>
@@ -81,6 +86,17 @@ public sealed class AdminDisputeHandlers(
         return await reader.ListAsync(
             new DisputeListFilter(request.Status, request.OverdueOnly),
             PageRequest.From(request.Page, request.PageSize),
+            clock.UtcNow,
+            cancellationToken);
+    }
+
+    public async Task<Result<DisputeQueueCounts, Error>> Handle(
+        GetDisputeQueueCountsQuery request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return await reader.CountsAsync(
+            new DisputeListFilter(request.Status, request.OverdueOnly),
             clock.UtcNow,
             cancellationToken);
     }

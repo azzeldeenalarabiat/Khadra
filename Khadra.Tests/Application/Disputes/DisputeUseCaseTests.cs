@@ -98,8 +98,8 @@ public sealed class DisputeUseCaseTests
     private static Booking CancelledBooking(DateTimeOffset now)
     {
         var booking = Build.Booking(now: now, customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
-        booking.ConfirmDepositPaid(Id.New(), now);
         booking.Approve(Id.New(), now.AddMinutes(10));
+        booking.ConfirmDepositPaid(Id.New(), now);
         // Past the free window, so a penalty is assessed against the customer.
         booking.Cancel(BookingParty.Customer, CustomerId, "Changed plans.", now.AddHours(3));
         booking.ClearDomainEvents();
@@ -151,10 +151,10 @@ public sealed class DisputeUseCaseTests
     public async Task A_booking_still_in_progress_cannot_be_disputed()
     {
         var context = new Context();
-        var booking = context.GivenBooking(Build.ApprovedBooking());
+        var booking = context.GivenBooking(Build.ConfirmedBooking());
         var stillMine = Build.Booking(customerId: CustomerId);
-        stillMine.ConfirmDepositPaid(Id.New(), Build.Now);
         stillMine.Approve(Id.New(), Build.Now);
+        stillMine.ConfirmDepositPaid(Id.New(), Build.Now);
         context.GivenBooking(stillMine);
 
         var result = await context.Raise().Handle(
@@ -236,8 +236,8 @@ public sealed class DisputeUseCaseTests
         var context = new Context();
         var dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
         var booking = Build.Booking(customerId: CustomerId, dealerId: dealer.Id, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
-        booking.ConfirmDepositPaid(Id.New(), Build.Now);
         booking.Approve(Id.New(), Build.Now.AddMinutes(10));
+        booking.ConfirmDepositPaid(Id.New(), Build.Now);
         booking.Cancel(BookingParty.Customer, CustomerId, "Changed plans.", Build.Now.AddHours(3));
         context.GivenBooking(booking);
         context.Dealers.GetByOwnerUserIdAsync(OwnerId, Arg.Any<CancellationToken>()).Returns(dealer);
@@ -259,8 +259,8 @@ public sealed class DisputeUseCaseTests
         var context = new Context();
         var dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
         var booking = Build.Booking(customerId: CustomerId, dealerId: dealer.Id, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
-        booking.ConfirmDepositPaid(Id.New(), Build.Now);
         booking.Approve(Id.New(), Build.Now.AddMinutes(10));
+        booking.ConfirmDepositPaid(Id.New(), Build.Now);
         booking.Cancel(BookingParty.Customer, CustomerId, "Changed plans.", Build.Now.AddHours(3));
         context.GivenBooking(booking);
         context.Dealers.GetByOwnerUserIdAsync(OwnerId, Arg.Any<CancellationToken>()).Returns(dealer);
@@ -354,7 +354,7 @@ public sealed class DisputeUseCaseTests
     public async Task Resolving_a_returned_booking_completes_it_without_waiting_out_the_window()
     {
         var context = new Context();
-        var booking = Build.ApprovedBooking(terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        var booking = Build.ConfirmedBooking(terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
         var start = booking.Period.Start;
         booking.RecordPickup(BookingParty.Dealer, Id.New(), start);
         booking.RecordReturn(BookingParty.Dealer, Id.New(), start.AddDays(3));

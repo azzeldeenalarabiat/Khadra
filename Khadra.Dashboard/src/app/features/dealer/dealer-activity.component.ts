@@ -3,7 +3,9 @@ import { RouterLink } from '@angular/router';
 import { DealerActivityEntry } from '../../core/models/dealer-console.api';
 import { Tone } from '../../core/models/console.models';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Activity (design `isActivity`): every status change on the dealership's bookings, newest first,
@@ -17,13 +19,22 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class DealerActivityComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
 
   protected readonly page = this.service.activityPage;
   protected readonly resource = this.service.activity;
-  protected readonly entries = computed(() => this.resource.value()?.items ?? []);
-  protected readonly total = computed(() => this.resource.value()?.totalCount ?? 0);
-  protected readonly totalPages = computed(() => this.resource.value()?.totalPages ?? 1);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly entries = computed(() => this.data()?.items ?? []);
+  protected readonly total = computed(() => this.data()?.totalCount ?? 0);
+
+  /** One change is a change, not "1 changes". */
+  protected readonly summary = computed(() => {
+    const total = this.total();
+    return `${this.entries().length} of ${total} ${total === 1 ? 'change' : 'changes'}`;
+  });
+  protected readonly totalPages = computed(() => this.data()?.totalPages ?? 1);
 
   protected readonly failure = computed(() =>
     this.resource.error() ? 'Activity could not be loaded. Nothing has been changed.' : null,
@@ -39,9 +50,11 @@ export class DealerActivityComponent {
       case 'Cancelled':
       case 'NoShow':
         return 'bad';
+      // Both of the states with a clock running on them: nobody has answered, or nobody has paid.
       case 'Requested':
-        return 'warn';
       case 'Approved':
+        return 'warn';
+      case 'Confirmed':
       case 'PickedUp':
       case 'Returned':
       case 'Completed':
@@ -53,9 +66,9 @@ export class DealerActivityComponent {
 
   protected describe(e: DealerActivityEntry): string {
     const labels: Record<string, string> = {
-      PendingPayment: 'Request created',
-      Requested: 'Deposit paid — awaiting your answer',
-      Approved: 'Approved',
+      Requested: 'Requested — awaiting your answer',
+      Approved: 'Approved — awaiting the deposit',
+      Confirmed: 'Deposit paid — booking confirmed',
       Rejected: 'Rejected',
       PickedUp: 'Picked up',
       Returned: 'Returned',

@@ -8,10 +8,22 @@ public static class DealerErrors
         Error.Validation("dealer.invalid_business_name", "The business name must be between 2 and 150 characters.");
 
     public static readonly Error InvalidCommercialRegistration =
-        Error.Validation("dealer.invalid_commercial_registration", "The commercial registration number is not valid.");
+        Error.Validation(
+            "dealer.invalid_commercial_registration",
+            "The commercial registration number must be 4 to 20 digits. Spaces, dashes, slashes and dots are ignored; other characters are not allowed.");
+
+    public static readonly Error AlreadySuspended =
+        Error.Conflict("dealer.already_suspended", "This dealer is already suspended.");
+
+    public static readonly Error NotSuspended =
+        Error.Conflict("dealer.not_suspended", "This dealer is not suspended.");
 
     public static readonly Error InvalidDeliveryRadius =
         Error.Validation("dealer.invalid_delivery_radius", "The delivery radius must be greater than 0 and at most 200 km.");
+
+    // A ceiling, not a price: what a delivery is worth is the gallery’s decision.
+    public static readonly Error InvalidDeliveryFee =
+        Error.Validation("dealer.invalid_delivery_fee", "The delivery fee must be between 0 and 1000 JOD.");
 
     public static readonly Error InvalidOperatingHours =
         Error.Validation("dealer.invalid_operating_hours", "Operating hours must cover all seven days, and closing time must be after opening time.");
@@ -79,6 +91,13 @@ public static class DealerErrors
 
     public static readonly Error InvitationAlreadyAccepted =
         Error.Conflict("dealer.invitation_accepted", "This employee has already accepted their invitation.");
+
+    // The mail server refused the invitation. The employee record and the fresh token both stand,
+    // so this reports the one thing the owner cannot see for themselves: nobody was written to.
+    public static readonly Error InvitationEmailNotSent =
+        Error.Unavailable(
+            "dealer.invitation_email_not_sent",
+            "We could not email the invitation just now. The employee is saved — try sending it again in a few minutes.");
 
     public static readonly Error EmployeeAlreadyActive =
         Error.Conflict("dealer.employee_already_active", "This employee is already active.");

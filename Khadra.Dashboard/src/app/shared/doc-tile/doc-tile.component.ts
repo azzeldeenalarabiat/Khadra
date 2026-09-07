@@ -1,13 +1,15 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, inject } from '@angular/core';
 import { DocumentTile, toneClass } from '../../core/models/console.models';
 import { IconComponent } from '../icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * A private document (dealer licence, customer ID, dispute evidence).
  *
  * The file itself is never inlined: these are access-controlled objects served
- * through short-lived signed URLs, and every view is logged. The tile shows only
- * the filename and a button that would request one.
+ * through short-lived signed URLs. The tile shows what the caller put in `file` — the document's
+ * format on the dealer review screen, the stored name on dispute evidence — and a button that
+ * requests the link. Never the URL itself, which is a credential.
  */
 @Component({
   selector: 'kh-doc-tile',
@@ -16,6 +18,7 @@ import { IconComponent } from '../icon/icon.component';
   imports: [IconComponent],
 })
 export class DocTileComponent {
+  protected readonly t = inject(I18nService).t;
   readonly doc = input.required<DocumentTile>();
   /** Evidence tiles in the dispute screen show no preview button. */
   readonly showPreview = input<boolean>(true);

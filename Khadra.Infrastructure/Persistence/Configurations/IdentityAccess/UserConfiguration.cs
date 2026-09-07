@@ -13,15 +13,15 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         ConfigureAggregate(entity, "users");
 
         entity.Property(user => user.Email)
-            .HasConversion(email => email.Value, value => EmailAddress.Create(value).Value)
+            .HasConversion(email => email.Value, value => EmailAddress.FromPersisted(value))
             .HasMaxLength(EmailAddress.MaxLength)
             .IsRequired();
         entity.Property(user => user.Phone)
-            .HasConversion(phone => phone.Value, value => PhoneNumber.Create(value).Value)
+            .HasConversion(phone => phone.Value, value => PhoneNumber.FromPersisted(value))
             .HasMaxLength(PhoneNumber.MaxLength)
             .IsRequired();
         entity.Property(user => user.Name)
-            .HasConversion(name => name.Value, value => PersonName.Create(value).Value)
+            .HasConversion(name => name.Value, value => PersonName.FromPersisted(value))
             .HasMaxLength(PersonName.MaxLength)
             .IsRequired();
         entity.Property(user => user.PasswordHash)

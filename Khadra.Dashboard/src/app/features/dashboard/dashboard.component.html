@@ -1,9 +1,12 @@
 <div class="stack stack-14">
   <div>
-    <h1 class="page-title">Dashboard</h1>
-    <div class="page-sub">Overview of platform activity and items requiring attention.</div>
+    <h1 class="page-title">{{ t('adminDashboard.dashboard') }}</h1>
+    <div class="page-sub">{{ t('adminDashboard.overviewOfPlatformActivity') }}</div>
   </div>
 
+  <!-- One message for the whole page only when the session itself is the problem. Anything else is a
+       panel's own failure and is reported inside that panel, so a broken audit feed no longer hides
+       the work queue. -->
   @if (failure(); as problem) {
     <section class="sect">
       <div class="state-block">
@@ -11,27 +14,11 @@
         <div class="state-title">{{ problem.title }}</div>
         <div class="state-text">{{ problem.body }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('adminDashboard.retry') }}</button>
         </div>
       </div>
     </section>
-  } @else if (resource.isLoading()) {
-    <div class="kpi-grid">
-      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
-        <div class="sect kpi-card">
-          <div class="skel-row"><div class="skel" [style.width.%]="60"></div></div>
-          <div class="skel-row"><div class="skel" [style.width.%]="40"></div></div>
-          <div class="skel-row"><div class="skel" [style.width.%]="80"></div></div>
-        </div>
-      }
-    </div>
-    <section class="sect sect-pad">
-      <div class="skel-row"><div class="skel" [style.width.%]="30"></div></div>
-      @for (placeholder of [0, 1, 2, 3, 4]; track placeholder) {
-        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
-      }
-    </section>
-  } @else if (resource.hasValue()) {
+  } @else {
     <div class="kpi-grid">
       @for (kpi of kpis(); track kpi.label) {
         <a class="sect kpi-card" [routerLink]="kpi.route">
@@ -50,101 +37,206 @@
           </div>
         </a>
       }
+      <!-- A card appears as its own answer lands; the skeletons stand in for the ones still out. -->
+      @if (countsLoading()) {
+        @for (placeholder of [0, 1, 2, 3]; track placeholder) {
+          <div class="sect kpi-card">
+            <div class="skel-row"><div class="skel" [style.width.%]="60"></div></div>
+            <div class="skel-row"><div class="skel" [style.width.%]="40"></div></div>
+            <div class="skel-row"><div class="skel" [style.width.%]="80"></div></div>
+          </div>
+        }
+      } @else if (countsFailed()) {
+        <!-- A card that cannot be drawn leaves a hole, and a row of holes reads as a platform with
+             nothing on it. It says so instead, once, like every other panel here. -->
+        <div class="sect kpi-card">
+          <div class="state-title">{{ t('adminDashboard.platformFiguresCouldNot') }}</div>
+          <div class="state-text">{{ t('adminDashboard.nothingHasBeenChanged') }}</div>
+          <div class="state-actions">
+            <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">{{ t('adminDashboard.retry') }}</button>
+          </div>
+        </div>
+      }
     </div>
 
     <div class="dash-split">
       <section class="sect stack sect-clip">
         <div class="sect-h">
           <kh-icon name="warning-diamond" class="s-bad status-text" />
-          <span class="sect-t">Requires attention</span>
+          <span class="sect-t">{{ t('adminDashboard.requiresAttention') }}</span>
           <span class="queue-count">{{ queueSummary() }}</span>
           <span class="sect-note">{{ slaNote() }}</span>
         </div>
 
-        @for (item of queue(); track item.title + item.entity) {
-          <div class="queue-row" [class]="toneClass(item.tone)">
-            <div class="queue-rail"></div>
-            <div class="queue-body">
-              <div class="row row-gap-8">
-                <span class="pill">{{ item.severity }}</span>
-                <span class="queue-entity">{{ item.entity }}</span>
-              </div>
-              <div class="queue-title">{{ item.title }}</div>
-              <div class="queue-desc">{{ item.description }}</div>
-            </div>
-            <div class="queue-side">
-              <div class="sla-head">
-                <span class="k">SLA</span>
-                <span class="num sla-value">{{ item.sla }}</span>
-              </div>
-              <div class="meter">
-                <div class="meter-fill" [style.width.%]="item.percent"></div>
-              </div>
-              <a class="btn btn-primary btn-sm" [routerLink]="item.route">{{ item.action }}</a>
-            </div>
-          </div>
-        } @empty {
-          <div class="state-block is-empty">
-            <div class="state-icon is-outline"><kh-icon name="check-circle" /></div>
-            <div class="state-title">Nothing needs attention</div>
+        @if (panelFailed(queueResource)) {
+          <div class="state-block">
+            <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+            <div class="state-title">{{ t('adminDashboard.theWorkQueueCould') }}</div>
             <div class="state-text">
-              No dispute or dealer application is approaching its review deadline.
+              {{ t('adminDashboard.nothingHasBeenChanged2') }}
+            </div>
+            <div class="state-actions">
+              <button type="button" class="btn btn-primary btn-sm" (click)="queueResource.reload()">
+                {{ t('adminDashboard.retry') }}
+              </button>
             </div>
           </div>
+        } @else if (queueResource.isLoading()) {
+          <div class="sect-pad" aria-busy="true" aria-live="polite">
+            @for (placeholder of [0, 1, 2, 3]; track placeholder) {
+              <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+            }
+          </div>
+        } @else {
+          @for (item of queue(); track item.id) {
+            <div class="queue-row" [class]="toneClass(item.tone)">
+              <div class="queue-rail"></div>
+              <div class="queue-body">
+                <div class="row row-gap-8">
+                  <span class="pill">{{ item.severity }}</span>
+                  <span class="queue-entity">{{ item.entity }}</span>
+                </div>
+                <div class="queue-title">{{ item.title }}</div>
+                <div class="queue-desc">{{ item.description }}</div>
+              </div>
+              <div class="queue-side">
+                <div class="sla-head">
+                  <span class="k">{{ t('adminDashboard.sla') }}</span>
+                  <span class="num sla-value">{{ item.sla }}</span>
+                </div>
+                <div class="meter">
+                  <div class="meter-fill" [style.width.%]="item.percent"></div>
+                </div>
+                <a class="btn btn-primary btn-sm" [routerLink]="item.route">{{ item.action }}</a>
+              </div>
+            </div>
+          } @empty {
+            <div class="state-block is-empty">
+              <div class="state-icon is-outline"><kh-icon name="check-circle" /></div>
+              <div class="state-title">{{ t('adminDashboard.nothingNeedsAttention') }}</div>
+              <div class="state-text">
+                {{ t('adminDashboard.noDisputeOrDealer') }}
+              </div>
+            </div>
+          }
         }
       </section>
 
       <div class="stack stack-14">
         <section class="sect sect-pad stack stack-10">
           <div class="sla-head">
-            <span class="k">Bookings · last {{ trendDays() }} days</span>
-            <span class="num trend-up">{{ trendChange() }}</span>
+            <span class="k">{{ t('adminDashboard.bookingsLastDays', { days: trendDays() }) }}</span>
+            <span
+              class="num trend-change status-text"
+              [class]="trendTone() ? toneClass(trendTone()!) : ''"
+              >{{ trendChange() }}</span
+            >
           </div>
-          <div
-            class="chart-bars"
-            role="img"
-            [attr.aria-label]="'Daily bookings over the last ' + trendDays() + ' days'"
-          >
-            @for (height of trend(); track $index) {
-              <div class="chart-bar" [style.height.%]="height"></div>
-            }
-          </div>
-        </section>
+          @if (panelFailed(trendResource)) {
+            <div class="state-text">
+              {{ t('adminDashboard.theBookingTrendCould') }}
+              <button
+                type="button"
+                class="btn btn-secondary btn-xs"
+                (click)="trendResource.reload()"
+              >
+                {{ t('adminDashboard.retry') }}
+              </button>
+            </div>
+          } @else if (trendResource.isLoading()) {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          } @else if (trend().length === 0) {
+            <div class="state-text">{{ t('adminDashboard.noBookingsWereMade') }}</div>
+          } @else {
+            <!--
+              Every bar carries the day and the count it was drawn from.
 
-        <section class="sect sect-pad stack stack-12">
-          <span class="k">Money in motion</span>
-          @for (row of money(); track row.k) {
-            <div>
-              <div class="money-head">
-                <span class="money-k">{{ row.k }}</span>
-                <span class="num money-v">{{ row.v }}</span>
-              </div>
-              <div class="money-meter">
-                <div class="money-fill" [style.width.%]="row.percent"></div>
-              </div>
+              It used to be fourteen bare heights: no dates, no counts, no scale, and a quiet day
+              rendered as nothing at all, so a fortnight showed twelve bars. The figures were real
+              and the chart looked exactly like decoration, which is the one thing this console must
+              never do — a reader has to be able to check a number against the records behind it.
+            -->
+            <div class="chart-bars">
+              @for (bar of trend(); track bar.date) {
+                <div class="chart-col" [title]="bar.label">
+                  <!-- The track keeps a zero day visible as a day with no bookings, rather than a
+                       gap the reader has to guess the meaning of. -->
+                  <div class="chart-track">
+                    <div class="chart-bar" [style.height.%]="bar.height"></div>
+                  </div>
+                  <span class="visually-hidden">{{ bar.label }}</span>
+                </div>
+              }
+            </div>
+            <div class="chart-axis" aria-hidden="true">
+              @for (bar of trend(); track bar.date) {
+                <span class="chart-tick">{{ bar.tick }}</span>
+              }
+            </div>
+            <div class="page-sub">
+              {{ trendRange() }} ·
+              {{ t('adminDashboard.busiestDayWith', { count: trendPeak() ?? 0 }) }} ·
+              <a class="row-link" routerLink="/bookings">{{ t('adminDashboard.seeTheBookings') }}</a>
             </div>
           }
         </section>
 
-        <section class="sect sect-clip">
-          <div class="activity-head"><span class="k">Recent activity</span></div>
-          <div class="activity-list">
-            @for (entry of activity(); track entry.text + entry.ts) {
-              <div class="activity-row">
-                <kh-icon [name]="entry.icon" class="activity-icon" />
-                <div class="grow">
-                  <div class="activity-text">{{ entry.text }}</div>
-                  <div class="activity-ts">{{ entry.ts }}</div>
-                </div>
-              </div>
-            } @empty {
-              <div class="activity-row">
-                <div class="grow">
-                  <div class="activity-text">No recorded activity yet.</div>
-                </div>
-              </div>
-            }
+        <!-- No request is made for these figures. The Payments context is not built, so nothing can
+             answer for money, and asking an endpoint in order to be told so on every page load is
+             the waste this split removed. It says it once, plainly, the way `features/not-built/`
+             speaks for a whole screen. -->
+        <section class="sect sect-pad stack stack-10">
+          <span class="k">{{ t('adminDashboard.moneyInMotion') }}</span>
+          <div class="state-block is-empty">
+            <div class="state-icon is-outline"><kh-icon name="currency-circle-dollar" /></div>
+            <div class="state-title">{{ t('adminDashboard.noMoneyHasMoved') }}</div>
+            <div class="state-text">
+              {{ t('adminDashboard.grossBookingValueCommission') }}
+            </div>
+            <div class="state-actions">
+              <a class="btn btn-secondary btn-sm" routerLink="/finance">{{ t('adminDashboard.whatThisWillShow') }}</a>
+            </div>
           </div>
+        </section>
+
+        <section class="sect sect-clip">
+          <div class="activity-head"><span class="k">{{ t('adminDashboard.recentActivity') }}</span></div>
+          @if (panelFailed(activityResource)) {
+            <div class="sect-pad state-text">
+              {{ t('adminDashboard.theActivityFeedCould') }}
+              <button
+                type="button"
+                class="btn btn-secondary btn-xs"
+                (click)="activityResource.reload()"
+              >
+                {{ t('adminDashboard.retry') }}
+              </button>
+            </div>
+          } @else if (activityResource.isLoading()) {
+            <div class="sect-pad" aria-busy="true" aria-live="polite">
+              @for (placeholder of [0, 1, 2]; track placeholder) {
+                <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+              }
+            </div>
+          } @else {
+            <div class="activity-list">
+              @for (entry of activity(); track entry.text + entry.ts) {
+                <div class="activity-row">
+                  <kh-icon [name]="entry.icon" class="activity-icon" />
+                  <div class="grow">
+                    <div class="activity-text">{{ entry.text }}</div>
+                    <div class="activity-ts">{{ entry.ts }}</div>
+                  </div>
+                </div>
+              } @empty {
+                <div class="activity-row">
+                  <div class="grow">
+                    <div class="activity-text">{{ t('adminDashboard.noRecordedActivityYet') }}</div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
         </section>
       </div>
     </div>

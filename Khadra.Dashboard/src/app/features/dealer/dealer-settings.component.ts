@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { SessionService } from '../../core/services/session.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * Settings (design `isSettings`).
@@ -19,12 +21,13 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [IconComponent],
 })
 export class DealerSettingsComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly session = inject(SessionService);
   private readonly console = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
 
   protected readonly user = this.session.user;
-  protected readonly dealer = computed(() => this.console.me.value() ?? null);
+  protected readonly dealer = loaded(this.console.me);
 
   protected readonly current = signal('');
   protected readonly next = signal('');
@@ -48,18 +51,18 @@ export class DealerSettingsComponent {
   );
 
   protected readonly notLive: readonly { readonly title: string; readonly body: string }[] = [
-    { title: 'Two-factor authentication', body: 'Not live yet. Sign-in is email and password.' },
+    { title: this.t('dealerSettings.twoFactorAuthentication'), body: this.t('dealerSettings.notLiveYetSign') },
     {
-      title: 'Notification preferences',
-      body: 'Not live yet. Invitations and password links go by email; everything else is on the dashboard.',
+      title: this.t('employeeSettings.notificationPreferences'),
+      body: this.t('dealerSettings.notLiveYetInvitations'),
     },
     {
-      title: 'Bank details for payouts',
-      body: 'Not live yet. Payouts are not built; commission is deducted from the card deposit and the balance is collected in cash.',
+      title: this.t('dealerSettings.bankDetailsForPayouts'),
+      body: this.t('dealerSettings.notLiveYetPayouts'),
     },
     {
-      title: 'Pause or close the dealership',
-      body: 'Not live yet. Hide individual cars from the fleet page to stop taking bookings; ask the platform to close the account.',
+      title: this.t('dealerSettings.pauseOrCloseThe'),
+      body: this.t('dealerSettings.notLiveYetHide'),
     },
   ];
 

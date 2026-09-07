@@ -3,11 +3,11 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load this dispute</div>
+        <div class="state-title">{{ t('common.couldntLoadThisDispute') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/disputes">Back to the queue</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          <a class="btn btn-secondary btn-sm" routerLink="/disputes">{{ t('disputeDetail.backToTheQueue') }}</a>
         </div>
       </div>
     </section>
@@ -26,28 +26,28 @@
             {{ d.status === 'UnderReview' ? 'Under review' : d.status }}
           </span>
           @if (d.isOverdue && d.isLive) {
-            <span class="pill s-bad">Overdue</span>
+            <span class="pill s-bad">{{ t('disputeDetail.overdue') }}</span>
           }
         </div>
         <div class="page-sub">
-          Opened {{ when(d.openedAt) }} by {{ d.openedByName }} ({{ d.openedByParty }}) ·
-          {{ d.booking.dealerName }} and {{ d.booking.customerName }}
+          {{ t('disputeDetail.opened') }} {{ when(d.openedAt) }} by {{ d.openedByName }} ({{ d.openedByParty }}) ·
+          {{ d.booking.dealerName }} {{ t('disputeDetail.and') }} {{ d.booking.customerName }}
         </div>
       </div>
       <div class="sla-panel">
         <div [class]="sla().over ? 's-bad' : ''">
-          <div class="k">Platform SLA</div>
+          <div class="k">{{ t('disputeDetail.platformSla') }}</div>
           <div class="num sla-panel-figure status-text">{{ sla().figure }}</div>
         </div>
         <div class="sla-divider"></div>
         <div>
-          <div class="k">Age</div>
+          <div class="k">{{ t('disputeDetail.age') }}</div>
           <div class="num sla-panel-figure">{{ age() }}</div>
         </div>
       </div>
       <div class="dc-head-actions">
         <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', d.booking.dealerId]">
-          Open dealer
+          {{ t('common.openDealer') }}
         </a>
         @if (d.isLive && !d.assignedAdminName) {
           <button
@@ -56,7 +56,7 @@
             [disabled]="busy()"
             (click)="assign()"
           >
-            Take this on
+            {{ t('disputeDetail.takeThisOn') }}
           </button>
         }
       </div>
@@ -85,26 +85,19 @@
 
         <section class="sect">
           <div class="sect-h">
-            <span class="sect-t">Statements</span>
-            <span class="sect-hint">Both parties and the platform read everything here</span>
+            <span class="sect-t">{{ t('common.statements') }}</span>
+            <span class="sect-hint">{{ t('disputeDetail.bothPartiesAndThe') }}</span>
           </div>
+          <!--
+            One card per statement, and the FIRST one wears the "opened it" pill.
+
+            DisputeTicket.Open records the reason as statement #1, so a separate card built from
+            d.reason printed the opening complaint twice over: same words, same author, same
+            timestamp, one above the other. Marking the real statement instead keeps the evidence
+            that came attached to it with the words it was sent to support.
+          -->
           <div class="sect-pad stack stack-12">
-            <div class="row row-gap-12">
-              <div class="customer-avatar" [class.s-accent]="d.openedByParty === 'Dealer'">
-                {{ initials(d.openedByName) }}
-              </div>
-              <div class="grow">
-                <div class="row row-gap-8">
-                  <span class="handover-title">{{ d.openedByName }}</span>
-                  <span class="pill" [class]="d.openedByParty === 'Dealer' ? 's-accent' : 's-dim'">
-                    {{ d.openedByParty }} · opened it
-                  </span>
-                  <span class="page-sub push">{{ when(d.openedAt) }}</span>
-                </div>
-                <div class="queue-desc">{{ d.reason }}</div>
-              </div>
-            </div>
-            @for (s of d.statements; track s.statementId) {
+            @for (s of d.statements; track s.statementId; let first = $first) {
               <div class="row row-gap-12">
                 <div class="customer-avatar" [class.s-accent]="s.party === 'Dealer'">
                   {{ initials(s.authorName) }}
@@ -113,7 +106,7 @@
                   <div class="row row-gap-8">
                     <span class="handover-title">{{ s.authorName }}</span>
                     <span class="pill" [class]="s.party === 'Dealer' ? 's-accent' : 's-dim'">
-                      {{ s.party }}
+                      {{ s.party }}{{ first ? ' · opened it' : '' }}
                     </span>
                     <span class="page-sub push">{{ when(s.createdAt) }}</span>
                   </div>
@@ -121,7 +114,9 @@
                 </div>
               </div>
             } @empty {
-              <div class="page-sub">No statement has been added since the ticket was opened.</div>
+              <!-- Unreachable while Open() writes the first statement, but a ticket with no
+                   statement at all must not render an empty panel with no explanation. -->
+              <div class="page-sub">{{ d.reason }}</div>
             }
           </div>
         </section>
@@ -130,9 +125,9 @@
           <section class="sect">
             <div class="sect-h">
               <kh-icon name="paperclip" class="kpi-icon" />
-              <span class="sect-t">Evidence</span>
+              <span class="sect-t">{{ t('disputeDetail.evidence') }}</span>
               <span class="sect-hint">
-                {{ evidence().length }} file(s) from both parties · links expire
+                {{ evidence().length }} {{ t('disputeDetail.fileSFromBoth') }}
               </span>
             </div>
             <div class="doc-grid-4">
@@ -155,7 +150,7 @@
         }
 
         <section class="sect">
-          <div class="sect-h"><span class="sect-t">Case timeline</span></div>
+          <div class="sect-h"><span class="sect-t">{{ t('disputeDetail.caseTimeline') }}</span></div>
           <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
         </section>
       </div>
@@ -165,51 +160,59 @@
           <section class="sect sect-pad stack stack-9">
             <div class="row row-gap-8">
               <kh-icon name="scales" class="kpi-icon" />
-              <span class="sect-t">Decision recorded</span>
+              <span class="sect-t">{{ t('disputeDetail.decisionRecorded') }}</span>
             </div>
             <div class="page-sub">{{ when(r.resolvedAt) }} · {{ r.resolvedByName }}</div>
             <div class="money-line">
-              <span class="k-label">Deposit held</span>
+              <span class="k-label">{{ t('common.depositHeld') }}</span>
               <span class="num">{{ r.depositHeld.amount }} {{ r.depositHeld.currency }}</span>
             </div>
+            <!-- Each leg carries its own currency code, like every other money value in the console.
+                 Three bare numbers under one that reads "120 JOD" invite the eye to borrow the code
+                 from the line above -- which is the assumption the rule exists to stop, on the one
+                 screen where the platform decides who gets what. -->
             <div class="money-line">
-              <span class="k-label">Refunded to the customer</span>
-              <span class="num">{{ r.refundToCustomer.amount }}</span>
+              <span class="k-label">{{ t('common.refundedToTheCustomer') }}</span>
+              <span class="num"
+                >{{ r.refundToCustomer.amount }} {{ r.refundToCustomer.currency }}</span
+              >
             </div>
             <div class="money-line">
-              <span class="k-label">Kept by the platform</span>
-              <span class="num">{{ r.retainedByPlatform.amount }}</span>
+              <span class="k-label">{{ t('common.keptByThePlatform') }}</span>
+              <span class="num"
+                >{{ r.retainedByPlatform.amount }} {{ r.retainedByPlatform.currency }}</span
+              >
             </div>
             <div class="money-line">
-              <span class="k-label">Transferred to the dealer</span>
-              <span class="num">{{ r.transferredToDealer.amount }}</span>
+              <span class="k-label">{{ t('disputeDetail.transferredToTheDealer') }}</span>
+              <span class="num"
+                >{{ r.transferredToDealer.amount }} {{ r.transferredToDealer.currency }}</span
+              >
             </div>
             @if (r.dealerCharge) {
               <div class="money-line s-bad">
-                <span class="k-label">Charged to the dealer</span>
+                <span class="k-label">{{ t('disputeDetail.chargedToTheDealer') }}</span>
                 <span class="num">{{ r.dealerCharge.amount }} {{ r.dealerCharge.currency }}</span>
               </div>
             }
             <div class="page-sub">“{{ r.note }}”</div>
             <div class="note-box is-plain">
               <kh-icon name="info" />
-              Decision recorded — no funds moved. Money only moves once the platform's payment
-              module is live.
+              {{ t('common.decisionRecordedNoFunds') }}
             </div>
           </section>
         } @else if (!d.isLive) {
           <section class="sect sect-pad stack stack-9">
-            <span class="k">Closed without a decision</span>
+            <span class="k">{{ t('disputeDetail.closedWithoutADecision') }}</span>
             <div class="page-sub">
-              This ticket was withdrawn by the party who opened it, so nothing is charged to anyone
-              and the booking settles as if no dispute had been raised.
+              {{ t('disputeDetail.thisTicketWasWithdrawn') }}
             </div>
           </section>
         } @else {
           <section class="sect sect-pad stack stack-12">
             <div class="row row-gap-8">
               <kh-icon name="scales" class="kpi-icon" />
-              <span class="sect-t">Admin resolution</span>
+              <span class="sect-t">{{ t('disputeDetail.adminResolution') }}</span>
             </div>
 
             @if (problem(); as message) {
@@ -240,37 +243,37 @@
             </div>
 
             <div class="field">
-              <label for="leg-refund">Refunded to the customer ({{ currency() }})</label>
+              <label for="leg-refund">{{ t('disputeDetail.refundedToTheCustomer') }}{{ currency() }})</label>
               <input
                 id="leg-refund"
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="refund()"
                 (input)="setLeg('refund', $event)"
               />
             </div>
             <div class="field">
-              <label for="leg-platform">Kept by the platform ({{ currency() }})</label>
+              <label for="leg-platform">{{ t('disputeDetail.keptByThePlatform') }}{{ currency() }})</label>
               <input
                 id="leg-platform"
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="platform()"
                 (input)="setLeg('platform', $event)"
               />
             </div>
             <div class="field">
-              <label for="leg-dealer">Transferred to the dealer ({{ currency() }})</label>
+              <label for="leg-dealer">{{ t('disputeDetail.transferredToTheDealerOpen') }}{{ currency() }})</label>
               <input
                 id="leg-dealer"
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="dealer()"
                 (input)="setLeg('dealer', $event)"
               />
@@ -289,28 +292,28 @@
             </div>
 
             <div class="field">
-              <label for="dealer-charge">Charge to the dealer ({{ currency() }}, optional)</label>
+              <label for="dealer-charge">{{ t('disputeDetail.chargeToTheDealer') }}{{ currency() }}{{ t('disputeDetail.optional') }}</label>
               <input
                 id="dealer-charge"
                 class="input input-num"
                 type="number"
                 min="0"
-                step="0.01"
+                [step]="step()"
                 [value]="dealerCharge()"
                 (input)="dealerCharge.set(text($event))"
               />
               <div class="field-hint">
-                Separate from the deposit, and only inside the range this booking assessed.
+                {{ t('disputeDetail.separateFromTheDeposit') }}
               </div>
             </div>
 
             <div class="field">
-              <label for="admin-note">Admin note (required)</label>
+              <label for="admin-note">{{ t('disputeDetail.adminNoteRequired') }}</label>
               <textarea
                 id="admin-note"
                 class="input"
                 rows="4"
-                placeholder="Explain the decision and the evidence it rests on…"
+                [placeholder]="t('disputeDetail.explainTheDecisionAnd')"
                 [value]="note()"
                 (input)="note.set(text($event))"
               ></textarea>
@@ -325,12 +328,11 @@
               {{ busy() ? 'Working…' : 'Resolve dispute' }}
             </button>
             <div class="field-hint">
-              The decision, your note, your name and the timestamp are shown to both parties and
-              written to the audit log.
+              {{ t('disputeDetail.theDecisionYourNote') }}
             </div>
             <div class="note-box is-plain">
               <kh-icon name="info" />
-              Resolving records the decision. No funds move until the payment module is live.
+              {{ t('disputeDetail.resolvingRecordsTheDecision') }}
             </div>
           </section>
         }

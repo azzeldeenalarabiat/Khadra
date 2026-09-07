@@ -1,0 +1,109 @@
+<div class="stack stack-14 page-wide">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('platformSettings.platformSettings') }}</h1>
+      <div class="page-sub">
+        {{ t('platformSettings.theNumbersTheWhole') }}
+      </div>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('platformSettings.couldntLoadTheSettings') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading()) {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  } @else {
+    <section class="sect sect-pad">
+      <!-- Why there is no Save button. This is a limit of what has been decided, not an oversight. -->
+      <div class="note-box is-plain">
+        {{ t('platformSettings.theseValuesAreRead') }} <strong>{{ source() }}</strong
+        >{{ t('platformSettings.notFromARecord') }}
+      </div>
+    </section>
+
+    <div class="split-16">
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="currency-circle-dollar" class="kpi-icon" />
+            <span class="sect-t">{{ t('common.money') }}</span>
+          </div>
+          <div class="kv-body">
+            @for (row of moneyRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val num">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="warning-diamond" class="kpi-icon" />
+            <span class="sect-t">{{ t('platformSettings.penalties') }}</span>
+            <span class="sect-hint">{{ t('platformSettings.assessedNeverCharged') }}</span>
+          </div>
+          <div class="kv-body">
+            @for (row of penaltyRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val num">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+          <div class="sect-pad">
+            <div class="decision-note">
+              {{ t('platformSettings.aPenaltyIsWhat') }}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack stack-14 resolve-panel">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="clock-counter-clockwise" class="kpi-icon" />
+            <span class="sect-t">{{ t('platformSettings.windowsAndDeadlines') }}</span>
+          </div>
+          <div class="kv-body">
+            @for (row of windowRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="identification-card" class="kpi-icon" />
+            <span class="sect-t">{{ t('platformSettings.whoMayRent') }}</span>
+          </div>
+          <div class="kv-body">
+            @for (row of renterRows(); track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+      </div>
+    </div>
+  }
+</div>

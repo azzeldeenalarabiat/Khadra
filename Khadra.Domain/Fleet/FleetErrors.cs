@@ -5,7 +5,24 @@ namespace Khadra.Domain.Fleet;
 public static class FleetErrors
 {
     public static readonly Error InvalidPlateNumber =
-        Error.Validation("vehicle.invalid_plate", "The plate number is not valid.");
+        Error.Validation(
+            "vehicle.invalid_plate",
+            "The plate number must be digits only. Spaces, dashes, slashes and dots are ignored; other characters are not allowed.");
+
+    public static readonly Error UnknownCarType =
+        Error.Validation("vehicle.unknown_car_type", "That car type does not exist.");
+
+    public static readonly Error CarTypeRetired =
+        Error.Validation("vehicle.car_type_retired", "That car type is no longer offered. Choose one that is.");
+
+    public static readonly Error InvalidTransmission =
+        Error.Validation("vehicle.invalid_transmission", "The transmission must be Automatic or Manual.");
+
+    public static readonly Error InvalidFuelType =
+        Error.Validation("vehicle.invalid_fuel_type", "The fuel type must be Petrol, Diesel, Hybrid or Electric.");
+
+    public static readonly Error InvalidFuelPolicy =
+        Error.Validation("vehicle.invalid_fuel_policy", "The fuel policy must be FullToFull or SameToSame.");
 
     public static readonly Error InvalidMakeOrModel =
         Error.Validation("vehicle.invalid_make_model", "The make and model are required and must be at most 60 characters each.");

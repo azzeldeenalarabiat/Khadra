@@ -2,11 +2,14 @@ using Khadra.Application.Bookings.DecideBooking;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers;
+using Khadra.Application.Notifications;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -26,6 +29,8 @@ public sealed class BookingDecisionTests
         public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
         public IBookingReader Reader { get; } = Substitute.For<IBookingReader>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
+        public INotifier Notifier { get; } = Substitute.For<INotifier>();
+        public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
         public TestClock Clock { get; } = new(Build.Now);
         public Dealer Dealer { get; }
 
@@ -40,8 +45,8 @@ public sealed class BookingDecisionTests
 
         public Booking GivenRequested()
         {
+            // A request as it now arrives: nothing paid, waiting on the dealer.
             var booking = Build.Booking(dealerId: Dealer.Id);
-            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             booking.ClearDomainEvents();
             Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
             return booking;
@@ -55,7 +60,7 @@ public sealed class BookingDecisionTests
         }
 
         public BookingDecisionHandlers Handlers() =>
-            new(Bookings, new DealerMembershipResolver(Dealers), Reader, Clock, UnitOfWork);
+            new(Bookings, new DealerMembershipResolver(Dealers), Reader, new DealerTeamNotifier(Notifier, Users), Clock, UnitOfWork);
     }
 
     [Fact]
@@ -143,7 +148,6 @@ public sealed class BookingDecisionTests
     {
         var context = new Context();
         var foreign = Build.Booking(dealerId: Id.New());
-        foreign.ConfirmDepositPaid(Id.New(), Build.Now);
         context.Bookings.GetByIdAsync(foreign.Id, Arg.Any<CancellationToken>()).Returns(foreign);
 
         var result = await context.Handlers().Handle(
@@ -160,14 +164,14 @@ public sealed class BookingDecisionTests
         var requested = context.GivenRequested();
 
         // A rental already under way when the sanction lands.
-        var outOnRental = Build.ApprovedBooking(terms: Build.Terms());
+        var outOnRental = Build.ConfirmedBooking(terms: Build.Terms());
         var start = outOnRental.Period.Start;
         outOnRental.RecordPickup(BookingParty.Dealer, OwnerId, start);
         context.Bookings.GetByIdAsync(outOnRental.Id, Arg.Any<CancellationToken>()).Returns(outOnRental);
         // Re-home it under this dealer: the factory picks a random dealer id.
-        var mine = Build.Booking(dealerId: context.Dealer.Id, period: Build.Period(Build.Now.AddDays(1), 3), pricing: Build.Pricing(days: 3));
-        mine.ConfirmDepositPaid(Id.New(), Build.Now);
+        var mine = Build.Booking(dealerId: context.Dealer.Id, period: Build.Period(Build.Now.AddDays(1), 3));
         mine.Approve(OwnerId, Build.Now);
+        mine.ConfirmDepositPaid(Id.New(), Build.Now);
         mine.RecordPickup(BookingParty.Dealer, OwnerId, mine.Period.Start);
         context.Bookings.GetByIdAsync(mine.Id, Arg.Any<CancellationToken>()).Returns(mine);
 
@@ -195,8 +199,8 @@ public sealed class BookingDecisionTests
         var context = new Context();
         context.GivenEmployee();
         var booking = Build.Booking(dealerId: context.Dealer.Id);
-        booking.ConfirmDepositPaid(Id.New(), Build.Now);
         booking.Approve(OwnerId, Build.Now);
+        booking.ConfirmDepositPaid(Id.New(), Build.Now);
         context.Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
         context.Clock.UtcNow = booking.Period.Start;
 

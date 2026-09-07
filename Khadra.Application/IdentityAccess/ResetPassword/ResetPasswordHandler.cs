@@ -43,6 +43,11 @@ public sealed class ResetPasswordHandler(
         if (user is null)
             return UnitResult.Failure(IdentityErrors.InvalidToken);
 
+        // Checked here because it needs the user, and before any save so a refusal leaves the link
+        // usable for the retry it is asking for. The token above is consumed in memory only.
+        if (passwordHasher.Verify(request.NewPassword, user.PasswordHash.Value))
+            return UnitResult.Failure(IdentityErrors.PasswordUnchanged);
+
         // Raises UserPasswordChanged: every refresh-token family of this user is revoked after commit.
         user.ChangePassword(PasswordHash.FromHash(passwordHasher.Hash(request.NewPassword)), now);
         await unitOfWork.SaveChangesAsync(cancellationToken);

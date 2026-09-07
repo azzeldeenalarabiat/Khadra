@@ -95,7 +95,7 @@
   padding: 2px 7px;
   border-radius: 9px;
   background: color-mix(in srgb, var(--status-bad) 16%, transparent);
-  color: #e0a292;
+  color: var(--status-bad);
 }
 
 .queue-row {
@@ -105,7 +105,7 @@
 }
 
 .queue-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--tint-1);
 }
 
 .queue-rail {
@@ -142,7 +142,7 @@
   width: 184px;
   flex: none;
   padding: 12px 14px;
-  border-inline-start: 1px solid rgba(255, 255, 255, 0.06);
+  border-inline-start: 1px solid var(--tint-2);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -179,15 +179,49 @@
   height: 58px;
 }
 
-.chart-bar {
+/* One day. The column is the hit area the tooltip hangs off, so a reader can put a figure to any
+   bar without leaving the dashboard. */
+.chart-col {
   flex: 1;
+  height: 100%;
+  cursor: default;
+}
+
+/* The day itself, always drawn. A day with no bookings is a fact, and a missing bar would leave the
+   reader counting gaps to work out which day it was. */
+.chart-track {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--hairline-strong);
+}
+
+.chart-bar {
+  width: 100%;
   border-radius: 2px 2px 0 0;
   background: var(--color-accent-700);
 }
 
-.trend-up {
+.chart-axis {
+  display: flex;
+  gap: 4px;
+  margin-block-start: 6px;
+}
+
+.chart-tick {
+  flex: 1;
+  font-size: 10px;
+  color: var(--text-40);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* The period-on-period change. Size only: the colour is a status tone the template picks from the
+   sign of the number, because this rule used to hard-code the "good news" green onto a figure that
+   is just as often negative. */
+.trend-change {
   font-size: 12px;
-  color: var(--status-ok);
 }
 
 .money-head {
@@ -207,7 +241,7 @@
 .money-meter {
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tint-3);
   margin-top: 5px;
   overflow: hidden;
 }
@@ -307,7 +341,7 @@
   color: var(--text-50);
 }
 .td-accent {
-  color: var(--color-accent-300);
+  color: var(--status-accent);
 }
 .td-sub {
   font-size: 10.5px;
@@ -329,8 +363,8 @@
   place-items: center;
   font-size: 10px;
   font-weight: 600;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-200);
+  background: var(--chip-bg);
+  color: var(--chip-text);
 }
 
 .entity-name {
@@ -526,7 +560,7 @@
 .sla-divider {
   width: 1px;
   height: 34px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--tint-4);
 }
 
 .split-15 {
@@ -723,7 +757,7 @@
 
 .past-resolution {
   padding: 9px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--tint-2);
 }
 .past-res-title {
   font-size: 12.5px;
@@ -807,8 +841,8 @@
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 8px;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-100);
+  background: var(--chip-bg);
+  color: var(--chip-text);
 }
 
 .btn-primary .notif-count {
@@ -824,10 +858,10 @@
 }
 
 .notif-row.is-unread {
-  background: rgba(145, 132, 217, 0.05);
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
 }
 .notif-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--tint-1);
 }
 
 .notif-icon-wrap {
@@ -1074,9 +1108,6 @@
 }
 .btn-33 kh-icon {
   font-size: 15px;
-}
-.sidebar-mark kh-icon {
-  font-size: 14px;
 }
 .sidebar-link kh-icon {
   font-size: 15px;
@@ -1333,4 +1364,31 @@
   gap: 4px;
   padding: 6px;
   flex-wrap: wrap;
+}
+
+/* The audit log's filter bar: several small controls that wrap rather than scroll, because an
+   auditor combines them (who + what + when) and a row that scrolls sideways hides the combination
+   they just built. */
+.filters-row {
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: end;
+}
+
+.field-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 132px;
+}
+
+.field-inline .k {
+  font-size: 11px;
+}
+
+/* The change column reads "old -> new" on one line; the arrow is decoration between two values. */
+.table .mono + kh-icon {
+  margin-inline: 6px;
+  vertical-align: middle;
+  opacity: 0.6;
 }

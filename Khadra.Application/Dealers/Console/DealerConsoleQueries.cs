@@ -22,7 +22,8 @@ public sealed record GetDealerDashboardQuery(Id UserId) : IQuery<Result<DealerDa
 /// <summary>Period: daily, weekly or monthly, always the CURRENT one in the reporting calendar.</summary>
 public sealed record GetDealerReportQuery(Id UserId, string Period) : IQuery<Result<DealerReportDto, Error>>;
 
-public sealed record ListDealerActivityQuery(Id UserId, int? Page, int? PageSize)
+/// <summary>`MineOnly` narrows the dealership's trail to the caller's own actions (`?actor=me`).</summary>
+public sealed record ListDealerActivityQuery(Id UserId, int? Page, int? PageSize, bool MineOnly = false)
     : IQuery<Result<PagedResult<DealerActivityEntry>, Error>>;
 
 public sealed class GetDealerReportQueryValidator : AbstractValidator<GetDealerReportQuery>
@@ -104,7 +105,7 @@ public sealed class DealerConsoleHandlers(
         var returns = await bookings.UpcomingReturnsAsync(dealer.Id, now, now.Add(settings.UpcomingWindow), cancellationToken);
         var held = await bookings.HeldVehicleIdsAsync(dealer.Id, now, cancellationToken);
         var cars = await fleet.SummaryAsync(dealer.Id, cancellationToken);
-        var activity = await bookings.ActivityAsync(dealer.Id, PageRequest.From(1, 6), cancellationToken);
+        var activity = await bookings.ActivityAsync(dealer.Id, PageRequest.From(1, 6), cancellationToken: cancellationToken);
 
         // Money and occupancy only for someone allowed to see reports; the dashboard tile stays null
         // for an employee without the grant rather than leaking a figure the Reports screen refuses.
@@ -200,7 +201,13 @@ public sealed class DealerConsoleHandlers(
         if (member.IsFailure)
             return member.Error;
 
-        return await bookings.ActivityAsync(member.Value.Dealer.Id, PageRequest.From(request.Page, request.PageSize), cancellationToken);
+        // The handler substitutes the caller's own id. A user-id parameter would let one member of
+        // staff page a colleague's record, and nothing in the spec asks for that.
+        return await bookings.ActivityAsync(
+            member.Value.Dealer.Id,
+            PageRequest.From(request.Page, request.PageSize),
+            request.MineOnly ? request.UserId : null,
+            cancellationToken);
     }
 
     /// <summary>The current day, week or month as [start, end) instants in the reporting calendar.</summary>

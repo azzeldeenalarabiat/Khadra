@@ -17,8 +17,10 @@ import { DealerActivityEntry } from '../../core/models/dealer-console.api';
 import { FleetService } from '../../core/services/fleet.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 type Tab = 'overview' | 'availability' | 'bookings' | 'activity';
 
@@ -45,6 +47,7 @@ interface CalendarDay {
   imports: [RouterLink, IconComponent, ImageFallbackDirective],
 })
 export class VehicleDetailComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(FleetService);
   private readonly consoleData = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
@@ -61,7 +64,9 @@ export class VehicleDetailComponent {
   }
 
   protected readonly resource = this.service.vehicle;
-  protected readonly car = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly car = computed(() => this.data() ?? null);
   protected readonly tab = signal<Tab>('overview');
   protected readonly busy = signal(false);
   protected readonly month = signal(startOfMonth(new Date()));
@@ -80,9 +85,27 @@ export class VehicleDetailComponent {
       ? { url: '/api/v1/bookings', params: { vehicleId: id, page: 1, pageSize: 100 } }
       : undefined;
   });
-  protected readonly bookings = computed(() => this.bookingsResource.value()?.items ?? []);
+  protected readonly bookings = computed(() => this.hires()?.items ?? []);
 
   private readonly activity = this.consoleData.activity;
+  private readonly activityPage = loaded(this.activity);
+  private readonly hires = loaded(this.bookingsResource);
+  private readonly dealer = loaded(this.consoleData.me);
+
+  /**
+   * Editing, publishing, hiding, taking off the road and removing are all `ApprovedDealer`.
+   *
+   * Reading this car is not: any member of staff needs its plate, its photos, its calendar and its
+   * booking history to hand it over. So the page stays whole for an employee and loses only the
+   * controls — which is the honest shape, because none of those controls would work. `null` until
+   * `me` answers, so the owner's own buttons do not blink.
+   */
+  protected readonly canManage = computed(
+    () => this.consoleData.permissions()?.canManageFleet ?? null,
+  );
+  protected readonly readOnly = computed(
+    () => this.canManage() === false && !this.dealer()?.isOwner,
+  );
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
@@ -97,15 +120,15 @@ export class VehicleDetailComponent {
   protected readonly next = computed(
     () =>
       this.bookings()
-        .filter((b) => b.status === 'Approved' && Date.parse(b.periodStart) > Date.now())
+        .filter((b) => b.status === 'Confirmed' && Date.parse(b.periodStart) > Date.now())
         .sort((a, b) => Date.parse(a.periodStart) - Date.parse(b.periodStart))[0] ?? null,
   );
 
   protected readonly pill = computed<{ label: string; tone: Tone }>(() => {
     const c = this.car();
     if (!c) return { label: '', tone: 'dim' };
-    if (this.current()) return { label: 'On hire', tone: 'accent' };
-    if (c.status === 'Maintenance') return { label: 'Off the road', tone: 'bad' };
+    if (this.current()) return { label: this.t('vehicleDetail.onHire'), tone: 'accent' };
+    if (c.status === 'Maintenance') return { label: this.t('vehicleDetail.offTheRoad'), tone: 'bad' };
     if (c.status === 'Draft') return { label: 'Draft', tone: 'dim' };
     if (c.status === 'Hidden') return { label: 'Hidden', tone: 'dim' };
     return c.isBookable ? { label: 'Listed', tone: 'ok' } : { label: 'Blocked', tone: 'warn' };
@@ -143,7 +166,7 @@ export class VehicleDetailComponent {
   protected readonly pricing = computed<readonly KeyValue[]>(() => {
     const c = this.car();
     if (!c) return [];
-    const delivery = this.consoleData.me.value()?.delivery;
+    const delivery = this.dealer()?.delivery;
     return [
       { k: 'Daily price', v: `${c.dailyRate.amount} ${c.dailyRate.currency}` },
       { k: 'Security deposit', v: `${c.securityDeposit.amount} ${c.securityDeposit.currency}` },
@@ -174,8 +197,8 @@ export class VehicleDetailComponent {
     const c = this.car();
     const first = this.month();
     const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-    const holds = this.bookings().filter(
-      (b) => b.status === 'Requested' || b.status === 'Approved' || b.status === 'PickedUp',
+    const holds = this.bookings().filter((b) =>
+      ['Requested', 'Approved', 'Confirmed', 'PickedUp'].includes(b.status),
     );
     return Array.from({ length: days }, (_, i) => {
       const dayStart = new Date(first.getFullYear(), first.getMonth(), i + 1).getTime();
@@ -188,6 +211,8 @@ export class VehicleDetailComponent {
           return { n: i + 1, tag: 'On hire', tone: 'accent', bookingId: hold.bookingId };
         if (hold.status === 'Requested')
           return { n: i + 1, tag: 'Requested', tone: 'bad', bookingId: hold.bookingId };
+        if (hold.status === 'Approved')
+          return { n: i + 1, tag: 'Awaiting deposit', tone: 'bad', bookingId: hold.bookingId };
         return { n: i + 1, tag: hold.reference, tone: 'warn', bookingId: hold.bookingId };
       }
       if (c && c.status === 'Maintenance')
@@ -201,22 +226,24 @@ export class VehicleDetailComponent {
   protected readonly legend: readonly { label: string; tone: Tone }[] = [
     { label: 'Free', tone: 'ok' },
     { label: 'Booked', tone: 'warn' },
-    { label: 'Requested (deposit paid)', tone: 'bad' },
-    { label: 'On hire', tone: 'accent' },
-    { label: 'Not offered', tone: 'dim' },
+    { label: this.t('vehicleDetail.requestedOrUnpaid'), tone: 'bad' },
+    { label: this.t('vehicleDetail.onHire'), tone: 'accent' },
+    { label: this.t('vehicleWizard.notOffered'), tone: 'dim' },
   ];
 
   protected readonly historyNote = computed(() => {
     const all = this.bookings();
     const done = all.filter((b) => b.status === 'Completed' || b.status === 'Returned').length;
-    const upcoming = all.filter((b) => b.status === 'Approved' || b.status === 'Requested').length;
+    const upcoming = all.filter((b) =>
+      ['Requested', 'Approved', 'Confirmed'].includes(b.status),
+    ).length;
     return `${done} completed · ${upcoming} upcoming`;
   });
 
   /** Booking changes on this car, from the dealership's activity feed. */
   protected readonly log = computed<readonly DealerActivityEntry[]>(() => {
     const ids = new Set(this.bookings().map((b) => b.bookingId));
-    return (this.activity.value()?.items ?? []).filter((e) => ids.has(e.bookingId));
+    return (this.activityPage()?.items ?? []).filter((e) => ids.has(e.bookingId));
   });
 
   protected shiftMonth(delta: number): void {
@@ -227,9 +254,11 @@ export class VehicleDetailComponent {
   protected tone(b: BookingListItem): Tone {
     if (b.hasLiveDispute) return 'bad';
     switch (b.status) {
+      // Still waiting on somebody: an answer, or a deposit.
       case 'Requested':
-        return 'warn';
       case 'Approved':
+        return 'warn';
+      case 'Confirmed':
         return 'accent';
       case 'PickedUp':
       case 'Returned':
@@ -243,7 +272,13 @@ export class VehicleDetailComponent {
   protected label(b: BookingListItem): string {
     if (b.hasLiveDispute) return 'Disputed';
     return (
-      { Requested: 'Pending', Approved: 'Upcoming', PickedUp: 'Active', NoShow: 'No-show' }[
+      {
+        Requested: 'Pending',
+        Approved: 'Awaiting deposit',
+        Confirmed: 'Upcoming',
+        PickedUp: 'Active',
+        NoShow: 'No-show',
+      }[
         b.status as string
       ] ?? b.status
     );
@@ -283,7 +318,7 @@ export class VehicleDetailComponent {
     if (!c) return null;
     if (c.status === 'Active') return { label: 'Hide', action: 'Hide', icon: 'eye-slash' };
     if (c.status === 'Maintenance')
-      return { label: 'Back on the road', action: 'ReturnFromMaintenance', icon: 'check-circle' };
+      return { label: this.t('vehicleDetail.backOnTheRoad'), action: 'ReturnFromMaintenance', icon: 'check-circle' };
     return { label: 'Publish', action: 'Publish', icon: 'eye' };
   }
 
@@ -295,14 +330,16 @@ export class VehicleDetailComponent {
       await this.service.changeStatus(c.vehicleId, action);
       this.resource.reload();
       this.service.refresh();
-      this.ui.showToast(
-        action === 'Publish' ? 'Published' : action === 'Hide' ? 'Hidden' : 'Back on the road',
-        action === 'Publish'
-          ? 'Customers can see it now.'
-          : action === 'Hide'
-            ? 'Customers no longer see it.'
-            : 'It is offered again.',
-      );
+      // Four actions, four outcomes. Returning from the garage lands on Hidden by design
+      // (Vehicle.ReturnFromMaintenance), so it must not claim the car is bookable again.
+      const told: Record<VehicleStatusAction, readonly [string, string]> = {
+        Publish: ['Published', 'Customers can see it now.'],
+        Hide: ['Hidden', 'Customers no longer see it.'],
+        SendToMaintenance: ['Off the road', 'It is not offered while it is off the road.'],
+        ReturnFromMaintenance: ['Back on the road', 'It is hidden until you publish it again.'],
+      };
+      const [title, body] = told[action];
+      this.ui.showToast(title, body);
     } catch (error) {
       const problem = error as { error?: { code?: string; title?: string } };
       this.ui.showToast(
@@ -325,10 +362,10 @@ export class VehicleDetailComponent {
         icon: 'gear',
         tone: 'warn',
         title: `Take ${c.make} ${c.model} off the road?`,
-        body: 'Every day shows as not offered until you bring it back. Bookings already approved are not affected — tell those customers yourself if the car will not be ready.',
-        confirm: 'Take off the road',
+        body: this.t('vehicleDetail.everyDayShowsAs'),
+        confirm: this.t('fleetList.takeOffTheRoad'),
         result: {
-          title: 'Off the road',
+          title: this.t('vehicleDetail.offTheRoad'),
           body: `${c.make} ${c.model} is not being offered.`,
           tone: 'warn',
         },
@@ -338,7 +375,7 @@ export class VehicleDetailComponent {
         this.resource.reload();
         this.service.refresh();
       },
-      { title: 'Off the road', body: `${c.make} ${c.model} is not being offered.`, tone: 'warn' },
+      { title: this.t('vehicleDetail.offTheRoad'), body: `${c.make} ${c.model} is not being offered.`, tone: 'warn' },
     );
   }
 

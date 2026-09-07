@@ -8,29 +8,35 @@ namespace Khadra.Infrastructure.Reporting;
 
 internal sealed class BookingDashboardReader(KhadraDbContext context) : IBookingDashboardReader
 {
-    public async Task<BookingCounts> CountsAsync(CancellationToken cancellationToken = default)
+    public async Task<BookingCounts> CountsAsync(
+        DateTimeOffset createdSince,
+        CancellationToken cancellationToken = default)
     {
         var requested = BookingStatus.Requested;
         // "Active" is BookingStatus.HoldsVehicle spelled out. It cannot be expressed as a property
         // call in a LINQ predicate (the domain computes it in memory), so the member statuses are
         // listed here; the domain remains the definition and this is the projection of it.
-        var pendingPayment = BookingStatus.PendingPayment;
         var approved = BookingStatus.Approved;
+        var confirmed = BookingStatus.Confirmed;
         var pickedUp = BookingStatus.PickedUp;
 
         var counts = await context.Bookings
             .GroupBy(_ => 1)
             .Select(group => new BookingCounts(
                 group.Count(),
+                // Today, as one more filter on the aggregate the card already pays for. No upper
+                // bound: createdSince is local midnight of the day in progress, and a booking cannot
+                // be created after now.
+                group.Count(booking => booking.CreatedAt >= createdSince),
                 group.Count(booking =>
-                    booking.Status == pendingPayment ||
                     booking.Status == requested ||
                     booking.Status == approved ||
+                    booking.Status == confirmed ||
                     booking.Status == pickedUp),
                 group.Count(booking => booking.Status == requested)))
             .SingleOrDefaultAsync(cancellationToken);
 
-        return counts ?? new BookingCounts(0, 0, 0);
+        return counts ?? new BookingCounts(0, 0, 0, 0);
     }
 
     public async Task<IReadOnlyList<DateTimeOffset>> CreatedBetweenAsync(

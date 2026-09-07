@@ -76,6 +76,7 @@ export type IconName =
   | 'storefront'
   | 'toggle-left'
   | 'toggle-right'
+  | 'translate'
   | 'tray'
   | 'user'
   | 'user-circle-plus'
@@ -203,6 +204,9 @@ export const ICON_PATHS: Readonly<Record<IconName, string>> = Object.freeze({
     '<path d="M12 3.8l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 17.3 6.8 20l1-5.9L3.5 10l5.9-.8z" fill="currentColor" stroke="none"/>',
   'toggle-right':
     '<rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.8"/>',
+  translate:
+    '<path d="M3 6.5h8.5M7.25 4.5v2M10 6.5c0 3.9-2.4 6.9-6.2 8.4M5.2 9.6c1.1 2.6 3.2 4.5 5.8 5.4"/>' +
+    '<path d="m12.5 20.5 4-9.5 4 9.5M14.1 17.4h4.8"/>',
   'user-circle-plus':
     '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="2.8"/><path d="M7 18c.9-2 2.7-3.2 5-3.2M16.5 17h4M18.5 15v4"/>',
   'user-plus':

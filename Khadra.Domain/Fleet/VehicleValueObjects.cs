@@ -19,13 +19,29 @@ public sealed class PlateNumber : ValueObject
         Value = value;
     }
 
+    /// <summary>
+    /// A value already in the database, taken as-is.
+    /// </summary>
+    /// <remarks>
+    /// Reading a row is not the moment to re-litigate whether it should have been allowed in. The EF
+    /// converters used to rebuild these through <c>Create(...).Value</c>, and <c>.Value</c> on a
+    /// failed result THROWS — so the day a rule is tightened in a way some stored row no longer
+    /// satisfies, that row stops being readable at all. Not a validation error the caller could
+    /// handle: an exception on load, for every query that touches the aggregate.
+    ///
+    /// Writes still go through <see cref="Create"/>, which is where the rule belongs.
+    /// </remarks>
+    public static PlateNumber FromPersisted(string value) => new(value);
+
     public static Result<PlateNumber, Error> Create(string? raw)
     {
         if (string.IsNullOrWhiteSpace(raw))
             return FleetErrors.InvalidPlateNumber;
 
-        var digits = new string(raw.Where(char.IsAsciiDigit).ToArray());
-        if (digits.Length is < MinDigits or > MaxDigits)
+        // Same rule as the commercial registration, and for the same reason: plate_number is UNIQUE,
+        // so quietly deleting letters let "AB1234" become "1234" and take another dealer's plate.
+        var digits = DigitIdentifier.Normalise(raw);
+        if (digits is null || digits.Length is < MinDigits or > MaxDigits)
             return FleetErrors.InvalidPlateNumber;
 
         return new PlateNumber(digits);
@@ -41,7 +57,16 @@ public sealed class PlateNumber : ValueObject
 
 public sealed class VehicleDetails : ValueObject
 {
-    public const int EarliestModelYear = 1990;
+    /// <summary>
+    /// The floor used when a caller does not supply one.
+    ///
+    /// The real bound is <c>BusinessRules.EarliestVehicleModelYear</c> and every caller in the
+    /// application passes it. This exists only so the invariant has a value it can refuse nonsense
+    /// with — a car cannot predate the car — and is deliberately far below anything an owner would
+    /// configure. It used to be 1990 and it was the ONLY bound, which quietly refused every vehicle
+    /// older than that with "the model year is not valid".
+    /// </summary>
+    public const int EarliestPossibleModelYear = 1900;
 
     public const int MaxDescriptionLength = 2000;
 
@@ -86,7 +111,8 @@ public sealed class VehicleDetails : ValueObject
         FuelType fuelType,
         int currentYear,
         string? color = null,
-        string? description = null)
+        string? description = null,
+        int? earliestModelYear = null)
     {
         ArgumentNullException.ThrowIfNull(transmission);
         ArgumentNullException.ThrowIfNull(fuelType);
@@ -97,8 +123,11 @@ public sealed class VehicleDetails : ValueObject
             return FleetErrors.InvalidMakeOrModel;
         }
 
-        // Next year's models go on sale during the current year, so allow one year ahead.
-        if (year < EarliestModelYear || year > currentYear + 1)
+        // Next year's models go on sale during the current year, so allow one year ahead. The floor
+        // is the platform's, passed in like `currentYear` so the domain stays free of both ambient
+        // time and ambient configuration.
+        var floor = Math.Max(earliestModelYear ?? EarliestPossibleModelYear, EarliestPossibleModelYear);
+        if (year < floor || year > currentYear + 1)
             return FleetErrors.InvalidYear;
 
         if (seats is < 1 or > 20)

@@ -43,7 +43,19 @@ public sealed class ForgotPasswordHandler(
         await verificationTokens.AddAsync(token, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await emails.SendPasswordResetAsync(user, rawToken.Value, cancellationToken);
-        return UnitResult.Success<Error>();
+        // The two "nothing to do" paths above return success on purpose: an unparseable address and
+        // an unknown one must be indistinguishable from a real request, or this form becomes a way to
+        // ask the platform who holds an account.
+        //
+        // A send that was ATTEMPTED and failed is different, and is reported -- the same trade-off
+        // ResendVerification already makes. The leak is real and slightly wider here (any account,
+        // not only an unverified one), but it opens ONLY while the mail path is broken, and the
+        // alternative is what this screen did until now: tell someone a reset link is on its way when
+        // the relay had just refused it, and leave them waiting at an inbox nothing was coming to.
+        // Recorded on the pre-launch checklist beside the other enumeration items.
+        var delivered = await emails.SendPasswordResetAsync(user, rawToken.Value, cancellationToken);
+        return delivered
+            ? UnitResult.Success<Error>()
+            : UnitResult.Failure(IdentityErrors.PasswordResetEmailNotSent);
     }
 }

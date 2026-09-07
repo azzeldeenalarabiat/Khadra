@@ -10,7 +10,11 @@ import { DayScheduleInput } from '../../core/models/dealer-console.api';
 import { DealerProfile } from '../../core/models/dealers.api';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { MapComponent } from '../../shared/map/map.component';
+import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 
 const DAYS = [
   'Sunday',
@@ -26,10 +30,13 @@ const DAYS = [
  * The dealer page (spec 4.1, design `isProfile` and `isPublicPreview`).
  *
  * What customers see: name, description, logo and cover, where the dealership is, when it is open,
- * whether it delivers. The owner edits all of it here; staff read it. Two things the design shows
- * that this page will not fake: a star rating (reviews are not live, so the preview says "No reviews
- * yet") and an interactive map (the pin is the stored coordinates, entered as numbers until a map
- * provider is chosen).
+ * whether it delivers. The owner edits all of it here; staff read it. One thing the design shows
+ * that this page will not fake: a star rating, because reviews are not live, so the preview says
+ * "No reviews yet".
+ *
+ * The location is a real map now (`kh-map`), and the pin is draggable. The coordinate fields stay,
+ * because they are the form's state and someone pasting a pair from their phone should not have to
+ * hunt for the spot — the two are kept in step in both directions.
  *
  * The business name locks once the dealership is approved, because that is the name the licence
  * was verified against. The API enforces it; the field explains it.
@@ -38,14 +45,18 @@ const DAYS = [
   selector: 'kh-dealer-profile',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dealer-profile.component.html',
-  imports: [IconComponent],
+  imports: [IconComponent, MapComponent],
 })
 export class DealerProfileComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(DealerConsoleService);
+  protected readonly fmt = inject(FormatService);
   private readonly ui = inject(ConsoleUiService);
 
   protected readonly resource = this.service.me;
-  protected readonly dealer = computed(() => this.resource.value() ?? null);
+  /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
+  private readonly data = loaded(this.resource);
+  protected readonly dealer = computed(() => this.data() ?? null);
   protected readonly days = DAYS;
 
   protected readonly businessName = signal('');
@@ -90,6 +101,23 @@ export class DealerProfileComponent {
       this.longitude() === ''
     );
   });
+
+  // The fields are strings because they are bound to text inputs; the map needs numbers. Only read
+  // where `coordsInvalid()` is false, so these are always a pair the map can place.
+  protected readonly latNumber = computed(() => Number(this.latitude()));
+  protected readonly lngNumber = computed(() => Number(this.longitude()));
+
+  /** Drawn to scale around the pin, so "30 km" is something the owner can see rather than trust. */
+  protected readonly deliveryRadiusKm = computed(() => {
+    const delivery = this.dealer()?.delivery;
+    return delivery?.isEnabled ? delivery.radiusKm : null;
+  });
+
+  /** The pin was dragged. The fields are the form's state, so the move is written back to them. */
+  protected moveTo(point: { latitude: number; longitude: number }): void {
+    this.latitude.set(String(point.latitude));
+    this.longitude.set(String(point.longitude));
+  }
 
   protected readonly hoursSummary = computed(() => {
     const open = this.hours().filter((h) => !h.isClosed);

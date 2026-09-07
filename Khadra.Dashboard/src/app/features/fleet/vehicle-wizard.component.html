@@ -1,16 +1,16 @@
 <div class="stack stack-14 page-wide">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Add vehicle</h1>
-      <div class="page-sub">Step {{ step() }} of 8 · {{ footer() }}</div>
+      <h1 class="page-title">{{ t('common.addVehicle') }}</h1>
+      <div class="page-sub">{{ t('vehicleWizard.step') }} {{ step() }} {{ t('vehicleWizard.of8') }} {{ footer() }}</div>
     </div>
     <div class="dc-head-actions">
-      <button type="button" class="btn btn-ghost btn-md" (click)="cancel()">Cancel</button>
+      <button type="button" class="btn btn-ghost btn-md" (click)="cancel()">{{ t('vehicleWizard.cancel') }}</button>
     </div>
   </div>
 
   <div class="wiz-grid">
-    <nav class="sect wiz-steps" aria-label="Steps">
+    <nav class="sect wiz-steps" [attr.aria-label]="t('vehicleWizard.steps')">
       @for (s of steps; track s.n) {
         <button
           type="button"
@@ -29,7 +29,7 @@
       <div class="sect-h">
         <kh-icon [name]="current().icon" class="kpi-icon" />
         <span class="sect-t">{{ current().title }}</span>
-        <span class="sect-hint">Step {{ step() }} of 8</span>
+        <span class="sect-hint">{{ t('vehicleWizard.step') }} {{ step() }} {{ t('vehicleWizard.of82') }}</span>
       </div>
 
       <div class="sect-pad stack stack-12">
@@ -40,7 +40,7 @@
               <div class="banner-text">{{ message }}</div>
               @if (resumable(); as own) {
                 <button type="button" class="btn btn-secondary btn-xs" (click)="resume(own)">
-                  Continue that draft
+                  {{ t('vehicleWizard.continueThatDraft') }}
                 </button>
               }
             </div>
@@ -51,7 +51,7 @@
           @case (1) {
             <div class="dc-split-even">
               <div class="field">
-                <label for="w-make">Make</label>
+                <label for="w-make">{{ t('vehicleWizard.make') }}</label>
                 <input
                   id="w-make"
                   class="input"
@@ -69,11 +69,11 @@
                 }
               </div>
               <div class="field">
-                <label for="w-model">Model</label>
+                <label for="w-model">{{ t('common.model') }}</label>
                 <input
                   id="w-model"
                   class="input"
-                  placeholder="e.g. Elantra"
+                  [placeholder]="t('vehicleWizard.eGElantra')"
                   [value]="form().model"
                   (input)="patch({ model: text($event) })"
                 />
@@ -82,14 +82,15 @@
                 }
               </div>
               <div class="field">
-                <label for="w-year">Year</label>
+                <label for="w-year">{{ t('common.year') }}</label>
                 <select
                   id="w-year"
                   class="input"
                   [value]="form().year"
                   (change)="patch({ year: number($event) })"
                 >
-                  @for (y of years; track y) {
+                  <option value="" [selected]="form().year === null">{{ t('vehicleWizard.chooseAYear') }}</option>
+                  @for (y of years(); track y) {
                     <option [value]="y" [selected]="y === form().year">{{ y }}</option>
                   }
                 </select>
@@ -98,48 +99,63 @@
                 }
               </div>
               <div class="field">
-                <label for="w-color">Colour</label>
+                <label for="w-color">{{ t('common.colour') }}</label>
                 <input
                   id="w-color"
                   class="input"
-                  placeholder="e.g. White"
+                  [placeholder]="t('vehicleWizard.eGWhite')"
                   [value]="form().color ?? ''"
                   (input)="patch({ color: text($event) || null })"
                 />
-                <div class="field-hint">
-                  Vehicle type (sedan, SUV…) is a platform lookup that is not live yet.
-                </div>
+              </div>
+              <div class="field">
+                <label for="w-type">{{ t('common.vehicleType') }}</label>
+                <select id="w-type" class="input" (change)="patch({ carTypeId: text($event) })">
+                  @for (type of carTypes(); track type.id) {
+                    <option [value]="type.id" [selected]="type.id === form().carTypeId">
+                      {{ type.nameEn }}
+                    </option>
+                  }
+                </select>
+                @if (carTypesFailure(); as e) {
+                  <div class="field-error">{{ e }}</div>
+                } @else {
+                  <div class="field-hint">{{ t('vehicleWizard.thePlatformsCategoriesUsed') }}</div>
+                }
               </div>
             </div>
           }
           @case (2) {
             <div class="dc-split-even">
               <div class="field">
-                <label for="w-trans">Transmission</label>
+                <label for="w-trans">{{ t('common.transmission') }}</label>
                 <select id="w-trans" class="input" (change)="patch({ transmission: text($event) })">
-                  @for (t of transmissions; track t) {
-                    <option [value]="t" [selected]="t === form().transmission">{{ t }}</option>
+                  <option value="" [selected]="!form().transmission">{{ t('vehicleWizard.choose') }}</option>
+                  @for (option of transmissions; track option) {
+                    <option [value]="option" [selected]="option === form().transmission">{{ option }}</option>
                   }
                 </select>
               </div>
               <div class="field">
-                <label for="w-fuel">Fuel</label>
+                <label for="w-fuel">{{ t('common.fuel') }}</label>
                 <select id="w-fuel" class="input" (change)="patch({ fuelType: text($event) })">
+                  <option value="" [selected]="!form().fuelType">{{ t('vehicleWizard.choose') }}</option>
                   @for (f of fuelTypes; track f) {
                     <option [value]="f" [selected]="f === form().fuelType">{{ f }}</option>
                   }
                 </select>
               </div>
               <div class="field">
-                <label for="w-seats">Seats</label>
+                <label for="w-seats">{{ t('common.seats') }}</label>
                 <select id="w-seats" class="input" (change)="patch({ seats: number($event) })">
+                  <option value="" [selected]="form().seats === null">{{ t('vehicleWizard.choose') }}</option>
                   @for (s of seatOptions; track s) {
                     <option [value]="s" [selected]="s === form().seats">{{ s }}</option>
                   }
                 </select>
               </div>
               <div class="field">
-                <label for="w-plate">Plate number</label>
+                <label for="w-plate">{{ t('common.plateNumber') }}</label>
                 <input
                   id="w-plate"
                   class="input mono"
@@ -148,7 +164,7 @@
                   (input)="patch({ plateNumber: text($event) })"
                 />
                 <div class="field-hint">
-                  Shown to the customer only after you approve their booking.
+                  {{ t('vehicleWizard.shownToTheCustomer') }}
                 </div>
                 @if (fieldError('plateNumber'); as e) {
                   <div class="field-error">{{ e }}</div>
@@ -159,14 +175,14 @@
           @case (3) {
             <div class="dc-split-even">
               <div class="field">
-                <label for="w-rate">Daily rental price (JOD)</label>
+                <label for="w-rate">{{ t('vehicleWizard.dailyRentalPriceJod') }}</label>
                 <input
                   id="w-rate"
                   class="input"
                   type="number"
                   min="1"
                   step="1"
-                  [value]="form().dailyRate"
+                  [value]="form().dailyRate ?? ''"
                   (input)="patch({ dailyRate: number($event) })"
                 />
                 @if (fieldError('dailyRate'); as e) {
@@ -174,22 +190,22 @@
                 }
               </div>
               <div class="field">
-                <label for="w-deposit">Security deposit (JOD)</label>
+                <label for="w-deposit">{{ t('common.securityDepositJod') }}</label>
                 <input
                   id="w-deposit"
                   class="input"
                   type="number"
                   min="0"
                   step="5"
-                  [value]="form().securityDeposit"
+                  [value]="form().securityDeposit ?? ''"
                   (input)="patch({ securityDeposit: number($event) })"
                 />
                 <div class="field-hint">
-                  Held against the booking and returned after a clean handover.
+                  {{ t('vehicleWizard.heldAgainstTheBooking') }}
                 </div>
               </div>
               <div class="field">
-                <label for="w-mileage">Mileage</label>
+                <label for="w-mileage">{{ t('vehicleWizard.mileage') }}</label>
                 <select
                   id="w-mileage"
                   class="input"
@@ -205,28 +221,28 @@
                     })
                   "
                 >
-                  <option value="unlimited" [selected]="form().mileageUnlimited">Unlimited</option>
-                  <option value="limited" [selected]="!form().mileageUnlimited">Daily limit</option>
+                  <option value="unlimited" [selected]="form().mileageUnlimited">{{ t('vehicleWizard.unlimited') }}</option>
+                  <option value="limited" [selected]="!form().mileageUnlimited">{{ t('vehicleWizard.dailyLimit') }}</option>
                 </select>
               </div>
               <div class="field">
-                <label for="w-fuelpolicy">Fuel policy</label>
+                <label for="w-fuelpolicy">{{ t('common.fuelPolicy') }}</label>
                 <select
                   id="w-fuelpolicy"
                   class="input"
                   (change)="patch({ fuelPolicy: text($event) })"
                 >
                   <option value="FullToFull" [selected]="form().fuelPolicy === 'FullToFull'">
-                    Full to full
+                    {{ t('vehicleWizard.fullToFull') }}
                   </option>
                   <option value="SameToSame" [selected]="form().fuelPolicy === 'SameToSame'">
-                    Same to same
+                    {{ t('vehicleWizard.sameToSame') }}
                   </option>
                 </select>
               </div>
               @if (!form().mileageUnlimited) {
                 <div class="field">
-                  <label for="w-limit">Daily limit (km)</label>
+                  <label for="w-limit">{{ t('vehicleWizard.dailyLimitKm') }}</label>
                   <input
                     id="w-limit"
                     class="input"
@@ -238,7 +254,7 @@
                   />
                 </div>
                 <div class="field">
-                  <label for="w-excess">Fee per km over (JOD)</label>
+                  <label for="w-excess">{{ t('vehicleWizard.feePerKmOver') }}</label>
                   <input
                     id="w-excess"
                     class="input"
@@ -251,12 +267,12 @@
                 </div>
               }
               <div class="field span-2">
-                <label for="w-desc">Description</label>
+                <label for="w-desc">{{ t('common.description') }}</label>
                 <textarea
                   id="w-desc"
                   class="input"
                   rows="3"
-                  placeholder="What the customer should know: extras, condition, long-rental terms…"
+                  [placeholder]="t('vehicleWizard.whatTheCustomerShould')"
                   [value]="form().description ?? ''"
                   (input)="patch({ description: text($event) || null })"
                 ></textarea>
@@ -264,33 +280,31 @@
             </div>
           }
           @case (4) {
-            @if (me.value(); as d) {
-              <div class="map-stub is-tall">
-                <span class="map-ring is-1" [style.width.px]="120" [style.height.px]="120"></span>
-                <span class="map-pin"></span>
-                <span class="map-coords mono"
-                  >{{ d.latitude.toFixed(4) }}, {{ d.longitude.toFixed(4) }}</span
-                >
-              </div>
+            @if (dealer(); as d) {
+              <kh-map
+                size="tall"
+                [latitude]="d.latitude"
+                [longitude]="d.longitude"
+                [radiusKm]="d.delivery.isEnabled ? d.delivery.radiusKm : null"
+                [label]="d.businessName + ' — pickup location'"
+              />
               <div class="kv-narrow">
                 <div class="kv">
-                  <span class="kv-key">Pickup location</span
+                  <span class="kv-key">{{ t('vehicleWizard.pickupLocation') }}</span
                   ><span class="kv-val">{{ d.businessName }}</span>
                 </div>
                 <div class="kv">
-                  <span class="kv-key">Coordinates</span
+                  <span class="kv-key">{{ t('common.coordinates') }}</span
                   ><span class="kv-val mono">{{ d.latitude }}, {{ d.longitude }}</span>
                 </div>
               </div>
               <div class="note-box is-plain">
                 <kh-icon name="info" />
-                Every car is collected from your dealership's location. To move it, change the
-                location on your
-                <a class="auth-link" routerLink="/dealer/profile">dealer profile</a>; a per-car
-                pickup point is not offered.
+                {{ t('vehicleWizard.everyCarIsCollected') }}
+                <a class="auth-link" routerLink="/dealer/profile">{{ t('vehicleWizard.dealerProfile') }}</a>{{ t('vehicleWizard.aPerCarPickup') }}
               </div>
             } @else {
-              <div class="page-sub">Loading your dealership…</div>
+              <div class="page-sub">{{ t('vehicleWizard.loadingYourDealership') }}</div>
             }
           }
           @case (5) {
@@ -301,7 +315,7 @@
                   <kh-icon name="image" />
                   <div class="photo-tools">
                     @if (p.isPrimary) {
-                      <span class="pill s-ok">Cover</span>
+                      <span class="pill s-ok">{{ t('vehicleWizard.cover') }}</span>
                     } @else {
                       <button
                         type="button"
@@ -309,7 +323,7 @@
                         [disabled]="uploading()"
                         (click)="setCover(p.imageId)"
                       >
-                        Make cover
+                        {{ t('common.makeCover') }}
                       </button>
                     }
                     <button
@@ -318,7 +332,7 @@
                       [disabled]="uploading()"
                       (click)="removePhoto(p.imageId)"
                     >
-                      Remove
+                      {{ t('common.remove') }}
                     </button>
                   </div>
                 </div>
@@ -338,8 +352,7 @@
             </div>
             <div class="wiz-note">
               <kh-icon name="lock-key" />
-              Photos are uploaded straight to protected storage and served from a public, cacheable
-              path. JPEG, PNG or WebP. At least one is needed before the car can be published.
+              {{ t('vehicleWizard.photosAreUploadedStraight') }}
             </div>
           }
           @case (6) {
@@ -350,10 +363,9 @@
                 (change)="publishOnSave.set(!publishOnSave())"
               />
               <div class="grow">
-                <div class="toggle-title">Publish when I save</div>
+                <div class="toggle-title">{{ t('vehicleWizard.publishWhenISave') }}</div>
                 <div class="toggle-desc">
-                  Published cars appear in customer search straight away. Leave this off to keep the
-                  car as a draft in your fleet.
+                  {{ t('vehicleWizard.publishedCarsAppearIn') }}
                 </div>
               </div>
               <span class="pill" [class]="publishOnSave() ? 's-ok' : 's-dim'">{{
@@ -362,24 +374,21 @@
             </label>
             <div class="toggle-card is-off">
               <div class="grow">
-                <div class="toggle-title">Available for booking</div>
+                <div class="toggle-title">{{ t('vehicleWizard.availableForBooking') }}</div>
                 <div class="toggle-desc">
-                  A published car is bookable whenever no approved booking holds it. To stop
-                  offering it for a while, take it off the road from its page; existing bookings are
-                  unaffected.
+                  {{ t('vehicleWizard.aPublishedCarIs') }}
                 </div>
               </div>
-              <span class="pill s-dim">From its page</span>
+              <span class="pill s-dim">{{ t('vehicleWizard.fromItsPage') }}</span>
             </div>
             <div class="toggle-card is-off">
               <div class="grow">
-                <div class="toggle-title">Block specific dates</div>
+                <div class="toggle-title">{{ t('vehicleWizard.blockSpecificDates') }}</div>
                 <div class="toggle-desc">
-                  There is no separate blocked-dates list. Approved bookings hold their dates;
-                  taking the car off the road blocks every day until it is back.
+                  {{ t('vehicleWizard.thereIsNoSeparate') }}
                 </div>
               </div>
-              <span class="pill s-dim">Not offered</span>
+              <span class="pill s-dim">{{ t('vehicleWizard.notOffered') }}</span>
             </div>
           }
           @case (7) {
@@ -390,18 +399,16 @@
                 (change)="patch({ isDeliveryEligible: !form().isDeliveryEligible })"
               />
               <div class="grow">
-                <div class="toggle-title">Eligible for delivery</div>
+                <div class="toggle-title">{{ t('vehicleWizard.eligibleForDelivery') }}</div>
                 <div class="toggle-desc">
-                  @if (delivery.value(); as ds) {
+                  @if (deliverySettings(); as ds) {
                     @if (ds.isEnabled) {
-                      Customers within your {{ ds.radiusKm }} km radius can ask for this car to be
-                      delivered.
+                      {{ t('vehicleWizard.customersWithinYour') }} {{ ds.radiusKm }} {{ t('vehicleWizard.kmRadiusCanAsk') }}
                     } @else {
-                      Delivery is switched off for your dealership, so this only takes effect once
-                      you switch it on from the Delivery page.
+                      {{ t('vehicleWizard.deliveryIsSwitchedOff') }}
                     }
                   } @else {
-                    Customers inside your delivery radius can ask for this car to be delivered.
+                    {{ t('vehicleWizard.customersInsideYourDelivery') }}
                   }
                 </div>
               </div>
@@ -411,14 +418,16 @@
             </label>
             <div class="toggle-card is-off">
               <div class="grow">
-                <div class="toggle-title">Delivery fee</div>
-                <div class="toggle-desc">Set platform-wide. Dealers cannot change it.</div>
+                <div class="toggle-title">{{ t('vehicleWizard.deliveryFee') }}</div>
+                <div class="toggle-desc">
+                  {{ t('vehicleWizard.yourOwnAndThe') }}
+                </div>
               </div>
               <span class="pill s-dim num">
-                @if (delivery.value(); as ds) {
-                  Fixed · {{ ds.platformDeliveryFee.amount }} {{ ds.platformDeliveryFee.currency }}
+                @if (deliverySettings()?.fee; as fee) {
+                  {{ fee.amount }} {{ fee.currency }}
                 } @else {
-                  Platform-wide
+                  {{ t('vehicleWizard.notSet') }}
                 }
               </span>
             </div>
@@ -436,11 +445,11 @@
                   {{ form().make }} {{ form().model }} {{ form().year }}
                 </div>
                 <div class="page-sub">
-                  {{ form().transmission }} · {{ form().fuelType }} · {{ form().seats }} seats
+                  {{ form().transmission }} · {{ form().fuelType }} · {{ form().seats }} {{ t('vehicleWizard.seats') }}
                 </div>
                 <div class="num">
-                  {{ form().dailyRate }} JOD
-                  <span class="page-sub">per day · {{ form().securityDeposit }} JOD deposit</span>
+                  {{ form().dailyRate }} {{ t('vehicleWizard.jod') }}
+                  <span class="page-sub">{{ t('vehicleWizard.perDay') }} {{ form().securityDeposit }} {{ t('vehicleWizard.jodDeposit') }}</span>
                 </div>
               </div>
             </div>
@@ -473,7 +482,7 @@
             [disabled]="step() === 1 || busy()"
             (click)="back()"
           >
-            Back
+            {{ t('vehicleWizard.back') }}
           </button>
           <button
             type="button"

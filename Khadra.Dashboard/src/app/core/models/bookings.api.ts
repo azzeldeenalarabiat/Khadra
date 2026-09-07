@@ -15,6 +15,13 @@ export interface BookingListItem {
   readonly status: BookingStatus;
   readonly periodStart: string;
   readonly periodEnd: string;
+  /**
+   * The billed calendar days, frozen on the booking when it was made.
+   *
+   * Never recompute this from the two instants above. Subtracting them gives elapsed time, which is
+   * the rule the platform stopped using on 2026-09-07, and the screen would contradict the invoice.
+   */
+  readonly days: number;
   readonly pickupMethod: 'SelfPickup' | 'Delivery';
   readonly totalPrice: number;
   readonly currency: string;
@@ -24,12 +31,18 @@ export interface BookingListItem {
   readonly dealerName: string;
   readonly customerName: string;
   readonly hasLiveDispute: boolean;
+  /**
+   * Both parties by id, so a platform-wide row can open the dealership or the customer behind it.
+   * A dealer or a customer reading their own list already knows one of them; the Admin knows neither.
+   */
+  readonly dealerId: string;
+  readonly customerId: string;
 }
 
 export type BookingStatus =
-  | 'PendingPayment'
   | 'Requested'
   | 'Approved'
+  | 'Confirmed'
   | 'Rejected'
   | 'PickedUp'
   | 'Returned'
@@ -69,7 +82,12 @@ export interface Booking {
   readonly cancelledBy: string | null;
   readonly cancellationReason: string | null;
   readonly createdAt: string;
-  readonly paymentDeadline: string;
+  /** When the dealer must answer by. */
+  readonly decisionDeadline: string;
+  /** Null until the dealer approves: there is no payment clock before there is a decision. */
+  readonly paymentDeadline: string | null;
+  /** Whether the deposit cleared. Never inferred from the status on a screen. */
+  readonly depositPaid: boolean;
   readonly requestedAt: string | null;
   readonly approvedAt: string | null;
   readonly freeCancellationDeadline: string | null;
@@ -107,7 +125,7 @@ export interface BookingTerms {
   readonly commissionPercent: number;
   readonly freeCancellationWindowHours: number;
   readonly noShowTimeoutHours: number;
-  readonly paymentWindowMinutes: number;
+  readonly paymentWindowHours: number;
   readonly postReturnSettlementWindowHours: number;
   readonly customerCancellationPenaltyPercent: number;
   readonly dealerPenaltyMinPercent: number;
@@ -117,7 +135,7 @@ export interface BookingTerms {
 
 /** What a penalty WOULD be. Assessed, never charged: only a resolved dispute moves money. */
 export interface PenaltyAssessment {
-  readonly attributedTo: 'Customer' | 'Dealer' | 'System' | 'Unattributed';
+  readonly attributedTo: 'Customer' | 'Dealer' | 'System' | 'Unattributed' | 'Admin';
   readonly minPercent: number;
   readonly maxPercent: number;
   readonly minAmount: Money;

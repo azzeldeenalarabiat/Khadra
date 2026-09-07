@@ -27,39 +27,35 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
     public Task<bool> HasOverlappingBookingAsync(
         Id vehicleId,
         DateRange period,
+        TimeSpan turnaroundBuffer,
+        DateTimeOffset now,
         Id? excludingBookingId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(period);
 
-        // BookingStatus.HoldsVehicle spelled out: a computed property cannot be translated, so the
-        // member statuses are listed here and the domain stays the definition.
-        var pendingPayment = BookingStatus.PendingPayment;
-        var requested = BookingStatus.Requested;
-        var approved = BookingStatus.Approved;
-        var pickedUp = BookingStatus.PickedUp;
+        // What this rental would claim: its period, opened earlier by the gap the gallery needs to
+        // turn the car around. The stored side of the comparison already carries its own frozen gap
+        // in HoldStart, which is why only the candidate is padded here.
+        var candidateHoldStart = period.Start.Subtract(turnaroundBuffer);
 
-        return context.Bookings.AnyAsync(
-            booking =>
-                booking.VehicleId == vehicleId &&
-                (excludingBookingId == null || booking.Id != excludingBookingId.Value) &&
-                (booking.Status == pendingPayment ||
-                 booking.Status == requested ||
-                 booking.Status == approved ||
-                 booking.Status == pickedUp) &&
-                // Half-open intervals: a car returned at 10:00 can be collected at 10:00.
-                booking.Period.Start < period.End &&
-                booking.Period.End > period.Start,
-            cancellationToken);
+        return BookingHolds
+            .Colliding(context.Bookings, now, candidateHoldStart, period.End)
+            .AnyAsync(
+                booking =>
+                    booking.VehicleId == vehicleId &&
+                    (excludingBookingId == null || booking.Id != excludingBookingId.Value),
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<Booking>> ListDueForPaymentExpiryAsync(
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        var pendingPayment = BookingStatus.PendingPayment;
+        // Approved, and the customer let the payment window close.
+        var approved = BookingStatus.Approved;
         return await WithChildren()
-            .Where(booking => booking.Status == pendingPayment && booking.PaymentDeadline <= now)
+            .Where(booking => booking.Status == approved && booking.PaymentDeadline <= now)
             .ToListAsync(cancellationToken);
     }
 
@@ -67,9 +63,12 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
+        // The dealer let their ANSWER window close. This used to wait for the rental period to
+        // arrive, which was harmless while a deposit gated the hold and is not now: a request costs
+        // nothing, so without a real window one account could hold a car for the booking horizon.
         var requested = BookingStatus.Requested;
         return await WithChildren()
-            .Where(booking => booking.Status == requested && booking.Period.Start <= now)
+            .Where(booking => booking.Status == requested && booking.DecisionDeadline <= now)
             .ToListAsync(cancellationToken);
     }
 
@@ -77,10 +76,12 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        // Candidates: approved and past the start. The no-show timeout is per booking, in its Terms.
-        var approved = BookingStatus.Approved;
+        // Candidates: CONFIRMED and past the start. Approved-but-unpaid is not a no-show -- nobody
+        // failed to collect a car they had not paid for, and the aggregate refuses it anyway. The
+        // no-show timeout itself is per booking, in its Terms.
+        var confirmed = BookingStatus.Confirmed;
         return await WithChildren()
-            .Where(booking => booking.Status == approved && booking.Period.Start <= now)
+            .Where(booking => booking.Status == confirmed && booking.Period.Start <= now)
             .ToListAsync(cancellationToken);
     }
 
@@ -92,6 +93,40 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
         var returned = BookingStatus.Returned;
         return await WithChildren()
             .Where(booking => booking.Status == returned && booking.ReturnedAt <= now)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Booking>> ListStaleHoldsForVehicleAsync(
+        Id vehicleId,
+        DateRange candidatePeriod,
+        TimeSpan turnaroundBuffer,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(candidatePeriod);
+
+        // The two ListDueFor* predicates above, taken together because the caller does not care
+        // WHICH clock ran out -- only that the row still sits in the exclusion constraint's index
+        // while the application has stopped counting it.
+        //
+        // Written out rather than composed from those methods: each returns a materialised list, and
+        // a caller that wants one vehicle should not pull the whole platform's expiries into memory
+        // to filter them.
+        var requested = BookingStatus.Requested;
+        var approved = BookingStatus.Approved;
+
+        // The same half-open overlap the guard and the constraint use, against the same padded
+        // window, so this returns exactly the rows that could refuse the caller's insert.
+        var candidateHoldStart = candidatePeriod.Start.Subtract(turnaroundBuffer);
+        var candidateEnd = candidatePeriod.End;
+
+        return await WithChildren()
+            .Where(booking =>
+                booking.VehicleId == vehicleId &&
+                booking.HoldStart < candidateEnd &&
+                booking.Period.End > candidateHoldStart &&
+                ((booking.Status == requested && booking.DecisionDeadline <= now) ||
+                 (booking.Status == approved && booking.PaymentDeadline <= now)))
             .ToListAsync(cancellationToken);
     }
 

@@ -21,6 +21,8 @@ public sealed class RegisterCustomerHandler(AccountRegistrar registrar)
             request.FullName,
             request.Password,
             request.DateOfBirth,
+            // Spec 5.1's minimum age is a rule about renters, and this is the flow that creates one.
+            enforceMinimumAge: true,
             (email, phone, name, hash, now, dateOfBirth) =>
                 User.RegisterCustomer(email, phone, name, hash, now, dateOfBirth, request.IsForeignNational),
             cancellationToken);

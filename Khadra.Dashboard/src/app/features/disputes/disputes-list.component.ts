@@ -3,7 +3,9 @@ import { Router, RouterLink } from '@angular/router';
 import { Tone } from '../../core/models/console.models';
 import { DisputeListItem } from '../../core/models/disputes.api';
 import { AdminDisputesService, DisputeQueue } from '../../core/services/admin-disputes.service';
+import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
  * The Admin's dispute queue (spec 3.3).
@@ -20,13 +22,14 @@ import { IconComponent } from '../../shared/icon/icon.component';
   imports: [RouterLink, IconComponent],
 })
 export class DisputesListComponent {
+  protected readonly t = inject(I18nService).t;
   private readonly service = inject(AdminDisputesService);
   private readonly router = inject(Router);
 
   protected readonly queues: readonly { key: DisputeQueue; label: string }[] = [
-    { key: 'live', label: 'Live queue' },
+    { key: 'live', label: this.t('disputesList.liveQueue') },
     { key: 'Open', label: 'Open' },
-    { key: 'UnderReview', label: 'Under review' },
+    { key: 'UnderReview', label: this.t('disputesList.underReview') },
     { key: 'Resolved', label: 'Resolved' },
     { key: 'Withdrawn', label: 'Withdrawn' },
   ];
@@ -36,13 +39,18 @@ export class DisputesListComponent {
   protected readonly page = this.service.page;
   protected readonly resource = this.service.list;
 
-  protected readonly rows = computed(() => this.resource.value()?.items ?? []);
-  protected readonly total = computed(() => this.resource.value()?.totalCount ?? 0);
-  protected readonly totalPages = computed(() => this.resource.value()?.totalPages ?? 1);
-  protected readonly overdue = computed(() => this.rows().filter((row) => row.isOverdue).length);
-  protected readonly unassigned = computed(
-    () => this.rows().filter((row) => !row.assignedAdminId && row.closedAt === null).length,
-  );
+  // Resource.value() throws while a request has failed, so nothing reads it directly; failure()
+  // goes on reading error(), which does not throw.
+  private readonly loadedPage = loaded(this.resource);
+
+  protected readonly rows = computed(() => this.loadedPage()?.items ?? []);
+  protected readonly total = computed(() => this.loadedPage()?.totalCount ?? 0);
+  protected readonly totalPages = computed(() => this.loadedPage()?.totalPages ?? 1);
+  // The server's, for the whole filtered queue. These were counted from the rows on screen and
+  // printed beside a platform total, which is right only while everything fits on one page.
+  private readonly loadedCounts = loaded(this.service.counts);
+  protected readonly overdue = computed(() => this.loadedCounts()?.overdue ?? null);
+  protected readonly unassigned = computed(() => this.loadedCounts()?.unassigned ?? null);
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;

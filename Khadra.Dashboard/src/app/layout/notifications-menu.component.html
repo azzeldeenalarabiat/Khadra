@@ -1,0 +1,69 @@
+<div class="bell-wrap">
+  <button
+    type="button"
+    class="btn btn-secondary btn-33"
+    [attr.aria-expanded]="open()"
+    aria-haspopup="menu"
+    [attr.aria-label]="t('notif.count', { count: count() })"
+    (click)="toggle($event)"
+  >
+    <kh-icon name="bell" />
+    @if (count() > 0) {
+      <span class="bell-badge">{{ count() }}</span>
+    }
+  </button>
+
+  @if (open()) {
+    <div class="notif-panel" role="menu">
+      <div class="notif-panel-head">
+        <span class="sect-t">{{ t('notif.needsAttention') }}</span>
+        @if (count() > 0) {
+          <span class="notif-count">{{ count() }}</span>
+        }
+      </div>
+
+      @if (failed()) {
+        <div class="notif-empty">
+          <div class="state-text">{{ t('notif.loadFailed') }}</div>
+        </div>
+      } @else if (loading() && count() === 0) {
+        <div class="notif-empty" aria-busy="true">
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          <div class="skel-row"><div class="skel" [style.width.%]="70"></div></div>
+        </div>
+      } @else if (count() === 0) {
+        <div class="notif-empty">
+          <div class="state-icon is-outline"><kh-icon name="check-circle" /></div>
+          <div class="state-title">{{ t('notif.nothingWaiting') }}</div>
+          <div class="state-text">{{ t('notif.allAnswered') }}</div>
+        </div>
+      } @else {
+        <div class="notif-list">
+          @for (row of rows(); track row.id) {
+            <a
+              class="notif-row"
+              role="menuitem"
+              [class]="'s-' + row.tone"
+              [routerLink]="row.route"
+              (click)="close()"
+            >
+              <span class="notif-icon-wrap"><kh-icon [name]="row.icon" /></span>
+              <span class="grow">
+                <div class="notif-title user-text">{{ row.title }}</div>
+                @if (row.detail) {
+                  <div class="notif-desc">{{ row.detail }}</div>
+                }
+              </span>
+              <span class="notif-ts">{{ row.when }}</span>
+            </a>
+          }
+        </div>
+      }
+
+      <a class="notif-panel-foot" [routerLink]="allRoute()" (click)="close()">
+        {{ t('notif.openDashboard') }}
+        <kh-icon name="caret-right" class="icon-mirrored" />
+      </a>
+    </div>
+  }
+</div>

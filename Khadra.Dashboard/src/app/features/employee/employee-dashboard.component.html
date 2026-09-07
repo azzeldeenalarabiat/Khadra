@@ -1,0 +1,135 @@
+<div class="stack stack-14">
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('common.couldntLoadYourDashboard') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    </section>
+  } @else if (dashboard(); as d) {
+    <div class="dc-head">
+      <div>
+        <h1 class="page-title">{{ greeting() }}</h1>
+        <div class="page-sub">{{ t('employeeDashboard.heresWhatNeedsYour') }}</div>
+      </div>
+      <div class="dc-head-actions">
+        <a
+          class="btn btn-primary btn-md"
+          routerLink="/employee/bookings"
+          [queryParams]="{ tab: 'pending' }"
+        >
+          <kh-icon name="bell-ringing" />
+          {{ t('employeeDashboard.reviewRequests') }}
+        </a>
+        <a class="btn btn-secondary btn-md" routerLink="/employee/bookings">
+          <kh-icon name="calendar-check" />
+          {{ t('employeeDashboard.allBookings') }}
+        </a>
+      </div>
+    </div>
+
+    <div class="dc-kpi-grid">
+      @for (kpi of kpis(); track kpi.label) {
+        <a class="sect kpi-card" [routerLink]="kpi.route" [queryParams]="kpi.query ?? null">
+          <div class="kpi-head">
+            <span class="k">{{ kpi.label }}</span>
+            <kh-icon [name]="kpi.icon" class="kpi-icon" />
+          </div>
+          <div class="kpi-main num">{{ kpi.main }}</div>
+          <div class="kpi-sub-k">{{ kpi.note }}</div>
+        </a>
+      }
+    </div>
+
+    <div class="dc-split">
+      <div class="stack stack-14">
+        <section class="sect sect-clip">
+          <div class="sect-h">
+            <kh-icon name="warning-diamond" class="s-bad" />
+            <span class="sect-t">{{ t('employeeDashboard.requiresAttention') }}</span>
+            @if (attention().length > 0) {
+              <span class="queue-count">{{ attention().length }}</span>
+            }
+          </div>
+          @if (attention().length === 0) {
+            <div class="state-block">
+              <div class="state-icon is-outline"><kh-icon name="check-circle" /></div>
+              <div class="state-title">{{ t('employeeDashboard.nothingNeedsYouRight') }}</div>
+              <div class="state-text">
+                {{ t('employeeDashboard.noRequestsWaitingNo') }}
+              </div>
+            </div>
+          } @else {
+            @for (item of attention(); track item.entity + item.title) {
+              <div class="queue-row" [class]="'s-' + item.tone">
+                <div class="queue-rail"></div>
+                <div class="queue-body">
+                  <div class="row row-gap-8">
+                    <span class="pill" [class]="'s-' + item.tone">{{ item.type }}</span>
+                    <span class="queue-entity">{{ item.entity }}</span>
+                    <span class="queue-entity push">{{ item.when }}</span>
+                  </div>
+                  <div class="queue-title">{{ item.title }}</div>
+                  @if (item.desc) {
+                    <div class="queue-desc">{{ item.desc }}</div>
+                  }
+                </div>
+                <div class="queue-side">
+                  <a
+                    class="btn btn-primary btn-sm"
+                    [routerLink]="item.route"
+                    [queryParams]="item.query ?? null"
+                  >
+                    {{ item.action }}
+                  </a>
+                </div>
+              </div>
+            }
+          }
+        </section>
+      </div>
+
+      <section class="sect sect-clip">
+        <div class="sect-h">
+          <span class="sect-t">{{ t('employeeDashboard.yourRecentActivity') }}</span>
+          <!-- Filtered by the server to this person (`?actor=me`), so every row here is theirs and
+               none of them needs a "You" badge to say so. -->
+          <span class="sect-hint">{{ t('employeeDashboard.recordedAgainstYou') }}</span>
+        </div>
+        <div class="sect-pad">
+          @for (entry of activity(); track entry.occurredAt + entry.reference) {
+            <div class="act-row">
+              <kh-icon
+                [name]="
+                  entry.toStatus === 'Rejected'
+                    ? 'x-circle'
+                    : entry.toStatus === 'Approved'
+                      ? 'check-circle'
+                      : 'key'
+                "
+              />
+              <div class="grow">
+                <div class="act-text">{{ describe(entry) }}</div>
+                <div class="act-ts">{{ ago(entry.occurredAt) }}</div>
+              </div>
+            </div>
+          } @empty {
+            <div class="page-sub">
+              {{ t('employeeDashboard.youHaveNotRecorded') }}
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+  } @else {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2, 3]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  }
+</div>

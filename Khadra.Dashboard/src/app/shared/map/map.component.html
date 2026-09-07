@@ -1,0 +1,23 @@
+<div class="kh-map" [class.is-tall]="size() === 'tall'" [class.is-short]="size() === 'short'">
+  <div class="kh-map-canvas" #canvas [attr.aria-label]="label()" role="application"></div>
+
+  <!-- The coordinates the pin is actually on, over the map, so a reader can check the numbers
+       against the place without looking away from it. -->
+  <span class="kh-map-coords mono">
+    {{ latitude().toFixed(4) }}, {{ longitude().toFixed(4) }}
+  </span>
+
+  <!-- Puts the pin back in the middle. The map can be panned away from it, and after a new pair of
+       coordinates is typed the old view is the one still on screen. -->
+  <button type="button" class="kh-map-recentre" (click)="recentre()" [title]="t('map.centreOnThePin')">
+    <kh-icon name="map-pin" />
+  </button>
+
+  @if (tilesFailed()) {
+    <span class="kh-map-warning">
+      {{ t('map.mapImageryUnavailableThe') }}
+    </span>
+  } @else if (editable()) {
+    <span class="kh-map-hint">{{ t('map.dragThePinOr') }}</span>
+  }
+</div>

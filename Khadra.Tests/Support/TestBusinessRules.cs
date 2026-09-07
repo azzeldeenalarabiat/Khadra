@@ -10,24 +10,38 @@ internal static class TestBusinessRules
 {
     public const int MinimumRenterAge = 21;
 
-    public static BusinessRules Values(int? minimumRenterAge = MinimumRenterAge) => new(
+    // Wide enough that a test picking a plausible model year is never refused on the floor; a test
+    // that cares about the bound passes its own.
+    public const int EarliestVehicleModelYear = 1970;
+
+    public static BusinessRules Values(
+        int? minimumRenterAge = MinimumRenterAge,
+        int earliestVehicleModelYear = EarliestVehicleModelYear) => new(
         CommissionPercent: 20m,
         DepositPercent: 20m,
         NoShowTimeoutHours: 8,
-        DeliveryFee: Money.Jod(10m),
         DealerNonDeliveryPenaltyMinPercent: 25m,
         DealerNonDeliveryPenaltyMaxPercent: 50m,
         FreeCancellationWindowMinutes: 60,
         AdminSlaHours: 48,
         CustomerCancellationPenaltyPercent: 100m,
-        PaymentWindowMinutes: 20,
+        PaymentWindowHours: 24,
+        BookingAnswerWindowHours: 48,
         PostReturnSettlementHours: 48,
-        MinimumRenterAge: minimumRenterAge);
+        MinimumRenterAge: minimumRenterAge,
+        TurnaroundMinutes: 120,
+        MaxAdvanceBookingDays: 180,
+        MinimumBookingLeadTimeMinutes: 120,
+        MaxRentalDays: 90,
+        EarliestVehicleModelYear: earliestVehicleModelYear);
 
-    public static IBusinessRulesProvider Provider(int? minimumRenterAge = MinimumRenterAge)
+    public static IBusinessRulesProvider Provider(
+        int? minimumRenterAge = MinimumRenterAge,
+        int earliestVehicleModelYear = EarliestVehicleModelYear)
     {
         var provider = Substitute.For<IBusinessRulesProvider>();
-        provider.GetAsync(Arg.Any<CancellationToken>()).Returns(Values(minimumRenterAge));
+        provider.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(Values(minimumRenterAge, earliestVehicleModelYear));
         return provider;
     }
 
@@ -39,6 +53,10 @@ internal static class TestBusinessRules
             .Returns(call => DateOnly.FromDateTime(call.Arg<DateTimeOffset>().ToOffset(TimeSpan.FromHours(3)).DateTime));
         calendar.DayOf(Arg.Any<DateTimeOffset>())
             .Returns(call => DateOnly.FromDateTime(call.Arg<DateTimeOffset>().ToOffset(TimeSpan.FromHours(3)).DateTime));
+        // The other half of the same conversion. A substitute would otherwise answer 00:00 for every
+        // instant, which reads as the middle of the night and refuses every self-pickup booking.
+        calendar.TimeOfDay(Arg.Any<DateTimeOffset>())
+            .Returns(call => TimeOnly.FromDateTime(call.Arg<DateTimeOffset>().ToOffset(TimeSpan.FromHours(3)).DateTime));
         // Local midnight in Amman, expressed as the UTC instant it is.
         calendar.StartOfDay(Arg.Any<DateOnly>())
             .Returns(call => new DateTimeOffset(call.Arg<DateOnly>().ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(3)).ToUniversalTime());

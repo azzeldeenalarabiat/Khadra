@@ -34,4 +34,9 @@ public sealed record AuthTokensDto(
     DateTimeOffset RefreshTokenExpiresAt,
     UserDto User);
 
-public sealed record RegisteredUserDto(Guid UserId, string Email);
+/// <param name="VerificationEmailSent">
+/// Whether the mail server accepted the verification message. False does NOT mean the registration
+/// failed — the account and its token are saved either way — it means nothing is on its way to that
+/// inbox and the person should be told to ask for another link rather than sent off to wait.
+/// </param>
+public sealed record RegisteredUserDto(Guid UserId, string Email, bool VerificationEmailSent);

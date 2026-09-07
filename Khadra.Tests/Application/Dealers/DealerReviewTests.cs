@@ -1,3 +1,6 @@
+using Khadra.Application.Notifications;
+using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers;
 using Khadra.Application.Dealers.ReviewDealer;
@@ -49,6 +52,7 @@ public sealed class DealerReviewTests
         public ReviewDealerHandlers Handlers() => new(
             Dealers,
             new DealerReviewAuditor(AuditTrail, Actor, Clock),
+            new DealerTeamNotifier(Substitute.For<INotifier>(), Substitute.For<IUserRepository>()),
             Clock,
             UnitOfWork,
             Actor);

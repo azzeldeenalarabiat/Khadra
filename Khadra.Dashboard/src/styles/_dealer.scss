@@ -86,8 +86,8 @@
 
 .thumb {
   border-radius: 6px;
-  background: linear-gradient(150deg, #22243244, #2b2d3d);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--tint-3);
   display: grid;
   place-items: center;
   flex: none;
@@ -162,7 +162,7 @@
   width: 82px;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--tint-3);
   overflow: hidden;
 }
 
@@ -212,7 +212,7 @@
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--tint-3);
   color: var(--text-55);
 }
 
@@ -290,7 +290,7 @@
 }
 
 .note-box.is-plain {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--tint-1);
   color: var(--text-55);
   line-height: 1.5;
 }
@@ -299,8 +299,8 @@
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  background: var(--color-neutral-800);
-  color: var(--color-neutral-200);
+  background: var(--chip-bg);
+  color: var(--chip-text);
   display: grid;
   place-items: center;
   font-size: 14px;
@@ -404,6 +404,8 @@
   object-fit: cover;
 }
 
+// Absolutely positioned, so its containers must establish a positioning context or it resolves
+// against a far ancestor and lands on the sidebar, on top of Logout. See .brand-logo/.brand-cover.
 .photo-label {
   position: absolute;
   bottom: 7px;
@@ -509,13 +511,13 @@
   place-items: center;
   font-size: 10.5px;
   font-weight: 600;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--tint-5);
   color: var(--text-45);
 }
 
 .wiz-step.is-active .wiz-dot {
   background: var(--color-accent);
-  color: #161826;
+  color: var(--color-surface);
   border-color: transparent;
 }
 
@@ -565,6 +567,7 @@
 }
 
 .brand-logo {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -579,6 +582,7 @@
 }
 
 .brand-cover {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -622,23 +626,123 @@
   color: var(--text-40);
 }
 
-.map-stub {
+/* ── The map ─────────────────────────────────────────────────────────────────
+   `.map-stub` used to live here: a ring on a gradient that drew the same picture
+   wherever the dealer was. `kh-map` renders real tiles now, and these rules dress
+   Leaflet's own DOM in the console's tokens. */
+
+/* A custom element is `display: inline` until told otherwise, which gives the host
+   no box: it does not stretch to its column, and the ResizeObserver watching it
+   never sees a size change to react to. */
+kh-map {
+  display: block;
+  min-width: 0;
+}
+
+/* The height lives on the wrapper and the canvas is taken out of flow inside it.
+   With the canvas in normal flow, Leaflet's own panes are wide enough to stop a
+   flex item shrinking (`min-width: auto`), so invalidateSize grew the container,
+   which grew the canvas, which fired the observer again: the map reached 15,000px
+   and pulled a hundred tiles before anyone saw it. Absolute positioning means the
+   canvas can never report a width back to the layout. */
+.kh-map {
   position: relative;
+  height: 260px;
+  min-width: 0;
   border-radius: 8px;
   border: 1px solid var(--color-divider);
   overflow: hidden;
-  background: radial-gradient(circle at 46% 50%, #252838, #171926 72%);
+  background: var(--color-bg);
 }
 
-.map-stub.is-tall {
-  height: 300px;
+.kh-map-canvas {
+  position: absolute;
+  inset: 0;
+  /* Leaflet paints its own ground before the first tile arrives; without this it
+     is a light grey slab in the middle of a dark console. */
+  background: var(--color-bg);
 }
 
-.map-stub.is-mid {
-  height: 170px;
+/* OpenStreetMap ships one light raster style, which is the right one now. The dark
+   theme had to invert it — `invert(1) hue-rotate(180deg) …` — to stop a white slab
+   sitting in the middle of a dark console; on a white page that inversion would put
+   a black slab there instead. The tiles are left as the server draws them, muted a
+   little so the green pin stays the loudest thing in the box. */
+.kh-map .leaflet-tile-pane {
+  filter: saturate(0.72) contrast(0.96);
 }
 
-.map-pin {
+.kh-map.is-tall {
+  height: 320px;
+}
+
+.kh-map.is-short {
+  height: 190px;
+}
+
+.kh-map-coords {
+  position: absolute;
+  bottom: 9px;
+  inset-inline-start: 11px;
+  z-index: 500; /* Over the tile pane, under Leaflet's controls (1000). */
+  padding: 3px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-70);
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  border: 1px solid var(--color-divider);
+  pointer-events: none;
+}
+
+.kh-map-hint,
+.kh-map-warning {
+  position: absolute;
+  top: 9px;
+  inset-inline-end: 44px; /* Clear of the recentre button. */
+  z-index: 500;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-70);
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  border: 1px solid var(--color-divider);
+  pointer-events: none;
+}
+
+.kh-map-warning {
+  color: var(--status-warn);
+  border-color: color-mix(in srgb, var(--status-warn) 40%, transparent);
+}
+
+/* Puts the pin back in the middle after the map has been panned away from it. */
+.kh-map-recentre {
+  position: absolute;
+  top: 9px;
+  inset-inline-end: 11px;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-70);
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  border: 1px solid var(--color-divider);
+}
+
+.kh-map-recentre:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+/* The pin. A div icon, so no bundled PNG path to break. */
+.kh-map-pin {
+  position: relative;
+}
+
+.kh-map-pin-dot {
   position: absolute;
   inset-inline-start: 50%;
   top: 50%;
@@ -647,34 +751,57 @@
   margin: -6px 0 0 -6px;
   border-radius: 50%;
   background: var(--color-accent);
-  box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-bg) 70%, transparent);
 }
 
-.map-coords {
-  position: absolute;
-  bottom: 9px;
-  inset-inline-start: 11px;
-}
-
-.map-ring {
+.kh-map-pin-ring {
   position: absolute;
   inset-inline-start: 50%;
   top: 50%;
-  transform: translate(-50%, -50%);
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
   border-radius: 50%;
-}
-
-.map-ring.is-1 {
   border: 1px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
 }
 
-.map-ring.is-2 {
-  border: 1px dashed color-mix(in srgb, var(--color-accent) 24%, transparent);
+/* A draggable pin should say so before it is grabbed. */
+.leaflet-marker-draggable .kh-map-pin-dot {
+  cursor: grab;
 }
 
-.map-ring.is-3 {
-  border: 1px dashed rgba(255, 255, 255, 0.07);
+/* The delivery radius, drawn to scale on the real map rather than as a fixed circle. */
+.kh-map-radius {
+  fill: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  stroke: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  stroke-width: 1;
+}
+
+/* Leaflet's own chrome, in the console's colours rather than its default white. */
+.kh-map .leaflet-bar a,
+.kh-map .leaflet-bar a:hover {
+  background: var(--color-surface);
+  color: var(--text-70);
+  border-bottom-color: var(--color-divider);
+}
+
+.kh-map .leaflet-bar a:hover {
+  color: var(--color-accent);
+}
+
+.kh-map .leaflet-bar {
+  border: 1px solid var(--color-divider);
+}
+
+.kh-map .leaflet-control-attribution {
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  color: var(--text-40);
+  font-size: 10px;
+}
+
+.kh-map .leaflet-control-attribution a {
+  color: var(--text-70);
 }
 
 .radius-head {
@@ -703,10 +830,10 @@
 .public-cover {
   position: relative;
   height: 168px;
-  background: linear-gradient(160deg, #2a2d40, #191b28);
+  background: linear-gradient(160deg, var(--color-accent-200), var(--color-accent-100));
   display: grid;
   place-items: center;
-  color: rgba(233, 233, 237, 0.16);
+  color: var(--tint-5);
   font-size: 30px;
   overflow: hidden;
 }
@@ -729,8 +856,8 @@
   width: 76px;
   height: 76px;
   border-radius: 14px;
-  background: #20222f;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: var(--color-neutral-100);
+  border: 1px solid var(--tint-3);
   display: grid;
   place-items: center;
   flex: none;
@@ -829,7 +956,7 @@
   width: 160px;
   height: 5px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--tint-3);
   overflow: hidden;
 }
 
@@ -1121,7 +1248,7 @@ button.cal-day[disabled] {
 }
 
 .photo-strip .thumb-add {
-  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border: 1px dashed var(--tint-5);
   background: none;
   cursor: pointer;
   display: flex;
@@ -1146,4 +1273,180 @@ button.cal-day[disabled] {
 
 .dc-split-even .span-2 {
   grid-column: span 2;
+}
+
+/* ── The fleet, as cards ──────────────────────────────────────────────────────
+   A car is recognised by looking at it, so the fleet is a grid of photographs
+   rather than a table of text. `auto-fill` with a minimum does the responsive
+   work on its own: one column on a phone, as many as fit on a wide screen, with
+   no breakpoint list to keep in step with the sidebar. */
+
+.car-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(264px, 1fr));
+  gap: 14px;
+  padding: 14px;
+  margin: 0;
+  list-style: none;
+}
+
+.car-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.car-card:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  transform: translateY(-1px);
+}
+
+/* A card mid-write is not a card to click again. */
+.car-card.is-busy {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.car-card-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.car-card-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.car-card-nophoto {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-40);
+  font-size: 11px;
+}
+
+.car-card-nophoto svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* Status and delivery sit on the photo: on a card the picture is the biggest
+   thing, and a reader should not have to look past it to learn the state. */
+.car-card-status {
+  position: absolute;
+  top: 9px;
+  inset-inline-start: 9px;
+  backdrop-filter: blur(3px);
+}
+
+.car-card-delivery {
+  position: absolute;
+  top: 9px;
+  inset-inline-end: 9px;
+  background: color-mix(in srgb, var(--color-bg) 78%, transparent);
+}
+
+.car-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 12px 0;
+  flex: 1;
+}
+
+.car-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.car-card-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-90);
+  text-decoration: none;
+  /* A long make-and-model wraps rather than pushing the plate off the card. */
+  min-width: 0;
+}
+
+.car-card-name:hover {
+  color: var(--color-accent);
+}
+
+.car-card-plate {
+  font-size: 11px;
+  color: var(--text-40);
+  white-space: nowrap;
+}
+
+.car-card-spec {
+  font-size: 11.5px;
+  color: var(--text-70);
+}
+
+.car-card-note {
+  font-size: 11px;
+  color: var(--text-40);
+}
+
+.car-card-money {
+  display: flex;
+  gap: 18px;
+  margin-block-start: auto;
+  padding-block-start: 10px;
+}
+
+.car-card-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.car-card-figure .num {
+  font-size: 13px;
+  color: var(--text-90);
+}
+
+.car-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  margin-block-start: 10px;
+  border-top: 1px solid var(--color-divider);
+}
+
+/* The destructive one sits apart from the rest, at the end of the row. */
+.car-card-actions .s-bad {
+  margin-inline-start: auto;
+}
+
+/* An unread notification row. The tint comes from --c, which the row's own .s-* class sets, so no
+   status colour is written here (see the design-system rule in the frontend rules file). */
+.queue-row.is-unread {
+  background: color-mix(in srgb, var(--c) 5%, transparent);
+}
+
+.unread-dot {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--c);
+  flex: none;
 }

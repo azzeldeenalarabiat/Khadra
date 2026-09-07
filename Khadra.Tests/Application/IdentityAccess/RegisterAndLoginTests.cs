@@ -1,6 +1,7 @@
 using Khadra.Application.Common;
 using Khadra.Application.IdentityAccess.Login;
 using Khadra.Application.IdentityAccess.RegisterCustomer;
+using Khadra.Application.IdentityAccess.RegisterDealerOwner;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Tests.Support;
 using NSubstitute;
@@ -182,5 +183,77 @@ public sealed class LoginHandlerTests
         Assert.Equal(refreshToken.ExpiresAt, result.Value.RefreshTokenExpiresAt);
         Assert.Equal("10.0.0.5", refreshToken.CreatedByIp);
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+}
+
+/// <summary>
+/// Step one of spec 3.1, and the one rule the two self-service flows do NOT share.
+///
+/// Both go through <c>AccountRegistrar</c>, and for a long time both were judged by the configured
+/// renter minimum age. That is a rule about who may RENT a car (spec 5.1). Applied to the person who
+/// owns the rental office it refused a legally trading gallery owner and told them "Renters must be
+/// at least 21 years old" — a rule they are not subject to, in words that do not describe them.
+/// </summary>
+public sealed class RegisterDealerOwnerHandlerTests
+{
+    private static RegisterDealerOwnerCommand ValidCommand() =>
+        new("Owner@Gallery.jo", "Passw0rd1", "Rami Odeh", "079 555 4444");
+
+    private static RegisterDealerOwnerHandler Handler(AuthHandlerTestContext context) => new(context.Registrar);
+
+    [Fact]
+    public async Task Creates_an_unverified_dealer_owner_with_a_verification_link()
+    {
+        var context = new AuthHandlerTestContext();
+
+        var result = await Handler(context).Handle(ValidCommand(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var user = Assert.Single(context.AddedUsers);
+        Assert.Equal("owner@gallery.jo", user.Email.Value);
+        // The role is settled at registration; it is the DEALER that will start PENDING_REVIEW.
+        Assert.Same(UserRole.DealerOwner, user.Role);
+        Assert.False(user.IsEmailVerified);
+
+        var token = Assert.Single(context.AddedVerificationTokens);
+        Assert.Same(VerificationPurpose.EmailVerification, token.Purpose);
+        Assert.Equal(user.Id, token.UserId);
+    }
+
+    /// <summary>
+    /// The point of the change: no date of birth is asked for, and none is demanded.
+    ///
+    /// With a minimum age configured, the shared registrar used to refuse any registration that
+    /// arrived without one. A gallery owner has no date of birth to give — the form no longer has
+    /// the field — so that refusal made owner registration impossible to complete.
+    /// </summary>
+    [Fact]
+    public async Task Is_not_refused_for_having_no_date_of_birth_when_a_minimum_age_is_configured()
+    {
+        var context = new AuthHandlerTestContext();
+
+        var result = await Handler(context).Handle(ValidCommand(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(Assert.Single(context.AddedUsers).DateOfBirth);
+    }
+
+    /// <summary>
+    /// The rule still bites where it belongs. Guards the pair: moving the age check out of the
+    /// shared path must not quietly stop enforcing it for the people spec 5.1 is about.
+    /// </summary>
+    [Fact]
+    public async Task The_renter_minimum_age_still_refuses_a_customer_who_is_too_young()
+    {
+        var context = new AuthHandlerTestContext();
+        var tooYoung = DateOnly.FromDateTime(Users.Now.UtcDateTime).AddYears(-(TestBusinessRules.MinimumRenterAge - 1));
+
+        var result = await new RegisterCustomerHandler(context.Registrar).Handle(
+            new RegisterCustomerCommand("young@example.com", "Passw0rd1", "Sami Odeh", "0791112222", tooYoung, false),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("auth.under_minimum_age", result.Error.Code);
+        Assert.Empty(context.AddedUsers);
     }
 }

@@ -9,7 +9,10 @@ import { Money } from './fleet.api';
 export interface DealerBookingCounts {
   readonly requested: number;
   readonly oldestRequestedAt: string | null;
-  readonly approved: number;
+  /** Approved and not paid for: a car held on nothing but a clock. */
+  readonly awaitingDeposit: number;
+  /** Approved AND paid for: the rentals actually going ahead. */
+  readonly confirmed: number;
   readonly pickedUp: number;
   readonly overdueReturns: number;
 }
@@ -129,5 +132,9 @@ export interface DeliverySettingsView {
   readonly isEnabled: boolean;
   readonly radiusKm: number;
   readonly maxRadiusKm: number;
-  readonly platformDeliveryFee: Money;
+  /** This gallery’s own price for a delivery. Null exactly when delivery is off. */
+  readonly fee: Money | null;
+  /** The ceiling the server enforces, so the form can refuse what the server would. */
+  readonly maxFee: number;
+  readonly currencyCode: string;
 }

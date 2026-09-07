@@ -43,8 +43,10 @@ public sealed class SubmitDealerProfileCommandValidator : AbstractValidator<Subm
     public SubmitDealerProfileCommandValidator()
     {
         RuleFor(command => command.BusinessName).NotEmpty().MaximumLength(BusinessName.MaxLength);
+        // Raw input, so it has room for the separators the value object strips. Capping it at the
+        // DIGIT maximum would refuse a legitimate 20-digit number typed with dashes.
         RuleFor(command => command.CommercialRegistrationNumber)
-            .NotEmpty().MaximumLength(CommercialRegistrationNumber.MaxLength);
+            .NotEmpty().MaximumLength(CommercialRegistrationNumber.MaxLength + 10);
         RuleFor(command => command.Latitude).InclusiveBetween(-90, 90);
         RuleFor(command => command.Longitude).InclusiveBetween(-180, 180);
         RuleFor(command => command.Description).MaximumLength(2000);

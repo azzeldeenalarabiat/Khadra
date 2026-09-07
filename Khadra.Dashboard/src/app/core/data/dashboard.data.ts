@@ -5,7 +5,7 @@ import { Tone } from '../models/console.models';
  * View-model shapes for the dashboard screen.
  *
  * This file used to hold the design's sample content. It no longer holds any: the dashboard reads
- * `GET /api/v1/admin/dashboard` and `dashboard.presenter.ts` maps that snapshot into these shapes.
+ * one endpoint per panel and `dashboard.presenter.ts` maps those responses into these shapes.
  * What is left is the contract between the presenter and the template — the KPI card and the work
  * queue row as the design draws them, with no colours or figures baked in.
  */
@@ -19,6 +19,13 @@ export interface KpiCard {
 }
 
 export interface QueueItem {
+  /**
+   * The API's own key for this item.
+   *
+   * The rows were tracked by title + entity, which collides for two disputes of the same age between
+   * the same dealer and customer — and a colliding track key makes Angular reuse the wrong row.
+   */
+  readonly id: string;
   readonly severity: string;
   readonly tone: Tone;
   readonly title: string;

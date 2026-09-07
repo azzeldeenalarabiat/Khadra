@@ -1,14 +1,14 @@
 <div class="stack stack-14">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Fleet</h1>
+      <h1 class="page-title">{{ t('fleetList.fleet') }}</h1>
       <div class="page-sub">
-        Your cars, what each one is doing, and whether customers can see it.
+        {{ t('fleetList.yourCarsWhatEach') }}
       </div>
     </div>
     <div class="dc-head-actions">
-      <div class="tabs tabs-seg" role="tablist" aria-label="State">
-        @for (s of states; track s.key) {
+      <div class="tabs tabs-seg" role="tablist" [attr.aria-label]="t('common.state')">
+        @for (s of states(); track s.key) {
           <button
             type="button"
             class="tab"
@@ -24,20 +24,32 @@
       @if (canAdd()) {
         <a class="btn btn-primary btn-md" routerLink="/dealer/fleet/new">
           <kh-icon name="plus" />
-          Add vehicle
+          {{ t('common.addVehicle') }}
         </a>
       }
     </div>
   </div>
 
+  <!-- Said once, at the top, rather than as a tooltip on each of four dead buttons per card. -->
+  @if (readOnly()) {
+    <div class="banner s-warn" role="status">
+      <kh-icon name="info" class="banner-icon" />
+      <div class="banner-body">
+        <div class="banner-text">
+          {{ t('fleetList.theFleetIsThe') }}
+        </div>
+      </div>
+    </div>
+  }
+
   @if (failure(); as message) {
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load your fleet</div>
+        <div class="state-title">{{ t('fleetList.couldntLoadYourFleet') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     </section>
@@ -51,14 +63,20 @@
     <section class="sect">
       <div class="state-block is-empty">
         <div class="state-icon is-outline"><kh-icon name="car-simple" /></div>
-        <div class="state-title">No cars yet</div>
-        <div class="state-text">
-          Add your first car. It stays a draft until you publish it, and it needs at least one photo
-          before it can be published.
-        </div>
+        <div class="state-title">{{ t('fleetList.noCarsYet') }}</div>
+        <!-- "Add your first car" is an instruction only the owner can follow. -->
+        @if (readOnly()) {
+          <div class="state-text">
+            {{ t('fleetList.yourDealershipHasNot') }}
+          </div>
+        } @else {
+          <div class="state-text">
+            {{ t('fleetList.addYourFirstCar') }}
+          </div>
+        }
         @if (canAdd()) {
           <div class="state-actions">
-            <a class="btn btn-primary btn-sm" routerLink="/dealer/fleet/new">Add a car</a>
+            <a class="btn btn-primary btn-sm" routerLink="/dealer/fleet/new">{{ t('fleetList.addACar') }}</a>
           </div>
         }
       </div>
@@ -77,133 +95,137 @@
       <div class="list-toolbar">
         <div class="list-search">
           <kh-icon name="magnifying-glass" class="search-icon" />
-          <label class="visually-hidden" for="fleet-search">Search your fleet</label>
+          <label class="visually-hidden" for="fleet-search">{{ t('fleetList.searchYourFleet') }}</label>
           <input
             id="fleet-search"
             class="input"
-            placeholder="Make, model, plate…"
+            [placeholder]="t('fleetList.makeModelPlate')"
             [value]="search()"
             (input)="setSearch($event)"
           />
         </div>
-        <span class="page-sub push">{{ rows().length }} of {{ cars().length }} cars</span>
+        <span class="page-sub push">{{ t('fleetList.showingOfCars', { shown: rows().length, total: cars().length }) }}</span>
       </div>
 
       @if (rows().length === 0) {
         <div class="state-block is-empty">
-          <div class="state-title">Nothing matches</div>
-          <div class="state-text">No car in this state matches your search.</div>
+          <div class="state-title">{{ t('fleetList.nothingMatches') }}</div>
+          <div class="state-text">{{ t('fleetList.noCarInThis') }}</div>
           <div class="state-actions">
             <button
               type="button"
               class="btn btn-secondary btn-sm"
               (click)="state.set('all'); search.set('')"
             >
-              Show all
+              {{ t('common.showAll') }}
             </button>
           </div>
         </div>
       } @else {
-        <div class="table-wrap">
-          <table class="table table-wide">
-            <thead>
-              <tr>
-                <th>Vehicle</th>
-                <th>Plate</th>
-                <th class="td-num">Daily rate</th>
-                <th class="td-num">Deposit</th>
-                <th>Delivery</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (car of rows(); track car.vehicleId) {
-                <tr class="rowlink" (click)="open(car)">
-                  <td class="td">
-                    <div class="entity">
-                      <div class="thumb thumb-sm">
-                        @if (cover(car); as url) {
-                          <img khFallback [src]="url" alt="" width="34" height="26" />
-                        }
-                        <kh-icon name="car-simple" />
-                      </div>
-                      <div>
-                        <a
-                          class="entity-name row-link"
-                          [routerLink]="['/dealer/fleet', car.vehicleId]"
-                          (click)="$event.stopPropagation()"
-                          >{{ car.make }} {{ car.model }} {{ car.year }}</a
-                        >
-                        <div class="entity-sub">
-                          {{ car.transmission }} · {{ car.fuelType }} · {{ car.seats }} seats{{
-                            car.color ? ' · ' + car.color : ''
-                          }}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="td mono">{{ car.plateNumber }}</td>
-                  <td class="td td-num">
+        <!-- Cars are a visual inventory: a dealer recognises a car by looking at it, which a table
+             row of text cannot do. The grid reflows on its own from one column upwards. -->
+        <ul class="car-grid" role="list">
+          @for (car of rows(); track car.vehicleId) {
+            <li class="car-card" [class.is-busy]="busy() === car.vehicleId">
+              <a
+                class="car-card-photo"
+                [routerLink]="['/dealer/fleet', car.vehicleId]"
+                [attr.aria-label]="car.make + ' ' + car.model + ' ' + car.year"
+              >
+                @if (cover(car); as url) {
+                  <img khFallback [src]="url" alt="" loading="lazy" />
+                } @else {
+                  <span class="car-card-nophoto">
+                    <kh-icon name="car-simple" />
+                    <span>{{ t('fleetList.noPhoto') }}</span>
+                  </span>
+                }
+                <span class="pill car-card-status" [class]="'s-' + statusTone(car)">
+                  {{ statusLabel(car) }}
+                </span>
+                @if (car.isDeliveryEligible) {
+                  <span class="tag-delivery car-card-delivery">
+                    <kh-icon name="moped" /> {{ t('common.delivery') }}
+                  </span>
+                }
+              </a>
+
+              <div class="car-card-body">
+                <div class="car-card-head">
+                  <a class="car-card-name" [routerLink]="['/dealer/fleet', car.vehicleId]">
+                    {{ car.make }} {{ car.model }} {{ car.year }}
+                  </a>
+                  <span class="car-card-plate mono">{{ car.plateNumber }}</span>
+                </div>
+
+                <div class="car-card-spec">
+                  {{ car.transmission }} · {{ car.fuelType }} · {{ car.seats }} {{ t('fleetList.seats') }}{{
+                    car.color ? ' · ' + car.color : ''
+                  }}
+                </div>
+
+                <div class="car-card-note">{{ statusNote(car) }}</div>
+
+                <div class="car-card-money">
+                  <div class="car-card-figure">
+                    <span class="k">{{ t('fleetList.perDay') }}</span>
                     <span class="num">{{ car.dailyRate.amount }} {{ car.dailyRate.currency }}</span>
-                  </td>
-                  <td class="td td-num">
+                  </div>
+                  <div class="car-card-figure">
+                    <span class="k">{{ t('common.deposit') }}</span>
                     <span class="num"
                       >{{ car.securityDeposit.amount }} {{ car.securityDeposit.currency }}</span
                     >
-                  </td>
-                  <td class="td">
-                    @if (car.isDeliveryEligible) {
-                      <span class="tag-delivery"><kh-icon name="moped" /> Eligible</span>
-                    } @else {
-                      <span class="page-sub">Pickup only</span>
-                    }
-                  </td>
-                  <td class="td">
-                    <span class="pill" [class]="'s-' + statusTone(car)">{{
-                      statusLabel(car)
-                    }}</span>
-                    <div class="td-sub">{{ statusNote(car) }}</div>
-                  </td>
-                  <td class="td td-num">
-                    <div class="row-actions">
-                      @if (primaryAction(car); as action) {
-                        <button
-                          type="button"
-                          class="btn btn-secondary btn-xs"
-                          [disabled]="busy() === car.vehicleId"
-                          (click)="changeStatus($event, car, action.action)"
-                        >
-                          {{ action.label }}
-                        </button>
-                      }
-                      @if (car.status === 'Active' || car.status === 'Hidden') {
-                        <button
-                          type="button"
-                          class="btn btn-ghost btn-xs"
-                          [disabled]="busy() === car.vehicleId"
-                          (click)="takeOffRoad($event, car)"
-                          title="Take off the road"
-                        >
-                          <kh-icon name="gear" />
-                        </button>
-                      }
-                      <button
-                        type="button"
-                        class="btn btn-ghost btn-xs s-bad"
-                        [disabled]="busy() === car.vehicleId"
-                        (click)="remove($event, car)"
-                        title="Remove from fleet"
-                      >
-                        <kh-icon name="x-circle" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Every one of these is an `ApprovedDealer` write. Absent, not disabled: the
+                   banner above has already said whose they are. -->
+              @if (canManage()) {
+                <div class="car-card-actions">
+                  @if (primaryAction(car); as action) {
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-xs"
+                      [disabled]="busy() === car.vehicleId"
+                      (click)="changeStatus($event, car, action.action)"
+                    >
+                      {{ action.label }}
+                    </button>
+                  }
+                  <a
+                    class="btn btn-ghost btn-xs"
+                    [routerLink]="['/dealer/fleet', car.vehicleId, 'edit']"
+                    [title]="t('fleetList.editThisCar')"
+                  >
+                    <kh-icon name="pencil-simple" />
+                  </a>
+                  @if (car.status === 'Active' || car.status === 'Hidden') {
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-xs"
+                      [disabled]="busy() === car.vehicleId"
+                      (click)="takeOffRoad($event, car)"
+                      [title]="t('fleetList.takeOffTheRoad')"
+                    >
+                      <kh-icon name="gear" />
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs s-bad"
+                    [disabled]="busy() === car.vehicleId"
+                    (click)="remove($event, car)"
+                    [title]="t('fleetList.removeFromFleet')"
+                  >
+                    <kh-icon name="x-circle" />
+                  </button>
+                </div>
               }
-            </tbody>
-          </table>
-        </div>
+            </li>
+          }
+        </ul>
       }
     </section>
   }

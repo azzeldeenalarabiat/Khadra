@@ -44,6 +44,18 @@ public sealed class AdminDisputesController : ApiControllerBase
     }
 
     /// <summary>The workspace: the ticket, both parties' statements with fresh evidence links, and the whole booking.</summary>
+    /// <summary>How the queue is shaped under the same filters — all of it, not the page shown.</summary>
+    [HttpGet("counts")]
+    [ProducesResponseType<DisputeQueueCounts>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> Counts(
+        [FromQuery] string? status,
+        [FromQuery] bool overdueOnly,
+        CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetDisputeQueueCountsQuery(status, overdueOnly), cancellationToken);
+        return FromResult(result);
+    }
+
     [HttpGet("{ticketId:guid}")]
     [ProducesResponseType<DisputeDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

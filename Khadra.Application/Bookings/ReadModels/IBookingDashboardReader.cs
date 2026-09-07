@@ -7,13 +7,25 @@ namespace Khadra.Application.Bookings.ReadModels;
 /// the states in which a vehicle is committed to this rental. Anything looser would be a number the
 /// operations team could not act on.
 /// </summary>
-public sealed record BookingCounts(int Total, int Active, int PendingApproval);
+public sealed record BookingCounts(int Total, int Today, int Active, int PendingApproval);
 
 public sealed record BookingLabel(Id BookingId, string Reference, Id DealerId);
 
 public interface IBookingDashboardReader
 {
-    Task<BookingCounts> CountsAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// The four booking figures the KPI card shows, in one aggregate.
+    ///
+    /// <paramref name="createdSince"/> is local midnight of the reporting day, and "today" is counted
+    /// as another filter on the same single-row query rather than a second round trip. It used to be
+    /// derived from the trend, so the KPI and the last bar of the chart could not disagree; now that
+    /// they are separate endpoints, the part of that guarantee worth keeping survives because BOTH
+    /// take their day from <see cref="Common.Ports.IReportingCalendar"/> — one definition of which
+    /// local day it is, not one query. Any other way of deciding "today" would be a second calendar.
+    /// </summary>
+    Task<BookingCounts> CountsAsync(
+        DateTimeOffset createdSince,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creation instants inside a window, for the daily trend.

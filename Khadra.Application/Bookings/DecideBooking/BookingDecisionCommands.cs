@@ -4,18 +4,20 @@ using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers;
+using Khadra.Application.Notifications;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Domain.Notifications;
 using MediatR;
 
 namespace Khadra.Application.Bookings.DecideBooking;
 
 // The dealer's side of a booking (spec 4.2, 5.4): answer a request, then record the two handovers.
 // Every one of these names the person who did it -- owner or employee -- on the booking's own status
-// history, which is the accountability record spec 4.2 asks for. Nothing here touches money: the
-// deposit was taken before the request reached the dealer, and cash at handover is recorded as a
-// fact, never computed from.
+// history, which is the accountability record spec 4.2 asks for. Nothing here touches money: an
+// approval only opens the customer's window to pay, and cash at handover is recorded as a fact,
+// never computed from.
 
 public sealed record ApproveBookingCommand(Id ActorUserId, Id BookingId, string? Note) : ICommand<Result<BookingDto, Error>>;
 
@@ -98,6 +100,7 @@ public sealed class BookingDecisionHandlers(
     IBookingRepository bookings,
     DealerMembershipResolver membership,
     IBookingReader reader,
+    DealerTeamNotifier team,
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<ApproveBookingCommand, Result<BookingDto, Error>>,
@@ -117,7 +120,7 @@ public sealed class BookingDecisionHandlers(
         if (approved.IsFailure)
             return approved.Error;
 
-        return await CommitAsync(loaded.Value, cancellationToken);
+        return await CommitAsync(loaded.Value, request.ActorUserId, NotificationKind.BookingApproved, cancellationToken);
     }
 
     public async Task<Result<BookingDto, Error>> Handle(RejectBookingCommand request, CancellationToken cancellationToken)
@@ -134,7 +137,7 @@ public sealed class BookingDecisionHandlers(
         if (rejected.IsFailure)
             return rejected.Error;
 
-        return await CommitAsync(loaded.Value, cancellationToken);
+        return await CommitAsync(loaded.Value, request.ActorUserId, NotificationKind.BookingRejected, cancellationToken);
     }
 
     public async Task<Result<BookingDto, Error>> Handle(RecordPickupCommand request, CancellationToken cancellationToken)
@@ -157,7 +160,7 @@ public sealed class BookingDecisionHandlers(
         if (recorded.IsFailure)
             return recorded.Error;
 
-        return await CommitAsync(booking, cancellationToken);
+        return await CommitAsync(booking, request.ActorUserId, NotificationKind.BookingPickedUp, cancellationToken);
     }
 
     public async Task<Result<BookingDto, Error>> Handle(RecordReturnCommand request, CancellationToken cancellationToken)
@@ -180,7 +183,7 @@ public sealed class BookingDecisionHandlers(
         if (recorded.IsFailure)
             return recorded.Error;
 
-        return await CommitAsync(booking, cancellationToken);
+        return await CommitAsync(booking, request.ActorUserId, NotificationKind.BookingReturned, cancellationToken);
     }
 
     /// <summary>
@@ -228,8 +231,33 @@ public sealed class BookingDecisionHandlers(
         return (booking, member.Value);
     }
 
-    private async Task<Result<BookingDto, Error>> CommitAsync(Booking booking, CancellationToken cancellationToken)
+    /// <summary>
+    /// Saves the decision and, in the SAME transaction, tells the rest of the dealership about it.
+    ///
+    /// Staged before the save on purpose. Raising afterwards — or from the domain event this
+    /// transition adds — would be at-most-once: `UnitOfWork` dispatches events after the commit, so a
+    /// failure there leaves the booking decided and nobody told, with nothing to show it went
+    /// missing. Same reasoning the audit trail is built on.
+    /// </summary>
+    private async Task<Result<BookingDto, Error>> CommitAsync(
+        Booking booking,
+        Id actorUserId,
+        NotificationKind kind,
+        CancellationToken cancellationToken)
     {
+        var member = await membership.ResolveAsync(actorUserId, cancellationToken);
+        if (member.IsSuccess)
+        {
+            await team.NotifyTeamAsync(
+                member.Value.Dealer,
+                actorUserId,
+                kind,
+                clock.UtcNow,
+                booking.Id,
+                booking.Reference.Value,
+                cancellationToken);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
         var context = await reader.ContextAsync(booking.Id, cancellationToken);
         return BookingDto.From(booking, context, clock.UtcNow);

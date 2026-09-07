@@ -21,9 +21,18 @@ public sealed class DocumentStorageOptions
     [Range(1024, 50 * 1024 * 1024)]
     public long MaximumSizeBytes { get; init; } = 8 * 1024 * 1024;
 
-    /// <summary>Photographs of a licence or ID, or a scanned PDF. Nothing executable.</summary>
-    public IReadOnlyList<string> AllowedContentTypes { get; init; } =
-        ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+    /// <summary>
+    /// Photographs of a licence or ID, or a scanned PDF. Nothing executable.
+    /// </summary>
+    /// <remarks>
+    /// Empty by default, and configuration is the only source. A seeded default here does NOT get
+    /// replaced by the configured list -- the binder APPENDS to a collection that already has
+    /// items -- so the four types in appsettings became eight, each one twice. Nothing broke,
+    /// because every use was a Contains check, and it stayed invisible until the app-config
+    /// endpoint published the list to a client. An empty default plus the existing "at least one"
+    /// validation means a missing key fails at startup instead.
+    /// </remarks>
+    public IReadOnlyList<string> AllowedContentTypes { get; init; } = [];
 
     [Range(1, 60)]
     public int LinkLifetimeMinutes { get; init; } = 5;

@@ -47,6 +47,14 @@ public static class IdentityErrors
         Error.Conflict("auth.phone_taken", "An account with this phone number already exists.");
 
     // Deliberately identical for unknown email, wrong password and deleted accounts (no enumeration).
+    /// <remarks>
+    /// A rotation that changes nothing is not a rotation. It cannot be caught by comparing hashes —
+    /// bcrypt salts every one, so the new hash never equals the stored one — which is why the check
+    /// lives in the Application layer beside IPasswordHasher.Verify rather than in the aggregate.
+    /// </remarks>
+    public static readonly Error PasswordUnchanged =
+        Error.Validation("auth.password_unchanged", "That is the password you already have. Choose a different one.");
+
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("auth.invalid_credentials", "The email or password is incorrect.");
 
@@ -62,6 +70,20 @@ public static class IdentityErrors
     public static readonly Error InvalidToken =
         Error.Validation("auth.invalid_token", "The link is invalid or has expired. Request a new one.");
 
+    // The mail server refused the message. The account is untouched and the link is still valid, so
+    // this asks the person to try again rather than telling them anything is wrong with their account.
+    public static readonly Error VerificationEmailNotSent =
+        Error.Unavailable(
+            "auth.verification_email_not_sent",
+            "We could not send the verification email just now. Please try again in a few minutes.");
+
+    // Same shape, different sentence: a person who asked for a reset link is watching a screen that
+    // used to promise one was coming whatever the relay said.
+    public static readonly Error PasswordResetEmailNotSent =
+        Error.Unavailable(
+            "auth.password_reset_email_not_sent",
+            "We could not send the reset link just now. Please try again in a few minutes.");
+
     public static readonly Error UserNotFound =
         Error.NotFound("auth.user_not_found", "The user was not found.");
 
@@ -73,4 +95,16 @@ public static class IdentityErrors
 
     public static readonly Error AlreadyDeleted =
         Error.Conflict("auth.already_deleted", "The account is already deleted.");
+
+    // Deactivating yourself ends the session that is doing it, mid-action.
+    public static readonly Error CannotDeactivateSelf =
+        Error.Conflict("admin.cannot_deactivate_self", "You cannot deactivate your own administrator account.");
+
+    // Nothing creates an administrator except another administrator — the one exception, the
+    // configured bootstrap, fires only on a database that has NEVER held one — so an empty set here
+    // is permanent, and the platform would be locked out of its own console.
+    public static readonly Error LastAdministrator =
+        Error.Conflict(
+            "admin.last_administrator",
+            "This is the last active administrator. Invite another before deactivating this one.");
 }

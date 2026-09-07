@@ -1,7 +1,12 @@
 import { Routes } from '@angular/router';
 import { AdminShellComponent } from './layout/admin-shell.component';
 import { adminSessionGuard } from './core/guards/admin-session.guard';
-import { adminOnlyGuard, dealerStaffGuard } from './core/guards/role.guards';
+import {
+  adminOnlyGuard,
+  dealerEmployeeGuard,
+  dealerOwnerGuard,
+  dealerStaffGuard,
+} from './core/guards/role.guards';
 
 /**
  * Console routes.
@@ -30,6 +35,14 @@ export const routes: Routes = [
     title: 'Sign in · Khadra Admin',
     loadComponent: () => import('./features/auth/sign-in.component').then((m) => m.SignInComponent),
   },
+  // Step one of spec 3.1. The only self-service account the console creates: administrators are
+  // invited by another administrator, employees by their owner, and customers register in the app.
+  {
+    path: 'register',
+    title: 'Register your gallery · Khadra',
+    loadComponent: () =>
+      import('./features/auth/register-dealer.component').then((m) => m.RegisterDealerComponent),
+  },
   {
     path: 'forgot-password',
     title: 'Reset your password · Khadra Admin',
@@ -41,6 +54,15 @@ export const routes: Routes = [
     title: 'Choose a new password · Khadra Admin',
     loadComponent: () =>
       import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent),
+  },
+  // Where a self-registered account proves its address: {base}/verify-email?token=. Without this
+  // route the emailed link fell into the console shell and the session guard bounced it to sign-in,
+  // which no self-registered account can pass — CanAuthenticate refuses an unverified address.
+  {
+    path: 'verify-email',
+    title: 'Verify your email · Khadra',
+    loadComponent: () =>
+      import('./features/auth/verify-email.component').then((m) => m.VerifyEmailComponent),
   },
   // The link an invited employee receives (spec 4.2): {base}/accept-invitation?token=
   {
@@ -94,11 +116,40 @@ export const routes: Routes = [
               ),
           },
 
-          notBuilt('bookings', 'Bookings'),
-          notBuilt('bookings/detail', 'Booking details', 'booking-detail'),
+          // Every booking on the platform, and the three interventions an admin can make in one.
+          {
+            path: 'bookings',
+            title: 'Bookings · Khadra Admin',
+            loadComponent: () =>
+              import('./features/bookings/bookings-list.component').then(
+                (m) => m.BookingsListComponent,
+              ),
+          },
+          {
+            path: 'bookings/:bookingId',
+            title: 'Booking details · Khadra Admin',
+            loadComponent: () =>
+              import('./features/bookings/booking-detail.component').then(
+                (m) => m.AdminBookingDetailComponent,
+              ),
+          },
 
-          notBuilt('customers', 'Customers'),
-          notBuilt('customers/profile', 'Customer profile', 'customer-profile'),
+          {
+            path: 'customers',
+            title: 'Customers · Khadra Admin',
+            loadComponent: () =>
+              import('./features/customers/customers-list.component').then(
+                (m) => m.CustomersListComponent,
+              ),
+          },
+          {
+            path: 'customers/:customerId',
+            title: 'Customer profile · Khadra Admin',
+            loadComponent: () =>
+              import('./features/customers/customer-profile.component').then(
+                (m) => m.CustomerProfileComponent,
+              ),
+          },
 
           notBuilt('finance', 'Finance'),
           notBuilt('payments', 'Payments'),
@@ -125,14 +176,52 @@ export const routes: Routes = [
           },
 
           notBuilt('reviews', 'Reviews'),
-          notBuilt('cities', 'Cities & Regions'),
-          notBuilt('car-types', 'Car Types', 'car-types'),
-          notBuilt('audit-logs', 'Audit logs', 'audit-logs'),
-          notBuilt('admin-users', 'Admin users', 'admin-users'),
+          // One component serves both: the same aggregate with the same four actions, and the
+          // route says which list it is curating.
+          {
+            path: 'cities',
+            title: 'Cities & Regions · Khadra Admin',
+            data: { kind: 'cities' },
+            loadComponent: () =>
+              import('./features/lookups/lookups.component').then((m) => m.LookupsComponent),
+          },
+          {
+            path: 'car-types',
+            title: 'Car Types · Khadra Admin',
+            data: { kind: 'car-types' },
+            loadComponent: () =>
+              import('./features/lookups/lookups.component').then((m) => m.LookupsComponent),
+          },
+          // The entries have existed and been append-only from the start; only a way to read them
+          // was missing.
+          {
+            path: 'audit-logs',
+            title: 'Audit logs · Khadra Admin',
+            loadComponent: () =>
+              import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
+          },
+          {
+            path: 'admin-users',
+            title: 'Admin users · Khadra Admin',
+            loadComponent: () =>
+              import('./features/admin-users/admin-users.component').then(
+                (m) => m.AdminUsersComponent,
+              ),
+          },
 
-          notBuilt('settings', 'Platform settings'),
+          {
+            path: 'settings',
+            title: 'Platform settings · Khadra Admin',
+            loadComponent: () =>
+              import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+          },
           notBuilt('notifications', 'Notifications'),
-          notBuilt('security', 'Security'),
+          {
+            path: 'security',
+            title: 'Security · Khadra Admin',
+            loadComponent: () =>
+              import('./features/security/security.component').then((m) => m.SecurityComponent),
+          },
         ],
       },
 
@@ -147,6 +236,16 @@ export const routes: Routes = [
           import('./features/dealer/dealer-gate.component').then((m) => m.DealerGateComponent),
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+          // Spec 3.1 step two, and the one screen that belongs to an owner with no dealership yet.
+          // The gate lets this through while `GET /dealers/me` is answering dealer.not_registered.
+          {
+            path: 'apply',
+            title: 'Submit your gallery · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-apply.component').then(
+                (m) => m.DealerApplyComponent,
+              ),
+          },
           {
             path: 'dashboard',
             title: 'Dashboard · Khadra',
@@ -247,9 +346,13 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
           },
+          // The two forms an employee may open but never submit: every vehicle write is owner-only
+          // (`ApprovedDealer`), and a role failure answers with a bodiless 403 that no screen can
+          // explain. Guarded so the trap is never entered, rather than sprung at the end of it.
           {
             path: 'fleet/new',
             title: 'Add vehicle · Khadra',
+            canActivate: [dealerOwnerGuard],
             loadComponent: () =>
               import('./features/fleet/vehicle-wizard.component').then(
                 (m) => m.VehicleWizardComponent,
@@ -266,8 +369,98 @@ export const routes: Routes = [
           {
             path: 'fleet/:vehicleId/edit',
             title: 'Edit vehicle · Khadra',
+            canActivate: [dealerOwnerGuard],
             loadComponent: () =>
               import('./features/fleet/car-form.component').then((m) => m.CarFormComponent),
+          },
+        ],
+      },
+
+      // ── The Employee console (design: Employee Console.dc.html).
+      //
+      // Its own tree, not a filtered view of /dealer. An employee's day is handovers, so the screens
+      // are arranged around those: the bookings they answer, the fleet they hand over, the one
+      // read-only page about the business, and their own account. It sits behind the same gate as
+      // the dealer console, because a dealership that cannot trade closes for its staff too.
+      {
+        path: 'employee',
+        canActivateChild: [dealerEmployeeGuard],
+        loadComponent: () =>
+          import('./features/dealer/dealer-gate.component').then((m) => m.DealerGateComponent),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+          {
+            path: 'dashboard',
+            title: 'Dashboard · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-dashboard.component').then(
+                (m) => m.EmployeeDashboardComponent,
+              ),
+          },
+          // The bookings screens are shared with the dealer console on purpose: they are the same
+          // bookings, the same decisions and the same API, and an employee is a first-class actor on
+          // all of it (spec 4.2). Forking them would be two copies of the console's hardest screen.
+          {
+            path: 'bookings',
+            title: 'Bookings · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-bookings.component').then(
+                (m) => m.DealerBookingsComponent,
+              ),
+          },
+          {
+            path: 'bookings/:bookingId',
+            title: 'Booking details · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/booking-detail.component').then(
+                (m) => m.DealerBookingDetailComponent,
+              ),
+          },
+          {
+            path: 'disputes/:ticketId',
+            title: 'Dispute · Khadra',
+            loadComponent: () =>
+              import('./features/dealer/dealer-dispute.component').then(
+                (m) => m.DealerDisputeComponent,
+              ),
+          },
+          {
+            path: 'fleet',
+            title: 'Fleet · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
+          },
+          {
+            path: 'fleet/:vehicleId',
+            title: 'Vehicle · Khadra',
+            loadComponent: () =>
+              import('./features/fleet/vehicle-detail.component').then(
+                (m) => m.VehicleDetailComponent,
+              ),
+          },
+          {
+            path: 'business',
+            title: 'My business · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-business.component').then(
+                (m) => m.EmployeeBusinessComponent,
+              ),
+          },
+          {
+            path: 'notifications',
+            title: 'Notifications · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-notifications.component').then(
+                (m) => m.EmployeeNotificationsComponent,
+              ),
+          },
+          {
+            path: 'settings',
+            title: 'Settings · Khadra',
+            loadComponent: () =>
+              import('./features/employee/employee-settings.component').then(
+                (m) => m.EmployeeSettingsComponent,
+              ),
           },
         ],
       },

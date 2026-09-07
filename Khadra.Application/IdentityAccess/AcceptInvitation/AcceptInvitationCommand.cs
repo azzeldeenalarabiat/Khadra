@@ -44,10 +44,14 @@ public sealed class AcceptInvitationHandler(
             return password;
 
         var now = clock.UtcNow;
-        var token = await verificationTokens.GetByHashAsync(
-            opaqueTokens.Hash(request.Token),
-            VerificationPurpose.EmployeeInvitation,
-            cancellationToken);
+
+        // One screen redeems both invitations, so the token decides which it is. Looked up by hash
+        // against each purpose in turn rather than asking the caller: the link is all the person
+        // has, and a staff invitation and an admin one are indistinguishable from the outside.
+        var hash = opaqueTokens.Hash(request.Token);
+        var token =
+            await verificationTokens.GetByHashAsync(hash, VerificationPurpose.EmployeeInvitation, cancellationToken)
+            ?? await verificationTokens.GetByHashAsync(hash, VerificationPurpose.AdminInvitation, cancellationToken);
         if (token is null)
             return UnitResult.Failure(IdentityErrors.InvalidToken);
 

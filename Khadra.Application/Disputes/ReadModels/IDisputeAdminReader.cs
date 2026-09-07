@@ -29,11 +29,26 @@ public sealed record DisputeListItem(
 /// </summary>
 public sealed record DisputeListFilter(string? Status, bool OverdueOnly);
 
+/// <summary>
+/// How the queue is shaped under the filters in force — for ALL of it, not the page on screen.
+/// </summary>
+/// <remarks>
+/// The console used to count these from the rows it had. With a page size of 25 and ten tickets that
+/// was right by accident; at thirty tickets it prints a page's overdue count beside a platform total
+/// and nothing on screen says which is which. A figure the server already knows is the server's.
+/// </remarks>
+public sealed record DisputeQueueCounts(int Total, int Overdue, int Unassigned);
+
 public interface IDisputeAdminReader
 {
     Task<PagedResult<DisputeListItem>> ListAsync(
         DisputeListFilter filter,
         PageRequest page,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    Task<DisputeQueueCounts> CountsAsync(
+        DisputeListFilter filter,
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
 

@@ -1,10 +1,9 @@
 <div class="stack stack-14">
   <div class="page-head">
     <div>
-      <h1 class="page-title">Dealers</h1>
+      <h1 class="page-title">{{ t('dealersList.dealers') }}</h1>
       <div class="page-sub">
-        Rental offices on the platform. Applications are ordered by how close they are to the review
-        deadline.
+        {{ t('dealersList.rentalOfficesOnThe') }}
       </div>
     </div>
   </div>
@@ -13,10 +12,10 @@
     <section class="sect">
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the dealer queue</div>
+        <div class="state-title">{{ t('dealersList.couldntLoadTheDealer') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     </section>
@@ -26,12 +25,12 @@
         <div class="list-search">
           <kh-icon name="magnifying-glass" class="search-icon" />
           <label class="visually-hidden" for="dealer-search"
-            >Search dealer or registration no.</label
+            >{{ t('dealersList.searchDealerOrRegistration') }}</label
           >
           <input
             id="dealer-search"
             class="input input-sm"
-            placeholder="Search dealer or registration no."
+            [placeholder]="t('dealersList.searchDealerOrRegistration')"
             [value]="search()"
             (input)="setSearch($event)"
           />
@@ -40,13 +39,24 @@
           <button
             type="button"
             class="btn btn-sm"
-            [class.btn-primary]="status() === option.value"
-            [class.btn-secondary]="status() !== option.value"
+            [class.btn-primary]="status() === option.value && !suspendedOnly()"
+            [class.btn-secondary]="status() !== option.value || suspendedOnly()"
             (click)="setStatus(option.value)"
           >
             {{ option.label }}
           </button>
         }
+        <!-- Suspension is orthogonal to the verification statuses above, which is why it is its own
+             chip rather than one more of them. -->
+        <button
+          type="button"
+          class="btn btn-sm"
+          [class.btn-primary]="suspendedOnly()"
+          [class.btn-secondary]="!suspendedOnly()"
+          (click)="showSuspended()"
+        >
+          {{ t('dealersList.suspended') }}
+        </button>
       </div>
 
       @if (resource.isLoading()) {
@@ -58,11 +68,11 @@
       } @else if (rows().length === 0) {
         <div class="state-block is-empty">
           <div class="state-icon is-outline"><kh-icon name="tray" /></div>
-          <div class="state-title">No dealers match this view</div>
-          <div class="state-text">Clear the search or choose a different status.</div>
+          <div class="state-title">{{ t('dealersList.noDealersMatchThis') }}</div>
+          <div class="state-text">{{ t('dealersList.clearTheSearchOr') }}</div>
         </div>
       } @else {
-        <kh-data-table [columns]="columns" [rows]="rows()" minWidth="1040px" />
+        <kh-data-table [columns]="columns()" [rows]="rows()" minWidth="1040px" />
         <div class="pager">
           <span class="pager-count">{{ summary() }}</span>
           <div class="pager-nav">
@@ -72,16 +82,19 @@
               [disabled]="!hasPrevious()"
               (click)="goTo(page() - 1)"
             >
-              Previous
+              {{ t('common.previous') }}
             </button>
-            <button type="button" class="btn btn-primary btn-page">{{ page() }}</button>
+            <!-- Which page you are on is a label, not a control. It was a `button` with nothing
+                 behind it, which invites a click that does nothing; the other four lists say it
+                 this way. -->
+            <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
             <button
               type="button"
               class="btn btn-secondary btn-page"
               [disabled]="!hasNext()"
               (click)="goTo(page() + 1)"
             >
-              Next
+              {{ t('common.next') }}
             </button>
           </div>
         </div>

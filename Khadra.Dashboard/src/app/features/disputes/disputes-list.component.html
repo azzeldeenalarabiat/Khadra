@@ -1,9 +1,9 @@
 <div class="stack stack-14">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">Disputes</h1>
+      <h1 class="page-title">{{ t('disputesList.disputes') }}</h1>
       <div class="page-sub">
-        Tickets between a customer and a dealer. Money only moves when one of these is resolved.
+        {{ t('disputesList.ticketsBetweenACustomer') }}
       </div>
     </div>
     <div class="dc-head-actions">
@@ -15,7 +15,7 @@
         (click)="toggleOverdue()"
       >
         <kh-icon name="warning-circle" />
-        Overdue only
+        {{ t('disputesList.overdueOnly') }}
       </button>
     </div>
   </div>
@@ -39,10 +39,10 @@
     @if (failure(); as message) {
       <div class="state-block">
         <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
-        <div class="state-title">Couldn't load the dispute queue</div>
+        <div class="state-title">{{ t('disputesList.couldntLoadTheDispute') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">Retry</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
         </div>
       </div>
     } @else if (resource.isLoading() && rows().length === 0) {
@@ -59,29 +59,30 @@
         </div>
         <div class="state-text">
           @if (queue() === 'live') {
-            No dispute is open. A customer or a dealer can open one from a finished booking, within
-            the window that booking froze.
+            {{ t('disputesList.noDisputeIsOpen') }}
           } @else {
-            No ticket matches this view right now.
+            {{ t('disputesList.noTicketMatchesThis') }}
           }
         </div>
         @if (queue() !== 'live' || overdueOnly()) {
           <div class="state-actions">
             <button type="button" class="btn btn-secondary btn-sm" (click)="select('live')">
-              Back to the live queue
+              {{ t('disputesList.backToTheLive') }}
             </button>
           </div>
         }
       </div>
     } @else {
       <div class="list-toolbar">
+        <!-- The two figures describe the whole filtered queue, not the page. They are only shown
+             once the server has answered: a zero the screen assumed would read as "none overdue". -->
         <span class="page-sub">
-          {{ rows().length }} of {{ total() }} tickets
+          {{ rows().length }} of {{ total() }} {{ t('disputesList.tickets') }}
           @if (overdue()) {
-            · <span class="s-bad">{{ overdue() }} overdue</span>
+            · <span class="s-bad">{{ overdue() }} {{ t('disputesList.overdue') }}</span>
           }
           @if (unassigned()) {
-            · {{ unassigned() }} unassigned
+            · {{ unassigned() }} {{ t('disputesList.unassigned') }}
           }
         </span>
       </div>
@@ -90,12 +91,12 @@
         <table class="table table-wide">
           <thead>
             <tr>
-              <th>Ticket</th>
-              <th>Parties</th>
-              <th>Raised by</th>
-              <th>Reason</th>
-              <th>SLA</th>
-              <th>Status</th>
+              <th>{{ t('disputesList.ticket') }}</th>
+              <th>{{ t('disputesList.parties') }}</th>
+              <th>{{ t('disputesList.raisedBy') }}</th>
+              <th>{{ t('disputesList.reason') }}</th>
+              <th>{{ t('disputesList.sla') }}</th>
+              <th>{{ t('common.status') }}</th>
               <th></th>
             </tr>
           </thead>
@@ -109,7 +110,7 @@
                     (click)="$event.stopPropagation()"
                     >{{ row.bookingReference }}</a
                   >
-                  <div class="td-sub">Opened {{ when(row.openedAt) }}</div>
+                  <div class="td-sub">{{ t('disputesList.opened') }} {{ when(row.openedAt) }}</div>
                 </td>
                 <td class="td">
                   <div class="entity">
@@ -137,8 +138,16 @@
                 </td>
                 <td class="td">
                   <span [class]="row.isOverdue ? 's-bad' : ''">{{ sla(row) }}</span>
+                  <!-- Whether a ticket is taken is the ID's answer, not the name's. Keying this on
+                       the name printed "Unassigned" against a ticket whose admin could not be named
+                       -- so the queue contradicted its own "N unassigned" count above, which keys on
+                       the id, and told a second admin the work was free. -->
                   <div class="td-sub">
-                    {{ row.assignedAdminName ? 'With ' + row.assignedAdminName : 'Unassigned' }}
+                    {{
+                      row.assignedAdminId
+                        ? 'With ' + (row.assignedAdminName ?? 'an admin')
+                        : 'Unassigned'
+                    }}
                   </div>
                 </td>
                 <td class="td">
@@ -160,7 +169,7 @@
       </div>
 
       <div class="pager">
-        <span class="pager-count">{{ rows().length }} of {{ total() }} tickets</span>
+        <span class="pager-count">{{ rows().length }} of {{ total() }} {{ t('disputesList.tickets') }}</span>
         <div class="pager-nav">
           <button
             type="button"
@@ -168,16 +177,16 @@
             [disabled]="page() <= 1"
             (click)="goTo(page() - 1)"
           >
-            Previous
+            {{ t('common.previous') }}
           </button>
-          <span class="pager-count">Page {{ page() }} of {{ totalPages() }}</span>
+          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
           <button
             type="button"
             class="btn btn-secondary btn-page"
             [disabled]="page() >= totalPages()"
             (click)="goTo(page() + 1)"
           >
-            Next
+            {{ t('common.next') }}
           </button>
         </div>
       </div>

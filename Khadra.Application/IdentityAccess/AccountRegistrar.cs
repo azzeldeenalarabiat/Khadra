@@ -11,10 +11,17 @@ namespace Khadra.Application.IdentityAccess;
 /// <summary>
 /// The self-service registration a customer and a dealer owner share.
 ///
-/// Both flows validate the same fields, enforce the same uniqueness, apply the same minimum-age rule
-/// and send the same verification email; only the role differs. Keeping that in one place means the
-/// two paths cannot drift apart on something like account enumeration or which failure is reported
-/// first, which is exactly the sort of divergence that turns into a security bug.
+/// Both flows validate the same fields, enforce the same uniqueness and send the same verification
+/// email. Keeping that in one place means the two paths cannot drift apart on something like account
+/// enumeration or which failure is reported first, which is exactly the sort of divergence that
+/// turns into a security bug.
+///
+/// The minimum age is the one rule they do NOT share, and it is a parameter for that reason. Spec
+/// 5.1's age limit is about who may RENT a car; it was being applied to the person who owns the
+/// rental office, so a 21-year-old bound was refusing gallery owners and telling them "Renters must
+/// be at least 21 years old" — a rule they are not subject to, in words that do not describe them.
+/// Whoever an owner's age matters to, it is the administrator reading their identity document at
+/// licence review, not this handler.
 /// </summary>
 public sealed class AccountRegistrar(
     IUserRepository users,
@@ -36,12 +43,17 @@ public sealed class AccountRegistrar(
         DateTimeOffset now,
         DateOnly? dateOfBirth);
 
+    /// <param name="enforceMinimumAge">
+    /// Whether the configured renter minimum age applies to this registration. True for a customer,
+    /// false for a gallery owner: see the class remarks.
+    /// </param>
     public async Task<Result<RegisteredUserDto, Error>> RegisterAsync(
         string rawEmail,
         string rawPhone,
         string rawName,
         string rawPassword,
         DateOnly? dateOfBirth,
+        bool enforceMinimumAge,
         CreateUser create,
         CancellationToken cancellationToken)
     {
@@ -64,12 +76,15 @@ public sealed class AccountRegistrar(
             return password.Error;
 
         var now = clock.UtcNow;
-        var rules = await businessRules.GetAsync(cancellationToken);
-        // Age is counted against the local calendar day in Jordan, not UTC: someone who turns 21
-        // today should not be refused because it is still yesterday in Greenwich.
-        var age = RenterAgePolicy.Validate(dateOfBirth, rules.MinimumRenterAge, calendar.Today(now));
-        if (age.IsFailure)
-            return age.Error;
+        if (enforceMinimumAge)
+        {
+            var rules = await businessRules.GetAsync(cancellationToken);
+            // Age is counted against the local calendar day in Jordan, not UTC: someone who turns 21
+            // today should not be refused because it is still yesterday in Greenwich.
+            var age = RenterAgePolicy.Validate(dateOfBirth, rules.MinimumRenterAge, calendar.Today(now));
+            if (age.IsFailure)
+                return age.Error;
+        }
 
         if (await users.ExistsByEmailAsync(email.Value, cancellationToken))
             return IdentityErrors.EmailTaken;
@@ -95,9 +110,11 @@ public sealed class AccountRegistrar(
         await verificationTokens.AddAsync(verification, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        // A mail failure must not undo a completed registration; the dispatcher logs and swallows.
-        await emails.SendEmailVerificationAsync(user, rawToken.Value, cancellationToken);
+        // A mail failure must not undo a completed registration — the account and the token are
+        // already committed — but it is carried back to the caller so the screen can say so instead
+        // of promising an email that nobody sent.
+        var delivered = await emails.SendEmailVerificationAsync(user, rawToken.Value, cancellationToken);
 
-        return new RegisteredUserDto(user.Id, user.Email.Value);
+        return new RegisteredUserDto(user.Id, user.Email.Value, delivered);
     }
 }

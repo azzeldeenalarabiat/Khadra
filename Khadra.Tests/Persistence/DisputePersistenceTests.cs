@@ -156,7 +156,16 @@ public sealed class DisputePersistenceTests : IDisposable
         Assert.Equal(booking.Terms.FreeCancellationWindow, stored.Terms.FreeCancellationWindow);
         Assert.Equal(booking.Terms.NoShowTimeout, stored.Terms.NoShowTimeout);
         Assert.Equal(booking.Terms.PaymentWindow, stored.Terms.PaymentWindow);
+        // The answer window is the only thing that ever releases a car nobody answered for. Lost in
+        // the JSON it would read as zero, and every request would expire the instant it was made.
+        Assert.Equal(booking.Terms.AnswerWindow, stored.Terms.AnswerWindow);
+        Assert.NotEqual(TimeSpan.Zero, stored.Terms.AnswerWindow);
+        Assert.Equal(booking.Terms.TurnaroundBuffer, stored.Terms.TurnaroundBuffer);
         Assert.Equal(booking.Terms.RulesVersion, stored.Terms.RulesVersion);
+        // Both deadlines are real columns, and a booking still waiting for an answer has no payment
+        // one at all.
+        Assert.Equal(booking.DecisionDeadline, stored.DecisionDeadline);
+        Assert.Null(stored.PaymentDeadline);
         Assert.Equal(booking.Pricing.Days, stored.Pricing.Days);
         Assert.NotEqual(TimeSpan.Zero, stored.Terms.PostReturnSettlementWindow);
         Assert.Equal(booking.Pricing.Mileage.IsUnlimited, stored.Pricing.Mileage.IsUnlimited);
@@ -166,7 +175,7 @@ public sealed class DisputePersistenceTests : IDisposable
     [Fact]
     public async Task A_penalty_assessment_keeps_its_reason_and_moment()
     {
-        var booking = Build.ApprovedBooking();
+        var booking = Build.ConfirmedBooking();
         booking.Cancel(BookingParty.Customer, Id.New(), "Changed plans.", Build.Now.AddHours(3));
 
         await using (var context = NewContext())

@@ -1,25 +1,25 @@
 <div class="stack stack-14 page-mid">
   <div class="dc-head">
     <div>
-      <h1 class="page-title">{{ copy().title }}</h1>
-      <div class="page-sub">Not live yet</div>
+      <h1 class="page-title">{{ t(copy().titleKey) }}</h1>
+      <div class="page-sub">{{ t('notLive.badge') }}</div>
     </div>
   </div>
   <section class="sect">
     <div class="state-block is-empty">
       <div class="state-icon is-outline"><kh-icon [name]="copy().icon" /></div>
-      <div class="state-title">{{ copy().title }} are not live yet</div>
-      <div class="state-text">{{ copy().body }}</div>
+      <div class="state-title">{{ t('notLive.heading', { screen: t(copy().titleKey) }) }}</div>
+      <div class="state-text">{{ t(copy().bodyKey) }}</div>
       <ul class="locked-points">
-        @for (point of copy().points; track point) {
+        @for (pointKey of copy().pointKeys; track pointKey) {
           <li class="locked-point">
             <kh-icon name="check-circle" />
-            <span>{{ point }}</span>
+            <span>{{ t(pointKey) }}</span>
           </li>
         }
       </ul>
       <div class="state-actions">
-        <a class="btn btn-secondary btn-sm" routerLink="/dealer/dashboard">Back to dashboard</a>
+        <a class="btn btn-secondary btn-sm" routerLink="/dealer/dashboard">{{ t('notLive.back') }}</a>
       </div>
     </div>
   </section>

@@ -2,6 +2,7 @@ import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { UploadTicket, Vehicle, VehicleRequest, VehicleStatusAction } from '../models/fleet.api';
+import { DealerConsoleService } from './dealer-console.service';
 
 /**
  * A dealer's own fleet (spec 4.3).
@@ -13,6 +14,7 @@ import { UploadTicket, Vehicle, VehicleRequest, VehicleStatusAction } from '../m
 @Injectable({ providedIn: 'root' })
 export class FleetService {
   private readonly http = inject(HttpClient);
+  private readonly console = inject(DealerConsoleService);
   private readonly base = '/api/v1/dealers/me/vehicles';
 
   readonly vehicles = httpResource<readonly Vehicle[]>(() => this.base);
@@ -86,6 +88,9 @@ export class FleetService {
   refresh(): void {
     this.vehicles.reload();
     this.vehicle.reload();
+    // The dashboard counts published, available and off-the-road cars, so hiding one or putting it
+    // back on the road changes figures that live on another screen's resource.
+    this.console.refreshDerived();
   }
 
   private async post<T>(url: string, body: unknown): Promise<T> {

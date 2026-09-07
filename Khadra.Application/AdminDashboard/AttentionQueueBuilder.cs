@@ -105,6 +105,9 @@ public static class AttentionQueueBuilder
             .ToList();
 
         return new AttentionQueueDto(
+            // The instant this panel speaks for. Each panel is its own request now, so each carries
+            // its own freshness rather than borrowing one snapshot's.
+            GeneratedAt: now,
             SlaHours: slaHours,
             OpenCount: ordered.Count,
             OverdueCount: ordered.Count(item => item.IsOverdue),

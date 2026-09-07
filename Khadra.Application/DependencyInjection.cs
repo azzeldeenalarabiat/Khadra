@@ -23,12 +23,16 @@ public static class DependencyInjection
 
         services.AddScoped<AuthTokenFactory>();
         services.AddScoped<AccountRegistrar>();
+        services.AddScoped<IdentityAccess.AdminUsers.AdminBootstrapper>();
+        services.AddScoped<Auditing.AdminActionRecorder>();
         services.AddScoped<Dealers.DealerReviewAuditor>();
         services.AddScoped<Dealers.DealerMembershipResolver>();
         services.AddScoped<EmployeeAccountProvisioner>();
         services.AddScoped<Bookings.BookingPartyResolver>();
+        services.AddScoped<Bookings.BookingPricer>();
         services.AddScoped<Disputes.DisputeAuditor>();
         services.AddScoped<Disputes.DisputeViewComposer>();
+        services.AddScoped<Notifications.DealerTeamNotifier>();
         services.AddScoped<AuthEmailDispatcher>();
 
         var eventHandlerRegistrations = assembly

@@ -1,0 +1,12 @@
+<button
+  type="button"
+  class="btn btn-secondary btn-28 lang-switch"
+  [attr.aria-label]="description()"
+  [title]="description()"
+  (click)="switch()"
+>
+  <kh-icon name="translate" />
+  <!-- Always in its own script, and always left-to-right within itself, so "English" reads correctly
+       while the console around it is running right-to-left. -->
+  <span class="lang-switch-label" dir="ltr">{{ otherLabel() }}</span>
+</button>

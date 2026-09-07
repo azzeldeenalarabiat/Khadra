@@ -1,8 +1,9 @@
 import { HttpClient, httpResource } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
-import { Dispute, DisputeListItem } from '../models/disputes.api';
+import { Dispute, DisputeListItem, DisputeQueueCounts } from '../models/disputes.api';
+import { AdminDashboardService } from './admin-dashboard.service';
 
 /** What the queue is filtered to. `live` is the default because it is the queue an admin works. */
 export type DisputeQueue = 'live' | 'Open' | 'UnderReview' | 'Resolved' | 'Withdrawn';
@@ -18,20 +19,34 @@ export type DisputeQueue = 'live' | 'Open' | 'UnderReview' | 'Resolved' | 'Withd
 export class AdminDisputesService {
   private readonly http = inject(HttpClient);
   private readonly base = '/api/v1/admin/disputes';
+  private readonly dashboard = inject(AdminDashboardService);
 
   readonly queue = signal<DisputeQueue>('live');
   readonly overdueOnly = signal(false);
   readonly page = signal(1);
 
+  /** The filters both the page and its counts are read under, so the two cannot describe different sets. */
+  private readonly filter = computed(() => ({
+    // The API reads a missing status as "live"; sending the word would be a status that does not exist.
+    ...(this.queue() === 'live' ? {} : { status: this.queue() }),
+    overdueOnly: this.overdueOnly(),
+  }));
+
   readonly list = httpResource<PagedResult<DisputeListItem>>(() => ({
     url: this.base,
-    params: {
-      // The API reads a missing status as "live"; sending the word would be a status that does not exist.
-      ...(this.queue() === 'live' ? {} : { status: this.queue() }),
-      overdueOnly: this.overdueOnly(),
-      page: this.page(),
-      pageSize: 25,
-    },
+    params: { ...this.filter(), page: this.page(), pageSize: 25 },
+  }));
+
+  /**
+   * How the queue is shaped, for ALL of it under these filters.
+   *
+   * The screen used to count overdue and unassigned from the rows it happened to be holding and
+   * print them beside a platform total. With ten tickets and a page size of twenty-five that was
+   * right by accident; at thirty it reports a page's figures as though they were the queue's.
+   */
+  readonly counts = httpResource<DisputeQueueCounts>(() => ({
+    url: `${this.base}/counts`,
+    params: this.filter(),
   }));
 
   readonly viewing = signal<string | null>(null);
@@ -65,9 +80,18 @@ export class AdminDisputesService {
 
   refreshList(): void {
     this.list.reload();
+    this.counts.reload();
+    this.dashboard.refreshWorkload();
   }
 
+  /**
+   * After taking or resolving a ticket, the rail's live-dispute count is stale too.
+   *
+   * It used to come from a whole-dashboard snapshot fetched once per page load, so an admin who
+   * resolved every open ticket still saw the badge claiming they were all waiting.
+   */
   refresh(): void {
     this.dispute.reload();
+    this.dashboard.refreshWorkload();
   }
 }

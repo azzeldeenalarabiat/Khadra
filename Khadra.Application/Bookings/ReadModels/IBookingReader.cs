@@ -11,6 +11,10 @@ public sealed record BookingListItem(
     string Status,
     DateTimeOffset PeriodStart,
     DateTimeOffset PeriodEnd,
+    // The billed calendar days, frozen on the booking. A screen must never recompute this from the
+    // two instants above: subtracting them answers "how long was it out", which is the rule the
+    // platform stopped billing by on 2026-09-07, and it would contradict the invoice.
+    int Days,
     string PickupMethod,
     decimal TotalPrice,
     string Currency,
@@ -19,7 +23,11 @@ public sealed record BookingListItem(
     VehicleLabel? Vehicle,
     string DealerName,
     string CustomerName,
-    bool HasLiveDispute);
+    bool HasLiveDispute,
+    // Both parties by id, so a platform-wide row can open the dealership or the customer behind it.
+    // A dealer or customer reading their own list already knows one of them; the Admin knows neither.
+    Guid DealerId,
+    Guid CustomerId);
 
 /// <summary>What a booking needs from the other contexts to be readable as a whole.</summary>
 /// <remarks>
@@ -47,14 +55,29 @@ public sealed record VehicleLabel(
 /// Which bookings. Either a raw domain status or a TAB, the console's vocabulary, resolved here so
 /// the client never encodes state names and the tab counts are the database's answer.
 /// </summary>
-public sealed record BookingListFilter(Id? CustomerId, Id? DealerId, string? Status, string? Tab = null, Guid? VehicleId = null);
+/// <param name="Reference">One booking by its reference, matched exactly. The Admin's search box.</param>
+public sealed record BookingListFilter(
+    Id? CustomerId,
+    Id? DealerId,
+    string? Status,
+    string? Tab = null,
+    Guid? VehicleId = null,
+    string? Reference = null);
 
 /// <summary>
-/// The dealer's tabs mapped onto the domain (design: Dealer Console, TABS). The design's "Confirmed"
-/// has no domain state and is dropped; "Upcoming" IS Approved (every approved booking is still ahead
-/// of its pickup); "Disputed" is orthogonal to status -- a booking is Returned AND disputed.
-/// PendingPayment never reaches a dealer's list: no deposit has cleared, so nothing has been asked
-/// of them yet (spec 5.3).
+/// The dealer's tabs mapped onto the domain (design: Dealer Console, TABS).
+///
+/// "Upcoming" is Approved AND Confirmed: both are answered and neither has been collected, and what
+/// separates them -- whether the deposit has cleared -- is a fact about one booking, shown on its
+/// row, not a queue of its own. The design drew a "Confirmed" tab back when nothing in the domain
+/// could be confirmed; it is served by the status on the row instead of by a tab that would split
+/// one dealer's week in half.
+///
+/// "Disputed" is orthogonal to status, since a booking is Returned AND disputed.
+///
+/// Every request reaches the dealer's list. It used to be that an unpaid one did not, because until
+/// 2026-09-07 a request without a deposit had asked the dealer for nothing; now it is precisely the
+/// thing they must answer.
 /// </summary>
 public static class BookingTabs
 {
@@ -74,7 +97,7 @@ public static class BookingTabs
         tab.ToLowerInvariant() switch
         {
             Pending => [BookingStatus.Requested],
-            Upcoming => [BookingStatus.Approved],
+            Upcoming => [BookingStatus.Approved, BookingStatus.Confirmed],
             Active => [BookingStatus.PickedUp],
             Returned => [BookingStatus.Returned],
             Completed => [BookingStatus.Completed],

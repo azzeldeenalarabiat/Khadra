@@ -1,0 +1,95 @@
+/* Arabic and right-to-left.
+
+   The console's layout needs almost nothing here: every rule in the other files already uses logical
+   properties, so `dir="rtl"` on <html> mirrors the whole thing on its own. What is left is the part
+   direction does not cover — the SHAPE of Arabic text, and the handful of glyphs and data runs that
+   must not be mirrored with everything else. */
+
+/* ── Tracking ──────────────────────────────────────────────────────────────────────────────────
+   Arabic is cursive: the letters in a word are joined. `letter-spacing` prises those joins apart, so
+   a tracked caption does not render as wide Arabic, it renders as broken Arabic. Every tracked style
+   in the console is a Latin small-caps caption, and `text-transform: uppercase` is a no-op on Arabic
+   anyway, so those captions lose the two things that made them read as headings. Weight brings it
+   back without touching the joins. */
+:lang(ar) {
+  .k,
+  .kpi-label,
+  .sidebar-brand,
+  .sidebar-group-title,
+  .topbar-crumbs,
+  .pill,
+  .badge,
+  .mono,
+  .num,
+  h1,
+  h2,
+  h3 {
+    letter-spacing: 0;
+  }
+
+  .k,
+  .kpi-label,
+  .sidebar-group-title {
+    font-weight: 600;
+  }
+
+  /* Arabic needs more room between lines than Latin: it carries marks above and below the baseline,
+     and descenders on ج ح خ ع غ run deep. */
+  body,
+  .page-sub,
+  .banner-text,
+  .locked-body {
+    line-height: 1.7;
+  }
+}
+
+/* ── Runs that must stay left-to-right ─────────────────────────────────────────────────────────
+   An email address, a "+962…" phone number, a plate, a booking reference, a URL or a signed amount
+   is Latin text with its own internal order. Dropped bare into an Arabic paragraph the bidi
+   algorithm reorders the edges of it: "+962 7…" renders as "962 7…+" and "−30 JOD" as "JOD 30−",
+   which is a different number from the one the server sent. `isolate` fences the run off. */
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Text somebody typed — a dealership name, a note, a rejection reason — may be in either language
+   whatever the console is set to, so let the browser decide per value rather than inheriting. */
+.user-text {
+  unicode-bidi: isolate;
+}
+
+/* ── Icons ────────────────────────────────────────────────────────────────────────────────────
+   Only glyphs that MEAN a direction get mirrored: a back arrow points the other way in Arabic. A
+   clock, a car, a rotation arrow and a rising chart do not — mirroring those makes a clock run
+   backwards and a car drive off the wrong way. The set is declared, never guessed. */
+[dir='rtl'] .icon-mirrored {
+  transform: scaleX(-1);
+}
+
+/* ── The language switch ──────────────────────────────────────────────────────────────────────
+   Sized like the other topbar icon buttons, but wide enough to carry the name of the language it
+   offers, because an unlabelled globe does not tell you which language you would land in. */
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: auto;
+  padding-inline: var(--space-3);
+  white-space: nowrap;
+}
+
+.lang-switch-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* On the auth cards there is no topbar to sit in, so the switch floats in the corner of the screen.
+   Logical insets keep it in the leading corner in both directions. */
+.auth-lang {
+  position: fixed;
+  inset-block-start: var(--space-6);
+  inset-inline-end: var(--space-6);
+  z-index: 10;
+}

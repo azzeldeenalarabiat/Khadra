@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 
@@ -25,6 +26,10 @@ public sealed record DealerProfileDto(
     bool IsSuspended,
     IReadOnlyList<string> SubmittedDocuments,
     IReadOnlyList<string> MissingDocuments,
+    // Every document type an approval requires (spec 3.1). Sent rather than counted in the browser:
+    // the console printed "of 3" in prose, so adding a fourth required type would have left it
+    // telling an Admin the application was complete while approval kept failing.
+    IReadOnlyList<string> RequiredDocuments,
     // Spec 4.1: what the dealer page shows. Editable by the owner, read by everyone else.
     string? Description,
     double Latitude,
@@ -60,11 +65,15 @@ public sealed record DealerProfileDto(
             dealer.IsSuspended,
             [.. held.OrderBy(type => type.Id).Select(type => type.Name)],
             [.. DealerDocumentType.Required.Where(required => !held.Contains(required)).Select(type => type.Name)],
+            [.. DealerDocumentType.Required.Select(type => type.Name)],
             dealer.Description,
             dealer.Location.Latitude,
             dealer.Location.Longitude,
             [.. dealer.OperatingHours.Days.Select(DayScheduleDto.From)],
-            new DeliverySettingsDto(dealer.Delivery.IsEnabled, dealer.Delivery.RadiusKm),
+            new DeliverySettingsDto(
+                dealer.Delivery.IsEnabled,
+                dealer.Delivery.RadiusKm,
+                MoneyDto.FromOptional(dealer.Delivery.Fee)),
             PublicImage(dealer.LogoStorageKey),
             PublicImage(dealer.CoverStorageKey),
             dealer.Employees.Count(employee => employee.IsActive),
@@ -93,4 +102,8 @@ public sealed record DayScheduleDto(string Day, bool IsClosed, string? OpensAt, 
     }
 }
 
-public sealed record DeliverySettingsDto(bool IsEnabled, decimal RadiusKm);
+/// <param name="Fee">
+/// What this gallery charges to deliver, null exactly when delivery is off. Each gallery sets its
+/// own; there is no platform figure behind it.
+/// </param>
+public sealed record DeliverySettingsDto(bool IsEnabled, decimal RadiusKm, MoneyDto? Fee);

@@ -1,0 +1,125 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ title() }}</h1>
+      <div class="page-sub">{{ subtitle() }}</div>
+    </div>
+    <div class="dc-head-actions">
+      <button type="button" class="btn btn-primary btn-md" (click)="add()">
+        <kh-icon name="plus-circle" />
+        {{ isCities() ? 'Add city' : 'Add car type' }}
+      </button>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('lookups.couldntLoadTheList') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    } @else if (resource.isLoading() && entries().length === 0) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        @for (row of [0, 1, 2]; track row) {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </div>
+    } @else if (entries().length === 0) {
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline">
+          <kh-icon [name]="isCities() ? 'map-pin' : 'car-simple'" />
+        </div>
+        <div class="state-title">{{ t('lookups.nothingOnThisList') }}</div>
+        <div class="state-text">
+          @if (isCities()) {
+            {{ t('lookups.dealersPinTheirLocation') }}
+          } @else {
+            {{ t('lookups.everyCarCurrentlyCarries') }}
+          }
+        </div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="add()">
+            {{ isCities() ? 'Add the first city' : 'Add the first car type' }}
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div class="list-toolbar">
+        <span class="page-sub">
+          {{ entries().length }} {{ t('lookups.inTheList') }} {{ activeCount() }} {{ t('lookups.offeredOnNewListings') }}
+        </span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>{{ t('lookups.order') }}</th>
+              <th>{{ t('lookups.english') }}</th>
+              <th>{{ t('lookups.arabic') }}</th>
+              @if (isCities()) {
+                <th>{{ t('lookups.centre') }}</th>
+              }
+              <th>{{ t('common.state') }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entry of entries(); track entry.id) {
+              <tr>
+                <td class="td td-num">{{ entry.displayOrder }}</td>
+                <td class="td">
+                  <span class="entity-name">{{ entry.nameEn }}</span>
+                </td>
+                <td class="td" dir="rtl">{{ entry.nameAr }}</td>
+                @if (isCities()) {
+                  <td class="td mono">
+                    <!-- A city nobody has pinned yet is a real state, not a missing value. -->
+                    {{ centre(entry) ?? 'Not pinned' }}
+                  </td>
+                }
+                <td class="td">
+                  <span class="pill" [class]="entry.isActive ? 's-ok' : 's-dim'">
+                    {{ entry.isActive ? 'Offered' : 'Retired' }}
+                  </span>
+                </td>
+                <td class="td td-num">
+                  <button type="button" class="btn btn-secondary btn-xs" (click)="rename(entry)">
+                    {{ t('lookups.rename') }}
+                  </button>
+                  @if (entry.isActive) {
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-xs"
+                      (click)="setActive(entry, false)"
+                    >
+                      {{ t('lookups.retire') }}
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn-secondary btn-xs"
+                      (click)="setActive(entry, true)"
+                    >
+                      {{ t('lookups.restore') }}
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sect-pad">
+        <div class="note-box is-plain">
+          {{ t('lookups.thereIsNoDelete') }}
+        </div>
+      </div>
+    }
+  </section>
+</div>

@@ -13,6 +13,12 @@ public sealed class AuthOptions
     [Range(1, 365)]
     public int RefreshFamilyDays { get; init; } = 30;
 
+    // Seconds. Long enough to cover a lost response and the customer's next attempt, short enough
+    // that a stolen token is worth very little. Zero disables the grace entirely and restores strict
+    // single-use rotation.
+    [Range(0, 300)]
+    public int RefreshReuseGraceSeconds { get; init; } = 60;
+
     [Range(1, 168)]
     public int EmailVerificationHours { get; init; } = 24;
 
