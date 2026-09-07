@@ -29,6 +29,7 @@ internal static class TestBusinessRules
         PostReturnSettlementHours: 48,
         MinimumRenterAge: minimumRenterAge,
         TurnaroundMinutes: 120,
+        MaxAdvanceBookingDays: 180,
         EarliestVehicleModelYear: earliestVehicleModelYear);
 
     public static IBusinessRulesProvider Provider(

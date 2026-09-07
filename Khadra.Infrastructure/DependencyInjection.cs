@@ -112,6 +112,8 @@ public static class DependencyInjection
             // no time to be cleaned. Zero remains a legitimate, deliberate value.
             .Validate(options => options.TurnaroundMinutes is not null,
                 "BusinessRules: TurnaroundMinutes must be set. Use 0 to allow back-to-back rentals.")
+            .Validate(options => options.MaxAdvanceBookingDays is not null,
+                "BusinessRules: MaxAdvanceBookingDays must be set.")
             .ValidateOnStart();
     }
 

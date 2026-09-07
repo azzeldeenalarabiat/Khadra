@@ -54,6 +54,16 @@ public sealed class AppConfigTests
     }
 
     [Fact]
+    public async Task It_names_how_far_ahead_a_rental_may_be_booked()
+    {
+        var config = (await Handler().Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        // A date picker has to stop somewhere. This is the owner's number, not a bound invented in
+        // the app -- and a real trade-off, because a booking freezes the price it was made under.
+        Assert.Equal(180, config.MaxAdvanceBookingDays);
+    }
+
+    [Fact]
     public async Task It_publishes_the_upload_limits_instead_of_letting_a_client_discover_them_by_being_refused()
     {
         var config = (await Handler().Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;

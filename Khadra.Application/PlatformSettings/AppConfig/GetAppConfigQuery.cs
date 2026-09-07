@@ -32,6 +32,9 @@ public sealed record AppConfigDto(
     /// Null means the owner has set no age limit and nobody is refused on age -- a real shipping
     /// state, not a missing value.
     int? MinimumRenterAge,
+    /// How far ahead a rental may be booked. The date picker needs a bound, and this is the owner's
+    /// figure rather than one baked into a phone binary that only a release could change.
+    int MaxAdvanceBookingDays,
     DocumentLimitsDto Documents,
     VocabulariesDto Vocabularies);
 
@@ -77,6 +80,7 @@ public sealed class GetAppConfigHandler(
             calendar.TimeZoneId,
             new CurrencyDto(Money.JordanianDinar, Money.MinorUnits),
             rules.MinimumRenterAge,
+            rules.MaxAdvanceBookingDays,
             new DocumentLimitsDto(documents.MaximumSizeBytes, [.. documents.AllowedContentTypes]),
             new VocabulariesDto(
                 [.. Enumeration.GetAll<TransmissionType>().Select(Vocabulary.Describe)],

@@ -54,6 +54,11 @@ public sealed class BusinessRulesOptions
     [Range(0, 1440)]
     public int? TurnaroundMinutes { get; init; }
 
+    // How far ahead a rental may be booked. Nullable for the same reason as the turnaround gap: a
+    // missing key must be an error, not a silent zero that would refuse every date.
+    [Range(1, 3650)]
+    public int? MaxAdvanceBookingDays { get; init; }
+
     // The oldest model year a dealer may list. This is a guard against a typo — "1200", "19" — not a
     // judgement about what is rentable: an older car in sound condition is an ordinary listing on
     // this market, and the owner can lower it without a deploy. It was a `const` in the domain,

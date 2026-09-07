@@ -35,6 +35,10 @@ public sealed record BusinessRules(
     // rentals are allowed. A booking freezes this like every other rule, and also derives its
     // HoldStart from it, which is the figure the database enforces.
     int TurnaroundMinutes,
+    // How far ahead a customer may pick a rental date. Settled by the owner at 180 days on
+    // 2026-09-07. It is a real business trade-off rather than a UI bound: a booking FREEZES the
+    // price it was made under, so a long horizon means honouring a rate the gallery set months ago.
+    int MaxAdvanceBookingDays,
     // The oldest model year a dealer may list. A guard against a mistyped year, not a statement
     // about what is worth renting; the console builds its year list from it so the two cannot drift.
     int EarliestVehicleModelYear);
