@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Khadra.Application.Common;
+using Khadra.Application.PlatformSettings.AppConfig;
 using Khadra.Application.PlatformSettings.Lookups;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -43,6 +44,24 @@ public sealed class LookupsController : ApiControllerBase
     public async Task<ActionResult> Cities(CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(new ListCitiesQuery(ActiveOnly: true), cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// What a client needs to know about the platform before it can ask anything sensible.
+    /// </summary>
+    /// <remarks>
+    /// Anonymous and cheap, called once at startup. Everything in it is a value the server already
+    /// owns and a phone would otherwise hard-code -- which means a new release in every shop each
+    /// time the owner changes a number.
+    /// </remarks>
+    [HttpGet("app-config")]
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Public)]
+    [ProducesResponseType<AppConfigDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> AppConfig(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetAppConfigQuery(), cancellationToken);
         return FromResult(result);
     }
 

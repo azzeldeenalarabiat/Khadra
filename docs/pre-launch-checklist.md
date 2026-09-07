@@ -1104,7 +1104,7 @@ handler. No migration of existing bookings is needed; they keep the gap they wer
 
 ### 56. Rate limits assume one customer per IP address
 
-**Status:** open · **Raised:** 2026-09-07 (Fable advisor, reviewing the API as a mobile client sees it)
+**Status:** CLOSED 2026-09-07 · **Raised:** 2026-09-07 (Fable advisor, reviewing the API as a mobile client sees it)
 
 Every limit in `Program.cs` is partitioned by client address: login 10 per 15 minutes, auth 10 per
 minute, refresh 60 per minute, the public catalogue 120 per minute. That is the right shape for a
@@ -1121,14 +1121,32 @@ This is the single most likely production incident for the app, and no amount of
 it. Item 32 already records that the partitioning is wrong behind a proxy; this is the same fault
 with a much larger blast radius.
 
-**To close:** partition login by (address, normalised email) and rely on per-account lockout for
-brute force; raise the public and refresh ceilings by an order of magnitude and let a global
-concurrency limiter be the real protection; and send `Retry-After` on the 429 — the handler currently
-sets `code: rate_limited` and no header, so a client can only guess how long to wait.
+**Closed by** partitioning the auth limits on (address, account) instead of the address alone.
+`CredentialSubject` reads the account out of the request body before the limiter runs — the limiter
+is upstream of model binding, so nothing else has read it yet — and hands the partitioner a key of
+the address plus a SHA-256 prefix of the normalised email. Only the prefix, because partition keys
+sit in memory for the length of a window and an email address is not something to leave lying in
+them. The address stays in the key: dropping it would let one attacker spread attempts on one
+account across many addresses.
+
+Brute-forcing one account from one address is still ten attempts per quarter hour. Forty strangers
+on one carrier address signing in to forty accounts no longer collide at all.
+
+Public raised to 1200/minute and refresh to 600/minute, both still per address: they are read-only
+public prices and per-device rotations respectively, and the ceiling is there to stop a scraper
+rather than to ration customers. `Retry-After` now accompanies every 429, taken from the limiter's
+own metadata, so a client backs off honestly instead of guessing.
+
+The body is rewound after reading, and `CredentialSubjectTests` asserts that explicitly — an
+unrewound body would make every sign-in on the platform bind an empty model and fail validation,
+with a cause that looks like anything but a rate limiter.
+
+Verified against the running API: ten attempts on one account are allowed, the eleventh is refused
+with `Retry-After: 900`, and a different account from the same address is unaffected.
 
 ### 57. A lost refresh response signs a customer out of a working session
 
-**Status:** open · **Raised:** 2026-09-07 · **Owner decision needed**
+**Status:** CLOSED 2026-09-07 · **Raised:** 2026-09-07 · **Owner confirmed:** retry before sign-out
 
 `RefreshTokensHandler` rotates the refresh token and revokes the whole family when a consumed one is
 presented again. That is correct replay detection, and on a phone it fires on something that is not
@@ -1140,16 +1158,26 @@ this is the common case, not the exotic one.
 There is a second, smaller version of it in the same handler: when two refreshes race, the `xmin`
 loser also revokes the family — which destroys the replacement token the WINNER was just issued.
 
-**To close:** a short reuse grace. When a revoked token is presented within
-`Authentication:Policy:RefreshReuseGraceSeconds` of its `RevokedAt`, and the replacement it points at
-has itself never been used, revoke that unused replacement and issue a fresh one. Outside the window,
-or if the replacement was used, kill the family exactly as today — replay detection is unchanged past
-the grace. And let the concurrency loser return 401 without revoking the family, since the only way
-two refreshes of one token race is a client bug the winner should survive.
+**Closed by** a reuse grace, `Authentication:Policy:RefreshReuseGraceSeconds`, default 60. A consumed
+token presented inside the window whose replacement has never itself been used is treated as the
+retry it is: the unused replacement is retired and a fresh pair issued. Past the window, or once the
+replacement has been spent, the family dies exactly as before — the narrowing that matters is "never
+used", because if anyone has spent it then two parties hold live tokens and that IS the attack.
+
+The owner asked for sign-out only after REPEATED failures, so the handler follows the replacement
+chain up to five hops rather than one. A customer on a failing connection retries and can lose that
+response too; signing them out on the second hiccup is the same mistake as the first. Bounded,
+because each hop is a whole request that reached the server and came back to nobody, and a genuine
+client cannot need many.
+
+The concurrency loser no longer kills the family either. Two refreshes of one token can only race
+because one client sent both, and the winner is holding a perfectly good replacement — revoking the
+family destroyed a token the customer legitimately had, over a bug on their own device. The loser is
+refused, and its retry falls into the grace above.
 
 ### 58. There is no platform-context endpoint, so the app must hard-code what the platform knows
 
-**Status:** open · **Raised:** 2026-09-07
+**Status:** CLOSED 2026-09-07 · **Raised:** 2026-09-07
 
 Several facts the customer app needs are known only to the server and reach it nowhere, or only
 inside a response it cannot get before it needs them:
@@ -1163,6 +1191,22 @@ inside a response it cannot get before it needs them:
 - **Filter vocabularies.** Transmissions and fuel types are smart enums with no endpoint, so filter
   chips would be a literal in a widget — which the standing rule forbids.
 
-**To close:** one anonymous, rate-limited `GET /api/v1/platform-context` returning the time zone, the
-currency and its minor units, the minimum renter age, the document limits, and the transmission and
-fuel-type vocabularies. Items 16 and 34 already ask for the same thing on the dealer side.
+**Closed by** `GET /api/v1/app-config` — anonymous, on the public rate limit, called once at startup.
+It returns the reporting time zone, the currency with its minor units, the minimum renter age, the
+document limits, and the transmission, fuel-type and pickup-method vocabularies in both languages.
+
+The owner's reason for it is the one that matters: a customer app lives in shops, so a number baked
+into it needs a release to change, and until every customer updates there are two answers to one
+question.
+
+The vocabularies are projected from the domain's own smart enums, so a fuel type added tomorrow
+appears without anyone remembering to add it — which is exactly why a filter chip is not a literal in
+a widget. A member with no Arabic falls back to its own name rather than throwing, so a new member
+cannot take the whole endpoint down.
+
+**It also surfaced a live defect.** `Documents:AllowedContentTypes` was coming back with every type
+twice: the options class carried a property initialiser AND appsettings configured the same list, and
+the binder APPENDS to a collection that already has items rather than replacing it. Nothing had ever
+broken, because every use was a `Contains` check — it became visible the moment the list was
+published to a client. The initialiser is now empty, configuration is the only source, and the
+existing "at least one" validation makes a missing key fail at startup.

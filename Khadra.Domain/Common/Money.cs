@@ -4,6 +4,16 @@ public sealed class Money : ValueObject
 {
     public const string JordanianDinar = "JOD";
 
+    /// <summary>
+    /// How many decimal places the platform stores and rounds money to.
+    /// </summary>
+    /// <remarks>
+    /// Three, because a dinar is a thousand fils. It is stated here rather than left implicit in the
+    /// (18,3) column, so a client can be TOLD the figure instead of carrying its own table and
+    /// rendering 12.75 where the invoice says 12.750.
+    /// </remarks>
+    public const int MinorUnits = 3;
+
     public decimal Amount { get; }
     public string CurrencyCode { get; }
 
@@ -23,8 +33,9 @@ public sealed class Money : ValueObject
         if (currencyCode.Length != 3)
             throw new DomainException("Currency code must be an ISO 4217 three-letter code.");
 
-        // Persisted precision is (18,3): JOD has three minor units (fils). Round once at the boundary.
-        Amount = decimal.Round(amount, 3, MidpointRounding.ToEven);
+        // Persisted precision is (18, MinorUnits): JOD has three minor units (fils). Round once at
+        // the boundary.
+        Amount = decimal.Round(amount, MinorUnits, MidpointRounding.ToEven);
         CurrencyCode = currencyCode.ToUpperInvariant();
     }
 

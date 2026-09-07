@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text;
 using System.Threading.RateLimiting;
@@ -134,6 +135,15 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     options.OnRejected = async (context, cancellationToken) =>
     {
+        // Retry-After, so a client can back off honestly instead of guessing. A phone that guesses
+        // wrong either hammers a limit it is already over or leaves a customer waiting far longer
+        // than they need to.
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+            context.HttpContext.Response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
+        }
+
         context.HttpContext.Response.ContentType = "application/problem+json";
         await context.HttpContext.Response.WriteAsJsonAsync(new ProblemDetails
         {
@@ -145,16 +155,26 @@ builder.Services.AddRateLimiter(options =>
     };
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(600, TimeSpan.FromMinutes(1), queueLimit: 50)));
+    // The auth limits are keyed on the address AND the account being named, not the address alone.
+    // A Jordanian carrier NATs thousands of subscribers behind one IPv4 address, so an
+    // address-only bucket meant ten sign-in attempts shared by a whole network. Keying on the pair
+    // keeps brute force on one account just as tight while letting strangers coexist.
     options.AddPolicy(RateLimitPolicies.Auth, context =>
-        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(10, TimeSpan.FromMinutes(1))));
+        RateLimitPartition.GetFixedWindowLimiter(
+            CredentialSubject.PartitionKey(context, ClientAddress(context)),
+            _ => FixedWindow(10, TimeSpan.FromMinutes(1))));
     options.AddPolicy(RateLimitPolicies.Login, context =>
-        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(10, TimeSpan.FromMinutes(15))));
+        RateLimitPartition.GetFixedWindowLimiter(
+            CredentialSubject.PartitionKey(context, ClientAddress(context)),
+            _ => FixedWindow(10, TimeSpan.FromMinutes(15))));
+    // A refresh is per DEVICE, and a carrier address carries thousands of them.
     options.AddPolicy(RateLimitPolicies.Refresh, context =>
-        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(60, TimeSpan.FromMinutes(1))));
+        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(600, TimeSpan.FromMinutes(1))));
     // Browsing is chatty and shared: a customer scrolling results and opening cars makes many reads,
-    // and a whole mobile network can arrive from one address.
+    // and a whole mobile network arrives from one address. Read-only public prices, so the ceiling
+    // is there to stop a scraper, not to ration customers.
     options.AddPolicy(RateLimitPolicies.Public, context =>
-        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(120, TimeSpan.FromMinutes(1), queueLimit: 20)));
+        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(1200, TimeSpan.FromMinutes(1), queueLimit: 20)));
 });
 
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
@@ -277,6 +297,9 @@ await MailStartupCheck.ReportAsync(app.Services);
 
 app.UseHttpsRedirection();
 app.UseCors();
+// Before the limiter, because it partitions the auth endpoints by the account being named and the
+// name is in the request body, which nothing has read at this point.
+app.UseCredentialSubject();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

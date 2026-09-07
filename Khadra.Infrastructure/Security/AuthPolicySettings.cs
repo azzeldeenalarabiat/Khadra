@@ -12,6 +12,8 @@ internal sealed class AuthPolicySettings(IOptions<AuthOptions> options) : IAuthP
 
     public TimeSpan RefreshFamilyLifetime => TimeSpan.FromDays(_options.RefreshFamilyDays);
 
+    public TimeSpan RefreshReuseGrace => TimeSpan.FromSeconds(_options.RefreshReuseGraceSeconds);
+
     public TimeSpan EmailVerificationLifetime => TimeSpan.FromHours(_options.EmailVerificationHours);
 
     public TimeSpan PasswordResetLifetime => TimeSpan.FromMinutes(_options.PasswordResetMinutes);

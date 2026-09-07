@@ -113,11 +113,22 @@ public sealed record CatalogueListing(
     CatalogueGalleryLabel Gallery);
 
 /// <summary>The gallery behind a search row: enough to recognise it, nothing more.</summary>
+/// <remarks>
+/// The rating is the GALLERY's, and it sits here rather than on the car deliberately. The platform
+/// rates rental offices, not vehicles (spec 4.1, and `Review` feeds the dealer's rating) -- so a
+/// per-car score is not a feature that is merely unbuilt, it is a thing this domain does not model.
+/// A renter comparing two Corollas is really choosing between two offices, which is what this says.
+///
+/// Null and zero until Reviews has a table (pre-launch checklist item 3). The fields exist now so the
+/// card has a rendering path that lights up the day the data does, without an app change.
+/// </remarks>
 public sealed record CatalogueGalleryLabel(
     Guid DealerId,
     string BusinessName,
     Guid? CityId,
-    string? LogoUrl);
+    string? LogoUrl,
+    decimal? AverageRating,
+    int ReviewCount);
 
 public sealed record CatalogueCarType(Guid CarTypeId, string NameEn, string NameAr);
 

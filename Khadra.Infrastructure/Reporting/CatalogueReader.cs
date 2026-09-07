@@ -147,7 +147,11 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                         dealer.CityId == null ? null : dealer.CityId.Value.Value,
                         dealer.LogoStorageKey == null
                             ? null
-                            : DealerProfileDto.PublicImagePath + "/" + dealer.LogoStorageKey))
+                            : DealerProfileDto.PublicImagePath + "/" + dealer.LogoStorageKey,
+                        // Reviews has no table yet. Null is the honest score and 0 the honest count;
+                        // a card renders no star rather than a zero-star one.
+                        null,
+                        0))
                     .First()))
             .ToListAsync(cancellationToken);
 
