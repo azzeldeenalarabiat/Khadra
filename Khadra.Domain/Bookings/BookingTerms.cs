@@ -29,6 +29,13 @@ public sealed class BookingTerms : ValueObject
     // inside it when a ticket is actually opened.
     public Percentage DealerPenaltyMinPercent { get; }
     public Percentage DealerPenaltyMaxPercent { get; }
+    // The gap a gallery needs between one rental coming back and the next going out, to clean,
+    // refuel and inspect. Settled by the owner at two hours on 2026-09-07.
+    //
+    // Frozen like every other rule here, and for the same reason — but this one also has a physical
+    // consequence, because it is what Booking.HoldStart is derived from and the database enforces
+    // that hold. Zero is a legitimate value meaning back-to-back rentals are allowed.
+    public TimeSpan TurnaroundBuffer { get; }
     public int RulesVersion { get; }
 
 #pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
@@ -48,6 +55,7 @@ public sealed class BookingTerms : ValueObject
         Percentage customerCancellationPenaltyPercent,
         Percentage dealerPenaltyMinPercent,
         Percentage dealerPenaltyMaxPercent,
+        TimeSpan turnaroundBuffer,
         int rulesVersion)
     {
         DepositPercent = depositPercent;
@@ -59,6 +67,7 @@ public sealed class BookingTerms : ValueObject
         CustomerCancellationPenaltyPercent = customerCancellationPenaltyPercent;
         DealerPenaltyMinPercent = dealerPenaltyMinPercent;
         DealerPenaltyMaxPercent = dealerPenaltyMaxPercent;
+        TurnaroundBuffer = turnaroundBuffer;
         RulesVersion = rulesVersion;
     }
 
@@ -72,6 +81,7 @@ public sealed class BookingTerms : ValueObject
         Percentage customerCancellationPenaltyPercent,
         Percentage dealerPenaltyMinPercent,
         Percentage dealerPenaltyMaxPercent,
+        TimeSpan turnaroundBuffer,
         int rulesVersion)
     {
         ArgumentNullException.ThrowIfNull(depositPercent);
@@ -95,7 +105,8 @@ public sealed class BookingTerms : ValueObject
         }
 
         if (freeCancellationWindow < TimeSpan.Zero || noShowTimeout <= TimeSpan.Zero ||
-            paymentWindow <= TimeSpan.Zero || postReturnSettlementWindow < TimeSpan.Zero)
+            paymentWindow <= TimeSpan.Zero || postReturnSettlementWindow < TimeSpan.Zero ||
+            turnaroundBuffer < TimeSpan.Zero)
         {
             return Error.Validation("booking.invalid_terms", "Booking terms carry an invalid time window.");
         }
@@ -110,6 +121,7 @@ public sealed class BookingTerms : ValueObject
             customerCancellationPenaltyPercent,
             dealerPenaltyMinPercent,
             dealerPenaltyMaxPercent,
+            turnaroundBuffer,
             rulesVersion);
     }
 
@@ -124,6 +136,7 @@ public sealed class BookingTerms : ValueObject
         yield return CustomerCancellationPenaltyPercent;
         yield return DealerPenaltyMinPercent;
         yield return DealerPenaltyMaxPercent;
+        yield return TurnaroundBuffer;
         yield return RulesVersion;
     }
 }

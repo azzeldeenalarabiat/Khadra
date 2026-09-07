@@ -170,7 +170,7 @@ public sealed class BookingDecisionTests
         outOnRental.RecordPickup(BookingParty.Dealer, OwnerId, start);
         context.Bookings.GetByIdAsync(outOnRental.Id, Arg.Any<CancellationToken>()).Returns(outOnRental);
         // Re-home it under this dealer: the factory picks a random dealer id.
-        var mine = Build.Booking(dealerId: context.Dealer.Id, period: Build.Period(Build.Now.AddDays(1), 3), pricing: Build.Pricing(days: 3));
+        var mine = Build.Booking(dealerId: context.Dealer.Id, period: Build.Period(Build.Now.AddDays(1), 3));
         mine.ConfirmDepositPaid(Id.New(), Build.Now);
         mine.Approve(OwnerId, Build.Now);
         mine.RecordPickup(BookingParty.Dealer, OwnerId, mine.Period.Start);

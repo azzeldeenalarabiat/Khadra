@@ -100,7 +100,8 @@ public sealed class DeliveryFeeTests
 
         var pricing = BookingPricing.Calculate(
             Money.Jod(30m),
-            days: 3,
+            new DateOnly(2026, 9, 10),
+            new DateOnly(2026, 9, 13),
             deliveryFee: dealer.Delivery.Fee!,
             depositPercent: Percentage.Create(20m).Value,
             securityDeposit: Money.Jod(150m),
@@ -124,7 +125,8 @@ public sealed class DeliveryFeeTests
     {
         var pricing = BookingPricing.Calculate(
             Money.Jod(30m),
-            days: 3,
+            new DateOnly(2026, 9, 10),
+            new DateOnly(2026, 9, 13),
             deliveryFee: Money.Jod(10m),
             depositPercent: Percentage.Create(20m).Value,
             securityDeposit: Money.Jod(150m),

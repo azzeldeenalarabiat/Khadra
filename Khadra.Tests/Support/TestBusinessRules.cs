@@ -28,6 +28,7 @@ internal static class TestBusinessRules
         PaymentWindowMinutes: 20,
         PostReturnSettlementHours: 48,
         MinimumRenterAge: minimumRenterAge,
+        TurnaroundMinutes: 120,
         EarliestVehicleModelYear: earliestVehicleModelYear);
 
     public static IBusinessRulesProvider Provider(

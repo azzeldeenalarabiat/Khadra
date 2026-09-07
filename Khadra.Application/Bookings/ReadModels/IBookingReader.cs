@@ -11,6 +11,10 @@ public sealed record BookingListItem(
     string Status,
     DateTimeOffset PeriodStart,
     DateTimeOffset PeriodEnd,
+    // The billed calendar days, frozen on the booking. A screen must never recompute this from the
+    // two instants above: subtracting them answers "how long was it out", which is the rule the
+    // platform stopped billing by on 2026-09-07, and it would contradict the invoice.
+    int Days,
     string PickupMethod,
     decimal TotalPrice,
     string Currency,

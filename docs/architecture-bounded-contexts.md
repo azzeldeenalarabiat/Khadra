@@ -35,7 +35,7 @@ Communication is by `Id`, by explicit application contracts, or by domain events
 
 ## Shared kernel (`Khadra.Domain/Common`)
 
-`Id` (UUIDv7), `Entity`, `AggregateRoot` (domain events), `ValueObject`, `Enumeration` (smart enum), `Error` + `ErrorKind`, `Money` (three minor units for JOD fils, no cross-currency arithmetic), `Percentage`, `GeoPoint` (haversine distance), `DateRange` (half-open, whole days rounded up), `ISoftDeletable`, `IUnitOfWork`, `DomainException`, `ConcurrencyConflictException`.
+`Id` (UUIDv7), `Entity`, `AggregateRoot` (domain events), `ValueObject`, `Enumeration` (smart enum), `Error` + `ErrorKind`, `Money` (three minor units for JOD fils, no cross-currency arithmetic), `Percentage`, `GeoPoint` (haversine distance), `DateRange` (half-open, both ends normalised to UTC; it carries no day count -- see below), `ISoftDeletable`, `IUnitOfWork`, `DomainException`, `ConcurrencyConflictException`.
 
 ## 1. Identity & Access
 
@@ -66,6 +66,10 @@ Availability is **not** stored on the vehicle. It is derived from bookings, beca
 - `Returned` completes when the post-return settlement window passes with no open dispute, or immediately once a dispute is resolved.
 
 **Terms are frozen at booking time.** `BookingTerms` snapshots the deposit and commission percentages, the free-cancellation window, the no-show timeout and the penalty range as they stood when the booking was made. Rules are admin-editable, so judging a cancellation against today's settings would retroactively penalise customers and make past decisions unreproducible.
+
+**Rentals are billed in CALENDAR days**, settled by the owner on 2026-09-07: the difference between the Amman pickup and return dates, never fewer than one. Monday 09:00 to Thursday 11:00 is three days. The count lives in `RentalDays.Between(DateOnly, DateOnly)` and is frozen onto `BookingPricing` beside the two dates it came from, so changing `ReportingTimeZone` can never re-judge a rental that was already agreed. `DateRange` deliberately has no day count: it is the shared kernel's INSTANT interval, and a calendar day is a question about a local calendar the kernel has no zone to answer with. Two consequences the owner has been told: the rule is never dearer than the elapsed-time one it replaced, and a late return costs nothing, because the return time of day no longer affects the price.
+
+**A booking claims the car before the customer collects it.** `Booking.HoldStart` is the period start moved back by `BookingTerms.TurnaroundBuffer` (`BusinessRules:TurnaroundMinutes`, 120), the gap a gallery needs to clean and check the car. The pad is on the LEADING edge only -- padding both would double-count the gap and refuse one exactly equal to the buffer, and a trailing pad would make an extension, which starts where its parent ends, impossible to store. An extension carries no pad at all. `HoldStart` is a real column because the `bookings_one_hold_per_vehicle` exclusion constraint indexes it, and Postgres refuses to index `timestamptz` arithmetic.
 
 **Pricing is frozen too.** `BookingPricing` snapshots the daily rate, the security deposit, the mileage policy and the fuel policy. A dealer raising a rate or tightening a mileage cap cannot rewrite a contract already accepted. The deposit and commission are taken on `RentalTotal`, deliberately excluding the delivery fee, which is a pass-through for the driver's trip rather than rental revenue.
 

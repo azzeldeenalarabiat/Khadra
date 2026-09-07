@@ -128,6 +128,13 @@ export const EN = {
   'notif.openDashboard': 'Open the dashboard',
   // The aria-label on the bell. English needs two forms; Arabic asks for six, and the dictionary
   // is where that difference lives rather than in a ternary at the call site.
+  // The billed length of a rental. The count is the server's frozen figure, never one the browser
+  // worked out from the two instants -- those give elapsed time, not calendar days.
+  'booking.days': {
+    one: '{count} day',
+    other: '{count} days',
+  },
+
   'notif.count': {
     zero: 'Nothing needs your attention',
     one: '{count} item needs your attention',

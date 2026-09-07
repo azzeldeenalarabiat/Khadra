@@ -66,6 +66,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                 booking.Status.Name,
                 booking.Period.Start,
                 booking.Period.End,
+                booking.Pricing.Days,
                 booking.PickupMethod.Name,
                 booking.Pricing.TotalPrice.Amount,
                 booking.Pricing.TotalPrice.CurrencyCode,

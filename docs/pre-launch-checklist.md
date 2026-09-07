@@ -168,7 +168,7 @@ features, not before.
 
 ### 12. Nothing stops two bookings holding the same car on the same dates
 
-**Status:** open · **Raised:** 2026-09-03 (found by end-to-end testing)
+**Status:** CLOSED 2026-09-07 · **Raised:** 2026-09-03 (found by end-to-end testing)
 
 `IBookingRepository.HasOverlappingBookingAsync` is implemented and covered by repository tests, and
 its own comment says "a database exclusion constraint backs this up, because a check-then-act in
@@ -182,11 +182,22 @@ It is not causing harm yet only because nothing creates bookings outside the see
 booking flow is not built. The danger is precisely that the next person to build it will read that
 comment, trust the database, and ship a race that double-books cars.
 
-**To close:** enable `btree_gist`, add an exclusion constraint over `(vehicle_id WITH =,
-tstzrange(period_start, period_end) WITH &&)` limited to the statuses where `HoldsVehicle` is true,
-and call the guard in the booking-creation handler for a friendly error before the constraint fires.
-The seeder must stop generating overlaps first, or the migration will not apply to an existing
-development database.
+**Closed by** migration `20260907021642_CalendarDaysAndVehicleHolds`, which enables `btree_gist` and
+adds `bookings_one_hold_per_vehicle`:
+
+```sql
+EXCLUDE USING gist (vehicle_id WITH =, tstzrange(hold_start, period_end, '[)') WITH &&)
+  WHERE (status IN ('PendingPayment', 'Requested', 'Approved', 'PickedUp'))
+```
+
+It excludes on `hold_start`, not `period_start`, so the gallery's turnaround gap is enforced by the
+database too. The 59 overlapping pairs are gone with the seeder that made them: they lived in the
+abandoned `khadra` database, while the API has been on `khadra_e2e` (0 bookings) since 2026-09-05.
+
+The guard is still called first for a friendly error, and it now shares one predicate with the
+catalogue's availability query (`BookingHolds`). Three caveats moved to items 51-53 rather than being
+considered closed here: the constraint cannot be tested on SQLite, the create handler must expire
+stale unpaid holds before inserting, and SQLSTATE 23P01 needs its own error code.
 
 ## Admin console static data (2026-09-04)
 
@@ -993,3 +1004,98 @@ write path refuses on purpose ("AB1234" as a plate and a registration, a one-cha
 malformed address) and asserts each still reads back, with a final test asserting the write path is
 unchanged. If a converter is ever routed back through `Create`, it fails there rather than in
 production on the next rule change.
+
+## Calendar-day billing and vehicle holds (2026-09-07)
+
+### 51. A late return costs the customer nothing
+
+**Status:** open · **Raised:** 2026-09-07 (a direct consequence of the owner's calendar-day decision)
+
+Rentals are now billed by the difference between two Amman calendar dates, so the return *time* no
+longer affects the price at all. A car due back Thursday at 09:00 and returned Thursday at 23:59
+costs exactly the same. Under the elapsed-time rule it replaced, the overrun rolled into another
+billed day on its own.
+
+This is not a defect in the implementation — it is what the rule says, and the owner chose it
+knowing the rule is never dearer to the customer than the old one. It is on this list because the
+platform now has no answer at all for a late return, and `RecordReturn` has no concept of lateness to
+build one from. The usual answer in this trade is a grace period plus an hourly overage; the spec
+(v3.1) specifies neither, so nothing was invented.
+
+Nobody is affected yet: no booking can be created. The first gallery to lose a day's rental to a
+customer who returns at midnight will raise it, and by then bookings will exist to be re-judged.
+
+**To close:** the owner names a grace period and an overage rate, both frozen onto `BookingTerms`
+like every other number, and `RecordReturn` assesses the overage against the frozen figures. Decide
+before the booking flow ships, because retrofitting a term onto bookings already made means either
+re-judging them or carrying two rules.
+
+### 52. The exclusion constraint cannot be tested
+
+**Status:** open · **Raised:** 2026-09-07
+
+`bookings_one_hold_per_vehicle` is the only thing that actually prevents two customers holding one
+car in a race. The persistence suite runs on SQLite through `EnsureCreated`, which never executes the
+raw SQL in a migration, so **no test exercises the constraint at all**. What is tested is the
+application guard, which is the check-then-act the constraint exists to backstop.
+
+The constraint has been verified by hand against the development database — `pg_constraint` holds it
+and `btree_gist` is installed — and that is a person looking once, not a test that keeps looking.
+
+**To close:** a Postgres-backed test (Testcontainers, or a dedicated test database) that inserts two
+overlapping held bookings for one vehicle and asserts the second is refused with SQLSTATE 23P01.
+Until then this is one migration edit away from silently guarding nothing, and the only thing
+standing between it and that is `VehicleHoldStatusTests`, which pins the four status names the
+constraint's `WHERE` clause spells out.
+
+### 53. Creating a booking must expire stale unpaid holds first, and translate 23P01
+
+**Status:** open · **Raised:** 2026-09-07 · **Blocks:** the booking-creation slice
+
+Two things the create handler must do that nothing does yet, because nothing creates bookings:
+
+**Expire stale holds in the same transaction.** The exclusion constraint's predicate cannot mention
+`now()`, so a `PendingPayment` booking whose deadline passed a week ago still counts as holding the
+car. The application predicate (`BookingHolds.Live`) correctly ignores it. The two therefore
+disagree: the guard says the car is free, and the insert is refused by the database. The handler must
+call `ExpireUnpaid` on the vehicle's stale unpaid bookings before it inserts. Both halves are
+required — the `PaymentDeadline > now` term alone leaves the constraint refusing bookings the guard
+allowed, and lazy expiry alone leaves an abandoned checkout holding a car forever (see item 4).
+
+**Give 23P01 its own code.** An exclusion violation surfaces as `DbUpdateException`, which
+`ApiExceptionHandler` maps to 409 `data.conflict`. That is not a 500, but a phone cannot say "this
+car was taken while you were deciding" from a generic conflict code. Catch it and return
+`booking.vehicle_unavailable`.
+
+### 54. The fleet screen buckets vehicle holds in the browser's own calendar
+
+**Status:** open · **Raised:** 2026-09-07 (found by the Fable advisor while reviewing calendar days)
+
+`Khadra.Dashboard/src/app/features/fleet/vehicle-detail.component.ts` turns a car's bookings into
+day cells using the browser's local calendar, and knows nothing about the turnaround gap. A dealer
+in a different time zone sees a car blocked on the wrong days, and every dealer sees it free during
+the two hours it is actually being cleaned.
+
+It predates calendar-day billing, but that decision makes it worse: "which day" is now a business
+fact the server owns, and this screen is a second source for it.
+
+**To close:** serve the occupancy from an availability read model that uses the same `BookingHolds`
+predicate and the same Amman calendar as everything else. The customer catalogue needs that read
+model anyway, so this closes with it. Until then the strip is approximate and does not say so.
+
+### 55. The turnaround gap is one number for the whole platform
+
+**Status:** open by design · **Raised:** 2026-09-07 · **Owner confirmed:** 120 minutes
+
+`BusinessRules:TurnaroundMinutes` is a single figure every gallery is held to. A city-centre office
+that valets at the counter and an airport operator who drives cars to a depot have genuinely
+different needs, and a delivery return includes the driver's trip back, which self-pickup does not.
+
+Deferred deliberately: one number is the right thing to ship first, and the design already absorbs a
+per-gallery or per-method figure without a schema change, because each booking stores the resolved
+value in `BookingTerms.TurnaroundBuffer` and derives `hold_start` from it. Nothing reads the platform
+setting after a booking is made.
+
+**To close:** if the owner wants it per gallery, add it to `DeliverySettings` beside the radius and
+the fee — the same move the delivery fee already made on 2026-09-06 — and resolve it in the create
+handler. No migration of existing bookings is needed; they keep the gap they were made under.

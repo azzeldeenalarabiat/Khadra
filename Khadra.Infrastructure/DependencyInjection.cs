@@ -107,6 +107,11 @@ public static class DependencyInjection
             // would leave the platform chasing every dealer for the difference on every booking.
             .Validate(options => options.DepositPercent >= options.CommissionPercent,
                 "BusinessRules: DepositPercent must be at least CommissionPercent.")
+            // Absence is a misconfiguration, not a default. Without this a deleted key binds to null,
+            // the provider would have to invent a number, and a car would go straight back out with
+            // no time to be cleaned. Zero remains a legitimate, deliberate value.
+            .Validate(options => options.TurnaroundMinutes is not null,
+                "BusinessRules: TurnaroundMinutes must be set. Use 0 to allow back-to-back rentals.")
             .ValidateOnStart();
     }
 

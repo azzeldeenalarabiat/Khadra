@@ -67,13 +67,13 @@ public sealed class BookingRepositoryTests : IDisposable
         // Each booking gets its OWN DateRange. A value object handed to two aggregates is tracked by
         // EF as one entity in two places, and the second booking's period arrives at the database
         // as null -- the same trap the seeder fell into with GeoPoint.
-        var released = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3), pricing: Build.Pricing(days: 3));
+        var released = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
         released.Cancel(BookingParty.Customer, Id.New(), "Changed plans.", Build.Now.AddMinutes(5));
         var elsewhere = Build.ApprovedBooking();
 
         await using (var context = NewContext())
         {
-            var held = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3), pricing: Build.Pricing(days: 3));
+            var held = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
             held.ConfirmDepositPaid(Id.New(), Build.Now);
             held.Approve(Id.New(), Build.Now);
             context.Bookings.AddRange(held, released, elsewhere);
@@ -82,17 +82,83 @@ public sealed class BookingRepositoryTests : IDisposable
 
         await using var reader = NewContext();
         var repository = new BookingRepository(reader);
+        var gap = Build.TurnaroundBuffer;
 
         // Same dates, same car: blocked.
-        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, period, null));
+        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, period, gap, Build.Now, null));
         // Same dates, a different car: free.
-        Assert.False(await repository.HasOverlappingBookingAsync(Id.New(), period, null));
-        // Back-to-back: a car returned at 10:00 can be collected at 10:00 (half-open intervals).
-        var following = DateRange.Create(period.End, period.End.AddDays(2)).Value;
-        Assert.False(await repository.HasOverlappingBookingAsync(vehicleId, following, null));
-        // Partly overlapping: still blocked.
+        Assert.False(await repository.HasOverlappingBookingAsync(Id.New(), period, gap, Build.Now, null));
+        // Partly overlapping: blocked.
         var straddling = DateRange.Create(period.End.AddHours(-1), period.End.AddDays(1)).Value;
-        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, straddling, null));
+        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, straddling, gap, Build.Now, null));
+    }
+
+    /// <summary>
+    /// Back-to-back is no longer free. The owner settled a two-hour turnaround gap on 2026-09-07, so
+    /// a car returned at 10:00 cannot go out again until 12:00 — and the boundary is exact.
+    /// </summary>
+    [Fact]
+    public async Task A_car_cannot_go_straight_back_out_without_its_turnaround_gap()
+    {
+        var vehicleId = Id.New();
+        var start = Build.Now.AddDays(10);
+        var period = Build.Period(start, days: 3);
+        var gap = Build.TurnaroundBuffer;
+
+        await using (var context = NewContext())
+        {
+            var held = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
+            held.ConfirmDepositPaid(Id.New(), Build.Now);
+            held.Approve(Id.New(), Build.Now);
+            context.Bookings.Add(held);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var repository = new BookingRepository(reader);
+
+        // Collected the moment it comes back: refused.
+        var immediate = DateRange.Create(period.End, period.End.AddDays(2)).Value;
+        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, immediate, gap, Build.Now, null));
+
+        // One minute short of the gap: still refused.
+        var justShort = DateRange.Create(period.End.Add(gap).AddMinutes(-1), period.End.AddDays(2)).Value;
+        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, justShort, gap, Build.Now, null));
+
+        // Exactly the gap: allowed. A gap equal to the buffer satisfies the buffer, which is why the
+        // padding is on one edge only — padding both would double-count it and refuse this.
+        var exactlyTheGap = DateRange.Create(period.End.Add(gap), period.End.AddDays(2)).Value;
+        Assert.False(await repository.HasOverlappingBookingAsync(vehicleId, exactlyTheGap, gap, Build.Now, null));
+    }
+
+    /// <summary>
+    /// An unpaid booking holds the car only until its payment deadline. Nothing expires those
+    /// bookings yet (pre-launch checklist item 4), so without this term one abandoned checkout would
+    /// keep a car off the market for good.
+    /// </summary>
+    [Fact]
+    public async Task An_abandoned_checkout_stops_holding_the_car_once_its_deadline_passes()
+    {
+        var vehicleId = Id.New();
+        var start = Build.Now.AddDays(10);
+        var period = Build.Period(start, days: 3);
+        var gap = Build.TurnaroundBuffer;
+
+        await using (var context = NewContext())
+        {
+            // Left in PendingPayment: never paid, never expired.
+            context.Bookings.Add(Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3)));
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var repository = new BookingRepository(reader);
+
+        // Inside the payment window it is a real hold.
+        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, period, gap, Build.Now, null));
+        // Once the window has passed, the car is free again whether or not a job has said so.
+        var afterTheDeadline = Build.Now.AddHours(1);
+        Assert.False(await repository.HasOverlappingBookingAsync(vehicleId, period, gap, afterTheDeadline, null));
     }
 
     [Fact]
@@ -100,7 +166,7 @@ public sealed class BookingRepositoryTests : IDisposable
     {
         var vehicleId = Id.New();
         var period = Build.Period(Build.Now.AddDays(10), days: 3);
-        var cancelled = Build.Booking(vehicleId: vehicleId, period: period, pricing: Build.Pricing(days: 3));
+        var cancelled = Build.Booking(vehicleId: vehicleId, period: period);
         cancelled.Cancel(BookingParty.Customer, Id.New(), "Changed plans.", Build.Now.AddMinutes(5));
 
         await using (var context = NewContext())
@@ -110,7 +176,7 @@ public sealed class BookingRepositoryTests : IDisposable
         }
 
         await using var reader = NewContext();
-        Assert.False(await new BookingRepository(reader).HasOverlappingBookingAsync(vehicleId, period, null));
+        Assert.False(await new BookingRepository(reader).HasOverlappingBookingAsync(vehicleId, period, Build.TurnaroundBuffer, Build.Now, null));
     }
 
     [Fact]

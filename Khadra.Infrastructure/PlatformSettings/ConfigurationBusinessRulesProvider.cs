@@ -24,6 +24,7 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
             current.PaymentWindowMinutes,
             current.PostReturnSettlementHours,
             current.MinimumRenterAge,
+            current.TurnaroundMinutes!.Value,
             current.EarliestVehicleModelYear));
     }
 }

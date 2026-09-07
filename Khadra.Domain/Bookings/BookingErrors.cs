@@ -7,9 +7,6 @@ public static class BookingErrors
     public static readonly Error PeriodInThePast =
         Error.Validation("booking.period_in_past", "A booking must start in the future.");
 
-    public static readonly Error PeriodTooShort =
-        Error.Validation("booking.period_too_short", "A booking must cover at least one day.");
-
     public static readonly Error DeliveryLocationRequired =
         Error.Validation("booking.delivery_location_required", "A delivery booking needs a drop-off location.");
 

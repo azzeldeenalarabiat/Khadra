@@ -44,6 +44,16 @@ public sealed class BusinessRulesOptions
     [Range(18, 30)]
     public int? MinimumRenterAge { get; init; }
 
+    // The gap a gallery needs between one rental coming back and the next going out: cleaning,
+    // refuelling, a look over the car. Settled by the owner at 120 minutes on 2026-09-07.
+    //
+    // Nullable on purpose. An `int` with `[Range(0, ...)]` binds a MISSING key to 0 and passes
+    // validation, so a deleted line would read as "no buffer required" and quietly let a car go out
+    // the minute it came back. Zero stays a legitimate value; absence has to be an error, and the
+    // .Validate in DependencyInjection is what makes it one.
+    [Range(0, 1440)]
+    public int? TurnaroundMinutes { get; init; }
+
     // The oldest model year a dealer may list. This is a guard against a typo — "1200", "19" — not a
     // judgement about what is rentable: an older car in sound condition is an ordinary listing on
     // this market, and the owner can lower it without a deploy. It was a `const` in the domain,

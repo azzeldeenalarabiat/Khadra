@@ -43,6 +43,10 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         entity.Property(booking => booking.CancellationReason).HasMaxLength(1000);
         entity.Property(booking => booking.CreatedAt).IsRequired();
         entity.Property(booking => booking.PaymentDeadline).IsRequired();
+        // A first-class column, not a computed one: the exclusion constraint that stops two bookings
+        // holding one car indexes it, and Postgres refuses to index timestamptz arithmetic because
+        // adding an interval is STABLE, not IMMUTABLE.
+        entity.Property(booking => booking.HoldStart).IsRequired();
 
         entity.OwnsOne(booking => booking.Period, period =>
         {
@@ -80,6 +84,9 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
                 ConfigureMoney(mileage.OwnsOne(policy => policy.ExcessFeePerKm));
             });
             pricing.Property(value => value.Days);
+            // The local dates the customer agreed to, frozen beside the count they produced.
+            pricing.Property(value => value.PickupDate);
+            pricing.Property(value => value.ReturnDate);
             pricing.Property(value => value.FuelPolicy)
                 .HasConversion(policy => policy.Name, name => Enumeration.FromName<FuelPolicy>(name));
         });
@@ -97,6 +104,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             terms.Property(value => value.NoShowTimeout);
             terms.Property(value => value.PaymentWindow);
             terms.Property(value => value.PostReturnSettlementWindow);
+            terms.Property(value => value.TurnaroundBuffer);
             terms.Property(value => value.RulesVersion);
         });
         entity.Navigation(booking => booking.Terms).IsRequired();
@@ -134,6 +142,9 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         entity.HasIndex(booking => booking.Status);
         // The dashboard counts bookings created per day over a rolling window.
         entity.HasIndex(booking => booking.CreatedAt).IsDescending();
+        // Availability: both the overlap guard and the customer catalogue ask "which bookings hold
+        // this car across these dates", and both read from HoldStart, never from the period start.
+        entity.HasIndex(booking => new { booking.VehicleId, booking.HoldStart });
 
         // A booking is a financial record: Cancelled and Expired are its deletes. No soft-delete flag,
         // and therefore no query filter.

@@ -30,6 +30,11 @@ public sealed record BusinessRules(
     // Spec 5.1: enforced at registration. Null means the owner has not set one, and nobody is
     // refused on age -- a real shipping state, not a missing value.
     int? MinimumRenterAge,
+    // The gap a gallery needs between one rental ending and the next starting, to clean, refuel and
+    // check the car. Settled by the owner at 120 minutes on 2026-09-07. Zero means back-to-back
+    // rentals are allowed. A booking freezes this like every other rule, and also derives its
+    // HoldStart from it, which is the figure the database enforces.
+    int TurnaroundMinutes,
     // The oldest model year a dealer may list. A guard against a mistyped year, not a statement
     // about what is worth renting; the console builds its year list from it so the two cannot drift.
     int EarliestVehicleModelYear);

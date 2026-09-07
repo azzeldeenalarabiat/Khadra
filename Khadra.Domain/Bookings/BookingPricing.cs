@@ -11,9 +11,18 @@ namespace Khadra.Domain.Bookings;
 //
 // The deposit and the commission are both taken on RentalTotal, deliberately excluding the delivery
 // fee: the fee is a pass-through for the driver's trip, not rental revenue to be shared.
+//
+// The two calendar dates are frozen here alongside the day count, and that is not redundancy. The
+// count is a fact about a LOCAL calendar, and the zone it was computed in is configuration
+// (ReportingTimeZone). Storing only the instants would leave the count re-derivable — and therefore
+// re-judgeable — the day that setting changed. Storing the dates the customer agreed to means the
+// contract reads the same forever, in the calendar the customer was actually looking at.
 public sealed class BookingPricing : ValueObject
 {
     public Money DailyRate { get; }
+    // The local calendar dates this rental was priced between, in the platform's reporting zone.
+    public DateOnly PickupDate { get; }
+    public DateOnly ReturnDate { get; }
     public int Days { get; }
     public Money RentalTotal { get; }
     public Money DeliveryFee { get; }
@@ -36,6 +45,8 @@ public sealed class BookingPricing : ValueObject
 
     private BookingPricing(
         Money dailyRate,
+        DateOnly pickupDate,
+        DateOnly returnDate,
         int days,
         Money rentalTotal,
         Money deliveryFee,
@@ -48,6 +59,8 @@ public sealed class BookingPricing : ValueObject
         FuelPolicy fuelPolicy)
     {
         DailyRate = dailyRate;
+        PickupDate = pickupDate;
+        ReturnDate = returnDate;
         Days = days;
         RentalTotal = rentalTotal;
         DeliveryFee = deliveryFee;
@@ -60,9 +73,21 @@ public sealed class BookingPricing : ValueObject
         FuelPolicy = fuelPolicy;
     }
 
+    /// <summary>
+    /// Prices a rental between two LOCAL calendar dates.
+    /// </summary>
+    /// <remarks>
+    /// The caller passes dates, not a day count, because there is exactly one right way to count and
+    /// this is where it lives (<see cref="RentalDays"/>). A quote and the booking it becomes cannot
+    /// disagree about the number of days if neither of them is allowed to name it.
+    ///
+    /// Convert the period's instants with IReportingCalendar before calling; the domain does not
+    /// resolve time zones.
+    /// </remarks>
     public static Result<BookingPricing, Error> Calculate(
         Money dailyRate,
-        int days,
+        DateOnly pickupDate,
+        DateOnly returnDate,
         Money deliveryFee,
         Percentage depositPercent,
         Money securityDeposit,
@@ -76,15 +101,14 @@ public sealed class BookingPricing : ValueObject
         ArgumentNullException.ThrowIfNull(mileage);
         ArgumentNullException.ThrowIfNull(fuelPolicy);
 
-        if (days <= 0)
-            return BookingErrors.PeriodTooShort;
-
         var currency = dailyRate.CurrencyCode;
         if (!string.Equals(deliveryFee.CurrencyCode, currency, StringComparison.Ordinal) ||
             !string.Equals(securityDeposit.CurrencyCode, currency, StringComparison.Ordinal))
         {
             return BookingErrors.CurrencyMismatch;
         }
+
+        var days = RentalDays.Between(pickupDate, returnDate);
 
         var rentalTotal = dailyRate.MultiplyBy(days);
         var totalPrice = rentalTotal.Add(deliveryFee);
@@ -95,6 +119,8 @@ public sealed class BookingPricing : ValueObject
 
         return new BookingPricing(
             dailyRate,
+            pickupDate,
+            returnDate,
             days,
             rentalTotal,
             deliveryFee,
@@ -112,6 +138,8 @@ public sealed class BookingPricing : ValueObject
     protected override IEnumerable<object?> GetEqualityComponents()
     {
         yield return DailyRate;
+        yield return PickupDate;
+        yield return ReturnDate;
         yield return Days;
         yield return RentalTotal;
         yield return DeliveryFee;

@@ -27,30 +27,25 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
     public Task<bool> HasOverlappingBookingAsync(
         Id vehicleId,
         DateRange period,
+        TimeSpan turnaroundBuffer,
+        DateTimeOffset now,
         Id? excludingBookingId,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(period);
 
-        // BookingStatus.HoldsVehicle spelled out: a computed property cannot be translated, so the
-        // member statuses are listed here and the domain stays the definition.
-        var pendingPayment = BookingStatus.PendingPayment;
-        var requested = BookingStatus.Requested;
-        var approved = BookingStatus.Approved;
-        var pickedUp = BookingStatus.PickedUp;
+        // What this rental would claim: its period, opened earlier by the gap the gallery needs to
+        // turn the car around. The stored side of the comparison already carries its own frozen gap
+        // in HoldStart, which is why only the candidate is padded here.
+        var candidateHoldStart = period.Start.Subtract(turnaroundBuffer);
 
-        return context.Bookings.AnyAsync(
-            booking =>
-                booking.VehicleId == vehicleId &&
-                (excludingBookingId == null || booking.Id != excludingBookingId.Value) &&
-                (booking.Status == pendingPayment ||
-                 booking.Status == requested ||
-                 booking.Status == approved ||
-                 booking.Status == pickedUp) &&
-                // Half-open intervals: a car returned at 10:00 can be collected at 10:00.
-                booking.Period.Start < period.End &&
-                booking.Period.End > period.Start,
-            cancellationToken);
+        return BookingHolds
+            .Colliding(context.Bookings, now, candidateHoldStart, period.End)
+            .AnyAsync(
+                booking =>
+                    booking.VehicleId == vehicleId &&
+                    (excludingBookingId == null || booking.Id != excludingBookingId.Value),
+                cancellationToken);
     }
 
     public async Task<IReadOnlyList<Booking>> ListDueForPaymentExpiryAsync(

@@ -119,6 +119,15 @@ export const AR = {
   'notif.loadFailed': 'تعذّر تحميل هذا. لم يفتك شيء.',
   'notif.openDashboard': 'فتح لوحة التحكم',
   // Six forms, and the dual is not optional in Arabic: two items is عنصران, not "2 عنصر".
+  // أيام الإيجار المحسوبة. ستة أشكال، والمثنى ليس اختياريًا في العربية.
+  'booking.days': {
+    one: 'يوم واحد',
+    two: 'يومان',
+    few: '{count} أيام',
+    many: '{count} يومًا',
+    other: '{count} يوم',
+  },
+
   'notif.count': {
     zero: 'لا شيء يحتاج انتباهك',
     one: 'عنصر واحد يحتاج انتباهك',

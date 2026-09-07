@@ -157,11 +157,17 @@ export class DealerBookingsComponent {
     return `${f(booking.periodStart)} → ${f(booking.periodEnd)}`;
   }
 
+  /**
+   * The booking's own billed days, as the server froze them.
+   *
+   * This used to subtract the two instants and round. That answered a different question --
+   * elapsed time -- and since the owner settled calendar-day billing on 2026-09-07 it gives a
+   * different number: a car out Monday 09:00 and back Thursday 21:00 is three days on the invoice
+   * and four to a subtraction. A screen must never be a second source for a figure the server
+   * already holds.
+   */
   protected days(booking: BookingListItem): string {
-    const days = Math.round(
-      (Date.parse(booking.periodEnd) - Date.parse(booking.periodStart)) / 86_400_000,
-    );
-    return `${days} ${days === 1 ? 'day' : 'days'}`;
+    return this.t('booking.days', { count: booking.days });
   }
 
   protected created(booking: BookingListItem): string {

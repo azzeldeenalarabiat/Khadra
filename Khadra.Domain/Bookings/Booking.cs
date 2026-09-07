@@ -24,6 +24,27 @@ public sealed class Booking : AggregateRoot
     public Id DealerId { get; private set; }
     public Id VehicleId { get; private set; }
     public DateRange Period { get; private set; } = null!;
+    /// <summary>
+    /// The instant from which this booking claims the vehicle — the period's start, moved earlier by
+    /// the turnaround buffer frozen on <see cref="Terms"/>.
+    /// </summary>
+    /// <remarks>
+    /// The customer's period is what they pay for; this is what the gallery's calendar loses. The two
+    /// differ by the time it takes to clean and check the car between renters.
+    ///
+    /// It is a stored column rather than something derived on read, because the database enforces it:
+    /// an exclusion constraint over [HoldStart, Period.End) is what actually stops two bookings
+    /// holding one car. Postgres will not index or exclude on a computed timestamp — adding an
+    /// interval to a `timestamptz` is STABLE, not IMMUTABLE, since the answer depends on the session
+    /// time zone — so the aggregate computes it once, here, and the row carries it.
+    ///
+    /// The pad is on the LEADING edge only. Padding both ends would double-count the gap between two
+    /// bookings and refuse a gap exactly equal to the buffer. Padding the trailing edge instead would
+    /// make an EXTENSION impossible to insert, since an extension starts precisely where its parent
+    /// ends; with a leading pad the extension simply carries none, and the two claims touch without
+    /// overlapping.
+    /// </remarks>
+    public DateTimeOffset HoldStart { get; private set; }
     public PickupMethod PickupMethod { get; private set; } = null!;
     public GeoPoint? DeliveryLocation { get; private set; }
     public BookingPricing Pricing { get; private set; } = null!;
@@ -87,8 +108,18 @@ public sealed class Booking : AggregateRoot
 
         if (period.Start <= now)
             return BookingErrors.PeriodInThePast;
-        if (pricing.Days != period.WholeDays)
-            return BookingErrors.PeriodTooShort;
+        // The pricing must belong to the period being booked. The exact check — that the frozen dates
+        // are the period's instants seen through the platform's calendar — needs a time zone, which
+        // the domain deliberately does not have. What it can assert without one is that no real zone
+        // is more than a day from UTC, so a frozen date further than that from the UTC date of the
+        // same instant means the handler priced one period and booked another. That is a bug in the
+        // caller, never something a customer can provoke, so it throws rather than returning a Result.
+        if (Math.Abs(pricing.PickupDate.DayNumber - DateOnly.FromDateTime(period.Start.UtcDateTime).DayNumber) > 1 ||
+            Math.Abs(pricing.ReturnDate.DayNumber - DateOnly.FromDateTime(period.End.UtcDateTime).DayNumber) > 1)
+        {
+            throw new DomainException(
+                "The pricing was calculated for different dates than the period being booked.");
+        }
         if (pickupMethod == PickupMethod.Delivery && deliveryLocation is null)
             return BookingErrors.DeliveryLocationRequired;
         if (pickupMethod == PickupMethod.SelfPickup && deliveryLocation is not null)
@@ -107,6 +138,11 @@ public sealed class Booking : AggregateRoot
             DealerId = dealerId,
             VehicleId = vehicleId,
             Period = period,
+            // An extension continues a rental the customer never gave back, so there is no handover
+            // to prepare for and no gap to keep. Anything else pads its start by the frozen buffer.
+            HoldStart = extendedFromBookingId is null
+                ? period.Start.Subtract(terms.TurnaroundBuffer)
+                : period.Start,
             PickupMethod = pickupMethod,
             DeliveryLocation = deliveryLocation,
             Pricing = pricing,

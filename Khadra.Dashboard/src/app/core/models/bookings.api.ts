@@ -15,6 +15,13 @@ export interface BookingListItem {
   readonly status: BookingStatus;
   readonly periodStart: string;
   readonly periodEnd: string;
+  /**
+   * The billed calendar days, frozen on the booking when it was made.
+   *
+   * Never recompute this from the two instants above. Subtracting them gives elapsed time, which is
+   * the rule the platform stopped using on 2026-09-07, and the screen would contradict the invoice.
+   */
+  readonly days: number;
   readonly pickupMethod: 'SelfPickup' | 'Delivery';
   readonly totalPrice: number;
   readonly currency: string;

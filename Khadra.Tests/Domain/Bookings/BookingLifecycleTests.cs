@@ -49,16 +49,66 @@ public sealed class BookingCreationTests
         Assert.Equal("booking.delivery_location_not_allowed", pickupWith.Error.Code);
     }
 
+    /// <summary>
+    /// Pricing that describes a different rental than the one being booked is a bug in the handler,
+    /// not something a customer can provoke, so it throws rather than returning an error a screen
+    /// would have to explain.
+    /// </summary>
+    /// <remarks>
+    /// The aggregate cannot check this exactly: the frozen dates are LOCAL and the domain has no
+    /// time zone to convert the period with. What it can say without one is that no real zone sits
+    /// more than a day from UTC, so a frozen date further than that from the same instant's UTC date
+    /// can only mean the two were computed from different periods. The exact equality — that the
+    /// dates are the period seen through IReportingCalendar — belongs in the handler that has the
+    /// calendar, and is tested there.
+    /// </remarks>
     [Fact]
-    public void The_priced_days_must_match_the_period_actually_booked()
+    public void Pricing_for_a_different_period_is_a_programming_error()
     {
         var period = Build.Period(Now.AddDays(7), days: 3);
 
-        var mismatched = Booking.Create(
+        // Priced for five days against a three-day period: two days adrift, well past the one day
+        // any time zone could account for.
+        Assert.Throws<DomainException>(() => Booking.Create(
             Id.New(), Id.New(), Id.New(), period, PickupMethod.SelfPickup, null,
-            Build.Pricing(days: 5), Build.Terms(), PaymentOption.DepositOnly, Now);
+            Build.Pricing(days: 5), Build.Terms(), PaymentOption.DepositOnly, Now));
+    }
 
-        Assert.Equal("booking.period_too_short", mismatched.Error.Code);
+    /// <summary>
+    /// A booking claims the car earlier than the customer's period starts, by the turnaround gap
+    /// frozen onto its terms — the time the gallery needs to clean and check it between renters.
+    /// </summary>
+    [Fact]
+    public void A_booking_claims_the_car_from_before_the_customer_collects_it()
+    {
+        var period = Build.Period(Now.AddDays(7), days: 3);
+
+        var booking = Booking.Create(
+            Id.New(), Id.New(), Id.New(), period, PickupMethod.SelfPickup, null,
+            Build.Pricing(days: 3), Build.Terms(turnaroundBuffer: TimeSpan.FromHours(2)),
+            PaymentOption.DepositOnly, Now).Value;
+
+        Assert.Equal(period.Start.AddHours(-2), booking.HoldStart);
+        // The customer still pays for, and collects at, the period they chose.
+        Assert.Equal(period.Start, booking.Period.Start);
+    }
+
+    /// <summary>
+    /// An extension carries no gap. It continues a rental the customer never gave back, so there is
+    /// no handover to prepare for — and a leading pad would collide with the parent booking it
+    /// starts against, making the extension impossible to store at all.
+    /// </summary>
+    [Fact]
+    public void An_extension_does_not_claim_a_turnaround_gap_against_its_own_parent()
+    {
+        var period = Build.Period(Now.AddDays(7), days: 3);
+
+        var extension = Booking.Create(
+            Id.New(), Id.New(), Id.New(), period, PickupMethod.SelfPickup, null,
+            Build.Pricing(days: 3), Build.Terms(turnaroundBuffer: TimeSpan.FromHours(2)),
+            PaymentOption.DepositOnly, Now, extendedFromBookingId: Id.New()).Value;
+
+        Assert.Equal(period.Start, extension.HoldStart);
     }
 
     [Fact]
@@ -183,7 +233,7 @@ public sealed class BookingDecisionTests
         // walk away after the car was already due to be collected.
         var start = Now.AddMinutes(20);
         var period = DateRange.Create(start, start.AddDays(2)).Value;
-        var booking = Build.Booking(period: period, pricing: Build.Pricing(days: 2));
+        var booking = Build.Booking(period: period);
         booking.ConfirmDepositPaid(Id.New(), Now);
 
         booking.Approve(Id.New(), Now);
