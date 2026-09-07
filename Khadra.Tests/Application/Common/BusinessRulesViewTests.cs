@@ -54,7 +54,7 @@ public sealed class BusinessRulesViewTests
         Assert.Equal(rules.FreeCancellationWindowMinutes, dto.FreeCancellationWindowMinutes);
         Assert.Equal(rules.AdminSlaHours, dto.AdminSlaHours);
         Assert.Equal(rules.CustomerCancellationPenaltyPercent, dto.CustomerCancellationPenaltyPercent);
-        Assert.Equal(rules.PaymentWindowMinutes, dto.PaymentWindowMinutes);
+        Assert.Equal(rules.PaymentWindowHours, dto.PaymentWindowHours);
         Assert.Equal(rules.PostReturnSettlementHours, dto.PostReturnSettlementHours);
         Assert.Equal(rules.MinimumRenterAge, dto.MinimumRenterAge);
         Assert.Equal(rules.EarliestVehicleModelYear, dto.EarliestVehicleModelYear);

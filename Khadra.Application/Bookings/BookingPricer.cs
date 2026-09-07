@@ -60,6 +60,20 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
             return BookingErrors.DeliveryLocationNotAllowed;
         }
 
+        // Whether anybody is behind the counter at either end. Judged here, beside the other
+        // gallery-specific rules, rather than in BookingWindowPolicy: the window policy is about
+        // dates every gallery shares, and this depends on WHICH gallery. It is also why the
+        // catalogue search does not apply it -- a search spans galleries and has no single schedule.
+        var openingHours = PickupHoursPolicy.Validate(
+            dealer.OperatingHours,
+            pickupMethod,
+            calendar.DayOf(period.Start),
+            calendar.TimeOfDay(period.Start),
+            calendar.DayOf(period.End),
+            calendar.TimeOfDay(period.End));
+        if (openingHours.IsFailure)
+            return openingHours.Error;
+
         var deliveryFee = pickupMethod == PickupMethod.Delivery
             // Delivery is enabled, so the fee is set: DeliverySettings makes Fee null exactly when
             // delivery is off, and the guard above has already refused that case.
@@ -118,7 +132,8 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
             commission.Value,
             TimeSpan.FromMinutes(rules.FreeCancellationWindowMinutes),
             TimeSpan.FromHours(rules.NoShowTimeoutHours),
-            TimeSpan.FromMinutes(rules.PaymentWindowMinutes),
+            TimeSpan.FromHours(rules.PaymentWindowHours),
+            TimeSpan.FromHours(rules.BookingAnswerWindowHours),
             TimeSpan.FromHours(rules.PostReturnSettlementHours),
             customerPenalty.Value,
             dealerMin.Value,

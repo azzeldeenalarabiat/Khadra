@@ -15,12 +15,26 @@ public sealed class BookingTerms : ValueObject
     public Percentage DepositPercent { get; }
     // Recorded for traceability. Commission itself is calculated in the Payments context.
     public Percentage CommissionPercent { get; }
-    // Spec 2: no penalty for cancelling within this window after dealer approval.
+    // Spec 2: no penalty for cancelling within this window. Spec 5.5 measures it from approval; it
+    // has run from PAYMENT since 2026-09-07, because at approval nothing has been paid and there is
+    // nothing to be penalised on. The duration is unchanged.
     public TimeSpan FreeCancellationWindow { get; }
     // Spec 2: 8 hours after start with no pickup.
     public TimeSpan NoShowTimeout { get; }
     // How long the customer has to pay the deposit before the held vehicle is released.
     public TimeSpan PaymentWindow { get; }
+
+    /// <summary>How long the dealer has to answer a request before it expires.</summary>
+    /// <remarks>
+    /// Its own figure rather than the admin SLA it happens to match. They are different clocks
+    /// owned by different people -- one is how long an administrator may take over a gallery's
+    /// licence, the other how long a gallery may leave a customer waiting -- and sharing a key
+    /// would mean the owner could not move one without moving the other.
+    ///
+    /// It matters more than it used to. A request no longer costs a deposit, so this window is the
+    /// only thing between one account and a car held for the whole booking horizon.
+    /// </remarks>
+    public TimeSpan AnswerWindow { get; }
     // Quiet period after return; if nobody disputes, the booking completes on its own.
     public TimeSpan PostReturnSettlementWindow { get; }
     // Spec 2: penalty on a customer who cancels after the free window.
@@ -51,6 +65,7 @@ public sealed class BookingTerms : ValueObject
         TimeSpan freeCancellationWindow,
         TimeSpan noShowTimeout,
         TimeSpan paymentWindow,
+        TimeSpan answerWindow,
         TimeSpan postReturnSettlementWindow,
         Percentage customerCancellationPenaltyPercent,
         Percentage dealerPenaltyMinPercent,
@@ -63,6 +78,7 @@ public sealed class BookingTerms : ValueObject
         FreeCancellationWindow = freeCancellationWindow;
         NoShowTimeout = noShowTimeout;
         PaymentWindow = paymentWindow;
+        AnswerWindow = answerWindow;
         PostReturnSettlementWindow = postReturnSettlementWindow;
         CustomerCancellationPenaltyPercent = customerCancellationPenaltyPercent;
         DealerPenaltyMinPercent = dealerPenaltyMinPercent;
@@ -77,6 +93,7 @@ public sealed class BookingTerms : ValueObject
         TimeSpan freeCancellationWindow,
         TimeSpan noShowTimeout,
         TimeSpan paymentWindow,
+        TimeSpan answerWindow,
         TimeSpan postReturnSettlementWindow,
         Percentage customerCancellationPenaltyPercent,
         Percentage dealerPenaltyMinPercent,
@@ -105,7 +122,8 @@ public sealed class BookingTerms : ValueObject
         }
 
         if (freeCancellationWindow < TimeSpan.Zero || noShowTimeout <= TimeSpan.Zero ||
-            paymentWindow <= TimeSpan.Zero || postReturnSettlementWindow < TimeSpan.Zero ||
+            paymentWindow <= TimeSpan.Zero || answerWindow <= TimeSpan.Zero ||
+            postReturnSettlementWindow < TimeSpan.Zero ||
             turnaroundBuffer < TimeSpan.Zero)
         {
             return Error.Validation("booking.invalid_terms", "Booking terms carry an invalid time window.");
@@ -117,6 +135,7 @@ public sealed class BookingTerms : ValueObject
             freeCancellationWindow,
             noShowTimeout,
             paymentWindow,
+            answerWindow,
             postReturnSettlementWindow,
             customerCancellationPenaltyPercent,
             dealerPenaltyMinPercent,
@@ -132,6 +151,7 @@ public sealed class BookingTerms : ValueObject
         yield return FreeCancellationWindow;
         yield return NoShowTimeout;
         yield return PaymentWindow;
+        yield return AnswerWindow;
         yield return PostReturnSettlementWindow;
         yield return CustomerCancellationPenaltyPercent;
         yield return DealerPenaltyMinPercent;

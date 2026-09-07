@@ -70,7 +70,7 @@ public sealed class AdminBookingActionTests
         var context = new Context();
         // Approved and past its free-cancellation window: cancelled BY the customer here, the
         // aggregate would assess the whole deposit against them.
-        var booking = context.Given(Build.ApprovedBooking());
+        var booking = context.Given(Build.ConfirmedBooking());
         context.At(Build.Now.AddDays(3));
 
         var result = await context.Handlers().Handle(
@@ -89,7 +89,7 @@ public sealed class AdminBookingActionTests
     {
         // The counterweight to the test above: this is what the admin path deliberately avoids, and
         // without it "no penalty" could pass for a booking that was never going to be penalised.
-        var booking = Build.ApprovedBooking();
+        var booking = Build.ConfirmedBooking();
 
         booking.Cancel(BookingParty.Customer, Id.New(), "Changed my mind.", Build.Now.AddDays(3));
 
@@ -101,7 +101,7 @@ public sealed class AdminBookingActionTests
     public async Task The_cancellation_reason_and_the_status_change_reach_the_audit_log()
     {
         var context = new Context();
-        var booking = context.Given(Build.ApprovedBooking());
+        var booking = context.Given(Build.ConfirmedBooking());
         context.At(Build.Now.AddDays(3));
 
         await context.Handlers().Handle(
@@ -112,7 +112,7 @@ public sealed class AdminBookingActionTests
         Assert.Same(AuditAction.BookingCancelledByAdmin, entry.Action);
         Assert.Same(AuditEntityType.Booking, entry.EntityType);
         Assert.Equal(booking.Reference.Value, entry.SubjectLabel);
-        Assert.Equal("Approved", entry.PreviousValue);
+        Assert.Equal("Confirmed", entry.PreviousValue);
         Assert.Equal("Cancelled", entry.NewValue);
         Assert.Equal("The dealership was suspended mid-rental.", entry.Reason);
         Assert.Equal(AdminId, entry.ActorUserId);
@@ -122,15 +122,15 @@ public sealed class AdminBookingActionTests
     public async Task An_expiry_is_refused_while_the_bookings_own_window_still_has_time_in_it()
     {
         var context = new Context();
-        // Created and never paid: still inside its payment window at Build.Now.
-        var booking = context.Given(Build.Booking());
+        // Approved and not yet paid: still inside its payment window at Build.Now.
+        var booking = context.Given(Build.ApprovedBooking());
 
         var result = await context.Handlers().Handle(
             new ExpireBookingAsAdminCommand(booking.Id),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Same(BookingStatus.PendingPayment, booking.Status);
+        Assert.Same(BookingStatus.Approved, booking.Status);
         Assert.Empty(context.Recorded);
         await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -139,8 +139,28 @@ public sealed class AdminBookingActionTests
     public async Task An_unpaid_booking_expires_once_its_payment_window_has_elapsed()
     {
         var context = new Context();
+        var booking = context.Given(Build.ApprovedBooking());
+        context.At(booking.PaymentDeadline!.Value.AddMinutes(1));
+
+        var result = await context.Handlers().Handle(
+            new ExpireBookingAsAdminCommand(booking.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(BookingStatus.Expired, booking.Status);
+        Assert.True(booking.Penalty!.IsNothingOwed);
+    }
+
+    /// <summary>
+    /// The handler picks the expiry from the booking's own state, never from the caller, so the same
+    /// command has to reach the other clock too: a request no dealer ever answered.
+    /// </summary>
+    [Fact]
+    public async Task An_unanswered_request_expires_once_the_dealers_answer_window_has_elapsed()
+    {
+        var context = new Context();
         var booking = context.Given(Build.Booking());
-        context.At(booking.PaymentDeadline.AddMinutes(1));
+        context.At(booking.DecisionDeadline.AddMinutes(1));
 
         var result = await context.Handlers().Handle(
             new ExpireBookingAsAdminCommand(booking.Id),
@@ -155,8 +175,8 @@ public sealed class AdminBookingActionTests
     public async Task An_admin_triggered_expiry_names_the_admin_in_the_history_rather_than_the_timer()
     {
         var context = new Context();
-        var booking = context.Given(Build.Booking());
-        context.At(booking.PaymentDeadline.AddMinutes(1));
+        var booking = context.Given(Build.ApprovedBooking());
+        context.At(booking.PaymentDeadline!.Value.AddMinutes(1));
 
         await context.Handlers().Handle(new ExpireBookingAsAdminCommand(booking.Id), CancellationToken.None);
 
@@ -170,21 +190,21 @@ public sealed class AdminBookingActionTests
     public async Task A_no_show_is_refused_before_the_no_show_window_has_run_out()
     {
         var context = new Context();
-        var booking = context.Given(Build.ApprovedBooking());
+        var booking = context.Given(Build.ConfirmedBooking());
 
         var result = await context.Handlers().Handle(
             new MarkBookingNoShowAsAdminCommand(booking.Id),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Same(BookingStatus.Approved, booking.Status);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
     }
 
     [Fact]
     public async Task A_self_pickup_no_show_assesses_the_deposit_the_booking_froze()
     {
         var context = new Context();
-        var booking = context.Given(Build.ApprovedBooking(pickupMethod: PickupMethod.SelfPickup));
+        var booking = context.Given(Build.ConfirmedBooking(pickupMethod: PickupMethod.SelfPickup));
         context.At(booking.Period.Start.Add(booking.Terms.NoShowTimeout).AddMinutes(1));
 
         var result = await context.Handlers().Handle(

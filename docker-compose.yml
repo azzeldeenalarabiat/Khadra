@@ -42,6 +42,11 @@ services:
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
+      # Without this mailpit does a reverse-DNS lookup on whatever connects to it, and inside the
+      # container that lookup has nowhere to go: the greeting arrives roughly eight seconds late.
+      # The API allows five seconds per send attempt, so every verification email timed out waiting
+      # for hello and no mail was ever delivered, while a plain connection test still looked fine.
+      MP_SMTP_DISABLE_RDNS: 1
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8025/livez"]
       interval: 10s

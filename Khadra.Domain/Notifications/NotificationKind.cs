@@ -10,12 +10,17 @@ namespace Khadra.Domain.Notifications;
 // with ad-hoc strings nobody can render.
 //
 // Every kind here has a PRODUCER in this repository today — a handler that raises it inside its own
-// transaction. Kinds the design draws but nothing can raise (a customer's booking request, a customer
-// cancellation, "pickup approaching") are deliberately absent: the customer flow is the Flutter app,
-// which is not in this repository, and there is no scheduler. They arrive with their producers, not
-// before, because a kind nothing raises is a promise of an alert that never comes.
+// transaction. Kinds the design draws but nothing can raise (a customer cancellation, "pickup
+// approaching") are deliberately absent: there is no customer-cancellation endpoint and no scheduler.
+// They arrive with their producers, not before, because a kind nothing raises is a promise of an
+// alert that never comes.
 public sealed class NotificationKind : Enumeration
 {
+    // A customer asked for one of the dealership's cars (CreateBookingHandler). The only kind here
+    // raised by someone OUTSIDE the dealership, which is why its row carries no actor: see
+    // DealerTeamNotifier.NotifyTeamOfCustomerActionAsync for why a customer is never named on it.
+    public static readonly NotificationKind BookingRequested = new(13, "BookingRequested");
+
     // What a colleague did to a booking the dealership shares (BookingDecisionHandlers).
     public static readonly NotificationKind BookingApproved = new(1, "BookingApproved");
     public static readonly NotificationKind BookingRejected = new(2, "BookingRejected");

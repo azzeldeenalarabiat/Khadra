@@ -124,9 +124,11 @@ export class DealerBookingsComponent {
   protected tone(booking: BookingListItem): Tone {
     if (booking.hasLiveDispute) return 'bad';
     switch (booking.status) {
+      // Waiting on somebody: the dealer's answer, or the customer's deposit.
       case 'Requested':
-        return 'warn';
       case 'Approved':
+        return 'warn';
+      case 'Confirmed':
         return 'accent';
       case 'PickedUp':
       case 'Returned':
@@ -142,6 +144,8 @@ export class DealerBookingsComponent {
     switch (booking.status) {
       case 'Requested':
         return 'Pending';
+      case 'Approved':
+        return 'Awaiting deposit';
       case 'PickedUp':
         return 'Active';
       case 'NoShow':

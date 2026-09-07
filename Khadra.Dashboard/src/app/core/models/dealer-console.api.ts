@@ -9,7 +9,10 @@ import { Money } from './fleet.api';
 export interface DealerBookingCounts {
   readonly requested: number;
   readonly oldestRequestedAt: string | null;
-  readonly approved: number;
+  /** Approved and not paid for: a car held on nothing but a clock. */
+  readonly awaitingDeposit: number;
+  /** Approved AND paid for: the rentals actually going ahead. */
+  readonly confirmed: number;
   readonly pickedUp: number;
   readonly overdueReturns: number;
 }

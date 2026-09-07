@@ -33,7 +33,13 @@ public sealed record BookingDto(
     string? CancelledBy,
     string? CancellationReason,
     DateTimeOffset CreatedAt,
-    DateTimeOffset PaymentDeadline,
+    /// When the dealer must answer by.
+    DateTimeOffset DecisionDeadline,
+    /// Null until the dealer approves: there is no payment clock before there is a decision.
+    DateTimeOffset? PaymentDeadline,
+    /// Whether the deposit has actually cleared, rather than a status a screen would have to
+    /// interpret. Confirmed onwards is paid, and so is every booking that ended after being paid.
+    bool DepositPaid,
     DateTimeOffset? RequestedAt,
     DateTimeOffset? ApprovedAt,
     DateTimeOffset? FreeCancellationDeadline,
@@ -76,7 +82,9 @@ public sealed record BookingDto(
             booking.CancelledBy?.Name,
             booking.CancellationReason,
             booking.CreatedAt,
+            booking.DecisionDeadline,
             booking.PaymentDeadline,
+            booking.DepositPaymentId is not null,
             booking.RequestedAt,
             booking.ApprovedAt,
             booking.FreeCancellationDeadline,
@@ -141,7 +149,7 @@ public sealed record BookingTermsDto(
     decimal CommissionPercent,
     double FreeCancellationWindowHours,
     double NoShowTimeoutHours,
-    double PaymentWindowMinutes,
+    double PaymentWindowHours,
     double PostReturnSettlementWindowHours,
     decimal CustomerCancellationPenaltyPercent,
     decimal DealerPenaltyMinPercent,
@@ -156,7 +164,7 @@ public sealed record BookingTermsDto(
             terms.CommissionPercent.Value,
             terms.FreeCancellationWindow.TotalHours,
             terms.NoShowTimeout.TotalHours,
-            terms.PaymentWindow.TotalMinutes,
+            terms.PaymentWindow.TotalHours,
             terms.PostReturnSettlementWindow.TotalHours,
             terms.CustomerCancellationPenaltyPercent.Value,
             terms.DealerPenaltyMinPercent.Value,

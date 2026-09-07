@@ -1429,11 +1429,13 @@ export const EN = {
   'dealerDashboard.pendingRequests': 'Pending requests',
   'dealerDashboard.activeRentals': 'Active rentals',
   'dealerDashboard.availableVehicles': 'Available vehicles',
-  'dealerDashboard.approvedNotYetCollected': 'Approved, not yet collected',
+  'dealerDashboard.confirmedNotYetCollected': 'Confirmed, not yet collected',
+  'dealerDashboard.awaitingDeposit': 'Awaiting deposit',
+  'dealerDashboard.approvedAndUnpaid': 'approved, not paid for yet',
   'dealerDashboard.heldForTheirDates': 'held for their dates',
   'dealerDashboard.revenueThisMonth': 'Revenue · this month',
   'dealerDashboard.occupancyRate': 'Occupancy rate',
-  'dealerBooking.theRentalDateHas': 'The rental date has arrived.',
+  'dealerBooking.theAnswerWindowHasClosed': 'The answer window has closed. This request can only be rejected now.',
   'dealerEmployees.staffIsTheOwners': 'Staff is the owner’s to manage',
   'dealerEmployees.whoWorksHereWhat':
     'Who works here, what they may see, and who is invited or deactivated are the dealer owner’s decisions. Your own access is on the Settings screen.',
@@ -1455,7 +1457,7 @@ export const EN = {
   'dealerEmployees.staffMemberDeactivated': 'Staff member deactivated',
   'vehicleDetail.onHire': 'On hire',
   'vehicleDetail.offTheRoad': 'Off the road',
-  'vehicleDetail.requestedDepositPaid': 'Requested (deposit paid)',
+  'vehicleDetail.requestedOrUnpaid': 'Requested or unpaid',
   'vehicleDetail.backOnTheRoad': 'Back on the road',
   'vehicleDetail.everyDayShowsAs':
     'Every day shows as not offered until you bring it back. Bookings already approved are not affected — tell those customers yourself if the car will not be ready.',
@@ -1485,7 +1487,7 @@ export const EN = {
   'fleetList.carRemoved': 'Car removed',
   'employeeDashboard.pendingRequests': 'Pending requests',
   'employeeDashboard.activeRentals': 'Active rentals',
-  'employeeDashboard.approvedNotYetCollected': 'Approved, not yet collected',
+  'employeeDashboard.confirmedNotYetCollected': 'Confirmed, not yet collected',
   'employeeDashboard.heldForTheirDates': 'held for their dates',
   'vehicleWizard.basicInformation': 'Basic information',
   'customerProfile.theyAreSignedOut':

@@ -82,13 +82,14 @@ public sealed record RentalQuote(
 public sealed record QuoteTerms(
     decimal DepositPercent,
     double FreeCancellationWindowHours,
-    double PaymentWindowMinutes,
+    double PaymentWindowHours,
     decimal CustomerCancellationPenaltyPercent,
     double NoShowTimeoutHours);
 
 public sealed class SearchCatalogueHandler(
     ICatalogueReader catalogue,
     IBusinessRulesProvider businessRules,
+    IReportingCalendar calendar,
     IClock clock)
     : IRequestHandler<SearchCatalogueQuery, Result<PagedResult<CatalogueListing>, Error>>
 {
@@ -98,7 +99,8 @@ public sealed class SearchCatalogueHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var window = await BuildWindowAsync(request.PickupAt, request.ReturnAt, businessRules, clock, cancellationToken);
+        var window = await BuildWindowAsync(
+            request.PickupAt, request.ReturnAt, businessRules, calendar, clock, cancellationToken);
         if (window.IsFailure)
             return window.Error;
 
@@ -124,11 +126,18 @@ public sealed class SearchCatalogueHandler(
     /// Shared by search and the single listing because both accept the same optional dates and must
     /// judge them the same way. Half a period is a client bug, not a browse: silently ignoring one
     /// end would show a customer cars that are not free on the dates they typed.
+    ///
+    /// Dates that could never be booked are refused rather than searched. It would be easy to argue
+    /// that browsing should be permissive and only the booking strict, and it is wrong: a search for
+    /// a car in the next half hour would list cars, price them, and refuse at the last step. Every
+    /// surface that takes rental dates judges them through BookingWindowPolicy, so the customer is
+    /// told about a date they cannot use at the moment they type it.
     /// </remarks>
     internal static async Task<Result<AvailabilityWindow?, Error>> BuildWindowAsync(
         DateTimeOffset? pickupAt,
         DateTimeOffset? returnAt,
         IBusinessRulesProvider businessRules,
+        IReportingCalendar calendar,
         IClock clock,
         CancellationToken cancellationToken)
     {
@@ -147,16 +156,41 @@ public sealed class SearchCatalogueHandler(
             return period.Error;
 
         var rules = await businessRules.GetAsync(cancellationToken);
+        var now = clock.UtcNow;
+
+        var window = BookingWindowPolicy.Validate(
+            period.Value,
+            now,
+            TimeSpan.FromMinutes(rules.MinimumBookingLeadTimeMinutes),
+            rules.MaxAdvanceBookingDays,
+            BilledDays(period.Value, calendar),
+            rules.MaxRentalDays);
+        if (window.IsFailure)
+            return window.Error;
+
         return new AvailabilityWindow(
             period.Value,
-            clock.UtcNow,
+            now,
             TimeSpan.FromMinutes(rules.TurnaroundMinutes));
     }
+
+    /// <summary>
+    /// The days this rental would be BILLED for: the Amman calendar dates, never the elapsed hours.
+    /// </summary>
+    /// <remarks>
+    /// The one conversion in this file, so search, the single listing and the quote all bound the
+    /// length by the same count the price is built from. <c>BookingPricer</c> does the same
+    /// conversion for the figures it freezes; they cannot disagree, because both go through
+    /// <c>IReportingCalendar</c> and <c>RentalDays</c>.
+    /// </remarks>
+    internal static int BilledDays(DateRange period, IReportingCalendar calendar) =>
+        RentalDays.Between(calendar.DayOf(period.Start), calendar.DayOf(period.End));
 }
 
 public sealed class GetCatalogueVehicleHandler(
     ICatalogueReader catalogue,
     IBusinessRulesProvider businessRules,
+    IReportingCalendar calendar,
     IClock clock)
     : IRequestHandler<GetCatalogueVehicleQuery, Result<CatalogueVehicle, Error>>
 {
@@ -167,7 +201,7 @@ public sealed class GetCatalogueVehicleHandler(
         ArgumentNullException.ThrowIfNull(request);
 
         var window = await SearchCatalogueHandler.BuildWindowAsync(
-            request.PickupAt, request.ReturnAt, businessRules, clock, cancellationToken);
+            request.PickupAt, request.ReturnAt, businessRules, calendar, clock, cancellationToken);
         if (window.IsFailure)
             return window.Error;
 
@@ -207,12 +241,24 @@ public sealed class QuoteRentalHandler(
         ArgumentNullException.ThrowIfNull(request);
 
         var now = clock.UtcNow;
-        if (request.PickupAt <= now)
-            return BookingErrors.PeriodInThePast;
+        var rules = await businessRules.GetAsync(cancellationToken);
 
         var period = DateRange.Create(request.PickupAt, request.ReturnAt);
         if (period.IsFailure)
             return period.Error;
+
+        // The same policy the create endpoint applies, so a quote can never price a rental the
+        // booking would then refuse. It replaces a bare "must be in the future" check that let a
+        // customer be quoted for a pickup twenty minutes away, or for a date past the horizon.
+        var window = BookingWindowPolicy.Validate(
+            period.Value,
+            now,
+            TimeSpan.FromMinutes(rules.MinimumBookingLeadTimeMinutes),
+            rules.MaxAdvanceBookingDays,
+            SearchCatalogueHandler.BilledDays(period.Value, calendar),
+            rules.MaxRentalDays);
+        if (window.IsFailure)
+            return window.Error;
 
         var pickupMethod = Enumeration.GetAll<PickupMethod>()
             .FirstOrDefault(method => string.Equals(method.Name, request.PickupMethod, StringComparison.OrdinalIgnoreCase));
@@ -242,7 +288,6 @@ public sealed class QuoteRentalHandler(
         if (priced.IsFailure)
             return priced.Error;
 
-        var rules = await businessRules.GetAsync(cancellationToken);
         // The same guard the booking itself will run, so a quote that says "available" and a booking
         // that is refused cannot disagree for any reason other than someone else booking first.
         var taken = await bookings.HasOverlappingBookingAsync(
@@ -264,7 +309,7 @@ public sealed class QuoteRentalHandler(
             new QuoteTerms(
                 terms.DepositPercent.Value,
                 terms.FreeCancellationWindow.TotalHours,
-                terms.PaymentWindow.TotalMinutes,
+                terms.PaymentWindow.TotalHours,
                 terms.CustomerCancellationPenaltyPercent.Value,
                 terms.NoShowTimeout.TotalHours),
             !taken);

@@ -79,7 +79,13 @@ no dispute, and `IBookingRepository.ListDueForSettlementAsync` exists to feed it
 either. Returned bookings past their window therefore sit visibly un-Completed.
 
 The rule is still enforced correctly wherever it is asked — the gap is that nobody asks on a timer.
-The same is true of the payment-expiry and no-show jobs.
+The same is true of the payment-expiry, decision-expiry and no-show jobs.
+
+The reordering of 2026-09-07 raised the stakes on two of them without changing this item. A request
+and an unpaid approval both stop HOLDING the car at their own deadline, because the availability
+predicate reads the clock — so no car is stranded by the missing job. What is missing is the status:
+until something runs, a booking whose window closed still reads as Requested or Approved to both
+parties, and neither is told it ended.
 
 **To close:** a hosted background service driving the four `ListDueFor*` queries.
 
@@ -189,6 +195,10 @@ adds `bookings_one_hold_per_vehicle`:
 EXCLUDE USING gist (vehicle_id WITH =, tstzrange(hold_start, period_end, '[)') WITH &&)
   WHERE (status IN ('PendingPayment', 'Requested', 'Approved', 'PickedUp'))
 ```
+
+The status list was rewritten to `('Requested', 'Approved', 'Confirmed', 'PickedUp')` by
+`20260907121340_ReserveNowPayAfterApproval` when the lifecycle was reordered. Everything else about
+the constraint is unchanged.
 
 It excludes on `hold_start`, not `period_start`, so the gallery's turnaround gap is enforced by the
 database too. The 59 overlapping pairs are gone with the seeder that made them: they lived in the
@@ -435,7 +445,7 @@ let the customer search filter by it.
 
 ### 27. Admins cannot view a customer's identity documents
 
-**Status:** open by decision · **Raised:** 2026-09-04
+**Status:** open by decision · **Raised:** 2026-09-04 · **See also:** item 63, which the owner has made a hard launch blocker
 
 The customer profile lists what is on file — type, state, format, size, when — and mints no signed
 URL. `CustomerDocument` scopes viewing to the customer themselves and to a dealer with an active
@@ -756,6 +766,25 @@ deviations recorded in the components' own comments.
 
 ### 42. The design promises a 48-hour answer window that the platform does not keep
 
+**Status:** closed · **Closed:** 2026-09-07 — the window exists, on the terms this item asked for.
+
+`BusinessRules:BookingAnswerWindowHours` (48) is frozen onto every booking as
+`BookingTerms.AnswerWindow`, and `Booking.Create` sets `DecisionDeadline = min(now + window,
+Period.Start)` from it. `ExpireUnanswered` judges against that column, `Approve` refuses once it has
+passed (a late REJECT is still allowed — it costs nobody anything and closes the record honestly),
+and the availability predicate stops counting the request as a hold at the same moment, so the car
+returns to the market on the deadline rather than whenever a job next looks.
+
+It is its own setting rather than `AdminSlaHours`, which happens to share the number: they are
+different clocks owned by different people, and one owner must be able to move without the other.
+
+The refund consequences this item asked to be worked out turned out not to exist. Under the
+reordering of 2026-09-07 (`docs/spec-amendments.md`) a request carries no deposit, so an unanswered
+one refunds nothing — there is no money to give back and no penalty to assess.
+
+The dealer console now counts down to that deadline instead of to the rental date. The original
+report follows.
+
 `Employee Console.dc.html` shows "Requests expire 48h after they arrive", "48h limit" beside the
 pending-requests tile, and "answer within 34h" on notification rows. No such rule exists.
 `Booking.ExpireUnanswered` refuses until `now >= Period.Start` — a request expires when the RENTAL
@@ -1042,6 +1071,13 @@ application guard, which is the check-then-act the constraint exists to backstop
 The constraint has been verified by hand against the development database — `pg_constraint` holds it
 and `btree_gist` is installed — and that is a person looking once, not a test that keeps looking.
 
+**Partly answered on 2026-09-07** by the create-booking slice. Six concurrent `POST /bookings` for one
+car and one window were driven against the real API and Postgres: exactly one returned 201 and five
+returned 409 `booking.vehicle_unavailable`, and a query for overlapping live pairs found none. That
+proves the OBSERVABLE contract holds under a real race. It does not prove the constraint is what held
+it — the application guard may have caught every loser — so this item stays open, and what it now
+needs is a test that reaches the constraint with the guard deliberately bypassed.
+
 **To close:** a Postgres-backed test (Testcontainers, or a dedicated test database) that inserts two
 overlapping held bookings for one vehicle and asserts the second is refused with SQLSTATE 23P01.
 Until then this is one migration edit away from silently guarding nothing, and the only thing
@@ -1050,17 +1086,42 @@ constraint's `WHERE` clause spells out.
 
 ### 53. Creating a booking must expire stale unpaid holds first, and translate 23P01
 
-**Status:** open · **Raised:** 2026-09-07 · **Blocks:** the booking-creation slice
+**Status:** closed · **Closed:** 2026-09-07 — both halves are in `CreateBookingHandler`.
+
+`ExpireStaleHoldsAsync` clears the vehicle's expired requests and unpaid approvals inside the same
+transaction, before the overlap guard and the insert, through the new
+`IBookingRepository.ListStaleHoldsForVehicleAsync`. The expiries are attributed to nobody, because
+the clock ended those bookings and not the customer who arrived next.
+
+`UnitOfWork` now translates SQLSTATE 23P01 into `ExclusiveHoldConflictException`, carrying the
+constraint name; the handler turns `bookings_one_hold_per_vehicle` into `booking.vehicle_unavailable`
+(409) and leaves any other constraint to surface as a generic conflict.
+
+A lost optimistic-concurrency race on a stale hold is **not** given that answer, and an earlier draft
+of this note said it was. Losing a row to another writer says nothing about whether the car is free:
+an administrator, or the expiry job when it exists, can change a stale hold under a request whose
+dates are perfectly available, and answering "no longer free for those dates" would send that
+customer away from dates that are fine. It surfaces as the generic `concurrency.conflict`, which
+tells them to reload and try again, and that is true.
+
+Two things keep it rare rather than routine. `ListStaleHoldsForVehicleAsync` is scoped to holds that
+OVERLAP the candidate window, so two customers booking the same car in different months never touch
+the same row. And `IVehicleHoldLock` takes a transaction-scoped Postgres advisory lock on the vehicle
+as the first statement inside the transaction, so the whole check-then-act sequence is serial per
+car: the second creator waits, then reads a world that has stopped moving.
+
+The original report follows.
 
 Two things the create handler must do that nothing does yet, because nothing creates bookings:
 
 **Expire stale holds in the same transaction.** The exclusion constraint's predicate cannot mention
-`now()`, so a `PendingPayment` booking whose deadline passed a week ago still counts as holding the
-car. The application predicate (`BookingHolds.Live`) correctly ignores it. The two therefore
-disagree: the guard says the car is free, and the insert is refused by the database. The handler must
-call `ExpireUnpaid` on the vehicle's stale unpaid bookings before it inserts. Both halves are
-required — the `PaymentDeadline > now` term alone leaves the constraint refusing bookings the guard
-allowed, and lazy expiry alone leaves an abandoned checkout holding a car forever (see item 4).
+`now()`, so a booking whose deadline passed a week ago still counts there as holding the car. The
+application predicate (`BookingHolds.Live`) correctly ignores it. The two therefore disagree: the
+guard says the car is free, and the insert is refused by the database. The handler must clear both
+kinds of stale hold on that vehicle before it inserts — `ExpireUnanswered` on requests past their
+decision deadline, `ExpireUnpaid` on approvals past their payment deadline. Both halves are required:
+the deadline terms alone leave the constraint refusing bookings the guard allowed, and lazy expiry
+alone leaves a stale hold keeping a car off the market forever (see item 4).
 
 **Give 23P01 its own code.** An exclusion violation surfaces as `DbUpdateException`, which
 `ApiExceptionHandler` maps to 409 `data.conflict`. That is not a 500, but a phone cannot say "this
@@ -1210,3 +1271,205 @@ the binder APPENDS to a collection that already has items rather than replacing 
 broken, because every use was a `Contains` check — it became visible the moment the list was
 published to a client. The initialiser is now empty, configuration is the only source, and the
 existing "at least one" validation makes a missing key fail at startup.
+
+### 59. The deposit payment window is 24 hours only because nothing can tell the customer
+
+**Status:** open · **Raised:** 2026-09-07 · **Owner decision recorded**
+
+`BusinessRules:PaymentWindowHours` is 24. The number the flow wants is closer to one hour: a car sits
+held against nothing for the whole window, and a dealership that has said yes deserves an answer
+sooner than the next day.
+
+It is 24 because there are no push notifications. A customer learns their booking was approved only
+by opening the app. A one-hour window would auto-expire most bookings approved overnight or during a
+working day before the customer ever saw the approval, wasting the dealer's decision and losing the
+rental — a worse failure than a car held a day too long.
+
+It is configuration, not a constant, precisely so this can be shortened without a release.
+
+**To close:** once approval reaches a customer's phone (item 43's notification producers plus a push
+transport), shorten the window and say so on the screen that counts it down.
+
+### 60. Nothing tells a customer their approval is waiting for money
+
+**Status:** open · **Raised:** 2026-09-07 · **Blocks:** the booking-creation slice being usable
+
+The reordering of 2026-09-07 puts a deadline on the customer that they are never told about. The
+dealer console counts its own answer window down; the customer app has no booking screens at all yet,
+and no notification is raised when a booking is approved.
+
+The consequence is not theoretical: a booking approved and never paid for expires silently, and the
+customer's account shows a car they thought they had.
+
+**To close:** a `BookingApproved` notification to the customer carrying `PaymentDeadline`, and a
+booking screen in the customer app that shows the deadline and the amount. The payment step itself
+can stay the honest "not built yet" screen until Payments exists.
+
+### 61. A booking can be made minutes before its own pickup, and every window collapses
+
+**Status:** closed · **Closed:** 2026-09-07 — the owner set a 120-minute minimum lead time.
+
+`BusinessRules:MinimumBookingLeadTimeMinutes` (120) is judged by `BookingWindowPolicy`, which the
+create endpoint, the quote and the catalogue search all share — so a customer is told about a date
+they cannot use at the moment they type it, rather than at the last step. It is published on
+`GET /api/v1/app-config` beside the horizon, so the date picker bounds itself from the server.
+
+The horizon itself was being published and never enforced; the same policy now refuses a pickup
+beyond `MaxAdvanceBookingDays`.
+
+The second half of the original report stands and is NOT closed: the customer app must count down the
+`paymentDeadline` the booking carries, never `paymentWindowHours` from app-config. That belongs to the
+customer-app booking screens (item 60).
+
+The original report follows.
+
+`Booking.Create` requires only that the period starts in the future. Nothing stops a request being
+made twenty minutes before the car is due out. Every window on a booking is capped at the rental
+start, so all three collapse at once: the dealer gets twenty minutes to answer, the customer gets
+whatever is left to pay, and free cancellation is already over.
+
+None of that is wrong — a window that outlived the rental it governs would be worse — but the
+platform is meanwhile telling the customer, on `GET /api/v1/app-config`, that they have 24 hours to
+pay. Two answers to one question is the failure this endpoint exists to prevent.
+
+**To close:** two things.
+
+A **minimum lead time** in `BusinessRules`, refused at creation, long enough that the three windows
+mean something. The owner picks the number.
+
+And the customer app must count down `paymentDeadline` — the instant on that booking — never
+`paymentWindowHours` from app-config. The window is what the platform offers; the deadline is what
+this booking got.
+
+### 62. Payments must honour the deposit deadline the booking carries
+
+**Status:** open · **Raised:** 2026-09-07 · **Blocks:** nothing yet — Payments is unbuilt
+
+`ConfirmDepositPaid` deliberately does not check `PaymentDeadline`. A webhook settles a checkout that
+was already started, and refusing it there would mean money captured against a booking the platform
+then refuses to confirm. The deadline belongs at the other end — where a checkout is opened — and
+Payments does not exist to enforce it yet.
+
+Two obligations for whoever builds it:
+
+- **Refuse to open a checkout once `PaymentDeadline` has passed.** Otherwise the customer pays for a
+  car the catalogue released at the deadline and somebody else may already hold.
+- **Treat `booking.not_awaiting_payment` on a webhook as a refund**, not an error to retry. It means
+  the money was captured for a booking that expired or was cancelled in the race. `bookings.xmin`
+  makes that race resolve to exactly one winner, and this is the loser's side of it.
+
+`ConfirmDepositPaid` is idempotent by payment id, so a retry of the SAME payment is always a success
+whatever the booking's state — a gateway must never be made to retry forever.
+
+### 63. HARD BLOCKER — a dealer cannot see the documents they are required to check
+
+**Status:** open · **Raised:** 2026-09-07 · **Owner: hard requirement before real launch**
+
+Spec 5.1 makes the dealer the party who checks a renter's licence. They cannot. `CustomerDocument`
+already scopes viewing to the customer themselves *and to a dealer with an active booking request* —
+the rule is written, and no endpoint implements it. There is no way, anywhere in the platform, for
+the gallery handing over a car to look at the licence of the person taking it.
+
+Since 2026-09-07 the booking-creation guard requires only that a licence and an identity document
+have been UPLOADED. Nothing verifies them: `MarkVerified` and `MarkRejected` are `internal` with no
+public path, so every document on the platform sits in `PendingReview` for ever. The guard is a
+checkbox, and the owner has accepted it as one **for development only**.
+
+The owner has recorded this as a hard requirement, not a nice-to-have. Handing a real car to a real
+stranger on an unverified claim is the failure this closes.
+
+**To close:** an endpoint that mints a short-lived signed link to a customer's licence and identity
+document, authorised exactly as `CustomerDocument` already says — the dealer of a booking that is
+live, for as long as it is live, and no longer. Then the dealer console screen that shows them at the
+handover, and a decision (item 27) on whether an admin reviews documents at all or the dealer's
+look at pickup is the check.
+
+### 64. A free hold is renewable, so the 72-hour ceiling is per request, not per customer
+
+**Status:** open by decision · **Raised:** 2026-09-07 · **Accepted exposure**
+
+A request holds a car for up to 48 hours unanswered, and an approval holds it a further 24 unpaid:
+72 hours, none of it paid for. Nothing then stops the same customer requesting the same car again the
+instant it expires, so one account can keep a car off the market indefinitely at no cost.
+
+The deposit used to make that expensive. Under "reserve now, pay after approval" nothing does.
+
+The owner has accepted this exposure while the platform has no Payments module and no real customers.
+It is recorded so it is reconsidered deliberately rather than discovered.
+
+**To close (when it matters):** the cheapest effective limit is a cap on live unpaid requests per
+customer — a business number, not a constant — refused at creation with its own error code. A
+per-customer-per-vehicle cooldown after an expiry is the next step if that is not enough. Neither is
+worth building before there is a customer to abuse it.
+
+### 65. Turning on EF retry-on-failure would break the create-booking transaction
+
+**Status:** open · **Raised:** 2026-09-07 · **A trap, not a defect**
+
+`UnitOfWork.ExecuteInTransactionAsync` runs its work through an EF execution strategy. No
+`EnableRetryOnFailure` is configured, so today that strategy never retries and the delegate runs
+exactly once. `CreateBookingHandler` depends on that: it captures its result in variables closed over
+by the delegate, and it adds the new booking to the change tracker inside it.
+
+Enabling retries — an ordinary thing to reach for against a managed Postgres — would break it
+quietly. The handler already clears its captured state at the top of each attempt, but the
+`DbContext` is not reset between attempts, so a retried delegate would re-add an entity the first
+attempt had already tracked.
+
+**To close, if retries are ever wanted:** give `ExecuteInTransactionAsync` a shape that survives one
+— a fresh `DbContext` per attempt, or an explicit `ChangeTracker.Clear()` at the start of the
+delegate — and re-check every caller of it, not only this one.
+
+### 66. Two questions the create endpoint raises
+
+**Status:** open · **Raised:** 2026-09-07 · **One answered, one still an owner decision**
+
+Both surfaced while building `POST /bookings`. Neither is a defect; both are cheap now and awkward
+once the customer app's date picker has shipped without them.
+
+**~~There is no maximum rental length.~~ Closed 2026-09-07 at 90 days.**
+`BusinessRules:MaxRentalDays` (90) is judged in `BookingPricer` on the BILLED day count, so a customer
+is refused on the same number they were quoted, and the quote, the catalogue listing and the create
+endpoint all inherit it from one place. It is published on `/app-config` beside the other two bounds
+so the date picker cannot offer a span the server refuses. Ninety days is a proposal, not a
+principle: long hires are a real business, and the number is one line in configuration.
+
+**~~Nothing judges a pickup against the gallery's operating hours.~~ Closed 2026-09-07.**
+The owner chose: **refuse a self-pickup outside the gallery's hours; never judge a delivery against
+counter hours.** The reasoning is physical rather than commercial — a customer cannot collect keys
+from a closed office, but a gallery driving a car out may do that whenever it likes.
+
+`PickupHoursPolicy` holds the rule and `BookingPricer` applies it, which puts it in the one place a
+quote and a create both pass through, beside the other gallery-specific rules. The catalogue SEARCH
+deliberately does not apply it: a search spans galleries and has no single schedule to judge against.
+
+Both ends of a self-pickup are checked, not only the collection. The customer brings the car back to
+the same counter, so a return booked for 03:00 is the same impossibility — it is just discovered
+three days later. They are reported separately (`booking.pickup_outside_opening_hours` and
+`booking.return_outside_opening_hours`) so a customer is told which date to move, and each refusal
+carries the gallery's hours for that day, because "outside opening hours" alone tells somebody they
+are wrong without telling them what would be right.
+
+**The accepted cost:** a gallery whose hours are set wrongly refuses its own self-pickup bookings.
+That is loud, immediately visible to them, and fixable from their own console — the better failure
+against a customer turned away at the counter.
+
+### 67. A dealership is not told a request arrived
+
+**Status:** closed · **Closed:** 2026-09-07 — `NotificationKind.BookingRequested` now has a producer.
+
+`CreateBookingHandler` stages a notification for the owner and every ACTIVE employee in the same
+transaction as the insert, so a request and the alert about it land together or not at all. A
+deactivated employee is not told (spec 4.2), and a refused booking tells nobody.
+
+It goes through a new `DealerTeamNotifier.NotifyTeamOfCustomerActionAsync`, which differs from the
+team feed in the way that matters: **nobody is named.** Every other row snapshots the actor's name so
+it still reads correctly after that person leaves; doing that with a customer would copy their name
+into a table that is never deleted from, which is a promise about their data this platform has not
+made (spec 7). The row says "A customer" and carries no actor id. The dealership sees whose booking
+it is on the booking itself, where closing an account removes it.
+
+The customer-side twin is item 60, still open: nothing tells the CUSTOMER their approval is waiting
+for money.
+
+The original report follows.

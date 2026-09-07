@@ -125,8 +125,8 @@ export class EmployeeDashboardComponent {
         query: { tab: 'active' },
       },
       {
-        label: this.t('employeeDashboard.approvedNotYetCollected'),
-        main: String(d.bookings.approved),
+        label: this.t('employeeDashboard.confirmedNotYetCollected'),
+        main: String(d.bookings.confirmed),
         note: this.t('employeeDashboard.heldForTheirDates'),
         icon: 'calendar-check',
         route: '/employee/bookings',
@@ -233,7 +233,10 @@ export class EmployeeDashboardComponent {
 
   protected statusTone(handover: UpcomingHandover): Tone {
     if (handover.isOverdue) return 'bad';
-    return handover.status === 'Approved' ? 'accent' : 'ok';
+    // Approved is still waiting on the customer's deposit; only a confirmed booking is a car to
+    // have ready.
+    if (handover.status === 'Approved') return 'warn';
+    return handover.status === 'Confirmed' ? 'accent' : 'ok';
   }
 
   /** Every row is already this person's, so the sentence does not repeat their name back at them. */

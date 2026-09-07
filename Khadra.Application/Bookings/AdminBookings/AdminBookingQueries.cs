@@ -12,9 +12,9 @@ namespace Khadra.Application.Bookings.AdminBookings;
 
 // The platform's own view of every booking, across all dealers (spec 3.3). It reads through the same
 // IBookingReader both parties use rather than a second reader of its own: one projection means a
-// booking cannot look different to an admin than it does to the people it belongs to. The only thing
-// the Admin asks for that the parties do not is IncludePendingPayment, because the rule that hides an
-// unpaid request is about the DEALER's list, not about the data.
+// booking cannot look different to an admin than it does to the people it belongs to. It now asks
+// for nothing the parties do not: the reader used to hide unpaid requests from a dealer and needed
+// an opt-out for the admin, and since 2026-09-07 it hides nothing from anyone.
 
 /// <summary>Every booking on the platform, filtered the way an admin working it would.</summary>
 public sealed record ListAllBookingsQuery(
@@ -85,17 +85,12 @@ public sealed class AdminBookingQueryHandlers(IBookingReader reader) :
     /// <summary>
     /// The Admin's scope is the whole platform, narrowed only by an explicit filter.
     /// </summary>
-    /// <remarks>
-    /// <c>IncludePendingPayment</c> is always true here. Without it, filtering to one dealership would
-    /// quietly apply that dealership's own visibility rule and drop every booking still holding a car
-    /// against an unpaid deposit — the ones an administrator most needs to see.
-    /// </remarks>
     private static BookingListFilter Scope(Guid? dealerId, Guid? customerId) =>
         new(
             CustomerId: customerId is { } customer ? Id.From(customer) : null,
             DealerId: dealerId is { } dealer ? Id.From(dealer) : null,
             Status: null,
-            IncludePendingPayment: true);
+            Reference: null);
 }
 
 /// <summary>One booking as the platform sees it, with no party check.</summary>

@@ -75,8 +75,8 @@ public sealed class CustomerAdminReaderTests : IDisposable
         // One of each shape the screen reports, plus one still running.
         var completed = Mine(booking =>
         {
-            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             booking.Approve(Id.New(), Build.Now);
+            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             booking.RecordPickup(BookingParty.Dealer, Id.New(), booking.Period.Start);
             booking.RecordReturn(BookingParty.Dealer, Id.New(), booking.Period.End);
             booking.Settle(booking.Period.End.Add(booking.Terms.PostReturnSettlementWindow).AddHours(1), hasOpenDispute: false);
@@ -85,14 +85,14 @@ public sealed class CustomerAdminReaderTests : IDisposable
             booking.Cancel(BookingParty.Customer, Id.New(), "Changed my mind.", Build.Now));
         var noShow = Mine(booking =>
         {
-            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             booking.Approve(Id.New(), Build.Now);
+            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             booking.MarkNoShow(booking.Period.Start.Add(booking.Terms.NoShowTimeout).AddHours(1));
         });
         var live = Mine(booking =>
         {
-            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             booking.Approve(Id.New(), Build.Now);
+            booking.ConfirmDepositPaid(Id.New(), Build.Now);
         });
 
         var profile = await SeedAndReadAsync(completed, cancelled, noShow, live);

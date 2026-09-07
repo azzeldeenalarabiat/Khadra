@@ -77,12 +77,12 @@ public sealed class DealerBookingReaderTests : IDisposable
         booking.RecordPickup(BookingParty.Dealer, Id.New(), at);
     }
 
-    /// <summary>Paid and approved, but not collected: a claim on the dates, car still on the lot.</summary>
+    /// <summary>Approved and paid, but not collected: a claim on the dates, car still on the lot.</summary>
     private static void Reserve(Booking booking)
     {
         var beforeStart = booking.Period.Start.AddDays(-1);
-        booking.ConfirmDepositPaid(Id.New(), beforeStart);
         booking.Approve(Id.New(), beforeStart);
+        booking.ConfirmDepositPaid(Id.New(), beforeStart);
     }
 
     /// <summary>The failure this was written for: the car is late back, and it was called available.</summary>
@@ -138,6 +138,40 @@ public sealed class DealerBookingReaderTests : IDisposable
         var held = await HeldAsync(start.AddDays(2), back);
 
         Assert.DoesNotContain(back.VehicleId.Value, held);
+    }
+
+    /// <summary>
+    /// A request nobody answered is not a hold, however close its dates are.
+    /// </summary>
+    /// <remarks>
+    /// The deadline this turns on is invisible in the arrangement, which is why it is worth spelling
+    /// out: every window on a booking is capped at the rental start, so a request whose period has
+    /// begun is necessarily past its own answer deadline. The catalogue released that car at the
+    /// deadline. If this screen still counted it, the dealership would be told a car was spoken for
+    /// on the same afternoon the customer app was offering it to somebody else.
+    /// </remarks>
+    [Fact]
+    public async Task A_request_nobody_answered_is_not_held_once_its_dates_arrive()
+    {
+        var start = Build.Now.AddDays(-1);
+        var unanswered = Theirs(start);
+
+        var held = await HeldAsync(Build.Now, unanswered);
+
+        Assert.Empty(held);
+    }
+
+    /// <summary>And the same for an approval the customer never paid for.</summary>
+    [Fact]
+    public async Task An_approval_nobody_paid_for_is_not_held_once_its_dates_arrive()
+    {
+        var start = Build.Now.AddDays(-1);
+        // Approved the day it was made, which is the day before its dates begin.
+        var unpaid = Theirs(start, booking => booking.Approve(Id.New(), start.AddDays(-1)));
+
+        var held = await HeldAsync(Build.Now, unpaid);
+
+        Assert.Empty(held);
     }
 
     /// <summary>One car, two live bookings, one entry: the tile counts cars, not bookings.</summary>

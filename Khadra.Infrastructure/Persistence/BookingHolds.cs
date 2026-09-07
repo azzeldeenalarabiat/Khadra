@@ -30,26 +30,30 @@ internal static class BookingHolds
     /// Narrows to the bookings that hold their vehicle right now.
     /// </summary>
     /// <remarks>
-    /// A booking awaiting payment holds the car only until its deadline passes. That term matters
-    /// more than it looks: nothing expires those bookings yet (pre-launch checklist item 4), so
-    /// without it one abandoned checkout would keep a car off the market permanently.
+    /// Two of the four states hold the car only while a clock is still running, and that is what
+    /// makes a released car released IMMEDIATELY rather than whenever a job next happens to look:
     ///
-    /// The database constraint cannot make the same distinction — an exclusion predicate has no
-    /// access to the current time — so it treats a stale unpaid hold as live. The booking handler
-    /// therefore has to expire stale holds on the vehicle in the same transaction, before it
-    /// inserts, or the guard will say free and the constraint will say taken.
+    /// - A REQUEST holds the car until the dealer's answer window closes. Past it the car is back on
+    ///   the market even though the row still says Requested.
+    /// - An APPROVED booking holds it until the payment window closes. Past it, likewise.
+    /// - CONFIRMED and PICKED UP hold it outright: the deposit is paid, or the car is already gone.
+    ///
+    /// The database constraint can make neither distinction, because an exclusion predicate has no
+    /// access to the current time and so treats a stale hold as live. Whatever creates a booking must
+    /// therefore expire stale requests and approvals on that vehicle in the same transaction, before
+    /// it inserts, or this will say free and the constraint will say taken.
     /// </remarks>
     internal static IQueryable<Booking> Live(IQueryable<Booking> bookings, DateTimeOffset now)
     {
-        var pendingPayment = BookingStatus.PendingPayment;
         var requested = BookingStatus.Requested;
         var approved = BookingStatus.Approved;
+        var confirmed = BookingStatus.Confirmed;
         var pickedUp = BookingStatus.PickedUp;
 
         return bookings.Where(booking =>
-            (booking.Status == pendingPayment && booking.PaymentDeadline > now) ||
-            booking.Status == requested ||
-            booking.Status == approved ||
+            (booking.Status == requested && booking.DecisionDeadline > now) ||
+            (booking.Status == approved && booking.PaymentDeadline > now) ||
+            booking.Status == confirmed ||
             booking.Status == pickedUp);
     }
 

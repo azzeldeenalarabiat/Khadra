@@ -25,6 +25,9 @@ internal sealed class ReportingCalendar : IReportingCalendar
     public DateOnly DayOf(DateTimeOffset instant) =>
         DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, _zone).DateTime);
 
+    public TimeOnly TimeOfDay(DateTimeOffset instant) =>
+        TimeOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, _zone).DateTime);
+
     public DateTimeOffset StartOfDay(DateOnly day)
     {
         var midnight = day.ToDateTime(TimeOnly.MinValue);

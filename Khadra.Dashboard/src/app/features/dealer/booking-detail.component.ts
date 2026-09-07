@@ -78,9 +78,11 @@ export class DealerBookingDetailComponent {
     if (!b) return 'dim';
     if (b.liveDisputeId) return 'bad';
     switch (b.status) {
+      // Waiting on somebody: the dealer's answer, or the customer's deposit.
       case 'Requested':
-        return 'warn';
       case 'Approved':
+        return 'warn';
+      case 'Confirmed':
         return 'accent';
       case 'PickedUp':
       case 'Returned':
@@ -96,6 +98,7 @@ export class DealerBookingDetailComponent {
     if (b.liveDisputeId) return 'Disputed';
     const labels: Partial<Record<Booking['status'], string>> = {
       Requested: 'Pending',
+      Approved: 'Awaiting deposit',
       PickedUp: 'Active',
       NoShow: 'No-show',
     };
@@ -109,15 +112,22 @@ export class DealerBookingDetailComponent {
     return `Requested ${this.dateTime(b.requestedAt ?? b.createdAt)} · ${b.customerName} · ${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'} · ${method}`;
   });
 
-  /** Time left to answer: the request expires when its rental date arrives (the domain's rule). */
+  /**
+   * Time left to answer, against the deadline THIS booking carries.
+   *
+   * It used to count down to the rental start, which was the rule while a deposit had to clear
+   * before a request reached a dealer at all. A request costs the customer nothing now, so the
+   * answer window is what gets the car back if nobody replies, and the server sends the moment.
+   */
   protected readonly answerBy = computed(() => {
     const b = this.booking();
     if (!b || b.status !== 'Requested') return null;
-    const hours = Math.round((Date.parse(b.periodStart) - Date.now()) / 3_600_000);
-    if (hours <= 0) return { figure: 'Expiring', note: this.t('dealerBooking.theRentalDateHas') };
+    const hours = Math.round((Date.parse(b.decisionDeadline) - Date.now()) / 3_600_000);
+    if (hours <= 0)
+      return { figure: 'Expired', note: this.t('dealerBooking.theAnswerWindowHasClosed') };
     return {
       figure: hours >= 48 ? `${Math.round(hours / 24)}d left` : `${hours}h left`,
-      note: `Expires at pickup time, ${this.dateTime(b.periodStart)}.`,
+      note: `Expires ${this.dateTime(b.decisionDeadline)}.`,
     };
   });
 
@@ -188,9 +198,15 @@ export class DealerBookingDetailComponent {
     // What the customer has paid and what is still due only mean something while a handover can
     // still happen. A rejected or expired request refunds its deposit (Payments will do that);
     // a cancelled or no-show booking is settled through the penalty panel, not this one.
-    const live = b.status === 'Requested' || b.status === 'Approved' || b.status === 'PickedUp';
+    const live =
+      b.status === 'Requested' ||
+      b.status === 'Approved' ||
+      b.status === 'Confirmed' ||
+      b.status === 'PickedUp';
     const settling = b.status === 'Returned' || b.status === 'Completed';
-    const paidDeposit = b.status !== 'PendingPayment';
+    // From the server, not from the status: a booking that ended after being paid is still one the
+    // customer paid, and reading that off a list of statuses is how a screen starts lying.
+    const paidDeposit = b.depositPaid;
     return [
       {
         k: `Rental · ${b.pricing.days} × ${b.pricing.dailyRate.amount} ${cur}`,
@@ -241,18 +257,27 @@ export class DealerBookingDetailComponent {
     if (b.status === 'Requested')
       future.push({
         label: 'Approved / rejected',
-        meta: `Your answer, before ${this.dateTime(b.periodStart)}`,
+        meta: `Your answer, before ${this.dateTime(b.decisionDeadline)}`,
         tone: 'dim',
         future: true,
       });
-    if (b.status === 'Requested' || b.status === 'Approved')
+    // The step between the two that did not exist before: the customer's deposit, on their own
+    // clock, which is what turns an approval into a rental.
+    if (b.status === 'Approved' && b.paymentDeadline)
+      future.push({
+        label: 'Deposit paid',
+        meta: `The customer pays by ${this.dateTime(b.paymentDeadline)}`,
+        tone: 'dim',
+        future: true,
+      });
+    if (b.status === 'Requested' || b.status === 'Approved' || b.status === 'Confirmed')
       future.push({
         label: 'Pickup',
         meta: `Scheduled ${this.dateTime(b.periodStart)}`,
         tone: 'dim',
         future: true,
       });
-    if (['Requested', 'Approved', 'PickedUp'].includes(b.status))
+    if (['Requested', 'Approved', 'Confirmed', 'PickedUp'].includes(b.status))
       future.push({
         label: 'Return',
         meta: `Scheduled ${this.dateTime(b.periodEnd)}`,
@@ -280,7 +305,8 @@ export class DealerBookingDetailComponent {
       this.booking()?.status === 'Requested' &&
       this.console.permissions()?.canDecideBookings === true,
   );
-  protected readonly canPickUp = computed(() => this.booking()?.status === 'Approved');
+  // Not Approved: the deposit has to have cleared before a car leaves the lot.
+  protected readonly canPickUp = computed(() => this.booking()?.status === 'Confirmed');
   protected readonly canReturn = computed(() => this.booking()?.status === 'PickedUp');
   protected readonly canDispute = computed(
     () => !!this.booking()?.canBeDisputed && !this.booking()?.liveDisputeId,
@@ -390,9 +416,9 @@ export class DealerBookingDetailComponent {
   private stepLabel(status: string): string {
     return (
       {
-        PendingPayment: 'Request created',
-        Requested: 'Deposit paid · awaiting your answer',
-        Approved: 'Approved',
+        Requested: 'Requested · awaiting your answer',
+        Approved: 'Approved · awaiting the deposit',
+        Confirmed: 'Deposit paid · booking confirmed',
         Rejected: 'Rejected',
         PickedUp: 'Picked up',
         Returned: 'Returned',

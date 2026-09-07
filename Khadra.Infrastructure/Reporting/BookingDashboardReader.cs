@@ -16,8 +16,8 @@ internal sealed class BookingDashboardReader(KhadraDbContext context) : IBooking
         // "Active" is BookingStatus.HoldsVehicle spelled out. It cannot be expressed as a property
         // call in a LINQ predicate (the domain computes it in memory), so the member statuses are
         // listed here; the domain remains the definition and this is the projection of it.
-        var pendingPayment = BookingStatus.PendingPayment;
         var approved = BookingStatus.Approved;
+        var confirmed = BookingStatus.Confirmed;
         var pickedUp = BookingStatus.PickedUp;
 
         var counts = await context.Bookings
@@ -29,9 +29,9 @@ internal sealed class BookingDashboardReader(KhadraDbContext context) : IBooking
                 // be created after now.
                 group.Count(booking => booking.CreatedAt >= createdSince),
                 group.Count(booking =>
-                    booking.Status == pendingPayment ||
                     booking.Status == requested ||
                     booking.Status == approved ||
+                    booking.Status == confirmed ||
                     booking.Status == pickedUp),
                 group.Count(booking => booking.Status == requested)))
             .SingleOrDefaultAsync(cancellationToken);

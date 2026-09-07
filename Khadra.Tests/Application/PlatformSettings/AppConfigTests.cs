@@ -64,6 +64,16 @@ public sealed class AppConfigTests
     }
 
     [Fact]
+    public async Task It_says_how_long_a_customer_has_to_pay_after_approval()
+    {
+        var config = (await Handler().Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        // The app tells the customer this on the screen where they are waiting for it, so the figure
+        // has to be the platform's. Twenty-four hours until push notifications exist to justify less.
+        Assert.Equal(24, config.PaymentWindowHours);
+    }
+
+    [Fact]
     public async Task It_publishes_the_upload_limits_instead_of_letting_a_client_discover_them_by_being_refused()
     {
         var config = (await Handler().Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;

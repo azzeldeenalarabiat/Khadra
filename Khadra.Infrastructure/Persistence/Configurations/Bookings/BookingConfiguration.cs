@@ -42,7 +42,10 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
 
         entity.Property(booking => booking.CancellationReason).HasMaxLength(1000);
         entity.Property(booking => booking.CreatedAt).IsRequired();
-        entity.Property(booking => booking.PaymentDeadline).IsRequired();
+        // The two consecutive clocks. A request always has a decision deadline; only an approved
+        // booking has a payment one, and it stays null on every booking that was never approved.
+        entity.Property(booking => booking.DecisionDeadline).IsRequired();
+        entity.Property(booking => booking.PaymentDeadline);
         // A first-class column, not a computed one: the exclusion constraint that stops two bookings
         // holding one car indexes it, and Postgres refuses to index timestamptz arithmetic because
         // adding an interval is STABLE, not IMMUTABLE.
@@ -103,6 +106,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             terms.Property(value => value.FreeCancellationWindow);
             terms.Property(value => value.NoShowTimeout);
             terms.Property(value => value.PaymentWindow);
+            terms.Property(value => value.AnswerWindow);
             terms.Property(value => value.PostReturnSettlementWindow);
             terms.Property(value => value.TurnaroundBuffer);
             terms.Property(value => value.RulesVersion);

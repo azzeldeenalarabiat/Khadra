@@ -120,7 +120,7 @@ export class VehicleDetailComponent {
   protected readonly next = computed(
     () =>
       this.bookings()
-        .filter((b) => b.status === 'Approved' && Date.parse(b.periodStart) > Date.now())
+        .filter((b) => b.status === 'Confirmed' && Date.parse(b.periodStart) > Date.now())
         .sort((a, b) => Date.parse(a.periodStart) - Date.parse(b.periodStart))[0] ?? null,
   );
 
@@ -197,8 +197,8 @@ export class VehicleDetailComponent {
     const c = this.car();
     const first = this.month();
     const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-    const holds = this.bookings().filter(
-      (b) => b.status === 'Requested' || b.status === 'Approved' || b.status === 'PickedUp',
+    const holds = this.bookings().filter((b) =>
+      ['Requested', 'Approved', 'Confirmed', 'PickedUp'].includes(b.status),
     );
     return Array.from({ length: days }, (_, i) => {
       const dayStart = new Date(first.getFullYear(), first.getMonth(), i + 1).getTime();
@@ -211,6 +211,8 @@ export class VehicleDetailComponent {
           return { n: i + 1, tag: 'On hire', tone: 'accent', bookingId: hold.bookingId };
         if (hold.status === 'Requested')
           return { n: i + 1, tag: 'Requested', tone: 'bad', bookingId: hold.bookingId };
+        if (hold.status === 'Approved')
+          return { n: i + 1, tag: 'Awaiting deposit', tone: 'bad', bookingId: hold.bookingId };
         return { n: i + 1, tag: hold.reference, tone: 'warn', bookingId: hold.bookingId };
       }
       if (c && c.status === 'Maintenance')
@@ -224,7 +226,7 @@ export class VehicleDetailComponent {
   protected readonly legend: readonly { label: string; tone: Tone }[] = [
     { label: 'Free', tone: 'ok' },
     { label: 'Booked', tone: 'warn' },
-    { label: this.t('vehicleDetail.requestedDepositPaid'), tone: 'bad' },
+    { label: this.t('vehicleDetail.requestedOrUnpaid'), tone: 'bad' },
     { label: this.t('vehicleDetail.onHire'), tone: 'accent' },
     { label: this.t('vehicleWizard.notOffered'), tone: 'dim' },
   ];
@@ -232,7 +234,9 @@ export class VehicleDetailComponent {
   protected readonly historyNote = computed(() => {
     const all = this.bookings();
     const done = all.filter((b) => b.status === 'Completed' || b.status === 'Returned').length;
-    const upcoming = all.filter((b) => b.status === 'Approved' || b.status === 'Requested').length;
+    const upcoming = all.filter((b) =>
+      ['Requested', 'Approved', 'Confirmed'].includes(b.status),
+    ).length;
     return `${done} completed · ${upcoming} upcoming`;
   });
 
@@ -250,9 +254,11 @@ export class VehicleDetailComponent {
   protected tone(b: BookingListItem): Tone {
     if (b.hasLiveDispute) return 'bad';
     switch (b.status) {
+      // Still waiting on somebody: an answer, or a deposit.
       case 'Requested':
-        return 'warn';
       case 'Approved':
+        return 'warn';
+      case 'Confirmed':
         return 'accent';
       case 'PickedUp':
       case 'Returned':
@@ -266,7 +272,13 @@ export class VehicleDetailComponent {
   protected label(b: BookingListItem): string {
     if (b.hasLiveDispute) return 'Disputed';
     return (
-      { Requested: 'Pending', Approved: 'Upcoming', PickedUp: 'Active', NoShow: 'No-show' }[
+      {
+        Requested: 'Pending',
+        Approved: 'Awaiting deposit',
+        Confirmed: 'Upcoming',
+        PickedUp: 'Active',
+        NoShow: 'No-show',
+      }[
         b.status as string
       ] ?? b.status
     );

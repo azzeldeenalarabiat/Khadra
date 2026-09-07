@@ -72,6 +72,10 @@ export class NotificationsService {
     const what = item.subjectReference ?? 'a booking';
 
     switch (item.kind) {
+      // The one kind raised from outside the dealership. Its row carries no actor on purpose --
+      // a customer's name is never copied into this table -- so it does not use `who`.
+      case 'BookingRequested':
+        return `A customer requested ${what}`;
       case 'BookingApproved':
         return `${who} approved ${what}`;
       case 'BookingRejected':
@@ -106,6 +110,7 @@ export class NotificationsService {
     if (!item.subjectId) return null;
 
     switch (item.kind) {
+      case 'BookingRequested':
       case 'BookingApproved':
       case 'BookingRejected':
       case 'BookingPickedUp':

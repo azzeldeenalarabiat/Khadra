@@ -32,8 +32,8 @@ namespace Khadra.Application.Bookings.AdminBookings;
 public sealed record CancelBookingAsAdminCommand(Id BookingId, string Reason) : ICommand<Result<BookingDto, Error>>;
 
 /// <summary>
-/// Ends a booking whose own deadline has passed: unpaid past its payment window, or unanswered past
-/// its start.
+/// Ends a booking whose own deadline has passed: approved but unpaid past its payment window, or
+/// unanswered past the dealer's.
 /// </summary>
 /// <remarks>
 /// The stand-in for a background job that does not exist yet (pre-launch item 4). Which of the two
@@ -88,9 +88,9 @@ public sealed class AdminBookingCommandHandlers(
         return ActAsync(
             request.BookingId,
             // Which expiry applies is the booking's own state, not something the caller chooses:
-            // unpaid past its payment window, or approved-by-nobody past its start. Any other status
-            // falls through to the aggregate, which answers with the right refusal.
-            (booking, now) => booking.Status == BookingStatus.PendingPayment
+            // approved but unpaid past its payment window, or unanswered past the dealer's own. Any other
+            // status falls through to the aggregate, which answers with the right refusal.
+            (booking, now) => booking.Status == BookingStatus.Approved
                 ? booking.ExpireUnpaid(now, actor.UserId)
                 : booking.ExpireUnanswered(now, actor.UserId),
             AuditAction.BookingExpired,

@@ -40,9 +40,9 @@ export interface BookingListItem {
 }
 
 export type BookingStatus =
-  | 'PendingPayment'
   | 'Requested'
   | 'Approved'
+  | 'Confirmed'
   | 'Rejected'
   | 'PickedUp'
   | 'Returned'
@@ -82,7 +82,12 @@ export interface Booking {
   readonly cancelledBy: string | null;
   readonly cancellationReason: string | null;
   readonly createdAt: string;
-  readonly paymentDeadline: string;
+  /** When the dealer must answer by. */
+  readonly decisionDeadline: string;
+  /** Null until the dealer approves: there is no payment clock before there is a decision. */
+  readonly paymentDeadline: string | null;
+  /** Whether the deposit cleared. Never inferred from the status on a screen. */
+  readonly depositPaid: boolean;
   readonly requestedAt: string | null;
   readonly approvedAt: string | null;
   readonly freeCancellationDeadline: string | null;
@@ -120,7 +125,7 @@ export interface BookingTerms {
   readonly commissionPercent: number;
   readonly freeCancellationWindowHours: number;
   readonly noShowTimeoutHours: number;
-  readonly paymentWindowMinutes: number;
+  readonly paymentWindowHours: number;
   readonly postReturnSettlementWindowHours: number;
   readonly customerCancellationPenaltyPercent: number;
   readonly dealerPenaltyMinPercent: number;

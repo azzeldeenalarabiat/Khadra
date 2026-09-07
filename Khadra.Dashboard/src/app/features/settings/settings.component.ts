@@ -14,7 +14,7 @@ interface BusinessRules {
   readonly freeCancellationWindowMinutes: number;
   readonly adminSlaHours: number;
   readonly customerCancellationPenaltyPercent: number;
-  readonly paymentWindowMinutes: number;
+  readonly paymentWindowHours: number;
   readonly postReturnSettlementHours: number;
   /** Null means the owner has not set one and nobody is refused on age — a real shipping state. */
   readonly minimumRenterAge: number | null;
@@ -75,7 +75,7 @@ export class SettingsComponent {
     const rules = this.view()?.rules;
     if (!rules) return [];
     return [
-      { k: 'Payment window', v: `${rules.paymentWindowMinutes} minutes` },
+      { k: 'Payment window', v: `${rules.paymentWindowHours} hours` },
       { k: 'Free cancellation window', v: `${rules.freeCancellationWindowMinutes} minutes` },
       { k: 'No-show timeout', v: `${rules.noShowTimeoutHours} hours` },
       { k: 'Settlement window after return', v: `${rules.postReturnSettlementHours} hours` },

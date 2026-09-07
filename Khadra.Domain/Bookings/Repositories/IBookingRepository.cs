@@ -41,5 +41,34 @@ public interface IBookingRepository
 
     Task<IReadOnlyList<Booking>> ListDueForSettlementAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Bookings on one vehicle, overlapping one candidate window, whose hold has run out but whose
+    /// status has not caught up.
+    /// </summary>
+    /// <remarks>
+    /// The narrow twin of the two ListDueFor* queries above, and it exists for a reason those cannot
+    /// serve: whatever creates a booking must clear these in its OWN transaction before it inserts.
+    ///
+    /// The database's exclusion constraint cannot mention <c>now()</c>, so a request past its
+    /// decision deadline, or an approval past its payment deadline, still occupies the index.
+    /// <c>BookingHolds.Live</c> correctly ignores both. The two therefore disagree: the guard says
+    /// the car is free and the INSERT is refused. Expiring them first is what makes the application
+    /// and the database describe the same world.
+    ///
+    /// It is scoped BOTH ways on purpose, and the window half matters as much as the vehicle half.
+    /// Only a stale hold that overlaps the candidate can trip the constraint, so only those need
+    /// settling — and a customer booking a car in March has no business ending someone's abandoned
+    /// request for the same car in July, nor losing a race to another customer who was touching it.
+    ///
+    /// The candidate is padded by its caller with the CURRENT turnaround gap, exactly as the overlap
+    /// guard pads it; each stored booking carries its own frozen gap in <c>HoldStart</c>.
+    /// </remarks>
+    Task<IReadOnlyList<Booking>> ListStaleHoldsForVehicleAsync(
+        Id vehicleId,
+        DateRange candidatePeriod,
+        TimeSpan turnaroundBuffer,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Booking booking, CancellationToken cancellationToken = default);
 }

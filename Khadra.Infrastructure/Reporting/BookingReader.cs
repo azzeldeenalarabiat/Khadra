@@ -122,7 +122,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         return counts;
     }
 
-    /// <summary>The bookings this caller may see at all. A dealer never sees PendingPayment.</summary>
+    /// <summary>The bookings this caller may see at all: their own, and nothing else filtered out.</summary>
     private IQueryable<Booking> Scoped(BookingListFilter filter)
     {
         var query = context.Bookings.AsQueryable();
@@ -130,21 +130,12 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         if (filter.CustomerId is { } customerId)
             query = query.Where(booking => booking.CustomerId == customerId);
 
+        // A dealer used to be shielded from unpaid requests, because under the old order a request
+        // without a deposit was not yet a request at all (spec 5.3). Since 2026-09-07 it is precisely
+        // the thing they must answer, and hiding it would leave the queue empty while cars sat held.
+        // Nothing is filtered out of a dealer's list any more.
         if (filter.DealerId is { } dealerId)
-        {
             query = query.Where(booking => booking.DealerId == dealerId);
-
-            // Spec 5.3 hides an unpaid request from the DEALER: no deposit has cleared, so nothing
-            // has been asked of them yet. That is a rule about their list, not about the data, and
-            // the Admin's platform-wide list opts out of it — filtering to one dealership must not
-            // silently drop the bookings holding that dealership's cars unpaid, which are exactly
-            // the ones worth looking at.
-            if (!filter.IncludePendingPayment)
-            {
-                var pendingPayment = BookingStatus.PendingPayment;
-                query = query.Where(booking => booking.Status != pendingPayment);
-            }
-        }
 
         if (!string.IsNullOrWhiteSpace(filter.Reference))
         {
@@ -178,17 +169,18 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         var statuses = BookingTabs.StatusesFor(tab);
         if (statuses is null)
             return query;
+        if (statuses.Count == 0)
+            throw new ArgumentException("A tab must name at least one status.", nameof(tab));
 
-        // Listed out rather than Contains(): smart enums compare through a converter, and a plain
-        // equality per member translates cleanly where a collection Contains does not.
-        return statuses.Count switch
-        {
-            1 => query.Where(booking => booking.Status == statuses[0]),
-            4 => query.Where(booking =>
-                booking.Status == statuses[0] || booking.Status == statuses[1] ||
-                booking.Status == statuses[2] || booking.Status == statuses[3]),
-            _ => query,
-        };
+        // One IN over the converted column, for a tab of any size. Two earlier shapes were wrong:
+        // a switch on 1 and 4 that fell through to the UNFILTERED query for every other count, so a
+        // two-status tab quietly listed the whole scope; and a Concat of one query per status, which
+        // EF cannot translate at all once the projection reaches into a JSON-mapped value object.
+        //
+        // Materialised into a List first: EF translates Contains over a local list, not over an
+        // IReadOnlyList it cannot recognise as a parameter.
+        var wanted = statuses.ToList();
+        return query.Where(booking => wanted.Contains(booking.Status));
     }
 
     public async Task<BookingContext> ContextAsync(Id bookingId, CancellationToken cancellationToken = default)

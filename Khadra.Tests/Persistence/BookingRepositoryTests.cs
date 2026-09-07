@@ -35,7 +35,7 @@ public sealed class BookingRepositoryTests : IDisposable
     [Fact]
     public async Task A_booking_round_trips_with_its_handovers_and_history()
     {
-        var booking = Build.ApprovedBooking();
+        var booking = Build.ConfirmedBooking();
         var start = booking.Period.Start;
         booking.RecordPickup(BookingParty.Dealer, Id.New(), start, odometerKm: 41_200, fuelLevel: 1m, notes: "Clean.");
 
@@ -69,13 +69,13 @@ public sealed class BookingRepositoryTests : IDisposable
         // as null -- the same trap the seeder fell into with GeoPoint.
         var released = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
         released.Cancel(BookingParty.Customer, Id.New(), "Changed plans.", Build.Now.AddMinutes(5));
-        var elsewhere = Build.ApprovedBooking();
+        var elsewhere = Build.ConfirmedBooking();
 
         await using (var context = NewContext())
         {
             var held = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
-            held.ConfirmDepositPaid(Id.New(), Build.Now);
             held.Approve(Id.New(), Build.Now);
+            held.ConfirmDepositPaid(Id.New(), Build.Now);
             context.Bookings.AddRange(held, released, elsewhere);
             await context.SaveChangesAsync();
         }
@@ -108,8 +108,8 @@ public sealed class BookingRepositoryTests : IDisposable
         await using (var context = NewContext())
         {
             var held = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
-            held.ConfirmDepositPaid(Id.New(), Build.Now);
             held.Approve(Id.New(), Build.Now);
+            held.ConfirmDepositPaid(Id.New(), Build.Now);
             context.Bookings.Add(held);
             await context.SaveChangesAsync();
         }
@@ -132,12 +132,12 @@ public sealed class BookingRepositoryTests : IDisposable
     }
 
     /// <summary>
-    /// An unpaid booking holds the car only until its payment deadline. Nothing expires those
-    /// bookings yet (pre-launch checklist item 4), so without this term one abandoned checkout would
+    /// An approved booking holds the car only until its payment deadline. Nothing expires those
+    /// bookings yet (pre-launch checklist item 4), so without this term one unpaid approval would
     /// keep a car off the market for good.
     /// </summary>
     [Fact]
-    public async Task An_abandoned_checkout_stops_holding_the_car_once_its_deadline_passes()
+    public async Task An_approved_booking_stops_holding_the_car_once_the_payment_deadline_passes()
     {
         var vehicleId = Id.New();
         var start = Build.Now.AddDays(10);
@@ -146,8 +146,10 @@ public sealed class BookingRepositoryTests : IDisposable
 
         await using (var context = NewContext())
         {
-            // Left in PendingPayment: never paid, never expired.
-            context.Bookings.Add(Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3)));
+            // Approved and never paid, and nothing has expired it.
+            var approved = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
+            approved.Approve(Id.New(), Build.Now);
+            context.Bookings.Add(approved);
             await context.SaveChangesAsync();
         }
 
@@ -159,6 +161,154 @@ public sealed class BookingRepositoryTests : IDisposable
         // Once the window has passed, the car is free again whether or not a job has said so.
         var afterTheDeadline = Build.Now.AddHours(1);
         Assert.False(await repository.HasOverlappingBookingAsync(vehicleId, period, gap, afterTheDeadline, null));
+    }
+
+    /// <summary>
+    /// The other half of the same guarantee, and the newer one: a request costs nothing now, so the
+    /// dealer's answer window is the only thing that ever gets the car back if nobody replies.
+    /// </summary>
+    [Fact]
+    public async Task An_unanswered_request_stops_holding_the_car_once_the_answer_window_closes()
+    {
+        var vehicleId = Id.New();
+        var start = Build.Now.AddDays(10);
+        var period = Build.Period(start, days: 3);
+        var gap = Build.TurnaroundBuffer;
+        DateTimeOffset deadline;
+
+        await using (var context = NewContext())
+        {
+            var requested = Build.Booking(vehicleId: vehicleId, period: Build.Period(start, days: 3));
+            deadline = requested.DecisionDeadline;
+            context.Bookings.Add(requested);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var repository = new BookingRepository(reader);
+
+        Assert.True(await repository.HasOverlappingBookingAsync(vehicleId, period, gap, deadline.AddMinutes(-1), null));
+        Assert.False(await repository.HasOverlappingBookingAsync(vehicleId, period, gap, deadline, null));
+    }
+
+    /// <summary>
+    /// The query the create handler clears before it inserts: exactly the holds whose clock has run
+    /// out, on exactly one car.
+    /// </summary>
+    /// <remarks>
+    /// Everything it must NOT return is the point. A live hold is somebody's booking. A confirmed
+    /// one is paid for. An already-expired one is settled. Another car's stale hold is none of this
+    /// customer's business. And a stale hold on THIS car in a different week is the case that made
+    /// the query take a window at all: expiring it would let one customer end an unrelated booking,
+    /// and losing a race over it would refuse dates that were free.
+    /// </remarks>
+    [Fact]
+    public async Task Stale_holds_are_exactly_the_expired_clocks_that_stand_in_this_bookings_way()
+    {
+        var car = Id.New();
+        var otherCar = Id.New();
+        var start = Build.Now.AddDays(10);
+        var wanted = Build.Period(start, days: 3);
+        var gap = Build.TurnaroundBuffer;
+        var madeLongAgo = Build.Now.AddDays(-5);
+
+        // Overlapping this candidate, and both its clocks are long gone.
+        var staleRequest = Build.Booking(vehicleId: car, now: madeLongAgo, period: Build.Period(start, days: 3));
+
+        // Also overlapping, approved and never paid for.
+        var staleApproval = Build.Booking(vehicleId: car, now: madeLongAgo, period: Build.Period(start.AddDays(1), days: 3));
+        staleApproval.Approve(Id.New(), madeLongAgo);
+
+        // Stale, same car, a different month. Nothing to do with this booking.
+        var staleElsewhen = Build.Booking(vehicleId: car, now: madeLongAgo, period: Build.Period(start.AddDays(40), days: 3));
+
+        // Made now: the dealer still has 48 hours, so this is a live hold on the same dates.
+        var liveRequest = Build.Booking(vehicleId: car, period: Build.Period(start, days: 3));
+
+        // Paid for. No clock is running on it at all.
+        var confirmed = Build.Booking(vehicleId: car, now: madeLongAgo, period: Build.Period(start, days: 3));
+        confirmed.Approve(Id.New(), madeLongAgo);
+        confirmed.ConfirmDepositPaid(Id.New(), madeLongAgo);
+
+        // Already settled: nothing left to expire.
+        var alreadyExpired = Build.Booking(vehicleId: car, now: madeLongAgo, period: Build.Period(start, days: 3));
+        alreadyExpired.ExpireUnanswered(Build.Now.AddDays(-2));
+
+        // Another car's problem entirely.
+        var elsewhere = Build.Booking(vehicleId: otherCar, now: madeLongAgo, period: Build.Period(start, days: 3));
+
+        await using (var context = NewContext())
+        {
+            context.Bookings.AddRange(
+                staleRequest, staleApproval, staleElsewhen, liveRequest, confirmed, alreadyExpired, elsewhere);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stale = await new BookingRepository(reader)
+            .ListStaleHoldsForVehicleAsync(car, wanted, gap, Build.Now);
+
+        Assert.Equal(
+            new[] { staleApproval.Id.Value, staleRequest.Id.Value }.OrderBy(id => id),
+            stale.Select(booking => booking.Id.Value).OrderBy(id => id));
+    }
+
+    /// <summary>
+    /// The window is the SAME padded window the overlap guard and the database constraint use, so a
+    /// stale hold inside the turnaround gap counts: it is exactly the row that would otherwise
+    /// refuse the insert after the guard had said the car was free.
+    /// </summary>
+    [Fact]
+    public async Task A_stale_hold_inside_the_turnaround_gap_still_stands_in_the_way()
+    {
+        var car = Id.New();
+        var gap = Build.TurnaroundBuffer;
+        var theirs = Build.Period(Build.Now.AddDays(10), days: 3);
+        var stale = Build.Booking(vehicleId: car, now: Build.Now.AddDays(-5), period: theirs);
+
+        await using (var context = NewContext())
+        {
+            context.Bookings.Add(stale);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var repository = new BookingRepository(reader);
+
+        // Starting half an hour after theirs ends: inside the gap, so it collides.
+        var insideTheGap = DateRange.Create(theirs.End.AddMinutes(30), theirs.End.AddDays(2)).Value;
+        Assert.Single(await repository.ListStaleHoldsForVehicleAsync(car, insideTheGap, gap, Build.Now));
+
+        // Starting exactly at the gap: clear of it, so it does not.
+        var atTheGap = DateRange.Create(theirs.End.Add(gap), theirs.End.AddDays(2)).Value;
+        Assert.Empty(await repository.ListStaleHoldsForVehicleAsync(car, atTheGap, gap, Build.Now));
+    }
+
+    /// <summary>
+    /// The boundary. A deadline that has arrived is a deadline that has passed, matching every other
+    /// clock on a booking: the expiry methods refuse while <c>now &lt; deadline</c> and the hold
+    /// predicate counts it while <c>deadline &gt; now</c>, so both flip at the same instant.
+    /// </summary>
+    [Fact]
+    public async Task A_hold_becomes_stale_at_its_deadline_not_after_it()
+    {
+        var car = Id.New();
+        var booking = Build.Booking(vehicleId: car, period: Build.Period(Build.Now.AddDays(10), days: 3));
+        var deadline = booking.DecisionDeadline;
+
+        await using (var context = NewContext())
+        {
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var repository = new BookingRepository(reader);
+        var wanted = booking.Period;
+        var gap = Build.TurnaroundBuffer;
+
+        Assert.Empty(await repository.ListStaleHoldsForVehicleAsync(car, wanted, gap, deadline.AddSeconds(-1)));
+        Assert.Single(await repository.ListStaleHoldsForVehicleAsync(car, wanted, gap, deadline));
     }
 
     [Fact]

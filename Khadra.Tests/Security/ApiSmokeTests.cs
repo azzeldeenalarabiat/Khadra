@@ -37,6 +37,45 @@ public sealed class ApiSmokeTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>
+    /// The one endpoint on the platform that creates a booking is default-deny like everything else.
+    /// </summary>
+    /// <remarks>
+    /// Belt and braces: the handler checks the caller's role itself, and that is unit-tested. This
+    /// holds the line one layer earlier, where a mistake would be a missing attribute rather than a
+    /// missing branch — the failure mode nothing else in the suite would notice.
+    ///
+    /// No database is reached: authorization runs before the handler, so an anonymous request is
+    /// refused without a query.
+    /// </remarks>
+    [Fact]
+    public async Task Creating_a_booking_without_a_token_is_401()
+    {
+        using var client = _factory.CreateClient();
+
+        using var response = await client.PostAsJsonAsync(
+            new Uri("/api/v1/bookings", UriKind.Relative),
+            new
+            {
+                vehicleId = Guid.NewGuid(),
+                pickupAt = DateTimeOffset.UtcNow.AddDays(7),
+                returnAt = DateTimeOffset.UtcNow.AddDays(10),
+                pickupMethod = "SelfPickup",
+            });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Reading_someones_bookings_without_a_token_is_401()
+    {
+        using var client = _factory.CreateClient();
+
+        using var response = await client.GetAsync(new Uri("/api/v1/bookings", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task Malformed_json_is_a_problem_details_with_trace_id()
     {

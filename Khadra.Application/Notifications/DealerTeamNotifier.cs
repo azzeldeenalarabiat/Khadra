@@ -7,15 +7,17 @@ using Khadra.Domain.Notifications.Repositories;
 namespace Khadra.Application.Notifications;
 
 /// <summary>
-/// Tells a dealership's people what one of them just did.
+/// Tells a dealership's people what just happened to their booking book.
 ///
-/// This is the producer that actually exists today. The design imagines notifications arriving from
-/// the customer's side — a new request, a cancellation — and none of those can be raised here: the
-/// customer flow is the Flutter app, which is not in this repository, and there is no scheduler for
-/// the time-based ones. What IS true is that a dealership is a team: when one member of staff answers
-/// a request or hands a car over, that is news to the owner and to every colleague who shares the
-/// booking book with them. Spec 4.2 asks for exactly this accountability, and until now it existed
-/// only on the booking's own history where nobody was looking.
+/// Most of it is what one of THEM did: a dealership is a team, and when one member of staff answers a
+/// request or hands a car over, that is news to the owner and to every colleague who shares the
+/// booking book with them. Spec 4.2 asks for exactly this accountability, and until this existed it
+/// lived only on the booking's own history where nobody was looking.
+///
+/// Since 2026-09-07 one thing arrives from outside the dealership as well — a customer asking for a
+/// car — and that goes through NotifyTeamOfCustomerActionAsync, which names nobody. The remaining
+/// customer-side notifications the design draws still have no producer: there is no
+/// customer-cancellation endpoint and no scheduler for the time-based ones.
 ///
 /// The actor is never notified of their own action. They were there.
 ///
@@ -51,6 +53,39 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         var actorName = await NameOfAsync(actorUserId, cancellationToken);
         notifier.RaiseMany(recipients.Select(recipient =>
             Notification.Raise(recipient, kind, actorName, now, subjectId, subjectReference, actorUserId)));
+    }
+
+    /// <summary>
+    /// Everyone at <paramref name="dealer"/>, told that a CUSTOMER did something.
+    /// </summary>
+    /// <remarks>
+    /// Nobody is excluded, because the actor is not one of them.
+    ///
+    /// And nobody is named. Every other row here snapshots the actor's name so the line still reads
+    /// correctly after that person is renamed or leaves; doing the same with a customer would copy
+    /// their name into a table that is never deleted from, which is a promise about their data this
+    /// platform has not made (spec 7). The dealership can see whose booking it is on the booking
+    /// itself, where it belongs and where deleting an account removes it. So the row says "a
+    /// customer" and carries no actor id at all.
+    /// </remarks>
+    public Task NotifyTeamOfCustomerActionAsync(
+        Dealer dealer,
+        NotificationKind kind,
+        DateTimeOffset now,
+        Id? subjectId = null,
+        string? subjectReference = null)
+    {
+        ArgumentNullException.ThrowIfNull(dealer);
+        ArgumentNullException.ThrowIfNull(kind);
+
+        var recipients = Recipients(dealer, exceptUserId: Id.Empty);
+        if (recipients.Count == 0)
+            return Task.CompletedTask;
+
+        notifier.RaiseMany(recipients.Select(recipient =>
+            Notification.Raise(recipient, kind, CustomerActorName, now, subjectId, subjectReference)));
+
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -109,4 +144,7 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
 
     private const string PlatformActorName = "Khadra";
     private const string UnknownActorName = "A colleague";
+
+    // Deliberately not a name. See NotifyTeamOfCustomerActionAsync.
+    private const string CustomerActorName = "A customer";
 }

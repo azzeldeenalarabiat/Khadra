@@ -42,8 +42,9 @@ export class BookingsListComponent {
   private readonly loadedCounts = loaded(this.countsResource);
 
   /**
-   * 'unpaid' is not one of the server's tabs: it is the PendingPayment status, asked for directly.
-   * The tab vocabulary belongs to the dealer console, which is never shown an unpaid request.
+   * 'unpaid' is not one of the server's tabs: it is the Approved status, asked for directly. Since
+   * 2026-09-07 that is exactly the booking a dealer has agreed to and nobody has paid for, which is
+   * the platform's own concern rather than a queue the dealer console needs.
    */
   protected readonly tabs: readonly { readonly key: AdminBookingTab; readonly label: string }[] = [
     { key: 'all', label: 'All' },
@@ -87,7 +88,7 @@ export class BookingsListComponent {
       const known = this.tabs.find((candidate) => candidate.key === wanted.tab);
       const key: AdminBookingTab = known ? known.key : 'all';
       this.service.tab.set(key === 'unpaid' ? 'all' : key);
-      this.service.status.set(key === 'unpaid' ? 'PendingPayment' : null);
+      this.service.status.set(key === 'unpaid' ? 'Approved' : null);
       this.service.dealerId.set(wanted.dealerId);
       this.service.customerId.set(wanted.customerId);
       this.service.page.set(1);
@@ -192,9 +193,11 @@ export class BookingsListComponent {
 }
 
 const STATUS_TONES: Readonly<Partial<Record<BookingStatus, Tone>>> = {
-  PendingPayment: 'warn',
   Requested: 'warn',
-  Approved: 'accent',
+  // Approved is a warning, not an accent: the dealer has said yes and the deposit has not arrived,
+  // so the car is held against nothing and a clock is running on it.
+  Approved: 'warn',
+  Confirmed: 'accent',
   PickedUp: 'accent',
   Returned: 'warn',
   Completed: 'ok',

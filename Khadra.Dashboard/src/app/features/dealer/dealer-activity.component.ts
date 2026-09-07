@@ -50,9 +50,11 @@ export class DealerActivityComponent {
       case 'Cancelled':
       case 'NoShow':
         return 'bad';
+      // Both of the states with a clock running on them: nobody has answered, or nobody has paid.
       case 'Requested':
-        return 'warn';
       case 'Approved':
+        return 'warn';
+      case 'Confirmed':
       case 'PickedUp':
       case 'Returned':
       case 'Completed':
@@ -64,9 +66,9 @@ export class DealerActivityComponent {
 
   protected describe(e: DealerActivityEntry): string {
     const labels: Record<string, string> = {
-      PendingPayment: 'Request created',
-      Requested: 'Deposit paid — awaiting your answer',
-      Approved: 'Approved',
+      Requested: 'Requested — awaiting your answer',
+      Approved: 'Approved — awaiting the deposit',
+      Confirmed: 'Deposit paid — booking confirmed',
       Rejected: 'Rejected',
       PickedUp: 'Picked up',
       Returned: 'Returned',

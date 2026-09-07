@@ -39,9 +39,10 @@ public sealed class DealerConsoleTests
             Settings.ReportingWeekStart.Returns(DayOfWeek.Sunday);
 
             Bookings.CountsAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-                .Returns(new DealerBookingCounts(3, Build.Now.AddHours(-14), 2, 1, 0));
+                // 3 waiting on the dealer, 2 waiting on a deposit, 1 confirmed, 1 out, none overdue.
+                .Returns(new DealerBookingCounts(3, Build.Now.AddHours(-14), 2, 1, 1, 0));
             Bookings.UpcomingPickupsAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
-                .Returns([new UpcomingHandover(Guid.NewGuid(), "KH-1", "Approved", Build.Now.AddHours(4), "Delivery", CarA, "Layla Odeh", false)]);
+                .Returns([new UpcomingHandover(Guid.NewGuid(), "KH-1", "Confirmed", Build.Now.AddHours(4), "Delivery", CarA, "Layla Odeh", false)]);
             Bookings.UpcomingReturnsAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
                 .Returns([]);
             Bookings.HeldVehicleIdsAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())

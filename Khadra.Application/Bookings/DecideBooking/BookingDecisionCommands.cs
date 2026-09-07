@@ -15,9 +15,9 @@ namespace Khadra.Application.Bookings.DecideBooking;
 
 // The dealer's side of a booking (spec 4.2, 5.4): answer a request, then record the two handovers.
 // Every one of these names the person who did it -- owner or employee -- on the booking's own status
-// history, which is the accountability record spec 4.2 asks for. Nothing here touches money: the
-// deposit was taken before the request reached the dealer, and cash at handover is recorded as a
-// fact, never computed from.
+// history, which is the accountability record spec 4.2 asks for. Nothing here touches money: an
+// approval only opens the customer's window to pay, and cash at handover is recorded as a fact,
+// never computed from.
 
 public sealed record ApproveBookingCommand(Id ActorUserId, Id BookingId, string? Note) : ICommand<Result<BookingDto, Error>>;
 

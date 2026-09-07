@@ -114,6 +114,14 @@ public static class DependencyInjection
                 "BusinessRules: TurnaroundMinutes must be set. Use 0 to allow back-to-back rentals.")
             .Validate(options => options.MaxAdvanceBookingDays is not null,
                 "BusinessRules: MaxAdvanceBookingDays must be set.")
+            // Not merely present but positive. Zero would mean a car could be booked for one minute
+            // from now, and every window on that booking -- the dealer's answer, the customer's
+            // payment, free cancellation -- is capped at the rental start, so all three would
+            // collapse while /app-config still advertised a 24-hour payment window.
+            .Validate(options => options.MinimumBookingLeadTimeMinutes is > 0,
+                "BusinessRules: MinimumBookingLeadTimeMinutes must be set to a positive number of minutes.")
+            .Validate(options => options.MaxRentalDays is > 0,
+                "BusinessRules: MaxRentalDays must be set to a positive number of days.")
             .ValidateOnStart();
     }
 
@@ -128,6 +136,7 @@ public static class DependencyInjection
                 .UseSnakeCaseNamingConvention());
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IVehicleHoldLock, VehicleHoldLock>();
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();

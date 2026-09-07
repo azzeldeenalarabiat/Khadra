@@ -2,6 +2,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
+using Khadra.Domain.IdentityAccess;
 
 namespace Khadra.Tests.Support;
 
@@ -77,6 +78,52 @@ internal static class Build
             dealer.AttachDocument(type, $"docs/{type.Name}.jpg", moment);
     }
 
+    /// <summary>
+    /// A customer as they arrive at the booking endpoint: email verified, both sides of a licence
+    /// and an identity document on file.
+    /// </summary>
+    /// <remarks>
+    /// Every flag is a parameter because each one is a separate refusal at booking time, and a test
+    /// about one of them should state only that one. The defaults are the customer who may book;
+    /// anything else is the exception a test is making.
+    /// </remarks>
+    public static User Customer(
+        DateTimeOffset? now = null,
+        bool emailVerified = true,
+        bool hasLicence = true,
+        bool hasIdentity = true,
+        string email = "rana@example.jo",
+        string phone = "0791234567")
+    {
+        var moment = now ?? Now;
+        var customer = User.RegisterCustomer(
+            EmailAddress.Create(email).Value,
+            PhoneNumber.Create(phone).Value,
+            PersonName.Create("Rana Sharif").Value,
+            PasswordHash.FromHash("hash"),
+            moment.AddYears(-1),
+            // Comfortably over the configured minimum of 21, which is enforced at registration.
+            new DateOnly(1995, 4, 12));
+
+        if (emailVerified)
+            customer.VerifyEmail(moment);
+
+        if (hasLicence)
+        {
+            AttachDocument(customer, CustomerDocumentType.DrivingLicenceFront, moment);
+            AttachDocument(customer, CustomerDocumentType.DrivingLicenceBack, moment);
+        }
+
+        if (hasIdentity)
+            AttachDocument(customer, CustomerDocumentType.NationalId, moment);
+
+        customer.ClearDomainEvents();
+        return customer;
+    }
+
+    private static void AttachDocument(User customer, CustomerDocumentType type, DateTimeOffset now) =>
+        customer.AttachDocument(type, $"customers/{type.Name}.jpg", "image/jpeg", 1024, now);
+
     public static VehicleDetails VehicleDetails(int year = 2024) =>
         Khadra.Domain.Fleet.VehicleDetails.Create(
             "Toyota", "Corolla", year, 5, TransmissionType.Automatic, FuelType.Petrol, currentYear: 2026).Value;
@@ -115,6 +162,7 @@ internal static class Build
         TimeSpan? freeCancellationWindow = null,
         TimeSpan? noShowTimeout = null,
         TimeSpan? paymentWindow = null,
+        TimeSpan? answerWindow = null,
         TimeSpan? settlementWindow = null,
         decimal customerPenaltyPercent = 100m,
         decimal dealerPenaltyMin = 25m,
@@ -126,6 +174,7 @@ internal static class Build
             freeCancellationWindow ?? TimeSpan.FromHours(1),
             noShowTimeout ?? TimeSpan.FromHours(8),
             paymentWindow ?? TimeSpan.FromMinutes(20),
+            answerWindow ?? TimeSpan.FromHours(48),
             settlementWindow ?? TimeSpan.FromHours(48),
             Percent(customerPenaltyPercent),
             Percent(dealerPenaltyMin),
@@ -195,13 +244,31 @@ internal static class Build
         return booking;
     }
 
-    // A booking the dealer has approved: the state most rules hang off.
+    // A booking as the customer first makes it: requested, unanswered, nothing paid. This is what
+    // Booking() already returns; the name exists so a test that cares about the state says so.
+    public static Booking RequestedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null) =>
+        Booking(now, pickupMethod: pickupMethod, terms: terms);
+
+    // Approved by the dealer and NOT yet paid: the window in which the customer owes a deposit and
+    // the car is held on nothing but a clock. Every expiry rule hangs off this one.
     public static Booking ApprovedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null)
     {
         var moment = now ?? Now;
         var booking = Booking(moment, pickupMethod: pickupMethod, terms: terms);
-        booking.ConfirmDepositPaid(Id.New(), moment);
         booking.Approve(Id.New(), moment);
+        booking.ClearDomainEvents();
+        return booking;
+    }
+
+    // Approved AND paid: the state most rules hang off, and what this file used to call an approved
+    // booking. Under the old order approval was the last step and the deposit came first, so the two
+    // names meant the same booking; since 2026-09-07 they are different states and a test asking for
+    // "approved" would silently get an unpaid one.
+    public static Booking ConfirmedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null)
+    {
+        var moment = now ?? Now;
+        var booking = ApprovedBooking(moment, pickupMethod, terms);
+        booking.ConfirmDepositPaid(Id.New(), moment);
         booking.ClearDomainEvents();
         return booking;
     }

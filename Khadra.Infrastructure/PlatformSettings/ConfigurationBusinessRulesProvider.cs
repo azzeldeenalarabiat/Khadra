@@ -21,11 +21,14 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
             current.FreeCancellationWindowMinutes,
             current.AdminSlaHours,
             current.CustomerCancellationPenaltyPercent,
-            current.PaymentWindowMinutes,
+            current.PaymentWindowHours,
+            current.BookingAnswerWindowHours,
             current.PostReturnSettlementHours,
             current.MinimumRenterAge,
             current.TurnaroundMinutes!.Value,
             current.MaxAdvanceBookingDays!.Value,
+            current.MinimumBookingLeadTimeMinutes!.Value,
+            current.MaxRentalDays!.Value,
             current.EarliestVehicleModelYear));
     }
 }

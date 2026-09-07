@@ -38,15 +38,21 @@
   gap: 9px;
 }
 
+/* The Khadra mark. It arrives as a circle on transparency with its own white disc, so it needs no
+   border, no background and no radius of its own - the square and the accent outline here existed
+   only to make the placeholder glyph look deliberate. */
 .sidebar-mark {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
-  border: 1px solid var(--color-accent);
-  display: grid;
-  place-items: center;
   flex: none;
-  color: var(--color-accent);
+  object-fit: contain;
+}
+
+/* The sign-in and dealer-registration screens are the one place the brand is the subject rather
+   than a label, and 24px is too small to read a strapline at. */
+.auth-head .sidebar-mark {
+  width: 40px;
+  height: 40px;
 }
 
 .sidebar-brand {

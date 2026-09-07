@@ -150,6 +150,10 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("dealer_id");
 
+                    b.Property<DateTimeOffset>("DecisionDeadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decision_deadline");
+
                     b.Property<Guid?>("DepositPaymentId")
                         .HasColumnType("uuid")
                         .HasColumnName("deposit_payment_id");
@@ -170,7 +174,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("hold_start");
 
-                    b.Property<DateTimeOffset>("PaymentDeadline")
+                    b.Property<DateTimeOffset?>("PaymentDeadline")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("payment_deadline");
 
@@ -1521,6 +1525,8 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.OwnsOne("Khadra.Domain.Bookings.BookingTerms", "Terms", b1 =>
                         {
                             b1.Property<Guid>("BookingId");
+
+                            b1.Property<TimeSpan>("AnswerWindow");
 
                             b1.Property<TimeSpan>("FreeCancellationWindow");
 

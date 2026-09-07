@@ -170,8 +170,8 @@ public sealed class CatalogueReaderTests : IDisposable
         await using (var context = NewContext())
         {
             var booking = Build.Booking(vehicleId: vehicle.Id, period: Build.Period(start, days: 3));
-            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             booking.Approve(Id.New(), Build.Now);
+            booking.ConfirmDepositPaid(Id.New(), Build.Now);
             context.Dealers.Add(dealer);
             context.Vehicles.Add(vehicle);
             context.Bookings.Add(booking);
@@ -203,24 +203,36 @@ public sealed class CatalogueReaderTests : IDisposable
     }
 
     /// <summary>
-    /// Nothing expires abandoned checkouts yet (pre-launch checklist item 4). Without the payment
-    /// deadline in the hold predicate, one customer who opened a booking and walked away would take
+    /// Nothing expires stale holds yet (pre-launch checklist item 4). Without the two deadlines in
+    /// the hold predicate, one unpaid approval — or one request no dealer ever answered — would take
     /// a car off the market permanently.
     /// </summary>
-    [Fact]
-    public async Task An_abandoned_checkout_stops_hiding_the_car_once_its_deadline_passes()
+    /// <remarks>
+    /// The two clocks are checked in one test on purpose: the search's anti-join has to name both,
+    /// and a version that named only one would still pass a test that only ever made the other run
+    /// out.
+    /// </remarks>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_stale_hold_stops_hiding_the_car_once_its_own_deadline_passes(bool approved)
     {
         var dealer = Build.ApprovedDealer();
         var vehicle = Listed(dealer.Id, Id.New());
         var start = Build.Now.AddDays(10);
         var wanted = Build.Period(start, days: 3);
+        DateTimeOffset deadline;
 
         await using (var context = NewContext())
         {
             context.Dealers.Add(dealer);
             context.Vehicles.Add(vehicle);
-            // Left in PendingPayment: never paid, never expired.
-            context.Bookings.Add(Build.Booking(vehicleId: vehicle.Id, period: Build.Period(start, days: 3)));
+            var booking = Build.Booking(vehicleId: vehicle.Id, period: Build.Period(start, days: 3));
+            if (approved)
+                booking.Approve(Id.New(), Build.Now);
+            // Approved and never paid, or requested and never answered. Nothing has expired either.
+            deadline = approved ? booking.PaymentDeadline!.Value : booking.DecisionDeadline;
+            context.Bookings.Add(booking);
             await context.SaveChangesAsync();
         }
 
@@ -229,10 +241,10 @@ public sealed class CatalogueReaderTests : IDisposable
         var gap = Build.TurnaroundBuffer;
 
         Assert.Empty((await catalogue.SearchAsync(
-            new CatalogueFilter(Window: new AvailabilityWindow(wanted, Build.Now, gap)), Page)).Items);
+            new CatalogueFilter(Window: new AvailabilityWindow(wanted, deadline.AddMinutes(-1), gap)), Page)).Items);
 
         Assert.Single((await catalogue.SearchAsync(
-            new CatalogueFilter(Window: new AvailabilityWindow(wanted, Build.Now.AddHours(1), gap)), Page)).Items);
+            new CatalogueFilter(Window: new AvailabilityWindow(wanted, deadline, gap)), Page)).Items);
     }
 
     [Fact]

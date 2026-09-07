@@ -8,10 +8,18 @@ namespace Khadra.Application.Bookings.ReadModels;
 // database knows neither the Amman calendar nor how a Percentage rounds.
 
 /// <summary>Headcounts the dashboard leads with.</summary>
+/// <param name="AwaitingDeposit">
+/// Approved and not paid for. These hold a car on nothing but a clock, and the dealer can neither
+/// prepare them nor count on them.
+/// </param>
+/// <param name="Confirmed">
+/// Approved AND paid for: the rentals that are actually going ahead, and the cars to have ready.
+/// </param>
 public sealed record DealerBookingCounts(
     int Requested,
     DateTimeOffset? OldestRequestedAt,
-    int Approved,
+    int AwaitingDeposit,
+    int Confirmed,
     int PickedUp,
     int OverdueReturns);
 
@@ -53,7 +61,14 @@ public interface IDealerBookingReader
 {
     Task<DealerBookingCounts> CountsAsync(Id dealerId, DateTimeOffset now, CancellationToken cancellationToken = default);
 
-    /// <summary>Approved bookings starting inside [from, to).</summary>
+    /// <summary>
+    /// Bookings the dealer has answered that start inside [from, to) -- Approved AND Confirmed.
+    /// </summary>
+    /// <remarks>
+    /// The unpaid ones are included deliberately. A gallery preparing its week needs to know that a
+    /// car is spoken for on Tuesday and that the deposit has not landed, and each row carries its own
+    /// status so the screen can say which is which.
+    /// </remarks>
     Task<IReadOnlyList<UpcomingHandover>> UpcomingPickupsAsync(Id dealerId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
 
     /// <summary>Cars out on rental due back inside [from, to), plus any already overdue.</summary>

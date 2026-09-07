@@ -35,6 +35,15 @@ public sealed record AppConfigDto(
     /// How far ahead a rental may be booked. The date picker needs a bound, and this is the owner's
     /// figure rather than one baked into a phone binary that only a release could change.
     int MaxAdvanceBookingDays,
+    /// The soonest a rental may start, from now. The date picker needs both bounds, and a phone that
+    /// guessed either would offer a slot the server refuses.
+    int MinimumBookingLeadTimeMinutes,
+    /// The longest a single rental may run, in calendar days. The picker needs it for the same
+    /// reason it needs the other two bounds: so it cannot offer a span the server will refuse.
+    int MaxRentalDays,
+    /// How long after a dealer approves the customer has to pay the deposit. The app tells them,
+    /// so it must come from the platform rather than from a sentence typed into a screen.
+    int PaymentWindowHours,
     DocumentLimitsDto Documents,
     VocabulariesDto Vocabularies);
 
@@ -81,6 +90,9 @@ public sealed class GetAppConfigHandler(
             new CurrencyDto(Money.JordanianDinar, Money.MinorUnits),
             rules.MinimumRenterAge,
             rules.MaxAdvanceBookingDays,
+            rules.MinimumBookingLeadTimeMinutes,
+            rules.MaxRentalDays,
+            rules.PaymentWindowHours,
             new DocumentLimitsDto(documents.MaximumSizeBytes, [.. documents.AllowedContentTypes]),
             new VocabulariesDto(
                 [.. Enumeration.GetAll<TransmissionType>().Select(Vocabulary.Describe)],

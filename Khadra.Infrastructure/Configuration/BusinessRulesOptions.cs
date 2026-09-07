@@ -33,8 +33,11 @@ public sealed class BusinessRulesOptions
     [Range(0, 100)]
     public decimal CustomerCancellationPenaltyPercent { get; init; }
 
-    [Range(5, 1440)]
-    public int PaymentWindowMinutes { get; init; }
+    [Range(1, 168)]
+    public int PaymentWindowHours { get; init; }
+
+    [Range(1, 168)]
+    public int BookingAnswerWindowHours { get; init; }
 
     [Range(0, 720)]
     public int PostReturnSettlementHours { get; init; }
@@ -58,6 +61,20 @@ public sealed class BusinessRulesOptions
     // missing key must be an error, not a silent zero that would refuse every date.
     [Range(1, 3650)]
     public int? MaxAdvanceBookingDays { get; init; }
+
+    // The soonest a rental may start, from the moment of the request. Nullable for the same reason
+    // as the two above: a missing key must be an error rather than a silent zero, which here would
+    // read as "a car may be booked for one minute from now" and quietly collapse every window on the
+    // booking. Zero is not a legitimate value for this one, but the range starts at 0 so that a
+    // deliberate 0 fails the .Validate rather than the binder, with a message that explains itself.
+    [Range(0, 10080)]
+    public int? MinimumBookingLeadTimeMinutes { get; init; }
+
+    // The longest a single rental may run, in calendar days. Nullable for the same reason as the
+    // others: a missing key must be an error rather than a silent zero, which here would refuse
+    // every booking on the platform.
+    [Range(0, 3650)]
+    public int? MaxRentalDays { get; init; }
 
     // The oldest model year a dealer may list. This is a guard against a typo — "1200", "19" — not a
     // judgement about what is rentable: an older car in sound condition is an ordinary listing on

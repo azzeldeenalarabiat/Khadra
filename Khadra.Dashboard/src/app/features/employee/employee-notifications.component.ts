@@ -62,6 +62,8 @@ export class EmployeeNotificationsComponent {
   /** The badge on a row: what KIND of thing happened, in one word. */
   protected label(item: NotificationItem): string {
     switch (item.kind) {
+      case 'BookingRequested':
+        return 'New request';
       case 'BookingApproved':
       case 'BookingRejected':
         return 'Booking decision';
@@ -87,6 +89,9 @@ export class EmployeeNotificationsComponent {
       case 'ReportAccessRevoked':
         return 'bad';
       case 'DealerClarificationRequested':
+      // A request is somebody waiting on this dealership, with a clock running. It is the one
+      // notification here that is a task rather than a record of one.
+      case 'BookingRequested':
         return 'warn';
       case 'BookingApproved':
       case 'BookingReturned':
@@ -101,6 +106,8 @@ export class EmployeeNotificationsComponent {
 
   protected icon(item: NotificationItem): IconName {
     switch (item.kind) {
+      case 'BookingRequested':
+        return 'bell-ringing';
       case 'BookingApproved':
         return 'check-circle';
       case 'BookingRejected':

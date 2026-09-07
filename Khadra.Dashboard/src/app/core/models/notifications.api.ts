@@ -9,6 +9,7 @@
  * still reads correctly after that person is renamed or leaves.
  */
 export type NotificationKind =
+  | 'BookingRequested'
   | 'BookingApproved'
   | 'BookingRejected'
   | 'BookingPickedUp'

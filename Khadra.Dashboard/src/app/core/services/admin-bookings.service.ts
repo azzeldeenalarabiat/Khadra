@@ -24,10 +24,10 @@ export class AdminBookingsService {
   /**
    * A status the tabs cannot reach.
    *
-   * `BookingTabs` is the DEALER's vocabulary and has no tab for PendingPayment, because a dealership
-   * is not shown a request whose deposit never cleared. For the platform those are the bookings
-   * holding cars against nothing, so the Admin's "Unpaid" tab asks for the status directly rather
-   * than adding a tab to a mapping the dealer console shares.
+   * `BookingTabs` is the DEALER's vocabulary, and to a dealership an approved booking is simply one
+   * of the week's bookings whether or not the deposit has landed yet. To the platform the unpaid
+   * ones are cars being held against nothing, so the Admin's "Unpaid" tab asks for that status
+   * directly rather than adding a tab to a mapping the dealer console shares.
    */
   readonly status = signal<string | null>(null);
   readonly search = signal('');

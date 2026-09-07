@@ -136,10 +136,18 @@ export class DealerDashboardComponent {
         query: { tab: 'active' },
       },
       {
-        label: this.t('dealerDashboard.approvedNotYetCollected'),
-        main: String(d.bookings.approved),
+        label: this.t('dealerDashboard.confirmedNotYetCollected'),
+        main: String(d.bookings.confirmed),
         note: this.t('dealerDashboard.heldForTheirDates'),
         icon: 'calendar-check',
+        route: '/dealer/bookings',
+        query: { tab: 'upcoming' },
+      },
+      {
+        label: this.t('dealerDashboard.awaitingDeposit'),
+        main: String(d.bookings.awaitingDeposit),
+        note: this.t('dealerDashboard.approvedAndUnpaid'),
+        icon: 'clock',
         route: '/dealer/bookings',
         query: { tab: 'upcoming' },
       },
@@ -282,7 +290,10 @@ export class DealerDashboardComponent {
 
   protected statusTone(handover: UpcomingHandover): Tone {
     if (handover.isOverdue) return 'bad';
-    return handover.status === 'Approved' ? 'accent' : 'ok';
+    // An approved pickup is still waiting on the customer's deposit, so it is not yet a rental the
+    // gallery should be getting a car ready for.
+    if (handover.status === 'Approved') return 'warn';
+    return handover.status === 'Confirmed' ? 'accent' : 'ok';
   }
 
   protected reload(): void {

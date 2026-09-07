@@ -9,8 +9,21 @@ public sealed record BookingCreated(
     Id VehicleId,
     DateTimeOffset OccurredAt) : IDomainEvent;
 
-// The deposit cleared. Payments listens to nothing here; the booking is simply now visible to the dealer.
+// A customer has asked for a car. Nothing has been paid -- since 2026-09-07 the deposit comes after
+// the dealer answers -- so this is the whole of it: the request is now the dealer's to answer.
 public sealed record BookingRequested(Id BookingId, Id DealerId, DateTimeOffset OccurredAt) : IDomainEvent;
+
+/// <summary>The deposit has been paid and the rental is on.</summary>
+/// <remarks>
+/// Separate from <see cref="BookingRequested"/> because they are now different moments. Under the
+/// old order a request WAS a payment; since 2026-09-07 a request costs nothing and this is the
+/// point at which money exists, which is what Payments and the dealer both care about.
+/// </remarks>
+public sealed record BookingConfirmed(
+    Id BookingId,
+    Id DealerId,
+    Id VehicleId,
+    DateTimeOffset OccurredAt) : IDomainEvent;
 
 public sealed record BookingApproved(
     Id BookingId,

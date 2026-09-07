@@ -295,7 +295,18 @@ using (var bootstrapScope = app.Services.CreateScope())
 // nothing was coming to. Never fatal: a mail outage must not stop the API serving everything else.
 await MailStartupCheck.ReportAsync(app.Services);
 
-app.UseHttpsRedirection();
+// Not in Development, and the reason is a device rather than a preference.
+//
+// A phone testing the customer app talks to this API over the local network, where there is no
+// certificate it would trust and no HTTPS port bound to anything but localhost. With redirection on,
+// every call from the phone answers 307 to an address it cannot reach, and the app reports the
+// platform as unreachable. The Flutter debug build permits cleartext for exactly this case and the
+// release build does not (android/app/src/debug/network_security_config.xml).
+//
+// Outside Development it is unconditional, and HSTS above it makes the browser stop trying HTTP at
+// all after the first visit.
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
 app.UseCors();
 // Before the limiter, because it partitions the auth endpoints by the account being named and the
 // name is in the request body, which nothing has read at this point.

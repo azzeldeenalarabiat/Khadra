@@ -23,6 +23,18 @@ public interface IReportingCalendar
     /// <summary>The local calendar day an instant falls on.</summary>
     DateOnly DayOf(DateTimeOffset instant);
 
+    /// <summary>The local wall-clock time an instant falls at.</summary>
+    /// <remarks>
+    /// The other half of <see cref="DayOf"/>, and needed for the same reason: a gallery's opening
+    /// hours are wall-clock times, and 09:00 in Amman is 06:00 UTC. Asking whether a pickup falls
+    /// inside opening hours without converting first would refuse the entire morning.
+    ///
+    /// A gallery's hours are LOCAL TO THE GALLERY, and this zone is the platform's reporting zone.
+    /// For a Jordan-only platform they are the same zone, which is why this is the right answer
+    /// today; the first market in a second zone needs the gallery to carry its own.
+    /// </remarks>
+    TimeOnly TimeOfDay(DateTimeOffset instant);
+
     /// <summary>The instant local midnight begins for the given local day.</summary>
     DateTimeOffset StartOfDay(DateOnly day);
 

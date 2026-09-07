@@ -98,7 +98,7 @@ export class AdminBookingDetailComponent {
     if (!terms) return [];
     return [
       { k: 'Free cancellation window', v: `${terms.freeCancellationWindowHours} hours` },
-      { k: 'Payment window', v: `${terms.paymentWindowMinutes} minutes` },
+      { k: 'Payment window', v: `${terms.paymentWindowHours} hours` },
       { k: 'No-show timeout', v: `${terms.noShowTimeoutHours} hours` },
       { k: 'Settlement window after return', v: `${terms.postReturnSettlementWindowHours} hours` },
       { k: 'Customer cancellation penalty', v: `${terms.customerCancellationPenaltyPercent}%` },
@@ -145,15 +145,18 @@ export class AdminBookingDetailComponent {
   // be refused.
   protected readonly canCancel = computed(() => {
     const status = this.booking()?.status;
-    return status === 'PendingPayment' || status === 'Requested' || status === 'Approved';
+    return status === 'Requested' || status === 'Approved' || status === 'Confirmed';
   });
 
+  // The two expiries an admin can force, and the two states that have a clock running on them: a
+  // request nobody answered, and an approval nobody paid for.
   protected readonly canExpire = computed(() => {
     const status = this.booking()?.status;
-    return status === 'PendingPayment' || status === 'Requested';
+    return status === 'Requested' || status === 'Approved';
   });
 
-  protected readonly canMarkNoShow = computed(() => this.booking()?.status === 'Approved');
+  // A no-show needs a rental that was actually going ahead, which means the deposit cleared.
+  protected readonly canMarkNoShow = computed(() => this.booking()?.status === 'Confirmed');
 
   protected readonly hasAnyAction = computed(
     () => this.canCancel() || this.canExpire() || this.canMarkNoShow(),
@@ -193,9 +196,9 @@ export class AdminBookingDetailComponent {
     const booking = this.booking();
     if (!booking) return;
     const which =
-      booking.status === 'PendingPayment'
+      booking.status === 'Approved'
         ? 'The deposit was never paid inside the payment window.'
-        : 'The dealer never answered before the rental was due to start.';
+        : 'The dealer never answered inside their window.';
     this.ui.openAction(
       {
         icon: 'clock-counter-clockwise',
@@ -256,9 +259,10 @@ export class AdminBookingDetailComponent {
 }
 
 const STATUS_TONES: Readonly<Partial<Record<BookingStatus, Tone>>> = {
-  PendingPayment: 'warn',
   Requested: 'warn',
-  Approved: 'accent',
+  // Approved but unpaid is a car held against nothing, with a clock on it.
+  Approved: 'warn',
+  Confirmed: 'accent',
   PickedUp: 'accent',
   Returned: 'warn',
   Completed: 'ok',

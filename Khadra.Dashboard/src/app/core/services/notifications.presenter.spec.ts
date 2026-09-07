@@ -105,7 +105,8 @@ describe('toDealerNotifications', () => {
       bookings: {
         requested: 0,
         oldestRequestedAt: null,
-        approved: 0,
+        awaitingDeposit: 0,
+        confirmed: 0,
         pickedUp: 0,
         overdueReturns: 0,
       },
@@ -137,7 +138,8 @@ describe('toDealerNotifications', () => {
         bookings: {
           requested: 3,
           oldestRequestedAt: '2026-09-01T12:00:00Z',
-          approved: 0,
+          awaitingDeposit: 0,
+          confirmed: 0,
           pickedUp: 2,
           overdueReturns: 1,
         },
@@ -158,7 +160,8 @@ describe('toDealerNotifications', () => {
         bookings: {
           requested: 1,
           oldestRequestedAt: null,
-          approved: 0,
+          awaitingDeposit: 0,
+          confirmed: 0,
           pickedUp: 0,
           overdueReturns: 1,
         },
@@ -177,7 +180,8 @@ describe('toDealerNotifications', () => {
         bookings: {
           requested: 2,
           oldestRequestedAt: '2026-09-01T12:00:00Z',
-          approved: 0,
+          awaitingDeposit: 0,
+          confirmed: 0,
           pickedUp: 0,
           overdueReturns: 0,
         },
@@ -234,7 +238,8 @@ describe('toDealerNotifications', () => {
         bookings: {
           requested: 5,
           oldestRequestedAt: '2026-09-04T12:00:00Z',
-          approved: 0,
+          awaitingDeposit: 0,
+          confirmed: 0,
           pickedUp: 0,
           overdueReturns: 2,
         },

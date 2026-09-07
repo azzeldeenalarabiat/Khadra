@@ -29,7 +29,7 @@ public sealed record BusinessRulesDto(
     int FreeCancellationWindowMinutes,
     int AdminSlaHours,
     decimal CustomerCancellationPenaltyPercent,
-    int PaymentWindowMinutes,
+    int PaymentWindowHours,
     int PostReturnSettlementHours,
     int? MinimumRenterAge,
     int EarliestVehicleModelYear)
@@ -46,7 +46,7 @@ public sealed record BusinessRulesDto(
             rules.FreeCancellationWindowMinutes,
             rules.AdminSlaHours,
             rules.CustomerCancellationPenaltyPercent,
-            rules.PaymentWindowMinutes,
+            rules.PaymentWindowHours,
             rules.PostReturnSettlementHours,
             rules.MinimumRenterAge,
             rules.EarliestVehicleModelYear);

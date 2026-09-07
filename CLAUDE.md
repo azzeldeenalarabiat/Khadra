@@ -19,6 +19,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
   - Gmail: `Provider` `Smtp`, Host `smtp.gmail.com`, Port 587, `UseStartTls` true, plus `Email:Username` and an `Email:Password` that is a **Google App Password** (myaccount.google.com/apppasswords) — the account password is refused with `535-5.7.8 BadCredentials`.
   - Brevo: `Provider` `Smtp`, Host `smtp-relay.brevo.com`, Port 587, `Email:Username` = your Brevo login, `Email:Password` = an SMTP key. No code change; it is the same sender.
   - The API probes the transport on every start and logs `Email ready…` or `EMAIL WILL NOT BE DELIVERED…` with the provider’s own reason. Check that line before debugging anything else about email.
+  - `Email ready…` proves the transport ANSWERED, not that it is fast enough to use. `Email:TimeoutSeconds` is split across `Email:MaxAttempts`, so the default 15/3 gives each attempt five seconds — and a server that takes longer than that just to send its SMTP greeting fails every send while the startup probe still reports ready. The dev mailpit did exactly this until `MP_SMTP_DISABLE_RDNS` was set in `docker-compose.yml`: a reverse-DNS lookup with nowhere to go delayed its greeting by eight seconds. If mail is not arriving and the probe says ready, time the greeting before suspecting anything else.
 
 ## Architecture map (dependency direction: Domain <- Application <- Infrastructure <- WebAPI)
 
