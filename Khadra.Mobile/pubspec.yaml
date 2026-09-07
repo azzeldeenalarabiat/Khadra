@@ -1,0 +1,63 @@
+name: khadra_mobile
+description: "Khadra — rent a car in Jordan from licensed rental offices."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State. Riverpod rather than Bloc because this app is read-heavy over state the
+  # SERVER owns: AsyncValue forces the loading/error/data branches at every call
+  # site, and there are no client-side invariants for a reducer to protect. Bloc's
+  # event -> reducer shape actively invites the thing to avoid here, which is
+  # emitting a new status from local knowledge instead of from the server's answer.
+  flutter_riverpod: ^2.6.1
+
+  # HTTP. Interceptors are what make the single-flight token refresh possible at all.
+  dio: ^5.7.0
+
+  # The refresh token, and only the refresh token. Keychain / Keystore backed.
+  flutter_secure_storage: ^9.2.4
+  # Per-viewer conveniences that are not secrets: the chosen language, the
+  # first-run marker that clears a Keychain entry surviving an app deletion.
+  shared_preferences: ^2.3.5
+
+  # Rentals are billed in AMMAN calendar days. A date picker running in the
+  # device's zone would price a different number of days, so every calendar
+  # calculation goes through this with the zone /app-config names.
+  timezone: ^0.10.0
+  intl: ^0.20.2
+
+  go_router: ^14.6.2
+  cached_network_image: ^3.4.1
+  image_picker: ^1.1.2
+  # The gallery's location, and where a delivery should go. Tiles come from a
+  # public raster source; no API key, no billing account.
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  url_launcher: ^6.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/brand/
+
+  # NO BUNDLED FONT, matching the console's decision in _tokens.scss: font fallback is
+  # per GLYPH, so Latin renders in the platform's UI face while Arabic -- which that
+  # face may not cover at all -- picks the first fallback that does. Naming the
+  # fallbacks explicitly is the part that matters; without it Arabic lands on
+  # whatever the platform has last, which on Windows is a serif Naskh that does not
+  # sit level with the Latin beside it. See lib/core/theme/khadra_theme.dart.
