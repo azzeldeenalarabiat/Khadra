@@ -31,6 +31,9 @@ public sealed record BookingDto(
     MoneyDto CommissionAmount,
     PenaltyAssessmentDto? Penalty,
     string? CancelledBy,
+    /// The closed-set code, for a client that renders it in the reader's own language.
+    string? CancellationReasonCode,
+    /// Whatever the canceller typed, in whatever language they typed it.
     string? CancellationReason,
     DateTimeOffset CreatedAt,
     /// When the dealer must answer by.
@@ -48,7 +51,31 @@ public sealed record BookingDto(
     DateTimeOffset? FinishedAt,
     // Whether a dispute can be opened RIGHT NOW, judged against this booking's own frozen window.
     bool CanBeDisputed,
+    /// <summary>Whether the gallery can still answer this request, or its window has closed.</summary>
+    /// <remarks>
+    /// Status alone does not say. A request past its decision deadline is over -- the car went back
+    /// on the market at that instant -- but the row still reads Requested until the settlement job
+    /// reaches it. A client must not work this out from <c>DecisionDeadline</c> and its own clock: a
+    /// phone whose time is wrong would show a dead booking as live, or the reverse.
+    /// </remarks>
+    bool IsAwaitingDecision,
+    /// <summary>Whether the deposit can still be paid, judged the same way.</summary>
+    bool IsAwaitingPayment,
+    /// <summary>
+    /// What cancelling right now would cost the CUSTOMER, and whether they may.
+    /// </summary>
+    /// <remarks>
+    /// Always the customer's view, because this DTO is the customer's booking. The dealer console
+    /// does not offer cancellation and the Admin's is a different action attributed to a different
+    /// party. It is here for the same reason <c>CommissionAmount</c> is: so no screen multiplies a
+    /// percentage by an amount to find out what somebody is about to agree to.
+    /// </remarks>
+    CancellationPreviewDto Cancellation,
     Guid? LiveDisputeId,
+    /// <summary>Whether this booking may be rated right now: the aggregate's own rule, not a status check.</summary>
+    bool CanBeReviewed,
+    /// <summary>The customer's review of it, if they have already left one.</summary>
+    Guid? MyReviewId,
     VehicleLabel? Vehicle,
     string DealerName,
     string CustomerName,
@@ -80,6 +107,7 @@ public sealed record BookingDto(
             MoneyDto.From(booking.Terms.CommissionPercent.Of(booking.Pricing.RentalTotal)),
             PenaltyAssessmentDto.From(booking.Penalty),
             booking.CancelledBy?.Name,
+            booking.CancellationReasonCode,
             booking.CancellationReason,
             booking.CreatedAt,
             booking.DecisionDeadline,
@@ -92,7 +120,12 @@ public sealed record BookingDto(
             booking.ReturnedAt,
             booking.FinishedAt,
             booking.CanBeDisputed(now),
+            booking.IsAwaitingDecision(now),
+            booking.IsAwaitingPayment(now),
+            CancellationPreviewDto.From(booking.PreviewCancellation(BookingParty.Customer, now)),
             context.LiveDisputeId,
+            booking.CanBeReviewed,
+            context.MyReviewId,
             context.Vehicle,
             context.DealerName,
             context.CustomerName,
@@ -182,6 +215,11 @@ public sealed record PenaltyAssessmentDto(
     MoneyDto MaxAmount,
     bool IsRange,
     bool IsNothingOwed,
+    /// <summary>
+    /// Always true today, and sent anyway so a screen states the rule from the server's answer rather
+    /// than from a sentence typed into it. Spec 3.3: with no ticket, nothing is charged at all.
+    /// </summary>
+    bool RequiresTicketToEnforce,
     string Reason,
     DateTimeOffset AssessedAt)
 {
@@ -196,6 +234,7 @@ public sealed record PenaltyAssessmentDto(
                 MoneyDto.From(penalty.MaxAmount),
                 penalty.MinAmount != penalty.MaxAmount,
                 penalty.IsNothingOwed,
+                penalty.RequiresTicketToEnforce,
                 penalty.Reason,
                 penalty.AssessedAt);
 }
@@ -234,6 +273,13 @@ public sealed record BookingStatusChangeDto(
     string ToStatus,
     string ActorParty,
     Guid? ActorUserId,
+    /// <summary>
+    /// The closed-set code behind the change, where the actor chose one -- a rejection reason, a
+    /// cancellation reason. The label for it travels on <c>/app-config</c> in both languages, so the
+    /// customer reads their own language on their own booking.
+    /// </summary>
+    string? ReasonCode,
+    /// <summary>The actor's own words, unchanged. Shown beside the label, never instead of it.</summary>
     string? Reason,
     DateTimeOffset OccurredAt)
 {
@@ -245,7 +291,28 @@ public sealed record BookingStatusChangeDto(
             change.To.Name,
             change.ActorParty.Name,
             change.ActorUserId?.Value,
+            change.ReasonCode,
             change.Reason,
             change.OccurredAt);
+    }
+}
+
+/// <summary>
+/// Whether this booking can be cancelled right now, and what it would cost.
+/// </summary>
+/// <remarks>
+/// A screen enables its button from <see cref="CanCancel"/> and states the consequence from
+/// <see cref="Penalty"/>. Neither is derivable on a client: the first needs the server's clock
+/// against two frozen deadlines, the second a percentage applied to money.
+/// </remarks>
+public sealed record CancellationPreviewDto(bool CanCancel, bool IsFree, PenaltyAssessmentDto Penalty)
+{
+    public static CancellationPreviewDto From(CancellationPreview preview)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        return new CancellationPreviewDto(
+            preview.CanCancel,
+            preview.IsFree,
+            PenaltyAssessmentDto.From(preview.Penalty)!);
     }
 }

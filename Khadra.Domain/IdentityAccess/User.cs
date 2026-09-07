@@ -219,6 +219,32 @@ public sealed class User : AggregateRoot, ISoftDeletable
         AddDomainEvent(new UserEmailVerified(Id, now));
     }
 
+    /// <summary>
+    /// Corrects the person's own name and phone number.
+    /// </summary>
+    /// <remarks>
+    /// EMAIL IS NOT HERE, and that is not an omission. It is the sign-in identifier and the address a
+    /// password reset is sent to, so moving it on the strength of a live session alone would let
+    /// anyone who borrowed an unlocked phone take the account permanently. Changing it needs its own
+    /// verified flow (pre-launch checklist item 44), and until that exists this endpoint must not
+    /// pretend otherwise.
+    ///
+    /// Date of birth and foreign-national status are likewise absent: they were the inputs to
+    /// RenterAgePolicy at registration and the uploaded documents are the evidence for them, so a
+    /// customer editing them freely would be editing the answer to a check the platform already made.
+    ///
+    /// The security stamp is deliberately NOT rotated. Rotating it signs the person out of every
+    /// device, and correcting a misspelt name is not a security event.
+    /// </remarks>
+    public void UpdateContactDetails(PersonName name, PhoneNumber phone)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(phone);
+
+        Name = name;
+        Phone = phone;
+    }
+
     public void RecordSuccessfulLogin(DateTimeOffset now) => LastLoginAt = now;
 
     public void ChangePassword(PasswordHash newPasswordHash, DateTimeOffset now)

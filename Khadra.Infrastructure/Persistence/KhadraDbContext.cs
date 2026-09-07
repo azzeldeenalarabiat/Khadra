@@ -7,6 +7,7 @@ using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Notifications;
 using Khadra.Domain.PlatformSettings;
+using Khadra.Domain.Reviews;
 using Microsoft.EntityFrameworkCore;
 
 namespace Khadra.Infrastructure.Persistence;
@@ -26,6 +27,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<CarType> CarTypes => Set<CarType>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Review> Reviews => Set<Review>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

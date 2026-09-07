@@ -64,6 +64,14 @@ public sealed record BusinessRules(
     // judgement about them: it is a bound the owner can move, and a gallery that wants a six-month
     // hire can have one by moving it.
     int MaxRentalDays,
+    // How long after the rental was due to start before the customer may report that the gallery
+    // never handed the car over (spec 5.5). The mirror of NoShowTimeoutHours, which is the gallery's
+    // wait before it may say the customer never appeared.
+    //
+    // OPEN OWNER DECISION, raised 2026-09-08. Shipped at 0 -- a gallery that has not handed the car
+    // over at the agreed moment is already late -- but how much lateness is worth reporting is a
+    // business judgement, not a developer's. Frozen onto each booking like every other rule.
+    int NonDeliveryGraceHours,
     // The oldest model year a dealer may list. A guard against a mistyped year, not a statement
     // about what is worth renting; the console builds its year list from it so the two cannot drift.
     int EarliestVehicleModelYear);

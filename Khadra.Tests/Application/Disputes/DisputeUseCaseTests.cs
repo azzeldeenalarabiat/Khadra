@@ -57,7 +57,7 @@ public sealed class DisputeUseCaseTests
             AuditTrail.When(trail => trail.Record(Arg.Any<AuditEntry>()))
                 .Do(call => Audited.Add(call.Arg<AuditEntry>()));
             BookingReader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Petra Wheels", "Layla Odeh", null));
+                .Returns(new BookingContext(null, "Petra Wheels", "Layla Odeh", null, null));
             Names.NamesAsync(Arg.Any<IReadOnlyCollection<Id>>(), Arg.Any<CancellationToken>())
                 .Returns(new Dictionary<Guid, string>());
             Signer.Sign(Arg.Any<string>(), Arg.Any<DateTimeOffset>())

@@ -155,7 +155,7 @@ public sealed class BookingTermsTests
         var terms = BookingTerms.Create(
             Build.Percent(20m), Build.Percent(25m),
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
-            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), Turnaround, 1);
+            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), Turnaround, TimeSpan.Zero, 1);
 
         Assert.Equal("booking.commission_exceeds_deposit", terms.Error.Code);
     }
@@ -166,7 +166,7 @@ public sealed class BookingTermsTests
         var terms = BookingTerms.Create(
             Build.Percent(20m), Build.Percent(20m),
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
-            Build.Percent(100m), Build.Percent(50m), Build.Percent(25m), Turnaround, 1);
+            Build.Percent(100m), Build.Percent(50m), Build.Percent(25m), Turnaround, TimeSpan.Zero, 1);
 
         Assert.Equal("booking.penalty_range_inverted", terms.Error.Code);
     }
@@ -177,7 +177,7 @@ public sealed class BookingTermsTests
         var terms = BookingTerms.Create(
             Build.Percent(20m), Build.Percent(20m),
             TimeSpan.FromHours(1), TimeSpan.Zero, TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
-            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), Turnaround, 1);
+            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), Turnaround, TimeSpan.Zero, 1);
 
         Assert.Equal("booking.invalid_terms", terms.Error.Code);
     }
@@ -188,7 +188,7 @@ public sealed class BookingTermsTests
         var terms = BookingTerms.Create(
             Build.Percent(20m), Build.Percent(20m),
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
-            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), TimeSpan.FromMinutes(-1), 1);
+            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), TimeSpan.FromMinutes(-1), TimeSpan.Zero, 1);
 
         Assert.Equal("booking.invalid_terms", terms.Error.Code);
     }
@@ -201,7 +201,7 @@ public sealed class BookingTermsTests
         var terms = BookingTerms.Create(
             Build.Percent(20m), Build.Percent(20m),
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
-            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), TimeSpan.Zero, 1);
+            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), TimeSpan.Zero, TimeSpan.Zero, 1);
 
         Assert.True(terms.IsSuccess);
         Assert.Equal(TimeSpan.Zero, terms.Value.TurnaroundBuffer);

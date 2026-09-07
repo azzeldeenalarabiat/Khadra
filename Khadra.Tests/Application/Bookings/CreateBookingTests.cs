@@ -72,7 +72,7 @@ public sealed class CreateBookingTests
                 .When(notifier => notifier.RaiseMany(Arg.Any<IEnumerable<Notification>>()))
                 .Do(call => Notified.AddRange(call.Arg<IEnumerable<Notification>>()));
             Reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Petra Rentals", "Rana Sharif", null));
+                .Returns(new BookingContext(null, "Petra Rentals", "Rana Sharif", null, null));
 
             // A substituted IUnitOfWork returns a completed task and never invokes the delegate, so
             // every guard inside the transaction would be silently skipped and every test would

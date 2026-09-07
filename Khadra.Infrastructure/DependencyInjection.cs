@@ -7,6 +7,7 @@ using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Reviews.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Auditing.Repositories;
@@ -16,6 +17,7 @@ using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.Reviews.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Notifications;
@@ -23,6 +25,7 @@ using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Infrastructure.PlatformSettings;
 using Khadra.Infrastructure.Reporting;
+using Khadra.Infrastructure.Scheduling;
 using Khadra.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -44,6 +47,11 @@ public static class DependencyInjection
         AddNotifications(services, configuration);
 
         services.AddSingleton<IBusinessRulesProvider, ConfigurationBusinessRulesProvider>();
+
+        // The timer behind pre-launch checklist item 4. Every rule it applies belongs to the Booking
+        // aggregate; this only decides how often to ask.
+        services.AddHostedService<BookingSettlementService>();
+
         return services;
     }
 
@@ -98,6 +106,10 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(DealerConsoleOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<SchedulingOptions>()
+            .Bind(configuration.GetSection(SchedulingOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
         services.AddOptions<BusinessRulesOptions>()
             .Bind(configuration.GetSection(BusinessRulesOptions.SectionName))
             .ValidateDataAnnotations()
@@ -147,6 +159,7 @@ public static class DependencyInjection
         services.AddScoped<IBookingRepository, BookingRepository>();
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IReviewRepository, ReviewRepository>();
         services.AddScoped<INotifier, Notifier>();
 
         AddReporting(services);
@@ -174,6 +187,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerAdminReader, CustomerAdminReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
+        services.AddScoped<IGalleryReviewReader, GalleryReviewReader>();
         // The dashboard glance and the audit screen read one table with different questions: a fixed
         // seven-row feed, and a filtered, paged log. Two readers, deliberately.
         services.AddScoped<IAuditLogReader, AuditLogReader>();

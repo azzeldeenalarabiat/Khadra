@@ -69,7 +69,18 @@ public sealed record DocumentLimitsDto(long MaximumSizeBytes, IReadOnlyList<stri
 public sealed record VocabulariesDto(
     IReadOnlyList<VocabularyEntryDto> Transmissions,
     IReadOnlyList<VocabularyEntryDto> FuelTypes,
-    IReadOnlyList<VocabularyEntryDto> PickupMethods);
+    IReadOnlyList<VocabularyEntryDto> PickupMethods,
+    /// <summary>
+    /// Why a customer may say they are cancelling. The chips on the cancel sheet come from here, and
+    /// the code is what is stored on the booking -- so the sentence is chosen when it is READ, in the
+    /// reader's own language, rather than frozen in one language on a permanent record.
+    /// </summary>
+    IReadOnlyList<VocabularyEntryDto> CancellationReasons,
+    /// <summary>
+    /// Why a gallery declined. A customer needs it to render the reason on their own booking; the
+    /// dealer console needs it to offer the choice. One list serves both.
+    /// </summary>
+    IReadOnlyList<VocabularyEntryDto> RejectionReasons);
 
 public sealed record VocabularyEntryDto(string Name, string LabelEn, string LabelAr);
 
@@ -97,7 +108,9 @@ public sealed class GetAppConfigHandler(
             new VocabulariesDto(
                 [.. Enumeration.GetAll<TransmissionType>().Select(Vocabulary.Describe)],
                 [.. Enumeration.GetAll<FuelType>().Select(Vocabulary.Describe)],
-                [.. Enumeration.GetAll<PickupMethod>().Select(Vocabulary.Describe)]));
+                [.. Enumeration.GetAll<PickupMethod>().Select(Vocabulary.Describe)],
+                [.. Enumeration.GetAll<BookingCancellationReason>().Select(Vocabulary.Describe)],
+                [.. Enumeration.GetAll<BookingRejectionReason>().Select(Vocabulary.Describe)]));
     }
 }
 
@@ -124,11 +137,49 @@ internal static class Vocabulary
         ["Electric"] = ("Electric", "كهربائي"),
         ["SelfPickup"] = ("Collect it yourself", "الاستلام من المكتب"),
         ["Delivery"] = ("Delivered to you", "التوصيل إليك"),
+
+        // Why a customer cancelled. Written as the customer's own voice, because that is who picks
+        // one and who reads it back on their booking afterwards.
+        ["PlansChanged"] = ("My plans changed", "تغيّرت خططي"),
+        ["FoundBetterPrice"] = ("I found a better price", "وجدت سعراً أفضل"),
+        ["TravelCancelled"] = ("My trip was cancelled", "أُلغيت رحلتي"),
+        ["BookedByMistake"] = ("I booked this by mistake", "حجزت عن طريق الخطأ"),
+        ["DealerUnresponsive"] = ("The rental office did not respond", "لم يستجب مكتب التأجير"),
+        // Qualified by type: "Other" means different things to the two parties, and both sets have a
+        // member by that name. An unqualified key would have silently given the gallery's refusal the
+        // customer's wording.
+        ["BookingCancellationReason:Other"] = ("Another reason", "سبب آخر"),
+
+        // Why a gallery declined. Written to be read BY the customer, since that is where it lands:
+        // "we" is the gallery speaking. Until 2026-09-08 the English of these was composed into the
+        // stored reason, so an Arabic-speaking customer read English on their own booking.
+        ["VehicleUnavailable"] = ("The vehicle is no longer available", "المركبة لم تعد متاحة"),
+        ["DatesConflict"] = ("The dates conflict with another booking", "التواريخ تتعارض مع حجز آخر"),
+        ["OutsideDeliveryRadius"] = ("The delivery location is outside our delivery area", "موقع التوصيل خارج نطاق خدمتنا"),
+        ["CustomerVerificationIncomplete"] = ("Your documents could not be verified", "تعذّر التحقق من مستنداتك"),
+        ["BookingRejectionReason:Other"] = ("Declined by the rental office", "رُفض من قِبل مكتب التأجير"),
     };
 
+    /// <summary>
+    /// The label for one member, looked up by type-qualified name first and by bare name after.
+    /// </summary>
+    /// <remarks>
+    /// Two sets both have a member called "Other" and they do not mean the same thing -- a customer's
+    /// "another reason" against a gallery's "declined by the rental office". Bare names alone would
+    /// have given one of them the other's words, silently and in both languages. Everything without a
+    /// collision stays keyed by its plain name so the table reads as a vocabulary rather than a
+    /// namespace.
+    /// </remarks>
     public static VocabularyEntryDto Describe(Enumeration member)
     {
         ArgumentNullException.ThrowIfNull(member);
+
+        var qualified = $"{member.GetType().Name}:{member.Name}";
+        if (Labels.TryGetValue(qualified, out var scoped))
+            return new VocabularyEntryDto(member.Name, scoped.En, scoped.Ar);
+
+        // A member added tomorrow with no translation falls back to its own name rather than taking
+        // the whole config endpoint -- and with it every client's startup -- down with it.
         return Labels.TryGetValue(member.Name, out var label)
             ? new VocabularyEntryDto(member.Name, label.En, label.Ar)
             : new VocabularyEntryDto(member.Name, member.Name, member.Name);

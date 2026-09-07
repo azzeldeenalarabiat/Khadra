@@ -146,6 +146,21 @@ public sealed class BookingStatusChange : Entity
     public BookingStatus To { get; private set; } = null!;
     public BookingParty ActorParty { get; private set; } = null!;
     public Id? ActorUserId { get; private set; }
+
+    /// <summary>
+    /// The closed-set code behind this change, where one exists: a rejection reason, a cancellation
+    /// reason. Null for transitions nobody chose a reason for.
+    /// </summary>
+    /// <remarks>
+    /// Stored beside <see cref="Reason"/> rather than folded into it. Until 2026-09-08 the rejection
+    /// code was composed into an English sentence on the way in, which put untranslatable prose on a
+    /// permanent record: an Arabic-speaking customer read English on their own booking and no client
+    /// could do anything about it. The code is the platform's word for what happened; the sentence
+    /// is chosen by whoever reads it.
+    /// </remarks>
+    public string? ReasonCode { get; private set; }
+
+    /// <summary>What the actor typed, if anything. Their own words, in their own language.</summary>
     public string? Reason { get; private set; }
     public DateTimeOffset OccurredAt { get; private set; }
 
@@ -164,7 +179,8 @@ public sealed class BookingStatusChange : Entity
         BookingParty actorParty,
         Id? actorUserId,
         string? reason,
-        DateTimeOffset now) =>
+        DateTimeOffset now,
+        string? reasonCode = null) =>
         new(Id.New())
         {
             BookingId = bookingId,
@@ -172,6 +188,7 @@ public sealed class BookingStatusChange : Entity
             To = to,
             ActorParty = actorParty,
             ActorUserId = actorUserId,
+            ReasonCode = string.IsNullOrWhiteSpace(reasonCode) ? null : reasonCode.Trim(),
             Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
             OccurredAt = now
         };

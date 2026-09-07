@@ -12,6 +12,70 @@ Entries are newest first.
 
 ---
 
+## 2026-09-08 — The customer app, and four things the platform owed it
+
+**Supersedes:** nothing outright. It closes gaps §5.5, §5.6 and §4.1 described and nothing implemented.
+
+### What was missing
+
+The Flutter customer app is built. Four things the spec already promised had no way to happen, and
+each was found by asking what a customer could actually DO once they had the app in their hand:
+
+1. **A customer could not cancel their own booking.** `Booking.Cancel` had existed since the domain
+   model was written; only an administrator could reach it. A customer's only exit was to let the
+   booking expire.
+2. **Nothing settled a booking whose window had closed.** Four rules were enforced wherever anyone
+   asked and nobody asked on a timer (pre-launch item 4). No car was stranded, because the
+   availability predicate reads the clock — but both parties went on reading `Requested` or
+   `Approved` on a booking that had ended, and neither was told.
+3. **Reviews had no table.** §4.1 computes a gallery's rating from customer reviews. Every rating on
+   the platform read null.
+4. **Nobody could correct their own name or phone.** There is still no way to change an EMAIL address
+   (pre-launch items 44 and 72); that needs a verified flow and did not ship here.
+
+### Two defects the work uncovered
+
+**A customer could accuse a gallery of non-delivery days before the car was due.**
+`ReportDealerNonDelivery` checked that the booking was Confirmed and that the reason was non-blank,
+and nothing else. So a customer past their free-cancellation window — facing an assessment of the
+whole deposit for cancelling — could file non-delivery instead, and the record would say the GALLERY
+failed, with 25–50% of the rental assessed against them. The gallery would then have to open a
+dispute to clear a claim made without them. `MarkNoShow`, which is the same accusation pointing the
+other way, has always been guarded by `Period.Start + NoShowTimeout`. It is now guarded by
+`Period.Start + BookingTerms.NonDeliveryGrace`, frozen onto the booking like every other rule.
+**The grace itself is an open owner decision** shipped at 0 hours — pre-launch item 68.
+
+**A rejection reason was stored as English prose.** `BookingDecisionHandlers` composed
+`"The dates conflict with another booking: " + the dealer's note` into the status history. An
+Arabic-speaking customer read English on their own booking and no client could fix it, because the
+words were in the row. The CODE is now stored beside the dealer's own words, and both languages of
+the label travel on `/app-config`. The same shape is used for the new cancellation reasons.
+
+### The rule the app is built on
+
+**The server owns every judgment; the app renders judgments and sends intentions.** Concretely, the
+phone never computes a day count, a total, a deposit, a penalty, a commission, or availability — and
+never decides from a deadline comparison whether a booking is still live. `BookingDto` therefore grew
+three server-judged fields: `IsAwaitingDecision`, `IsAwaitingPayment`, and a `Cancellation` preview
+carrying whether cancelling is possible and what it would cost. The preview and the real cancellation
+share `AssessCancellation`, so the figure on the confirmation sheet is the figure that gets recorded.
+
+### Numbers
+
+| Setting | Value | Where |
+|---|---|---|
+| `BusinessRules:NonDeliveryGraceHours` | 0 | Frozen onto each booking as `BookingTerms.NonDeliveryGrace`. **Owner decision open** — pre-launch item 68 |
+| `Scheduling:SettlementIntervalSeconds` | 60 | How often the settlement service looks for work its own clocks already decided |
+
+### Still open
+
+Payments remains unbuilt and blocked. A customer can be approved and cannot pay, so every approval
+ends in expiry — stated as pre-launch item 69 rather than left implied. The app shows the amount, the
+deadline and a plain sentence saying paying is not available in this version. **There is no Pay
+button, and nobody must add a cash path to unblock it** (item 2).
+
+---
+
 ## 2026-09-07 — Reserve now, pay after approval
 
 **Supersedes:** §5.3 "Payment at Booking", and the booking state order implied by §2 and §3.1.

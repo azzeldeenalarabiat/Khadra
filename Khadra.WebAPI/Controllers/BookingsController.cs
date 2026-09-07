@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Khadra.Application.Bookings.CancelBooking;
 using Khadra.Application.Bookings.CreateBooking;
 using Khadra.Application.Bookings.DecideBooking;
 using Khadra.Application.Bookings.Dtos;
@@ -113,6 +114,86 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
         return result.IsSuccess
             ? CreatedAtAction(nameof(Get), new { bookingId = result.Value.BookingId }, result.Value)
             : Failure(result.Error);
+    }
+
+    /// <param name="ReasonCode">
+    /// One of the codes published on <c>GET /api/v1/app-config</c>. A closed list rather than free
+    /// text: a required text box produces "asdf", and neither the gallery nor the owner can count it.
+    /// </param>
+    /// <param name="Details">Optional, and the customer's own words in their own language.</param>
+    public sealed record CancelBookingRequest(
+        [Required, MaxLength(40)] string ReasonCode,
+        [MaxLength(500)] string? Details);
+
+    /// <summary>
+    /// The customer ends their own booking (spec 5.5).
+    /// </summary>
+    /// <remarks>
+    /// Nothing is charged here. A cancellation ASSESSES a penalty and stops (spec 3.3) — money moves
+    /// only through an admin resolving a dispute — and before the deposit clears there is nothing to
+    /// assess at all. The figure a customer is shown before they confirm is
+    /// <c>BookingDto.Cancellation</c>, computed by the server from this booking's own frozen terms.
+    ///
+    /// Retrying is safe: a second call on a booking this customer already cancelled answers 200 with
+    /// the booking rather than a conflict, because a phone that lost the first response would
+    /// otherwise tell them their cancellation failed when it succeeded.
+    ///
+    /// It can also answer with an EXPIRED booking rather than a cancelled one. If the window closed
+    /// while the customer was deciding, the clock already ended the booking and the platform released
+    /// the car; recording a cancellation over that would say "you cancelled this" where the truth is
+    /// "the time ran out".
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.Customer)]
+    [HttpPost("{bookingId:guid}/cancel")]
+    [ProducesResponseType<BookingDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> Cancel(
+        Guid bookingId,
+        [FromBody] CancelBookingRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var result = await Mediator.Send(
+            new CancelMyBookingCommand(actor.UserId!.Value, Id.From(bookingId), request.ReasonCode, request.Details),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    public sealed record ReportNonDeliveryRequest([Required, MaxLength(1000)] string Details);
+
+    /// <summary>
+    /// The customer reports that the gallery never handed the car over (spec 5.5).
+    /// </summary>
+    /// <remarks>
+    /// Refused before the rental was due to start. Without that guard a customer facing a
+    /// cancellation penalty could file this days ahead instead, and the record would say the GALLERY
+    /// failed to deliver — with a 25-50% assessment against them — leaving the gallery to open a
+    /// dispute to clear a claim made without them. <c>MarkNoShow</c>, the mirror-image claim, has
+    /// always been guarded this way.
+    ///
+    /// NOT REACHABLE TODAY. It needs a Confirmed booking, and Confirmed needs a cleared deposit,
+    /// which needs the Payments context. The app gates the screen on the booking's own status, so no
+    /// customer is shown a button that cannot work.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.Customer)]
+    [HttpPost("{bookingId:guid}/report-non-delivery")]
+    [ProducesResponseType<BookingDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> ReportNonDelivery(
+        Guid bookingId,
+        [FromBody] ReportNonDeliveryRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var result = await Mediator.Send(
+            new ReportNonDeliveryCommand(actor.UserId!.Value, Id.From(bookingId), request.Details),
+            cancellationToken);
+        return FromResult(result);
     }
 
     // ── The dealer's decisions (spec 4.2, 5.4). Owner or ACTIVE employee; approve and reject also

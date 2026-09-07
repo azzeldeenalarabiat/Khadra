@@ -44,17 +44,18 @@ public sealed record RecordReturnCommand(
     string? Notes,
     decimal? CashCollected) : ICommand<Result<BookingDto, Error>>;
 
+/// <summary>
+/// The closed set of reasons a gallery may decline a request.
+/// </summary>
+/// <remarks>
+/// This was a dictionary of English sentences, and the sentence was composed into the stored reason.
+/// The set itself now lives in the domain as <see cref="BookingRejectionReason"/> -- so the CODE is
+/// what is persisted -- and both languages of the label travel on <c>GET /api/v1/app-config</c>
+/// beside the platform's other vocabularies. This shim keeps the name the validator reads.
+/// </remarks>
 public static class RejectionReasons
 {
-    /// <summary>Code → the sentence the customer is shown. The console offers exactly these.</summary>
-    public static readonly IReadOnlyDictionary<string, string> Labels = new Dictionary<string, string>(StringComparer.Ordinal)
-    {
-        ["VehicleUnavailable"] = "The vehicle is no longer available",
-        ["DatesConflict"] = "The dates conflict with another booking",
-        ["OutsideDeliveryRadius"] = "The delivery location is outside our delivery area",
-        ["CustomerVerificationIncomplete"] = "Your documents could not be verified",
-        ["Other"] = "Declined by the rental office",
-    };
+    public static bool IsKnown(string? code) => BookingRejectionReason.IsKnown(code);
 }
 
 public sealed class ApproveBookingCommandValidator : AbstractValidator<ApproveBookingCommand>
@@ -68,7 +69,7 @@ public sealed class RejectBookingCommandValidator : AbstractValidator<RejectBook
     public RejectBookingCommandValidator()
     {
         RuleFor(command => command.ReasonCode)
-            .Must(code => RejectionReasons.Labels.ContainsKey(code ?? string.Empty))
+            .Must(RejectionReasons.IsKnown)
             .WithMessage("Choose one of the listed reasons.");
         RuleFor(command => command.Details).NotEmpty().MaximumLength(500);
     }
@@ -120,7 +121,12 @@ public sealed class BookingDecisionHandlers(
         if (approved.IsFailure)
             return approved.Error;
 
-        return await CommitAsync(loaded.Value, request.ActorUserId, NotificationKind.BookingApproved, cancellationToken);
+        return await CommitAsync(
+            loaded.Value,
+            request.ActorUserId,
+            NotificationKind.BookingApproved,
+            cancellationToken,
+            NotificationKind.YourBookingApproved);
     }
 
     public async Task<Result<BookingDto, Error>> Handle(RejectBookingCommand request, CancellationToken cancellationToken)
@@ -131,13 +137,22 @@ public sealed class BookingDecisionHandlers(
         if (loaded.IsFailure)
             return loaded.Error;
 
-        // Written for the customer: the category in words, then whatever the dealer added.
-        var reason = $"{RejectionReasons.Labels[request.ReasonCode]}: {request.Details.Trim()}";
-        var rejected = loaded.Value.Reject(request.ActorUserId, reason, clock.UtcNow);
+        // The CODE and the dealer's own words, kept apart. They used to be composed into one English
+        // sentence on the way in, which put untranslatable prose on a permanent record: an
+        // Arabic-speaking customer read "The vehicle is no longer available" on their own booking and
+        // nothing downstream could do anything about it. Whoever renders it now picks the sentence.
+        var reasonCode = Enumeration.GetAll<BookingRejectionReason>()
+            .First(reason => string.Equals(reason.Name, request.ReasonCode, StringComparison.Ordinal));
+        var rejected = loaded.Value.Reject(request.ActorUserId, reasonCode, request.Details, clock.UtcNow);
         if (rejected.IsFailure)
             return rejected.Error;
 
-        return await CommitAsync(loaded.Value, request.ActorUserId, NotificationKind.BookingRejected, cancellationToken);
+        return await CommitAsync(
+            loaded.Value,
+            request.ActorUserId,
+            NotificationKind.BookingRejected,
+            cancellationToken,
+            NotificationKind.YourBookingRejected);
     }
 
     public async Task<Result<BookingDto, Error>> Handle(RecordPickupCommand request, CancellationToken cancellationToken)
@@ -239,11 +254,19 @@ public sealed class BookingDecisionHandlers(
     /// failure there leaves the booking decided and nobody told, with nothing to show it went
     /// missing. Same reasoning the audit trail is built on.
     /// </summary>
+    /// <param name="customerKind">
+    /// What the CUSTOMER is told, where there is anything to tell them. Null for the handovers: the
+    /// customer was standing at the counter when the car changed hands, and a notification about an
+    /// event they took part in is noise. It was pre-launch checklist item 60 that nothing told a
+    /// customer their booking had been answered at all — the dealer's decision reached them only by
+    /// email, and only if they had verified an address.
+    /// </param>
     private async Task<Result<BookingDto, Error>> CommitAsync(
         Booking booking,
         Id actorUserId,
         NotificationKind kind,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        NotificationKind? customerKind = null)
     {
         var member = await membership.ResolveAsync(actorUserId, cancellationToken);
         if (member.IsSuccess)
@@ -256,6 +279,17 @@ public sealed class BookingDecisionHandlers(
                 booking.Id,
                 booking.Reference.Value,
                 cancellationToken);
+
+            if (customerKind is not null)
+            {
+                await team.NotifyCustomerAsync(
+                    booking.CustomerId,
+                    member.Value.Dealer.BusinessName.Value,
+                    customerKind,
+                    clock.UtcNow,
+                    booking.Id,
+                    booking.Reference.Value);
+            }
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
