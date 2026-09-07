@@ -340,3 +340,93 @@ public sealed class CatalogueReaderTests : IDisposable
         Assert.Empty((await catalogue.SearchAsync(new CatalogueFilter(Text: "%"), Page)).Items);
     }
 }
+
+/// <summary>
+/// The public URL a gallery's logo is served from.
+/// </summary>
+/// <remarks>
+/// Its own class because the trap is specific and was live for a few hours: a storage key already
+/// carries its scope (`dealer-branding/{dealerId}/logo-….png`), so a URL built as prefix + dealer id
+/// + key contains the scope TWICE and 404s. Nothing caught it end to end, because a gallery that has
+/// never uploaded a logo returns null and the wrong branch is simply never taken.
+/// </remarks>
+public sealed class CatalogueBrandingUrlTests : IDisposable
+{
+    private readonly SqliteConnection _connection = new("DataSource=:memory:");
+    private readonly DbContextOptions<KhadraDbContext> _options;
+
+    public CatalogueBrandingUrlTests()
+    {
+        _connection.Open();
+        _options = new DbContextOptionsBuilder<KhadraDbContext>()
+            .UseSqlite(_connection)
+            .UseSnakeCaseNamingConvention()
+            .Options;
+        using var context = new KhadraDbContext(_options);
+        context.Database.EnsureCreated();
+    }
+
+    public void Dispose() => _connection.Dispose();
+
+    [Fact]
+    public async Task A_gallery_logo_is_addressed_at_the_path_that_actually_serves_it()
+    {
+        var dealer = Build.ApprovedDealer();
+        var logoKey = $"dealer-branding/{dealer.Id.Value}/logo-1.png";
+        var coverKey = $"dealer-branding/{dealer.Id.Value}/cover-1.png";
+        dealer.SetLogo(logoKey);
+        dealer.SetCover(coverKey);
+
+        var vehicle = Build.Vehicle(dealer.Id);
+        vehicle.AddImage("cars/front.jpg", Build.Now);
+        vehicle.Publish(dealerCanTrade: true, Build.Now);
+
+        await using (var context = new KhadraDbContext(_options))
+        {
+            context.Dealers.Add(dealer);
+            context.Vehicles.Add(vehicle);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = new KhadraDbContext(_options);
+        var catalogue = new CatalogueReader(reader);
+
+        // DealerImagesController is routed at api/v1/dealer-images and matches
+        // dealer-branding/{dealerId}/{fileName} beneath it, which is exactly the stored key.
+        var expectedLogo = $"/api/v1/dealer-images/{logoKey}";
+        var expectedCover = $"/api/v1/dealer-images/{coverKey}";
+
+        var gallery = await catalogue.GetGalleryAsync(dealer.Id);
+        Assert.NotNull(gallery);
+        Assert.Equal(expectedLogo, gallery.LogoUrl);
+        Assert.Equal(expectedCover, gallery.CoverUrl);
+
+        // The search row builds the same URL by a different route through the query, so it is
+        // asserted separately rather than assumed to agree.
+        var page = await catalogue.SearchAsync(new CatalogueFilter(), PageRequest.From(1, 10));
+        Assert.Equal(expectedLogo, page.Items.Single().Gallery.LogoUrl);
+
+        // The scope appears once. This is the assertion the bug would have failed.
+        Assert.Equal(1, expectedLogo.Split("dealer-branding").Length - 1);
+        Assert.DoesNotContain("dealer-branding/dealer-branding", gallery.LogoUrl, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_gallery_with_no_branding_reports_null_rather_than_a_broken_path()
+    {
+        var dealer = Build.ApprovedDealer();
+
+        await using (var context = new KhadraDbContext(_options))
+        {
+            context.Dealers.Add(dealer);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = new KhadraDbContext(_options);
+        var gallery = await new CatalogueReader(reader).GetGalleryAsync(dealer.Id);
+
+        Assert.NotNull(gallery);
+        Assert.Null(gallery.LogoUrl);
+        Assert.Null(gallery.CoverUrl);
+    }
+}

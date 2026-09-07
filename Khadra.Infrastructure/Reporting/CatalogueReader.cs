@@ -1,5 +1,6 @@
 using Khadra.Application.Common;
 using Khadra.Application.Common.Dtos;
+using Khadra.Application.Dealers.Dtos;
 using Khadra.Application.Fleet.Dtos;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Domain.Common;
@@ -144,7 +145,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                         dealer.Id.Value,
                         dealer.BusinessName.Value,
                         dealer.CityId == null ? null : dealer.CityId.Value.Value,
-                        dealer.LogoStorageKey == null ? null : DealerBrandingPath + "/" + dealer.Id.Value + "/" + dealer.LogoStorageKey))
+                        dealer.LogoStorageKey == null
+                            ? null
+                            : DealerProfileDto.PublicImagePath + "/" + dealer.LogoStorageKey))
                     .First()))
             .ToListAsync(cancellationToken);
 
@@ -212,9 +215,6 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
 
     public Task<PublicGallery?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default) =>
         LoadGalleryAsync(dealerId, cancellationToken);
-
-    /// <summary>Branding files are served from a public path, unlike identity documents.</summary>
-    private const string DealerBrandingPath = "/api/v1/dealer-branding";
 
     /// <summary>
     /// Every car a customer may be shown: listed, not deleted, and belonging to a gallery that may
@@ -297,6 +297,15 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             ReviewCount: 0);
     }
 
+    /// <summary>
+    /// The public URL for a gallery logo or cover.
+    /// </summary>
+    /// <remarks>
+    /// The storage key ALREADY carries its scope — `dealer-branding/{dealerId}/logo-….png` — so the
+    /// path is the serving prefix and the key, nothing between them. Building it from the dealer id
+    /// a second time produces a URL with the scope in it twice, which 404s. Sharing
+    /// DealerProfileDto's constant rather than declaring a second one is what stops the two drifting.
+    /// </remarks>
     private static string? Branding(Id dealerId, string? storageKey) =>
-        storageKey is null ? null : $"{DealerBrandingPath}/{dealerId.Value}/{storageKey}";
+        storageKey is null ? null : $"{DealerProfileDto.PublicImagePath}/{storageKey}";
 }

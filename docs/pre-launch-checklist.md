@@ -1099,3 +1099,70 @@ setting after a booking is made.
 **To close:** if the owner wants it per gallery, add it to `DeliverySettings` beside the radius and
 the fee — the same move the delivery fee already made on 2026-09-06 — and resolve it in the create
 handler. No migration of existing bookings is needed; they keep the gap they were made under.
+
+## The customer app's view of the API (2026-09-07)
+
+### 56. Rate limits assume one customer per IP address
+
+**Status:** open · **Raised:** 2026-09-07 (Fable advisor, reviewing the API as a mobile client sees it)
+
+Every limit in `Program.cs` is partitioned by client address: login 10 per 15 minutes, auth 10 per
+minute, refresh 60 per minute, the public catalogue 120 per minute. That is the right shape for a
+browser on a home connection and the wrong one for a phone in Jordan. Zain, Orange and Umniah put
+thousands of subscribers behind a single IPv4 address, so the partition key is the carrier, not the
+customer.
+
+Forty people opening the home screen in the same minute from one carrier — three calls each, cities,
+car types and a search — exhaust the public bucket for everyone behind it. Ten sign-ins per quarter
+hour is shared by an entire network. The API's own comment calls 120 "generous"; behind carrier-grade
+NAT it is not a limit on abuse, it is a limit on customers.
+
+This is the single most likely production incident for the app, and no amount of client care fixes
+it. Item 32 already records that the partitioning is wrong behind a proxy; this is the same fault
+with a much larger blast radius.
+
+**To close:** partition login by (address, normalised email) and rely on per-account lockout for
+brute force; raise the public and refresh ceilings by an order of magnitude and let a global
+concurrency limiter be the real protection; and send `Retry-After` on the 429 — the handler currently
+sets `code: rate_limited` and no header, so a client can only guess how long to wait.
+
+### 57. A lost refresh response signs a customer out of a working session
+
+**Status:** open · **Raised:** 2026-09-07 · **Owner decision needed**
+
+`RefreshTokensHandler` rotates the refresh token and revokes the whole family when a consumed one is
+presented again. That is correct replay detection, and on a phone it fires on something that is not
+an attack: the request reaches the server, the rotation commits, and the response is lost — a radio
+handover, a tunnel, iOS suspending the app mid-flight. The client still holds the old token, its next
+refresh looks exactly like a replay, and the customer is signed out for a network hiccup. On mobile
+this is the common case, not the exotic one.
+
+There is a second, smaller version of it in the same handler: when two refreshes race, the `xmin`
+loser also revokes the family — which destroys the replacement token the WINNER was just issued.
+
+**To close:** a short reuse grace. When a revoked token is presented within
+`Authentication:Policy:RefreshReuseGraceSeconds` of its `RevokedAt`, and the replacement it points at
+has itself never been used, revoke that unused replacement and issue a fresh one. Outside the window,
+or if the replacement was used, kill the family exactly as today — replay detection is unchanged past
+the grace. And let the concurrency loser return 401 without revoking the family, since the only way
+two refreshes of one token race is a client bug the winner should survive.
+
+### 58. There is no platform-context endpoint, so the app must hard-code what the platform knows
+
+**Status:** open · **Raised:** 2026-09-07
+
+Several facts the customer app needs are known only to the server and reach it nowhere, or only
+inside a response it cannot get before it needs them:
+
+- **The reporting time zone.** `RentalQuote.timeZone` carries it, but the date pickers run BEFORE the
+  first quote, and a picker in the wrong zone prices a different number of days.
+- **A currency's minor units.** JOD has three; the app currently carries its own table.
+- **The minimum renter age.** Reachable only as English prose inside `auth.under_minimum_age`.
+- **Upload limits.** `Documents:MaximumSizeBytes` and the allowed content types are enforced but never
+  published, so a client can only discover them by being refused.
+- **Filter vocabularies.** Transmissions and fuel types are smart enums with no endpoint, so filter
+  chips would be a literal in a widget — which the standing rule forbids.
+
+**To close:** one anonymous, rate-limited `GET /api/v1/platform-context` returning the time zone, the
+currency and its minor units, the minimum renter age, the document limits, and the transmission and
+fuel-type vocabularies. Items 16 and 34 already ask for the same thing on the dealer side.
