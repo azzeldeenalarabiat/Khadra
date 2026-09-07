@@ -453,16 +453,29 @@ show nothing rather than inventing a name.
 
 ### 29. Nothing checks that a car's type is a real car type
 
-**Status:** open · **Raised:** 2026-09-04 · **Narrowed:** 2026-09-05
+**Status:** CLOSED 2026-09-07 · **Raised:** 2026-09-04 · **Narrowed:** 2026-09-05
 
-Both forms now read `GET /api/v1/car-types` and offer a select, and neither will save without one, so
-the hardcoded id is gone from the console. The server-side half is not done: `VehicleHandlers` takes
-whatever `CarTypeId` it is given, and `vehicles.car_type_id` has no foreign key, so a request made
-outside the console can still point a car at a type that does not exist. That is how all 71 seeded
-vehicles came to carry a dangling id (item 28).
+Both forms read `GET /api/v1/car-types` and offer a select, and neither will save without one, so the
+hardcoded id went from the console first. The server-side half was still missing until now:
+`VehicleHandlers` took whatever `CarTypeId` it was given, so a request made outside the console could
+point a car at a type that does not exist. Confirmed live before the fix — a made-up id returned
+**201 Created**, and the row sat in the database with `car_type_exists = 0`.
 
-**To close:** `AddVehicle` and `UpdateVehicle` reject a CarTypeId that is not an ACTIVE car type, and
-`vehicles.car_type_id` gets its FK.
+**Closed by** an existence check in `AddVehicle` and `UpdateVehicle` (`vehicle.unknown_car_type`,
+`vehicle.car_type_retired`), with one asymmetry that matters: a type the dealer is CHANGING to must
+be offered, but the one already on the car need only exist. A strict check both ways would mean that
+retiring a category froze every car in it — the owner could not correct a price until they had
+re-categorised, which is not a decision a price edit should force.
+
+**The FK this item originally asked for was deliberately NOT added.** It would contradict
+`.claude/rules/backend/architecture.md` ("Cross-context references by Id only. No navigation
+properties or EF relationships across contexts"), and with the lookups append-only it buys nothing
+the handler check does not already give. The rule stands; the check is the enforcement.
+
+**Consequence still to handle:** a car whose type was retired after it was listed matches no
+`<option>` in the edit form, so the browser shows the first one and the next save would silently
+re-categorise it. The form needs to include the car's current type as an option, marked retired,
+when editing. Tracked as part of item 49's screen work rather than left implicit here.
 
 ### 30. Map tiles come from OpenStreetMap's public servers
 
