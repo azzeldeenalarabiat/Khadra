@@ -17,11 +17,11 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
         ConfigureId(entity.Property(dealer => dealer.ReviewedByAdminId));
 
         entity.Property(dealer => dealer.BusinessName)
-            .HasConversion(name => name.Value, value => BusinessName.Create(value).Value)
+            .HasConversion(name => name.Value, value => BusinessName.FromPersisted(value))
             .HasMaxLength(BusinessName.MaxLength)
             .IsRequired();
         entity.Property(dealer => dealer.CommercialRegistration)
-            .HasConversion(number => number.Value, value => CommercialRegistrationNumber.Create(value).Value)
+            .HasConversion(number => number.Value, value => CommercialRegistrationNumber.FromPersisted(value))
             .HasMaxLength(CommercialRegistrationNumber.MaxLength)
             .IsRequired();
         entity.Property(dealer => dealer.OperatingHours)

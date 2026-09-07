@@ -22,7 +22,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         ConfigureAggregate(entity, "bookings");
 
         entity.Property(booking => booking.Reference)
-            .HasConversion(reference => reference.Value, value => BookingReference.Create(value).Value)
+            .HasConversion(reference => reference.Value, value => BookingReference.FromPersisted(value))
             .HasMaxLength(20)
             .IsRequired();
 

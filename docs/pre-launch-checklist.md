@@ -688,35 +688,44 @@ Same gap as item 6 (listing edits are not logged), and the same fix serves both.
 **To close:** persist dealer-side changes to an activity trail the owner and an administrator can
 read, fed from the domain events these actions already raise.
 
-### 40. Email can only reach one address until a sender is verified
+### 40. Email leaves under a borrowed sender, and only ever in English
 
-**Status:** open · **Raised:** 2026-09-06 · **Blocks real users**
+**Status:** open · **HARD BLOCKER before real customers** · **NOT a blocker for Flutter development**
+· **Raised:** 2026-09-06 · **Rewritten:** 2026-09-07
 
-The platform sends through Resend with `Email:FromAddress` = `onboarding@resend.dev`, Resend's shared
-testing sender. No domain is verified on the account, and Resend therefore refuses every recipient
-except the account owner with a 403:
+Superseded the Resend problem this item was opened for: the platform now sends through **Brevo over
+HTTPS** (port 443), which was the answer to a network that silently swallows SMTP on 587 — the
+handshake succeeds, the greeting never arrives, and every message stalls until it times out. Real
+delivery to arbitrary recipients is verified working, most recently on 2026-09-07 by an actual send,
+not by trusting the startup probe. Two things about it are still wrong for real customers.
 
-> "You can only send testing emails to your own email address … To send emails to other recipients,
-> please verify a domain at resend.com/domains, and change the `from` address to an email using this
-> domain."
+**The sender is not ours.** `Email:FromAddress` is set to a confirmed Gmail address, and Brevo
+rewrites the visible sender to a subdomain of its own — mail arrives from
+`khadrajordan02@12062026.brevosend.com`. Nobody can DKIM-sign `gmail.com`, so a confirmed ADDRESS
+buys delivery while only a verified DOMAIN buys your own From. For a customer that means a password
+reset arriving from a domain that is not Khadra, and a materially higher chance of the spam folder.
 
-Nothing in the platform is wrong — registration, verification and resend all work, and a refusal is
-reported honestly rather than shown as success. But no customer or gallery owner other than the
-Resend account owner can receive a verification email, so **sign-up is effectively closed to
-everyone else** until this is closed.
+**Every message is English.** `AuthEmailComposer` has no culture, language or locale parameter
+anywhere — subjects and bodies are hard-coded English literals. So a customer who registers in
+Arabic reads an Arabic screen telling them to check their mail, and receives English. This is
+server-side, so neither the Angular console's language switch nor the Flutter app can compensate.
 
-The API states it at startup (`Email ready. Resend accepted the API key, but NO domain is
-verified…`), so it cannot be discovered late by accident.
+**Why it does not block Flutter.** The API contract does not change for either fix, and the app never
+composes mail; it triggers server-side sends and reads ProblemDetails codes. Both fixes are
+configuration and a server-side template pass. Building against the current behaviour is safe.
 
-**To close, either:**
-- Verify the platform's domain at resend.com/domains (three DNS records) and set
-  `Email:FromAddress` to something like `no-reply@khadra.jo`; or
-- Switch to a provider that verifies a single sender ADDRESS rather than a domain — Brevo's free tier
-  does this and needs no code change: `Email:Provider` `Smtp`, Host `smtp-relay.brevo.com`, Port 587,
-  `Email:Username` the Brevo login, `Email:Password` an SMTP key.
+**To close — one pass, when khadra.jo is set up:**
+- Verify `khadra.jo` at Brevo (SPF, DKIM, and a DMARC record), then set `Email:FromAddress` to
+  `no-reply@khadra.jo`. Configuration only, no code change; the startup probe already reports which
+  sender it is using and whether mail will be delivered.
+- Give `AuthEmailComposer` the recipient's language and key its subjects and bodies the way the
+  console's `en.ts` / `ar.ts` are keyed. That needs somewhere to READ the language from, which is the
+  real decision: a `PreferredLanguage` on the user, captured at registration and settable later. It is
+  a schema change, so it wants deciding rather than defaulting — and note the Flutter app must send
+  it at registration for a customer ever to get Arabic mail.
 
-A verified domain is the better answer regardless: mail from your own domain with SPF and DKIM is far
-less likely to land in spam than mail from a shared testing sender.
+Related and separate: item 38 (mail has no queue, no retry and no bounce handling) still stands, and
+matters more once real customers depend on delivery.
 
 ### 41. The Employee Console design is not in `docs/design/`
 
@@ -961,18 +970,26 @@ first. The development database was cleaned this way on 2026-09-06.
 
 ### 53. Value objects are re-parsed on read, and a failed parse throws
 
-**Status:** open · **Raised:** 2026-09-07
+**Status:** CLOSED 2026-09-07 · **Raised:** 2026-09-07
 
-`DealerConfiguration.cs:24` converts the stored commercial registration back with
-`CommercialRegistrationNumber.Create(value).Value`. `.Value` on a failed `Result` throws, so any
-future tightening of that rule which an already-stored row does not satisfy would make every dealer
-fail to load — not a validation error, a crash on read. `PlateNumber` and `BusinessName` have the
-same shape.
+Seven EF converters rebuilt their value object through `Create(...).Value` on every read, and
+`.Value` on a failed `Result` throws. Nothing was broken while every stored row happened to satisfy
+the current rule — but the rules move. The commercial registration rule was tightened the day before
+this was raised, so letters are refused rather than silently deleted; had one stored row contained a
+letter, that change would have turned every query touching a dealer into an exception on load. Not a
+validation error a caller could handle: a crash, on read, for an aggregate nobody was editing.
 
-Nothing is broken today: the rule was tightened on 2026-09-06 (letters are refused rather than
-silently deleted) and every stored value still parses, because they were all digits already. The
-risk is the NEXT change to one of these rules.
+**Closed by** a trusted `FromPersisted(string)` on each of the seven, used by the converters:
+`EmailAddress`, `PhoneNumber`, `PersonName`, `BusinessName`, `CommercialRegistrationNumber`,
+`PlateNumber`, `BookingReference`. Writes still go through `Create`, which is the only door new
+values come in by, so nothing is loosened — the rule simply stops being re-applied to rows that were
+already accepted under an older one.
 
-**To close:** give each value object a trusted `FromPersisted(string)` that skips validation, and use
-it in the EF converters. Reading a row is not the moment to re-litigate whether it should have been
-allowed in.
+`OperatingHoursConverter` was already safe and is untouched: it falls back to `AlwaysClosed()`
+instead of throwing.
+
+Regression tests: `Khadra.Tests/Persistence/StoredValuesSurviveTighterRulesTests.cs` loads values the
+write path refuses on purpose ("AB1234" as a plate and a registration, a one-character name, a
+malformed address) and asserts each still reads back, with a final test asserting the write path is
+unchanged. If a converter is ever routed back through `Create`, it fails there rather than in
+production on the next rule change.

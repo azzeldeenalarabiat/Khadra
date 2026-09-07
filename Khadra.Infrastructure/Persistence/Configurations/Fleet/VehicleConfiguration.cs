@@ -18,7 +18,7 @@ internal sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         ConfigureEnumeration(entity.Property(vehicle => vehicle.Status), 20);
 
         entity.Property(vehicle => vehicle.PlateNumber)
-            .HasConversion(plate => plate.Value, value => PlateNumber.Create(value).Value)
+            .HasConversion(plate => plate.Value, value => PlateNumber.FromPersisted(value))
             .HasMaxLength(PlateNumber.MaxDigits)
             .IsRequired();
 
