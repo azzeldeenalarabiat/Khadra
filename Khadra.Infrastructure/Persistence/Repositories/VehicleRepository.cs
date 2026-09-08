@@ -42,6 +42,33 @@ internal sealed class VehicleRepository(KhadraDbContext context) : IVehicleRepos
             vehicle => vehicle.DealerId == dealerId && vehicle.Status == active, cancellationToken);
     }
 
+    public Task<int> CountPublishedNotDeliveryEligibleAsync(
+        Id dealerId,
+        CancellationToken cancellationToken = default)
+    {
+        var active = VehicleStatus.Active;
+        return context.Vehicles.CountAsync(
+            vehicle =>
+                vehicle.DealerId == dealerId &&
+                vehicle.Status == active &&
+                !vehicle.IsDeliveryEligible,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Vehicle>> ListPublishedNotDeliveryEligibleAsync(
+        Id dealerId,
+        CancellationToken cancellationToken = default)
+    {
+        var active = VehicleStatus.Active;
+        // Tracked, not AsNoTracking: the caller is about to change every one of them.
+        return await context.Vehicles
+            .Where(vehicle =>
+                vehicle.DealerId == dealerId &&
+                vehicle.Status == active &&
+                !vehicle.IsDeliveryEligible)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Vehicle vehicle, CancellationToken cancellationToken = default) =>
         await context.Vehicles.AddAsync(vehicle, cancellationToken);
 }

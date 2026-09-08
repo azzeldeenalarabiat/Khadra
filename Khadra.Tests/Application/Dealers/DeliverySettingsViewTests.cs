@@ -3,6 +3,7 @@ using Khadra.Application.Dealers;
 using Khadra.Application.Dealers.UpdateDeliverySettings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.Fleet.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -19,8 +20,15 @@ public sealed class DeliverySettingsViewTests
 
     private static readonly JsonSerializerOptions WireOptions = new(JsonSerializerDefaults.Web);
 
-    private static GetMyDeliverySettingsHandler Handler(IDealerRepository dealers) =>
-        new(new DealerMembershipResolver(dealers));
+    private static GetMyDeliverySettingsHandler Handler(
+        IDealerRepository dealers,
+        int publishedNotOffered = 0)
+    {
+        var vehicles = Substitute.For<IVehicleRepository>();
+        vehicles.CountPublishedNotDeliveryEligibleAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
+            .Returns(publishedNotOffered);
+        return new(new DealerMembershipResolver(dealers), vehicles);
+    }
 
     [Fact]
     public async Task Owner_sees_their_own_radius_and_their_own_fee()

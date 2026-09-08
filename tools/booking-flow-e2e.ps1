@@ -396,8 +396,17 @@ Write-Host ("        rows: " + ($rows -join '; '))
 $requested = ($rows | Where-Object { $_ -like 'Requested|*' })
 Step 'every booking made is Requested in the database' ($null -ne $requested) "$requested"
 
-$shape = docker exec khadra-postgres psql -U khadra -d khadra_e2e -Atc "select count(*) from bookings where decision_deadline is null or payment_deadline is not null or deposit_payment_id is not null;"
-Step 'none carries a payment clock or a deposit' ([int]$shape -eq 0) "$shape row(s) with a payment clock"
+# Scoped to REQUESTED, and it has to be. The old query asked the whole table, which was right only
+# while nothing had ever been approved: an Approved booking is SUPPOSED to carry a payment deadline --
+# that clock is what approval starts -- so the assertion started failing the first time a dealer said
+# yes, and the failure said nothing was wrong with the system.
+$shape = docker exec khadra-postgres psql -U khadra -d khadra_e2e -Atc "select count(*) from bookings where status = 'Requested' and (decision_deadline is null or payment_deadline is not null or deposit_payment_id is not null);"
+Step 'a requested booking has a decision clock and no payment clock' ([int]$shape -eq 0) "$shape wrongly-shaped row(s)"
+
+# Nothing anywhere carries a deposit, and with no payment provider configured nothing can. This is
+# the assertion that would catch a cash path being added out of band (pre-launch item 2).
+$paid = docker exec khadra-postgres psql -U khadra -d khadra_e2e -Atc "select count(*) from bookings where deposit_payment_id is not null;"
+Step 'no booking anywhere claims a paid deposit' ([int]$paid -eq 0) "$paid booking(s) marked paid"
 
 $notified = docker exec khadra-postgres psql -U khadra -d khadra_e2e -Atc "select count(*) from notifications where kind = 'BookingRequested';"
 Step 'the gallery was notified about the requests' ([int]$notified -gt 0) "$notified notification(s)"

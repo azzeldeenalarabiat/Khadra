@@ -792,6 +792,24 @@ export const AR = {
   'dealerDelivery.exactRadiusKm': 'النطاق بالضبط (كم)',
   'dealerDelivery.howTheRadiusIs': 'كيف يُستخدم النطاق',
   'dealerDelivery.offerDelivery': 'تقديم خدمة التوصيل',
+  'dealerDelivery.carsNotOfferedTitle': 'سياراتك المعروضة غير متاحة للتوصيل',
+  'dealerDelivery.carsNotOfferedBody':
+    '{count} من سياراتك المعروضة يمكن استلامها من موقعك فقط، لأنها حُفظت قبل تفعيل التوصيل. لن يراها العملاء قابلة للتوصيل حتى تغيّر ذلك.',
+  'dealerDelivery.offerOnListedCars': 'أتح التوصيل لهذه السيارات',
+  'dealerDelivery.offerOnListedCarsHint':
+    'يمكنك إيقاف التوصيل لأي سيارة من صفحتها لاحقاً.',
+  'dealerDelivery.offeringOnListedCars': 'جارٍ تحديث سياراتك…',
+  'dealerDelivery.offeredOnListedCars': 'أصبح التوصيل متاحاً لـ {count} سيارة.',
+  'dealerDelivery.saving': 'جارٍ الحفظ…',
+  'dealerDelivery.saveSettings': 'احفظ إعدادات التوصيل',
+  'dealerDelivery.couldntLoadNothingChanged':
+    'تعذّر تحميل إعدادات التوصيل. لم يتغيّر شيء.',
+  'dealerDelivery.radiusMustBeBetween': 'يجب أن يكون نطاق التوصيل بين 0 و{max} كم.',
+  'dealerDelivery.serviceDidNotRespond': 'لم تستجب الخدمة. لم يتغيّر شيء.',
+  'dealerDelivery.switchedOnTitle': 'تم تفعيل التوصيل',
+  'dealerDelivery.switchedOnBody': 'يمكن للعملاء ضمن {radius} كم من موقعك طلب التوصيل.',
+  'dealerDelivery.switchedOffTitle': 'تم إيقاف التوصيل',
+  'dealerDelivery.switchedOffBody': 'سيستلم العملاء من موقعك فقط.',
   'dealerDelivery.unsavedChanges': 'تغييرات غير محفوظة',
   'dealerDelivery.whenACustomerDrops':
     'حين يحدّد العميل موقعه، تقيس المنصة المسافة المستقيمة من موقع معرضك. فداخل النطاق يُعرض التوصيل على مركباتك؛ وخارجه يكون الاستلام من المعرض فقط.',

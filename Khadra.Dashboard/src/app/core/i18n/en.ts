@@ -787,6 +787,24 @@ export const EN = {
   'dealerDelivery.exactRadiusKm': 'Exact radius (km)',
   'dealerDelivery.howTheRadiusIs': 'How the radius is used',
   'dealerDelivery.offerDelivery': 'Offer delivery',
+  'dealerDelivery.carsNotOfferedTitle': 'Your listed cars are not offered for delivery',
+  'dealerDelivery.carsNotOfferedBody':
+    '{count} of your listed car(s) can only be collected from your location, because they were saved before you offered delivery. Customers will not see them as deliverable until you change that.',
+  'dealerDelivery.offerOnListedCars': 'Offer delivery on these cars',
+  'dealerDelivery.offerOnListedCarsHint':
+    'You can still switch delivery off for any single car from its own page afterwards.',
+  'dealerDelivery.offeringOnListedCars': 'Updating your cars\u2026',
+  'dealerDelivery.offeredOnListedCars': 'Delivery is now offered on {count} car(s).',
+  'dealerDelivery.saving': 'Saving\u2026',
+  'dealerDelivery.saveSettings': 'Save delivery settings',
+  'dealerDelivery.couldntLoadNothingChanged':
+    'Delivery settings could not be loaded. Nothing has been changed.',
+  'dealerDelivery.radiusMustBeBetween': 'The radius must be between 0 and {max} km.',
+  'dealerDelivery.serviceDidNotRespond': 'The service did not respond. Nothing has been changed.',
+  'dealerDelivery.switchedOnTitle': 'Delivery switched on',
+  'dealerDelivery.switchedOnBody': 'Customers within {radius} km of your location can ask for delivery.',
+  'dealerDelivery.switchedOffTitle': 'Delivery switched off',
+  'dealerDelivery.switchedOffBody': 'Customers will collect from your location only.',
   'dealerDelivery.unsavedChanges': 'Unsaved changes',
   'dealerDelivery.whenACustomerDrops':
     'When a customer drops a pin, the platform measures the straight-line distance from your dealer location. Inside the radius, delivery is offered on your cars; outside, pickup only.',

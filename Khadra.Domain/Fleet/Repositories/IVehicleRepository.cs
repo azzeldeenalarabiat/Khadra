@@ -13,5 +13,24 @@ public interface IVehicleRepository
 
     Task<int> CountActiveByDealerAsync(Id dealerId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// How many of this dealership's LISTED cars are not offered for delivery.
+    /// </summary>
+    /// <remarks>
+    /// Active only. A draft or hidden car is not advertising anything, so it cannot be part of the
+    /// mismatch between "this gallery delivers" and "none of its cars do" -- and offering to change
+    /// a draft would be editing a listing the owner has not finished writing.
+    /// </remarks>
+    Task<int> CountPublishedNotDeliveryEligibleAsync(
+        Id dealerId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Those same cars, loaded so they can be changed.
+    /// </summary>
+    Task<IReadOnlyList<Vehicle>> ListPublishedNotDeliveryEligibleAsync(
+        Id dealerId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Vehicle vehicle, CancellationToken cancellationToken = default);
 }

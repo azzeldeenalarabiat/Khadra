@@ -6,6 +6,7 @@ using Khadra.Application.Dealers.ReviewDealer;
 using Khadra.Application.Dealers.SubmitDealerProfile;
 using Khadra.Application.Dealers.UpdateDeliverySettings;
 using Khadra.Application.Dealers.UpdateProfile;
+using Khadra.Application.Fleet.ManageVehicles;
 using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
@@ -155,6 +156,33 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
         var result = await Mediator.Send(
             new UpdateDeliverySettingsCommand(
                 actor.UserId!.Value, request.IsEnabled, request.RadiusKm, request.Fee),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// Offers delivery on every car this gallery already has listed.
+    /// </summary>
+    /// <remarks>
+    /// Closes pre-launch item 75. A car takes its delivery flag from whether the gallery offered
+    /// delivery when the car was SAVED, so a gallery that lists its fleet first and turns delivery on
+    /// afterwards advertises a service none of its cars provides. This is the action that fixes it,
+    /// and the delivery page counts the affected cars so the owner is told the number before pressing.
+    ///
+    /// A bulk EDIT a human asks for, not a rule. The per-car flag stays, and there is deliberately no
+    /// action the other way: a gallery switching delivery off keeps its per-car answers, or turning it
+    /// back on would silently re-offer the van its owner had excluded.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.ApprovedDealer)]
+    [HttpPost("me/delivery/offer-on-listed-vehicles")]
+    [ProducesResponseType<FleetDeliveryResult>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> OfferDeliveryOnListedVehicles(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new OfferDeliveryOnListedVehiclesCommand(actor.UserId!.Value),
             cancellationToken);
         return FromResult(result);
     }
