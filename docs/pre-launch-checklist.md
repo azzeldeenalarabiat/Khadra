@@ -758,6 +758,22 @@ Same gap as item 6 (listing edits are not logged), and the same fix serves both.
 **To close:** persist dealer-side changes to an activity trail the owner and an administrator can
 read, fed from the domain events these actions already raise.
 
+### 40. PARTLY CLOSED — email leaves under a borrowed sender; the English-only half is fixed
+
+**Updated 2026-09-08.** Every one of the five account emails is now BILINGUAL: Arabic first, then a
+rule, then English, in both the HTML and the plain-text part. The subject line carries both. Verified
+by delivering one and reading it back out of the mailbox.
+
+Both languages in one message rather than one chosen per recipient, because there is no language
+stored on an account — the console and the app each keep the reader's choice in their own browser —
+and adding a column would still pick WRONG for the two invitation emails, which go to somebody who
+has never used the platform. The `dir` attribute is on the Arabic BLOCK, never on the document, or
+the English half below it would flip with its punctuation and its link text.
+
+The borrowed sender is unchanged and is what keeps this item open.
+
+The original entry follows.
+
 ### 40. Email leaves under a borrowed sender, and only ever in English
 
 **Status:** open · **HARD BLOCKER before real customers** · **NOT a blocker for Flutter development**
