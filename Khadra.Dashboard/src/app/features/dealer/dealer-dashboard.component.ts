@@ -53,6 +53,9 @@ interface Attention {
 })
 export class DealerDashboardComponent {
   protected readonly t = inject(I18nService).t;
+  // Server enum names, in the reader's language. Shared rather than per-component: the same enum
+  // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
+  protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly console = inject(DealerConsoleService);
   private readonly bookings = inject(DealerBookingsService);
   private readonly session = inject(SessionService);
@@ -69,7 +72,7 @@ export class DealerDashboardComponent {
 
   protected readonly greeting = computed(() => {
     const hour = new Date().getHours();
-    const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const part = hour < 12 ? this.t('employeeDash.goodMorning') : hour < 18 ? this.t('employeeDash.goodAfternoon') : this.t('employeeDash.goodEvening');
     return `${part}, ${this.dashboard()?.businessName ?? this.session.user()?.fullName ?? ''}`;
   });
 
@@ -88,7 +91,7 @@ export class DealerDashboardComponent {
     if (!d) return [];
     const oldest = d.bookings.oldestRequestedAt
       ? `oldest ${this.ago(d.bookings.oldestRequestedAt)}`
-      : 'nothing waiting';
+      : this.t('employeeDash.nothingWaiting');
     return [
       {
         label: this.t('dealerDashboard.pendingRequests'),
@@ -103,7 +106,7 @@ export class DealerDashboardComponent {
         main: String(d.bookings.pickedUp),
         note: d.bookings.overdueReturns
           ? `${d.bookings.overdueReturns} overdue`
-          : 'all within their dates',
+          : this.t('dealerDash.allWithinTheirDates'),
         icon: 'car-profile',
         route: '/dealer/bookings',
         query: { tab: 'active' },
@@ -159,8 +162,8 @@ export class DealerDashboardComponent {
           ? `${d.revenueThisMonth.amount.toLocaleString('en-GB')} ${d.revenueThisMonth.currency}`
           : '—',
         note: d.revenueThisMonth
-          ? 'rentals returned this month, before commission'
-          : 'not part of your access',
+          ? this.t('dealerDash.rentalsReturnedThisMonth')
+          : this.t('dealerDash.notPartOfYour'),
         icon: 'currency-circle-dollar',
         route: d.revenueThisMonth ? '/dealer/reports' : null,
       },
@@ -169,8 +172,8 @@ export class DealerDashboardComponent {
         main: d.occupancyPercentLast30Days === null ? '—' : `${d.occupancyPercentLast30Days}%`,
         note:
           d.occupancyPercentLast30Days === null
-            ? 'not part of your access'
-            : 'fleet utilisation, last 30 days',
+            ? this.t('dealerDash.notPartOfYour')
+            : this.t('dealerDash.fleetUtilisationLast30'),
         icon: 'gauge',
         route: d.occupancyPercentLast30Days === null ? null : '/dealer/reports',
       },
@@ -189,8 +192,8 @@ export class DealerDashboardComponent {
 
     if (d.bookings.requested > 0) {
       items.push({
-        type: 'Booking request',
-        title: `${d.bookings.requested} booking ${d.bookings.requested === 1 ? 'request is' : 'requests are'} waiting for an answer`,
+        type: this.t('employeeDash.bookingRequest'),
+        title: `${d.bookings.requested} booking ${d.bookings.requested === 1 ? this.t('employeeDash.requestIs') : this.t('employeeDash.requestsAre')} waiting for an answer`,
         desc: d.bookings.oldestRequestedAt
           ? `The oldest was made ${this.ago(d.bookings.oldestRequestedAt)}. A request expires when its rental date arrives unanswered.`
           : '',
@@ -206,14 +209,14 @@ export class DealerDashboardComponent {
 
     for (const overdue of d.upcomingReturns.filter((r) => r.isOverdue)) {
       items.push({
-        type: 'Overdue return',
+        type: this.t('dealerDash.overdueReturn'),
         title: `${overdue.vehicleLabel} was due back ${this.when(overdue.when)}`,
         desc: `${overdue.customerName} has not returned the car. Record the return when it comes back, and note any damage within the settlement window.`,
         entity: overdue.reference,
         when: this.ago(overdue.when),
         status: 'Overdue',
         tone: 'bad',
-        action: 'View booking',
+        action: this.t('dealerDash.viewBooking'),
         route: `/dealer/bookings/${overdue.bookingId}`,
       });
     }
@@ -227,7 +230,7 @@ export class DealerDashboardComponent {
         when: this.until(pickup.when),
         status: pickup.status,
         tone: 'ok',
-        action: 'View booking',
+        action: this.t('dealerDash.viewBooking'),
         route: `/dealer/bookings/${pickup.bookingId}`,
       });
     }
@@ -241,7 +244,7 @@ export class DealerDashboardComponent {
         when: this.until(ret.when),
         status: 'Active',
         tone: 'ok',
-        action: 'View booking',
+        action: this.t('dealerDash.viewBooking'),
         route: `/dealer/bookings/${ret.bookingId}`,
       });
     }
@@ -262,7 +265,7 @@ export class DealerDashboardComponent {
     const labels: Record<string, string> = {
       Active: 'Published',
       Hidden: 'Hidden',
-      Maintenance: 'Off the road',
+      Maintenance: this.t('status.offTheRoad'),
       Draft: 'Draft',
     };
     return order
@@ -284,8 +287,8 @@ export class DealerDashboardComponent {
       { status?: number; error?: { code?: string } } | undefined;
     if (!error) return null;
     if (error.error?.code === 'dealer.not_registered')
-      return 'This account is not part of a dealership.';
-    return 'Your dashboard could not be loaded. Nothing has been changed.';
+      return this.t('employeeDash.thisAccountIsNot');
+    return this.t('employeeDash.yourDashboardCouldNot');
   });
 
   protected statusTone(handover: UpcomingHandover): Tone {
@@ -315,7 +318,7 @@ export class DealerDashboardComponent {
 
   protected ago(iso: string): string {
     const hours = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
-    if (hours < 1) return 'just now';
+    if (hours < 1) return this.t('employeeDash.justNow');
     if (hours < 48) return `${hours}h ago`;
     return `${Math.round(hours / 24)} days ago`;
   }
@@ -331,8 +334,8 @@ export class DealerDashboardComponent {
     const verb: Record<string, string> = {
       Approved: 'approved',
       Rejected: 'rejected',
-      PickedUp: 'handed over',
-      Returned: 'took back',
+      PickedUp: this.t('dealerDash.handedOver'),
+      Returned: this.t('dealerDash.tookBack'),
       Cancelled: 'cancelled',
     };
     return `${entry.actorName} ${verb[entry.toStatus] ?? entry.toStatus.toLowerCase()} booking ${entry.reference}`;

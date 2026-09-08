@@ -81,8 +81,8 @@ export class CustomersListComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'The customer list is for administrators.';
-    return 'The customers could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('customersList.theCustomerListIs');
+    return this.t('customersList.theCustomersCouldNot');
   });
 
   protected select(key: Chip['key']): void {

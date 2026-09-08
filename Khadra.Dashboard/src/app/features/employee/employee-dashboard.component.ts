@@ -71,7 +71,7 @@ export class EmployeeDashboardComponent {
 
   protected readonly greeting = computed(() => {
     const hour = new Date().getHours();
-    const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const part = hour < 12 ? this.t('employeeDash.goodMorning') : hour < 18 ? this.t('employeeDash.goodAfternoon') : this.t('employeeDash.goodEvening');
     const name = this.firstName();
     return name ? `${part}, ${name}` : part;
   });
@@ -91,7 +91,7 @@ export class EmployeeDashboardComponent {
         // the platform expires a request, so no deadline is claimed here.
         note: d.bookings.oldestRequestedAt
           ? `oldest ${this.ago(d.bookings.oldestRequestedAt)}`
-          : 'nothing waiting',
+          : this.t('employeeDash.nothingWaiting'),
         icon: 'bell-ringing',
         route: '/employee/bookings',
         query: { tab: 'pending' },
@@ -119,7 +119,7 @@ export class EmployeeDashboardComponent {
       {
         label: this.t('employeeDashboard.activeRentals'),
         main: String(d.bookings.pickedUp),
-        note: overdue > 0 ? `${overdue} overdue` : 'none overdue',
+        note: overdue > 0 ? `${overdue} overdue` : this.t('employeeDash.noneOverdue'),
         icon: 'car-simple',
         route: '/employee/bookings',
         query: { tab: 'active' },
@@ -147,9 +147,9 @@ export class EmployeeDashboardComponent {
     const items: Attention[] = [];
 
     if (d.bookings.requested > 0) {
-      const plural = d.bookings.requested === 1 ? 'request is' : 'requests are';
+      const plural = d.bookings.requested === 1 ? this.t('employeeDash.requestIs') : this.t('employeeDash.requestsAre');
       items.push({
-        type: 'Booking request',
+        type: this.t('employeeDash.bookingRequest'),
         title: `${d.bookings.requested} ${plural} waiting for an answer`,
         desc: d.bookings.oldestRequestedAt
           ? `The oldest arrived ${this.ago(d.bookings.oldestRequestedAt)}.`
@@ -165,13 +165,13 @@ export class EmployeeDashboardComponent {
 
     for (const overdue of d.upcomingReturns.filter((r) => r.isOverdue)) {
       items.push({
-        type: 'Return overdue',
+        type: this.t('employeeDash.returnOverdue'),
         title: `${overdue.vehicleLabel} was due back ${this.when(overdue.when)}`,
         desc: `${overdue.customerName} has not brought the car back. Record the return when it arrives.`,
         entity: overdue.reference,
         when: this.ago(overdue.when),
         tone: 'bad',
-        action: 'Record return',
+        action: this.t('dealerDecide.return.confirm'),
         route: `/employee/bookings/${overdue.bookingId}`,
       });
     }
@@ -179,26 +179,26 @@ export class EmployeeDashboardComponent {
     for (const pickup of d.upcomingPickups.slice(0, 3)) {
       const delivery = pickup.pickupMethod === 'Delivery';
       items.push({
-        type: delivery ? 'Delivery' : 'Pickup approaching',
+        type: delivery ? 'Delivery' : this.t('employeeDash.pickupApproaching'),
         title: `${pickup.vehicleLabel} ${delivery ? 'delivery' : 'pickup'} ${this.when(pickup.when)}`,
         desc: `${pickup.customerName}. Record the handover when the car leaves.`,
         entity: pickup.reference,
         when: this.until(pickup.when),
         tone: 'ok',
-        action: 'Record pickup',
+        action: this.t('dealerDecide.pickup.confirm'),
         route: `/employee/bookings/${pickup.bookingId}`,
       });
     }
 
     for (const ret of d.upcomingReturns.filter((r) => !r.isOverdue).slice(0, 3)) {
       items.push({
-        type: 'Return due',
+        type: this.t('employeeDash.returnDue'),
         title: `${ret.vehicleLabel} due back ${this.when(ret.when)}`,
         desc: `${ret.customerName}'s rental ends. Confirm the return and note any damage.`,
         entity: ret.reference,
         when: this.until(ret.when),
         tone: 'ok',
-        action: 'Record return',
+        action: this.t('dealerDecide.return.confirm'),
         route: `/employee/bookings/${ret.bookingId}`,
       });
     }
@@ -222,8 +222,8 @@ export class EmployeeDashboardComponent {
       { status?: number; error?: { code?: string } } | undefined;
     if (!error) return null;
     if (error.error?.code === 'dealer.not_registered')
-      return 'This account is not part of a dealership.';
-    return 'Your dashboard could not be loaded. Nothing has been changed.';
+      return this.t('employeeDash.thisAccountIsNot');
+    return this.t('employeeDash.yourDashboardCouldNot');
   });
 
   protected reload(): void {
@@ -244,8 +244,8 @@ export class EmployeeDashboardComponent {
     const verb: Record<string, string> = {
       Approved: 'Approved',
       Rejected: 'Rejected',
-      PickedUp: 'Handed over',
-      Returned: 'Took back',
+      PickedUp: this.t('employeeDash.handedOver'),
+      Returned: this.t('employeeDash.tookBack'),
       Cancelled: 'Cancelled',
     };
     return `${verb[entry.toStatus] ?? entry.toStatus} ${entry.reference}`;
@@ -264,7 +264,7 @@ export class EmployeeDashboardComponent {
 
   protected ago(iso: string): string {
     const hours = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
-    if (hours < 1) return 'just now';
+    if (hours < 1) return this.t('employeeDash.justNow');
     if (hours < 48) return `${hours}h ago`;
     return `${Math.round(hours / 24)} days ago`;
   }

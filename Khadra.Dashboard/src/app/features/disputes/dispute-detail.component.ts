@@ -17,6 +17,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslationKey } from '../../core/i18n/en';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 /** The four shapes spec 3.3 names, each one a preset split of the deposit the booking holds. */
@@ -40,6 +41,9 @@ type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
 })
 export class DisputeDetailComponent {
   protected readonly t = inject(I18nService).t;
+  // Server enum names, in the reader's language. Shared rather than per-component: the same enum
+  // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
+  protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly service = inject(AdminDisputesService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -92,35 +96,46 @@ export class DisputeDetailComponent {
   protected readonly busy = signal(false);
   protected readonly problem = signal<string | null>(null);
 
-  protected readonly presets: readonly { key: Preset; label: string; desc: string }[] = [
-    {
-      key: 'refund',
-      label: this.t('disputeDetail.refundTheCustomer'),
-      desc: 'The whole deposit goes back. Nothing is kept and nothing reaches the dealer.',
-    },
-    {
-      key: 'penalty',
-      label: this.t('disputeDetail.applyThePenaltyIn'),
-      desc: 'The deposit is split the way the booking assessed it, against the party at fault.',
-    },
-    {
-      key: 'partial',
-      label: 'Partial',
-      desc: 'You set each leg. The three must add up to the deposit held.',
-    },
-    {
-      key: 'waive',
-      label: this.t('disputeDetail.waiveEverything'),
-      desc: 'No penalty. The deposit returns to the customer and the booking closes clean.',
-    },
-  ];
+  /**
+   * The four ways an administrator can dispose of a held deposit.
+   *
+   * A `computed` rather than a `readonly` field, and the difference is a bug rather than a style
+   * preference: a field initialiser resolves ONCE at construction, so `this.t(...)` in one freezes
+   * the language at the moment the screen was created. Two of these labels were already keyed and
+   * already frozen -- switching to Arabic with this screen open left them in English until a reload.
+   * Pre-launch item 49 records the same defect on the fleet filter chips.
+   */
+  protected readonly presets = computed<readonly { key: Preset; label: string; desc: string }[]>(
+    () => [
+      {
+        key: 'refund',
+        label: this.t('disputeDetail.refundTheCustomer'),
+        desc: this.t('disputeDetail.theWholeDepositGoes'),
+      },
+      {
+        key: 'penalty',
+        label: this.t('disputeDetail.applyThePenaltyIn'),
+        desc: this.t('disputeDetail.theDepositIsSplit'),
+      },
+      {
+        key: 'partial',
+        label: this.t('disputeDetail.partial'),
+        desc: this.t('disputeDetail.youSetEachLeg'),
+      },
+      {
+        key: 'waive',
+        label: this.t('disputeDetail.waiveEverything'),
+        desc: this.t('disputeDetail.noPenaltyTheDeposit'),
+      },
+    ],
+  );
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 404) return 'That dispute was not found.';
-    if (error.status === 403) return 'The dispute workspace is for administrators.';
-    return 'The dispute could not be loaded. Nothing has been changed.';
+    if (error.status === 404) return this.t('disputeDetail.thatDisputeWasNot');
+    if (error.status === 403) return this.t('disputeDetail.theDisputeWorkspaceIs');
+    return this.t('dealerDispute.theDisputeCouldNot');
   });
 
   /**
@@ -190,39 +205,39 @@ export class DisputeDetailComponent {
     const cur = b.pricing.totalPrice.currency;
     return [
       {
-        title: 'Booking',
+        title: this.t('common.booking'),
         icon: 'car-simple',
         rows: [
-          { k: 'Reference', v: b.reference },
+          { k: this.t('bookingsList.reference'), v: b.reference },
           {
-            k: 'Vehicle',
+            k: this.t('dealerBooking.vehicle'),
             v: b.vehicle
               ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}`
-              : 'No longer listed',
+              : this.t('dealerBooking.noLongerListed'),
           },
-          { k: 'Rental', v: `${this.date(b.periodStart)} – ${this.date(b.periodEnd)}` },
-          { k: 'Status', v: b.status },
+          { k: this.t('dealerBooking.rental'), v: `${this.date(b.periodStart)} – ${this.date(b.periodEnd)}` },
+          { k: this.t('common.status'), v: b.status },
         ],
       },
       {
-        title: 'Parties',
+        title: this.t('disputesList.parties'),
         icon: 'user',
         rows: [
-          { k: 'Dealer', v: b.dealerName },
-          { k: 'Customer', v: b.customerName },
-          { k: 'Raised by', v: `${d.openedByName} (${d.openedByParty})` },
-          { k: 'Handled by', v: d.assignedAdminName ?? 'Unassigned' },
+          { k: this.t('dealersList.colDealer'), v: b.dealerName },
+          { k: this.t('vehicleDetail.customer'), v: b.customerName },
+          { k: this.t('disputesList.raisedBy'), v: `${d.openedByName} (${d.openedByParty})` },
+          { k: this.t('disputeDetail.handledBy'), v: d.assignedAdminName ?? 'Unassigned' },
         ],
       },
       {
         title: this.t('disputeDetail.moneyOnThisBooking'),
         icon: 'currency-circle-dollar',
         rows: [
-          { k: 'Rental total', v: `${b.pricing.rentalTotal.amount} ${cur}` },
-          { k: 'Deposit held', v: `${d.depositHeld.amount} ${d.depositHeld.currency}` },
-          { k: 'Security deposit', v: `${b.pricing.securityDeposit.amount} ${cur}` },
+          { k: this.t('myBooking.rentalTotal'), v: `${b.pricing.rentalTotal.amount} ${cur}` },
+          { k: this.t('common.depositHeld'), v: `${d.depositHeld.amount} ${d.depositHeld.currency}` },
+          { k: this.t('vehicleDetail.securityDeposit'), v: `${b.pricing.securityDeposit.amount} ${cur}` },
           {
-            k: 'Penalty assessed',
+            k: this.t('common.penaltyAssessed'),
             v:
               b.penalty && !b.penalty.isNothingOwed
                 ? `${b.penalty.isRange ? b.penalty.minAmount.amount + '–' + b.penalty.maxAmount.amount : b.penalty.minAmount.amount} ${b.penalty.minAmount.currency} · ${b.penalty.attributedTo}`
@@ -255,7 +270,7 @@ export class DisputeDetailComponent {
     if (d.assignedAdminName && !d.resolution) {
       steps.push({
         label: `Taken on by ${d.assignedAdminName}`,
-        meta: 'Under review',
+        meta: this.t('status.underReview'),
         tone: 'accent',
       });
     }
@@ -267,7 +282,7 @@ export class DisputeDetailComponent {
       });
     } else {
       steps.push({
-        label: 'Decision',
+        label: this.t('disputeDetail.decision'),
         meta: `Due ${this.when(d.slaDeadline)}`,
         tone: 'dim',
         future: true,
@@ -367,11 +382,11 @@ export class DisputeDetailComponent {
       .then(() => {
         this.service.refresh();
         this.ui.showToast(
-          'Assigned to you',
-          'Recorded on the ticket; any admin can still resolve it.',
+          this.t('disputeDetail.assignedToYou'),
+          this.t('disputeDetail.recordedOnTheTicket'),
         );
       })
-      .catch((error: unknown) => this.problem.set(describe(error)))
+      .catch((error: unknown) => this.problem.set(describe(error, this.t)))
       .finally(() => this.busy.set(false));
   }
 
@@ -437,18 +452,26 @@ export class DisputeDetailComponent {
   }
 }
 
-function describe(error: unknown): string {
+/**
+ * A server refusal, in the reader's own language.
+ *
+ * Takes `t` rather than reaching for one: this is a module function, so it has no `this` and no
+ * injector. The mapping is from the server's stable error CODE, which is the only part of a refusal
+ * that can be translated at all -- `Error.Message` is English and always will be until the API grows
+ * request localisation (pre-launch item 49).
+ */
+function describe(error: unknown, t: (key: TranslationKey) => string): string {
   const problem = error as { error?: { code?: string; title?: string } };
   switch (problem.error?.code) {
     case 'dispute.disposition_unbalanced':
-      return 'The three amounts must add up to exactly the deposit held.';
+      return t('disputeDetail.theThreeAmountsMust');
     case 'dispute.resolution_note_required':
-      return 'A note is required so both parties can see the reasoning.';
+      return t('disputeDetail.aNoteIsRequired');
     case 'dispute.already_resolved':
-      return 'This ticket has already been resolved.';
+      return t('disputeDetail.thisTicketHasAlready');
     case 'dispute.already_withdrawn':
-      return 'This ticket was withdrawn by the party who opened it.';
+      return t('disputeDetail.thisTicketWasWithdrawn');
     default:
-      return problem.error?.title ?? 'The service did not respond. Nothing has been changed.';
+      return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
   }
 }

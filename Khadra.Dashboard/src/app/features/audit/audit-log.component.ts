@@ -111,13 +111,13 @@ export class AuditLogComponent {
     if (error.status === 403) {
       return {
         title: this.t('auditLog.couldntLoadTheAudit'),
-        message: 'The audit log is for administrators.',
+        message: this.t('auditLog.theAuditLogIs'),
         action: 'none' as const,
       };
     }
     return {
       title: this.t('auditLog.couldntLoadTheAudit'),
-      message: 'The audit log could not be loaded. Nothing has been changed.',
+      message: this.t('auditLog.theAuditLogCould'),
       action: 'retry' as const,
     };
   });

@@ -54,9 +54,9 @@ export class DealerReportsComponent {
     // Still reachable, and worth keeping: the owner can withdraw the grant while the screen is
     // open, and the next period the reader clicks answers 403 before `me` has caught up.
     if (error.error?.code === 'dealer.reports_not_granted' || error.status === 403) {
-      return 'Reports are for the dealer owner and staff they have granted access to. Ask the owner if you need them.';
+      return this.t('dealerReports.reportsAreForThe');
     }
-    return 'Reports could not be loaded. Nothing has been changed.';
+    return this.t('dealerReports.reportsCouldNotBe');
   });
 
   protected readonly range = computed(() => {

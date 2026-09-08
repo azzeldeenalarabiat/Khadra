@@ -20,6 +20,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { BookingDecisions } from './booking-decisions';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslationKey } from '../../core/i18n/en';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 /**
@@ -38,6 +39,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 })
 export class DealerBookingDetailComponent {
   protected readonly t = inject(I18nService).t;
+  protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly service = inject(DealerBookingsService);
   private readonly console = inject(DealerConsoleService);
   private readonly disputes = inject(DealerDisputesService);
@@ -70,8 +72,8 @@ export class DealerBookingDetailComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 404) return 'That booking is not one of yours, or no longer exists.';
-    return 'The booking could not be loaded. Nothing has been changed.';
+    if (error.status === 404) return this.t('dealerBooking.thatBookingIsNot');
+    return this.t('dealerBooking.theBookingCouldNot');
   });
 
   protected readonly tone = computed<Tone>(() => {
@@ -93,23 +95,31 @@ export class DealerBookingDetailComponent {
     }
   });
 
+  /**
+   * What this booking's state is called ON THE DEALER'S SCREEN.
+   *
+   * Four of them are deliberately not the server's own word, because the server names a state and a
+   * gallery wants to know what is being asked OF THEM: `Approved` means "waiting for their money",
+   * `PickedUp` means "the car is out". Everything else falls through to the shared helper, so a
+   * status this console has never heard of still reads as words rather than as a raw enum name.
+   */
   protected readonly label = computed(() => {
     const b = this.booking();
     if (!b) return '';
-    if (b.liveDisputeId) return 'Disputed';
+    if (b.liveDisputeId) return this.statusLabel('Disputed');
     const labels: Partial<Record<Booking['status'], string>> = {
-      Requested: 'Pending',
-      Approved: 'Awaiting deposit',
-      PickedUp: 'Active',
-      NoShow: 'No-show',
+      Requested: this.t('status.pendingDealer'),
+      Approved: this.t('status.awaitingDeposit'),
+      PickedUp: this.t('status.activeRental'),
+      NoShow: this.t('status.noShow'),
     };
-    return labels[b.status] ?? b.status;
+    return labels[b.status] ?? this.statusLabel(b.status, 'booking');
   });
 
   protected readonly meta = computed(() => {
     const b = this.booking();
     if (!b) return '';
-    const method = b.pickupMethod === 'Delivery' ? 'delivery' : 'pickup at your location';
+    const method = b.pickupMethod === 'Delivery' ? 'delivery' : this.t('dealerBooking.pickupAtYourLocation');
     return `Requested ${this.dateTime(b.requestedAt ?? b.createdAt)} · ${b.customerName} · ${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'} · ${method}`;
   });
 
@@ -138,7 +148,7 @@ export class DealerBookingDetailComponent {
     // Only what the API carries. NO CONTACT DETAILS: the platform has not decided whether a dealer
     // ever sees a customer's phone, and the console must not promise it. The history below is a
     // separate, deliberately narrower thing -- aggregates the platform itself counted.
-    return [{ k: 'Name', v: b.customerName }];
+    return [{ k: this.t('dealerSettings.name'), v: b.customerName }];
   });
 
   /**
@@ -184,7 +194,7 @@ export class DealerBookingDetailComponent {
       this.service.refresh();
       this.ui.showToast(this.t("dealerBooking.rateCustomer"), this.t("dealerBooking.rateSaved"));
     } catch (error: unknown) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.ratingBusy.set(false);
     }
@@ -193,13 +203,13 @@ export class DealerBookingDetailComponent {
   protected readonly vehicleRows = computed<readonly KeyValue[]>(() => {
     const b = this.booking();
     if (!b) return [];
-    if (!b.vehicle) return [{ k: 'Vehicle', v: 'No longer listed', tone: 'dim' }];
+    if (!b.vehicle) return [{ k: this.t('dealerBooking.vehicle'), v: this.t('dealerBooking.noLongerListed'), tone: 'dim' }];
     return [
-      { k: 'Vehicle', v: `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` },
-      { k: 'Plate', v: b.vehicle.plateNumber },
-      { k: 'Colour', v: b.vehicle.color ?? '—' },
+      { k: this.t('dealerBooking.vehicle'), v: `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` },
+      { k: this.t('dealerBooking.plate'), v: b.vehicle.plateNumber },
+      { k: this.t('common.colour'), v: b.vehicle.color ?? '—' },
       {
-        k: 'Daily price on this booking',
+        k: this.t('dealerBooking.dailyPriceOnThis'),
         v: `${b.pricing.dailyRate.amount} ${b.pricing.dailyRate.currency}`,
       },
     ];
@@ -209,16 +219,16 @@ export class DealerBookingDetailComponent {
     const b = this.booking();
     if (!b) return [];
     return [
-      { k: 'Start', v: this.dateTime(b.periodStart) },
-      { k: 'End', v: this.dateTime(b.periodEnd) },
-      { k: 'Duration', v: `${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'}` },
+      { k: this.t('dealerBooking.start'), v: this.dateTime(b.periodStart) },
+      { k: this.t('dealerBooking.end'), v: this.dateTime(b.periodEnd) },
+      { k: this.t('dealerBooking.duration'), v: `${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'}` },
       {
-        k: 'Mileage',
+        k: this.t('vehicleWizard.mileage'),
         v: b.pricing.mileageUnlimited
           ? 'Unlimited'
           : `${b.pricing.mileageDailyLimitKm} km/day, ${b.pricing.mileageExcessFeePerKm?.amount ?? 0} ${b.pricing.dailyRate.currency}/km over`,
       },
-      { k: 'Fuel', v: b.pricing.fuelPolicy === 'FullToFull' ? 'Full to full' : 'Same to same' },
+      { k: this.t('common.fuel'), v: b.pricing.fuelPolicy === 'FullToFull' ? this.t('vehicleWizard.fullToFull') : this.t('vehicleWizard.sameToSame') },
     ];
   });
 
@@ -226,16 +236,16 @@ export class DealerBookingDetailComponent {
     const b = this.booking();
     if (!b) return [];
     if (b.pickupMethod !== 'Delivery' || !b.deliveryLocation) {
-      return [{ k: 'Method', v: 'Collected from your location' }];
+      return [{ k: this.t('dealerBooking.method'), v: this.t('dealerBooking.collectedFromYourLocation') }];
     }
     return [
-      { k: 'Method', v: 'Delivery' },
+      { k: this.t('dealerBooking.method'), v: 'Delivery' },
       {
-        k: 'Location',
+        k: this.t('dealerProfile.location'),
         v: `${b.deliveryLocation.latitude.toFixed(4)}, ${b.deliveryLocation.longitude.toFixed(4)}`,
       },
       {
-        k: 'Delivery fee',
+        k: this.t('vehicleWizard.deliveryFee'),
         v: `${b.pricing.deliveryFee.amount} ${b.pricing.deliveryFee.currency} · frozen on this booking`,
       },
     ];
@@ -263,8 +273,8 @@ export class DealerBookingDetailComponent {
         k: `Rental · ${b.pricing.days} × ${b.pricing.dailyRate.amount} ${cur}`,
         v: `${b.pricing.rentalTotal.amount}`,
       },
-      { k: 'Delivery fee (yours)', v: `${b.pricing.deliveryFee.amount}` },
-      { k: 'Security deposit (held per car)', v: `${b.pricing.securityDeposit.amount}` },
+      { k: this.t('dealerBooking.deliveryFeeYours'), v: `${b.pricing.deliveryFee.amount}` },
+      { k: this.t('dealerBooking.securityDepositHeldPer'), v: `${b.pricing.securityDeposit.amount}` },
       {
         k: `Deposit paid by card (${b.pricing.depositPercent}%)`,
         v: paidDeposit ? `${b.pricing.depositAmount.amount}` : '0',
@@ -273,20 +283,20 @@ export class DealerBookingDetailComponent {
       ...(live
         ? [
             {
-              k: 'Balance to collect in cash at handover',
+              k: this.t('dealerBooking.balanceToCollectIn'),
               v: `${b.pricing.balanceDue.amount}`,
               hi: true,
             },
           ]
         : settling
-          ? [{ k: 'Balance collected in cash at handover', v: `${b.pricing.balanceDue.amount}` }]
-          : [{ k: 'Deposit', v: 'Held pending settlement — see the penalty panel', dim: true }]),
+          ? [{ k: this.t('dealerBooking.balanceCollectedInCash'), v: `${b.pricing.balanceDue.amount}` }]
+          : [{ k: this.t('common.deposit'), v: this.t('dealerBooking.heldPendingSettlementSee'), dim: true }]),
       {
         k: `Platform commission · ${b.terms.commissionPercent}% (frozen on this booking)`,
         // Computed by the API at the frozen rate; the console never multiplies money.
         v: `−${b.commissionAmount.amount}`,
       },
-      { k: 'Net payout', v: 'Not available yet', dim: true },
+      { k: this.t('dealerReports.netPayout'), v: this.t('dealerReports.notAvailableYet'), dim: true },
     ];
   });
 
@@ -316,28 +326,28 @@ export class DealerBookingDetailComponent {
     // clock, which is what turns an approval into a rental.
     if (b.status === 'Approved' && b.paymentDeadline)
       future.push({
-        label: 'Deposit paid',
+        label: this.t('dealerBooking.depositPaid'),
         meta: `The customer pays by ${this.dateTime(b.paymentDeadline)}`,
         tone: 'dim',
         future: true,
       });
     if (b.status === 'Requested' || b.status === 'Approved' || b.status === 'Confirmed')
       future.push({
-        label: 'Pickup',
+        label: this.t('dealerBooking.pickup'),
         meta: `Scheduled ${this.dateTime(b.periodStart)}`,
         tone: 'dim',
         future: true,
       });
     if (['Requested', 'Approved', 'Confirmed', 'PickedUp'].includes(b.status))
       future.push({
-        label: 'Return',
+        label: this.t('dealerBooking.return'),
         meta: `Scheduled ${this.dateTime(b.periodEnd)}`,
         tone: 'dim',
         future: true,
       });
     if (!b.isTerminal)
       future.push({
-        label: 'Completed',
+        label: this.t('status.completed'),
         meta:
           b.status === 'Returned'
             ? `After the ${b.terms.postReturnSettlementWindowHours}h settlement window`
@@ -403,7 +413,7 @@ export class DealerBookingDetailComponent {
       this.evidenceKeys.update((keys) => [...keys, key]);
       this.evidenceNames.update((names) => [...names, file.name]);
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.disputeBusy.set(false);
       input.value = '';
@@ -419,12 +429,12 @@ export class DealerBookingDetailComponent {
     try {
       const ticket = await this.disputes.open(b.bookingId, reason, this.evidenceKeys());
       this.ui.showToast(
-        'Dispute opened',
+        this.t('dealerBooking.disputeOpened'),
         `The platform will answer within ${this.slaHours(ticket.openedAt, ticket.slaDeadline)} hours.`,
       );
       await this.router.navigate(['/dealer/disputes', ticket.ticketId]);
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.disputeBusy.set(false);
     }
@@ -447,7 +457,7 @@ export class DealerBookingDetailComponent {
   }
 
   protected carName(b: Booking): string {
-    return b.vehicle ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` : 'the vehicle';
+    return b.vehicle ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` : this.t('dealerBooking.theVehicle');
   }
 
   protected dateTime(iso: string): string {
@@ -467,11 +477,11 @@ export class DealerBookingDetailComponent {
   private stepLabel(status: string): string {
     return (
       {
-        Requested: 'Requested · awaiting your answer',
-        Approved: 'Approved · awaiting the deposit',
-        Confirmed: 'Deposit paid · booking confirmed',
+        Requested: this.t('dealerBooking.requestedAwaitingYourAnswer'),
+        Approved: this.t('dealerBooking.approvedAwaitingTheDeposit'),
+        Confirmed: this.t('dealerBooking.depositPaidBookingConfirmed'),
         Rejected: 'Rejected',
-        PickedUp: 'Picked up',
+        PickedUp: this.t('status.pickedUp'),
         Returned: 'Returned',
         Completed: 'Completed',
         Cancelled: 'Cancelled',
@@ -482,22 +492,30 @@ export class DealerBookingDetailComponent {
   }
 
   private actor(party: string, userId: string | null): string {
-    if (party === 'Dealer') return userId ? 'by your staff' : 'by your dealership';
-    if (party === 'Customer') return 'by the customer';
-    return 'by the platform';
+    if (party === 'Dealer') return userId ? this.t('dealerBooking.byYourStaff') : this.t('dealerBooking.byYourDealership');
+    if (party === 'Customer') return this.t('dealerBooking.byTheCustomer');
+    return this.t('dealerBooking.byThePlatform');
   }
 }
 
-function describe(error: unknown): string {
+/**
+ * A server refusal, in the reader's own language.
+ *
+ * Takes `t` rather than reaching for one: this is a module function, outside the class, so it has no
+ * `this` and no injector. Passing it in also keeps the mapping honest about what it is -- a lookup
+ * from the server's stable error CODE to a sentence, which is the only shape that can be translated
+ * at all. The server's own `title` is English and is the last resort.
+ */
+function describe(error: unknown, t: (key: TranslationKey) => string): string {
   const problem = error as { status?: number; error?: { code?: string; title?: string } };
   switch (problem.error?.code) {
     case 'dispute.booking_not_disputable':
-      return 'This booking cannot be disputed: it has not finished, or its dispute window has closed.';
+      return t('dealerBooking.thisBookingCannotBe');
     case 'dispute.already_open':
-      return 'A dispute is already open on this booking.';
+      return t('dealerBooking.aDisputeIsAlready');
     case 'dispute.invalid_evidence_type':
-      return 'Evidence must be a photo or a PDF.';
+      return t('dealerBooking.evidenceMustBeA');
     default:
-      return problem.error?.title ?? 'The service did not respond. Nothing has been changed.';
+      return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
   }
 }

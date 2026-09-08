@@ -31,6 +31,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 })
 export class AdminBookingDetailComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly status = inject(I18nService).statusLabel;
   private readonly service = inject(AdminBookingsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -50,9 +51,9 @@ export class AdminBookingDetailComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 404) return 'That booking was not found.';
-    if (error.status === 403) return 'The platform booking record is for administrators.';
-    return 'The booking could not be loaded. Nothing has been changed.';
+    if (error.status === 404) return this.t('myBooking.thatBookingWasNot');
+    if (error.status === 403) return this.t('myBooking.thePlatformBookingRecord');
+    return this.t('dealerBooking.theBookingCouldNot');
   });
 
   protected readonly tone = computed<Tone>(() => {
@@ -62,8 +63,9 @@ export class AdminBookingDetailComponent {
     return STATUS_TONES[booking.status] ?? 'dim';
   });
 
+  /** The server's own word for the state, in the customer's language. */
   protected readonly statusLabel = computed(() =>
-    (this.booking()?.status ?? '').replace(/([a-z])([A-Z])/g, '$1 $2'),
+    this.status(this.booking()?.status, 'booking'),
   );
 
   /** What the booking is worth, all of it frozen at the moment it was made. */
@@ -73,18 +75,18 @@ export class AdminBookingDetailComponent {
     const pricing = booking.pricing;
     const rows: KeyValue[] = [
       { k: `Daily rate × ${pricing.days} days`, v: this.money(pricing.dailyRate) },
-      { k: 'Rental total', v: this.money(pricing.rentalTotal) },
+      { k: this.t('myBooking.rentalTotal'), v: this.money(pricing.rentalTotal) },
     ];
     // Keyed on the pickup method, not the amount: 0 is now a real answer a gallery can give, and
     // hiding the row would make free delivery indistinguishable from no delivery at all.
     if (booking.pickupMethod === 'Delivery')
-      rows.push({ k: 'Delivery fee', v: this.money(pricing.deliveryFee) });
+      rows.push({ k: this.t('vehicleWizard.deliveryFee'), v: this.money(pricing.deliveryFee) });
     rows.push(
-      { k: 'Total price', v: this.money(pricing.totalPrice) },
+      { k: this.t('myBooking.totalPrice'), v: this.money(pricing.totalPrice) },
       // The percentages come from the booking's own terms, never from the settings in force today.
       { k: `Deposit (${pricing.depositPercent}%)`, v: this.money(pricing.depositAmount) },
-      { k: 'Balance due', v: this.money(pricing.balanceDue) },
-      { k: 'Security deposit', v: this.money(pricing.securityDeposit) },
+      { k: this.t('myBooking.balanceDue'), v: this.money(pricing.balanceDue) },
+      { k: this.t('vehicleDetail.securityDeposit'), v: this.money(pricing.securityDeposit) },
       {
         k: `Platform commission (${booking.terms.commissionPercent}%)`,
         v: this.money(booking.commissionAmount),
@@ -98,16 +100,16 @@ export class AdminBookingDetailComponent {
     const terms = this.booking()?.terms;
     if (!terms) return [];
     return [
-      { k: 'Free cancellation window', v: `${terms.freeCancellationWindowHours} hours` },
-      { k: 'Payment window', v: `${terms.paymentWindowHours} hours` },
-      { k: 'No-show timeout', v: `${terms.noShowTimeoutHours} hours` },
-      { k: 'Settlement window after return', v: `${terms.postReturnSettlementWindowHours} hours` },
-      { k: 'Customer cancellation penalty', v: `${terms.customerCancellationPenaltyPercent}%` },
+      { k: this.t('myBooking.freeCancellationWindow'), v: `${terms.freeCancellationWindowHours} hours` },
+      { k: this.t('myBooking.paymentWindow'), v: `${terms.paymentWindowHours} hours` },
+      { k: this.t('myBooking.noShowTimeout'), v: `${terms.noShowTimeoutHours} hours` },
+      { k: this.t('myBooking.settlementWindowAfterReturn'), v: `${terms.postReturnSettlementWindowHours} hours` },
+      { k: this.t('myBooking.customerCancellationPenalty'), v: `${terms.customerCancellationPenaltyPercent}%` },
       {
-        k: 'Dealer non-delivery penalty',
+        k: this.t('myBooking.dealerNonDeliveryPenalty'),
         v: `${terms.dealerPenaltyMinPercent}–${terms.dealerPenaltyMaxPercent}%`,
       },
-      { k: 'Rules version', v: String(terms.rulesVersion) },
+      { k: this.t('dealerBooking.rulesVersion'), v: String(terms.rulesVersion) },
     ];
   });
 
@@ -115,15 +117,15 @@ export class AdminBookingDetailComponent {
     const booking = this.booking();
     if (!booking) return [];
     return [
-      { k: 'Dealer', v: booking.dealerName },
-      { k: 'Customer', v: booking.customerName },
+      { k: this.t('dealersList.colDealer'), v: booking.dealerName },
+      { k: this.t('vehicleDetail.customer'), v: booking.customerName },
       {
-        k: 'Vehicle',
+        k: this.t('dealerBooking.vehicle'),
         v: booking.vehicle
           ? `${booking.vehicle.make} ${booking.vehicle.model} ${booking.vehicle.year} · ${booking.vehicle.plateNumber}`
-          : 'Delisted since this booking was made',
+          : this.t('myBooking.delistedSinceThisBooking'),
       },
-      { k: 'Handover', v: booking.pickupMethod === 'Delivery' ? 'Delivery' : 'Self pickup' },
+      { k: this.t('myBooking.handover'), v: booking.pickupMethod === 'Delivery' ? 'Delivery' : this.t('myBooking.selfPickup') },
     ];
   });
 
@@ -176,8 +178,8 @@ export class AdminBookingDetailComponent {
         note: this.t('adminBooking.nothingIsRefundedHere'),
         fields: [
           {
-            name: 'reason',
-            label: 'Reason',
+            name: this.t('myBooking.reason'),
+            label: this.t('dealerDecide.reject.reasonLabel'),
             type: 'text',
             placeholder: this.t('adminBooking.whyIsThePlatform'),
           },
@@ -198,8 +200,8 @@ export class AdminBookingDetailComponent {
     if (!booking) return;
     const which =
       booking.status === 'Approved'
-        ? 'The deposit was never paid inside the payment window.'
-        : 'The dealer never answered inside their window.';
+        ? this.t('myBooking.theDepositWasNever')
+        : this.t('myBooking.theDealerNeverAnswered');
     this.ui.openAction(
       {
         icon: 'clock-counter-clockwise',

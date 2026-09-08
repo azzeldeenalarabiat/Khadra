@@ -46,9 +46,9 @@ export class CustomerProfileComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 404) return 'That customer was not found.';
-    if (error.status === 403) return 'Customer records are for administrators.';
-    return 'The customer could not be loaded. Nothing has been changed.';
+    if (error.status === 404) return this.t('customerProfile.thatCustomerWasNot');
+    if (error.status === 403) return this.t('customerProfile.customerRecordsAreFor');
+    return this.t('customerProfile.theCustomerCouldNot');
   });
 
   protected readonly tone = computed<Tone>(() => {
@@ -58,30 +58,40 @@ export class CustomerProfileComponent {
     return customer.isEmailVerified ? 'ok' : 'warn';
   });
 
-  protected readonly statusLabel = computed(() => {
+  /**
+   * The ACCOUNT's standing, which is not the same question as a status enum's name.
+   *
+   * Renamed from `statusLabel` when the shared helper arrived: this screen labels two different
+   * things -- the account, and each uploaded document -- and one name for both was a collision
+   * waiting to be read as a duplicate.
+   */
+  protected readonly accountStatusLabel = computed(() => {
     const customer = this.customer();
     if (!customer) return '';
-    if (customer.status === 'Suspended') return 'Suspended';
-    return customer.isEmailVerified ? 'Verified' : 'Email unverified';
+    if (customer.status === 'Suspended') return this.t('status.suspended');
+    return customer.isEmailVerified ? this.t('status.verified') : this.t('customerProfile.emailUnverified');
   });
+
+  /** A document's status, straight from the server's enum. */
+  protected readonly statusLabel = inject(I18nService).statusLabel;
 
   protected readonly accountRows = computed<readonly KeyValue[]>(() => {
     const customer = this.customer();
     if (!customer) return [];
     const rows: KeyValue[] = [
-      { k: 'Email', v: customer.email },
-      { k: 'Phone', v: customer.phone },
+      { k: this.t('dealerSettings.email'), v: customer.email },
+      { k: this.t('customerProfile.phone'), v: customer.phone },
       {
-        k: 'Email verified',
+        k: this.t('customerProfile.emailVerified'),
         v: customer.isEmailVerified ? this.when(customer.emailVerifiedAt) : 'No',
       },
-      { k: 'Date of birth', v: customer.dateOfBirth ?? 'Not given' },
-      { k: 'Foreign national', v: customer.isForeignNational ? 'Yes' : 'No' },
-      { k: 'Joined', v: this.when(customer.createdAt) },
-      { k: 'Last signed in', v: this.when(customer.lastLoginAt) },
+      { k: this.t('customerProfile.dateOfBirth'), v: customer.dateOfBirth ?? this.t('customerProfile.notGiven') },
+      { k: this.t('customerProfile.foreignNational'), v: customer.isForeignNational ? 'Yes' : 'No' },
+      { k: this.t('customersList.joined'), v: this.when(customer.createdAt) },
+      { k: this.t('adminUsers.lastSignedIn'), v: this.when(customer.lastLoginAt) },
     ];
     if (customer.passwordChangedAt) {
-      rows.push({ k: 'Password last changed', v: this.when(customer.passwordChangedAt) });
+      rows.push({ k: this.t('customerProfile.passwordLastChanged'), v: this.when(customer.passwordChangedAt) });
     }
     return rows;
   });
@@ -90,11 +100,11 @@ export class CustomerProfileComponent {
     const totals = this.customer()?.bookings;
     if (!totals) return [];
     return [
-      { k: 'Total', v: String(totals.total) },
-      { k: 'Live now', v: String(totals.live) },
-      { k: 'Completed', v: String(totals.completed) },
-      { k: 'Cancelled', v: String(totals.cancelled) },
-      { k: 'No-shows', v: String(totals.noShow) },
+      { k: this.t('bookingsList.total'), v: String(totals.total) },
+      { k: this.t('customerProfile.liveNow'), v: String(totals.live) },
+      { k: this.t('status.completed'), v: String(totals.completed) },
+      { k: this.t('status.cancelled'), v: String(totals.cancelled) },
+      { k: this.t('dealerBooking.noShows'), v: String(totals.noShow) },
     ];
   });
 
@@ -115,7 +125,7 @@ export class CustomerProfileComponent {
         // must not type identity into a field that outlives every request to remove it.
         note: this.t('customerProfile.theReasonIsRecorded'),
         fields: [
-          { name: 'reason', label: 'Reason', type: 'text', placeholder: this.t('customerProfile.whyIsThisAccount') },
+          { name: this.t('myBooking.reason'), label: this.t('dealerDecide.reject.reasonLabel'), type: 'text', placeholder: this.t('customerProfile.whyIsThisAccount') },
         ],
         confirm: this.t('customerProfile.suspendAccount'),
         result: { title: this.t('customerProfile.accountSuspended'), body: '', tone: 'bad' },

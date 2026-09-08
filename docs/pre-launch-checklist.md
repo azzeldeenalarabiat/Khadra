@@ -959,12 +959,43 @@ One fix worth repeating elsewhere: the fleet filter chips were a `readonly` FIEL
 left them in the old one. They are a `computed` now. Any other chip or column list built the same way
 has the same latent bug.
 
-**Still open: roughly 330 strings across the other screens**, unchanged in nature from the list
-below. Heaviest are dealer/booking-detail, dealer/dealer-dashboard, disputes/dispute-detail,
-fleet/vehicle-wizard, bookings/booking-detail and employee/employee-dashboard — the last is the most
-visible, because every stat tile caption on an employee's landing screen is English. Deferred as its
-own piece of work, not a blocker: the mechanism (switch, RTL mirroring, persistence across reload and
-logout, switching back) is correct and was re-verified.
+**Updated 2026-09-08 (second pass). Substantially closed: 411 scanner hits down to 75, and 28 of
+those 75 are the route-title literals below, which are dead weight rather than English on a screen.**
+The dictionaries went from 1,202 keys to 1,505, in both languages, and `ar.ts` is still typed against
+`en.ts` so a missing translation cannot ship.
+
+Measured rather than asserted: at `/`, `/forgot-password` and `/register` in Arabic there is now
+exactly ONE Latin word on the page, and it is the language switcher naming the language you would
+switch to.
+
+Three systematic fixes, each of which was worth more than the strings it removed:
+
+- **`I18nService.statusLabel`.** Every status on every screen arrives as a server `Enumeration.Name`
+  and a dozen screens rendered it raw, so an Arabic page read "PendingReview" in Latin script mid
+  sentence. One helper now, with the CamelCase-split fallback the audit screen already used, so a
+  status this console has never heard of still reads as words. `scope: 'booking'` disambiguates
+  `Approved`, which means a licence check on a dealer and a gallery saying yes on a booking, and
+  which Arabic does not share a word for.
+- **The dispute workspace's resolution presets were a `readonly` FIELD calling `this.t(...)`.** That
+  is the exact bug this item already records on the fleet filter chips: a field initialiser resolves
+  once at construction, so switching language with the screen open left the old words on it. Two of
+  the four labels were already keyed and already frozen. They are a `computed` now.
+- **Module-level `describe(error)` helpers now take `t`.** Almost every feature file has one mapping
+  the server's error CODE to a sentence, and every one of them was English prose in a function with
+  no `this`. The mapping from a stable code is the only part of a refusal that can be translated at
+  all, which is why the server's own `title` stays the last-resort fallback.
+
+Notification sentences became messages with NAMED PARAMETERS rather than concatenated template
+literals, because Arabic does not put the actor and the object where English does; and the attention
+queue's counts became plural messages with all six Arabic forms rather than an `n === 1` ternary,
+which picks the wrong form for every count from two upwards.
+
+Two pieces of tooling made it tractable and are worth keeping: `key-copy.js`, which keys the copy
+shapes `key-components.js` never knew (`k`/`v` rows, ternary arms, bare returns, status maps) and
+REFUSES the two that would be bugs — a field initialiser, and anything outside the class body — and
+`key-describe.js` for the `describe(error)` pattern. `missing-ar.js` lists the English keys with no
+Arabic. `add-en.js` and `add-ar.js` now skip a key that already exists, after a hand-written batch
+and the codemod both named one and broke the build.
 
 `core/i18n/` holds 1,202 keys in both languages. EVERY template is keyed -- all 54 of them -- along
 with the shell, the auth screens, the dealer gate, both not-built placeholders, the dashboard KPI
@@ -973,20 +1004,17 @@ and the pagination. `ar.ts` is typed against `en.ts`, so a missing translation f
 `dictionaries.spec.ts` also fails on a key that drifts, a dropped placeholder, or an Arabic plural
 missing one of its six forms.
 
-What is still English, measured by `node scan-i18n.js` in `Khadra.Dashboard` (413 hits, 59 files --
-the scan is deliberately noisy, so perhaps 300 are real):
+What is still English, measured by `node scan-i18n.js` in `Khadra.Dashboard` (75 hits, 27 files --
+the scan is deliberately noisy, and most of what is left is a false positive):
 
-- **Copy in component TypeScript that is not a dialog field.** The codemod covered `title`, `body`,
-  `confirm`, `note`, `label`, `placeholder` and `hint`. Copy assembled in other shapes -- KPI
-  sub-labels, greetings, row actions, `describe()` failure sentences -- is still English. The
-  heaviest are `dealer/booking-detail`, `dealer/dealer-dashboard`, `disputes/dispute-detail`,
-  `fleet/vehicle-wizard`, `bookings/booking-detail`, `employee/employee-dashboard`.
-- **Status pills.** `status.*` keys exist for every enum member the console shows, but the pills
-  still render the server's raw `Enumeration.Name`. They need one `statusLabel(name)` helper applied
-  at each render site, with the CamelCase-split fallback the audit screen already uses.
-- **Route `title` literals in `app.routes.ts`.** Dead weight rather than a bug: `TranslatedTitleStrategy`
-  resolves every mapped route from `SCREEN_TITLES`, and these are only the fallback for one it does
-  not know.
+- **Route `title` literals in `app.routes.ts` (28 of the 75).** Dead weight rather than a bug, and
+  now VERIFIED rather than assumed: loading `/register` in Arabic gives the document title
+  "سجّل معرضك · Khadra", so `TranslatedTitleStrategy` is resolving it from `SCREEN_TITLES` and the
+  literal never reaches a tab. Removing them is tidying, not translation.
+- **Units, separators and the scanner's own blind spots.** `km`, `JOD`, `·`, `to`, `of`, and the
+  `t('key', { param })` calls the regex splits in the middle of. All false positives.
+- **A handful of strings the codemod correctly refused**, each a template literal whose value lands
+  in a different place in Arabic, in a screen whose copy is otherwise keyed.
 - **Server sentences.** Unchanged from before: `Error.Message` and ProblemDetails `title` are English,
   and FluentValidation messages cannot be keyed client-side at all. See the note below.
 - **`toLocaleString('en-GB')` sites on feature screens.** `FormatService` exists and the gate and the

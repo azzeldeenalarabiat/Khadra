@@ -98,7 +98,7 @@
                 <div class="queue-desc">{{ item.desc }}</div>
               </div>
               <div class="queue-side">
-                <span class="pill" [class]="'s-' + item.tone">{{ item.status }}</span>
+                <span class="pill" [class]="'s-' + item.tone">{{ statusLabel(item.status) }}</span>
                 <a
                   class="btn btn-primary btn-sm"
                   [routerLink]="item.route"
@@ -125,7 +125,7 @@
                 <div class="handover">
                   <div class="handover-head">
                     <span class="mono s-accent">{{ p.reference }}</span>
-                    <span class="pill" [class]="'s-' + statusTone(p)">{{ p.status }}</span>
+                    <span class="pill" [class]="'s-' + statusTone(p)">{{ statusLabel(p.status) }}</span>
                     <span class="handover-when num">{{ when(p.when) }}</span>
                   </div>
                   <div class="handover-car">

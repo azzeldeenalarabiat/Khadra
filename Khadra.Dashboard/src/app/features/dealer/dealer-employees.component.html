@@ -130,7 +130,7 @@
                     <div class="td-sub">{{ e.phone }}</div>
                   </td>
                   <td class="td">
-                    <span class="pill" [class]="'s-' + tone(e)">{{ e.status }}</span>
+                    <span class="pill" [class]="'s-' + tone(e)">{{ statusLabel(e.status) }}</span>
                     @if (e.status === 'Invited') {
                       <div class="td-sub">{{ t('dealerEmployees.hasNotSetA') }}</div>
                     } @else if (e.deactivatedAt) {

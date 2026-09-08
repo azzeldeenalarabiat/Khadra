@@ -55,8 +55,8 @@ export class DisputesListComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'The dispute queue is for administrators.';
-    return 'The dispute queue could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('disputesList.theDisputeQueueIs');
+    return this.t('disputesList.theDisputeQueueCould');
   });
 
   protected select(queue: DisputeQueue): void {
@@ -88,7 +88,7 @@ export class DisputesListComponent {
   }
 
   protected label(row: DisputeListItem): string {
-    return row.status === 'UnderReview' ? 'Under review' : row.status;
+    return row.status === 'UnderReview' ? this.t('status.underReview') : row.status;
   }
 
   /** Time against the ticket's own deadline, as words rather than a raw timestamp. */

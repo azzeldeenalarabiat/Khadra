@@ -48,7 +48,7 @@ export class EmployeeNotificationsComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    return 'Your notifications could not be loaded. Nothing has been changed.';
+    return this.t('employeeNotif.yourNotificationsCouldNot');
   });
 
   protected describe(item: NotificationItem): string {
@@ -63,17 +63,17 @@ export class EmployeeNotificationsComponent {
   protected label(item: NotificationItem): string {
     switch (item.kind) {
       case 'BookingRequested':
-        return 'New request';
+        return this.t('employeeNotif.newRequest');
       case 'BookingApproved':
       case 'BookingRejected':
-        return 'Booking decision';
+        return this.t('employeeNotif.bookingDecision');
       case 'BookingPickedUp':
         return 'Pickup';
       case 'BookingReturned':
         return 'Return';
       case 'ReportAccessGranted':
       case 'ReportAccessRevoked':
-        return 'Your access';
+        return this.t('employeeNotif.yourAccess');
       case 'StaffReactivated':
         return 'Team';
       default:
@@ -127,7 +127,7 @@ export class EmployeeNotificationsComponent {
 
   protected ago(iso: string): string {
     const hours = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
-    if (hours < 1) return 'just now';
+    if (hours < 1) return this.t('employeeDash.justNow');
     if (hours < 24) return `${hours}h ago`;
     const days = Math.round(hours / 24);
     return days === 1 ? 'yesterday' : `${days} days ago`;
@@ -144,11 +144,11 @@ export class EmployeeNotificationsComponent {
     try {
       const changed = await this.service.markAllRead();
       this.ui.showToast(
-        'Marked as read',
-        changed === 1 ? 'One notification marked read.' : `${changed} notifications marked read.`,
+        this.t('employeeNotif.markedAsRead'),
+        changed === 1 ? this.t('employeeNotif.oneNotificationMarkedRead') : `${changed} notifications marked read.`,
       );
     } catch {
-      this.ui.showToast('That did not go through', 'The service did not respond.', 'bad');
+      this.ui.showToast(this.t('vehicleDetail.thatDidNotGo'), this.t('vehicleDetail.theServiceDidNot'), 'bad');
     } finally {
       this.busy.set(false);
     }

@@ -63,7 +63,7 @@ export class RegisterDealerComponent {
     };
 
     if (!body.fullName || !body.email || !body.phone || !body.password) {
-      this.problem.set('Fill in every field before continuing.');
+      this.problem.set(this.t('registerDealer.fillInEveryField'));
       return;
     }
 

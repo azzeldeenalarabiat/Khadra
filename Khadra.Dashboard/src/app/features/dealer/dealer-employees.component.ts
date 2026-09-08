@@ -32,6 +32,9 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class DealerEmployeesComponent {
   protected readonly t = inject(I18nService).t;
+  // Server enum names, in the reader's language. Shared rather than per-component: the same enum
+  // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
+  protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly service = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
 
@@ -88,8 +91,8 @@ export class DealerEmployeesComponent {
       { status?: number; error?: { code?: string } } | undefined;
     if (!error) return null;
     // Reachable when standing changes under an open screen -- a suspension landing mid-session.
-    if (error.status === 403) return 'Your dealership can no longer manage staff just now.';
-    return 'Your staff list could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('dealerStaff.yourDealershipCanNo');
+    return this.t('dealerStaff.yourStaffListCould');
   });
 
   protected tone(e: Employee): Tone {
@@ -124,10 +127,10 @@ export class DealerEmployeesComponent {
         confirm: this.t('dealerEmployees.sendInvitation'),
         fields: [
           { name: 'fullName', label: this.t('employeeSettings.fullName'), type: 'text', placeholder: this.t('dealerEmployees.eGAhmadZaid') },
-          { name: 'email', label: 'Email', type: 'text', placeholder: 'name@example.jo' },
+          { name: this.t('dealerStaff.email'), label: this.t('dealerSettings.email'), type: 'text', placeholder: 'name@example.jo' },
           {
-            name: 'phone',
-            label: 'Phone',
+            name: this.t('dealerStaff.phone'),
+            label: this.t('customerProfile.phone'),
             type: 'text',
             placeholder: '07XXXXXXXX',
             hint: this.t('dealerEmployees.requiredHowYouReach'),
@@ -137,8 +140,8 @@ export class DealerEmployeesComponent {
             label: this.t('dealerEmployees.reportAccess'),
             type: 'select',
             options: [
-              { value: 'no', label: 'No' },
-              { value: 'yes', label: 'Yes' },
+              { value: 'no', label: this.t('dealerStaff.no') },
+              { value: 'yes', label: this.t('dealerStaff.yes') },
             ],
             value: 'no',
             hint: this.t('dealerEmployees.whetherTheyCanSee'),
@@ -150,7 +153,7 @@ export class DealerEmployeesComponent {
         const fullName = (values['fullName'] ?? '').trim();
         const email = (values['email'] ?? '').trim();
         const phone = (values['phone'] ?? '').trim();
-        if (!fullName || !email || !phone) throw invalid('Name, email and phone are all required.');
+        if (!fullName || !email || !phone) throw invalid(this.t('dealerStaff.nameEmailAndPhone'));
         await this.service.invite({
           fullName,
           email,
@@ -168,7 +171,7 @@ export class DealerEmployeesComponent {
     await this.run(
       e.employeeId,
       () => this.service.resendInvitation(e.employeeId),
-      'Invitation resent',
+      this.t('dealerStaff.invitationResent'),
       `A fresh link is on its way to ${e.email}.`,
     );
   }
@@ -178,7 +181,7 @@ export class DealerEmployeesComponent {
     await this.run(
       e.employeeId,
       () => this.service.setReportAccess(e.employeeId, grant),
-      grant ? 'Report access granted' : 'Report access removed',
+      grant ? this.t('dealerStaff.reportAccessGranted') : this.t('dealerStaff.reportAccessRemoved'),
       grant
         ? `${e.fullName} can now see revenue and reports.`
         : `${e.fullName} can still handle bookings; reports are hidden.`,
@@ -224,7 +227,7 @@ export class DealerEmployeesComponent {
     await this.run(
       e.employeeId,
       () => this.service.reactivate(e.employeeId),
-      'Staff member reactivated',
+      this.t('dealerStaff.staffMemberReactivated'),
       back,
     );
   }
@@ -245,8 +248,8 @@ export class DealerEmployeesComponent {
     } catch (error) {
       const p = error as { error?: { title?: string } };
       this.ui.showToast(
-        'That did not go through',
-        p.error?.title ?? 'The service did not respond.',
+        this.t('vehicleDetail.thatDidNotGo'),
+        p.error?.title ?? this.t('vehicleDetail.theServiceDidNot'),
         'bad',
       );
     } finally {

@@ -1646,6 +1646,447 @@ export const EN = {
   'status.deactivated': 'Deactivated',
   'status.verified': 'Verified',
   'status.unverified': 'Unverified',
+
+  // Status names the SERVER sends as Enumeration.Name, resolved through I18nService.statusLabel. Two of them are scope-qualified: Approved and Rejected mean different things on a dealer and on a booking, and Arabic does not share a word for both.
+  'status.pickedUp': 'Picked up',
+  'status.confirmed': 'Confirmed',
+  'status.pendingDealer': 'Pending',
+  'status.awaitingDeposit': 'Awaiting deposit',
+  'status.activeRental': 'Active',
+  'status.uploaded': 'Uploaded',
+  'status.missing': 'Missing',
+  'status.pending': 'Pending',
+
+  // The customer profile's account standing, which is not a server enum.
+  'customerProfile.emailUnverified': 'Email unverified',
+
+  // The dealer's booking detail: every label, sentence and status line it assembles in TypeScript. Keyed 2026-09-08; the screen read English under Arabic before this.
+  'dealerBooking.thatBookingIsNot': 'That booking is not one of yours, or no longer exists.',
+  'dealerBooking.theBookingCouldNot': 'The booking could not be loaded. Nothing has been changed.',
+  'dealerBooking.pickupAtYourLocation': 'pickup at your location',
+  'dealerBooking.noLongerListed': 'No longer listed',
+  'dealerBooking.plate': 'Plate',
+  'dealerBooking.dailyPriceOnThis': 'Daily price on this booking',
+  'dealerBooking.start': 'Start',
+  'dealerBooking.end': 'End',
+  'dealerBooking.duration': 'Duration',
+  'dealerBooking.method': 'Method',
+  'dealerBooking.collectedFromYourLocation': 'Collected from your location',
+  'dealerBooking.deliveryFeeYours': 'Delivery fee (yours)',
+  'dealerBooking.securityDepositHeldPer': 'Security deposit (held per car)',
+  'dealerBooking.balanceToCollectIn': 'Balance to collect in cash at handover',
+  'dealerBooking.balanceCollectedInCash': 'Balance collected in cash at handover',
+  'dealerBooking.heldPendingSettlementSee': 'Held pending settlement — see the penalty panel',
+  'dealerBooking.depositPaid': 'Deposit paid',
+  'dealerBooking.return': 'Return',
+  'dealerBooking.disputeOpened': 'Dispute opened',
+  'dealerBooking.theVehicle': 'the vehicle',
+  'dealerBooking.requestedAwaitingYourAnswer': 'Requested · awaiting your answer',
+  'dealerBooking.approvedAwaitingTheDeposit': 'Approved · awaiting the deposit',
+  'dealerBooking.depositPaidBookingConfirmed': 'Deposit paid · booking confirmed',
+  'dealerBooking.byYourStaff': 'by your staff',
+  'dealerBooking.byYourDealership': 'by your dealership',
+  'dealerBooking.byTheCustomer': 'by the customer',
+  'dealerBooking.byThePlatform': 'by the platform',
+  'dealerBooking.thisBookingCannotBe':
+    'This booking cannot be disputed: it has not finished, or its dispute window has closed.',
+  'dealerBooking.aDisputeIsAlready': 'A dispute is already open on this booking.',
+  'dealerBooking.evidenceMustBeA': 'Evidence must be a photo or a PDF.',
+
+  // The employee dashboard: greeting, workload captions and activity verbs. Item 49 called this the most visible gap, because every stat tile caption on an employee's landing screen was English.
+  'employeeDash.goodMorning': 'Good morning',
+  'employeeDash.goodAfternoon': 'Good afternoon',
+  'employeeDash.goodEvening': 'Good evening',
+  'employeeDash.nothingWaiting': 'nothing waiting',
+  'employeeDash.noneOverdue': 'none overdue',
+  'employeeDash.requestIs': 'request is',
+  'employeeDash.requestsAre': 'requests are',
+  'employeeDash.bookingRequest': 'Booking request',
+  'employeeDash.returnOverdue': 'Return overdue',
+  'employeeDash.pickupApproaching': 'Pickup approaching',
+  'employeeDash.returnDue': 'Return due',
+  'employeeDash.thisAccountIsNot': 'This account is not part of a dealership.',
+  'employeeDash.yourDashboardCouldNot':
+    'Your dashboard could not be loaded. Nothing has been changed.',
+  'employeeDash.handedOver': 'Handed over',
+  'employeeDash.tookBack': 'Took back',
+  'employeeDash.justNow': 'just now',
+
+  // The dealer dashboard's KPI sub-labels and activity verbs.
+  'dealerDash.allWithinTheirDates': 'all within their dates',
+  'dealerDash.rentalsReturnedThisMonth': 'rentals returned this month, before commission',
+  'dealerDash.notPartOfYour': 'not part of your access',
+  'dealerDash.fleetUtilisationLast30': 'fleet utilisation, last 30 days',
+  'dealerDash.overdueReturn': 'Overdue return',
+  'dealerDash.viewBooking': 'View booking',
+  'dealerDash.handedOver': 'handed over',
+  'dealerDash.tookBack': 'took back',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'vehicleDetail.thatCarIsNot': 'That car is not in your fleet, or has been removed.',
+  'vehicleDetail.theCarCouldNot': 'The car could not be loaded. Nothing has been changed.',
+  'vehicleDetail.dailyPrice': 'Daily price',
+  'vehicleDetail.securityDeposit': 'Security deposit',
+  'vehicleDetail.eligibleButDeliveryIs':
+    'Eligible, but delivery is switched off for your dealership',
+  'vehicleDetail.pickupOnly': 'Pickup only',
+  'vehicleDetail.insurance': 'Insurance',
+  'vehicleDetail.pendingPlatformConfiguration': 'Pending platform configuration',
+  'vehicleDetail.notListed': 'Not listed',
+  'vehicleDetail.customersCanSeeIt': 'Customers can see it now.',
+  'vehicleDetail.customersNoLongerSee': 'Customers no longer see it.',
+  'vehicleDetail.itIsNotOffered': 'It is not offered while it is off the road.',
+  'vehicleDetail.itIsHiddenUntil': 'It is hidden until you publish it again.',
+  'vehicleDetail.thatDidNotGo': 'That did not go through',
+  'vehicleDetail.addAtLeastOne': 'Add at least one photo before publishing.',
+  'vehicleDetail.theServiceDidNot': 'The service did not respond.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'vehicleWizard.vehicleTypesCouldNot': 'Vehicle types could not be loaded.',
+  'vehicleWizard.listing': 'Listing',
+  'vehicleWizard.publishedOnSave': 'Published on save',
+  'vehicleWizard.keptAsADraft': 'Kept as a draft',
+  'vehicleWizard.nothingIsPublishedUntil': 'Nothing is published until you save.',
+  'vehicleWizard.savedAsADraft': 'Saved as a draft in your fleet',
+  'vehicleWizard.becomesADraftOnce': 'Becomes a draft once you reach Photos',
+  'vehicleWizard.useAJpegPng': 'Use a JPEG, PNG or WebP image.',
+  'vehicleWizard.theUploadDidNot': 'The upload did not go through.',
+  'vehicleWizard.addAtLeastOne': 'Add at least one photo before publishing, or save it as a draft.',
+  'vehicleWizard.yourDealershipCannotTrade':
+    'Your dealership cannot trade right now, so the car was saved as a draft instead of published.',
+  'vehicleWizard.theCarWasSaved': 'The car was saved as a draft; publishing did not go through.',
+  'vehicleWizard.vehiclePublished': 'Vehicle published',
+  'vehicleWizard.draftSaved': 'Draft saved',
+  'vehicleWizard.draftKept': 'Draft kept',
+  'vehicleWizard.thatPlateIsAlready': 'That plate is already on another car on the platform.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'myBooking.thatBookingWasNot': 'That booking was not found.',
+  'myBooking.thePlatformBookingRecord': 'The platform booking record is for administrators.',
+  'myBooking.rentalTotal': 'Rental total',
+  'myBooking.totalPrice': 'Total price',
+  'myBooking.balanceDue': 'Balance due',
+  'myBooking.freeCancellationWindow': 'Free cancellation window',
+  'myBooking.paymentWindow': 'Payment window',
+  'myBooking.noShowTimeout': 'No-show timeout',
+  'myBooking.settlementWindowAfterReturn': 'Settlement window after return',
+  'myBooking.customerCancellationPenalty': 'Customer cancellation penalty',
+  'myBooking.dealerNonDeliveryPenalty': 'Dealer non-delivery penalty',
+  'myBooking.delistedSinceThisBooking': 'Delisted since this booking was made',
+  'myBooking.handover': 'Handover',
+  'myBooking.selfPickup': 'Self pickup',
+  'myBooking.reason': 'reason',
+  'myBooking.theDepositWasNever': 'The deposit was never paid inside the payment window.',
+  'myBooking.theDealerNeverAnswered': 'The dealer never answered inside their window.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'settings.platformSettingsAreFor': 'Platform settings are for administrators.',
+  'settings.thePlatformSettingsCould':
+    'The platform settings could not be loaded. Nothing has been changed.',
+  'settings.bookingDeposit': 'Booking deposit',
+  'settings.dealerApplicationReviewSla': 'Dealer application review SLA',
+  'settings.customerCancelsAfterThe': 'Customer cancels after the free window',
+  'settings.dealerFailsToDeliver': 'Dealer fails to deliver',
+  'settings.minimumRenterAge': 'Minimum renter age',
+  'settings.notSetNobodyIs': 'Not set — nobody is refused on age',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'lookups.carTypes': 'Car types',
+  'lookups.thePlacesCustomersSearch':
+    'The places customers search in. A retired city stays on every dealership and booking that already names it.',
+  'lookups.theCategoriesACar':
+    'The categories a car is listed under. A retired type stays on every vehicle that already names it.',
+  'lookups.platformLookupsAreCurated': 'Platform lookups are curated by administrators.',
+  'lookups.theListCouldNot': 'The list could not be loaded. Nothing has been changed.',
+  'lookups.addACarType': 'Add a car type',
+  'lookups.customersFilterTheirSearch':
+    'Customers filter their search by this list, in whichever language they are using.',
+  'lookups.dealersChooseFromThis':
+    'Dealers choose from this list when they list a car, and customers filter by it.',
+  'lookups.nameEnglish': 'Name (English)',
+  'lookups.nameArabic': 'Name (Arabic)',
+  'lookups.addCity': 'Add city',
+  'lookups.addCarType': 'Add car type',
+  'lookups.renamed': 'Renamed',
+  'lookups.itIsOfferedAgain': 'It is offered again on new listings and searches.',
+  'lookups.itStopsBeingOffered':
+    'It stops being offered on new listings and searches. Everything already using it is untouched — this is not a delete, and there is no delete.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerProfile.closedAllWeek': 'Closed all week',
+  'dealerProfile.everyDay': 'Every day',
+  'dealerProfile.yourDealerPageCould':
+    'Your dealer page could not be loaded. Nothing has been changed.',
+  'dealerProfile.dealerPageSaved': 'Dealer page saved',
+  'dealerProfile.customersSeeTheNew': 'Customers see the new details straight away.',
+  'dealerProfile.theBusinessNameIs':
+    'The business name is locked: it is the name your licence was verified against. Ask the platform if it has to change.',
+  'dealerProfile.logoUpdated': 'Logo updated',
+  'dealerProfile.coverUpdated': 'Cover updated',
+  'dealerProfile.itIsLiveOn': 'It is live on your public page.',
+  'dealerProfile.theUploadDidNot': 'The upload did not go through. Nothing has been changed.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerReview.submitted': 'Submitted',
+  'dealerReview.lastReviewNote': 'Last review note',
+  'dealerReview.expiredReloadThePage': 'expired — reload the page',
+  'dealerReview.thatDealerApplicationNo': 'That dealer application no longer exists.',
+  'dealerReview.onlyAdministratorsCanReview': 'Only administrators can review dealer applications.',
+  'dealerReview.theApplicationCouldNot':
+    'The application could not be loaded. Nothing has been changed.',
+  'dealerReview.note': 'note',
+  'dealerReview.note2': 'Note',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'customerProfile.thatCustomerWasNot': 'That customer was not found.',
+  'customerProfile.customerRecordsAreFor': 'Customer records are for administrators.',
+  'customerProfile.theCustomerCouldNot':
+    'The customer could not be loaded. Nothing has been changed.',
+  'customerProfile.phone': 'Phone',
+  'customerProfile.emailVerified': 'Email verified',
+  'customerProfile.dateOfBirth': 'Date of birth',
+  'customerProfile.notGiven': 'Not given',
+  'customerProfile.foreignNational': 'Foreign national',
+  'customerProfile.passwordLastChanged': 'Password last changed',
+  'customerProfile.liveNow': 'Live now',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerApply.applicationSubmitted': 'Application submitted',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerStaff.yourDealershipCanNo': 'Your dealership can no longer manage staff just now.',
+  'dealerStaff.yourStaffListCould':
+    'Your staff list could not be loaded. Nothing has been changed.',
+  'dealerStaff.email': 'email',
+  'dealerStaff.phone': 'phone',
+  'dealerStaff.no': 'No',
+  'dealerStaff.yes': 'Yes',
+  'dealerStaff.nameEmailAndPhone': 'Name, email and phone are all required.',
+  'dealerStaff.invitationResent': 'Invitation resent',
+  'dealerStaff.reportAccessGranted': 'Report access granted',
+  'dealerStaff.reportAccessRemoved': 'Report access removed',
+  'dealerStaff.staffMemberReactivated': 'Staff member reactivated',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'employeeNotif.yourNotificationsCouldNot':
+    'Your notifications could not be loaded. Nothing has been changed.',
+  'employeeNotif.newRequest': 'New request',
+  'employeeNotif.bookingDecision': 'Booking decision',
+  'employeeNotif.yourAccess': 'Your access',
+  'employeeNotif.markedAsRead': 'Marked as read',
+  'employeeNotif.oneNotificationMarkedRead': 'One notification marked read.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'carForm.addAtLeastOne': 'Add at least one photo before you can publish this car.',
+  'carForm.thisCarIsA': 'This car is a draft. Publish it from your fleet when you are ready.',
+  'carForm.chooseAVehicleType': 'Choose a vehicle type before saving this car.',
+  'carForm.carUpdated': 'Car updated',
+  'carForm.carAdded': 'Car added',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'employeeSettings.approveAndRejectRequests':
+    'Approve and reject requests, and record pickups and returns.',
+  'employeeSettings.yourDealershipCannotTake':
+    'Your dealership cannot take new bookings just now, so approving and rejecting are paused. Returns can still be recorded.',
+  'employeeSettings.revenueCommissionAndOccupancy':
+    'Revenue, commission and occupancy are visible to you.',
+  'employeeSettings.revenueCommissionAndOccupancy2':
+    'Revenue, commission and occupancy are hidden. Your owner can turn this on.',
+  'employeeSettings.everyOtherSessionHas': 'Every other session has been signed out.',
+  'employeeSettings.theCurrentPasswordIs': 'The current password is wrong.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'fleetList.youHaveNotSubmitted':
+    'You have not submitted a dealer application yet, so there is no fleet to manage.',
+  'fleetList.onlyDealerStaffCan': 'Only dealer staff can manage a fleet.',
+  'fleetList.yourFleetCouldNot': 'Your fleet could not be loaded. Nothing has been changed.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerActivity.activityCouldNotBe': 'Activity could not be loaded. Nothing has been changed.',
+  'dealerActivity.requestedAwaitingYourAnswer': 'Requested — awaiting your answer',
+  'dealerActivity.approvedAwaitingTheDeposit': 'Approved — awaiting the deposit',
+  'dealerActivity.depositPaidBookingConfirmed': 'Deposit paid — booking confirmed',
+  'dealerActivity.markedNoShow': 'Marked no-show',
+  'dealerActivity.expiredUnanswered': 'Expired unanswered',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerDispute.thatDisputeIsNot': 'That dispute is not yours to see, or no longer exists.',
+  'dealerDispute.theDisputeCouldNot': 'The dispute could not be loaded. Nothing has been changed.',
+  'dealerDispute.statementAdded': 'Statement added',
+  'dealerDispute.thePlatformAndThe': 'The platform and the customer can read it.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'adminUsers.administratorAccountsAreManaged':
+    'Administrator accounts are managed by administrators.',
+  'adminUsers.theAdministratorsCouldNot':
+    'The administrators could not be loaded. Nothing has been changed.',
+  'adminUsers.youCannotDeactivateYour': 'You cannot deactivate your own account.',
+  'adminUsers.thisIsTheLast': 'This is the last active administrator. Invite another first.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'bookingsList.oneParty': 'one party',
+  'bookingsList.thePlatformBookingList': 'The platform booking list is for administrators.',
+  'bookingsList.theBookingsCouldNot': 'The bookings could not be loaded. Nothing has been changed.',
+  'bookingsList.vehicleDelisted': 'Vehicle delisted',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerBookings.yourBookingsCouldNot':
+    'Your bookings could not be loaded. Nothing has been changed.',
+  'dealerBookings.vehicleNoLongerListed': 'Vehicle no longer listed',
+
+  // The dispute workspace.
+  'disputeDetail.thatDisputeWasNot': 'That dispute was not found.',
+  'disputeDetail.theDisputeWorkspaceIs': 'The dispute workspace is for administrators.',
+  'disputeDetail.handledBy': 'Handled by',
+  'disputeDetail.decision': 'Decision',
+  'disputeDetail.assignedToYou': 'Assigned to you',
+  'disputeDetail.recordedOnTheTicket': 'Recorded on the ticket; any admin can still resolve it.',
+
+  // The resolution presets and the server refusals the dispute workspace maps.
+  'disputeDetail.theWholeDepositGoes':
+    'The whole deposit goes back. Nothing is kept and nothing reaches the dealer.',
+  'disputeDetail.theDepositIsSplit':
+    'The deposit is split the way the booking assessed it, against the party at fault.',
+  'disputeDetail.partial': 'Partial',
+  'disputeDetail.youSetEachLeg': 'You set each leg. The three must add up to the deposit held.',
+  'disputeDetail.noPenaltyTheDeposit':
+    'No penalty. The deposit returns to the customer and the booking closes clean.',
+  'disputeDetail.theThreeAmountsMust': 'The three amounts must add up to exactly the deposit held.',
+  'disputeDetail.aNoteIsRequired': 'A note is required so both parties can see the reasoning.',
+  'disputeDetail.thisTicketHasAlready': 'This ticket has already been resolved.',
+
+  // test
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+  'dealerApply.theServiceDidNot':
+    'The service did not respond. Nothing was submitted; try again shortly.',
+  'dealerApply.thisAccountHasAlready':
+    'This account has already submitted a gallery. Reload the console to see where it stands.',
+  'dealerApply.aGalleryIsAlready':
+    'A gallery is already registered with that commercial registration number.',
+  'dealerApply.allThreeDocumentsAre':
+    'All three documents are required. Attach the missing one and submit again.',
+  'dealerApply.oneOfTheFiles':
+    'One of the files is larger than the upload limit. Attach a smaller copy.',
+  'dealerApply.uploadEachDocumentAs': 'Upload each document as a JPEG, PNG or PDF.',
+  'dealerApply.closingTimeMustBe': 'Closing time must be later in the day than opening time.',
+  'dealerApply.theDocumentsTogetherAre':
+    'The documents together are larger than the upload limit. Attach smaller copies.',
+  'dealerApply.theApplicationWasRejected':
+    'The application was rejected. Check the details and try again.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+  'acceptInvite.thisInvitationIsNo':
+    'This invitation is no longer valid — it may have expired or already been used. Ask the dealer owner to send a new one.',
+  'acceptInvite.thatPasswordDoesNot': 'That password does not meet the policy. Try a longer one.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+  'resetPassword.thisLinkIsInvalid':
+    'This link is invalid or has expired. Request a new one from the sign-in page.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'security.yourSessionsCouldNot': 'Your sessions could not be loaded. Nothing has been changed.',
+  'security.ifThisIsThe': 'If this is the session you are using now, you will be signed out.',
+  'security.deviceNotRecorded': 'Device not recorded',
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+  'dealerDispute.thisDisputeIsClosed': 'This dispute is closed; nothing more can be added to it.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'disputesList.theDisputeQueueIs': 'The dispute queue is for administrators.',
+  'disputesList.theDisputeQueueCould':
+    'The dispute queue could not be loaded. Nothing has been changed.',
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+  'carForm.yourDealershipIsNot':
+    'Your dealership is not approved yet, so you cannot manage cars. You will be able to once an administrator approves your application.',
+  'carForm.aCarWithThat': 'A car with that plate number is already listed on the platform.',
+  'carForm.theServiceDidNot': 'The service did not respond. Nothing has been saved.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'employeeBusiness.notShownToStaff': 'Not shown to staff',
+
+  // Server refusals mapped by error code, keyed 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Notification sentences. Named parameters rather than concatenation: Arabic does not put the actor and the object where English does, so each is ONE message with holes in it.
+  'notifications.you': 'You',
+  'notifications.aBooking': 'a booking',
+  'notifications.customerRequested': 'A customer requested {what}',
+  'notifications.customerPaid': 'A customer paid the deposit on {what}',
+  'notifications.approved': '{who} approved {what}',
+  'notifications.rejected': '{who} rejected {what}',
+  'notifications.recordedPickup': '{who} recorded the pickup for {what}',
+  'notifications.recordedReturn': '{who} recorded the return for {what}',
+  'notifications.updated': '{who} updated {what}',
+  'notifications.dealerApproved': 'Your dealership was approved',
+  'notifications.dealerRejected': 'Your dealership’s application was rejected',
+  'notifications.dealerClarification': 'The platform asked for more on your application',
+  'notifications.dealerSuspended': 'Your dealership was suspended',
+  'notifications.dealerReactivated': 'Your dealership is trading again',
+  'notifications.staffReactivated': '{who} reactivated a member of staff',
+  'notifications.reportAccessGranted': '{who} gave you access to financial reports',
+  'notifications.reportAccessRevoked': '{who} removed your access to financial reports',
+
+  // The notification presenter's plural helpers.
+
+  // The attention queue's plural counts. A plural message, not an n === 1 ternary: Arabic has six forms.
+  'notifications.carsOverdue': {
+    one: '{count} car is overdue back',
+    other: '{count} cars are overdue back',
+  },
+  'notifications.requestsWaiting': {
+    one: '{count} booking request is waiting',
+    other: '{count} booking requests are waiting',
+  },
+  'notifications.pastTheEndOf': 'Past the end of the rental period and not yet returned.',
+  'notifications.aRequestExpiresWhen': 'A request expires when its rental date arrives unanswered.',
+  'notifications.oldestAndExpiry':
+    'Oldest {when}. A request expires when its rental date arrives unanswered.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'auditLog.theAuditLogIs': 'The audit log is for administrators.',
+  'auditLog.theAuditLogCould': 'The audit log could not be loaded. Nothing has been changed.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'customersList.theCustomerListIs': 'The customer list is for administrators.',
+  'customersList.theCustomersCouldNot':
+    'The customers could not be loaded. Nothing has been changed.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'dealerReports.reportsAreForThe':
+    'Reports are for the dealer owner and staff they have granted access to. Ask the owner if you need them.',
+  'dealerReports.reportsCouldNotBe': 'Reports could not be loaded. Nothing has been changed.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+  'registerDealer.fillInEveryField': 'Fill in every field before continuing.',
+
+  // Keyed by key-copy.js, 2026-09-08.
+
+  // Keyed by key-copy.js, 2026-09-08.
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

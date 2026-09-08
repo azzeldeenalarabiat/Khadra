@@ -135,17 +135,17 @@ export class DealerReviewComponent {
     const review = this.review();
     if (!review) return [];
     return [
-      { k: 'Business name', v: review.dealer.businessName },
-      { k: 'Commercial registration', v: review.dealer.commercialRegistrationNumber },
-      { k: 'Location', v: `${review.latitude.toFixed(4)}, ${review.longitude.toFixed(4)}` },
-      { k: 'Description', v: review.description ?? '—' },
-      { k: 'Submitted', v: new Date(review.dealer.submittedAt).toLocaleString('en-GB') },
-      { k: 'Review due', v: new Date(review.dealer.reviewDueAt).toLocaleString('en-GB') },
+      { k: this.t('dealerProfile.businessName'), v: review.dealer.businessName },
+      { k: this.t('dealerProfile.commercialRegistration'), v: review.dealer.commercialRegistrationNumber },
+      { k: this.t('dealerProfile.location'), v: `${review.latitude.toFixed(4)}, ${review.longitude.toFixed(4)}` },
+      { k: this.t('common.description'), v: review.description ?? '—' },
+      { k: this.t('dealerReview.submitted'), v: new Date(review.dealer.submittedAt).toLocaleString('en-GB') },
+      { k: this.t('dealersList.colReviewDue'), v: new Date(review.dealer.reviewDueAt).toLocaleString('en-GB') },
       // Active staff only — the same number the dealership sees on its own profile. The review
       // response used to carry a second count that included deactivated rows, so one dealership
       // had two staff figures depending on which screen an admin was looking at.
-      { k: 'Employees', v: String(review.dealer.employeeCount) },
-      ...(review.dealer.reviewNote ? [{ k: 'Last review note', v: review.dealer.reviewNote }] : []),
+      { k: this.t('dealerEmployees.employees'), v: String(review.dealer.employeeCount) },
+      ...(review.dealer.reviewNote ? [{ k: this.t('dealerReview.lastReviewNote'), v: review.dealer.reviewNote }] : []),
     ];
   });
 
@@ -187,7 +187,7 @@ export class DealerReviewComponent {
 
     const earliest = Math.min(...expiries);
     return earliest <= this.now()
-      ? 'expired — reload the page'
+      ? this.t('dealerReview.expiredReloadThePage')
       : `expire at ${new Date(earliest).toLocaleTimeString('en-GB')}`;
   });
 
@@ -251,9 +251,9 @@ export class DealerReviewComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 404) return 'That dealer application no longer exists.';
-    if (error.status === 403) return 'Only administrators can review dealer applications.';
-    return 'The application could not be loaded. Nothing has been changed.';
+    if (error.status === 404) return this.t('dealerReview.thatDealerApplicationNo');
+    if (error.status === 403) return this.t('dealerReview.onlyAdministratorsCanReview');
+    return this.t('dealerReview.theApplicationCouldNot');
   });
 
   protected approve(): void {
@@ -289,8 +289,8 @@ export class DealerReviewComponent {
         body: this.t('dealerReview.theApplicationIsClosed'),
         fields: [
           {
-            name: 'reason',
-            label: 'Reason',
+            name: this.t('myBooking.reason'),
+            label: this.t('dealerDecide.reject.reasonLabel'),
             type: 'text',
             placeholder: this.t('dealerReview.whatIsWrongWith'),
             hint: this.t('dealerReview.theDealerSeesThis'),
@@ -318,8 +318,8 @@ export class DealerReviewComponent {
         body: this.t('dealerReview.theApplicationGoesBack'),
         fields: [
           {
-            name: 'note',
-            label: 'Note',
+            name: this.t('dealerReview.note'),
+            label: this.t('dealerReview.note2'),
             type: 'text',
             placeholder: this.t('dealerReview.eGTheVehicle'),
             hint: this.t('dealerReview.nameTheOneThing'),
@@ -351,7 +351,7 @@ export class DealerReviewComponent {
         title: `Suspend ${dealer.businessName}?`,
         body: this.t('dealerReview.theyStopTradingImmediately'),
         fields: [
-          { name: 'reason', label: 'Reason', type: 'text', placeholder: this.t('dealerReview.whyIsThisDealer') },
+          { name: this.t('myBooking.reason'), label: this.t('dealerDecide.reject.reasonLabel'), type: 'text', placeholder: this.t('dealerReview.whyIsThisDealer') },
         ],
         confirm: this.t('dealerReview.suspendDealer'),
         result: { title: this.t('dealerReview.dealerSuspended'), body: '', tone: 'bad' },

@@ -188,7 +188,7 @@ export class VehicleWizardComponent {
   private readonly lookups = inject(LookupsService);
   protected readonly carTypes = loaded(this.lookups.carTypes);
   protected readonly carTypesFailure = computed(() =>
-    this.lookups.carTypes.error() ? 'Vehicle types could not be loaded.' : null,
+    this.lookups.carTypes.error() ? this.t('vehicleWizard.vehicleTypesCouldNot') : null,
   );
 
   /**
@@ -249,36 +249,36 @@ export class VehicleWizardComponent {
     const me = this.dealer();
     const fee = this.deliverySettings()?.fee;
     return [
-      { k: 'Plate', v: f.plateNumber || '—' },
-      { k: 'Colour', v: f.color || '—' },
+      { k: this.t('dealerBooking.plate'), v: f.plateNumber || '—' },
+      { k: this.t('common.colour'), v: f.color || '—' },
       {
-        k: 'Location',
+        k: this.t('dealerProfile.location'),
         v: me ? `${me.businessName} · ${me.latitude.toFixed(4)}, ${me.longitude.toFixed(4)}` : '—',
       },
-      { k: 'Listing', v: this.publishOnSave() ? 'Published on save' : 'Kept as a draft' },
+      { k: this.t('vehicleWizard.listing'), v: this.publishOnSave() ? this.t('vehicleWizard.publishedOnSave') : this.t('vehicleWizard.keptAsADraft') },
       {
-        k: 'Mileage',
+        k: this.t('vehicleWizard.mileage'),
         v: f.mileageUnlimited
           ? 'Unlimited'
           : `${f.mileageDailyLimitKm} km/day · ${f.mileageExcessFeePerKm} JOD/km over`,
       },
-      { k: 'Fuel policy', v: f.fuelPolicy === 'FullToFull' ? 'Full to full' : 'Same to same' },
+      { k: this.t('common.fuelPolicy'), v: f.fuelPolicy === 'FullToFull' ? this.t('vehicleWizard.fullToFull') : this.t('vehicleWizard.sameToSame') },
       {
-        k: 'Delivery',
+        k: this.t('common.delivery'),
         v: f.isDeliveryEligible
           ? `Eligible${fee ? ` · your fee ${fee.amount} ${fee.currency}` : ''}`
-          : 'Pickup only',
+          : this.t('vehicleDetail.pickupOnly'),
       },
-      { k: 'Photos', v: `${this.photos().length} uploaded` },
-      { k: 'Insurance', v: 'Pending platform configuration', tone: 'dim' },
+      { k: this.t('carForm.photos'), v: `${this.photos().length} uploaded` },
+      { k: this.t('vehicleDetail.insurance'), v: this.t('vehicleDetail.pendingPlatformConfiguration'), tone: 'dim' },
     ];
   });
 
   protected readonly footer = computed(() => {
-    if (this.step() === 8) return 'Nothing is published until you save.';
+    if (this.step() === 8) return this.t('vehicleWizard.nothingIsPublishedUntil');
     return this.draft()
-      ? 'Saved as a draft in your fleet'
-      : 'Becomes a draft once you reach Photos';
+      ? this.t('vehicleWizard.savedAsADraft')
+      : this.t('vehicleWizard.becomesADraftOnce');
   });
 
   protected patch(patch: Partial<WizardForm>): void {
@@ -359,7 +359,7 @@ export class VehicleWizardComponent {
       this.problem.set(
         p.error?.code === 'vehicle.plate_taken'
           ? this.plateTakenMessage()
-          : (p.error?.title ?? 'The service did not respond. Nothing has been changed.'),
+          : (p.error?.title ?? this.t('dealerDelivery.serviceDidNotRespond')),
       );
       // Field errors belong to the early steps; go back to the first one that can show them.
       if (p.error?.errors) this.step.set(1);
@@ -385,8 +385,8 @@ export class VehicleWizardComponent {
       const p = error as { error?: { code?: string; title?: string } };
       this.problem.set(
         p.error?.code === 'vehicle.invalid_image_type'
-          ? 'Use a JPEG, PNG or WebP image.'
-          : (p.error?.title ?? 'The upload did not go through.'),
+          ? this.t('vehicleWizard.useAJpegPng')
+          : (p.error?.title ?? this.t('vehicleWizard.theUploadDidNot')),
       );
     } finally {
       this.uploading.set(false);
@@ -422,7 +422,7 @@ export class VehicleWizardComponent {
     if (!draft) return;
     if (this.publishOnSave()) {
       if (this.photos().length === 0) {
-        this.problem.set('Add at least one photo before publishing, or save it as a draft.');
+        this.problem.set(this.t('vehicleWizard.addAtLeastOne'));
         this.step.set(5);
         return;
       }
@@ -434,8 +434,8 @@ export class VehicleWizardComponent {
         const p = error as { error?: { code?: string; title?: string } };
         this.problem.set(
           p.error?.code === 'dealer.not_approved'
-            ? 'Your dealership cannot trade right now, so the car was saved as a draft instead of published.'
-            : (p.error?.title ?? 'The car was saved as a draft; publishing did not go through.'),
+            ? this.t('vehicleWizard.yourDealershipCannotTrade')
+            : (p.error?.title ?? this.t('vehicleWizard.theCarWasSaved')),
         );
         this.busy.set(false);
         return;
@@ -445,7 +445,7 @@ export class VehicleWizardComponent {
     }
     const f = this.form();
     this.ui.showToast(
-      this.publishOnSave() ? 'Vehicle published' : 'Draft saved',
+      this.publishOnSave() ? this.t('vehicleWizard.vehiclePublished') : this.t('vehicleWizard.draftSaved'),
       this.publishOnSave()
         ? `${f.make} ${f.model} ${f.year} is live in your fleet.`
         : `${f.make} ${f.model} ${f.year} is in your fleet as a draft.`,
@@ -459,7 +459,7 @@ export class VehicleWizardComponent {
       // Leaving keeps the draft, so the draft must hold what the form holds.
       await this.persist();
       this.ui.showToast(
-        'Draft kept',
+        this.t('vehicleWizard.draftKept'),
         `${draft.make} ${draft.model} stays in your fleet as a draft. Open it from the fleet to finish.`,
         'warn',
       );
@@ -477,7 +477,7 @@ export class VehicleWizardComponent {
     }
     return own
       ? `${plate} is already on ${own.make} ${own.model} ${own.year} in your fleet.`
-      : 'That plate is already on another car on the platform.';
+      : this.t('vehicleWizard.thatPlateIsAlready');
   }
 
   /** Switch this wizard onto an existing draft: same URL state as a refresh would produce. */

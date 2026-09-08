@@ -14,6 +14,10 @@ export type NotificationKind =
   | 'BookingRejected'
   | 'BookingPickedUp'
   | 'BookingReturned'
+  // Raised by the payments webhook when a deposit clears. Added with the Payments context on
+  // 2026-09-08; without it a confirmed booking rendered through the default arm as "You updated
+  // KR-1042", which is both wrong about who and silent about what.
+  | 'BookingConfirmed'
   | 'DealerApproved'
   | 'DealerRejected'
   | 'DealerClarificationRequested'

@@ -44,17 +44,17 @@ export class SecurityComponent {
     const user = this.session.user();
     if (!user) return [];
     return [
-      { k: 'Name', v: user.fullName },
-      { k: 'Email', v: user.email },
-      { k: 'Role', v: user.role },
-      { k: 'Email verified', v: user.isEmailVerified ? 'Yes' : 'No' },
+      { k: this.t('dealerSettings.name'), v: user.fullName },
+      { k: this.t('dealerSettings.email'), v: user.email },
+      { k: this.t('common.role'), v: user.role },
+      { k: this.t('customerProfile.emailVerified'), v: user.isEmailVerified ? 'Yes' : 'No' },
     ];
   });
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    return 'Your sessions could not be loaded. Nothing has been changed.';
+    return this.t('security.yourSessionsCouldNot');
   });
 
   protected changePassword(): void {
@@ -95,7 +95,7 @@ export class SecurityComponent {
         // as the access token it already holds has left to live.
         note: minutes
           ? `A session already in flight can keep working for up to ${minutes} minutes before it has to refresh. If this is the session you are using now, you will be signed out.`
-          : 'If this is the session you are using now, you will be signed out.',
+          : this.t('security.ifThisIsThe'),
         confirm: this.t('security.endSession'),
         result: { title: this.t('security.sessionEnded'), body: '', tone: 'bad' },
       },
@@ -113,7 +113,7 @@ export class SecurityComponent {
 
   /** What the device says it is. Never parsed into a guess about a brand or an operating system. */
   protected device(session: SessionSummary): string {
-    return session.userAgent?.trim() || 'Device not recorded';
+    return session.userAgent?.trim() || this.t('security.deviceNotRecorded');
   }
 
   protected when(iso: string): string {

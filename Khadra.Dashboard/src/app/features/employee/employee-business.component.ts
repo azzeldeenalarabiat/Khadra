@@ -47,7 +47,7 @@ export class EmployeeBusinessComponent {
       { status?: number; error?: { code?: string } } | undefined;
     if (!error) return null;
     if (error.error?.code === 'dealer.not_registered')
-      return 'This account is not part of a dealership.';
+      return this.t('employeeDash.thisAccountIsNot');
     return "Your dealership's details could not be loaded. Nothing has been changed.";
   });
 
@@ -69,15 +69,15 @@ export class EmployeeBusinessComponent {
       ? d.delivery.fee
         ? `${d.delivery.radiusKm} km · ${d.delivery.fee.amount} ${d.delivery.fee.currency}`
         : `${d.delivery.radiusKm} km`
-      : 'Not offered';
+      : this.t('vehicleWizard.notOffered');
 
     return [
       { label: this.t('dealerProfile.commercialRegistration'), value: d.commercialRegistrationNumber },
       { label: this.t('employeeBusiness.verificationStatus'), value: d.verificationStatus },
-      { label: 'Delivery', value: delivery },
+      { label: this.t('common.delivery'), value: delivery },
       { label: this.t('employeeBusiness.businessNameAndLocation'), value: 'Owner-maintained' },
       { label: this.t('employeeBusiness.staffAndPermissions'), value: 'Owner-maintained' },
-      { label: this.t('employeeBusiness.financialSettings'), value: 'Not shown to staff' },
+      { label: this.t('employeeBusiness.financialSettings'), value: this.t('employeeBusiness.notShownToStaff') },
     ];
   });
 

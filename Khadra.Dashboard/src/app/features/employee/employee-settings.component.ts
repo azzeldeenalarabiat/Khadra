@@ -77,8 +77,8 @@ export class EmployeeSettingsComponent {
       {
         label: this.t('sidebar.permBookings'),
         detail: permissions.canDecideBookings
-          ? 'Approve and reject requests, and record pickups and returns.'
-          : 'Your dealership cannot take new bookings just now, so approving and rejecting are paused. Returns can still be recorded.',
+          ? this.t('employeeSettings.approveAndRejectRequests')
+          : this.t('employeeSettings.yourDealershipCannotTake'),
         held: permissions.canDecideBookings,
         tone: permissions.canDecideBookings ? 'ok' : 'warn',
       },
@@ -91,8 +91,8 @@ export class EmployeeSettingsComponent {
       {
         label: this.t('sidebar.permReports'),
         detail: permissions.canViewReports
-          ? 'Revenue, commission and occupancy are visible to you.'
-          : 'Revenue, commission and occupancy are hidden. Your owner can turn this on.',
+          ? this.t('employeeSettings.revenueCommissionAndOccupancy')
+          : this.t('employeeSettings.revenueCommissionAndOccupancy2'),
         held: permissions.canViewReports,
         tone: permissions.canViewReports ? 'ok' : 'dim',
       },
@@ -112,7 +112,7 @@ export class EmployeeSettingsComponent {
       this.current.set('');
       this.next.set('');
       this.confirm.set('');
-      this.ui.showToast('Password changed', 'Every other session has been signed out.');
+      this.ui.showToast(this.t('auth.reset.doneTitle'), this.t('employeeSettings.everyOtherSessionHas'));
     } catch (error) {
       const p = error as {
         status?: number;
@@ -121,8 +121,8 @@ export class EmployeeSettingsComponent {
       const first = p.error?.errors ? Object.values(p.error.errors)[0]?.[0] : undefined;
       this.problem.set(
         p.error?.code === 'auth.invalid_credentials'
-          ? 'The current password is wrong.'
-          : (first ?? p.error?.title ?? 'The service did not respond. Nothing has been changed.'),
+          ? this.t('employeeSettings.theCurrentPasswordIs')
+          : (first ?? p.error?.title ?? this.t('dealerDelivery.serviceDidNotRespond')),
       );
     } finally {
       this.busy.set(false);

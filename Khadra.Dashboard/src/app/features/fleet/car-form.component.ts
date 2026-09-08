@@ -17,6 +17,7 @@ import { LookupsService } from '../../core/services/lookups.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslationKey } from '../../core/i18n/en';
 
 /**
  * Add or edit one car (spec 4.3).
@@ -63,7 +64,7 @@ export class CarFormComponent {
   private readonly lookups = inject(LookupsService);
   protected readonly carTypes = loaded(this.lookups.carTypes);
   protected readonly carTypesFailure = computed(() =>
-    this.lookups.carTypes.error() ? 'Vehicle types could not be loaded.' : null,
+    this.lookups.carTypes.error() ? this.t('vehicleWizard.vehicleTypesCouldNot') : null,
   );
   /** The platform's model-year bounds. This input had none at all, so it took anything. */
   protected readonly yearRange = loaded(this.lookups.modelYears);
@@ -111,9 +112,9 @@ export class CarFormComponent {
   protected readonly publishHint = computed(() => {
     const car = this.car();
     if (!car) return null;
-    if (car.images.length === 0) return 'Add at least one photo before you can publish this car.';
+    if (car.images.length === 0) return this.t('carForm.addAtLeastOne');
     if (car.status === 'Draft')
-      return 'This car is a draft. Publish it from your fleet when you are ready.';
+      return this.t('carForm.thisCarIsA');
     return null;
   });
 
@@ -136,7 +137,7 @@ export class CarFormComponent {
   protected async save(): Promise<void> {
     if (this.saving()) return;
     if (!this.form().carTypeId) {
-      this.problem.set('Choose a vehicle type before saving this car.');
+      this.problem.set(this.t('carForm.chooseAVehicleType'));
       return;
     }
     this.saving.set(true);
@@ -149,7 +150,7 @@ export class CarFormComponent {
 
       this.service.refresh();
       this.ui.showToast(
-        id ? 'Car updated' : 'Car added',
+        id ? this.t('carForm.carUpdated') : this.t('carForm.carAdded'),
         `${saved.year} ${saved.make} ${saved.model} is saved as ${saved.status}.`,
       );
 
@@ -157,7 +158,7 @@ export class CarFormComponent {
       // upload them until the car exists.
       if (!id) await this.router.navigate(['/dealer/fleet', saved.vehicleId]);
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.saving.set(false);
     }
@@ -175,7 +176,7 @@ export class CarFormComponent {
       await this.service.uploadImage(id, file);
       this.service.refresh();
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.uploading.set(false);
       // Clear it so choosing the same file again still fires a change event.
@@ -190,7 +191,7 @@ export class CarFormComponent {
       await this.service.removeImage(id, imageId);
       this.service.refresh();
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     }
   }
 
@@ -201,18 +202,18 @@ export class CarFormComponent {
       await this.service.setPrimaryImage(id, imageId);
       this.service.refresh();
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     }
   }
 }
 
-function describe(error: unknown): string {
+function describe(error: unknown, t: (key: TranslationKey) => string): string {
   const problem = error as { status?: number; error?: { code?: string; title?: string } };
   if (problem.error?.code === 'dealer.not_approved') {
-    return 'Your dealership is not approved yet, so you cannot manage cars. You will be able to once an administrator approves your application.';
+    return t('carForm.yourDealershipIsNot');
   }
   if (problem.error?.code === 'vehicle.plate_taken') {
-    return 'A car with that plate number is already listed on the platform.';
+    return t('carForm.aCarWithThat');
   }
-  return problem.error?.title ?? 'The service did not respond. Nothing has been saved.';
+  return problem.error?.title ?? t('carForm.theServiceDidNot');
 }

@@ -171,21 +171,21 @@ export class DealerApplyComponent {
     try {
       const dealer = await this.console.submitApplication(form);
       this.ui.showToast(
-        'Application submitted',
+        this.t('dealerApply.applicationSubmitted'),
         `${dealer.businessName} is with the platform for its licence check.`,
       );
       await this.router.navigateByUrl('/dealer/dashboard');
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.busy.set(false);
     }
   }
 }
 
-function describe(error: unknown): string {
+function describe(error: unknown, t: (key: TranslationKey) => string): string {
   if (!(error instanceof HttpErrorResponse)) {
-    return 'The service did not respond. Nothing was submitted; try again shortly.';
+    return t('dealerApply.theServiceDidNot');
   }
 
   const code: string | undefined = error.error?.code;
@@ -195,25 +195,25 @@ function describe(error: unknown): string {
     // handler's check and the index can only disagree in a race — two tabs, or a double click on a
     // slow multipart — and the person on the other end needs the same sentence either way.
     case 'data.conflict':
-      return 'This account has already submitted a gallery. Reload the console to see where it stands.';
+      return t('dealerApply.thisAccountHasAlready');
     case 'dealer.commercial_registration_taken':
-      return 'A gallery is already registered with that commercial registration number.';
+      return t('dealerApply.aGalleryIsAlready');
     case 'dealer.missing_required_documents':
-      return 'All three documents are required. Attach the missing one and submit again.';
+      return t('dealerApply.allThreeDocumentsAre');
     case 'dealer.document_too_large':
     case 'documents.too_large':
-      return 'One of the files is larger than the upload limit. Attach a smaller copy.';
+      return t('dealerApply.oneOfTheFiles');
     case 'dealer.invalid_document_content':
     case 'documents.invalid_content':
-      return 'Upload each document as a JPEG, PNG or PDF.';
+      return t('dealerApply.uploadEachDocumentAs');
     case 'dealer.invalid_operating_hours':
-      return 'Closing time must be later in the day than opening time.';
+      return t('dealerApply.closingTimeMustBe');
     default:
       break;
   }
 
   if (error.status === 413) {
-    return 'The documents together are larger than the upload limit. Attach smaller copies.';
+    return t('dealerApply.theDocumentsTogetherAre');
   }
-  return error.error?.title ?? 'The application was rejected. Check the details and try again.';
+  return error.error?.title ?? t('dealerApply.theApplicationWasRejected');
 }

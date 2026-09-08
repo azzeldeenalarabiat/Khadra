@@ -58,8 +58,10 @@ export function toDealerNotifications(
     const n = dashboard.bookings.overdueReturns;
     rows.push({
       id: 'overdue-returns',
-      title: `${n} ${n === 1 ? 'car is' : 'cars are'} overdue back`,
-      detail: 'Past the end of the rental period and not yet returned.',
+      // A PLURAL message, not an English `n === 1` ternary: Arabic has six forms, and choosing
+      // between two of them in TypeScript picks the wrong one for every count from two upwards.
+      title: t('notifications.carsOverdue', { count: n }),
+      detail: t('notifications.pastTheEndOf'),
       when: 'Overdue',
       tone: 'bad',
       icon: 'warning-circle',
@@ -71,11 +73,13 @@ export function toDealerNotifications(
     const n = dashboard.bookings.requested;
     rows.push({
       id: 'pending-requests',
-      title: `${n} booking ${n === 1 ? 'request is' : 'requests are'} waiting`,
+      title: t('notifications.requestsWaiting', { count: n }),
       // The oldest is the one closest to expiring, so it is the fact worth carrying.
       detail: dashboard.bookings.oldestRequestedAt
-        ? `Oldest ${relativeTime(dashboard.bookings.oldestRequestedAt, now, t)}. A request expires when its rental date arrives unanswered.`
-        : 'A request expires when its rental date arrives unanswered.',
+        ? t('notifications.oldestAndExpiry', {
+            when: relativeTime(dashboard.bookings.oldestRequestedAt, now, t),
+          })
+        : t('notifications.aRequestExpiresWhen'),
       when: 'To answer',
       tone: 'warn',
       icon: 'calendar-check',
