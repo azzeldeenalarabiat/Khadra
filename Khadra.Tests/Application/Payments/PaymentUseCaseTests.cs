@@ -550,6 +550,53 @@ public sealed class PaymentUseCaseTests
 
     // ---------------------------------------------------------------- the sweep
 
+    /// <summary>
+    /// The sharpest race in the feature: the settlement job expiring a booking at the same instant a
+    /// capture lands on it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Both load the booking as Approved and exactly one save wins on <c>xmin</c>. When the JOB wins,
+    /// this handler's save throws and NOTHING it did is written -- not the confirmation, not the
+    /// capture, not the receipt that would have made the delivery un-replayable.
+    /// </para>
+    /// <para>
+    /// The exception escapes on purpose, and this test is why. The first draft retried in place, and
+    /// this test failed: EF keeps the in-memory mutations after a failed <c>SaveChanges</c>, so the
+    /// second pass found a payment that already read Applied, could not orphan it, and left a
+    /// customer's money attached to an expired booking with no refund recorded. Handing the delivery
+    /// back to the provider is the only retry that reads the database again.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task A_capture_that_loses_a_race_is_handed_back_to_the_provider_unwritten()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved(paymentWindow: TimeSpan.FromHours(24));
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(
+                TestPayments.Captured("sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now)));
+
+        var saves = 0;
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ =>
+            {
+                saves++;
+                throw new ConcurrencyConflictException("The settlement job got there first.");
+            });
+
+        await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
+            context.Receive().Handle(
+                new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None));
+
+        // Tried exactly once. A second pass through the same scope would decide against dirty state.
+        Assert.Equal(1, saves);
+        // And the receipt went with the failed transaction, so the re-delivery is not a replay.
+        Assert.Single(context.Recorded);
+    }
+
     [Fact]
     public async Task With_no_provider_the_sweep_does_nothing_and_says_so()
     {

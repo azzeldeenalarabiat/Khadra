@@ -1623,6 +1623,15 @@ checkout is refused with `payments.provider_unavailable` (503) and the startup l
 
 **Two things that still need the owner**, both recorded as items 76 and 77 below.
 
+**One correctness note worth carrying forward.** The webhook handler does NOT retry a lost
+concurrency race, and that is deliberate rather than an omission. It did retry in the first draft;
+a test of the exact race — the settlement job expiring a booking at the instant a capture lands on
+it — proved that wrong. EF keeps the in-memory mutations after a failed `SaveChanges`, so the second
+pass decided against dirty state: it found a payment that already read `Applied`, could not orphan
+it, and would have left a customer's money attached to an expired booking with no refund recorded.
+The exception escapes, the endpoint answers 5xx, and the provider re-delivers into a fresh scope with
+a clean context. The receipt rolled back with the transaction, so the re-delivery is not a replay.
+
 The original entry follows, because its prohibition still stands.
 
 **Status:** open by design · **Raised:** 2026-09-08 · **Depends on:** Payments

@@ -85,17 +85,30 @@ public sealed partial class ReceiveProviderEventHandler(
     ILogger<ReceiveProviderEventHandler> logger) : IRequestHandler<ReceiveProviderEventCommand, UnitResult<Error>>
 {
     /// <summary>
-    /// How many times a lost concurrency race is re-read before giving up and letting the provider
-    /// retry.
+    /// Receives one provider notification, or refuses it.
     /// </summary>
     /// <remarks>
-    /// Two, not "until it works". The only writer that can beat this one is the settlement job
-    /// expiring the same booking, and after one reload the booking is terminal and the answer is
-    /// stable. An unbounded loop against a genuinely contended row would hold a request open instead
-    /// of handing the problem back to a provider that is built to retry.
+    /// <para>
+    /// <b>A lost concurrency race is NOT retried here.</b> It was, in the first draft, and a test of
+    /// the exact race proved that wrong: when the settlement job expires the booking first, this
+    /// handler's save throws having ALREADY mutated the aggregates in memory -- the payment reads
+    /// Applied and the booking reads Confirmed. EF's change tracker keeps those mutations after a
+    /// failed <c>SaveChanges</c>, so a second pass through the same scope decides against dirty state
+    /// rather than against the database: it finds a payment that is already captured, cannot orphan
+    /// it, and leaves a customer's money attached to an expired booking with no refund recorded.
+    /// </para>
+    /// <para>
+    /// So the exception escapes, the endpoint answers 5xx, and the PROVIDER re-delivers -- which is
+    /// what webhooks are built to do, and which arrives in a fresh scope with a clean context and
+    /// reads the booking as it now is. The receipt row rolled back with the failed transaction, so
+    /// the re-delivery is not mistaken for a replay. The settlement job resolves the same conflict
+    /// the same way: it logs and leaves the booking for its next pass.
+    /// </para>
+    /// <para>
+    /// This is the hazard <c>UnitOfWork.ExecuteInTransactionAsync</c> already records -- "nothing
+    /// resets the change tracker between attempts" -- reaching the one handler that moves money.
+    /// </para>
     /// </remarks>
-    private const int MaximumAttempts = 2;
-
     public async Task<UnitResult<Error>> Handle(
         ReceiveProviderEventCommand request,
         CancellationToken cancellationToken)
@@ -107,19 +120,14 @@ public sealed partial class ReceiveProviderEventHandler(
         if (parsed.IsFailure)
             return UnitResult.Failure(parsed.Error);
 
-        for (var attempt = 1; ; attempt++)
+        try
         {
-            try
-            {
-                return await ApplyAsync(parsed.Value, cancellationToken);
-            }
-            catch (ConcurrencyConflictException) when (attempt < MaximumAttempts)
-            {
-                // Something else changed the booking under us -- in practice the settlement job
-                // expiring it. Re-read and decide again: the answer is very likely now "orphan", and
-                // that is a correct answer rather than a failure.
-                LogRaceLost(logger, parsed.Value.ProviderEventId, attempt);
-            }
+            return await ApplyAsync(parsed.Value, cancellationToken);
+        }
+        catch (ConcurrencyConflictException)
+        {
+            LogRaceLost(logger, parsed.Value.ProviderEventId);
+            throw;
         }
     }
 
@@ -318,8 +326,9 @@ public sealed partial class ReceiveProviderEventHandler(
     [LoggerMessage(
         2300,
         LogLevel.Warning,
-        "Payment event {EventId} lost a concurrency race on attempt {Attempt}; retrying.")]
-    private static partial void LogRaceLost(ILogger logger, string eventId, int attempt);
+        "Payment event {EventId} lost a concurrency race. Answering 5xx so the provider re-delivers "
+        + "it into a clean context; nothing was written.")]
+    private static partial void LogRaceLost(ILogger logger, string eventId);
 
     [LoggerMessage(
         2301,
