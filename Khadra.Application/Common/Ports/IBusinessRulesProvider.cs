@@ -74,6 +74,16 @@ public sealed record BusinessRules(
     // rather than hours because the decision is not expressible in hours at all.
     // Frozen onto each booking like every other rule.
     int NonDeliveryGraceMinutes,
+    // How long after a rental finishes either party may review it, and -- the same number -- how long
+    // a first review stays hidden waiting for the second.
+    //
+    // One number rather than two, because they are the same instant seen from both ends: the second
+    // party's deadline to submit IS the first review's reveal, which is what makes "nobody sees the
+    // counterpart before submitting" true by construction instead of by checking.
+    //
+    // A PROPOSAL at 14 days, not a decision. The owner has not been asked; nothing in the spec names
+    // a figure. See pre-launch item 80.
+    int ReviewWindowDays,
     // The oldest model year a dealer may list. A guard against a mistyped year, not a statement
     // about what is worth renting; the console builds its year list from it so the two cannot drift.
     int EarliestVehicleModelYear);

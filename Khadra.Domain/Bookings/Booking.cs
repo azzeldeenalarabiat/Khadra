@@ -230,6 +230,18 @@ public sealed class Booking : AggregateRoot
         (Status == BookingStatus.Requested && now >= DecisionDeadline) ||
         (Status == BookingStatus.Approved && PaymentDeadline is { } paymentDeadline && now >= paymentDeadline);
 
+    /// <summary>
+    /// Whether this booking is still LIVE: it holds the vehicle and no window has closed on it.
+    /// </summary>
+    /// <remarks>
+    /// The in-memory twin of <c>BookingHolds.Live</c>, which asks the same question in SQL. Stated
+    /// once, here, because it is now load-bearing for more than availability: it is the predicate a
+    /// gallery's access to a customer is granted on -- what they may see about the person they are
+    /// deciding about, for as long as they are deciding, and no longer. Two copies of that rule would
+    /// drift, and the way it would drift is a gallery keeping access after the booking ended.
+    /// </remarks>
+    public bool IsLive(DateTimeOffset now) => Status.HoldsVehicle && !HasLapsed(now);
+
     /// <summary>Whether <see cref="Cancel"/> would succeed right now.</summary>
     public bool CanBeCancelled(DateTimeOffset now) =>
         (Status == BookingStatus.Requested ||

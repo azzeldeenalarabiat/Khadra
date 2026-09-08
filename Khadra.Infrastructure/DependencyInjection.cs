@@ -142,6 +142,11 @@ public static class DependencyInjection
             // NullReferenceException on the first booking priced, not at startup.
             .Validate(options => options.NonDeliveryGraceMinutes is not null,
                 "BusinessRules: NonDeliveryGraceMinutes must be set. Use 0 to allow an immediate report.")
+            // Positive, not merely present. Zero would reveal every review the instant it was written
+            // and close the window before the other party could answer, which is the blind window
+            // switched off by a typo rather than by a decision.
+            .Validate(options => options.ReviewWindowDays is > 0,
+                "BusinessRules: ReviewWindowDays must be set to a positive number of days.")
             .ValidateOnStart();
         services.AddOptions<PaymentOptions>()
             .Bind(configuration.GetSection(PaymentOptions.SectionName))
@@ -207,6 +212,7 @@ public static class DependencyInjection
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddScoped<IGalleryReviewReader, GalleryReviewReader>();
+        services.AddScoped<ICustomerReputationReader, CustomerReputationReader>();
         // The dashboard glance and the audit screen read one table with different questions: a fixed
         // seven-row feed, and a filtered, paged log. Two readers, deliberately.
         services.AddScoped<IAuditLogReader, AuditLogReader>();

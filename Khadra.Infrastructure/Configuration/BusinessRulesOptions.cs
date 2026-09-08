@@ -86,6 +86,13 @@ public sealed class BusinessRulesOptions
     [Range(0, 10080)]
     public int? NonDeliveryGraceMinutes { get; init; }
 
+    // How long after a rental finishes either party may review it, and how long a first review waits
+    // for the second before it is revealed anyway. Nullable for the same reason as the others: a
+    // missing key must be an error, and here a silent zero would reveal every review instantly and
+    // close the window before anyone could write one.
+    [Range(1, 365)]
+    public int? ReviewWindowDays { get; init; }
+
     // The oldest model year a dealer may list. This is a guard against a typo — "1200", "19" — not a
     // judgement about what is rentable: an older car in sound condition is an ordinary listing on
     // this market, and the owner can lower it without a deploy. It was a `const` in the domain,

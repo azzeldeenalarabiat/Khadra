@@ -58,9 +58,16 @@ public sealed record RatingSummary(decimal? Average, int Count)
 
 public interface IGalleryReviewReader
 {
+    /// <param name="now">
+    /// The instant visibility is judged at. A review inside its blind window is not published yet, and
+    /// this reader is the public one -- without the parameter the window would be decorative, because
+    /// a gallery could read the customer's rating here and answer it before the customer could see
+    /// theirs.
+    /// </param>
     Task<PagedResult<GalleryReviewDto>> ListForGalleryAsync(
         Id dealerId,
         PageRequest page,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
     Task<ReviewDto?> FindForBookingAsync(
@@ -78,5 +85,6 @@ public interface IGalleryReviewReader
     /// </remarks>
     Task<IReadOnlyDictionary<Guid, RatingSummary>> SummariseAsync(
         IReadOnlyCollection<Id> dealerIds,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 }

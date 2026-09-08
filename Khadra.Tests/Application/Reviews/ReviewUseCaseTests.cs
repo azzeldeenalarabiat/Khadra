@@ -37,7 +37,7 @@ public sealed class ReviewUseCaseTests
             return booking;
         }
 
-        public ReviewHandlers Handlers() => new(Reviews, Bookings, Reader, Clock, UnitOfWork);
+        public ReviewHandlers Handlers() => new(Reviews, Bookings, Reader, TestBusinessRules.Provider(), Clock, UnitOfWork);
     }
 
     /// <summary>A booking runs its whole course and settles, which is when a rating unlocks.</summary>
@@ -163,7 +163,7 @@ public sealed class ReviewUseCaseTests
     {
         var review = Review.Leave(
             Id.New(), ReviewDirection.CustomerRatesDealer, CustomerId, Id.New(),
-            Rating.Create(1).Value, "Unrepeatable.", bookingIsCompleted: true, Build.Now).Value;
+            Rating.Create(1).Value, "Unrepeatable.", bookingIsCompleted: true, revealAt: Build.Now.AddDays(14), now: Build.Now).Value;
 
         review.Hide("Abusive language.");
 

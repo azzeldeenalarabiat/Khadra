@@ -12,7 +12,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Fleet | done | done | dealer fleet management done; **customer catalogue done** (search, listing, gallery page) |
 | Bookings | done | done | dealer decisions and handover done; **quote done**; creation NOT built |
 | Disputes | done | done | dashboard read model only |
-| Reviews | done | pending | pending |
+| Reviews | done | done | **both directions done**; customer reputation read model done |
 | Platform Settings | done | pending (configuration-backed) | pending |
 | Payments | done | done | **deposit checkout + provider webhook done**; NO PROVIDER CONFIGURED |
 
@@ -103,7 +103,17 @@ The lock (`IVehicleHoldLock`, a transaction-scoped Postgres advisory lock keyed 
 
 ## 6. Reviews
 
-`Review` with a `Rating` value object. One per booking per direction, only on a completed booking. The customer's review of the dealer is public and feeds the dealer's rating; the dealer's review of the customer is visible to other dealers to inform approve/reject decisions (spec 5.6). Moderation hides the text but keeps the score, so a dealer cannot erase a bad rating by reporting it. Ratings are aggregated in SQL as read models.
+`Review` with a `Rating` value object. One per booking per direction, only on a completed booking. Both directions ship, and they are shaped very differently on purpose.
+
+**The customer's review of a gallery is PUBLIC**: anonymous to read, free text allowed, and hiding it removes the TEXT and keeps the SCORE, so a gallery cannot erase a bad rating by reporting the comment attached to it (spec 3.2, 4.1).
+
+**The gallery's rating of a customer is not public and never becomes so.** It is a bare score with NO free text at all -- unverified prose about a named private individual, circulating between competing businesses and invisible to the person it describes, is not something this platform will store. It is readable only as an AGGREGATE, only by a gallery holding a LIVE booking with that customer, and only through the booking that gives them the relationship: `GET /api/v1/bookings/{id}/customer-reputation`. There is deliberately no endpoint anywhere that takes a customer id, because that would be a lookup oracle over the whole customer base for anyone with a dealer session. Hiding one of these does NOT keep the score (`ReviewDirection.HiddenScoreStillCounts`): there is no text to moderate, so the only thing an administrator can be hiding is a score that was wrong.
+
+**Both directions are BLIND until the window closes or both sides are in.** `Review.VisibleFrom` is a real column, and the invariant -- nobody sees the counterpart before submitting -- holds by construction rather than by checking: the first review sets its own reveal instant, the second party's deadline to submit IS that instant, and a second review reveals both at once. Without it, publishing the customer's review the moment it is written would hand the gallery a retaliation button with the platform's own machinery behind it. `BusinessRules:ReviewWindowDays` is the number, proposed at 14 and not yet an owner decision.
+
+**`CustomerReputation` counts what the PLATFORM adjudicated**, never what a gallery asserted, and it reads `Penalty.AttributedTo` rather than the status. That distinction is the whole correctness of the reader: a DELIVERY no-show is `Unattributed` because the gallery had to travel, and `ReportDealerNonDelivery` cancels with `CancelledBy = Customer` while attributing the penalty to the DEALER -- counting by status would put the gallery's own failure on the customer's permanent record. A customer reads the same figures about themselves at `GET /api/v1/customers/me/reputation`, because a semi-private score somebody cannot see is the thing privacy law objects to, and it is the only way they learn to dispute a wrong no-show inside the window.
+
+Ratings are aggregated in SQL as read models.
 
 ## 7. Platform Settings
 

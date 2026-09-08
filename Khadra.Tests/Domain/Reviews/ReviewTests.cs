@@ -21,6 +21,7 @@ public sealed class ReviewTests
             Rating.Create(rating).Value,
             comment,
             completed,
+            revealAt: Now.AddDays(14),
             Now).Value;
 
     [Fact]
@@ -28,7 +29,7 @@ public sealed class ReviewTests
     {
         var review = Review.Leave(
             Id.New(), ReviewDirection.CustomerRatesDealer, Id.New(), Id.New(),
-            Rating.Create(5).Value, "Too soon", bookingIsCompleted: false, Now);
+            Rating.Create(5).Value, "Too soon", bookingIsCompleted: false, revealAt: Now.AddDays(14), now: Now);
 
         Assert.Equal("review.booking_not_completed", review.Error.Code);
     }
@@ -55,7 +56,7 @@ public sealed class ReviewTests
 
         var tooLong = Review.Leave(
             Id.New(), ReviewDirection.CustomerRatesDealer, Id.New(), Id.New(),
-            Rating.Create(4).Value, new string('x', 2001), true, Now);
+            Rating.Create(4).Value, new string('x', 2001), true, revealAt: Now.AddDays(14), now: Now);
 
         Assert.Equal("review.comment_too_long", tooLong.Error.Code);
     }
@@ -102,7 +103,7 @@ public sealed class ReviewTests
 
         var review = Review.Leave(
             booking, ReviewDirection.DealerRatesCustomer, reviewer, subject,
-            Rating.Create(3).Value, "Returned the car late.", true, Now).Value;
+            Rating.Create(3).Value, "Returned the car late.", true, revealAt: Now.AddDays(14), now: Now).Value;
 
         Assert.Equal(booking, review.BookingId);
         Assert.Equal(reviewer, review.ReviewerUserId);

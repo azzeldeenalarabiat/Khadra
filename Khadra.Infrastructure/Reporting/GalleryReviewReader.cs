@@ -12,6 +12,7 @@ internal sealed class GalleryReviewReader(KhadraDbContext context) : IGalleryRev
     public async Task<PagedResult<GalleryReviewDto>> ListForGalleryAsync(
         Id dealerId,
         PageRequest page,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(page);
@@ -20,7 +21,12 @@ internal sealed class GalleryReviewReader(KhadraDbContext context) : IGalleryRev
             .AsNoTracking()
             .Where(review =>
                 review.SubjectId == dealerId &&
-                review.Direction == ReviewDirection.CustomerRatesDealer);
+                review.Direction == ReviewDirection.CustomerRatesDealer &&
+                // The blind window. A review still inside it belongs to nobody but its author, and
+                // publishing it here is the exact leak the window exists to close: a gallery would
+                // read its new one-star, find the booking, and rate that customer back before their
+                // reputation reached anyone else.
+                review.VisibleFrom <= now);
 
         var total = await query.CountAsync(cancellationToken);
 
@@ -78,6 +84,7 @@ internal sealed class GalleryReviewReader(KhadraDbContext context) : IGalleryRev
     /// </remarks>
     public async Task<IReadOnlyDictionary<Guid, RatingSummary>> SummariseAsync(
         IReadOnlyCollection<Id> dealerIds,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(dealerIds);
@@ -91,6 +98,9 @@ internal sealed class GalleryReviewReader(KhadraDbContext context) : IGalleryRev
             .AsNoTracking()
             .Where(review =>
                 review.Direction == ReviewDirection.CustomerRatesDealer &&
+                // Same window as the listing. A rating that is not published yet must not move the
+                // average either, or the number on the card would give away what the text does not.
+                review.VisibleFrom <= now &&
                 ids.Contains(review.SubjectId))
             .GroupBy(review => review.SubjectId)
             .Select(group => new

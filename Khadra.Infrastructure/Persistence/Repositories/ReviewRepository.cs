@@ -21,6 +21,18 @@ internal sealed class ReviewRepository(KhadraDbContext context) : IReviewReposit
             cancellationToken);
     }
 
+    public Task<Review?> GetForBookingAsync(
+        Id bookingId,
+        ReviewDirection direction,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(direction);
+        // Tracked on purpose: the caller reveals it in the same save that writes the counterpart.
+        return context.Reviews.FirstOrDefaultAsync(
+            review => review.BookingId == bookingId && review.Direction == direction,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Review>> ListForSubjectAsync(
         Id subjectId,
         ReviewDirection direction,

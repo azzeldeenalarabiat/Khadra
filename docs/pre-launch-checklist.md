@@ -1628,9 +1628,45 @@ design. Recorded so nobody later assumes the app was built to one.
 
 **To close:** get an export, or record that the app's own theme file is the source of truth for it.
 
-### 71. The dealer's review of a customer has no endpoint
+### 71. CLOSED — the dealer's review of a customer
 
-**Status:** open · **Raised:** 2026-09-08
+**Status:** closed · **Raised:** 2026-09-08 · **Built:** 2026-09-08
+
+Shipped as two things rather than one, because the interesting half was never the writing.
+
+**A reputation READ MODEL**, `GET /api/v1/bookings/{id}/customer-reputation`, keyed on the booking
+and not on a customer id -- an endpoint taking a customer id would be a lookup oracle over the whole
+customer base for anybody with a dealer session, and no check inside it could undo that. A gallery may
+read it while they are deciding about, or holding, a booking with that person, and no longer
+(`Booking.IsLive`). It answers with aggregates only: a rating, five counts and an account age. No
+contact details, no documents, no per-review rows, and no dates on individual ratings, because a rating
+dated last Tuesday tells this gallery when the customer rented from a competitor.
+
+**A rating with NO free text.** The audience is other galleries, so prose here would be unverified
+writing about a named private individual circulating between competing businesses, unmoderated when
+written and invisible to its subject. The platform has replaced free text with closed codes twice
+already, for weaker reasons.
+
+**A blind window**, `Review.VisibleFrom`, which was the thing missing from the original framing.
+Without it the dealer direction is a retaliation tool: customer reviews publish instantly, so a gallery
+reads its new one-star, finds the booking, and rates that customer one star before their reputation
+reaches anyone else.
+
+**Counts read `Penalty.AttributedTo`, never the status.** Counting by status would have blamed
+customers the domain explicitly refused to blame -- a delivery no-show is `Unattributed`, and
+`ReportDealerNonDelivery` is the CUSTOMER reporting the GALLERY while the row reads
+`CancelledBy = Customer`.
+
+**The customer can see their own**, at `GET /api/v1/customers/me/reputation`. A semi-private score
+somebody cannot see is what privacy law objects to, and it is the only way they learn to dispute a
+wrong no-show while the window is open.
+
+What remains is items 80 to 83 below: the window length is the owner's, and nothing can moderate a
+review yet.
+
+The original entry follows.
+
+**Status:** closed · **Raised:** 2026-09-08
 
 Spec 5.6 makes reviews mutual: the dealer's review of a customer is visible to other dealers to inform
 their approve/reject decisions. `ReviewDirection.DealerRatesCustomer` exists, the table stores it, and
@@ -1793,3 +1829,53 @@ process.
 
 **To close, if it is ever wanted:** an admin screen listing payments whose provider state and stored
 state disagree, with a button that replays the provider's event through the real handler.
+
+## Customer reviews and reputation (2026-09-08)
+
+Closes item 71. Everything below is a gap that survives the build.
+
+### 80. OPEN OWNER DECISION — how long the review window is
+
+**Status:** open · **Raised:** 2026-09-08 · **Shipped proposal:** 14 days
+
+`BusinessRules:ReviewWindowDays` does two jobs at once, which is why there is one number and not two:
+it is how long after a rental either party may review it, AND how long a first review stays hidden
+waiting for the second. They are the same instant seen from both ends, and that equality is what makes
+"nobody sees the counterpart before submitting" true by construction.
+
+Fourteen days is a PROPOSAL. Nothing in the spec names a figure and the owner has not been asked. Too
+short and one party loses the chance to answer; too long and a gallery's public rating lags a fortnight
+behind reality.
+
+**To close:** ask the owner, set the number, record it in `docs/spec-amendments.md`.
+
+### 81. Nothing can moderate a review, in either direction
+
+**Status:** open · **Raised:** 2026-09-08 · **Pre-dates this work**
+
+`Review.Hide` and `Unhide` exist on the aggregate and no endpoint calls either. Every reader honours
+them — the public listing drops the text, and the customer reputation drops the whole rating — so the
+machinery works; there is simply no way for an administrator to reach it.
+
+That was survivable while only the public direction existed and the worst case was an abusive comment.
+It is worse now: a retaliatory rating of a CUSTOMER follows a real person to every future approval, and
+hiding it is the only remedy the model has. There is no appeal path and no admin screen.
+
+**To close:** an admin endpoint and screen to hide and unhide a review, with an audit entry, and a
+route by which a customer can ask for one to be looked at.
+
+### 82. `Review.Revise` is unreachable
+
+**Status:** open, harmless · **Raised:** 2026-09-08
+
+No endpoint calls it. It is now guarded twice — the edit window AND the reveal — so if it is ever
+exposed it cannot be used to answer a counterpart after reading it. Recorded so the second guard is
+not mistaken for dead code and removed.
+
+### 83. Reputation is on the booking detail only
+
+**Status:** open, deliberate · **Raised:** 2026-09-08
+
+A gallery sees a customer's history when they open the booking, not on the pending list. That is a
+scope decision rather than a privacy one — the list is already filtered to their own live requests —
+and a per-row summary would be a batch reader like `SummariseAsync`, built if galleries ask for it.

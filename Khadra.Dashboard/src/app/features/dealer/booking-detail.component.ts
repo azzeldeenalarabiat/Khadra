@@ -135,10 +135,60 @@ export class DealerBookingDetailComponent {
   protected readonly customerRows = computed<readonly KeyValue[]>(() => {
     const b = this.booking();
     if (!b) return [];
-    // Only what the API carries. No booking count, no contact details: the platform has not decided
-    // whether a dealer ever sees a customer's phone, and the console must not promise it.
+    // Only what the API carries. NO CONTACT DETAILS: the platform has not decided whether a dealer
+    // ever sees a customer's phone, and the console must not promise it. The history below is a
+    // separate, deliberately narrower thing -- aggregates the platform itself counted.
     return [{ k: 'Name', v: b.customerName }];
   });
+
+  /**
+   * What the platform knows about this customer, or null.
+   *
+   * Null covers two different situations that look the same on screen and are both correct: the
+   * booking is no longer live, so the gallery's access has ended (409 from the server), or the
+   * request has not landed yet. Neither is an error to show.
+   */
+  protected readonly reputation = computed(() => this.service.reputation.value() ?? null);
+
+  /** True when the access rule -- not a failure -- is why there is nothing to show. */
+  protected readonly reputationClosed = computed(
+    () => this.service.reputation.status() === 'error' && !this.reputation(),
+  );
+
+  protected readonly myCustomerRating = computed(() => this.service.customerRating.value() ?? null);
+
+  /**
+   * Whether the gallery may rate this customer now.
+   *
+   * The SERVER decides whether a rating is accepted; this only decides whether to offer the control,
+   * from the same two facts the server judges on -- the booking is finished, and no rating exists yet.
+   */
+  protected readonly canRateCustomer = computed(() => {
+    const b = this.booking();
+    return !!b && b.status === 'Completed' && !this.myCustomerRating();
+  });
+
+  protected readonly ratingBusy = signal(false);
+
+  /** The stars offered. A fixed 1-5 scale: it is the platform's, and it is not configurable. */
+  protected readonly ratingChoices = [1, 2, 3, 4, 5] as const;
+
+  async rateCustomer(rating: number): Promise<void> {
+    const b = this.booking();
+    if (!b || this.ratingBusy()) return;
+
+    this.ratingBusy.set(true);
+    this.problem.set(null);
+    try {
+      await this.service.rateCustomer(b.bookingId, rating);
+      this.service.refresh();
+      this.ui.showToast(this.t("dealerBooking.rateCustomer"), this.t("dealerBooking.rateSaved"));
+    } catch (error: unknown) {
+      this.problem.set(describe(error));
+    } finally {
+      this.ratingBusy.set(false);
+    }
+  }
 
   protected readonly vehicleRows = computed<readonly KeyValue[]>(() => {
     const b = this.booking();
