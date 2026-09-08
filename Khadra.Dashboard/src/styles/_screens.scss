@@ -1055,6 +1055,158 @@
   }
 }
 
+/* ── Narrow viewports (pre-launch checklist item 74) ──────────────────────────
+   The console is a desk tool and its layout says so: a 248px sidebar beside one
+   scrolling page. Measured at 491px that left the CONTENT 243px — half the
+   screen spent on navigation — and a detail heading broke one word per line
+   while the status chips and the primary action fought over the same row.
+
+   Two breakpoints, each fixing one half of that.
+
+   The rule everything here depends on: a flex child's default `min-width` is
+   `auto`, which is its CONTENT width, so a long heading or a wide chip row
+   refuses to shrink and pushes its neighbour out instead of wrapping. Every
+   `min-width: 0` below is that, not decoration. */
+
+/* Below 900px the sidebar becomes an icon rail. The labels go, the width drops
+   from 248px to 64px, and 184px of the screen comes back to the content — which
+   is the difference between a heading that wraps and one that breaks mid-word.
+   Nothing is hidden that has no icon: `title` carries the label for a pointer,
+   and `aria-label` is on the link itself for a screen reader. */
+@media (max-width: 900px) {
+  .sidebar {
+    width: 64px;
+  }
+
+  .sidebar-brand,
+  .sidebar-caption,
+  .nav-item-label,
+  .sidebar-link-label,
+  .sidebar-user-name,
+  .sidebar-user-role,
+  .perm-card {
+    display: none;
+  }
+
+  /* The chevron beside the signed-in user, and the caret on any collapsed row: at 64px there is
+     room for one glyph and it should be the one that says WHICH row this is. */
+  .sidebar-user .icon-mirrored {
+    display: none;
+  }
+
+  .nav-group {
+    /* Kept in the flow rather than removed: a group heading collapsing to zero
+       height would run two unrelated groups of icons together. */
+    height: 1px;
+    padding: 10px 0 0;
+    overflow: hidden;
+    color: transparent;
+  }
+
+  .nav-item,
+  .sidebar-link,
+  .sidebar-user {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  .sidebar-head {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  /* A count is the one label worth keeping: it is the reason to press the icon.
+     Floated over the corner rather than beside it, which there is no room for. */
+  .nav-badge {
+    position: absolute;
+    margin-block-start: -16px;
+    margin-inline-start: 16px;
+    font-size: 9px;
+    min-width: 14px;
+    padding: 0 3px;
+  }
+
+  .page {
+    padding: 16px 14px 28px;
+  }
+
+  .topbar {
+    gap: 10px;
+    padding: 0 14px;
+  }
+}
+
+/* Below 640px the header blocks stop competing for one row.
+
+   This is the half of item 74 that shows worst: on the dealer-application screen
+   the heading, the status pill, the meta line and the SLA badge all sit in one
+   flex row, and at 491px the SLA box overlapped the pill while the heading broke
+   a character at a time. */
+@media (max-width: 640px) {
+  .page-head,
+  .detail-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  /* A flex child's default `min-width` is `auto` — its CONTENT width — so a long
+     heading refuses to shrink and pushes its neighbour out instead of wrapping.
+     This one line is what most of the overlap was. */
+  .page-head > *,
+  .detail-head > * {
+    min-width: 0;
+  }
+
+  /* The SLA badge and the action buttons take the full row once it has wrapped,
+     and stop being pushed to the far end: `margin-inline-start: auto` on a
+     wrapped row strands them under an empty gap. */
+  .detail-actions,
+  .sla-box {
+    margin-inline-start: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .sla-box {
+    text-align: start;
+  }
+
+  /* The heading breaks BETWEEN words, and inside one only when a single token is
+     genuinely wider than the column — a plate number, a booking reference. The
+     rule is `anywhere` rather than `break-word` because only the former lets the
+     element's min-content width shrink, which is what stops the page itself
+     scrolling sideways. */
+  .page-title,
+  .detail-name {
+    font-size: 19px;
+    overflow-wrap: anywhere;
+  }
+
+  .page-sub,
+  .detail-meta {
+    overflow-wrap: anywhere;
+  }
+
+  /* A 210px label beside a value in 240px of screen leaves the value nowhere to
+     go, so the pair stacks. */
+  .kv {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .kv-key,
+  .kv-narrow .kv-key,
+  .kv-200 .kv-key {
+    width: auto;
+  }
+
+  .action-row,
+  .row {
+    flex-wrap: wrap;
+  }
+}
+
 /* Commission report keeps its columns readable before it scrolls. */
 .table-980 {
   min-width: 980px;

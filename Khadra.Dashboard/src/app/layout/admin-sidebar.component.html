@@ -15,14 +15,23 @@
         <div class="nav-group">{{ t(groupKey) }}</div>
       }
       @for (item of group.items; track item.route) {
+        <!--
+          The label is on the LINK as well as inside it. Below 900px the sidebar collapses to an icon
+          rail and `.nav-item-label` is hidden with `display: none`, which removes it from the
+          accessibility tree as well as from the screen -- so without this the link would have no
+          accessible name at exactly the width where the icon is the only thing left. `title` does
+          the same for a pointer.
+        -->
         <a
           class="nav-item"
           [routerLink]="item.route"
           routerLinkActive="is-active"
           [routerLinkActiveOptions]="{ exact: false }"
+          [attr.aria-label]="t(item.labelKey)"
+          [attr.title]="t(item.labelKey)"
         >
           <kh-icon [name]="item.icon" class="nav-item-icon" />
-          <span class="nav-item-label">{{ t(item.labelKey) }}</span>
+          <span class="nav-item-label" aria-hidden="true">{{ t(item.labelKey) }}</span>
           @if (badge(item.count); as n) {
             <span class="nav-badge">{{ n }}</span>
           }
@@ -51,7 +60,13 @@
 
     <!-- Who is signed in, and the way to their own account. It was a static block that looked
          exactly like the clickable row above it and did nothing when clicked. -->
-    <a class="sidebar-user" [routerLink]="accountRoute()" routerLinkActive="is-active">
+    <a
+      class="sidebar-user"
+      [routerLink]="accountRoute()"
+      routerLinkActive="is-active"
+      [attr.aria-label]="name()"
+      [attr.title]="name()"
+    >
       <div class="avatar avatar-28">{{ initials() }}</div>
       <div class="grow">
         <div class="sidebar-user-name user-text">{{ name() }}</div>
@@ -66,9 +81,16 @@
          to either -- Security and Admin users are both in the rail already, and both say they are
          not built -- so routing it there would be the same dead click at the end of a longer path.
          It comes back with the screen, not before. -->
-    <button type="button" class="sidebar-link" (click)="signOut()">
+    <!-- Same reason as the nav links: the words beside the icon are hidden on the collapsed rail. -->
+    <button
+      type="button"
+      class="sidebar-link"
+      (click)="signOut()"
+      [attr.aria-label]="t('sidebar.logout')"
+      [attr.title]="t('sidebar.logout')"
+    >
       <kh-icon name="sign-out" class="icon-mirrored" />
-      {{ t('sidebar.logout') }}
+      <span class="sidebar-link-label">{{ t('sidebar.logout') }}</span>
     </button>
   </div>
 </div>

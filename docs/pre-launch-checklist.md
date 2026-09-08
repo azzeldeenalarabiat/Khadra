@@ -1714,9 +1714,43 @@ verify by email, submit the gallery, approve it as an administrator, publish a c
 customer, approve the booking as the dealer. Both items below are deliberately NOT blockers; the
 owner has seen each and said so.
 
-### 74. The admin console is unusable below roughly 500px wide
+### 74. CLOSED — the admin console below roughly 500px wide
 
-**Status:** open, accepted · **Raised:** 2026-09-08 · **Not a blocker:** owner's decision, 2026-09-08
+**Status:** closed · **Raised:** 2026-09-08 · **Fixed:** 2026-09-08
+
+Two breakpoints, each fixing one half of it, and nothing at 1440×900 changed — every rule is
+`max-width`, so at desktop widths none of them apply. Measured before and after at 1440: sidebar
+248px, labels visible, heading 22px on one line, `overflow-wrap: normal`, page padding unchanged.
+
+**Below 900px the sidebar becomes a 64px icon rail.** That was the whole of the first half: at 491px
+a fixed 248px sidebar left the CONTENT 243px, and the heading on the dealer-application screen got
+106px of it, which is where "one word per line" came from. Measured after: content 427px, heading
+302px, one line.
+
+**Below 640px the header blocks stop competing for one row.** `.detail-head` wraps, and every direct
+child gets `min-width: 0` — a flex child's default `min-width` is `auto`, its CONTENT width, so a long
+heading refused to shrink and pushed the SLA badge over the status pill instead of wrapping. That one
+line was most of the overlap. The SLA box and the action row then take the full width rather than
+being pushed to the far end by a `margin-inline-start: auto` that strands them under a gap once the
+row has wrapped.
+
+Three things the fix had to get right beyond the obvious:
+
+- **`overflow-wrap: anywhere`, not `break-word`.** Only the former lets an element's min-content width
+  shrink, which is what stops a long booking reference scrolling the whole page sideways.
+- **Accessible names survive the collapse.** `display: none` removes the label from the accessibility
+  tree as well as from the screen, so at exactly the width where the icon is all that is left, every
+  nav link would have had no accessible name. The label is now on the link itself as `aria-label` and
+  `title`, and the visible span is `aria-hidden`.
+- **RTL was free, and verified rather than assumed.** The rail uses logical properties throughout, so
+  in Arabic at 375px the sidebar sits on the right and the badge stays inside it.
+
+Verified at 375, 491 and 1440 in both directions: no horizontal page scroll, no overlapping elements,
+no element whose `scrollWidth` exceeds its `clientWidth` except the deliberately-clipped group heading.
+
+The original entry follows.
+
+**Status:** closed · **Raised:** 2026-09-08 · **Was:** accepted by the owner
 
 On the dealer-application screen at a 491px viewport the heading wraps one word per line, the
 subtitle breaks a character at a time, and the review-SLA badge overlaps the status chip and the
@@ -1733,9 +1767,24 @@ and it would be done to a brief rather than guessed at.
 **To close, if it is ever wanted:** a breakpoint below which the sidebar collapses to icons or a
 drawer, and header blocks that stack instead of competing for one row.
 
-### 75. Switching on delivery does not offer it for cars already listed
+### 75. CLOSED — switching on delivery now offers it for cars already listed
 
-**Status:** open, future enhancement · **Raised:** 2026-09-08 · **Not needed now:** owner's decision, 2026-09-08
+**Status:** closed · **Raised:** 2026-09-08 · **Fixed:** 2026-09-08
+
+`POST /api/v1/dealers/me/delivery/offer-on-listed-vehicles`, and a prompt on the Delivery page that
+appears only when the SAVED settings say delivery is on and the server's own count of listed cars not
+offered for delivery is above zero. The count travels on the delivery settings the page already loads,
+so nothing fetches a fleet list to derive a number the API knows.
+
+The per-car flag stays and is not weakened: this is a bulk EDIT the owner asks for, on a page that
+tells them how many cars it will touch, not a rule keeping the flag in step. There is deliberately no
+action the other way — a gallery switching delivery off keeps its per-car answers, or turning it back
+on would silently re-offer the van its owner had excluded on purpose. Active cars only: a draft is not
+advertising anything.
+
+The original entry follows.
+
+**Status:** closed · **Raised:** 2026-09-08
 
 A vehicle carries its own `IsDeliveryEligible`, and the wizard sets it from whether the dealership
 offers delivery AT THE MOMENT THE CAR IS SAVED. A gallery that lists cars first and turns delivery
