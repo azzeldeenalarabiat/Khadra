@@ -193,4 +193,16 @@ These change field shapes, so they are worth settling before the affected contex
 
 ## Roadmap
 
-Persistence and use cases for Dealers, then Fleet, then Bookings including the expiry and no-show background jobs, then Disputes and Reviews, then Payments once approved. After that: an outbox for cross-context events, token pruning, MFA for Admin, and the Flutter customer app.
+Every context above is built, including Payments and both directions of Reviews, and the Flutter
+customer app ships. What is left is not another context:
+
+1. **A merchant account and one `IPaymentProvider` adapter.** The single thing standing between an
+   approved booking and a confirmed one (pre-launch item 76).
+2. **The owner's four open answers**: the cancellation-refund rule (item 77), the review window
+   length (item 80), the dealer non-delivery tier, and the held deposit with no ticket.
+3. **A way to moderate a review** (item 81). `Hide` exists on the aggregate, every reader honours it,
+   and nothing calls it — which matters more now that a rating follows a person.
+4. **An outbox for cross-context events.** Domain events dispatch after commit with nothing to
+   replay them, which is why the Payments seam is a call and not an event.
+5. Token pruning, MFA for Admin, push notifications (item 73), and request localisation on the API so
+   a refusal reaches a client in the reader's language rather than in English.

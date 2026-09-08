@@ -23,7 +23,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 
 ## Architecture map (dependency direction: Domain <- Application <- Infrastructure <- WebAPI)
 
-- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `Percentage`, `GeoPoint`, `DateRange`) and one folder per bounded context: `IdentityAccess/`, `Auditing/`, `Dealers/`, `Fleet/`, `Bookings/`, `Disputes/`, `Reviews/`, `PlatformSettings/`. `Payments/` is NOT built (blocked on owner decisions). Repository interfaces live next to their aggregate. See `docs/architecture-bounded-contexts.md` for the status table and the open owner decisions.
+- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `Percentage`, `GeoPoint`, `DateRange`) and one folder per bounded context: `IdentityAccess/`, `Auditing/`, `Dealers/`, `Fleet/`, `Bookings/`, `Disputes/`, `Reviews/`, `PlatformSettings/`. `Payments/` was built on 2026-09-08 with the owner's explicit approval: `Payment` (one checkout attempt) with `Refund` children, plus `ProviderEventReceipt` outside the aggregate. **No provider is configured**, so every checkout is refused with `payments.provider_unavailable` and the startup log says `PAYMENTS ARE NOT ACCEPTED` on every boot — see pre-launch item 76 for what closing that needs. Repository interfaces live next to their aggregate. See `docs/architecture-bounded-contexts.md` for the status table and the open owner decisions.
 - `Khadra.Application` — CQRS: `<Context>/<UseCase>/<UseCase>Command.cs` (+ validator) and `<UseCase>Handler.cs` using `ICommand<T>`/`IQuery<T>` (MediatR). Ports in `Common/Ports/`. Behaviors: logging, FluentValidation.
 - `Khadra.Infrastructure` — `KhadraDbContext`, `Persistence/Configurations/<Context>/`, migrations, repositories, `UnitOfWork` (dispatches domain events after commit), BCrypt/JWT/opaque tokens, MailKit email, strongly-typed options.
 - `Khadra.WebAPI` — controllers under `/api/v1`, JWT bearer with security-stamp check, policies, rate limiting, ProblemDetails, OpenAPI.
@@ -60,7 +60,8 @@ Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.com
 
 - Never hand-edit an existing file under `Persistence/Migrations/`; add a new migration.
 - Never commit secrets. `appsettings.Local.json`, `.env*` and `.keys/` are gitignored; tracked `appsettings*.json` hold empty placeholders.
-- Never touch the Payments context (money movement, commission, refunds) without explicit owner approval.
+- Never touch the Payments context (money movement, commission, refunds) without explicit owner approval. It exists now; the rule did not lapse when it was built.
+- **Never register a payment provider that simulates success.** `UnconfiguredPaymentProvider` is the only implementation and it refuses everything. One that captured and confirmed would be indistinguishable, in every table and on every screen, from a real payment: bookings would read Confirmed, galleries would prepare cars, and nobody could tell which rentals had money behind them. It is the cash path pre-launch item 2 already forbids, in a different costume. There is deliberately no `Payments:Provider` value that does it; tests substitute `IPaymentProvider` at the handler boundary.
 - Never `git push` without explicit owner approval; never force-push; never `dotnet ef database drop` or `docker compose down -v`.
 - Never bypass the soft-delete query filter without an explicit, commented reason.
 
