@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The city, as a SEAMLESS 720px tile laid across the whole page.
+
+  Tiled rather than placed. The first attempt drew one town centred in the window;
+  on a 1920px screen that left a circular cluster in the middle with empty bands
+  either side, and the parks read as stains poking out from behind the card. A
+  district that repeats covers the page evenly at any width, which is what a map
+  used as a BACKGROUND has to do.
+
+  What is deliberately absent is as important as what is here. An earlier version
+  had corner-to-corner boulevards and a river; both tiled, and both looked it - the
+  boulevards repeated into an obvious X lattice and the river into a regular wave.
+  A street grid is the one thing that can repeat without being noticed, because a
+  real one does. Blocks and parks carry the variation instead, spread across the
+  whole tile so no corner is emptier than another.
+
+  Everything tiles exactly: avenues sit on the tile edges, drawn at both 0 and 720
+  so neighbours agree, and every block and park sits wholly inside. 720 is a
+  multiple of the 120 grid tile underneath, so the two layers stay in register
+  rather than drifting against each other.
+
+  Abstract on purpose: no coordinate labels. A figure printed on a screen is read
+  as a fact, and the reference artwork's degrees name nowhere near Jordan.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 720" width="720" height="720">
+  <defs>
+    <style>
+      .avenue { fill: none; stroke: #c3e5d3; stroke-width: 2.2; }
+      .street { fill: none; stroke: #d3ece0; stroke-width: 1.4; }
+      .block  { fill: #e3f2ea; }
+      /* Kept pale and SMALL. At full size these were reading as green clouds
+         rather than parks, which is what made the page look unfinished. */
+      .park   { fill: #dcf0e5; }
+    </style>
+  </defs>
+
+  <!-- Building blocks, inset within their street cells so the roads stay legible
+       around them. Sizes vary, because a city's do. -->
+  <g class="block">
+    <rect x="18"  y="150" width="72" height="48" rx="3" />
+    <rect x="150" y="30"  width="48" height="66" rx="3" />
+    <rect x="270" y="150" width="60" height="60" rx="3" />
+    <rect x="342" y="150" width="36" height="60" rx="3" />
+    <rect x="390" y="42"  width="66" height="42" rx="3" />
+    <rect x="510" y="18"  width="42" height="72" rx="3" />
+    <rect x="630" y="102" width="66" height="42" rx="3" />
+
+    <rect x="30"  y="282" width="60" height="54" rx="3" />
+    <rect x="150" y="270" width="72" height="36" rx="3" />
+    <rect x="270" y="318" width="42" height="42" rx="3" />
+    <rect x="402" y="270" width="54" height="60" rx="3" />
+    <rect x="522" y="288" width="66" height="48" rx="3" />
+    <rect x="642" y="270" width="48" height="66" rx="3" />
+
+    <rect x="18"  y="426" width="54" height="60" rx="3" />
+    <rect x="138" y="450" width="60" height="42" rx="3" />
+    <rect x="282" y="438" width="66" height="54" rx="3" />
+    <rect x="390" y="510" width="48" height="48" rx="3" />
+    <rect x="534" y="426" width="42" height="60" rx="3" />
+    <rect x="618" y="462" width="72" height="42" rx="3" />
+
+    <rect x="42"  y="594" width="66" height="48" rx="3" />
+    <rect x="186" y="606" width="42" height="54" rx="3" />
+    <rect x="306" y="582" width="54" height="42" rx="3" />
+    <rect x="426" y="618" width="60" height="48" rx="3" />
+    <rect x="558" y="606" width="48" height="54" rx="3" />
+  </g>
+
+  <!-- Parks, sitting inside street cells like the blocks do, so they read as
+       places rather than smudges.
+
+       No circles. Round shapes among rectangles caught the eye, and because the
+       tile repeats, that put a regular row of dots across the window and gave the
+       seam away. Everything here is a block, softened by its corner radius. -->
+  <g class="park">
+    <rect x="138" y="138" width="84" height="60" rx="10" />
+    <rect x="588" y="156" width="54" height="48" rx="12" />
+    <path d="M414 402 q46 -10 62 24 q14 34 -14 56 q-30 22 -60 4 q-26 -16 -20 -46 q6 -28 32 -38 z" />
+    <rect x="252" y="606" width="60" height="48" rx="9" />
+    <rect x="66"  y="522" width="48" height="48" rx="11" />
+    <rect x="618" y="558" width="66" height="42" rx="9" />
+  </g>
+
+  <!-- Secondary streets, on the 120 grid so they sit over the fine layer exactly. -->
+  <g class="street">
+    <path d="M0 120.5H720 M0 240.5H720 M0 480.5H720 M0 600.5H720" />
+    <path d="M120.5 0V720 M240.5 0V720 M480.5 0V720 M600.5 0V720" />
+  </g>
+
+  <!-- Avenues: the tile edges, drawn at both ends so the seam disappears, and the
+       two centre lines. -->
+  <g class="avenue">
+    <path d="M0 .5H720 M0 719.5H720 M.5 0V720 M719.5 0V720" />
+    <path d="M0 360.5H720 M360.5 0V720" />
+  </g>
+</svg>

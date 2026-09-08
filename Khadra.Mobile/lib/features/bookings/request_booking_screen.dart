@@ -67,7 +67,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
           title: l10n.searchChooseDates,
           body: l10n.searchDatesHelp,
           action: OutlinedButton(
-            onPressed: () => context.pop(),
+            onPressed: () => khadraLeave(context, Routes.search),
             child: Text(l10n.actionBack),
           ),
         ),
@@ -184,8 +184,14 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
           // The gallery must offer delivery AND this car must be eligible for it.
           // Both halves come from the server; offering the option without them
           // would produce a quote the API refuses.
-          deliveryOffered:
-              vehicle.gallery.delivery.isEnabled && vehicle.isDeliveryEligible,
+          //
+          // They are passed SEPARATELY rather than pre-combined, because when
+          // delivery is unavailable the customer is told why, and the two reasons
+          // are not the same sentence. A car listed while the office had delivery
+          // switched off stays ineligible after the office switches it on, and
+          // saying "this office does not deliver" then is simply untrue.
+          galleryDelivers: vehicle.gallery.delivery.isEnabled,
+          carIsDeliveryEligible: vehicle.isDeliveryEligible,
           deliveryFee: vehicle.gallery.delivery.fee,
           formats: formats,
           onChanged: (method) => setState(() {
@@ -306,7 +312,11 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
       );
 
       if (!mounted) return;
-      context.go(Routes.booking(booking.bookingId));
+      // The LIST first, then the detail on top of it. Going straight to the detail
+      // replaced the whole stack and left the customer on a screen with no back
+      // button and no tabs — stranded on the booking they had just made.
+      context.go(Routes.bookings);
+      context.push(Routes.booking(booking.bookingId));
     } on ApiFailure catch (failure) {
       if (!mounted) return;
 
@@ -377,14 +387,18 @@ class _VehicleStrip extends StatelessWidget {
 class _PickupMethodChoice extends ConsumerWidget {
   const _PickupMethodChoice({
     required this.value,
-    required this.deliveryOffered,
+    required this.galleryDelivers,
+    required this.carIsDeliveryEligible,
     required this.deliveryFee,
     required this.formats,
     required this.onChanged,
   });
 
   final String value;
-  final bool deliveryOffered;
+  final bool galleryDelivers;
+  final bool carIsDeliveryEligible;
+
+  bool get deliveryOffered => galleryDelivers && carIsDeliveryEligible;
   final Money? deliveryFee;
   final Formats formats;
   final ValueChanged<String> onChanged;
@@ -451,7 +465,12 @@ class _PickupMethodChoice extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.only(top: Space.xs),
               child: Text(
-                l10n.galleryDeliveryNotOffered,
+                // Which of the two reasons it is. An office that does deliver,
+                // holding one car it does not deliver, must not be described as
+                // an office that does not deliver.
+                galleryDelivers
+                    ? l10n.bookDeliveryNotForThisCar
+                    : l10n.galleryDeliveryNotOffered,
                 style: const TextStyle(
                     color: KhadraColors.neutral500, fontSize: 12),
               ),

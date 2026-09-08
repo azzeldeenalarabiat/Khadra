@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The street grid behind the sign-in card: a SEAMLESS 120px tile, repeated.
+
+  Tiled rather than scaled, which is the whole point. A single large map stretched
+  with `background-size: cover` grows with the window, so on a wide monitor its
+  linework became giant arcs and its edges ended mid-screen. A tile holds the same
+  hairline weight at any size, the way map paper does.
+
+  Two weights, both of which tile exactly: a fine street every 24, and a heavier
+  one on the tile boundary itself, which repeats as an avenue every 120.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- Fine streets. Offset by .5 so a 1px stroke lands on the pixel, not across it. -->
+  <path fill="none" stroke="#dceee4" stroke-width="1"
+        d="M0 24.5H120 M0 48.5H120 M0 72.5H120 M0 96.5H120
+           M24.5 0V120 M48.5 0V120 M72.5 0V120 M96.5 0V120" />
+  <!-- The avenue on the tile edge. Drawn at both 0 and 120 so neighbouring tiles
+       agree and the seam disappears. -->
+  <path fill="none" stroke="#c8e6d5" stroke-width="1.2"
+        d="M0 .5H120 M0 119.5H120 M.5 0V120 M119.5 0V120" />
+</svg>

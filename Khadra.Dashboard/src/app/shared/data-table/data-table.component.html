@@ -33,7 +33,7 @@
                   </div>
                 }
                 @case ('money') {
-                  <span class="num">{{ cell.currency }} {{ cell.amount | number }}</span>
+                  <span class="num">{{ money(cell) }}</span>
                 }
                 @case ('badge') {
                   <span class="pill" [class]="toneClass(cell.tone)">{{ cell.value }}</span>

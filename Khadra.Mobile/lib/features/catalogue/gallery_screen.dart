@@ -35,7 +35,10 @@ class GalleryScreen extends ConsumerWidget {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.galleryTitle)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.search),
+        title: Text(l10n.galleryTitle),
+      ),
       body: switch (gallery) {
         AsyncLoading() => const KhadraLoading(),
         AsyncError(:final error) => KhadraError(

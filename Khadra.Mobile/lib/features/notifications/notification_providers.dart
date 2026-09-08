@@ -23,7 +23,13 @@ final unreadNotificationCountProvider = StreamProvider<int>((ref) async* {
 
   final api = ref.watch(apiProvider);
 
-  while (true) {
+  // Set when this provider is torn down. Without it a poll parked on its minute
+  // would wake up after a sign-out and fire one last request carrying no token --
+  // refused by the server, and read by the interceptor as an expired session.
+  var disposed = false;
+  ref.onDispose(() => disposed = true);
+
+  while (!disposed) {
     try {
       yield await api.unreadNotificationCount();
     } on Object {

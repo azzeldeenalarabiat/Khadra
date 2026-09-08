@@ -1178,16 +1178,79 @@
    .input, .banner and .btn. Nothing new is invented, so the front door reads as
    the same product as the console behind it. */
 .auth-shell {
+  position: relative;
   min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: var(--space-4);
   background: var(--color-bg);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* The map ornament, behind the card and nothing else.
+   A pseudo-element rather than an <img>, so it stays out of the accessibility
+   tree and out of the tab order entirely: it says nothing, so it should not be
+   announced.
+
+   TWO layers, and neither is scaled to the window:
+
+   - the city, drawn once at its own 980px and centred, so the ring roads are the
+     size they were drawn at on any monitor;
+   - the street grid, a 120px tile repeated, so its lines stay hairline-fine
+     whether the window is 1280 or 3440 wide.
+
+   The previous version stretched one 1200px drawing with `cover`. On a wide
+   screen that magnified it to 1920px and more: the streets became broad bands,
+   the ring became an arc sweeping off-screen, and the grid ended on a straight
+   edge halfway across. Fixed sizes are what keep it looking drawn rather than
+   zoomed. */
+.auth-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* 480 and 80 keep the 6:1 ratio the two files are drawn to, so the district's
+     streets land exactly on the grid's rather than drifting a pixel at a time
+     across the page. Drawn at 720/120 they were legible but LOUD: a city block
+     came out 72px wide and read as an abstract rounded rectangle. Two thirds of
+     that is the size at which they stop being shapes and start being blocks. */
+  background:
+    url('/auth-district.svg') center center / 480px 480px repeat,
+    url('/auth-grid.svg') center center / 80px 80px repeat;
+  opacity: 0.9;
+  /* Fades out before the viewport edge, so the texture ends by choice rather than
+     by being cut off at the window border. */
+  -webkit-mask-image: radial-gradient(ellipse 80% 95% at 50% 50%, #000 52%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 95% at 50% 50%, #000 52%, transparent 100%);
+}
+
+/* A calm halo under the card.
+   Quieting the map right where the form sits, rather than masking the map away
+   there: the texture still reads as continuous behind the card, but the couple of
+   hundred pixels around the inputs stop competing with them. */
+.auth-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 560px 440px at 50% 50%,
+    rgb(246 247 247 / 93%),
+    rgb(246 247 247 / 0%) 72%
+  );
 }
 
 .auth-card {
+  position: relative;
   width: min(400px, 100%);
   padding: 26px;
+  /* The card has to stay legible over the linework, so it stops being flat
+     white on near-white and earns an edge. */
+  box-shadow:
+    0 1px 2px rgb(11 63 31 / 6%),
+    0 12px 32px -12px rgb(11 63 31 / 18%);
 }
 
 .auth-head {

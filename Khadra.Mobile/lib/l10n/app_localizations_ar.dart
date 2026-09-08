@@ -194,6 +194,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authChangePasswordDone => 'تم تغيير كلمة المرور.';
 
   @override
+  String get authChangePasswordSignsOutOthers =>
+      'تغيير كلمة المرور يسجّل خروجك من بقية الأجهزة';
+
+  @override
+  String get authChangePasswordSignsOutOthersBody =>
+      'كل هاتف أو حاسوب آخر مسجَّل الدخول بهذا الحساب سيحتاج إلى تسجيل الدخول من جديد. أما هذا الجهاز فيبقى مسجَّلاً.';
+
+  @override
   String get authAlreadyHaveAccount => 'لديك حساب بالفعل؟';
 
   @override
@@ -496,6 +504,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get galleryDeliveryNotOffered =>
       'هذا المكتب لا يوصّل. تستلم السيارة منهم.';
+
+  @override
+  String get bookDeliveryNotForThisCar =>
+      'هذه السيارة غير متاحة للتوصيل. تستلمها من المكتب.';
 
   @override
   String get galleryCars => 'سياراتهم';
@@ -1117,6 +1129,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get documentsMissing => 'لا يزال مطلوباً';
+
+  @override
+  String get documentsBadgeComplete => 'مكتملة';
+
+  @override
+  String get documentsBadgeMissing => 'ناقصة';
 
   @override
   String get documentsComplete => 'لديك كل ما تحتاجه للحجز.';

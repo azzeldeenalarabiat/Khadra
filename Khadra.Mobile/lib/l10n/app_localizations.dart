@@ -452,6 +452,18 @@ abstract class AppLocalizations {
   /// **'Your password has been changed.'**
   String get authChangePasswordDone;
 
+  /// No description provided for @authChangePasswordSignsOutOthers.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing your password signs you out everywhere else'**
+  String get authChangePasswordSignsOutOthers;
+
+  /// No description provided for @authChangePasswordSignsOutOthersBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every other phone or computer signed in to this account will have to sign in again. This one stays signed in.'**
+  String get authChangePasswordSignsOutOthersBody;
+
   /// No description provided for @authAlreadyHaveAccount.
   ///
   /// In en, this message translates to:
@@ -943,6 +955,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This office does not deliver. You collect the car from them.'**
   String get galleryDeliveryNotOffered;
+
+  /// No description provided for @bookDeliveryNotForThisCar.
+  ///
+  /// In en, this message translates to:
+  /// **'This car is not offered for delivery. You collect it from the office.'**
+  String get bookDeliveryNotForThisCar;
 
   /// No description provided for @galleryCars.
   ///
@@ -1987,6 +2005,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Still needed'**
   String get documentsMissing;
+
+  /// No description provided for @documentsBadgeComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get documentsBadgeComplete;
+
+  /// No description provided for @documentsBadgeMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Needed'**
+  String get documentsBadgeMissing;
 
   /// No description provided for @documentsComplete.
   ///

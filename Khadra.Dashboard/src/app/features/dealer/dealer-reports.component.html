@@ -58,14 +58,14 @@
       <div class="stat-card">
         <span class="k">{{ t('dealerReports.rentalRevenue') }}</span>
         <span class="stat-v num"
-          >{{ r.revenue.amount }} <small>{{ r.revenue.currency }}</small></span
+          >{{ r.revenue | money: 'amount' }} <small>{{ r.revenue.currency }}</small></span
         >
         <span class="page-sub">{{ t('dealerReports.rentalTotalsOfThose') }}</span>
       </div>
       <div class="stat-card">
         <span class="k">{{ t('dealerReports.platformCommission') }}</span>
         <span class="stat-v num"
-          >−{{ r.commission.amount }} <small>{{ r.commission.currency }}</small></span
+          >−{{ r.commission | money: 'amount' }} <small>{{ r.commission.currency }}</small></span
         >
         <span class="page-sub">{{ t('dealerReports.atEachBookingsFrozen') }}</span>
       </div>
@@ -103,16 +103,16 @@
           <span class="k">{{ t('dealerReports.moneyInThisPeriod') }}</span>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.rentalRevenue') }}</span
-            ><span class="num">{{ r.revenue.amount }} {{ r.revenue.currency }}</span>
+            ><span class="num">{{ r.revenue | money }} </span>
           </div>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.platformCommission') }}</span
-            ><span class="num">−{{ r.commission.amount }} {{ r.commission.currency }}</span>
+            ><span class="num">−{{ r.commission | money }} </span>
           </div>
           <div class="money-line is-hi">
             <span class="k-label">{{ t('dealerReports.revenueAfterCommission') }}</span
             ><span class="num"
-              >{{ r.netAfterCommission.amount }} {{ r.netAfterCommission.currency }}</span
+              >{{ r.netAfterCommission | money }} </span
             >
           </div>
           <div class="money-line is-dim">
@@ -131,7 +131,7 @@
           </div>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.rentalValueInProgress') }}</span
-            ><span class="num">{{ r.inProgress.amount }} {{ r.inProgress.currency }}</span>
+            ><span class="num">{{ r.inProgress | money }} </span>
           </div>
           <div class="page-sub">{{ t('dealerReports.countedAsRevenueOnce') }}</div>
         </section>

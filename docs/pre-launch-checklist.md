@@ -1642,3 +1642,48 @@ constant.
 
 **To close:** a push transport (FCM/APNs), a device-token registration endpoint, and a decision about
 which `NotificationKind`s justify waking a phone.
+
+## Full-lifecycle test (2026-09-08)
+
+Raised while driving the whole platform end to end through the real screens: register an office,
+verify by email, submit the gallery, approve it as an administrator, publish a car, book it as a
+customer, approve the booking as the dealer. Both items below are deliberately NOT blockers; the
+owner has seen each and said so.
+
+### 74. The admin console is unusable below roughly 500px wide
+
+**Status:** open, accepted · **Raised:** 2026-09-08 · **Not a blocker:** owner's decision, 2026-09-08
+
+On the dealer-application screen at a 491px viewport the heading wraps one word per line, the
+subtitle breaks a character at a time, and the review-SLA badge overlaps the status chip and the
+breadcrumb. The sidebar is a fixed width, so almost nothing is left for content.
+
+Measured at 1440×900 the same screen has no horizontal overflow at all and no element whose
+scrollWidth exceeds its clientWidth: this is narrow-viewport only, not a desktop defect. Admins and
+dealer staff are expected to work at a desk, which is why the owner has accepted it as it stands.
+
+Recorded rather than fixed because the fix is a responsive pass over the console shell - a
+collapsing sidebar and a breakpoint for the detail headers - which is design work, not a bug fix,
+and it would be done to a brief rather than guessed at.
+
+**To close, if it is ever wanted:** a breakpoint below which the sidebar collapses to icons or a
+drawer, and header blocks that stack instead of competing for one row.
+
+### 75. Switching on delivery does not offer it for cars already listed
+
+**Status:** open, future enhancement · **Raised:** 2026-09-08 · **Not needed now:** owner's decision, 2026-09-08
+
+A vehicle carries its own `IsDeliveryEligible`, and the wizard sets it from whether the dealership
+offers delivery AT THE MOMENT THE CAR IS SAVED. A gallery that lists cars first and turns delivery
+on afterwards therefore has a fleet that is all pickup-only, with nothing on screen connecting the
+two facts. It was hit in testing within minutes of enabling delivery.
+
+The per-car flag is right and should stay: an office with one van it will not drive across Amman
+needs to say so. What is missing is the bulk action, and the prompt that offers it.
+
+The customer app no longer misreports this. It used to say "this office does not deliver" for both
+causes; it now distinguishes a gallery that does not deliver from a car that is not offered for
+delivery, so the screen is at least honest about which it is.
+
+**To close:** an "offer delivery on my existing cars" action on the Delivery page, and a prompt
+when delivery is switched on for a dealership whose published cars are all ineligible.

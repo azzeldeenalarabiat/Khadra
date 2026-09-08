@@ -9,6 +9,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { BookingDecisions } from './booking-decisions';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
@@ -26,6 +27,18 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class DealerBookingsComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly formats = inject(FormatService);
+
+  /**
+   * The row's total, at the currency's own scale.
+   *
+   * The template used to interpolate the two fields raw, which printed a 110.000 JOD booking as
+   * "JOD 110" while the customer app showed "JOD 110.000" for the same booking. Money is
+   * formatted in one place for exactly this reason.
+   */
+  protected rowTotal(booking: BookingListItem): string {
+    return this.formats.money(booking.totalPrice, booking.currency);
+  }
   private readonly service = inject(DealerBookingsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);

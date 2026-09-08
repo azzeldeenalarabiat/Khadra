@@ -16,6 +16,7 @@ import { SessionService } from '../../core/services/session.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MoneyPipe } from '../../shared/money.pipe';
 
 /**
  * A dispute from the dealer's side (spec 3.3).
@@ -28,7 +29,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
   selector: 'kh-dealer-dispute',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dealer-dispute.component.html',
-  imports: [RouterLink, IconComponent],
+  imports: [RouterLink, IconComponent, MoneyPipe],
 })
 export class DealerDisputeComponent {
   protected readonly t = inject(I18nService).t;

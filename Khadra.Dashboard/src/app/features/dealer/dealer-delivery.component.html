@@ -154,7 +154,7 @@
         <section class="sect sect-pad stack stack-9">
           <span class="k">{{ t('dealerDelivery.yourDeliveryFee') }}</span>
           @if (s.fee; as fee) {
-            <div class="stat-v num">{{ fee.amount }} {{ fee.currency }}</div>
+            <div class="stat-v num">{{ money(fee) }}</div>
           } @else {
             <div class="stat-v num">—</div>
           }

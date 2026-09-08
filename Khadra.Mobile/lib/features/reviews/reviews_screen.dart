@@ -6,6 +6,7 @@ import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/format/formats.dart';
 import '../../core/providers.dart';
+import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -33,7 +34,10 @@ class ReviewsScreen extends ConsumerWidget {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.reviewsTitle)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.search),
+        title: Text(l10n.reviewsTitle),
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(galleryReviewsProvider(dealerId).future),
         child: switch (reviews) {

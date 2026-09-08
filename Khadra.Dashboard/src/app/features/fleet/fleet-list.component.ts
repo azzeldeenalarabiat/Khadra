@@ -11,6 +11,7 @@ import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MoneyPipe } from '../../shared/money.pipe';
 
 type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
 
@@ -29,7 +30,7 @@ type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
   selector: 'kh-fleet-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './fleet-list.component.html',
-  imports: [RouterLink, IconComponent, ImageFallbackDirective],
+  imports: [RouterLink, IconComponent, ImageFallbackDirective, MoneyPipe],
 })
 export class FleetListComponent {
   protected readonly t = inject(I18nService).t;

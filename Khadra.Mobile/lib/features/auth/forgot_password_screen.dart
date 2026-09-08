@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/providers.dart';
+import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -78,7 +78,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           KhadraNotice(title: l10n.authResetSent, tone: NoticeTone.accent),
           const SizedBox(height: Space.lg),
           OutlinedButton(
-            onPressed: () => context.pop(),
+            onPressed: () => khadraLeave(context, Routes.signIn),
             child: Text(l10n.actionBack),
           ),
         ] else ...[

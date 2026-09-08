@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/providers.dart';
+import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -61,7 +61,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
       if (!mounted) return;
       showKhadraMessage(context, l10n.authChangePasswordDone);
-      context.pop();
+      khadraLeave(context, Routes.profile);
     } on ApiFailure catch (failure) {
       if (!mounted) return;
       setState(() {
@@ -110,9 +110,13 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               ],
             ),
           ),
+          // Said before the tap, not discovered after it. Changing a password
+          // rotates the security stamp, which revokes every OTHER family on the
+          // account; this device survives only because the endpoint hands back a
+          // fresh pair and the app adopts it.
           KhadraNotice(
-            title: l10n.profileSignOutEverywhereConfirm,
-            body: l10n.profileSessions,
+            title: l10n.authChangePasswordSignsOutOthers,
+            body: l10n.authChangePasswordSignsOutOthersBody,
             tone: NoticeTone.neutral,
             icon: Icons.devices_outlined,
           ),

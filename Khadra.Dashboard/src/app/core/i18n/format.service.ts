@@ -35,6 +35,23 @@ export class FormatService {
    */
   private timeZone: string | undefined = undefined;
 
+  /**
+   * How many decimal places this platform's currency is held at, once the server has said.
+   *
+   * Undefined until then, and undefined means "print it at whatever scale it arrived at" -- the
+   * behaviour the console had before it asked. Never defaulted to 3: a hard-coded scale would be
+   * this console asserting something about a currency it was not told about.
+   */
+  private currencyMinorUnits: number | undefined = undefined;
+
+  /** Set once, from `/api/v1/app-config`. See PlatformConfigService. */
+  useCurrencyMinorUnits(units: number | undefined): void {
+    this.currencyMinorUnits =
+      typeof units === 'number' && Number.isInteger(units) && units >= 0 && units <= 4
+        ? units
+        : undefined;
+  }
+
   /** Set once, when the server tells the console which zone its reporting day runs on. */
   useTimeZone(zone: string | undefined): void {
     this.timeZone = zone;
@@ -145,9 +162,14 @@ export class FormatService {
    */
   money(amount: number | null | undefined, currency: string | null | undefined): string {
     if (amount === null || amount === undefined || !Number.isFinite(amount)) return '—';
-    const formatted = new Intl.NumberFormat(this.locale(), { maximumFractionDigits: 3 }).format(
-      amount,
-    );
+    // Padded to the currency's own scale, so a 110.000 JOD booking does not print as "110"
+    // here while the customer app shows "JOD 110.000" for the same figure at the same moment.
+    // The dinar is divided into a thousand fils; the scale comes from the server, not a guess.
+    const minorUnits = this.currencyMinorUnits;
+    const formatted = new Intl.NumberFormat(this.locale(), {
+      minimumFractionDigits: minorUnits ?? 0,
+      maximumFractionDigits: minorUnits ?? 3,
+    }).format(amount);
     return this.isolate(currency ? `${formatted} ${currency}` : formatted);
   }
 

@@ -7,6 +7,7 @@ import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/format/formats.dart';
 import '../../core/providers.dart';
+import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -30,7 +31,10 @@ class DisputeScreen extends ConsumerWidget {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.disputeViewTitle)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.bookings),
+        title: Text(l10n.disputeViewTitle),
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(disputeProvider(ticketId).future),
         child: switch (dispute) {
@@ -95,16 +99,18 @@ class _BodyState extends ConsumerState<_Body> {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      // The DIALOG's context. See the same note in ProfileScreen._signOut:
+      // popping with the screen's context dismisses the SCREEN, not the dialog.
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.disputeWithdraw),
         content: Text(l10n.disputeWithdrawConfirm),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: Text(l10n.actionCancel),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(l10n.disputeWithdraw),
           ),
         ],

@@ -41,7 +41,18 @@ abstract final class AppEnvironment {
   /// `10.0.2.2` is the host as seen from inside the Android emulator; `localhost`
   /// there is the emulated device itself, which is not running an API.
   static String get _developmentDefault {
-    if (kIsWeb) return 'http://localhost:5012';
+    if (kIsWeb) {
+      // The API is on port 5012 of whichever machine served this page. DERIVED
+      // rather than fixed, because the same development build is opened two ways:
+      // from `localhost` on the machine itself, and from that machine's address
+      // on the Wi-Fi when the app is being tried on a real phone. Hard-coding
+      // `localhost` sent the phone's requests to the phone.
+      //
+      // It also survives the DHCP lease moving, which a compiled-in address does
+      // not — and a rebuild is a poor way to find out your IP changed.
+      final host = Uri.base.host;
+      return 'http://${host.isEmpty ? 'localhost' : host}:5012';
+    }
     return defaultTargetPlatform == TargetPlatform.android
         ? 'http://10.0.2.2:5012'
         : 'http://localhost:5012';

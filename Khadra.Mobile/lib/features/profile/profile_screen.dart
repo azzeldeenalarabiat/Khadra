@@ -163,17 +163,24 @@ class ProfileScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      // The DIALOG's context, not the screen's.
+      //
+      // `showDialog` pushes onto the root navigator, but `Navigator.of` walks up
+      // from whatever context it is given -- and from a screen inside the tab
+      // shell that finds the SHELL's navigator, not the root. Popping that one
+      // tears the profile page off its branch instead of dismissing the dialog,
+      // leaving the shell with an empty stack and the app with a blank screen.
+      builder: (dialogContext) => AlertDialog(
         title: Text(allDevices
             ? l10n.profileSignOutEverywhereConfirm
             : l10n.profileSignOutConfirm),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
             child: Text(l10n.actionCancel),
           ),
           FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
             child: Text(l10n.authSignOut),
           ),
         ],
@@ -280,8 +287,8 @@ class _DocumentsRow extends ConsumerWidget {
           ? null
           : KhadraBadge(
               label: documents.isComplete
-                  ? l10n.documentsComplete
-                  : l10n.documentsMissing,
+                  ? l10n.documentsBadgeComplete
+                  : l10n.documentsBadgeMissing,
               colour: documents.isComplete
                   ? KhadraColors.accent
                   : KhadraColors.warn,
@@ -362,7 +369,11 @@ class _Group extends StatelessWidget {
               ),
             ),
           ),
-          Container(
+          // A Material, not a Container. A ColoredBox here paints over the
+          // Scaffold canvas that the tiles ink onto, so every row in the group
+          // would swallow its own ripple -- and a tap with no feedback reads as a
+          // tap that did not land.
+          Material(
             color: KhadraColors.surface,
             child: Column(children: children),
           ),
@@ -387,15 +398,21 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) => ListTile(
         leading: Icon(icon, color: KhadraColors.neutral600),
         title: Text(label, style: const TextStyle(fontSize: 15)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (trailing != null) ...[
-              trailing!,
-              const SizedBox(width: Space.sm),
+        // Bounded on purpose. A ListTile gives its trailing widget as much width
+        // as it asks for, so an unbounded one crushes the title -- which is how
+        // "My documents" ended up rendering one character per line.
+        trailing: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 150),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (trailing != null) ...[
+                Flexible(child: trailing!),
+                const SizedBox(width: Space.sm),
+              ],
+              const Icon(Icons.chevron_right, color: KhadraColors.neutral400),
             ],
-            const Icon(Icons.chevron_right, color: KhadraColors.neutral400),
-          ],
+          ),
         ),
         onTap: onTap,
       );

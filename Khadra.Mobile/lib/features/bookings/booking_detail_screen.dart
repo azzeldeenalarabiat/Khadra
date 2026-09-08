@@ -68,7 +68,10 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.bookingsTitle)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.bookings),
+        title: Text(l10n.bookingsTitle),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           invalidateBookings(ref, bookingId: widget.bookingId);

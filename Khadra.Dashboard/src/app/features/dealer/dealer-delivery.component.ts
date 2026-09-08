@@ -10,6 +10,7 @@ import { DealerConsoleService } from '../../core/services/dealer-console.service
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
@@ -30,6 +31,12 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class DealerDeliveryComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly formats = inject(FormatService);
+
+  /** The fee at the dinar's own three decimals, not "9.5". */
+  protected money(value: { amount: number; currency: string }): string {
+    return this.formats.money(value.amount, value.currency);
+  }
   private readonly service = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
 

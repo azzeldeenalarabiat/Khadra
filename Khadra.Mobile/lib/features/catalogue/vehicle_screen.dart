@@ -88,9 +88,9 @@ class _VehicleScaffold extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
         child: Column(
           children: [
-            Align(
+            const Align(
               alignment: AlignmentDirectional.centerStart,
-              child: BackButton(onPressed: () => Navigator.of(context).maybePop()),
+              child: KhadraBack(fallback: Routes.search),
             ),
             Expanded(child: child),
           ],
@@ -116,6 +116,7 @@ class _VehicleBody extends ConsumerWidget {
           expandedHeight: 260,
           pinned: true,
           backgroundColor: KhadraColors.surface,
+          leading: const KhadraBack(fallback: Routes.search),
           flexibleSpace: FlexibleSpaceBar(
             background: _Photos(urls: vehicle.imageUrls),
           ),

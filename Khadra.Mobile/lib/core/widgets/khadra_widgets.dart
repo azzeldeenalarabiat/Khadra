@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../theme/khadra_theme.dart';
@@ -47,6 +48,43 @@ class KhadraWordmark extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Leaves the current screen, whether or not anything pushed it.
+///
+/// `context.pop()` on its own THROWS `GoError: There is nothing to pop` when the
+/// screen is the only page on the stack — which is not an edge case here. Every
+/// account screen is deep-linkable, and signing in on the way to one replaces the
+/// stack rather than adding to it: open `/profile/password` from a cold start,
+/// sign in, change the password, and the success path was the thing that crashed.
+///
+/// So: pop when there is something to pop, and otherwise go to [fallback].
+void khadraLeave(BuildContext context, String fallback) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go(fallback);
+  }
+}
+
+/// A back button that always leads somewhere.
+///
+/// Every screen here can be reached with an EMPTY stack — from a notification, a
+/// link in an email, or a flow that replaced the stack on its way in. `BackButton`
+/// renders nothing at all in that case, which leaves a customer on a pushed screen
+/// with no navigation and no tabs: on the web there is no way out but the browser's
+/// own back, and on a phone the gesture quits the app.
+class KhadraBack extends StatelessWidget {
+  const KhadraBack({super.key, required this.fallback});
+
+  final String fallback;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        icon: const BackButtonIcon(),
+        tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        onPressed: () => khadraLeave(context, fallback),
+      );
 }
 
 /// A network image with a placeholder that is never a broken-image glyph.
@@ -286,12 +324,16 @@ class KhadraBadge extends StatelessWidget {
               Icon(icon, size: 13, color: colour),
               const SizedBox(width: 4),
             ],
-            Text(
-              label,
-              style: TextStyle(
-                color: colour,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colour,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

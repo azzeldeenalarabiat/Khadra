@@ -17,6 +17,7 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MoneyPipe } from '../../shared/money.pipe';
 
 /** The four shapes spec 3.3 names, each one a preset split of the deposit the booking holds. */
 type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
@@ -35,7 +36,7 @@ type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
   selector: 'kh-dispute-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dispute-detail.component.html',
-  imports: [RouterLink, IconComponent, TimelineComponent],
+  imports: [RouterLink, IconComponent, TimelineComponent, MoneyPipe],
 })
 export class DisputeDetailComponent {
   protected readonly t = inject(I18nService).t;

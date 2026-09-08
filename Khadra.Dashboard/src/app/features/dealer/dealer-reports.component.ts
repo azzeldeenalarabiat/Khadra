@@ -5,6 +5,7 @@ import { DealerConsoleService } from '../../core/services/dealer-console.service
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MoneyPipe } from '../../shared/money.pipe';
 
 /**
  * Reports (spec 4.5, design `isReports`).
@@ -18,7 +19,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
   selector: 'kh-dealer-reports',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dealer-reports.component.html',
-  imports: [IconComponent, RouterLink],
+  imports: [IconComponent, RouterLink, MoneyPipe],
 })
 export class DealerReportsComponent {
   protected readonly t = inject(I18nService).t;

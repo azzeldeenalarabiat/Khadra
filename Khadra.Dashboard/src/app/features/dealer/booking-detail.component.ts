@@ -20,6 +20,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { BookingDecisions } from './booking-decisions';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MoneyPipe } from '../../shared/money.pipe';
 
 /**
  * One booking, from the dealer's side (design: Dealer Console, `isBooking`).
@@ -33,7 +34,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
   selector: 'kh-dealer-booking-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-detail.component.html',
-  imports: [RouterLink, IconComponent, TimelineComponent],
+  imports: [RouterLink, IconComponent, TimelineComponent, MoneyPipe],
 })
 export class DealerBookingDetailComponent {
   protected readonly t = inject(I18nService).t;

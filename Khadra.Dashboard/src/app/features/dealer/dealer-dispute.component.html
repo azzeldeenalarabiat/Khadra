@@ -58,30 +58,30 @@
         <div class="sect-pad stack stack-9">
           <div class="history-line">
             <span class="k-label">{{ t('common.depositHeld') }}</span
-            ><span class="num">{{ r.depositHeld.amount }} {{ r.depositHeld.currency }}</span>
+            ><span class="num">{{ r.depositHeld | money }} </span>
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('common.refundedToTheCustomer') }}</span
             ><span class="num"
-              >{{ r.refundToCustomer.amount }} {{ r.refundToCustomer.currency }}</span
+              >{{ r.refundToCustomer | money }} </span
             >
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('common.keptByThePlatform') }}</span
             ><span class="num"
-              >{{ r.retainedByPlatform.amount }} {{ r.retainedByPlatform.currency }}</span
+              >{{ r.retainedByPlatform | money }} </span
             >
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerDispute.transferredToYou') }}</span
             ><span class="num"
-              >{{ r.transferredToDealer.amount }} {{ r.transferredToDealer.currency }}</span
+              >{{ r.transferredToDealer | money }} </span
             >
           </div>
           @if (r.dealerCharge) {
             <div class="history-line s-bad">
               <span class="k-label">{{ t('dealerDispute.chargedToYou') }}</span
-              ><span class="num">{{ r.dealerCharge.amount }} {{ r.dealerCharge.currency }}</span>
+              ><span class="num">{{ r.dealerCharge | money }} </span>
             </div>
           }
           <div class="page-sub">“{{ r.note }}”</div>
