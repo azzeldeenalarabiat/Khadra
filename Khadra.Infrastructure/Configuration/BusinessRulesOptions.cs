@@ -76,11 +76,15 @@ public sealed class BusinessRulesOptions
     [Range(0, 3650)]
     public int? MaxRentalDays { get; init; }
 
-    // How long after the rental start the customer must wait before reporting non-delivery. Zero is
-    // a legitimate and the shipped value, so this is nullable for the same reason as the three above:
-    // a missing key must be an error rather than a silent default nobody chose.
-    [Range(0, 168)]
-    public int? NonDeliveryGraceHours { get; init; }
+    // How long after the rental start the customer must wait before reporting non-delivery. Settled
+    // by the owner at 15 MINUTES on 2026-09-08, which is why this is minutes and not the hours it
+    // shipped as: the decision could not be written in the old unit at all.
+    //
+    // Nullable for the same reason as the three above: a missing key must be an error rather than a
+    // silent default nobody chose. Zero stays legitimate -- it says a gallery is late at the agreed
+    // minute -- so absence has to be distinguishable from it, and the .Validate is what does that.
+    [Range(0, 10080)]
+    public int? NonDeliveryGraceMinutes { get; init; }
 
     // The oldest model year a dealer may list. This is a guard against a typo — "1200", "19" — not a
     // judgement about what is rentable: an older car in sound condition is an ordinary listing on

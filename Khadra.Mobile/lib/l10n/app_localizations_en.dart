@@ -922,7 +922,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nonDeliveryTooEarly =>
-      'The rental has not started yet, so there is nothing to report.';
+      'It is too soon to report this. Give the rental office the short grace period it is allowed after the agreed time.';
+
+  @override
+  String nonDeliveryNotYet(String from) {
+    return 'You can report this from $from, once the rental office has had the grace period it is allowed.';
+  }
 
   @override
   String get nonDeliveryReport => 'Report it';

@@ -183,6 +183,11 @@ public sealed class CreateBookingTests
         Assert.Equal(TimeSpan.FromHours(48), booking.Terms.AnswerWindow);
         Assert.Equal(TimeSpan.FromHours(24), booking.Terms.PaymentWindow);
         Assert.Equal(TimeSpan.FromHours(2), booking.Terms.TurnaroundBuffer);
+        // The owner's 15 MINUTES, in the unit it was decided in. This assertion is the guard on the
+        // unit itself: the value used to be configured in hours, and reading 15 through the old
+        // TimeSpan.FromHours would freeze a fifteen-HOUR grace onto every booking and quietly put
+        // the report out of reach for most of a day.
+        Assert.Equal(TimeSpan.FromMinutes(15), booking.Terms.NonDeliveryGrace);
         // And the DTO the customer receives carries the same figures.
         Assert.Equal(90m, result.Value.Pricing.RentalTotal.Amount);
         Assert.Equal("Requested", result.Value.Status);

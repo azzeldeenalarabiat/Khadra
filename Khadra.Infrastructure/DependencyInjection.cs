@@ -134,6 +134,12 @@ public static class DependencyInjection
                 "BusinessRules: MinimumBookingLeadTimeMinutes must be set to a positive number of minutes.")
             .Validate(options => options.MaxRentalDays is > 0,
                 "BusinessRules: MaxRentalDays must be set to a positive number of days.")
+            // Present, not positive: 0 is the owner's to choose and says a gallery is late at the
+            // agreed minute. Absence is the misconfiguration, and it had no check at all until
+            // 2026-09-08 -- the provider dereferences this with `!`, so a deleted key surfaced as a
+            // NullReferenceException on the first booking priced, not at startup.
+            .Validate(options => options.NonDeliveryGraceMinutes is not null,
+                "BusinessRules: NonDeliveryGraceMinutes must be set. Use 0 to allow an immediate report.")
             .ValidateOnStart();
     }
 

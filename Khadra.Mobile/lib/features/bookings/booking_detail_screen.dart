@@ -375,16 +375,34 @@ class _Actions extends ConsumerWidget {
       );
     }
 
-    // Spec 5.5. Reachable only on a Confirmed booking, which needs a cleared
-    // deposit -- so with Payments unbuilt this never appears in practice. It is
-    // wired because the rule is real, and gated on the server's own status so a
-    // customer is never shown a button that cannot work.
-    if (booking.status == 'Confirmed') {
+    // Spec 5.5. Gated on the SERVER's verdict, not on the status: the gallery gets
+    // a grace period after the agreed start before it can be called a no-show, that
+    // grace is frozen per booking, and only the server knows whether it has run out.
+    // Until it has, the screen says WHEN rather than offering a refusable button.
+    if (booking.canReportNonDelivery) {
       actions.add(
         OutlinedButton.icon(
           onPressed: () => _reportNonDelivery(context, ref),
           icon: const Icon(Icons.report_gmailerrorred_outlined, size: 18),
           label: Text(l10n.nonDeliveryTitle),
+        ),
+      );
+    } else if (booking.status == 'Confirmed') {
+      actions.add(
+        Tooltip(
+          // Falls back to the general sentence when the config has not arrived and
+          // there is no formatter yet: a tooltip without a time still says why the
+          // button is off, which is more than a bare disabled control does.
+          message: switch (ref.watch(formatsProvider)) {
+            final formats? =>
+              l10n.nonDeliveryNotYet(formats.dateTime(booking.nonDeliveryReportableFrom)),
+            null => l10n.nonDeliveryTooEarly,
+          },
+          child: OutlinedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.report_gmailerrorred_outlined, size: 18),
+            label: Text(l10n.nonDeliveryTitle),
+          ),
         ),
       );
     }

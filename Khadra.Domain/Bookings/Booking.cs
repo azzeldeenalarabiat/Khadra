@@ -432,6 +432,26 @@ public sealed class Booking : AggregateRoot
         return UnitResult.Success<Error>();
     }
 
+    /// <summary>
+    /// The instant from which the customer may report that the gallery never handed the car over:
+    /// the rental start plus the grace frozen on this booking.
+    /// </summary>
+    /// <remarks>
+    /// Exposed so a screen can say WHEN rather than offering a button the server refuses. A client
+    /// must not add the grace itself: the grace is frozen per booking, so two bookings made either
+    /// side of a settings change have different answers, and only the record knows which.
+    /// </remarks>
+    public DateTimeOffset NonDeliveryReportableFrom => Period.Start.Add(Terms.NonDeliveryGrace);
+
+    /// <summary>Whether the customer may report non-delivery right now.</summary>
+    /// <remarks>
+    /// The same three conditions <see cref="ReportDealerNonDelivery"/> enforces, minus the reason,
+    /// which the customer has not typed yet. Kept beside it so the button and the command cannot
+    /// drift: a screen that enables on this can never be refused for a reason it could have known.
+    /// </remarks>
+    public bool CanReportNonDelivery(DateTimeOffset now) =>
+        Status == BookingStatus.Confirmed && now >= NonDeliveryReportableFrom;
+
     // Spec 5.5: the dealer approved and then failed to hand the car over. The penalty is a RANGE
     // because the owner has not settled on a tier (spec 2.2); an Admin picks inside it on a ticket.
     public UnitResult<Error> ReportDealerNonDelivery(Id customerUserId, string reason, DateTimeOffset now)

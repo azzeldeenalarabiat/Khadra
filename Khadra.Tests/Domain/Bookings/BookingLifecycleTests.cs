@@ -455,8 +455,39 @@ public sealed class BookingCancellationTests
             "booking.non_delivery_too_early",
             booking.ReportDealerNonDelivery(Id.New(), "They never came.", start.AddSeconds(-1)).Error.Code);
 
-        // The shipped grace is zero, so the instant the rental was due is soon enough.
+        // This booking froze a zero grace (the factory's default), so the instant the rental was due
+        // is soon enough FOR IT. The shipped configuration is 15 minutes; what the aggregate honours
+        // is the figure on the record, which is the point of the test below.
         Assert.True(booking.ReportDealerNonDelivery(Id.New(), "They never came.", start).IsSuccess);
+    }
+
+    /// <summary>
+    /// The flag a screen enables its button from answers the same question the command does.
+    /// </summary>
+    /// <remarks>
+    /// They are separate methods, so they can drift, and a drift is invisible until a customer taps a
+    /// button and is refused. This pins them together at the two instants either side of the grace.
+    /// </remarks>
+    [Fact]
+    public void Can_report_non_delivery_agrees_with_the_command_it_gates()
+    {
+        var grace = TimeSpan.FromMinutes(15);
+        var booking = Build.ConfirmedBooking(terms: Build.Terms(nonDeliveryGrace: grace));
+        var from = booking.Period.Start.Add(grace);
+
+        Assert.Equal(from, booking.NonDeliveryReportableFrom);
+        Assert.False(booking.CanReportNonDelivery(from.AddTicks(-1)));
+        Assert.True(booking.CanReportNonDelivery(from));
+
+        // And an unpaid booking is refused by both, for the same reason.
+        var unpaid = Build.ApprovedBooking();
+        Assert.False(unpaid.CanReportNonDelivery(unpaid.Period.Start.AddDays(1)));
+
+        // The command agrees at each instant the flag does.
+        Assert.Equal(
+            "booking.non_delivery_too_early",
+            booking.ReportDealerNonDelivery(Id.New(), "They never came.", from.AddTicks(-1)).Error.Code);
+        Assert.True(booking.ReportDealerNonDelivery(Id.New(), "They never came.", from).IsSuccess);
     }
 
     /// <summary>The grace is FROZEN, so lengthening it tomorrow cannot un-report today's claim.</summary>

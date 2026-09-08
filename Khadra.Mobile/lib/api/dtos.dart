@@ -1123,6 +1123,8 @@ class Booking {
     required this.isAwaitingPayment,
     required this.cancellation,
     required this.liveDisputeId,
+    required this.canReportNonDelivery,
+    required this.nonDeliveryReportableFrom,
     required this.canBeReviewed,
     required this.myReviewId,
     required this.vehicle,
@@ -1167,6 +1169,13 @@ class Booking {
   final bool isAwaitingPayment;
   final CancellationPreview cancellation;
   final String? liveDisputeId;
+
+  /// Whether the gallery can be reported for never handing the car over, and the
+  /// instant that becomes true. Both come from the server: the grace is FROZEN on
+  /// each booking, so the app cannot add it to `periodStart` itself and be right
+  /// for a booking made before the owner last moved the number.
+  final bool canReportNonDelivery;
+  final DateTime nonDeliveryReportableFrom;
   final bool canBeReviewed;
   final String? myReviewId;
   final VehicleLabel? vehicle;
@@ -1210,6 +1219,10 @@ class Booking {
         cancellation: CancellationPreview.fromJson(
             json['cancellation'] as Map<String, dynamic>?),
         liveDisputeId: json['liveDisputeId'] as String?,
+        canReportNonDelivery: json['canReportNonDelivery'] as bool? ?? false,
+        nonDeliveryReportableFrom:
+            _dateTime(json['nonDeliveryReportableFrom']) ??
+                _requiredDateTime(json['periodStart']),
         canBeReviewed: json['canBeReviewed'] as bool? ?? false,
         myReviewId: json['myReviewId'] as String?,
         vehicle: VehicleLabel.maybe(json['vehicle']),

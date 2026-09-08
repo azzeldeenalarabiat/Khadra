@@ -43,7 +43,9 @@ failed, with 25–50% of the rental assessed against them. The gallery would the
 dispute to clear a claim made without them. `MarkNoShow`, which is the same accusation pointing the
 other way, has always been guarded by `Period.Start + NoShowTimeout`. It is now guarded by
 `Period.Start + BookingTerms.NonDeliveryGrace`, frozen onto the booking like every other rule.
-**The grace itself is an open owner decision** shipped at 0 hours — pre-launch item 68.
+**The grace itself was an open owner decision**, shipped at 0 hours and settled by the owner on
+2026-09-08 at **15 minutes** — pre-launch item 68, now closed. The setting moved from
+`NonDeliveryGraceHours` to `NonDeliveryGraceMinutes` because the decision cannot be written in hours.
 
 **A rejection reason was stored as English prose.** `BookingDecisionHandlers` composed
 `"The dates conflict with another booking: " + the dealer's note` into the status history. An
@@ -64,7 +66,7 @@ share `AssessCancellation`, so the figure on the confirmation sheet is the figur
 
 | Setting | Value | Where |
 |---|---|---|
-| `BusinessRules:NonDeliveryGraceHours` | 0 | Frozen onto each booking as `BookingTerms.NonDeliveryGrace`. **Owner decision open** — pre-launch item 68 |
+| `BusinessRules:NonDeliveryGraceMinutes` | 15 | Frozen onto each booking as `BookingTerms.NonDeliveryGrace`. Owner's decision, 2026-09-08 — pre-launch item 68, closed |
 | `Scheduling:SettlementIntervalSeconds` | 60 | How often the settlement service looks for work its own clocks already decided |
 
 ### Still open

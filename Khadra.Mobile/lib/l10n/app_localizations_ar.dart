@@ -928,7 +928,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get nonDeliveryDetails => 'ما الذي حدث';
 
   @override
-  String get nonDeliveryTooEarly => 'لم يبدأ الإيجار بعد، فلا شيء للإبلاغ عنه.';
+  String get nonDeliveryTooEarly =>
+      'الوقت مبكر على الإبلاغ. امنح مكتب التأجير مهلة السماح القصيرة المتاحة له بعد الموعد المتفق عليه.';
+
+  @override
+  String nonDeliveryNotYet(String from) {
+    return 'يمكنك الإبلاغ عن ذلك اعتباراً من $from، بعد انقضاء مهلة السماح المتاحة لمكتب التأجير.';
+  }
 
   @override
   String get nonDeliveryReport => 'أبلغ عن ذلك';

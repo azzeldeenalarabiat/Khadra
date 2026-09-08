@@ -1543,9 +1543,9 @@ The original report follows.
 
 ## Customer mobile app (2026-09-08)
 
-### 68. OPEN OWNER DECISION — how late is late enough to report non-delivery
+### 68. CLOSED — how late is late enough to report non-delivery
 
-**Status:** open · **Raised:** 2026-09-08 · **Shipped default:** 0 hours
+**Status:** closed · **Raised:** 2026-09-08 · **Settled:** 2026-09-08, owner, at **15 minutes**
 
 `Booking.ReportDealerNonDelivery` was unguarded until 2026-09-08: it checked only that the booking was
 Confirmed and the reason non-blank, so a customer could file it at any time after the deposit cleared —
@@ -1558,14 +1558,25 @@ dispute to clear a claim made without them. `MarkNoShow` — the mirror-image ac
 CUSTOMER never appeared — has always been guarded by `Period.Start + NoShowTimeout`.
 
 It is now guarded by `Period.Start + BookingTerms.NonDeliveryGrace`, frozen onto each booking like
-every other rule, and configured as `BusinessRules:NonDeliveryGraceHours`.
+every other rule, and configured as `BusinessRules:NonDeliveryGraceMinutes`.
 
-**The figure is the owner's, and 0 is a placeholder, not a decision.** Zero says a gallery that has
-not handed the car over at the agreed minute is already late, which is defensible and is why it ships;
-but the customer's mirror figure is 8 hours (`NoShowTimeoutHours`), and the asymmetry deserves the
-owner's attention rather than a developer's.
+**The owner settled it at 15 minutes on 2026-09-08.** The setting changed unit to carry the answer:
+it was `NonDeliveryGraceHours`, an `int`, and fifteen minutes is not expressible in it. The asymmetry
+with the gallery's mirror figure of 8 hours (`NoShowTimeoutHours`) is deliberate and the owner's — a
+customer standing at a counter knows within minutes that nobody is coming, while a gallery holding a
+car cannot tell a late renter from an absent one for hours.
 
-**To close:** ask the owner, set the number, record it in `docs/spec-amendments.md`.
+Three things closed with it:
+
+- `NonDeliveryGraceMinutes` had **no startup validation**, and the provider dereferences it with `!`.
+  A deleted key surfaced as a `NullReferenceException` on the first booking priced rather than at
+  startup, unlike the four sibling settings that are all checked. It is checked now.
+- The customer app offered the report button on any Confirmed booking, so with a non-zero grace it
+  became a button the server refuses. `BookingDto` now carries `CanReportNonDelivery` and
+  `NonDeliveryReportableFrom`, both server-judged like `IsAwaitingDecision`, and the app shows a
+  disabled control saying when instead.
+- `nonDeliveryTooEarly` said "the rental has not started yet", which stopped being true the moment
+  the grace stopped being zero. Reworded in both languages.
 
 ### 69. A customer cannot pay, so every approval ends in expiry
 

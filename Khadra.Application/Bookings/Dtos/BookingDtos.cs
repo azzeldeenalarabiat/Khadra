@@ -72,6 +72,17 @@ public sealed record BookingDto(
     /// </remarks>
     CancellationPreviewDto Cancellation,
     Guid? LiveDisputeId,
+    /// <summary>
+    /// Whether the customer may report right now that the gallery never handed the car over.
+    /// </summary>
+    /// <remarks>
+    /// Server-computed for the same reason <see cref="IsAwaitingDecision"/> is: the grace is frozen
+    /// per booking and the comparison is against the server's clock, so a phone with a wrong time
+    /// would otherwise offer the button early and be refused, or hide it when it was due.
+    /// </remarks>
+    bool CanReportNonDelivery,
+    /// <summary>The instant that becomes true, so a screen can say when instead of just "not yet".</summary>
+    DateTimeOffset NonDeliveryReportableFrom,
     /// <summary>Whether this booking may be rated right now: the aggregate's own rule, not a status check.</summary>
     bool CanBeReviewed,
     /// <summary>The customer's review of it, if they have already left one.</summary>
@@ -124,6 +135,8 @@ public sealed record BookingDto(
             booking.IsAwaitingPayment(now),
             CancellationPreviewDto.From(booking.PreviewCancellation(BookingParty.Customer, now)),
             context.LiveDisputeId,
+            booking.CanReportNonDelivery(now),
+            booking.NonDeliveryReportableFrom,
             booking.CanBeReviewed,
             context.MyReviewId,
             context.Vehicle,

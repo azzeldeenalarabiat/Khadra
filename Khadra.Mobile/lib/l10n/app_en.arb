@@ -331,7 +331,12 @@
   "nonDeliveryTitle": "The car was never handed over",
   "nonDeliveryBody": "Tell us what happened. The rental office will be asked to answer, and Khadra will look at it if you open a dispute afterwards.",
   "nonDeliveryDetails": "What happened",
-  "nonDeliveryTooEarly": "The rental has not started yet, so there is nothing to report.",
+  "nonDeliveryTooEarly": "It is too soon to report this. Give the rental office the short grace period it is allowed after the agreed time.",
+  "nonDeliveryNotYet": "You can report this from {from}, once the rental office has had the grace period it is allowed.",
+  "@nonDeliveryNotYet": {
+    "description": "Shown on the disabled report button. The instant comes from the server, which freezes the grace on each booking; the app never adds it to the start time itself.",
+    "placeholders": { "from": { "type": "String" } }
+  },
   "nonDeliveryReport": "Report it",
   "nonDeliveryDone": "Reported. The booking is closed and the rental office has been told.",
 

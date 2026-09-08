@@ -1649,8 +1649,14 @@ abstract class AppLocalizations {
   /// No description provided for @nonDeliveryTooEarly.
   ///
   /// In en, this message translates to:
-  /// **'The rental has not started yet, so there is nothing to report.'**
+  /// **'It is too soon to report this. Give the rental office the short grace period it is allowed after the agreed time.'**
   String get nonDeliveryTooEarly;
+
+  /// Shown on the disabled report button. The instant comes from the server, which freezes the grace on each booking; the app never adds it to the start time itself.
+  ///
+  /// In en, this message translates to:
+  /// **'You can report this from {from}, once the rental office has had the grace period it is allowed.'**
+  String nonDeliveryNotYet(String from);
 
   /// No description provided for @nonDeliveryReport.
   ///

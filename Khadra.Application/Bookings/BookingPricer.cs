@@ -139,7 +139,7 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
             dealerMin.Value,
             dealerMax.Value,
             TimeSpan.FromMinutes(rules.TurnaroundMinutes),
-            TimeSpan.FromHours(rules.NonDeliveryGraceHours),
+            TimeSpan.FromMinutes(rules.NonDeliveryGraceMinutes),
             rulesVersion: 1);
     }
 }
