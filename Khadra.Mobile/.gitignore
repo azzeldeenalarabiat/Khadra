@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# The Kotlin compiler's own session directory, written under android/ by any Gradle build. It is
+# scratch -- one `.salive` file per compiler session -- and nothing reads it back. Ignored because
+# it is NOT under /build/ and so slipped past every rule above it, and a `git add -A` picks it up.
+/android/.kotlin/
