@@ -780,7 +780,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookingPaymentNotAvailableBody =>
-      'Khadra cannot take card payments in this version. This booking will end at the deadline above and the car will go back on the market. Nothing is owed when that happens.';
+      'Khadra cannot take card payments yet. This booking will end at the deadline above and the car will go back on the market. Nothing is owed when that happens.';
+
+  @override
+  String get bookingPaymentWindowClosedBody =>
+      'The time to pay the deposit for this booking has passed, so it can no longer be paid. Nothing is owed.';
+
+  @override
+  String get bookingPayDeposit => 'Pay the deposit';
+
+  @override
+  String get bookingPaymentOpening => 'Opening the payment page…';
 
   @override
   String get bookingExpiredTitle => 'This booking ran out of time';

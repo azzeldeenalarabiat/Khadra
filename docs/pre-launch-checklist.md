@@ -1578,7 +1578,24 @@ Three things closed with it:
 - `nonDeliveryTooEarly` said "the rental has not started yet", which stopped being true the moment
   the grace stopped being zero. Reworded in both languages.
 
-### 69. A customer cannot pay, so every approval ends in expiry
+### 69. PARTLY CLOSED — a customer cannot pay, because there is no merchant account
+
+**Status:** open, narrowed · **Raised:** 2026-09-08 · **Narrowed:** 2026-09-08, Payments shipped
+
+**Payments was built on 2026-09-08 with the owner's explicit approval.** What was "the context does not
+exist" is now exactly one missing thing: a merchant account. The aggregate, the state machine, the
+idempotency guards, the refunds, the sweep and both endpoints are complete, tested and running; every
+checkout is refused with `payments.provider_unavailable` (503) and the startup log says
+`PAYMENTS ARE NOT ACCEPTED` on every boot.
+
+**To close:** choose a provider, get an account, set `Payments:Provider`, `Payments:ApiKey` and
+`Payments:WebhookSecret` in user-secrets or the environment, and write one class implementing
+`IPaymentProvider`'s four methods. Nothing above that class changes. Then register the webhook URL
+`POST /api/v1/payments/webhooks/{provider}` with the provider.
+
+**Two things that still need the owner**, both recorded as items 76 and 77 below.
+
+The original entry follows, because its prohibition still stands.
 
 **Status:** open by design · **Raised:** 2026-09-08 · **Depends on:** Payments
 
@@ -1698,3 +1715,81 @@ delivery, so the screen is at least honest about which it is.
 
 **To close:** an "offer delivery on my existing cars" action on the Delivery page, and a prompt
 when delivery is switched on for a dealership whose published cars are all ineligible.
+
+## Payments (2026-09-08)
+
+Built with the owner's explicit approval, which `CLAUDE.md` requires. Everything below is a gap that
+survives the build, not a gap in it.
+
+### 76. HARD BLOCKER — there is no merchant account, so no deposit can be taken
+
+**Status:** open · **Raised:** 2026-09-08 · **Blocks:** every Confirmed booking
+
+`Payments:Provider` is `None`, and `UnconfiguredPaymentProvider` is the only implementation this build
+ships. Every checkout answers 503 `payments.provider_unavailable`; the webhook answers 401, because
+with no secret there is no way to tell a provider from anyone else who found the URL.
+
+**Nobody may close this with a simulated provider.** One that captured and confirmed would be
+indistinguishable, in every table and on every screen, from a real payment: bookings would read
+Confirmed, galleries would prepare cars, and nobody could tell which rentals had money behind them.
+That is the same prohibition item 2 records about cash paid out of band, in a different costume. There
+is deliberately no `Payments:Provider` value that does it, and none should be added.
+
+**To close:** an account with a provider that can take JOD; one class implementing the four methods of
+`IPaymentProvider`; the three settings in user-secrets or the environment; the webhook URL registered
+with the provider. Two details that will bite whoever writes the adapter:
+
+- **JOD has three minor units.** Most providers assume two. The adapter's money conversion needs a
+  round-trip test, and it must REFUSE an amount it cannot represent exactly rather than round it.
+- **`ParseEvent` must verify over the exact bytes received.** The controller passes the raw body
+  through unparsed for that reason; anything that deserialises and re-serialises breaks every signature.
+
+### 77. Cancellation does not refund, and that is the owner's decision to make
+
+**Status:** open · **Raised:** 2026-09-08 · **Owner decision:** number 3 in the architecture doc
+
+Two refund triggers are wired: an orphaned capture (automatic) and an admin's dispute resolution. A
+customer who cancels inside their free window, or a booking that ends with no ticket at all, gets no
+automatic refund — their deposit sits held.
+
+That is not an oversight. Owner decision 3 is genuinely open: spec 3.3's "no ticket, no penalty" reads
+as refund, and "the deposit is forfeited" reads as retain, and the two contradict. There is also a
+mechanical hazard: `CanBeDisputed` keeps a Cancelled or NoShow booking disputable for the whole
+post-return settlement window, while `BookingDisputeSettlement.DepositHeldFor` assumes the full deposit
+is still held whenever `DepositPaymentId` is set. An early refund would let a later resolution split
+money that had already gone.
+
+**To close:** the owner answers decision 3. If the answer is "refund", it belongs in the settlement job
+after the dispute window closes, not at the moment of cancellation.
+
+### 78. `DepositHeldFor` will need to read what is left, not what was taken
+
+**Status:** open · **Raised:** 2026-09-08 · **Not yet wrong**
+
+`BookingDisputeSettlement.DepositHeldFor` returns the booking's frozen deposit whenever a payment id is
+set, and a `DepositDisposition` must balance to exactly that. Correct today: a ticket resolves once, and
+the only refunds that exist before a resolution are on ORPHANED payments, which never confirmed a
+booking and so never set a payment id.
+
+It stops being correct the moment anything else refunds an APPLIED payment — item 77's cancellation
+refund is the obvious candidate. Then the deposit still held is `captured - refunded`, which Payments
+knows and Bookings does not.
+
+**To close:** when item 77 is answered, make `DepositHeldFor` read the applied payment's captured total
+less its outstanding and settled refunds, and give it a test with a partly-refunded deposit.
+
+### 79. A stale attempt whose provider says it WAS captured needs a human
+
+**Status:** open, accepted · **Raised:** 2026-09-08
+
+The payment sweep asks the provider what became of a session it believes is dead. If the provider says
+the money moved, the sweep logs at Error and does nothing: resolving a capture outside the webhook
+handler would be a second, weaker copy of the most delicate code in the system, and it has no booking
+loaded and no receipt to write.
+
+This is the right call for now — the provider's own retry is the proper path, and the log line is what
+tells somebody to look if none arrives. It is recorded because "the log tells somebody" is not a
+process.
+
+**To close, if it is ever wanted:** an admin screen listing payments whose provider state and stored
+state disagree, with a button that replays the provider's event through the real handler.

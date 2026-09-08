@@ -51,6 +51,12 @@ public sealed class NotificationKind : Enumeration
     public static readonly NotificationKind YourBookingCompleted = new(19, "YourBookingCompleted");
     public static readonly NotificationKind YourBookingMarkedNoShow = new(20, "YourBookingMarkedNoShow");
 
+    // The deposit cleared and the rental is on (ReceiveProviderEventHandler). The gallery learns it
+    // has a committed customer; the customer learns their money arrived. Both are raised inside the
+    // same transaction as the capture, so a notification can never claim a payment that rolled back.
+    public static readonly NotificationKind BookingConfirmed = new(21, "BookingConfirmed");
+    public static readonly NotificationKind YourBookingConfirmed = new(22, "YourBookingConfirmed");
+
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");
@@ -66,8 +72,12 @@ public sealed class NotificationKind : Enumeration
     //                       handlers exist; they are simply not wired yet. Add the kind WITH its
     //                       producer, never before it.
     //   YourDepositDue    — the customer IS told their booking was approved, and YourBookingApproved
-    //                       is that message. A separate "pay now" alert would be a promise of a
-    //                       payment screen that does not exist until Payments ships.
+    //                       is that message. A separate "pay now" alert would still be a promise of a
+    //                       payment the platform cannot take: Payments ships with no provider
+    //                       configured, so every checkout is refused with payments.provider_unavailable.
+    //                       Add it when a provider exists, not before.
+    //   YourRefundIssued  — the platform can RECORD a refund but cannot send one without a provider,
+    //                       so telling a customer their money is on its way would not be true yet.
 
     private NotificationKind(int id, string name) : base(id, name)
     {

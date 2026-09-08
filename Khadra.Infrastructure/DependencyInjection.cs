@@ -17,10 +17,12 @@ using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Reviews.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Notifications;
+using Khadra.Infrastructure.Payments;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Infrastructure.PlatformSettings;
@@ -141,6 +143,15 @@ public static class DependencyInjection
             .Validate(options => options.NonDeliveryGraceMinutes is not null,
                 "BusinessRules: NonDeliveryGraceMinutes must be set. Use 0 to allow an immediate report.")
             .ValidateOnStart();
+        services.AddOptions<PaymentOptions>()
+            .Bind(configuration.GetSection(PaymentOptions.SectionName))
+            .ValidateDataAnnotations()
+            // A session that outlived the booking's own payment window would take money the platform
+            // then has to give back. The margin has to be smaller than the session, or every checkout
+            // would be refused before it opened.
+            .Validate(options => options.CheckoutClosesBeforeDeadlineMinutes < options.CheckoutSessionMinutes,
+                "Payments: CheckoutClosesBeforeDeadlineMinutes must be less than CheckoutSessionMinutes.")
+            .ValidateOnStart();
     }
 
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
@@ -166,6 +177,8 @@ public static class DependencyInjection
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IProviderEventReceiptRepository, ProviderEventReceiptRepository>();
         services.AddScoped<INotifier, Notifier>();
 
         AddReporting(services);
@@ -201,6 +214,11 @@ public static class DependencyInjection
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();
+        services.AddSingleton<IPaymentSettings, PaymentSettings>();
+        // The ONLY implementation this build ships. See UnconfiguredPaymentProvider for why nothing
+        // that simulates a successful capture may ever be registered here.
+        services.AddSingleton<IPaymentProvider, UnconfiguredPaymentProvider>();
+        services.AddSingleton<IPaymentProviderProbe, PaymentProviderProbe>();
     }
 
     private static void AddSecurity(IServiceCollection services)

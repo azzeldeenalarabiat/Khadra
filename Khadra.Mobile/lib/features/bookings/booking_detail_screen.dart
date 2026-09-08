@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
@@ -300,12 +301,18 @@ class _StateNotice extends StatelessWidget {
 
 /// The payment step, told honestly.
 ///
-/// **There is no Pay button, because there is nothing behind one.** The Payments
-/// context is not built and is blocked on owner decisions, so this booking will
-/// expire at the deadline and the car will go back on the market. Showing a
-/// disabled button, or a "pay at the counter" that the domain does not support,
-/// would be worse than saying so: the deposit is what makes a booking a booking,
-/// and no deposit is taken out of band.
+/// **Whether there is a Pay button is the SERVER's answer, not this screen's.**
+/// It used to be a hard-coded "not available in this version", which was true and
+/// is exactly the kind of truth that rots: the day a provider is configured, a
+/// screen deciding for itself would still be refusing. `booking.payment` carries
+/// the verdict and, when it is no, the CODE behind it -- because "your window has
+/// closed" and "this platform cannot take cards yet" are different facts with
+/// different remedies, and a customer shown the wrong one either gives up or
+/// complains about the wrong thing.
+///
+/// What has not changed is that nothing here invents a way to pay. There is no
+/// "pay at the counter": the deposit is what makes a booking a booking, and no
+/// deposit is taken out of band.
 ///
 /// The amount and the deadline come from the BOOKING — never from
 /// `/app-config`'s current payment window, which is today's setting and not the
@@ -334,14 +341,81 @@ class _PaymentDue extends StatelessWidget {
           icon: Icons.payments_outlined,
         ),
         const SizedBox(height: Space.md),
-        KhadraNotice(
-          title: l10n.bookingPaymentNotAvailableTitle,
-          body: l10n.bookingPaymentNotAvailableBody,
-          tone: NoticeTone.neutral,
-          icon: Icons.credit_card_off_outlined,
-        ),
+        _PaymentAction(booking: booking),
       ],
     );
+  }
+}
+
+/// Pay, or the reason there is nothing to press.
+class _PaymentAction extends ConsumerStatefulWidget {
+  const _PaymentAction({required this.booking});
+
+  final Booking booking;
+
+  @override
+  ConsumerState<_PaymentAction> createState() => _PaymentActionState();
+}
+
+class _PaymentActionState extends ConsumerState<_PaymentAction> {
+  bool _opening = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final payment = widget.booking.payment;
+
+    // A missing verdict means an older server, or a booking read by someone who
+    // is not its customer. Say the safe thing rather than offering a button.
+    if (payment == null || !payment.canPay) {
+      return KhadraNotice(
+        title: l10n.bookingPaymentNotAvailableTitle,
+        body: payment != null && !payment.providerUnavailable
+            ? l10n.bookingPaymentWindowClosedBody
+            : l10n.bookingPaymentNotAvailableBody,
+        tone: NoticeTone.neutral,
+        icon: Icons.credit_card_off_outlined,
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: _opening ? null : _pay,
+        icon: const Icon(Icons.credit_card, size: 18),
+        label: Text(l10n.bookingPayDeposit),
+      ),
+    );
+  }
+
+  /// Opens a checkout and hands the customer to the provider.
+  ///
+  /// Repeating it is safe and is the intended way to recover: the server returns
+  /// the session already in flight rather than opening a second one, so a
+  /// customer who closed the tab lands back on the same card form.
+  Future<void> _pay() async {
+    final l10n = AppLocalizations.of(context);
+    setState(() => _opening = true);
+    try {
+      final attempt =
+          await ref.read(apiProvider).openDepositCheckout(widget.booking.bookingId);
+      if (!mounted) return;
+
+      final url = attempt.checkoutUrl;
+      if (url == null) {
+        showKhadraMessage(context, l10n.bookingPaymentNotAvailableBody, isError: true);
+        return;
+      }
+
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      // Coming back from a provider confirms NOTHING -- only a signed webhook
+      // does -- so the screen re-reads the booking rather than assuming.
+      if (mounted) invalidateBookings(ref, bookingId: widget.booking.bookingId);
+    } on ApiFailure catch (failure) {
+      if (mounted) showKhadraMessage(context, failure.messageFor(l10n), isError: true);
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
   }
 }
 

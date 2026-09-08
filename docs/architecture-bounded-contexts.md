@@ -14,11 +14,15 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Disputes | done | done | dashboard read model only |
 | Reviews | done | pending | pending |
 | Platform Settings | done | pending (configuration-backed) | pending |
-| Payments | **not started, blocked** | — | — |
+| Payments | done | done | **deposit checkout + provider webhook done**; NO PROVIDER CONFIGURED |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
-Payments is deliberately unbuilt. It needs owner decisions and explicit approval (see "Owner decisions required" below and the forbidden-actions list in `CLAUDE.md`).
+Payments was built on 2026-09-08 with the owner's explicit approval. "No provider configured" is not a
+qualifier on the table above: the aggregate, the state machine, the idempotency guards, the refunds and
+both endpoints are complete and tested, and the ONE thing missing is a merchant account. Every checkout
+is refused with `payments.provider_unavailable` (503) until `Payments:Provider` names a real one, and
+the startup log says so on every boot.
 
 ## Context map
 
@@ -105,17 +109,66 @@ The lock (`IVehicleHoldLock`, a transaction-scoped Postgres advisory lock keyed 
 
 `BusinessRuleSettings` is a single versioned aggregate holding every number from spec section 2, and it refuses a commission above the deposit, because commission is collected from the card deposit. `PendingOwnerDecisions()` surfaces the questions the owner has not answered rather than pretending a default is a decision. `CarType` and `City` are bilingual lookups that deactivate rather than delete.
 
-## 8. Payments — not built
+## 8. Payments
 
-Designed shape: `Payment`, `Commission`, `SecurityDeposit`. Blocked on the owner decisions below, and on explicit approval per `CLAUDE.md`.
+`Payment` is ONE CHECKOUT ATTEMPT for one booking's deposit, with `Refund` as a child entity, plus
+`ProviderEventReceipt` — an append-only log of provider notifications that is deliberately OUTSIDE the
+aggregate, because an event naming a reference this platform never issued has no payment to hang off
+and still has to be recorded.
 
-The central difficulty: at the confirmed 20% commission and 20% deposit the two are equal, so the platform never pays a dealer and never holds dealer funds. Three things in the spec nonetheless require money to move in a direction that has no rail:
+`Commission` and `SecurityDeposit`, which the old design sketched, were NOT built. Commission is
+already derivable from the booking's frozen `Terms.CommissionPercent` over `Pricing.RentalTotal` and a
+table for it would be a second source for one number; the security deposit is open owner decision 4 and
+lives today as cash on the handover record.
 
-1. A dealer non-delivery penalty of 25-50% has nothing to deduct from.
-2. `PaymentOption.FullUpfront` means the customer pays 100% by card, so the dealer's 80% must be paid out.
-3. Any configured commission above the deposit produces a shortfall to collect.
+**States: `Initiated -> Pending -> Failed | Applied | Orphaned`.** There is deliberately no persisted
+`Captured`. A capture is a FACT about money that has already moved, and the webhook handler must
+resolve it, in the same transaction, to `Applied` (the booking took it) or `Orphaned` (it could not,
+and a refund is recorded). A captured-but-unresolved row would be permanently stuck: its receipt makes
+the provider's retries look like replays.
 
-The likely answer is a single `DealerLedger` aggregate with typed entries and manual settlement, rather than separate payout and penalty mechanisms.
+**Five things must hold before a capture confirms anything.** The signature verified over the raw body;
+the delivery never seen before; the reference resolving to a `Payment` this platform issued; the
+captured amount AND currency equal to what that row asked for; and the booking still able to take it.
+Anything short of all five is an orphan, and an orphan always carries its refund — `Payment.Orphan`
+creates it, so the two cannot be separated.
+
+**Two database guards, not two handler checks.** `ux_payments_one_live_attempt_per_booking` (partial
+unique over `booking_id` where the status is live) stops one booking having two card forms open;
+`(provider, provider_event_id)` unique on the receipt table stops a replayed webhook, and is INSERTED
+in the same transaction as the effect rather than read first, because a read-then-write leaves a window
+two concurrent deliveries both pass.
+
+**The deadline is enforced at the DOOR, never at the capture.** `BookingDepositSettlement.DepositDue`
+is the only place the payment window is checked. Once a provider has captured, refusing the money would
+mean keeping it, so `ConfirmDepositPaid` stays deadline-blind (pre-launch item 62) and a late capture is
+applied if the booking can still take it and refunded if it cannot. The cheap half of the fix is
+`Payments:CheckoutClosesBeforeDeadlineMinutes`, which kills the provider's own session before the
+booking's window closes, so the expensive path is rare rather than routine.
+
+**The seam to Bookings is a CALL, not an event.** `BookingDepositSettlement` is the named door, the
+twin of `BookingDisputeSettlement`, and it is the only production caller of `Booking.ConfirmDepositPaid`.
+This project has no outbox and dispatches domain events after commit, so a cross-context event lost
+between the two would mean money captured, booking unconfirmed, and the car released at its deadline.
+
+**Refunds are RECORDED when owed and SENT afterwards**, by the payment sweep that runs beside the
+booking settlement pass. Two triggers exist: an orphaned capture (automatic, in the capture's own
+transaction) and an admin's dispute resolution returning money to the customer. Cancellation refunds are
+deliberately NOT wired — owner decision 3 is open, and `BookingDisputeSettlement.DepositHeldFor` assumes
+the full deposit is still held while a booking is disputable.
+
+**What is not built, and why.** No `DealerLedger`, no payout rail, no dealer charge: at the confirmed
+20% commission and 20% deposit the two are equal, so the platform never pays a dealer and never holds
+dealer funds. Of the three spec cases that would need a rail, two are closed by construction —
+`CreateBookingHandler` only ever writes `PaymentOption.DepositOnly`, and both `BookingTerms.Create` and
+`BusinessRuleSettings` refuse a commission above the deposit. What remains is the dealer non-delivery
+penalty, which is already an instruction with no rail (`DisputeResolution.DealerCharge`) and is settled
+by hand.
+
+**Nobody may add a provider that simulates success.** `UnconfiguredPaymentProvider` is the only
+implementation, and a stub that confirmed bookings without money would be indistinguishable, in every
+table and on every screen, from a real payment. Tests substitute `IPaymentProvider` at the handler
+boundary. Writing a real adapter is one class implementing four methods; nothing above it changes.
 
 ## Owner decisions required
 

@@ -1415,8 +1415,26 @@ abstract class AppLocalizations {
   /// No description provided for @bookingPaymentNotAvailableBody.
   ///
   /// In en, this message translates to:
-  /// **'Khadra cannot take card payments in this version. This booking will end at the deadline above and the car will go back on the market. Nothing is owed when that happens.'**
+  /// **'Khadra cannot take card payments yet. This booking will end at the deadline above and the car will go back on the market. Nothing is owed when that happens.'**
   String get bookingPaymentNotAvailableBody;
+
+  /// Shown when the server says the deposit cannot be paid for a reason other than the platform having no payment provider - almost always that the payment window closed.
+  ///
+  /// In en, this message translates to:
+  /// **'The time to pay the deposit for this booking has passed, so it can no longer be paid. Nothing is owed.'**
+  String get bookingPaymentWindowClosedBody;
+
+  /// No description provided for @bookingPayDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay the deposit'**
+  String get bookingPayDeposit;
+
+  /// No description provided for @bookingPaymentOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the payment page…'**
+  String get bookingPaymentOpening;
 
   /// No description provided for @bookingExpiredTitle.
   ///

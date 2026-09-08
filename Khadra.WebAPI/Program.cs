@@ -175,6 +175,11 @@ builder.Services.AddRateLimiter(options =>
     // is there to stop a scraper, not to ration customers.
     options.AddPolicy(RateLimitPolicies.Public, context =>
         RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(1200, TimeSpan.FromMinutes(1), queueLimit: 20)));
+    // A provider catching up after an outage delivers a burst, and each delivery is somebody's
+    // money. Queued rather than rejected for the same reason: a 429 makes the provider retry later,
+    // which is strictly worse than making it wait a moment now.
+    options.AddPolicy(RateLimitPolicies.Webhook, context =>
+        RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(600, TimeSpan.FromMinutes(1), queueLimit: 50)));
 });
 
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
@@ -338,6 +343,10 @@ using (var bootstrapScope = app.Services.CreateScope())
 // the only way to find out it was misconfigured was for someone to register and wait at an inbox
 // nothing was coming to. Never fatal: a mail outage must not stop the API serving everything else.
 await MailStartupCheck.ReportAsync(app.Services);
+
+// And whether a deposit can be taken. Today the answer is always no, because no provider is
+// configured; the point of the line is that nobody has to discover it from a customer.
+await PaymentsStartupCheck.ReportAsync(app.Services);
 
 // Not in Development, and the reason is a device rather than a preference.
 //

@@ -788,7 +788,17 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookingPaymentNotAvailableBody =>
-      'لا تستطيع خضرا استقبال مدفوعات البطاقات في هذه النسخة. سينتهي هذا الحجز عند الموعد أعلاه وتعود السيارة إلى السوق. لا شيء مستحق عليك عندها.';
+      'لا تستطيع خضرا استقبال مدفوعات البطاقات بعد. سينتهي هذا الحجز عند الموعد أعلاه وتعود السيارة إلى السوق. لا شيء مستحق عليك عندها.';
+
+  @override
+  String get bookingPaymentWindowClosedBody =>
+      'انتهى وقت دفع العربون لهذا الحجز، فلم يعد بالإمكان دفعه. لا شيء مستحق عليك.';
+
+  @override
+  String get bookingPayDeposit => 'ادفع العربون';
+
+  @override
+  String get bookingPaymentOpening => 'جارٍ فتح صفحة الدفع…';
 
   @override
   String get bookingExpiredTitle => 'انتهى وقت هذا الحجز';

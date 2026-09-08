@@ -1,5 +1,6 @@
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common.Dtos;
+using Khadra.Application.Payments.Dtos;
 using Khadra.Domain.Bookings;
 
 namespace Khadra.Application.Bookings.Dtos;
@@ -73,6 +74,11 @@ public sealed record BookingDto(
     CancellationPreviewDto Cancellation,
     Guid? LiveDisputeId,
     /// <summary>
+    /// Whether the deposit can be paid right now, and what is in the way if not. Null on a screen
+    /// that never offers payment.
+    /// </summary>
+    PaymentAvailabilityDto? Payment,
+    /// <summary>
     /// Whether the customer may report right now that the gallery never handed the car over.
     /// </summary>
     /// <remarks>
@@ -135,6 +141,7 @@ public sealed record BookingDto(
             booking.IsAwaitingPayment(now),
             CancellationPreviewDto.From(booking.PreviewCancellation(BookingParty.Customer, now)),
             context.LiveDisputeId,
+            context.Payment,
             booking.CanReportNonDelivery(now),
             booking.NonDeliveryReportableFrom,
             booking.CanBeReviewed,

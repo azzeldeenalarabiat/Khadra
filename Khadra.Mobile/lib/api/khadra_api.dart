@@ -311,6 +311,17 @@ class KhadraApi {
         body: {'reasonCode': reasonCode, 'details': details},
       )));
 
+  /// Starts, resumes or replaces the checkout for this booking's deposit.
+  ///
+  /// Safe to repeat, and repeating is the intended way to recover: the server
+  /// hands back the attempt already in flight rather than opening a second one,
+  /// so a customer who closed the tab lands on the same card form. Answers 503
+  /// `payments.provider_unavailable` while no provider is configured.
+  Future<PaymentAttempt> openDepositCheckout(String bookingId) async =>
+      PaymentAttempt.maybe(_object(await _client.post<dynamic>(
+        '/api/v1/bookings/$bookingId/deposit-checkout',
+      )))!;
+
   Future<Booking> reportNonDelivery(String bookingId, String details) async =>
       Booking.fromJson(_object(await _client.post<dynamic>(
         '/api/v1/bookings/$bookingId/report-non-delivery',

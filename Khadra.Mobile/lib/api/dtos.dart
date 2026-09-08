@@ -1091,6 +1091,77 @@ class Handover {
       );
 }
 
+/// One checkout attempt, as the customer's screen sees it.
+///
+/// Carries no provider reference and no provider prose: the reference is the key
+/// that resolves a webhook to a payment, which a screen has no use for, and a
+/// provider's own wording is written for an English-speaking developer.
+class PaymentAttempt {
+  const PaymentAttempt({
+    required this.paymentId,
+    required this.status,
+    required this.amount,
+    required this.checkoutUrl,
+    required this.expiresAt,
+    required this.failureCode,
+  });
+
+  final String paymentId;
+  final String status;
+  final Money amount;
+  final String? checkoutUrl;
+  final DateTime expiresAt;
+  final String? failureCode;
+
+  static PaymentAttempt? maybe(dynamic value) => value is Map<String, dynamic>
+      ? PaymentAttempt(
+          paymentId: value['paymentId'] as String? ?? '',
+          status: value['status'] as String? ?? '',
+          amount: Money.fromJson(value['amount'] as Map<String, dynamic>? ?? const {}),
+          checkoutUrl: value['checkoutUrl'] as String?,
+          expiresAt: _requiredDateTime(value['expiresAt']),
+          failureCode: value['failureCode'] as String?,
+        )
+      : null;
+}
+
+/// Whether the deposit can be paid right now, and what is in the way if not.
+///
+/// Every field is the SERVER's judgement. The app cannot work this out: the
+/// answer depends on whether the platform has a payment provider at all, which
+/// is not a property of any booking and never will be. `unavailableReason` is a
+/// platform error code, rendered through the same table as a refused request.
+class PaymentAvailability {
+  const PaymentAvailability({
+    required this.canPay,
+    required this.unavailableReason,
+    required this.amountDue,
+    required this.payBy,
+    required this.liveAttempt,
+  });
+
+  final bool canPay;
+  final String? unavailableReason;
+  final Money? amountDue;
+  final DateTime? payBy;
+  final PaymentAttempt? liveAttempt;
+
+  /// Whether the platform itself cannot take cards, as opposed to this booking
+  /// no longer being payable. Two different facts with two different remedies.
+  bool get providerUnavailable =>
+      unavailableReason == 'payments.provider_unavailable';
+
+  static PaymentAvailability? maybe(dynamic value) => value is Map<String, dynamic>
+      ? PaymentAvailability(
+          canPay: value['canPay'] as bool? ?? false,
+          unavailableReason: value['unavailableReason'] as String?,
+          amountDue: Money.maybe(value['amountDue']),
+          payBy: _dateTime(value['payBy']),
+          liveAttempt: PaymentAttempt.maybe(value['liveAttempt']),
+        )
+      : null;
+}
+
 class Booking {
   const Booking({
     required this.bookingId,
@@ -1123,6 +1194,7 @@ class Booking {
     required this.isAwaitingPayment,
     required this.cancellation,
     required this.liveDisputeId,
+    required this.payment,
     required this.canReportNonDelivery,
     required this.nonDeliveryReportableFrom,
     required this.canBeReviewed,
@@ -1169,6 +1241,11 @@ class Booking {
   final bool isAwaitingPayment;
   final CancellationPreview cancellation;
   final String? liveDisputeId;
+
+  /// The server's verdict on paying this booking's deposit. Null on a booking
+  /// read by anyone but its own customer -- a gallery has no Pay button, and is
+  /// not told whether the customer has a checkout open.
+  final PaymentAvailability? payment;
 
   /// Whether the gallery can be reported for never handing the car over, and the
   /// instant that becomes true. Both come from the server: the grace is FROZEN on
@@ -1219,6 +1296,7 @@ class Booking {
         cancellation: CancellationPreview.fromJson(
             json['cancellation'] as Map<String, dynamic>?),
         liveDisputeId: json['liveDisputeId'] as String?,
+        payment: PaymentAvailability.maybe(json['payment']),
         canReportNonDelivery: json['canReportNonDelivery'] as bool? ?? false,
         nonDeliveryReportableFrom:
             _dateTime(json['nonDeliveryReportableFrom']) ??

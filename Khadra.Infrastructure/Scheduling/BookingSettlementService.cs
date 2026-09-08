@@ -1,4 +1,5 @@
 using Khadra.Application.Bookings.SettleBookings;
+using Khadra.Application.Payments.SettlePayments;
 using Khadra.Infrastructure.Configuration;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,10 @@ namespace Khadra.Infrastructure.Scheduling;
 /// singleton. Every exception is swallowed and logged: a hosted service that throws out of
 /// ExecuteAsync stops for the lifetime of the process, and a settlement pass failing once is not a
 /// reason to stop settling bookings until somebody restarts the API.
+///
+/// Since 2026-09-08 it drives the payment sweep as well, which closes checkout attempts a provider
+/// stopped talking about and sends the refunds the platform owes. Same reasoning, same scope, same
+/// swallow-and-log: neither job owns a rule, and both only decide how often to look.
 ///
 /// One instance is assumed. Two processes running this concurrently is not a correctness problem —
 /// the transitions are idempotent and the concurrency token makes the loser retry — but it is wasted
@@ -60,6 +65,12 @@ internal sealed partial class BookingSettlementService(
             using var scope = scopes.CreateScope();
             var mediator = scope.ServiceProvider.GetRequiredService<ISender>();
             await mediator.Send(new SettleDueBookingsCommand(), cancellationToken);
+
+            // Payments after bookings, and in the same pass rather than on a timer of their own.
+            // The order matters: expiring an unpaid booking is what makes its open checkout pointless,
+            // and sweeping in that order closes the attempt on the same tick rather than the next.
+            // A second timer would buy nothing and give two schedules to reason about.
+            await mediator.Send(new SettlePaymentsCommand(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
