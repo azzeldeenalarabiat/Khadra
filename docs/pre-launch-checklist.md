@@ -60,7 +60,33 @@ different design.
 
 ### 3. Reviews have no persistence
 
-**Status:** open · **Raised:** 2026-09-03
+**Status:** closed · **Closed:** 2026-09-08 — the `reviews` table exists and ratings on the platform are real.
+
+`ReviewConfiguration`, a migration, `ReviewRepository`, `GalleryReviewReader` and the customer
+endpoints (`POST`/`GET /api/v1/bookings/{id}/review`, `GET /api/v1/galleries/{id}/reviews`) all
+exist, and `CatalogueReader` fills `AverageRating` and `ReviewCount` from one grouped query per page
+rather than the nulls it used to send.
+
+Three decisions worth naming, because each was a fork:
+
+- **`Rating` is an OWNED type over one column, not a value converter.** With a converter,
+  `review.Rating` is the column and `review.Rating.Value` is an unreadable member access on a
+  converted value, so `AVG()` and `COUNT()` do not translate and EF falls back to loading every
+  review to average them in memory — on the query the catalogue runs for every card on the screen.
+- **Hidden reviews still count towards the average.** Spec 3.2 moderation removes abusive TEXT; spec
+  4.1 makes the score something a dealer can never edit. Excluding a hidden review's rating would
+  hand a gallery a way to erase a bad score by reporting the comment attached to it.
+- **No reviewer is named on a public review.** Who left it is not something the platform asked a
+  customer's permission to publish, and a name beside the dates of a rental says more than either
+  fact alone. `GalleryReviewDto` therefore carries no name and no id, which is the whole point of it
+  being a different shape from `ReviewDto`.
+
+The dealer's review OF a customer (spec 5.6) has a domain model and no endpoint — that half is now
+item 71.
+
+The original report follows.
+
+**Status:** was open · **Raised:** 2026-09-03
 
 The `Review` aggregate exists in `Khadra.Domain/Reviews/` but has no `DbSet`, no EF configuration, no
 table and no data. Spec 4.1 says a dealer's rating is computed from customer reviews and is never
@@ -72,7 +98,30 @@ computes a dealer's average) and replace the placeholder.
 
 ### 4. No settlement job
 
-**Status:** open · **Raised:** 2026-09-03
+**Status:** closed · **Closed:** 2026-09-08 — `BookingSettlementService` runs all four queries on a timer.
+
+A hosted service in `Khadra.Infrastructure/Scheduling/` drives `SettleDueBookingsCommand` every
+`Scheduling:SettlementIntervalSeconds` (60), plus one pass at startup so a process that was down over
+a deadline does not wait a whole interval to notice. Every rule stays in the aggregate; the service
+only decides how often to ask.
+
+It became urgent rather than tidy when the customer app arrived. No car was ever stranded — the
+availability predicate reads the clock — but a booking whose window had closed still READ as
+`Requested` or `Approved`, and a phone's "Upcoming" list would show a dead booking indefinitely. A
+client must never invent the expiry for itself: the status is the server's word.
+
+Each booking commits on its own, so a concurrency conflict with a dealer acting at the same instant
+defers one booking to the next pass instead of rolling back everything the pass had done. Both
+parties are notified in that same transaction.
+
+**Still open, and deliberately:** the service assumes ONE instance. Two processes running it
+concurrently is not a correctness problem — the transitions are idempotent and the concurrency token
+makes the loser retry — but it is duplicated work, and a leader election belongs with the deployment
+story. Revisit before running more than one API process.
+
+The original report follows.
+
+**Status:** was open · **Raised:** 2026-09-03
 
 `Booking.Settle` closes a Returned booking once its frozen `PostReturnSettlementWindow` elapses with
 no dispute, and `IBookingRepository.ListDueForSettlementAsync` exists to feed it. Nothing calls
@@ -1292,7 +1341,23 @@ transport), shorten the window and say so on the screen that counts it down.
 
 ### 60. Nothing tells a customer their approval is waiting for money
 
-**Status:** open · **Raised:** 2026-09-07 · **Blocks:** the booking-creation slice being usable
+**Status:** closed · **Closed:** 2026-09-08 — the customer is notified, and the app has the screen.
+
+`NotificationKind` gained five customer-facing kinds, each WITH its producer:
+`YourBookingApproved` and `YourBookingRejected` from `BookingDecisionHandlers`, and
+`YourBookingExpired`, `YourBookingMarkedNoShow` and `YourBookingCompleted` from the settlement
+service (item 4). `DealerTeamNotifier.NotifyCustomerAsync` raises them naming the GALLERY rather than
+the member of staff who pressed the button: which employee answered is the dealership's internal
+business, and the gallery's name is already on the customer's booking.
+
+The booking screen shows the deposit and `PaymentDeadline` from the BOOKING — never
+`PaymentWindowHours` from `/app-config`, which is today's setting and not the one this booking froze
+— and says plainly that paying is not available in this version. There is no Pay button, because
+there is nothing behind one. See item 69.
+
+The original report follows.
+
+**Status:** was open · **Raised:** 2026-09-07 · **Blocked:** the booking-creation slice being usable
 
 The reordering of 2026-09-07 puts a deadline on the customer that they are never told about. The
 dealer console counts its own answer window down; the customer app has no booking screens at all yet,
@@ -1473,3 +1538,152 @@ The customer-side twin is item 60, still open: nothing tells the CUSTOMER their 
 for money.
 
 The original report follows.
+
+---
+
+## Customer mobile app (2026-09-08)
+
+### 68. OPEN OWNER DECISION — how late is late enough to report non-delivery
+
+**Status:** open · **Raised:** 2026-09-08 · **Shipped default:** 0 hours
+
+`Booking.ReportDealerNonDelivery` was unguarded until 2026-09-08: it checked only that the booking was
+Confirmed and the reason non-blank, so a customer could file it at any time after the deposit cleared —
+days before the car was ever due.
+
+That was reachable and expensive. A customer past their free-cancellation window, facing an assessment
+of the whole deposit for cancelling, could instead report non-delivery; the record would then say the
+GALLERY failed, with 25–50% of the rental assessed against them, and the gallery would have to open a
+dispute to clear a claim made without them. `MarkNoShow` — the mirror-image accusation, that the
+CUSTOMER never appeared — has always been guarded by `Period.Start + NoShowTimeout`.
+
+It is now guarded by `Period.Start + BookingTerms.NonDeliveryGrace`, frozen onto each booking like
+every other rule, and configured as `BusinessRules:NonDeliveryGraceHours`.
+
+**The figure is the owner's, and 0 is a placeholder, not a decision.** Zero says a gallery that has
+not handed the car over at the agreed minute is already late, which is defensible and is why it ships;
+but the customer's mirror figure is 8 hours (`NoShowTimeoutHours`), and the asymmetry deserves the
+owner's attention rather than a developer's.
+
+**To close:** ask the owner, set the number, record it in `docs/spec-amendments.md`.
+
+### 69. A customer cannot pay, so every approval ends in expiry
+
+**Status:** open by design · **Raised:** 2026-09-08 · **Depends on:** Payments
+
+Stated here as one line rather than left implied across items 59, 60 and 62. Until Payments ships,
+every customer whose booking is APPROVED will watch it expire, because there is no way to pay the
+deposit and `Confirmed` is reachable only in tests. The gallery's decision is wasted each time.
+
+The customer app shows this honestly — the amount, the deadline, and a sentence saying that paying is
+not available in this version and that nothing is owed when the booking expires — rather than a button
+that cannot work.
+
+**Nobody must "unblock" this with a cash path.** `ConfirmDepositPaid` is keyed by a payment id for a
+gateway's retries, and item 2 records the owner's decision that no deposits are taken out of band
+before Payments exists.
+
+**To close:** no real customers reach `Approved` before Payments ships.
+
+### 70. There is no design export for the customer app
+
+**Status:** open · **Raised:** 2026-09-08
+
+`docs/design/` holds the Claude Design export for the Admin Console and the Dealer Console, and the
+frontend rules make that export the source of truth for how those look. There is no equivalent for the
+customer app, so it was designed against the platform's own tokens instead — the same white / green /
+black palette, the same logo, the same spacing and radius geometry, read from
+`Khadra.Dashboard/src/styles/_tokens.scss` and restated in `Khadra.Mobile/lib/core/theme/`.
+
+That is a defensible way to keep one brand across three surfaces, and it is NOT the same as having a
+design. Recorded so nobody later assumes the app was built to one.
+
+**To close:** get an export, or record that the app's own theme file is the source of truth for it.
+
+### 71. The dealer's review of a customer has no endpoint
+
+**Status:** open · **Raised:** 2026-09-08
+
+Spec 5.6 makes reviews mutual: the dealer's review of a customer is visible to other dealers to inform
+their approve/reject decisions. `ReviewDirection.DealerRatesCustomer` exists, the table stores it, and
+nothing writes or reads it.
+
+It is not a matter of passing a different string to the existing endpoint. The audience is other
+dealerships rather than the public, which makes "who may read this" a question the customer-facing
+reader does not answer, and showing one gallery what another said about a named customer is a privacy
+decision the owner should make explicitly.
+
+**To close:** a dealer-console endpoint and reader with their own visibility rule, and the owner's
+answer on what a gallery may see about a customer before approving them.
+
+### 72. Email is still not changeable, for any role
+
+**Status:** open · **Raised:** 2026-09-08 · **Extends:** item 44
+
+`PUT /api/v1/customers/me/profile` now lets a customer correct their own NAME and PHONE. Email is
+deliberately absent, for exactly the reason item 44 gives: it is the sign-in identifier and the
+password-reset destination, so moving it on the strength of a live session alone would hand the
+account to anyone holding an unlocked phone.
+
+The customer app shows the address read-only and says so. The `VerificationPurpose.EmailChange` flow
+item 44 describes is still unbuilt, and is now missing from two consoles and an app rather than one.
+
+### 73. Push notifications do not exist
+
+**Status:** open · **Raised:** 2026-09-08 · **Makes worse:** items 59, 69
+
+The app has an in-app notification feed backed by `GET /api/v1/notifications`, which it polls. There
+is no push channel, so a customer learns their booking was approved only by opening the app.
+
+That is what forced the deposit payment window to 24 hours rather than the one hour first proposed
+(item 59): a shorter window would auto-expire most bookings approved overnight before the customer
+ever saw them. Shortening it is one configuration value once push exists, which is why it is not a
+constant.
+
+**To close:** a push transport (FCM/APNs), a device-token registration endpoint, and a decision about
+which `NotificationKind`s justify waking a phone.
+
+## Full-lifecycle test (2026-09-08)
+
+Raised while driving the whole platform end to end through the real screens: register an office,
+verify by email, submit the gallery, approve it as an administrator, publish a car, book it as a
+customer, approve the booking as the dealer. Both items below are deliberately NOT blockers; the
+owner has seen each and said so.
+
+### 74. The admin console is unusable below roughly 500px wide
+
+**Status:** open, accepted · **Raised:** 2026-09-08 · **Not a blocker:** owner's decision, 2026-09-08
+
+On the dealer-application screen at a 491px viewport the heading wraps one word per line, the
+subtitle breaks a character at a time, and the review-SLA badge overlaps the status chip and the
+breadcrumb. The sidebar is a fixed width, so almost nothing is left for content.
+
+Measured at 1440×900 the same screen has no horizontal overflow at all and no element whose
+scrollWidth exceeds its clientWidth: this is narrow-viewport only, not a desktop defect. Admins and
+dealer staff are expected to work at a desk, which is why the owner has accepted it as it stands.
+
+Recorded rather than fixed because the fix is a responsive pass over the console shell - a
+collapsing sidebar and a breakpoint for the detail headers - which is design work, not a bug fix,
+and it would be done to a brief rather than guessed at.
+
+**To close, if it is ever wanted:** a breakpoint below which the sidebar collapses to icons or a
+drawer, and header blocks that stack instead of competing for one row.
+
+### 75. Switching on delivery does not offer it for cars already listed
+
+**Status:** open, future enhancement · **Raised:** 2026-09-08 · **Not needed now:** owner's decision, 2026-09-08
+
+A vehicle carries its own `IsDeliveryEligible`, and the wizard sets it from whether the dealership
+offers delivery AT THE MOMENT THE CAR IS SAVED. A gallery that lists cars first and turns delivery
+on afterwards therefore has a fleet that is all pickup-only, with nothing on screen connecting the
+two facts. It was hit in testing within minutes of enabling delivery.
+
+The per-car flag is right and should stay: an office with one van it will not drive across Amman
+needs to say so. What is missing is the bulk action, and the prompt that offers it.
+
+The customer app no longer misreports this. It used to say "this office does not deliver" for both
+causes; it now distinguishes a gallery that does not deliver from a car that is not offered for
+delivery, so the screen is at least honest about which it is.
+
+**To close:** an "offer delivery on my existing cars" action on the Delivery page, and a prompt
+when delivery is switched on for a dealership whose published cars are all ineligible.

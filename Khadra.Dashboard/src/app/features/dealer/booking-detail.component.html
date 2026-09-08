@@ -255,7 +255,7 @@
               }
               @if (h.cashCollected) {
                 <div class="page-sub">
-                  {{ t('dealerBooking.cashCollected') }} {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
+                  {{ t('dealerBooking.cashCollected') }} {{ h.cashCollected | money }} 
                 </div>
               }
             }

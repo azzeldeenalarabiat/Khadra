@@ -4,6 +4,7 @@ using Khadra.Application.Fleet.Dtos;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Reviews;
 using Khadra.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -187,6 +188,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
     {
         var open = DisputeStatus.Open;
         var underReview = DisputeStatus.UnderReview;
+        var customerRatesDealer = ReviewDirection.CustomerRatesDealer;
 
         var found = await context.Bookings
             .Where(booking => booking.Id == bookingId)
@@ -218,11 +220,17 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                         ticket.BookingId == booking.Id &&
                         (ticket.Status == open || ticket.Status == underReview))
                     .Select(ticket => (Guid?)ticket.Id.Value)
+                    .FirstOrDefault(),
+                context.Reviews
+                    .Where(review =>
+                        review.BookingId == booking.Id &&
+                        review.Direction == customerRatesDealer)
+                    .Select(review => (Guid?)review.Id.Value)
                     .FirstOrDefault()))
             .SingleOrDefaultAsync(cancellationToken);
 
         // The caller has already loaded the aggregate, so a miss here is a race with a delete that
         // cannot happen (bookings are never deleted). Empty labels keep the contract total anyway.
-        return found ?? new BookingContext(null, string.Empty, string.Empty, null);
+        return found ?? new BookingContext(null, string.Empty, string.Empty, null, null);
     }
 }

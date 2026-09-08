@@ -165,7 +165,7 @@
             <div class="page-sub">{{ when(r.resolvedAt) }} · {{ r.resolvedByName }}</div>
             <div class="money-line">
               <span class="k-label">{{ t('common.depositHeld') }}</span>
-              <span class="num">{{ r.depositHeld.amount }} {{ r.depositHeld.currency }}</span>
+              <span class="num">{{ r.depositHeld | money }} </span>
             </div>
             <!-- Each leg carries its own currency code, like every other money value in the console.
                  Three bare numbers under one that reads "120 JOD" invite the eye to borrow the code
@@ -174,25 +174,25 @@
             <div class="money-line">
               <span class="k-label">{{ t('common.refundedToTheCustomer') }}</span>
               <span class="num"
-                >{{ r.refundToCustomer.amount }} {{ r.refundToCustomer.currency }}</span
+                >{{ r.refundToCustomer | money }} </span
               >
             </div>
             <div class="money-line">
               <span class="k-label">{{ t('common.keptByThePlatform') }}</span>
               <span class="num"
-                >{{ r.retainedByPlatform.amount }} {{ r.retainedByPlatform.currency }}</span
+                >{{ r.retainedByPlatform | money }} </span
               >
             </div>
             <div class="money-line">
               <span class="k-label">{{ t('disputeDetail.transferredToTheDealer') }}</span>
               <span class="num"
-                >{{ r.transferredToDealer.amount }} {{ r.transferredToDealer.currency }}</span
+                >{{ r.transferredToDealer | money }} </span
               >
             </div>
             @if (r.dealerCharge) {
               <div class="money-line s-bad">
                 <span class="k-label">{{ t('disputeDetail.chargedToTheDealer') }}</span>
-                <span class="num">{{ r.dealerCharge.amount }} {{ r.dealerCharge.currency }}</span>
+                <span class="num">{{ r.dealerCharge | money }} </span>
               </div>
             }
             <div class="page-sub">“{{ r.note }}”</div>

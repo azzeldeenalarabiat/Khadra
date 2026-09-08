@@ -1,8 +1,9 @@
-import { DecimalPipe, NgClass } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Cell, RowAction, TableRow, toneClass } from '../../core/models/console.models';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
@@ -18,10 +19,22 @@ import { I18nService } from '../../core/i18n/i18n.service';
   selector: 'kh-data-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './data-table.component.html',
-  imports: [NgClass, RouterLink, DecimalPipe],
+  imports: [NgClass, RouterLink],
 })
 export class DataTableComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly formats = inject(FormatService);
+
+  /**
+   * A money cell, at the currency's own scale.
+   *
+   * The template used the plain `number` pipe, whose default is up to three decimals and no
+   * minimum -- so a 110.000 JOD total printed as "JOD 110". This table is shared across the
+   * console, so that one default was wrong on a good many screens at once.
+   */
+  protected money(cell: { amount?: number | null; currency?: string | null }): string {
+    return this.formats.money(cell.amount, cell.currency);
+  }
   private readonly router = inject(Router);
   private readonly ui = inject(ConsoleUiService);
 

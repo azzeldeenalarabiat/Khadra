@@ -142,8 +142,29 @@ public static class BookingErrors
     public static readonly Error CannotCancelNow =
         Error.Conflict("booking.cannot_cancel", "This booking can no longer be cancelled.");
 
+    /// <summary>
+    /// A cancellation reason code the platform does not publish.
+    /// </summary>
+    /// <remarks>
+    /// The list is closed and travels on <c>GET /api/v1/app-config</c> so the chips a customer taps
+    /// are the platform's words in both languages rather than literals in a phone binary. Free text
+    /// alone produced "asdf"; a code is something the gallery and the owner can count.
+    /// </remarks>
+    public static readonly Error UnknownCancellationReason =
+        Error.Validation("booking.unknown_cancellation_reason", "That is not one of the cancellation reasons.");
+
     public static readonly Error NoShowTooEarly =
         Error.Conflict("booking.no_show_too_early", "The no-show window has not elapsed yet.");
+
+    /// <summary>
+    /// A non-delivery report filed before the car was ever due. The mirror of
+    /// <see cref="NoShowTooEarly"/>, and it exists for the same reason: neither party may accuse the
+    /// other of missing a handover that has not arrived yet.
+    /// </summary>
+    public static readonly Error NonDeliveryTooEarly =
+        Error.Conflict(
+            "booking.non_delivery_too_early",
+            "The rental has not started yet, so the gallery cannot have failed to hand the car over.");
 
     public static readonly Error SettlementTooEarly =
         Error.Conflict("booking.settlement_too_early", "The post-return settlement window has not elapsed yet.");

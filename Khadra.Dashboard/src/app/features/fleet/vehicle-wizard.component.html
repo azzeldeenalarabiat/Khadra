@@ -425,7 +425,7 @@
               </div>
               <span class="pill s-dim num">
                 @if (deliverySettings()?.fee; as fee) {
-                  {{ fee.amount }} {{ fee.currency }}
+                  {{ fee | money }} 
                 } @else {
                   {{ t('vehicleWizard.notSet') }}
                 }

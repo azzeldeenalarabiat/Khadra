@@ -116,6 +116,46 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
             recipientUserId, kind, actorName, now, subjectId, subjectReference, actorUserId));
     }
 
+    /// <summary>
+    /// The CUSTOMER, told what a gallery did to their booking.
+    /// </summary>
+    /// <remarks>
+    /// The actor is the gallery, named by its business name rather than by the member of staff who
+    /// pressed the button. Which employee answered is the dealership's internal business — the team
+    /// feed already tells THEM — and the business name is something the customer sees on the booking
+    /// anyway. It is passed in rather than looked up because the caller has the dealer loaded and a
+    /// second read for a name it already holds is waste.
+    ///
+    /// No actor id travels with it, for the same reason a customer is never named on a dealer's row:
+    /// notifications are not deleted from, and an id that outlives the account it points at is a
+    /// dangling reference nothing can resolve.
+    ///
+    /// Staged, not saved — like everything else here.
+    /// </remarks>
+    public Task NotifyCustomerAsync(
+        Id customerUserId,
+        string galleryName,
+        NotificationKind kind,
+        DateTimeOffset now,
+        Id? subjectId = null,
+        string? subjectReference = null)
+    {
+        ArgumentNullException.ThrowIfNull(kind);
+
+        if (customerUserId.IsEmpty)
+            return Task.CompletedTask;
+
+        notifier.Raise(Notification.Raise(
+            customerUserId,
+            kind,
+            string.IsNullOrWhiteSpace(galleryName) ? UnknownGalleryName : galleryName.Trim(),
+            now,
+            subjectId,
+            subjectReference));
+
+        return Task.CompletedTask;
+    }
+
     /// <summary>The owner and every ACTIVE employee. A deactivated one has no standing (spec 4.2).</summary>
     private static List<Id> Recipients(Dealer dealer, Id exceptUserId)
     {
@@ -147,4 +187,8 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
 
     // Deliberately not a name. See NotifyTeamOfCustomerActionAsync.
     private const string CustomerActorName = "A customer";
+
+    // A gallery removed from the platform between the action and the notification. The row still has
+    // to render, and "the rental office" is truer than a blank.
+    private const string UnknownGalleryName = "The rental office";
 }

@@ -35,6 +35,22 @@ public sealed class NotificationKind : Enumeration
     public static readonly NotificationKind DealerSuspended = new(8, "DealerSuspended");
     public static readonly NotificationKind DealerReactivated = new(9, "DealerReactivated");
 
+    // What a CUSTOMER did to a booking of the dealership's (CancelBookingHandlers). Raised through
+    // NotifyTeamOfCustomerActionAsync, so like BookingRequested the row names "A customer" and
+    // carries no actor id.
+    public static readonly NotificationKind BookingCancelledByCustomer = new(14, "BookingCancelledByCustomer");
+    public static readonly NotificationKind BookingNonDeliveryReported = new(15, "BookingNonDeliveryReported");
+
+    // What happened to the CUSTOMER's own booking (BookingDecisionHandlers, BookingSettlementService).
+    // The recipient is the customer, and the actor name is the GALLERY's business name rather than a
+    // member of its staff: which employee pressed the button is the dealership's internal business,
+    // and the customer already sees the gallery on the booking.
+    public static readonly NotificationKind YourBookingApproved = new(16, "YourBookingApproved");
+    public static readonly NotificationKind YourBookingRejected = new(17, "YourBookingRejected");
+    public static readonly NotificationKind YourBookingExpired = new(18, "YourBookingExpired");
+    public static readonly NotificationKind YourBookingCompleted = new(19, "YourBookingCompleted");
+    public static readonly NotificationKind YourBookingMarkedNoShow = new(20, "YourBookingMarkedNoShow");
+
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");
@@ -49,6 +65,9 @@ public sealed class NotificationKind : Enumeration
     //   BookingCancelledByAdmin, DisputeOpened, DisputeResolved — real and worth adding, and their
     //                       handlers exist; they are simply not wired yet. Add the kind WITH its
     //                       producer, never before it.
+    //   YourDepositDue    — the customer IS told their booking was approved, and YourBookingApproved
+    //                       is that message. A separate "pay now" alert would be a promise of a
+    //                       payment screen that does not exist until Payments ships.
 
     private NotificationKind(int id, string name) : base(id, name)
     {

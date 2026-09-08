@@ -303,8 +303,8 @@ public sealed class BookingApprovalTests
     {
         var booking = Build.Booking();
 
-        Assert.Equal("booking.reason_required", booking.Reject(Id.New(), " ", Now).Error.Code);
-        Assert.True(booking.Reject(Id.New(), "The car is in for service.", Now).IsSuccess);
+        Assert.Equal("booking.reason_required", booking.Reject(Id.New(), BookingRejectionReason.Other, " ", Now).Error.Code);
+        Assert.True(booking.Reject(Id.New(), BookingRejectionReason.VehicleUnavailable, "The car is in for service.", Now).IsSuccess);
 
         Assert.Same(BookingStatus.Rejected, booking.Status);
         Assert.True(booking.Penalty!.IsNothingOwed);
@@ -317,7 +317,7 @@ public sealed class BookingApprovalTests
         var booking = Build.ApprovedBooking();
 
         Assert.Equal("booking.not_awaiting_decision", booking.Approve(Id.New(), Now).Error.Code);
-        Assert.Equal("booking.not_awaiting_decision", booking.Reject(Id.New(), "no", Now).Error.Code);
+        Assert.Equal("booking.not_awaiting_decision", booking.Reject(Id.New(), BookingRejectionReason.Other, "no", Now).Error.Code);
     }
 
     /// <summary>
@@ -333,7 +333,7 @@ public sealed class BookingApprovalTests
         var late = toApprove.DecisionDeadline;
 
         Assert.Equal("booking.decision_window_elapsed", toApprove.Approve(Id.New(), late).Error.Code);
-        Assert.True(toReject.Reject(Id.New(), "Sorry, we missed this.", late).IsSuccess);
+        Assert.True(toReject.Reject(Id.New(), BookingRejectionReason.Other, "Sorry, we missed this.", late).IsSuccess);
     }
 }
 
@@ -406,8 +406,11 @@ public sealed class BookingCancellationTests
     {
         var booking = Build.ConfirmedBooking();
         var customer = Id.New();
+        // At the moment the customer was due to collect the car, not before it. See the guard test
+        // below for why the difference matters.
+        var due = booking.Period.Start;
 
-        Assert.True(booking.ReportDealerNonDelivery(customer, "Nobody showed up with the car.", Now.AddHours(3)).IsSuccess);
+        Assert.True(booking.ReportDealerNonDelivery(customer, "Nobody showed up with the car.", due).IsSuccess);
 
         Assert.Same(BookingStatus.Cancelled, booking.Status);
         Assert.Same(BookingParty.Dealer, booking.Penalty!.AttributedTo);
@@ -426,7 +429,47 @@ public sealed class BookingCancellationTests
         // A dealer who never turned up with a car nobody paid for owes nothing: the booking had not
         // committed either party yet, and it expires on its own.
         Assert.Equal("booking.not_confirmed", unpaid.ReportDealerNonDelivery(Id.New(), "nothing", Now).Error.Code);
-        Assert.Equal("booking.reason_required", confirmed.ReportDealerNonDelivery(Id.New(), " ", Now).Error.Code);
+        Assert.Equal(
+            "booking.reason_required",
+            confirmed.ReportDealerNonDelivery(Id.New(), " ", confirmed.Period.Start).Error.Code);
+    }
+
+    /// <summary>
+    /// A gallery cannot have failed to hand over a car that was not yet due.
+    /// </summary>
+    /// <remarks>
+    /// Until 2026-09-08 this was unguarded, and the consequence was not theoretical: a customer past
+    /// their free-cancellation window, facing an assessment of the whole deposit for cancelling,
+    /// could report non-delivery instead -- days before the rental -- and the record would say the
+    /// DEALER failed, with 25-50% of the rental assessed against them. The gallery would then have to
+    /// open a dispute to clear a claim made without them. MarkNoShow, which is the same accusation
+    /// pointing the other way, has always been guarded.
+    /// </remarks>
+    [Fact]
+    public void Non_delivery_cannot_be_reported_before_the_car_was_due()
+    {
+        var booking = Build.ConfirmedBooking();
+        var start = booking.Period.Start;
+
+        Assert.Equal(
+            "booking.non_delivery_too_early",
+            booking.ReportDealerNonDelivery(Id.New(), "They never came.", start.AddSeconds(-1)).Error.Code);
+
+        // The shipped grace is zero, so the instant the rental was due is soon enough.
+        Assert.True(booking.ReportDealerNonDelivery(Id.New(), "They never came.", start).IsSuccess);
+    }
+
+    /// <summary>The grace is FROZEN, so lengthening it tomorrow cannot un-report today's claim.</summary>
+    [Fact]
+    public void The_non_delivery_grace_is_the_one_the_booking_froze()
+    {
+        var booking = Build.ConfirmedBooking(terms: Build.Terms(nonDeliveryGrace: TimeSpan.FromHours(4)));
+        var start = booking.Period.Start;
+
+        Assert.Equal(
+            "booking.non_delivery_too_early",
+            booking.ReportDealerNonDelivery(Id.New(), "They never came.", start.AddHours(3)).Error.Code);
+        Assert.True(booking.ReportDealerNonDelivery(Id.New(), "They never came.", start.AddHours(4)).IsSuccess);
     }
 
     [Fact]

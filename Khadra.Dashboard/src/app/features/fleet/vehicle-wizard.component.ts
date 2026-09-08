@@ -19,6 +19,7 @@ import { MapComponent } from '../../shared/map/map.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 import { IconName } from '../../shared/icon/icon-paths';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MoneyPipe } from '../../shared/money.pipe';
 
 interface Step {
   readonly n: number;
@@ -81,7 +82,7 @@ function toRequest(form: WizardForm): VehicleRequest {
   selector: 'kh-vehicle-wizard',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './vehicle-wizard.component.html',
-  imports: [RouterLink, IconComponent, ImageFallbackDirective, MapComponent],
+  imports: [RouterLink, IconComponent, ImageFallbackDirective, MapComponent, MoneyPipe],
 })
 export class VehicleWizardComponent {
   protected readonly t = inject(I18nService).t;

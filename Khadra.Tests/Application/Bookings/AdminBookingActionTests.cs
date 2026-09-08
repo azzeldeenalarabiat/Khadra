@@ -44,7 +44,7 @@ public sealed class AdminBookingActionTests
             Actor.Name.Returns("Rania Haddad");
             Actor.CorrelationId.Returns("test-correlation");
             Reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Petra Rentals", "Sami Khoury", null));
+                .Returns(new BookingContext(null, "Petra Rentals", "Sami Khoury", null, null));
         }
 
         public Booking Given(Booking booking)

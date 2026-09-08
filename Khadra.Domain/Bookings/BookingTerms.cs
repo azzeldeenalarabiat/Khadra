@@ -49,6 +49,24 @@ public sealed class BookingTerms : ValueObject
     // Frozen like every other rule here, and for the same reason — but this one also has a physical
     // consequence, because it is what Booking.HoldStart is derived from and the database enforces
     // that hold. Zero is a legitimate value meaning back-to-back rentals are allowed.
+    /// <summary>
+    /// How long after the rental was due to start before the customer may report that the gallery
+    /// never handed the car over (spec 5.5).
+    /// </summary>
+    /// <remarks>
+    /// The mirror image of <see cref="NoShowTimeout"/>, which is what the gallery waits before it may
+    /// say the CUSTOMER never appeared. Both claims are about the same missed handover, and until
+    /// 2026-09-08 only one of them was guarded: a customer could report non-delivery at any time
+    /// after the deposit cleared, days before the car was due.
+    ///
+    /// Zero is a legitimate value and is the shipped default -- a gallery that has not handed the car
+    /// over at the agreed moment is already late. It is a setting rather than a constant because how
+    /// much lateness is worth reporting is a business judgement, and it is frozen here rather than
+    /// read live because a grace the owner lengthens tomorrow must not un-report yesterday's claim.
+    ///
+    /// OPEN OWNER DECISION: the figure itself. Shipped at 0 hours; see docs/spec-amendments.md.
+    /// </remarks>
+    public TimeSpan NonDeliveryGrace { get; }
     public TimeSpan TurnaroundBuffer { get; }
     public int RulesVersion { get; }
 
@@ -71,6 +89,7 @@ public sealed class BookingTerms : ValueObject
         Percentage dealerPenaltyMinPercent,
         Percentage dealerPenaltyMaxPercent,
         TimeSpan turnaroundBuffer,
+        TimeSpan nonDeliveryGrace,
         int rulesVersion)
     {
         DepositPercent = depositPercent;
@@ -84,6 +103,7 @@ public sealed class BookingTerms : ValueObject
         DealerPenaltyMinPercent = dealerPenaltyMinPercent;
         DealerPenaltyMaxPercent = dealerPenaltyMaxPercent;
         TurnaroundBuffer = turnaroundBuffer;
+        NonDeliveryGrace = nonDeliveryGrace;
         RulesVersion = rulesVersion;
     }
 
@@ -99,6 +119,7 @@ public sealed class BookingTerms : ValueObject
         Percentage dealerPenaltyMinPercent,
         Percentage dealerPenaltyMaxPercent,
         TimeSpan turnaroundBuffer,
+        TimeSpan nonDeliveryGrace,
         int rulesVersion)
     {
         ArgumentNullException.ThrowIfNull(depositPercent);
@@ -124,7 +145,8 @@ public sealed class BookingTerms : ValueObject
         if (freeCancellationWindow < TimeSpan.Zero || noShowTimeout <= TimeSpan.Zero ||
             paymentWindow <= TimeSpan.Zero || answerWindow <= TimeSpan.Zero ||
             postReturnSettlementWindow < TimeSpan.Zero ||
-            turnaroundBuffer < TimeSpan.Zero)
+            turnaroundBuffer < TimeSpan.Zero ||
+            nonDeliveryGrace < TimeSpan.Zero)
         {
             return Error.Validation("booking.invalid_terms", "Booking terms carry an invalid time window.");
         }
@@ -141,6 +163,7 @@ public sealed class BookingTerms : ValueObject
             dealerPenaltyMinPercent,
             dealerPenaltyMaxPercent,
             turnaroundBuffer,
+            nonDeliveryGrace,
             rulesVersion);
     }
 
@@ -157,6 +180,7 @@ public sealed class BookingTerms : ValueObject
         yield return DealerPenaltyMinPercent;
         yield return DealerPenaltyMaxPercent;
         yield return TurnaroundBuffer;
+        yield return NonDeliveryGrace;
         yield return RulesVersion;
     }
 }

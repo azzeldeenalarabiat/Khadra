@@ -52,3 +52,10 @@ App_Data/
 # Intermediate output from the i18n extraction tooling in Khadra.Dashboard/. The dictionaries in
 # src/app/core/i18n/ are the artefact; these are the scratch the codemods pass between themselves.
 Khadra.Dashboard/i18n-*.json
+
+# Flutter customer app
+Khadra.Mobile/.dart_tool/
+Khadra.Mobile/build/
+Khadra.Mobile/.flutter-plugins-dependencies
+Khadra.Mobile/l10n-untranslated.json
+Khadra.Mobile/*.iml

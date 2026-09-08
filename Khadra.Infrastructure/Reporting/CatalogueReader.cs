@@ -6,6 +6,7 @@ using Khadra.Application.Fleet.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
+using Khadra.Domain.Reviews;
 using Khadra.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -148,14 +149,16 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                         dealer.LogoStorageKey == null
                             ? null
                             : DealerProfileDto.PublicImagePath + "/" + dealer.LogoStorageKey,
-                        // Reviews has no table yet. Null is the honest score and 0 the honest count;
-                        // a card renders no star rather than a zero-star one.
+                        // Filled in below, from ONE grouped query over every gallery on this page.
+                        // Correlating it here would make a twenty-card page do twenty extra
+                        // aggregates; SQL can average them all at once.
                         null,
                         0))
                     .First()))
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<CatalogueListing>(items, page.Page, page.PageSize, totalCount);
+        return new PagedResult<CatalogueListing>(
+            await WithRatingsAsync(items, cancellationToken), page.Page, page.PageSize, totalCount);
     }
 
     public async Task<CatalogueVehicle?> GetAsync(
@@ -278,6 +281,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         if (dealer is null)
             return null;
 
+        // Null and 0 until somebody rates them -- a real state, and different from a zero-star score.
+        var rating = await RatingFor(dealer.Id, cancellationToken);
+
         return new PublicGallery(
             dealer.Id.Value,
             dealer.BusinessName.Value,
@@ -296,9 +302,91 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                 dealer.Delivery.IsEnabled,
                 dealer.Delivery.RadiusKm,
                 MoneyDto.FromOptional(dealer.Delivery.Fee)),
-            // Reviews has no persistence yet (pre-launch checklist item 3). Null is the truth.
-            AverageRating: null,
-            ReviewCount: 0);
+            rating.Average,
+            rating.Count);
+    }
+
+    /// <summary>
+    /// Fills the rating on every card of a page from one grouped query.
+    /// </summary>
+    /// <remarks>
+    /// The projection above cannot do this itself without a correlated aggregate per row, which is
+    /// the N+1 that turns a twenty-result page into twenty-one round trips on the endpoint a customer
+    /// hits most.
+    ///
+    /// A gallery nobody has rated is simply absent from the grouped result and keeps the null the
+    /// projection gave it. Null is the honest score: zero is a real rating on a one-to-five scale and
+    /// would render an unrated gallery as the worst on the platform.
+    ///
+    /// Hidden reviews are counted. Moderation removes abusive TEXT and never the score (spec 3.2,
+    /// 4.1), or reporting a comment would be a way to erase the rating attached to it.
+    /// </remarks>
+    private async Task<List<CatalogueListing>> WithRatingsAsync(
+        List<CatalogueListing> listings,
+        CancellationToken cancellationToken)
+    {
+        // A List<Id>, not a List<Guid>: SubjectId goes through the Id value converter, and comparing
+        // its unwrapped .Value against a Guid list is an expression EF cannot translate at all.
+        var dealerIds = listings
+            .Select(listing => Id.From(listing.Gallery.DealerId))
+            .Distinct()
+            .ToList();
+
+        if (dealerIds.Count == 0)
+            return listings;
+
+        var ratings = await context.Reviews
+            .AsNoTracking()
+            .Where(review =>
+                review.Direction == ReviewDirection.CustomerRatesDealer &&
+                dealerIds.Contains(review.SubjectId))
+            .GroupBy(review => review.SubjectId)
+            .Select(group => new
+            {
+                DealerId = group.Key,
+                Average = group.Average(review => (decimal)review.Rating.Value),
+                Count = group.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        if (ratings.Count == 0)
+            return listings;
+
+        var byDealer = ratings.ToDictionary(row => row.DealerId.Value);
+
+        return [.. listings.Select(listing =>
+            byDealer.TryGetValue(listing.Gallery.DealerId, out var rating)
+                ? listing with
+                {
+                    Gallery = listing.Gallery with
+                    {
+                        // Rounded here rather than on the client: a rating is shown to one decimal,
+                        // and rounding is a decision about a number, which is the server's to make.
+                        AverageRating = Math.Round(rating.Average, 1, MidpointRounding.AwayFromZero),
+                        ReviewCount = rating.Count
+                    }
+                }
+                : listing)];
+    }
+
+    /// <summary>One gallery's rating, for its own page.</summary>
+    private async Task<(decimal? Average, int Count)> RatingFor(Id dealerId, CancellationToken cancellationToken)
+    {
+        // Two aggregates rather than one GroupBy(_ => 1) with both in the projection: that shape
+        // translates on Postgres and NOT on the SQLite the persistence tests run against, so it would
+        // ship a gallery page that only ever fails in production.
+        var rated = context.Reviews
+            .AsNoTracking()
+            .Where(review =>
+                review.SubjectId == dealerId &&
+                review.Direction == ReviewDirection.CustomerRatesDealer);
+
+        var count = await rated.CountAsync(cancellationToken);
+        if (count == 0)
+            return (null, 0);
+
+        var average = await rated.AverageAsync(review => (decimal)review.Rating.Value, cancellationToken);
+        return (Math.Round(average, 1, MidpointRounding.AwayFromZero), count);
     }
 
     /// <summary>

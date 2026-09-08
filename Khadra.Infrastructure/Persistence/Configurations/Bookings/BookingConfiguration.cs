@@ -40,6 +40,10 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             .HasConversion(party => party!.Name, name => Enumeration.FromName<BookingParty>(name))
             .HasMaxLength(20);
 
+        // The code and the words the canceller typed, kept in two columns. Composing them into one
+        // English sentence -- which is how the dealer's rejection reason was stored until 2026-09-08
+        // -- puts untranslatable prose on a permanent record.
+        entity.Property(booking => booking.CancellationReasonCode).HasMaxLength(40);
         entity.Property(booking => booking.CancellationReason).HasMaxLength(1000);
         entity.Property(booking => booking.CreatedAt).IsRequired();
         // The two consecutive clocks. A request always has a decision deadline; only an approved
@@ -109,6 +113,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             terms.Property(value => value.AnswerWindow);
             terms.Property(value => value.PostReturnSettlementWindow);
             terms.Property(value => value.TurnaroundBuffer);
+            terms.Property(value => value.NonDeliveryGrace);
             terms.Property(value => value.RulesVersion);
         });
         entity.Navigation(booking => booking.Terms).IsRequired();
@@ -225,6 +230,7 @@ internal sealed class BookingStatusChangeConfiguration : IEntityTypeConfiguratio
             .HasMaxLength(20);
         ConfigureEnumeration(entity.Property(change => change.To), 20);
         ConfigureEnumeration(entity.Property(change => change.ActorParty), 20);
+        entity.Property(change => change.ReasonCode).HasMaxLength(40);
         entity.Property(change => change.Reason).HasMaxLength(1000);
         entity.Property(change => change.OccurredAt).IsRequired();
 

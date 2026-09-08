@@ -133,6 +133,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("cancellation_reason");
 
+                    b.Property<string>("CancellationReasonCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("cancellation_reason_code");
+
                     b.Property<string>("CancelledBy")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -287,6 +292,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("reason");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reason_code");
 
                     b.Property<string>("To")
                         .IsRequired()
@@ -1239,6 +1249,69 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.ToTable("cities", (string)null);
                 });
 
+            modelBuilder.Entity("Khadra.Domain.Reviews.Review", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("HiddenReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("hidden_reason");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_hidden");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<Guid>("ReviewerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_user_id");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reviews");
+
+                    b.HasIndex("BookingId", "Direction")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reviews_booking_id_direction");
+
+                    b.HasIndex("SubjectId", "Direction", "CreatedAt")
+                        .HasDatabaseName("ix_reviews_subject_id_direction_created_at");
+
+                    b.ToTable("reviews", (string)null);
+                });
+
             modelBuilder.Entity("Khadra.Domain.Bookings.Booking", b =>
                 {
                     b.OwnsOne("Khadra.Domain.Common.GeoPoint", "DeliveryLocation", b1 =>
@@ -1531,6 +1604,8 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                             b1.Property<TimeSpan>("FreeCancellationWindow");
 
                             b1.Property<TimeSpan>("NoShowTimeout");
+
+                            b1.Property<TimeSpan>("NonDeliveryGrace");
 
                             b1.Property<TimeSpan>("PaymentWindow");
 

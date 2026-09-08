@@ -1,0 +1,10 @@
+# English is the TEMPLATE, so a key added without an Arabic translation is a warning
+# rather than a silent gap. `untranslated-messages-file` writes those keys to a file
+# the build can be checked against -- the app's equivalent of the console's ar.ts
+# being typed against en.ts, which is what stopped Arabic quietly falling behind.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false
+untranslated-messages-file: l10n-untranslated.json

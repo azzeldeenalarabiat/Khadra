@@ -97,10 +97,10 @@
                   <span class="k-label">{{ t('adminBooking.against') }} {{ penalty.attributedTo }}</span>
                   <span class="num">
                     @if (penalty.isRange) {
-                      {{ penalty.minAmount.amount }}–{{ penalty.maxAmount.amount }}
-                      {{ penalty.maxAmount.currency }}
+                      {{ penalty.minAmount | money: 'amount' }}–{{ penalty.maxAmount | money }}
+                      
                     } @else {
-                      {{ penalty.maxAmount.amount }} {{ penalty.maxAmount.currency }}
+                      {{ penalty.maxAmount | money }} 
                     }
                   </span>
                 </div>
@@ -140,7 +140,7 @@
                   </div>
                   @if (h.cashCollected) {
                     <div class="page-sub">
-                      {{ t('adminBooking.cashCollected') }} {{ h.cashCollected.amount }} {{ h.cashCollected.currency }}
+                      {{ t('adminBooking.cashCollected') }} {{ h.cashCollected | money }} 
                     </div>
                   }
                   @if (h.notes) {

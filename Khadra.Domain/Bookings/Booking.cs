@@ -57,6 +57,14 @@ public sealed class Booking : AggregateRoot
     // The dealer owner or employee who approved or rejected (spec 4.2 accountability).
     public Id? ActedByUserId { get; private set; }
     public BookingParty? CancelledBy { get; private set; }
+    /// <summary>
+    /// The closed-set code the canceller chose, or null for a cancellation nobody attributed a reason
+    /// to. Kept beside <see cref="CancellationReason"/> so the sentence a customer reads is chosen in
+    /// their own language rather than frozen in English on the record.
+    /// </summary>
+    public string? CancellationReasonCode { get; private set; }
+
+    /// <summary>Whatever the canceller typed beside the code. Their own words.</summary>
     public string? CancellationReason { get; private set; }
     public PenaltyAssessment? Penalty { get; private set; }
     // An extension is a separate booking that points back here, never a mutation of the original.
@@ -194,6 +202,60 @@ public sealed class Booking : AggregateRoot
     public bool CanBeReviewed => Status == BookingStatus.Completed;
 
     /// <summary>
+    /// Whether this request is still genuinely waiting for the gallery's answer.
+    /// </summary>
+    /// <remarks>
+    /// Status alone cannot answer it. A request whose decision deadline has passed is over -- the
+    /// availability predicate released the car at that instant -- but nothing has rewritten the row,
+    /// so it still reads <c>Requested</c> until the settlement job gets to it. The server decides
+    /// this, because a client comparing a deadline against its own clock would show a dead booking
+    /// as live on any phone whose clock is wrong.
+    /// </remarks>
+    public bool IsAwaitingDecision(DateTimeOffset now) =>
+        Status == BookingStatus.Requested && now < DecisionDeadline;
+
+    /// <summary>Whether the deposit can still be paid on this booking.</summary>
+    public bool IsAwaitingPayment(DateTimeOffset now) =>
+        Status == BookingStatus.Approved && PaymentDeadline is { } deadline && now < deadline;
+
+    /// <summary>
+    /// Whether a window closed on this booking without the row having caught up.
+    /// </summary>
+    /// <remarks>
+    /// The clock has already decided; only the status is behind. Anything acting on the booking must
+    /// settle this first, or it writes a decision over an outcome that was no longer anyone's to
+    /// make -- "you cancelled this" onto a booking the platform had already released.
+    /// </remarks>
+    public bool HasLapsed(DateTimeOffset now) =>
+        (Status == BookingStatus.Requested && now >= DecisionDeadline) ||
+        (Status == BookingStatus.Approved && PaymentDeadline is { } paymentDeadline && now >= paymentDeadline);
+
+    /// <summary>Whether <see cref="Cancel"/> would succeed right now.</summary>
+    public bool CanBeCancelled(DateTimeOffset now) =>
+        (Status == BookingStatus.Requested ||
+         Status == BookingStatus.Approved ||
+         Status == BookingStatus.Confirmed) &&
+        !HasLapsed(now);
+
+    /// <summary>
+    /// What cancelling right now would cost the named party, without cancelling.
+    /// </summary>
+    /// <remarks>
+    /// Shares <see cref="AssessCancellation"/> with the real thing, so the figure on the confirmation
+    /// sheet is the figure that would be recorded. It exists for the same reason
+    /// <c>BookingDto.CommissionAmount</c> does: no screen may multiply a percentage by an amount to
+    /// find out what a customer is about to agree to.
+    /// </remarks>
+    public CancellationPreview PreviewCancellation(BookingParty cancelledBy, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(cancelledBy);
+
+        return CanBeCancelled(now)
+            ? CancellationPreview.Allowed(AssessCancellation(cancelledBy, now))
+            : CancellationPreview.NotAllowed(Pricing.CurrencyCode, now);
+    }
+
+    /// <summary>
     /// Whether either party can still open a dispute on this booking (spec 3.3).
     ///
     /// The window is the one FROZEN on this booking, never the current setting, and it runs from the
@@ -308,18 +370,25 @@ public sealed class Booking : AggregateRoot
     }
 
     // Rejection is always free for the customer: the dealer declined before any commitment existed.
-    public UnitResult<Error> Reject(Id actedByUserId, string reason, DateTimeOffset now)
+    /// <param name="reasonCode">
+    /// One of <see cref="BookingRejectionReason"/>. Stored as the code, never as a sentence composed
+    /// from it: the customer reading this booking may not read English.
+    /// </param>
+    /// <param name="details">The gallery's own words. Required, and shown to the customer as typed.</param>
+    public UnitResult<Error> Reject(Id actedByUserId, BookingRejectionReason reasonCode, string details, DateTimeOffset now)
     {
+        ArgumentNullException.ThrowIfNull(reasonCode);
+
         if (Status != BookingStatus.Requested)
             return UnitResult.Failure(BookingErrors.NotAwaitingDecision);
-        if (string.IsNullOrWhiteSpace(reason))
+        if (string.IsNullOrWhiteSpace(details))
             return UnitResult.Failure(BookingErrors.ReasonRequired);
 
         ActedByUserId = actedByUserId;
         Penalty = PenaltyAssessment.None("The dealer rejected the request.", Pricing.CurrencyCode, now);
         FinishedAt = now;
-        Transition(BookingStatus.Rejected, BookingParty.Dealer, actedByUserId, reason, now);
-        AddDomainEvent(new BookingRejected(Id, DealerId, actedByUserId, reason.Trim(), now));
+        Transition(BookingStatus.Rejected, BookingParty.Dealer, actedByUserId, details, now, reasonCode.Name);
+        AddDomainEvent(new BookingRejected(Id, DealerId, actedByUserId, details.Trim(), now));
         return UnitResult.Success<Error>();
     }
 
@@ -328,7 +397,12 @@ public sealed class Booking : AggregateRoot
     // approval the customer has not paid for as well as a request nobody has answered. Once it has
     // cleared the free window decides, and past it the canceller is assessed. Nothing is charged
     // here (see PenaltyAssessment).
-    public UnitResult<Error> Cancel(BookingParty cancelledBy, Id? actorUserId, string? reason, DateTimeOffset now)
+    public UnitResult<Error> Cancel(
+        BookingParty cancelledBy,
+        Id? actorUserId,
+        string? reason,
+        DateTimeOffset now,
+        BookingCancellationReason? reasonCode = null)
     {
         ArgumentNullException.ThrowIfNull(cancelledBy);
 
@@ -341,10 +415,11 @@ public sealed class Booking : AggregateRoot
 
         var assessment = AssessCancellation(cancelledBy, now);
         CancelledBy = cancelledBy;
+        CancellationReasonCode = reasonCode?.Name;
         CancellationReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
         Penalty = assessment;
         FinishedAt = now;
-        Transition(BookingStatus.Cancelled, cancelledBy, actorUserId, reason, now);
+        Transition(BookingStatus.Cancelled, cancelledBy, actorUserId, reason, now, reasonCode?.Name);
         AddDomainEvent(new BookingCancelled(
             Id,
             VehicleId,
@@ -365,6 +440,15 @@ public sealed class Booking : AggregateRoot
             return UnitResult.Failure(BookingErrors.NotConfirmed);
         if (string.IsNullOrWhiteSpace(reason))
             return UnitResult.Failure(BookingErrors.ReasonRequired);
+        // A gallery cannot have failed to hand over a car that was not yet due. Without this, a
+        // customer facing a cancellation penalty could report non-delivery days ahead of the rental
+        // instead, flipping a 25-50% assessment onto the gallery, who would then have to open a
+        // dispute to clear a record written without them. MarkNoShow -- the mirror-image claim, that
+        // the CUSTOMER never appeared -- has always been guarded this way. This is the other half of
+        // the same rule, and its grace is frozen on the booking for the same reason every other
+        // window is: a rule the owner changes tomorrow must not re-judge a rental agreed today.
+        if (now < Period.Start.Add(Terms.NonDeliveryGrace))
+            return UnitResult.Failure(BookingErrors.NonDeliveryTooEarly);
 
         CancelledBy = BookingParty.Customer;
         CancellationReason = reason.Trim();
@@ -575,9 +659,10 @@ public sealed class Booking : AggregateRoot
         BookingParty actorParty,
         Id? actorUserId,
         string? reason,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? reasonCode = null)
     {
-        RecordTransition(Status, to, actorParty, actorUserId, reason, now);
+        RecordTransition(Status, to, actorParty, actorUserId, reason, now, reasonCode);
         Status = to;
     }
 
@@ -587,6 +672,8 @@ public sealed class Booking : AggregateRoot
         BookingParty actorParty,
         Id? actorUserId,
         string? reason,
-        DateTimeOffset now) =>
-        _statusHistory.Add(BookingStatusChange.Record(Id, from, to, actorParty, actorUserId, reason, now));
+        DateTimeOffset now,
+        string? reasonCode = null) =>
+        _statusHistory.Add(
+            BookingStatusChange.Record(Id, from, to, actorParty, actorUserId, reason, now, reasonCode));
 }

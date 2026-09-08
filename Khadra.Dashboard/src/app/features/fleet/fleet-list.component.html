@@ -169,12 +169,12 @@
                 <div class="car-card-money">
                   <div class="car-card-figure">
                     <span class="k">{{ t('fleetList.perDay') }}</span>
-                    <span class="num">{{ car.dailyRate.amount }} {{ car.dailyRate.currency }}</span>
+                    <span class="num">{{ car.dailyRate | money }} </span>
                   </div>
                   <div class="car-card-figure">
                     <span class="k">{{ t('common.deposit') }}</span>
                     <span class="num"
-                      >{{ car.securityDeposit.amount }} {{ car.securityDeposit.currency }}</span
+                      >{{ car.securityDeposit | money }} </span
                     >
                   </div>
                 </div>

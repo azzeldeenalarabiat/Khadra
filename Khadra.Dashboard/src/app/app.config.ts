@@ -14,6 +14,7 @@ import { TitleStrategy, provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { I18nService } from './core/i18n/i18n.service';
 import { TranslatedTitleStrategy } from './core/i18n/translated-title.strategy';
+import { PlatformConfigService } from './core/services/platform-config.service';
 import { sessionExpiredInterceptor } from './core/services/session-expired.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -23,6 +24,12 @@ export const appConfig: ApplicationConfig = {
     // than rendering in English and flipping. It also puts `lang` and `dir` on <html> in time for
     // the first layout, which is what stops an Arabic session drawing left-to-right for a frame.
     provideAppInitializer(() => inject(I18nService).restore()),
+    // The currency's scale and the platform's reporting zone, read from the server rather than
+    // assumed. Not awaited: a slow or unreachable call must not hold the console at a blank
+    // screen, and the formatter falls back to the behaviour it had before it asked.
+    provideAppInitializer(() => {
+      void inject(PlatformConfigService).load();
+    }),
     provideRouter(routes),
     // Angular resolves a route's static `title` once, on activation, so a language switch never
     // reaches the browser tab without this.

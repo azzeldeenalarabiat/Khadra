@@ -167,7 +167,8 @@ internal static class Build
         decimal customerPenaltyPercent = 100m,
         decimal dealerPenaltyMin = 25m,
         decimal dealerPenaltyMax = 50m,
-        TimeSpan? turnaroundBuffer = null) =>
+        TimeSpan? turnaroundBuffer = null,
+        TimeSpan? nonDeliveryGrace = null) =>
         BookingTerms.Create(
             Percent(depositPercent),
             Percent(commissionPercent),
@@ -180,6 +181,7 @@ internal static class Build
             Percent(dealerPenaltyMin),
             Percent(dealerPenaltyMax),
             turnaroundBuffer ?? TurnaroundBuffer,
+            nonDeliveryGrace ?? TimeSpan.Zero,
             rulesVersion: 1).Value;
 
     public static DateRange Period(DateTimeOffset? start = null, int days = 3)
@@ -251,10 +253,15 @@ internal static class Build
 
     // Approved by the dealer and NOT yet paid: the window in which the customer owes a deposit and
     // the car is held on nothing but a clock. Every expiry rule hangs off this one.
-    public static Booking ApprovedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null)
+    public static Booking ApprovedBooking(
+        DateTimeOffset? now = null,
+        PickupMethod? pickupMethod = null,
+        BookingTerms? terms = null,
+        Id? customerId = null,
+        Id? dealerId = null)
     {
         var moment = now ?? Now;
-        var booking = Booking(moment, pickupMethod: pickupMethod, terms: terms);
+        var booking = Booking(moment, pickupMethod: pickupMethod, terms: terms, customerId: customerId, dealerId: dealerId);
         booking.Approve(Id.New(), moment);
         booking.ClearDomainEvents();
         return booking;
@@ -264,10 +271,15 @@ internal static class Build
     // booking. Under the old order approval was the last step and the deposit came first, so the two
     // names meant the same booking; since 2026-09-07 they are different states and a test asking for
     // "approved" would silently get an unpaid one.
-    public static Booking ConfirmedBooking(DateTimeOffset? now = null, PickupMethod? pickupMethod = null, BookingTerms? terms = null)
+    public static Booking ConfirmedBooking(
+        DateTimeOffset? now = null,
+        PickupMethod? pickupMethod = null,
+        BookingTerms? terms = null,
+        Id? customerId = null,
+        Id? dealerId = null)
     {
         var moment = now ?? Now;
-        var booking = ApprovedBooking(moment, pickupMethod, terms);
+        var booking = ApprovedBooking(moment, pickupMethod, terms, customerId, dealerId);
         booking.ConfirmDepositPaid(Id.New(), moment);
         booking.ClearDomainEvents();
         return booking;

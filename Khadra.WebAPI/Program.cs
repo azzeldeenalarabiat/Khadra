@@ -180,9 +180,53 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
 {
     var origins = builder.Configuration.GetSection($"{AppOptions.SectionName}:AllowedOrigins").Get<string[]>() ?? [];
-    if (origins.Length > 0)
-        policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod();
+    var allowLocalNetwork = builder.Environment.IsDevelopment();
+
+    // ONE predicate covering both rules. `SetIsOriginAllowed` REPLACES the check
+    // that `WithOrigins` installs rather than adding to it, so calling both leaves
+    // only the second -- which silently locked the console out of its own API.
+    policy
+        .SetIsOriginAllowed(origin =>
+            origins.Contains(origin, StringComparer.OrdinalIgnoreCase) ||
+            (allowLocalNetwork && IsLocalNetworkAppOrigin(origin)))
+        .AllowAnyHeader()
+        .AllowAnyMethod();
 }));
+
+/// <summary>
+/// The customer app served from this machine's own address on the local network,
+/// so it can be opened on a real phone.
+/// </summary>
+/// <remarks>
+/// A predicate rather than another entry in AllowedOrigins because the address is
+/// a DHCP lease: it moved from .251 to .254 in the middle of one test run, and a
+/// configured origin means editing and restarting every time that happens.
+///
+/// Deliberately narrow, and it is three conditions rather than one: the caller
+/// checks this only in development, and it accepts only plaintext http on the one
+/// port the app is served from, at a PRIVATE address. Nothing routable from the
+/// internet matches. Note also that this API authenticates with a bearer token and
+/// not a cookie, so a permitted origin cannot ride on a session the way it could
+/// if `AllowCredentials` were in play.
+/// </remarks>
+static bool IsLocalNetworkAppOrigin(string origin)
+{
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)) return false;
+    if (uri.Scheme != Uri.UriSchemeHttp || uri.Port != 4300) return false;
+    if (!System.Net.IPAddress.TryParse(uri.Host, out var address)) return false;
+    if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork) return false;
+
+    // RFC 1918, plus loopback. Anything else is not a machine on somebody's desk.
+    var octets = address.GetAddressBytes();
+    return octets[0] switch
+    {
+        10 => true,
+        127 => true,
+        172 => octets[1] >= 16 && octets[1] <= 31,
+        192 => octets[1] == 168,
+        _ => false,
+    };
+}
 
 // The API answers the BFF, never a browser directly, so the address on the connection is always the
 // BFF's. The BFF forwards the real client in X-Forwarded-For and the rate limiter partitions on the

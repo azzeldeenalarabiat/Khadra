@@ -38,7 +38,7 @@ public sealed class BookingDecisionTests
         {
             UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
             Reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Al-Nadeem Rentals", "Layla Odeh", null));
+                .Returns(new BookingContext(null, "Al-Nadeem Rentals", "Layla Odeh", null, null));
             Dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
             Dealers.GetByOwnerUserIdAsync(OwnerId, Arg.Any<CancellationToken>()).Returns(Dealer);
         }
@@ -113,8 +113,18 @@ public sealed class BookingDecisionTests
         Assert.Same(BookingStatus.Requested, booking.Status);
     }
 
+    /// <summary>
+    /// The code and the dealer's own words are stored APART.
+    /// </summary>
+    /// <remarks>
+    /// They used to be composed into one English sentence on the way in --
+    /// "The dates conflict with another booking: The car is out until the 12th." -- which put
+    /// untranslatable prose on a permanent record. An Arabic-speaking customer read English on their
+    /// own booking and no client could do anything about it, because the words were in the row.
+    /// Keeping the code means the sentence is chosen when the row is READ, in the reader's language.
+    /// </remarks>
     [Fact]
-    public async Task Rejection_composes_a_reason_written_for_the_customer()
+    public async Task Rejection_records_the_code_and_the_dealers_words_separately()
     {
         var context = new Context();
         var booking = context.GivenRequested();
@@ -125,8 +135,12 @@ public sealed class BookingDecisionTests
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Same(BookingStatus.Rejected, booking.Status);
+
         var last = booking.StatusHistory.OrderBy(change => change.OccurredAt).Last();
-        Assert.Equal("The dates conflict with another booking: The car is out until the 12th.", last.Reason);
+        Assert.Equal("DatesConflict", last.ReasonCode);
+        Assert.Equal("The car is out until the 12th.", last.Reason);
+        Assert.DoesNotContain("The dates conflict", last.Reason, StringComparison.Ordinal);
+
         // Rejection never costs the customer anything.
         Assert.True(booking.Penalty!.IsNothingOwed);
     }

@@ -39,7 +39,16 @@ public sealed record BookingContext(
     VehicleLabel? Vehicle,
     string DealerName,
     string CustomerName,
-    Guid? LiveDisputeId);
+    Guid? LiveDisputeId,
+    /// <summary>
+    /// The customer's own review of this booking, if they have left one.
+    /// </summary>
+    /// <remarks>
+    /// Correlated here rather than fetched by the app, so a booking screen can decide between
+    /// "rate this rental" and "you rated it" without a second request that would answer 404 for the
+    /// ordinary case of not having reviewed yet.
+    /// </remarks>
+    Guid? MyReviewId);
 
 public sealed record VehicleLabel(
     Guid VehicleId,

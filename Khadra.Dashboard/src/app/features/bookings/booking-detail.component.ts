@@ -10,6 +10,7 @@ import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { MoneyPipe } from '../../shared/money.pipe';
 
 /**
  * One booking as the platform sees it.
@@ -26,7 +27,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
   selector: 'kh-admin-booking-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './booking-detail.component.html',
-  imports: [RouterLink, IconComponent, TimelineComponent],
+  imports: [RouterLink, IconComponent, TimelineComponent, MoneyPipe],
 })
 export class AdminBookingDetailComponent {
   protected readonly t = inject(I18nService).t;
