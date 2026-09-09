@@ -338,6 +338,32 @@ else
 // on a managed platform, the readiness probe already reports it, and refusing to start would take
 // away the one endpoint that still works while somebody is fixing the configuration.
 await Program.ProbeDatabaseAsync(app.Services, app.Logger).ConfigureAwait(false);
+
+// Report, ONCE, what the first request actually looked like on the wire.
+//
+// KnownProxies is guesswork until somebody sees the address the platform connects from, and the
+// consequence of guessing wrong is invisible: X-Forwarded-For is quietly ignored, every visitor
+// partitions on the same proxy address, and ten failed sign-ins by anyone locks the whole platform
+// out for fifteen minutes. Nothing in the logs says so, and no response header does either.
+//
+// One line, on the first request only, naming the peer, the header it carried, and the address the
+// middleware settled on. If the peer is not inside a configured range, or the resolved client is
+// the same as the peer, the ranges are wrong and this says so plainly.
+var firstRequestSeen = 0;
+app.Use(async (context, next) =>
+{
+    if (Interlocked.Exchange(ref firstRequestSeen, 1) == 0)
+    {
+        // Materialised before the call: the analyzer objects to work inside a logging argument,
+        // and this runs exactly once, so there is nothing to defer anyway.
+        var peer = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
+        var header = context.Request.Headers["X-Forwarded-For"].ToString();
+        var forwarded = header.Length > 0 ? header : "(absent)";
+        Program.LogFirstRequest(app.Logger, peer, forwarded, context.Request.IsHttps);
+    }
+
+    await next(context).ConfigureAwait(false);
+});
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment())
@@ -431,45 +457,68 @@ public partial class Program
                   "Name the BFF in KnownProxies.")]
     internal static partial void LogNoTrustedProxy(ILogger logger);
 
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "First request: connection came from {Peer}, X-Forwarded-For was {Forwarded}, " +
+                  "and the request is {Scheme}. If the client address the limiter uses ends up " +
+                  "equal to {Peer} for every visitor, KnownProxies does not cover {Peer} and " +
+                  "X-Forwarded-For is being ignored -- add the range that contains it.")]
+    internal static partial void LogFirstRequest(ILogger logger, string peer, string forwarded, bool scheme);
+
     /// <summary>Opens one connection so a misconfigured database is a log line, not a mystery.</summary>
     internal static async Task ProbeDatabaseAsync(IServiceProvider services, ILogger logger)
     {
         var configuration = services.GetRequiredService<IConfiguration>();
 
-        string host, database, user;
+        // Parsed and CONNECTED in two steps, so a failure can still say which host and which user it
+        // was attempting. The first version logged only the reason, and "password authentication
+        // failed for user \"postgres\"" does not answer the question that actually matters on a
+        // pooled database: whether the username carried the project reference it needs. Naming the
+        // attempt turns one more redeploy into a glance.
+        string identity;
+        string resolved;
         try
         {
-            var resolved = Khadra.Infrastructure.DependencyInjection.ResolveConnectionString(configuration);
+            resolved = Khadra.Infrastructure.DependencyInjection.ResolveConnectionString(configuration);
             var builder = new Npgsql.NpgsqlConnectionStringBuilder(resolved);
-            host = $"{builder.Host}:{builder.Port.ToString(CultureInfo.InvariantCulture)}";
-            database = builder.Database ?? "(none)";
-            user = builder.Username ?? "(none)";
-
-            await using var connection = new Npgsql.NpgsqlConnection(resolved);
-            await connection.OpenAsync().ConfigureAwait(false);
-            LogDatabaseReachable(logger, host, database, user);
+            identity =
+                $"{builder.Host}:{builder.Port.ToString(CultureInfo.InvariantCulture)}, " +
+                $"database {builder.Database ?? "(none)"}, as {builder.Username ?? "(none)"}";
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            // Deliberately broad: this is a diagnostic, and every way a connection string can be wrong
-            // -- unparseable, wrong host, refused, bad credentials, TLS -- must produce the line rather
-            // than a second failure on top of the first.
-            LogDatabaseUnreachable(logger, exception.Message, exception);
+            // The string could not even be read, so there is no host or user to name.
+            LogDatabaseUnreachable(logger, "(the connection string could not be parsed)", exception.Message, exception);
+            return;
+        }
+
+        try
+        {
+            await using var connection = new Npgsql.NpgsqlConnection(resolved);
+            await connection.OpenAsync().ConfigureAwait(false);
+            LogDatabaseReachable(logger, identity);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Deliberately broad: every way a connection can fail -- wrong host, refused, bad
+            // credentials, TLS -- must produce the line rather than a second failure on top of the first.
+            LogDatabaseUnreachable(logger, identity, exception.Message, exception);
         }
     }
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Database reachable at {Host}, database {Database}, as {User}.")]
-    internal static partial void LogDatabaseReachable(ILogger logger, string host, string database, string user);
+        Message = "Database reachable at {Identity}.")]
+    internal static partial void LogDatabaseReachable(ILogger logger, string identity);
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "DATABASE UNREACHABLE. Every request that reads or writes data will answer 500 and " +
                   "/health/ready will report unhealthy, while /health/live stays 200. Set " +
                   "ConnectionStrings__DefaultConnection to this deployment's database; both " +
-                  "postgres:// URL form and Npgsql keyword form are accepted. The failure was: {Reason}")]
-    internal static partial void LogDatabaseUnreachable(ILogger logger, string reason, Exception exception);
+                  "postgres:// URL form and Npgsql keyword form are accepted. Tried {Identity}. " +
+                  "The failure was: {Reason}")]
+    internal static partial void LogDatabaseUnreachable(ILogger logger, string identity, string reason, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,

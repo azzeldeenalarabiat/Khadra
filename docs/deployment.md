@@ -81,6 +81,49 @@ Do **not** set `ASPNETCORE_HTTPS_PORTS` or an `https://` URL. Both hosts call
 nothing, which is what you want behind a proxy that has already terminated TLS.
 Give it one and every request redirects in a loop.
 
+## Supabase: use the session pooler, not the direct connection
+
+This one cost days, and nothing in the error names it.
+
+Supabase offers three connection strings, and the one the dashboard shows first is
+the one that cannot work from most hosts:
+
+| | Host | IPv4? |
+|---|---|---|
+| Direct | `db.<ref>.supabase.co:5432` | **No** — IPv6 only, unless the paid IPv4 add-on is on |
+| **Session pooler** | `aws-0-<region>.pooler.supabase.com:5432` | **Yes**, on every tier |
+| Transaction pooler | `aws-0-<region>.pooler.supabase.com:6543` | Yes, but no prepared statements |
+
+Resolved for a real free-tier project:
+
+```
+db.<ref>.supabase.co            A     (none)
+                                AAAA  2406:da18:e5c:b700:…
+aws-0-ap-southeast-1.pooler…    A     52.77.146.31, 52.74.252.201
+```
+
+The direct host publishes **no A record at all** on the free tier. Render, Fly and
+most container platforms have no IPv6 outbound, so the connection fails at DNS —
+and surfaces as a name-resolution error that says nothing about addressing. The
+application starts, `/health/live` answers 200, and every request touching data
+returns 500.
+
+**Use the session pooler.** Not the transaction pooler on 6543: it does not support
+prepared statements, which Npgsql uses by default and EF migrations rely on.
+
+Two details that catch people:
+
+- The username carries the project ref — `postgres.<ref>`, not `postgres`.
+- The region in the pooler host is the DATABASE's region, not the app's. A database
+  in Singapore is `ap-southeast-1` however far away the service runs.
+
+```bash
+ConnectionStrings__DefaultConnection=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+```
+
+URL form is fine — the application converts it, and adds `SSL Mode=Require`, which
+Supabase needs.
+
 ## Who the client is
 
 `KnownProxies` is a **security input**, not a formality.
