@@ -36,7 +36,7 @@ export class DealerSettingsComponent {
   protected readonly problem = signal<string | null>(null);
 
   protected readonly role = computed(() =>
-    this.user()?.role === 'DealerOwner' ? 'Dealer owner' : 'Dealer employee',
+    this.user()?.role === 'DealerOwner' ? this.t('role.dealerOwner') : this.t('employeeSettings.dealerEmployee'),
   );
 
   protected readonly mismatch = computed(
@@ -79,7 +79,7 @@ export class DealerSettingsComponent {
       this.current.set('');
       this.next.set('');
       this.confirm.set('');
-      this.ui.showToast('Password changed', 'Every other session has been signed out.');
+      this.ui.showToast(this.t('auth.reset.doneTitle'), this.t('employeeSettings.everyOtherSessionHas'));
     } catch (error) {
       const p = error as {
         status?: number;
@@ -88,8 +88,8 @@ export class DealerSettingsComponent {
       const first = p.error?.errors ? Object.values(p.error.errors)[0]?.[0] : undefined;
       this.problem.set(
         p.error?.code === 'auth.invalid_credentials'
-          ? 'The current password is wrong.'
-          : (first ?? p.error?.title ?? 'The service did not respond. Nothing has been changed.'),
+          ? this.t('employeeSettings.theCurrentPasswordIs')
+          : (first ?? p.error?.title ?? this.t('dealerDelivery.serviceDidNotRespond')),
       );
     } finally {
       this.busy.set(false);

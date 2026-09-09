@@ -48,7 +48,7 @@
                 }}</a>
                 · {{ describe(e) }}
                 @if (e.fromStatus) {
-                  <span class="page-sub">{{ t('dealerActivity.was') }} {{ e.fromStatus }})</span>
+                  <span class="page-sub">{{ t('dealerActivity.was') }} {{ statusLabel(e.fromStatus) }})</span>
                 }
               </div>
               <div class="page-sub">

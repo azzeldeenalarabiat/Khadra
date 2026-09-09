@@ -37,4 +37,17 @@ public static class RateLimitPolicies
     /// above it, and checklist item 32 tracks the partitioning problem behind a proxy.
     /// </remarks>
     public const string Public = "public";
+
+    /// <summary>
+    /// A payment provider delivering its webhooks.
+    /// </summary>
+    /// <remarks>
+    /// Its own bucket rather than <see cref="Public"/>, because the two want opposite things. A
+    /// provider that has been unable to reach us retries a BURST when we come back, and every one of
+    /// those deliveries is a payment somebody made; throttling them as if they were a scraper would
+    /// leave real money unapplied. It is still bounded — the endpoint is anonymous, and a signature
+    /// is only checked after the request is admitted — but the ceiling is set for a retry storm from
+    /// one provider rather than for a crowd of browsers behind one address.
+    /// </remarks>
+    public const string Webhook = "webhook";
 }

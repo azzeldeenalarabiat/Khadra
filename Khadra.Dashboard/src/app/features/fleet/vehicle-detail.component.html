@@ -266,7 +266,7 @@
                 <kh-icon name="calendar-plus" />
                 <div>
                   <div>
-                    <span class="mono">{{ e.reference }}</span> · {{ e.toStatus }} by
+                    <span class="mono">{{ e.reference }}</span> · {{ statusLabel(e.toStatus) }} by
                     {{ e.actorName }}
                   </div>
                   <div class="veh-log-ts">{{ when(e.occurredAt) }}</div>

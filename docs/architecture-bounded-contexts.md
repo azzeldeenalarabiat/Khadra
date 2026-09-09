@@ -12,13 +12,17 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Fleet | done | done | dealer fleet management done; **customer catalogue done** (search, listing, gallery page) |
 | Bookings | done | done | dealer decisions and handover done; **quote done**; creation NOT built |
 | Disputes | done | done | dashboard read model only |
-| Reviews | done | pending | pending |
+| Reviews | done | done | **both directions done**; customer reputation read model done |
 | Platform Settings | done | pending (configuration-backed) | pending |
-| Payments | **not started, blocked** | — | — |
+| Payments | done | done | **deposit checkout + provider webhook done**; NO PROVIDER CONFIGURED |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
-Payments is deliberately unbuilt. It needs owner decisions and explicit approval (see "Owner decisions required" below and the forbidden-actions list in `CLAUDE.md`).
+Payments was built on 2026-09-08 with the owner's explicit approval. "No provider configured" is not a
+qualifier on the table above: the aggregate, the state machine, the idempotency guards, the refunds and
+both endpoints are complete and tested, and the ONE thing missing is a merchant account. Every checkout
+is refused with `payments.provider_unavailable` (503) until `Payments:Provider` names a real one, and
+the startup log says so on every boot.
 
 ## Context map
 
@@ -99,23 +103,82 @@ The lock (`IVehicleHoldLock`, a transaction-scoped Postgres advisory lock keyed 
 
 ## 6. Reviews
 
-`Review` with a `Rating` value object. One per booking per direction, only on a completed booking. The customer's review of the dealer is public and feeds the dealer's rating; the dealer's review of the customer is visible to other dealers to inform approve/reject decisions (spec 5.6). Moderation hides the text but keeps the score, so a dealer cannot erase a bad rating by reporting it. Ratings are aggregated in SQL as read models.
+`Review` with a `Rating` value object. One per booking per direction, only on a completed booking. Both directions ship, and they are shaped very differently on purpose.
+
+**The customer's review of a gallery is PUBLIC**: anonymous to read, free text allowed, and hiding it removes the TEXT and keeps the SCORE, so a gallery cannot erase a bad rating by reporting the comment attached to it (spec 3.2, 4.1).
+
+**The gallery's rating of a customer is not public and never becomes so.** It is a bare score with NO free text at all -- unverified prose about a named private individual, circulating between competing businesses and invisible to the person it describes, is not something this platform will store. It is readable only as an AGGREGATE, only by a gallery holding a LIVE booking with that customer, and only through the booking that gives them the relationship: `GET /api/v1/bookings/{id}/customer-reputation`. There is deliberately no endpoint anywhere that takes a customer id, because that would be a lookup oracle over the whole customer base for anyone with a dealer session. Hiding one of these does NOT keep the score (`ReviewDirection.HiddenScoreStillCounts`): there is no text to moderate, so the only thing an administrator can be hiding is a score that was wrong.
+
+**Both directions are BLIND until the window closes or both sides are in.** `Review.VisibleFrom` is a real column, and the invariant -- nobody sees the counterpart before submitting -- holds by construction rather than by checking: the first review sets its own reveal instant, the second party's deadline to submit IS that instant, and a second review reveals both at once. Without it, publishing the customer's review the moment it is written would hand the gallery a retaliation button with the platform's own machinery behind it. `BusinessRules:ReviewWindowDays` is the number, proposed at 14 and not yet an owner decision.
+
+**`CustomerReputation` counts what the PLATFORM adjudicated**, never what a gallery asserted, and it reads `Penalty.AttributedTo` rather than the status. That distinction is the whole correctness of the reader: a DELIVERY no-show is `Unattributed` because the gallery had to travel, and `ReportDealerNonDelivery` cancels with `CancelledBy = Customer` while attributing the penalty to the DEALER -- counting by status would put the gallery's own failure on the customer's permanent record. A customer reads the same figures about themselves at `GET /api/v1/customers/me/reputation`, because a semi-private score somebody cannot see is the thing privacy law objects to, and it is the only way they learn to dispute a wrong no-show inside the window.
+
+Ratings are aggregated in SQL as read models.
 
 ## 7. Platform Settings
 
 `BusinessRuleSettings` is a single versioned aggregate holding every number from spec section 2, and it refuses a commission above the deposit, because commission is collected from the card deposit. `PendingOwnerDecisions()` surfaces the questions the owner has not answered rather than pretending a default is a decision. `CarType` and `City` are bilingual lookups that deactivate rather than delete.
 
-## 8. Payments — not built
+## 8. Payments
 
-Designed shape: `Payment`, `Commission`, `SecurityDeposit`. Blocked on the owner decisions below, and on explicit approval per `CLAUDE.md`.
+`Payment` is ONE CHECKOUT ATTEMPT for one booking's deposit, with `Refund` as a child entity, plus
+`ProviderEventReceipt` — an append-only log of provider notifications that is deliberately OUTSIDE the
+aggregate, because an event naming a reference this platform never issued has no payment to hang off
+and still has to be recorded.
 
-The central difficulty: at the confirmed 20% commission and 20% deposit the two are equal, so the platform never pays a dealer and never holds dealer funds. Three things in the spec nonetheless require money to move in a direction that has no rail:
+`Commission` and `SecurityDeposit`, which the old design sketched, were NOT built. Commission is
+already derivable from the booking's frozen `Terms.CommissionPercent` over `Pricing.RentalTotal` and a
+table for it would be a second source for one number; the security deposit is open owner decision 4 and
+lives today as cash on the handover record.
 
-1. A dealer non-delivery penalty of 25-50% has nothing to deduct from.
-2. `PaymentOption.FullUpfront` means the customer pays 100% by card, so the dealer's 80% must be paid out.
-3. Any configured commission above the deposit produces a shortfall to collect.
+**States: `Initiated -> Pending -> Failed | Applied | Orphaned`.** There is deliberately no persisted
+`Captured`. A capture is a FACT about money that has already moved, and the webhook handler must
+resolve it, in the same transaction, to `Applied` (the booking took it) or `Orphaned` (it could not,
+and a refund is recorded). A captured-but-unresolved row would be permanently stuck: its receipt makes
+the provider's retries look like replays.
 
-The likely answer is a single `DealerLedger` aggregate with typed entries and manual settlement, rather than separate payout and penalty mechanisms.
+**Five things must hold before a capture confirms anything.** The signature verified over the raw body;
+the delivery never seen before; the reference resolving to a `Payment` this platform issued; the
+captured amount AND currency equal to what that row asked for; and the booking still able to take it.
+Anything short of all five is an orphan, and an orphan always carries its refund — `Payment.Orphan`
+creates it, so the two cannot be separated.
+
+**Two database guards, not two handler checks.** `ux_payments_one_live_attempt_per_booking` (partial
+unique over `booking_id` where the status is live) stops one booking having two card forms open;
+`(provider, provider_event_id)` unique on the receipt table stops a replayed webhook, and is INSERTED
+in the same transaction as the effect rather than read first, because a read-then-write leaves a window
+two concurrent deliveries both pass.
+
+**The deadline is enforced at the DOOR, never at the capture.** `BookingDepositSettlement.DepositDue`
+is the only place the payment window is checked. Once a provider has captured, refusing the money would
+mean keeping it, so `ConfirmDepositPaid` stays deadline-blind (pre-launch item 62) and a late capture is
+applied if the booking can still take it and refunded if it cannot. The cheap half of the fix is
+`Payments:CheckoutClosesBeforeDeadlineMinutes`, which kills the provider's own session before the
+booking's window closes, so the expensive path is rare rather than routine.
+
+**The seam to Bookings is a CALL, not an event.** `BookingDepositSettlement` is the named door, the
+twin of `BookingDisputeSettlement`, and it is the only production caller of `Booking.ConfirmDepositPaid`.
+This project has no outbox and dispatches domain events after commit, so a cross-context event lost
+between the two would mean money captured, booking unconfirmed, and the car released at its deadline.
+
+**Refunds are RECORDED when owed and SENT afterwards**, by the payment sweep that runs beside the
+booking settlement pass. Two triggers exist: an orphaned capture (automatic, in the capture's own
+transaction) and an admin's dispute resolution returning money to the customer. Cancellation refunds are
+deliberately NOT wired — owner decision 3 is open, and `BookingDisputeSettlement.DepositHeldFor` assumes
+the full deposit is still held while a booking is disputable.
+
+**What is not built, and why.** No `DealerLedger`, no payout rail, no dealer charge: at the confirmed
+20% commission and 20% deposit the two are equal, so the platform never pays a dealer and never holds
+dealer funds. Of the three spec cases that would need a rail, two are closed by construction —
+`CreateBookingHandler` only ever writes `PaymentOption.DepositOnly`, and both `BookingTerms.Create` and
+`BusinessRuleSettings` refuse a commission above the deposit. What remains is the dealer non-delivery
+penalty, which is already an instruction with no rail (`DisputeResolution.DealerCharge`) and is settled
+by hand.
+
+**Nobody may add a provider that simulates success.** `UnconfiguredPaymentProvider` is the only
+implementation, and a stub that confirmed bookings without money would be indistinguishable, in every
+table and on every screen, from a real payment. Tests substitute `IPaymentProvider` at the handler
+boundary. Writing a real adapter is one class implementing four methods; nothing above it changes.
 
 ## Owner decisions required
 
@@ -130,4 +193,16 @@ These change field shapes, so they are worth settling before the affected contex
 
 ## Roadmap
 
-Persistence and use cases for Dealers, then Fleet, then Bookings including the expiry and no-show background jobs, then Disputes and Reviews, then Payments once approved. After that: an outbox for cross-context events, token pruning, MFA for Admin, and the Flutter customer app.
+Every context above is built, including Payments and both directions of Reviews, and the Flutter
+customer app ships. What is left is not another context:
+
+1. **A merchant account and one `IPaymentProvider` adapter.** The single thing standing between an
+   approved booking and a confirmed one (pre-launch item 76).
+2. **The owner's four open answers**: the cancellation-refund rule (item 77), the review window
+   length (item 80), the dealer non-delivery tier, and the held deposit with no ticket.
+3. **A way to moderate a review** (item 81). `Hide` exists on the aggregate, every reader honours it,
+   and nothing calls it — which matters more now that a rating follows a person.
+4. **An outbox for cross-context events.** Domain events dispatch after commit with nothing to
+   replay them, which is why the Payments seam is a call and not an event.
+5. Token pruning, MFA for Admin, push notifications (item 73), and request localisation on the API so
+   a refusal reaches a client in the reader's language rather than in English.

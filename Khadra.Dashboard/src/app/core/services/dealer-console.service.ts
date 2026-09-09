@@ -10,6 +10,7 @@ import {
   DealerDashboard,
   DealerReport,
   DeliverySettingsView,
+  FleetDeliveryResult,
   Employee,
   InviteEmployeeRequest,
   ReportPeriod,
@@ -277,6 +278,22 @@ export class DealerConsoleService {
   // ── Delivery (spec 4.4) ──
 
   /** `fee` is required to switch delivery on and ignored when switching it off. */
+  /**
+   * Offers delivery on every car this gallery already has listed.
+   *
+   * A bulk EDIT the owner asks for, never a rule: the per-car flag stays, and there is deliberately
+   * no action the other way -- a gallery switching delivery off keeps its per-car answers, or turning
+   * it back on would silently re-offer the van the owner had excluded on purpose.
+   */
+  offerDeliveryOnListedVehicles(): Promise<FleetDeliveryResult> {
+    return firstValueFrom(
+      // The literal base, not `dealerUrl`: that helper returns `string | undefined` so an
+      // httpResource stays IDLE for a non-dealer, and an undefined url here would silently select
+      // HttpClient.post's ArrayBuffer overload instead of failing.
+      this.http.post<FleetDeliveryResult>(`${this.base}/delivery/offer-on-listed-vehicles`, {}),
+    );
+  }
+
   updateDelivery(isEnabled: boolean, radiusKm: number, fee: number | null): Promise<DealerProfile> {
     return firstValueFrom(
       this.http.put<DealerProfile>(`${this.base}/delivery`, { isEnabled, radiusKm, fee }),

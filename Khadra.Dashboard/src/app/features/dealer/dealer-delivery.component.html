@@ -133,6 +133,38 @@
           </div>
         }
 
+        <!--
+          Pre-launch item 75: this gallery delivers, and some of its listed cars do not. Shown only
+          when the SAVED settings say delivery is on, so it is advice about a committed state rather
+          than about a switch mid-flip. The count is the server's.
+        -->
+        @if (canEdit() && listedCarsNotOffered() > 0) {
+          <div class="note-box">
+            <kh-icon name="info" />
+            <div class="stack stack-9">
+              <div class="k">{{ t('dealerDelivery.carsNotOfferedTitle') }}</div>
+              <div class="page-sub">
+                {{ t('dealerDelivery.carsNotOfferedBody', { count: listedCarsNotOffered() }) }}
+              </div>
+              <div class="action-row">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  [disabled]="offering()"
+                  (click)="offerOnListedCars()"
+                >
+                  {{
+                    offering()
+                      ? t('dealerDelivery.offeringOnListedCars')
+                      : t('dealerDelivery.offerOnListedCars')
+                  }}
+                </button>
+                <span class="page-sub">{{ t('dealerDelivery.offerOnListedCarsHint') }}</span>
+              </div>
+            </div>
+          </div>
+        }
+
         @if (canEdit()) {
           <div class="action-row">
             <button
@@ -141,7 +173,7 @@
               [disabled]="busy() || !dirty() || radiusInvalid() || feeInvalid()"
               (click)="save()"
             >
-              {{ busy() ? 'Saving…' : 'Save delivery settings' }}
+              {{ busy() ? t('dealerDelivery.saving') : t('dealerDelivery.saveSettings') }}
             </button>
             @if (dirty()) {
               <span class="page-sub">{{ t('dealerDelivery.unsavedChanges') }}</span>

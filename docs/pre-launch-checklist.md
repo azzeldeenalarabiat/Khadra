@@ -758,6 +758,22 @@ Same gap as item 6 (listing edits are not logged), and the same fix serves both.
 **To close:** persist dealer-side changes to an activity trail the owner and an administrator can
 read, fed from the domain events these actions already raise.
 
+### 40. PARTLY CLOSED — email leaves under a borrowed sender; the English-only half is fixed
+
+**Updated 2026-09-08.** Every one of the five account emails is now BILINGUAL: Arabic first, then a
+rule, then English, in both the HTML and the plain-text part. The subject line carries both. Verified
+by delivering one and reading it back out of the mailbox.
+
+Both languages in one message rather than one chosen per recipient, because there is no language
+stored on an account — the console and the app each keep the reader's choice in their own browser —
+and adding a column would still pick WRONG for the two invitation emails, which go to somebody who
+has never used the platform. The `dir` attribute is on the Arabic BLOCK, never on the document, or
+the English half below it would flip with its punctuation and its link text.
+
+The borrowed sender is unchanged and is what keeps this item open.
+
+The original entry follows.
+
 ### 40. Email leaves under a borrowed sender, and only ever in English
 
 **Status:** open · **HARD BLOCKER before real customers** · **NOT a blocker for Flutter development**
@@ -959,12 +975,43 @@ One fix worth repeating elsewhere: the fleet filter chips were a `readonly` FIEL
 left them in the old one. They are a `computed` now. Any other chip or column list built the same way
 has the same latent bug.
 
-**Still open: roughly 330 strings across the other screens**, unchanged in nature from the list
-below. Heaviest are dealer/booking-detail, dealer/dealer-dashboard, disputes/dispute-detail,
-fleet/vehicle-wizard, bookings/booking-detail and employee/employee-dashboard — the last is the most
-visible, because every stat tile caption on an employee's landing screen is English. Deferred as its
-own piece of work, not a blocker: the mechanism (switch, RTL mirroring, persistence across reload and
-logout, switching back) is correct and was re-verified.
+**Updated 2026-09-08 (second pass). Substantially closed: 411 scanner hits down to 75, and 28 of
+those 75 are the route-title literals below, which are dead weight rather than English on a screen.**
+The dictionaries went from 1,202 keys to 1,505, in both languages, and `ar.ts` is still typed against
+`en.ts` so a missing translation cannot ship.
+
+Measured rather than asserted: at `/`, `/forgot-password` and `/register` in Arabic there is now
+exactly ONE Latin word on the page, and it is the language switcher naming the language you would
+switch to.
+
+Three systematic fixes, each of which was worth more than the strings it removed:
+
+- **`I18nService.statusLabel`.** Every status on every screen arrives as a server `Enumeration.Name`
+  and a dozen screens rendered it raw, so an Arabic page read "PendingReview" in Latin script mid
+  sentence. One helper now, with the CamelCase-split fallback the audit screen already used, so a
+  status this console has never heard of still reads as words. `scope: 'booking'` disambiguates
+  `Approved`, which means a licence check on a dealer and a gallery saying yes on a booking, and
+  which Arabic does not share a word for.
+- **The dispute workspace's resolution presets were a `readonly` FIELD calling `this.t(...)`.** That
+  is the exact bug this item already records on the fleet filter chips: a field initialiser resolves
+  once at construction, so switching language with the screen open left the old words on it. Two of
+  the four labels were already keyed and already frozen. They are a `computed` now.
+- **Module-level `describe(error)` helpers now take `t`.** Almost every feature file has one mapping
+  the server's error CODE to a sentence, and every one of them was English prose in a function with
+  no `this`. The mapping from a stable code is the only part of a refusal that can be translated at
+  all, which is why the server's own `title` stays the last-resort fallback.
+
+Notification sentences became messages with NAMED PARAMETERS rather than concatenated template
+literals, because Arabic does not put the actor and the object where English does; and the attention
+queue's counts became plural messages with all six Arabic forms rather than an `n === 1` ternary,
+which picks the wrong form for every count from two upwards.
+
+Two pieces of tooling made it tractable and are worth keeping: `key-copy.js`, which keys the copy
+shapes `key-components.js` never knew (`k`/`v` rows, ternary arms, bare returns, status maps) and
+REFUSES the two that would be bugs — a field initialiser, and anything outside the class body — and
+`key-describe.js` for the `describe(error)` pattern. `missing-ar.js` lists the English keys with no
+Arabic. `add-en.js` and `add-ar.js` now skip a key that already exists, after a hand-written batch
+and the codemod both named one and broke the build.
 
 `core/i18n/` holds 1,202 keys in both languages. EVERY template is keyed -- all 54 of them -- along
 with the shell, the auth screens, the dealer gate, both not-built placeholders, the dashboard KPI
@@ -973,20 +1020,17 @@ and the pagination. `ar.ts` is typed against `en.ts`, so a missing translation f
 `dictionaries.spec.ts` also fails on a key that drifts, a dropped placeholder, or an Arabic plural
 missing one of its six forms.
 
-What is still English, measured by `node scan-i18n.js` in `Khadra.Dashboard` (413 hits, 59 files --
-the scan is deliberately noisy, so perhaps 300 are real):
+What is still English, measured by `node scan-i18n.js` in `Khadra.Dashboard` (75 hits, 27 files --
+the scan is deliberately noisy, and most of what is left is a false positive):
 
-- **Copy in component TypeScript that is not a dialog field.** The codemod covered `title`, `body`,
-  `confirm`, `note`, `label`, `placeholder` and `hint`. Copy assembled in other shapes -- KPI
-  sub-labels, greetings, row actions, `describe()` failure sentences -- is still English. The
-  heaviest are `dealer/booking-detail`, `dealer/dealer-dashboard`, `disputes/dispute-detail`,
-  `fleet/vehicle-wizard`, `bookings/booking-detail`, `employee/employee-dashboard`.
-- **Status pills.** `status.*` keys exist for every enum member the console shows, but the pills
-  still render the server's raw `Enumeration.Name`. They need one `statusLabel(name)` helper applied
-  at each render site, with the CamelCase-split fallback the audit screen already uses.
-- **Route `title` literals in `app.routes.ts`.** Dead weight rather than a bug: `TranslatedTitleStrategy`
-  resolves every mapped route from `SCREEN_TITLES`, and these are only the fallback for one it does
-  not know.
+- **Route `title` literals in `app.routes.ts` (28 of the 75).** Dead weight rather than a bug, and
+  now VERIFIED rather than assumed: loading `/register` in Arabic gives the document title
+  "سجّل معرضك · Khadra", so `TranslatedTitleStrategy` is resolving it from `SCREEN_TITLES` and the
+  literal never reaches a tab. Removing them is tidying, not translation.
+- **Units, separators and the scanner's own blind spots.** `km`, `JOD`, `·`, `to`, `of`, and the
+  `t('key', { param })` calls the regex splits in the middle of. All false positives.
+- **A handful of strings the codemod correctly refused**, each a template literal whose value lands
+  in a different place in Arabic, in a screen whose copy is otherwise keyed.
 - **Server sentences.** Unchanged from before: `Error.Message` and ProblemDetails `title` are English,
   and FluentValidation messages cannot be keyed client-side at all. See the note below.
 - **`toLocaleString('en-GB')` sites on feature screens.** `FormatService` exists and the gate and the
@@ -1543,9 +1587,9 @@ The original report follows.
 
 ## Customer mobile app (2026-09-08)
 
-### 68. OPEN OWNER DECISION — how late is late enough to report non-delivery
+### 68. CLOSED — how late is late enough to report non-delivery
 
-**Status:** open · **Raised:** 2026-09-08 · **Shipped default:** 0 hours
+**Status:** closed · **Raised:** 2026-09-08 · **Settled:** 2026-09-08, owner, at **15 minutes**
 
 `Booking.ReportDealerNonDelivery` was unguarded until 2026-09-08: it checked only that the booking was
 Confirmed and the reason non-blank, so a customer could file it at any time after the deposit cleared —
@@ -1558,16 +1602,53 @@ dispute to clear a claim made without them. `MarkNoShow` — the mirror-image ac
 CUSTOMER never appeared — has always been guarded by `Period.Start + NoShowTimeout`.
 
 It is now guarded by `Period.Start + BookingTerms.NonDeliveryGrace`, frozen onto each booking like
-every other rule, and configured as `BusinessRules:NonDeliveryGraceHours`.
+every other rule, and configured as `BusinessRules:NonDeliveryGraceMinutes`.
 
-**The figure is the owner's, and 0 is a placeholder, not a decision.** Zero says a gallery that has
-not handed the car over at the agreed minute is already late, which is defensible and is why it ships;
-but the customer's mirror figure is 8 hours (`NoShowTimeoutHours`), and the asymmetry deserves the
-owner's attention rather than a developer's.
+**The owner settled it at 15 minutes on 2026-09-08.** The setting changed unit to carry the answer:
+it was `NonDeliveryGraceHours`, an `int`, and fifteen minutes is not expressible in it. The asymmetry
+with the gallery's mirror figure of 8 hours (`NoShowTimeoutHours`) is deliberate and the owner's — a
+customer standing at a counter knows within minutes that nobody is coming, while a gallery holding a
+car cannot tell a late renter from an absent one for hours.
 
-**To close:** ask the owner, set the number, record it in `docs/spec-amendments.md`.
+Three things closed with it:
 
-### 69. A customer cannot pay, so every approval ends in expiry
+- `NonDeliveryGraceMinutes` had **no startup validation**, and the provider dereferences it with `!`.
+  A deleted key surfaced as a `NullReferenceException` on the first booking priced rather than at
+  startup, unlike the four sibling settings that are all checked. It is checked now.
+- The customer app offered the report button on any Confirmed booking, so with a non-zero grace it
+  became a button the server refuses. `BookingDto` now carries `CanReportNonDelivery` and
+  `NonDeliveryReportableFrom`, both server-judged like `IsAwaitingDecision`, and the app shows a
+  disabled control saying when instead.
+- `nonDeliveryTooEarly` said "the rental has not started yet", which stopped being true the moment
+  the grace stopped being zero. Reworded in both languages.
+
+### 69. PARTLY CLOSED — a customer cannot pay, because there is no merchant account
+
+**Status:** open, narrowed · **Raised:** 2026-09-08 · **Narrowed:** 2026-09-08, Payments shipped
+
+**Payments was built on 2026-09-08 with the owner's explicit approval.** What was "the context does not
+exist" is now exactly one missing thing: a merchant account. The aggregate, the state machine, the
+idempotency guards, the refunds, the sweep and both endpoints are complete, tested and running; every
+checkout is refused with `payments.provider_unavailable` (503) and the startup log says
+`PAYMENTS ARE NOT ACCEPTED` on every boot.
+
+**To close:** choose a provider, get an account, set `Payments:Provider`, `Payments:ApiKey` and
+`Payments:WebhookSecret` in user-secrets or the environment, and write one class implementing
+`IPaymentProvider`'s four methods. Nothing above that class changes. Then register the webhook URL
+`POST /api/v1/payments/webhooks/{provider}` with the provider.
+
+**Two things that still need the owner**, both recorded as items 76 and 77 below.
+
+**One correctness note worth carrying forward.** The webhook handler does NOT retry a lost
+concurrency race, and that is deliberate rather than an omission. It did retry in the first draft;
+a test of the exact race — the settlement job expiring a booking at the instant a capture lands on
+it — proved that wrong. EF keeps the in-memory mutations after a failed `SaveChanges`, so the second
+pass decided against dirty state: it found a payment that already read `Applied`, could not orphan
+it, and would have left a customer's money attached to an expired booking with no refund recorded.
+The exception escapes, the endpoint answers 5xx, and the provider re-delivers into a fresh scope with
+a clean context. The receipt rolled back with the transaction, so the re-delivery is not a replay.
+
+The original entry follows, because its prohibition still stands.
 
 **Status:** open by design · **Raised:** 2026-09-08 · **Depends on:** Payments
 
@@ -1600,9 +1681,45 @@ design. Recorded so nobody later assumes the app was built to one.
 
 **To close:** get an export, or record that the app's own theme file is the source of truth for it.
 
-### 71. The dealer's review of a customer has no endpoint
+### 71. CLOSED — the dealer's review of a customer
 
-**Status:** open · **Raised:** 2026-09-08
+**Status:** closed · **Raised:** 2026-09-08 · **Built:** 2026-09-08
+
+Shipped as two things rather than one, because the interesting half was never the writing.
+
+**A reputation READ MODEL**, `GET /api/v1/bookings/{id}/customer-reputation`, keyed on the booking
+and not on a customer id -- an endpoint taking a customer id would be a lookup oracle over the whole
+customer base for anybody with a dealer session, and no check inside it could undo that. A gallery may
+read it while they are deciding about, or holding, a booking with that person, and no longer
+(`Booking.IsLive`). It answers with aggregates only: a rating, five counts and an account age. No
+contact details, no documents, no per-review rows, and no dates on individual ratings, because a rating
+dated last Tuesday tells this gallery when the customer rented from a competitor.
+
+**A rating with NO free text.** The audience is other galleries, so prose here would be unverified
+writing about a named private individual circulating between competing businesses, unmoderated when
+written and invisible to its subject. The platform has replaced free text with closed codes twice
+already, for weaker reasons.
+
+**A blind window**, `Review.VisibleFrom`, which was the thing missing from the original framing.
+Without it the dealer direction is a retaliation tool: customer reviews publish instantly, so a gallery
+reads its new one-star, finds the booking, and rates that customer one star before their reputation
+reaches anyone else.
+
+**Counts read `Penalty.AttributedTo`, never the status.** Counting by status would have blamed
+customers the domain explicitly refused to blame -- a delivery no-show is `Unattributed`, and
+`ReportDealerNonDelivery` is the CUSTOMER reporting the GALLERY while the row reads
+`CancelledBy = Customer`.
+
+**The customer can see their own**, at `GET /api/v1/customers/me/reputation`. A semi-private score
+somebody cannot see is what privacy law objects to, and it is the only way they learn to dispute a
+wrong no-show while the window is open.
+
+What remains is items 80 to 83 below: the window length is the owner's, and nothing can moderate a
+review yet.
+
+The original entry follows.
+
+**Status:** closed · **Raised:** 2026-09-08
 
 Spec 5.6 makes reviews mutual: the dealer's review of a customer is visible to other dealers to inform
 their approve/reject decisions. `ReviewDirection.DealerRatesCustomer` exists, the table stores it, and
@@ -1650,9 +1767,43 @@ verify by email, submit the gallery, approve it as an administrator, publish a c
 customer, approve the booking as the dealer. Both items below are deliberately NOT blockers; the
 owner has seen each and said so.
 
-### 74. The admin console is unusable below roughly 500px wide
+### 74. CLOSED — the admin console below roughly 500px wide
 
-**Status:** open, accepted · **Raised:** 2026-09-08 · **Not a blocker:** owner's decision, 2026-09-08
+**Status:** closed · **Raised:** 2026-09-08 · **Fixed:** 2026-09-08
+
+Two breakpoints, each fixing one half of it, and nothing at 1440×900 changed — every rule is
+`max-width`, so at desktop widths none of them apply. Measured before and after at 1440: sidebar
+248px, labels visible, heading 22px on one line, `overflow-wrap: normal`, page padding unchanged.
+
+**Below 900px the sidebar becomes a 64px icon rail.** That was the whole of the first half: at 491px
+a fixed 248px sidebar left the CONTENT 243px, and the heading on the dealer-application screen got
+106px of it, which is where "one word per line" came from. Measured after: content 427px, heading
+302px, one line.
+
+**Below 640px the header blocks stop competing for one row.** `.detail-head` wraps, and every direct
+child gets `min-width: 0` — a flex child's default `min-width` is `auto`, its CONTENT width, so a long
+heading refused to shrink and pushed the SLA badge over the status pill instead of wrapping. That one
+line was most of the overlap. The SLA box and the action row then take the full width rather than
+being pushed to the far end by a `margin-inline-start: auto` that strands them under a gap once the
+row has wrapped.
+
+Three things the fix had to get right beyond the obvious:
+
+- **`overflow-wrap: anywhere`, not `break-word`.** Only the former lets an element's min-content width
+  shrink, which is what stops a long booking reference scrolling the whole page sideways.
+- **Accessible names survive the collapse.** `display: none` removes the label from the accessibility
+  tree as well as from the screen, so at exactly the width where the icon is all that is left, every
+  nav link would have had no accessible name. The label is now on the link itself as `aria-label` and
+  `title`, and the visible span is `aria-hidden`.
+- **RTL was free, and verified rather than assumed.** The rail uses logical properties throughout, so
+  in Arabic at 375px the sidebar sits on the right and the badge stays inside it.
+
+Verified at 375, 491 and 1440 in both directions: no horizontal page scroll, no overlapping elements,
+no element whose `scrollWidth` exceeds its `clientWidth` except the deliberately-clipped group heading.
+
+The original entry follows.
+
+**Status:** closed · **Raised:** 2026-09-08 · **Was:** accepted by the owner
 
 On the dealer-application screen at a 491px viewport the heading wraps one word per line, the
 subtitle breaks a character at a time, and the review-SLA badge overlaps the status chip and the
@@ -1669,9 +1820,24 @@ and it would be done to a brief rather than guessed at.
 **To close, if it is ever wanted:** a breakpoint below which the sidebar collapses to icons or a
 drawer, and header blocks that stack instead of competing for one row.
 
-### 75. Switching on delivery does not offer it for cars already listed
+### 75. CLOSED — switching on delivery now offers it for cars already listed
 
-**Status:** open, future enhancement · **Raised:** 2026-09-08 · **Not needed now:** owner's decision, 2026-09-08
+**Status:** closed · **Raised:** 2026-09-08 · **Fixed:** 2026-09-08
+
+`POST /api/v1/dealers/me/delivery/offer-on-listed-vehicles`, and a prompt on the Delivery page that
+appears only when the SAVED settings say delivery is on and the server's own count of listed cars not
+offered for delivery is above zero. The count travels on the delivery settings the page already loads,
+so nothing fetches a fleet list to derive a number the API knows.
+
+The per-car flag stays and is not weakened: this is a bulk EDIT the owner asks for, on a page that
+tells them how many cars it will touch, not a rule keeping the flag in step. There is deliberately no
+action the other way — a gallery switching delivery off keeps its per-car answers, or turning it back
+on would silently re-offer the van its owner had excluded on purpose. Active cars only: a draft is not
+advertising anything.
+
+The original entry follows.
+
+**Status:** closed · **Raised:** 2026-09-08
 
 A vehicle carries its own `IsDeliveryEligible`, and the wizard sets it from whether the dealership
 offers delivery AT THE MOMENT THE CAR IS SAVED. A gallery that lists cars first and turns delivery
@@ -1687,3 +1853,131 @@ delivery, so the screen is at least honest about which it is.
 
 **To close:** an "offer delivery on my existing cars" action on the Delivery page, and a prompt
 when delivery is switched on for a dealership whose published cars are all ineligible.
+
+## Payments (2026-09-08)
+
+Built with the owner's explicit approval, which `CLAUDE.md` requires. Everything below is a gap that
+survives the build, not a gap in it.
+
+### 76. HARD BLOCKER — there is no merchant account, so no deposit can be taken
+
+**Status:** open · **Raised:** 2026-09-08 · **Blocks:** every Confirmed booking
+
+`Payments:Provider` is `None`, and `UnconfiguredPaymentProvider` is the only implementation this build
+ships. Every checkout answers 503 `payments.provider_unavailable`; the webhook answers 401, because
+with no secret there is no way to tell a provider from anyone else who found the URL.
+
+**Nobody may close this with a simulated provider.** One that captured and confirmed would be
+indistinguishable, in every table and on every screen, from a real payment: bookings would read
+Confirmed, galleries would prepare cars, and nobody could tell which rentals had money behind them.
+That is the same prohibition item 2 records about cash paid out of band, in a different costume. There
+is deliberately no `Payments:Provider` value that does it, and none should be added.
+
+**To close:** an account with a provider that can take JOD; one class implementing the four methods of
+`IPaymentProvider`; the three settings in user-secrets or the environment; the webhook URL registered
+with the provider. Two details that will bite whoever writes the adapter:
+
+- **JOD has three minor units.** Most providers assume two. The adapter's money conversion needs a
+  round-trip test, and it must REFUSE an amount it cannot represent exactly rather than round it.
+- **`ParseEvent` must verify over the exact bytes received.** The controller passes the raw body
+  through unparsed for that reason; anything that deserialises and re-serialises breaks every signature.
+
+### 77. Cancellation does not refund, and that is the owner's decision to make
+
+**Status:** open · **Raised:** 2026-09-08 · **Owner decision:** number 3 in the architecture doc
+
+Two refund triggers are wired: an orphaned capture (automatic) and an admin's dispute resolution. A
+customer who cancels inside their free window, or a booking that ends with no ticket at all, gets no
+automatic refund — their deposit sits held.
+
+That is not an oversight. Owner decision 3 is genuinely open: spec 3.3's "no ticket, no penalty" reads
+as refund, and "the deposit is forfeited" reads as retain, and the two contradict. There is also a
+mechanical hazard: `CanBeDisputed` keeps a Cancelled or NoShow booking disputable for the whole
+post-return settlement window, while `BookingDisputeSettlement.DepositHeldFor` assumes the full deposit
+is still held whenever `DepositPaymentId` is set. An early refund would let a later resolution split
+money that had already gone.
+
+**To close:** the owner answers decision 3. If the answer is "refund", it belongs in the settlement job
+after the dispute window closes, not at the moment of cancellation.
+
+### 78. `DepositHeldFor` will need to read what is left, not what was taken
+
+**Status:** open · **Raised:** 2026-09-08 · **Not yet wrong**
+
+`BookingDisputeSettlement.DepositHeldFor` returns the booking's frozen deposit whenever a payment id is
+set, and a `DepositDisposition` must balance to exactly that. Correct today: a ticket resolves once, and
+the only refunds that exist before a resolution are on ORPHANED payments, which never confirmed a
+booking and so never set a payment id.
+
+It stops being correct the moment anything else refunds an APPLIED payment — item 77's cancellation
+refund is the obvious candidate. Then the deposit still held is `captured - refunded`, which Payments
+knows and Bookings does not.
+
+**To close:** when item 77 is answered, make `DepositHeldFor` read the applied payment's captured total
+less its outstanding and settled refunds, and give it a test with a partly-refunded deposit.
+
+### 79. A stale attempt whose provider says it WAS captured needs a human
+
+**Status:** open, accepted · **Raised:** 2026-09-08
+
+The payment sweep asks the provider what became of a session it believes is dead. If the provider says
+the money moved, the sweep logs at Error and does nothing: resolving a capture outside the webhook
+handler would be a second, weaker copy of the most delicate code in the system, and it has no booking
+loaded and no receipt to write.
+
+This is the right call for now — the provider's own retry is the proper path, and the log line is what
+tells somebody to look if none arrives. It is recorded because "the log tells somebody" is not a
+process.
+
+**To close, if it is ever wanted:** an admin screen listing payments whose provider state and stored
+state disagree, with a button that replays the provider's event through the real handler.
+
+## Customer reviews and reputation (2026-09-08)
+
+Closes item 71. Everything below is a gap that survives the build.
+
+### 80. OPEN OWNER DECISION — how long the review window is
+
+**Status:** open · **Raised:** 2026-09-08 · **Shipped proposal:** 14 days
+
+`BusinessRules:ReviewWindowDays` does two jobs at once, which is why there is one number and not two:
+it is how long after a rental either party may review it, AND how long a first review stays hidden
+waiting for the second. They are the same instant seen from both ends, and that equality is what makes
+"nobody sees the counterpart before submitting" true by construction.
+
+Fourteen days is a PROPOSAL. Nothing in the spec names a figure and the owner has not been asked. Too
+short and one party loses the chance to answer; too long and a gallery's public rating lags a fortnight
+behind reality.
+
+**To close:** ask the owner, set the number, record it in `docs/spec-amendments.md`.
+
+### 81. Nothing can moderate a review, in either direction
+
+**Status:** open · **Raised:** 2026-09-08 · **Pre-dates this work**
+
+`Review.Hide` and `Unhide` exist on the aggregate and no endpoint calls either. Every reader honours
+them — the public listing drops the text, and the customer reputation drops the whole rating — so the
+machinery works; there is simply no way for an administrator to reach it.
+
+That was survivable while only the public direction existed and the worst case was an abusive comment.
+It is worse now: a retaliatory rating of a CUSTOMER follows a real person to every future approval, and
+hiding it is the only remedy the model has. There is no appeal path and no admin screen.
+
+**To close:** an admin endpoint and screen to hide and unhide a review, with an audit entry, and a
+route by which a customer can ask for one to be looked at.
+
+### 82. `Review.Revise` is unreachable
+
+**Status:** open, harmless · **Raised:** 2026-09-08
+
+No endpoint calls it. It is now guarded twice — the edit window AND the reveal — so if it is ever
+exposed it cannot be used to answer a counterpart after reading it. Recorded so the second guard is
+not mistaken for dead code and removed.
+
+### 83. Reputation is on the booking detail only
+
+**Status:** open, deliberate · **Raised:** 2026-09-08
+
+A gallery sees a customer's history when they open the booking, not on the pending list. That is a
+scope decision rather than a privacy one — the list is already filtered to their own live requests —
+and a per-row summary would be a batch reader like `SummariseAsync`, built if galleries ask for it.

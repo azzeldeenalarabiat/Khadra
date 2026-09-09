@@ -27,7 +27,7 @@
         <div class="row row-gap-9">
           <div class="customer-avatar">{{ initials(c.fullName) }}</div>
           <h1 class="page-title">{{ c.fullName }}</h1>
-          <span class="pill" [class]="'s-' + tone()">{{ statusLabel() }}</span>
+          <span class="pill" [class]="'s-' + tone()">{{ accountStatusLabel() }}</span>
         </div>
         <div class="page-sub">{{ c.email }} · {{ c.phone }}</div>
       </div>
@@ -75,7 +75,7 @@
                     <div class="row row-gap-8">
                       <span class="handover-title">{{ documentLabel(document) }}</span>
                       <span class="pill" [class]="'s-' + documentTone(document)">
-                        {{ document.status }}
+                        {{ statusLabel(document.status) }}
                       </span>
                     </div>
                     <div class="page-sub">{{ documentDetail(document) }}</div>

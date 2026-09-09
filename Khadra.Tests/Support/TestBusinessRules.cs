@@ -33,7 +33,8 @@ internal static class TestBusinessRules
         MaxAdvanceBookingDays: 180,
         MinimumBookingLeadTimeMinutes: 120,
         MaxRentalDays: 90,
-        NonDeliveryGraceHours: 0,
+        NonDeliveryGraceMinutes: 15,
+        ReviewWindowDays: 14,
         EarliestVehicleModelYear: earliestVehicleModelYear);
 
     public static IBusinessRulesProvider Provider(

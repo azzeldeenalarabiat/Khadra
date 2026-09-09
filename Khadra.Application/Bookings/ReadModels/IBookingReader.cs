@@ -1,8 +1,10 @@
 using Khadra.Application.Common;
+using Khadra.Application.Payments.Dtos;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 
 namespace Khadra.Application.Bookings.ReadModels;
+
 
 /// <summary>One row of a bookings list, from either side of the counter.</summary>
 public sealed record BookingListItem(
@@ -48,7 +50,16 @@ public sealed record BookingContext(
     /// "rate this rental" and "you rated it" without a second request that would answer 404 for the
     /// ordinary case of not having reviewed yet.
     /// </remarks>
-    Guid? MyReviewId);
+    Guid? MyReviewId,
+    /// <summary>
+    /// Whether the deposit can be paid right now, for the screens that offer it.
+    /// </summary>
+    /// <remarks>
+    /// Defaulted to null, and null means "nobody asked" rather than "no". Only the customer's own
+    /// booking screens compose it: an admin looking at a rental has no Pay button, and computing the
+    /// verdict for them would be a query per booking for an answer nothing renders.
+    /// </remarks>
+    PaymentAvailabilityDto? Payment = null);
 
 public sealed record VehicleLabel(
     Guid VehicleId,

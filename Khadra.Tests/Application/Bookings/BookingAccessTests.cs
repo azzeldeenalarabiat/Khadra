@@ -3,6 +3,8 @@ using Khadra.Application.Bookings.ReadBookings;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers;
+using Khadra.Application.Payments;
+using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
@@ -125,7 +127,12 @@ public sealed class ReadBookingsTests
             .Returns(PagedResult.Empty<BookingListItem>(1, 20));
     }
 
-    private GetBookingHandler Get() => new(_bookings, _reader, new BookingPartyResolver(_dealers), _clock);
+    private GetBookingHandler Get() => new(
+        _bookings,
+        _reader,
+        new BookingPartyResolver(_dealers),
+        new BookingPaymentAvailability(TestPayments.NoProvider(), Substitute.For<IPaymentRepository>(), _clock),
+        _clock);
 
     private ListMyBookingsHandler List() => new(_reader, new DealerMembershipResolver(_dealers));
 

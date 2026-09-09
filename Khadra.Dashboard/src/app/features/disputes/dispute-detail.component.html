@@ -23,7 +23,7 @@
         <div class="row row-gap-9">
           <h1 class="page-title mono">{{ d.booking.reference }}</h1>
           <span class="pill" [class]="'s-' + tone()">
-            {{ d.status === 'UnderReview' ? 'Under review' : d.status }}
+            {{ statusLabel(d.status) }}
           </span>
           @if (d.isOverdue && d.isLive) {
             <span class="pill s-bad">{{ t('disputeDetail.overdue') }}</span>
@@ -225,7 +225,7 @@
             }
 
             <div class="stack stack-9">
-              @for (option of presets; track option.key) {
+              @for (option of presets(); track option.key) {
                 <label class="radio resolution-option" [class.is-on]="preset() === option.key">
                   <input
                     type="radio"

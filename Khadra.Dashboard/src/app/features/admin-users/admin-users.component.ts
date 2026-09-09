@@ -37,8 +37,8 @@ export class AdminUsersComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'Administrator accounts are managed by administrators.';
-    return 'The administrators could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('adminUsers.administratorAccountsAreManaged');
+    return this.t('adminUsers.theAdministratorsCouldNot');
   });
 
   /** How many accounts could still sign in. The last one cannot be deactivated. */
@@ -53,9 +53,9 @@ export class AdminUsersComponent {
   /** Why deactivation is unavailable, or null when it is. Restricted actions stay visible. */
   protected blockedReason(admin: AdminUserListItem): string | null {
     if (admin.status !== 'Active') return null;
-    if (this.isSelf(admin)) return 'You cannot deactivate your own account.';
+    if (this.isSelf(admin)) return this.t('adminUsers.youCannotDeactivateYour');
     if (this.activeCount() <= 1) {
-      return 'This is the last active administrator. Invite another first.';
+      return this.t('adminUsers.thisIsTheLast');
     }
     return null;
   }
@@ -84,8 +84,8 @@ export class AdminUsersComponent {
         note: this.t('adminUsers.thereIsOneAdministrator'),
         fields: [
           { name: 'fullName', label: this.t('adminUsers.fullName'), type: 'text', placeholder: this.t('adminUsers.eGYousefBarakat') },
-          { name: 'email', label: 'Email', type: 'text', placeholder: 'name@khadra.jo' },
-          { name: 'phone', label: 'Phone', type: 'text', placeholder: '07XXXXXXXX' },
+          { name: this.t('dealerStaff.email'), label: this.t('dealerSettings.email'), type: 'text', placeholder: 'name@khadra.jo' },
+          { name: this.t('dealerStaff.phone'), label: this.t('customerProfile.phone'), type: 'text', placeholder: '07XXXXXXXX' },
         ],
         confirm: this.t('adminUsers.sendInvitation'),
         result: { title: this.t('adminUsers.invitationSent'), body: '', tone: 'ok' },
@@ -99,7 +99,7 @@ export class AdminUsersComponent {
         this.service.refresh();
         // The expiry is the token's, not a literal: the lifetime is configuration.
         this.ui.showToast(
-          'Invitation sent',
+          this.t('adminUsers.invitationSent'),
           `${invited.email} can accept until ${new Date(invited.expiresAt).toLocaleString('en-GB')}.`,
         );
       },
@@ -117,7 +117,7 @@ export class AdminUsersComponent {
         body: this.t('adminUsers.theyAreSignedOut'),
         note: this.t('adminUsers.reversibleTheAccountIs'),
         fields: [
-          { name: 'reason', label: 'Reason', type: 'text', placeholder: this.t('adminUsers.whyIsThisAccount') },
+          { name: this.t('myBooking.reason'), label: this.t('dealerDecide.reject.reasonLabel'), type: 'text', placeholder: this.t('adminUsers.whyIsThisAccount') },
         ],
         confirm: 'Deactivate',
         result: { title: this.t('adminUsers.administratorDeactivated'), body: '', tone: 'bad' },

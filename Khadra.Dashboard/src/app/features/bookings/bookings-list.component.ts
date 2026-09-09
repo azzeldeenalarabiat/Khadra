@@ -123,15 +123,15 @@ export class BookingsListComponent {
     const rows = this.rows();
     if (this.service.dealerId() && rows.length) return `dealer: ${rows[0].dealerName}`;
     if (this.service.customerId() && rows.length) return `customer: ${rows[0].customerName}`;
-    if (this.service.dealerId() || this.service.customerId()) return 'one party';
+    if (this.service.dealerId() || this.service.customerId()) return this.t('bookingsList.oneParty');
     return null;
   });
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'The platform booking list is for administrators.';
-    return 'The bookings could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('bookingsList.thePlatformBookingList');
+    return this.t('bookingsList.theBookingsCouldNot');
   });
 
   protected select(tab: AdminBookingTab): void {
@@ -188,7 +188,7 @@ export class BookingsListComponent {
     const vehicle = row.vehicle;
     // The booking outlives the listing, so a delisted car has no label to show — and inventing one
     // would put a car on the screen that is no longer on the platform.
-    return vehicle ? `${vehicle.make} ${vehicle.model} ${vehicle.year}` : 'Vehicle delisted';
+    return vehicle ? `${vehicle.make} ${vehicle.model} ${vehicle.year}` : this.t('bookingsList.vehicleDelisted');
   }
 }
 

@@ -6,6 +6,7 @@ using Khadra.Domain.Disputes;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Notifications;
+using Khadra.Domain.Payments;
 using Khadra.Domain.PlatformSettings;
 using Khadra.Domain.Reviews;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,8 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<City> Cities => Set<City>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ProviderEventReceipt> ProviderEventReceipts => Set<ProviderEventReceipt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,9 +49,14 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
         //   covers two staff answering the same request at once: Approve and Reject would both pass
         //   the Requested check and write contradictory history rows.
         // - Dealer: an owner editing employees from two tabs.
+        // - Payment: the settlement job expiring a booking and a provider's capture landing on it are
+        //   the same row, moments apart. Losing that race silently would mean one of the two
+        //   overwriting the other's view of whether money moved -- a booking Confirmed with a payment
+        //   that says Orphaned, or the reverse. The webhook handler catches the conflict, re-reads,
+        //   and decides again against what it finds.
         if (Database.IsNpgsql())
         {
-            foreach (var type in new[] { typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer) })
+            foreach (var type in new[] { typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer), typeof(Payment) })
             {
                 modelBuilder.Entity(type)
                     .Property<uint>("xmin")

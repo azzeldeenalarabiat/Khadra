@@ -788,7 +788,17 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookingPaymentNotAvailableBody =>
-      'لا تستطيع خضرا استقبال مدفوعات البطاقات في هذه النسخة. سينتهي هذا الحجز عند الموعد أعلاه وتعود السيارة إلى السوق. لا شيء مستحق عليك عندها.';
+      'لا تستطيع خضرا استقبال مدفوعات البطاقات بعد. سينتهي هذا الحجز عند الموعد أعلاه وتعود السيارة إلى السوق. لا شيء مستحق عليك عندها.';
+
+  @override
+  String get bookingPaymentWindowClosedBody =>
+      'انتهى وقت دفع العربون لهذا الحجز، فلم يعد بالإمكان دفعه. لا شيء مستحق عليك.';
+
+  @override
+  String get bookingPayDeposit => 'ادفع العربون';
+
+  @override
+  String get bookingPaymentOpening => 'جارٍ فتح صفحة الدفع…';
 
   @override
   String get bookingExpiredTitle => 'انتهى وقت هذا الحجز';
@@ -928,7 +938,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get nonDeliveryDetails => 'ما الذي حدث';
 
   @override
-  String get nonDeliveryTooEarly => 'لم يبدأ الإيجار بعد، فلا شيء للإبلاغ عنه.';
+  String get nonDeliveryTooEarly =>
+      'الوقت مبكر على الإبلاغ. امنح مكتب التأجير مهلة السماح القصيرة المتاحة له بعد الموعد المتفق عليه.';
+
+  @override
+  String nonDeliveryNotYet(String from) {
+    return 'يمكنك الإبلاغ عن ذلك اعتباراً من $from، بعد انقضاء مهلة السماح المتاحة لمكتب التأجير.';
+  }
 
   @override
   String get nonDeliveryReport => 'أبلغ عن ذلك';

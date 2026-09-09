@@ -15,6 +15,36 @@ export type BookingTab =
 
 export type TabCounts = Readonly<Record<BookingTab, number>>;
 
+/**
+ * What the platform will tell a gallery about the customer in front of them.
+ *
+ * AGGREGATES ONLY, and every field is the server's own count over bookings it closed itself. There
+ * is no list of individual ratings and there never will be: a rating dated last Tuesday would tell
+ * this gallery when the customer rented from a competitor.
+ *
+ * Read through the BOOKING, never by customer id. The endpoint has no customer-id form, so a dealer
+ * session cannot be turned into a lookup service over the customer base.
+ */
+export interface CustomerReputation {
+  readonly dealerRating: { readonly average: number | null; readonly count: number };
+  readonly completedRentals: number;
+  readonly completedRentalsWithThisDealer: number;
+  readonly noShows: number;
+  readonly lateCancellations: number;
+  readonly disputesResolvedAgainstCustomer: number;
+  readonly customerSince: string;
+  /** False when the platform has nothing to say, so the panel can say THAT rather than show zeros. */
+  readonly hasHistory: boolean;
+}
+
+/** The gallery's own rating of a customer. A score and nothing else -- there is no comment field. */
+export interface CustomerRating {
+  readonly reviewId: string;
+  readonly bookingId: string;
+  readonly rating: number;
+  readonly createdAt: string;
+}
+
 export interface HandoverInput {
   readonly odometerKm: number | null;
   readonly fuelLevel: number | null;
@@ -66,11 +96,37 @@ export class DealerBookingsService {
     return firstValueFrom(this.http.post<Booking>(`${this.base}/${bookingId}/return`, handover));
   }
 
+  /**
+   * What the platform knows about the customer on the booking being viewed.
+   *
+   * Answers 409 once the booking is no longer live: a gallery may read this while they are deciding
+   * about, or holding, a booking with that person, and no longer. The panel treats that as "nothing
+   * to show" rather than an error, because it is not one -- it is the access rule working.
+   */
+  readonly reputation = httpResource<CustomerReputation>(() => {
+    const id = this.viewing();
+    return id ? `${this.base}/${id}/customer-reputation` : undefined;
+  });
+
+  /** The gallery's own rating of this booking's customer, or null if they have not left one. */
+  readonly customerRating = httpResource<CustomerRating | null>(() => {
+    const id = this.viewing();
+    return id ? `${this.base}/${id}/customer-rating` : undefined;
+  });
+
+  rateCustomer(bookingId: string, rating: number): Promise<CustomerRating> {
+    return firstValueFrom(
+      this.http.post<CustomerRating>(`${this.base}/${bookingId}/customer-rating`, { rating }),
+    );
+  }
+
   /** After a decision: the row, the counts and the open detail all describe the same booking. */
   refresh(): void {
     this.list.reload();
     this.counts.reload();
     this.booking.reload();
+    this.reputation.reload();
+    this.customerRating.reload();
     // The dashboard tiles and the activity trail are read from bookings too, and neither belongs to
     // this service; without this the dealer's own decision is missing from both until a page reload.
     this.console.refreshDerived();

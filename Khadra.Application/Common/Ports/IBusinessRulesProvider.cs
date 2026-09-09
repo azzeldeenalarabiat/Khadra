@@ -68,10 +68,22 @@ public sealed record BusinessRules(
     // never handed the car over (spec 5.5). The mirror of NoShowTimeoutHours, which is the gallery's
     // wait before it may say the customer never appeared.
     //
-    // OPEN OWNER DECISION, raised 2026-09-08. Shipped at 0 -- a gallery that has not handed the car
-    // over at the agreed moment is already late -- but how much lateness is worth reporting is a
-    // business judgement, not a developer's. Frozen onto each booking like every other rule.
-    int NonDeliveryGraceHours,
+    // Settled by the owner at 15 MINUTES on 2026-09-08. The asymmetry with the gallery's 8-hour wait
+    // is deliberate: a customer standing at a counter knows within minutes that nobody is coming,
+    // while a gallery holding a car cannot tell a late renter from an absent one for hours. Minutes
+    // rather than hours because the decision is not expressible in hours at all.
+    // Frozen onto each booking like every other rule.
+    int NonDeliveryGraceMinutes,
+    // How long after a rental finishes either party may review it, and -- the same number -- how long
+    // a first review stays hidden waiting for the second.
+    //
+    // One number rather than two, because they are the same instant seen from both ends: the second
+    // party's deadline to submit IS the first review's reveal, which is what makes "nobody sees the
+    // counterpart before submitting" true by construction instead of by checking.
+    //
+    // A PROPOSAL at 14 days, not a decision. The owner has not been asked; nothing in the spec names
+    // a figure. See pre-launch item 80.
+    int ReviewWindowDays,
     // The oldest model year a dealer may list. A guard against a mistyped year, not a statement
     // about what is worth renting; the console builds its year list from it so the two cannot drift.
     int EarliestVehicleModelYear);

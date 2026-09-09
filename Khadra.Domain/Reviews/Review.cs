@@ -20,6 +20,13 @@ public static class ReviewErrors
 
     public static readonly Error EditWindowClosed =
         Error.Conflict("review.edit_window_closed", "A review can no longer be edited.");
+
+    public static readonly Error ReviewWindowClosed =
+        Error.Conflict("review.window_closed", "The time to review this booking has passed.");
+
+    public static readonly Error ReputationNotAvailable = Error.Conflict(
+        "review.reputation_not_available",
+        "A customer's history is only visible while you have a live booking with them.");
 }
 
 public sealed class ReviewDirection : Enumeration
@@ -34,6 +41,21 @@ public sealed class ReviewDirection : Enumeration
     }
 
     public bool IsPublic => this == CustomerRatesDealer;
+
+    /// <summary>
+    /// Whether hiding a review's text leaves its SCORE counting.
+    /// </summary>
+    /// <remarks>
+    /// True for the public direction and false for the private one, and the asymmetry is deliberate.
+    /// Spec 4.1 makes a gallery's rating something it can never edit, so keeping the score when a
+    /// comment is moderated is what stops a gallery erasing a bad rating by reporting it.
+    ///
+    /// The dealer's rating of a customer has no text to moderate -- it never had one -- so the only
+    /// thing an administrator could be hiding is the SCORE itself, and the only reason to hide that is
+    /// that it was wrong. Keeping a retaliatory one-star counting against a real person at every
+    /// future approval, while telling them it had been dealt with, would be no remedy at all.
+    /// </remarks>
+    public bool HiddenScoreStillCounts => this == CustomerRatesDealer;
 }
 
 public sealed class Rating : ValueObject
@@ -71,6 +93,30 @@ public sealed class Review : AggregateRoot
     public Id SubjectId { get; private set; }
     public Rating Rating { get; private set; } = null!;
     public string? Comment { get; private set; }
+
+    /// <summary>
+    /// When this review becomes visible to anyone but its author.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The blind window, and it stops being optional the moment reviews are mutual. Without it a
+    /// gallery reads its new one-star, finds the booking it came from, and rates that customer one
+    /// star before their reputation reaches any other gallery -- a retaliation loop with the
+    /// platform's own machinery doing the work.
+    /// </para>
+    /// <para>
+    /// The invariant is "nobody sees the counterpart before submitting", and it holds BY CONSTRUCTION
+    /// rather than by checking: the first review sets its own reveal instant, the second party's
+    /// deadline to submit IS that instant, and a second review that does arrive reveals both at once.
+    /// So a party can only ever have submitted while the other was still hidden.
+    /// </para>
+    /// <para>
+    /// A real column, not a computation over the window in force today: a window the owner shortens
+    /// tomorrow must not retroactively expose a review written under a longer one.
+    /// </para>
+    /// </remarks>
+    public DateTimeOffset VisibleFrom { get; private set; }
+
     public bool IsHidden { get; private set; }
     public string? HiddenReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -92,6 +138,7 @@ public sealed class Review : AggregateRoot
         Rating rating,
         string? comment,
         bool bookingIsCompleted,
+        DateTimeOffset revealAt,
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(direction);
@@ -104,6 +151,10 @@ public sealed class Review : AggregateRoot
             return ReviewErrors.BookingNotCompleted;
         if (comment is { Length: > 2000 })
             return ReviewErrors.CommentTooLong;
+        // The counterpart is already readable, so anything written now could be a reply to it. This is
+        // the guard that makes the blind window an invariant rather than a hope.
+        if (now >= revealAt)
+            return ReviewErrors.ReviewWindowClosed;
 
         return new Review(Id.New())
         {
@@ -113,8 +164,25 @@ public sealed class Review : AggregateRoot
             SubjectId = subjectId,
             Rating = rating,
             Comment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim(),
+            VisibleFrom = revealAt,
             CreatedAt = now
         };
+    }
+
+    /// <summary>Whether anyone but the author may see this review yet.</summary>
+    public bool IsVisibleAt(DateTimeOffset now) => now >= VisibleFrom;
+
+    /// <summary>
+    /// Brings the reveal forward, because the counterpart has now been written.
+    /// </summary>
+    /// <remarks>
+    /// Only ever EARLIER. Pushing a reveal back would let a late second review hide a first one
+    /// somebody had already read.
+    /// </remarks>
+    public void Reveal(DateTimeOffset now)
+    {
+        if (now < VisibleFrom)
+            VisibleFrom = now;
     }
 
     // A short grace period to fix a rating left in haste; after that the score is stable.
@@ -123,6 +191,10 @@ public sealed class Review : AggregateRoot
         ArgumentNullException.ThrowIfNull(rating);
 
         if (now > CreatedAt.Add(editWindow))
+            return UnitResult.Failure(ReviewErrors.EditWindowClosed);
+        // And never once the reveal has passed, whatever the edit window says. After that an edit is a
+        // reply to the counterpart, which is the exact thing the blind window exists to prevent.
+        if (IsVisibleAt(now))
             return UnitResult.Failure(ReviewErrors.EditWindowClosed);
         if (comment is { Length: > 2000 })
             return UnitResult.Failure(ReviewErrors.CommentTooLong);

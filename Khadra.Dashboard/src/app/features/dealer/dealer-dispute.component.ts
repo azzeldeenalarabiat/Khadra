@@ -16,6 +16,7 @@ import { SessionService } from '../../core/services/session.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslationKey } from '../../core/i18n/en';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 /**
@@ -60,8 +61,8 @@ export class DealerDisputeComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 404) return 'That dispute is not yours to see, or no longer exists.';
-    return 'The dispute could not be loaded. Nothing has been changed.';
+    if (error.status === 404) return this.t('dealerDispute.thatDisputeIsNot');
+    return this.t('dealerDispute.theDisputeCouldNot');
   });
 
   protected readonly tone = computed<Tone>(() => {
@@ -96,7 +97,7 @@ export class DealerDisputeComponent {
       this.evidenceKeys.update((keys) => [...keys, key]);
       this.evidenceNames.update((names) => [...names, file.name]);
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.busy.set(false);
       input.value = '';
@@ -115,9 +116,9 @@ export class DealerDisputeComponent {
       this.evidenceKeys.set([]);
       this.evidenceNames.set([]);
       this.service.refresh();
-      this.ui.showToast('Statement added', 'The platform and the customer can read it.');
+      this.ui.showToast(this.t('dealerDispute.statementAdded'), this.t('dealerDispute.thePlatformAndThe'));
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.busy.set(false);
     }
@@ -169,14 +170,14 @@ export class DealerDisputeComponent {
   }
 }
 
-function describe(error: unknown): string {
+function describe(error: unknown, t: (key: TranslationKey) => string): string {
   const problem = error as { error?: { code?: string; title?: string } };
   switch (problem.error?.code) {
     case 'dispute.not_open':
-      return 'This dispute is closed; nothing more can be added to it.';
+      return t('dealerDispute.thisDisputeIsClosed');
     case 'dispute.invalid_evidence_type':
-      return 'Evidence must be a photo or a PDF.';
+      return t('dealerBooking.evidenceMustBeA');
     default:
-      return problem.error?.title ?? 'The service did not respond. Nothing has been changed.';
+      return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
   }
 }

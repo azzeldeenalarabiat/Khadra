@@ -47,6 +47,7 @@ public sealed class ReviewHandlers(
     IReviewRepository reviews,
     IBookingRepository bookings,
     IGalleryReviewReader reader,
+    IBusinessRulesProvider rules,
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<LeaveReviewCommand, Result<ReviewDto, Error>>,
@@ -74,6 +75,22 @@ public sealed class ReviewHandlers(
         if (rating.IsFailure)
             return rating.Error;
 
+        var now = clock.UtcNow;
+
+        // The gallery's counterpart, if they have already rated the customer. Loaded TRACKED, because
+        // writing the second half of a mutual review reveals the first half in the same save.
+        var counterpart = await reviews.GetForBookingAsync(
+            booking.Id, ReviewDirection.DealerRatesCustomer, cancellationToken);
+
+        // The counterpart's instant if there is one, so both sides share ONE deadline: the second
+        // party's window to write IS the first one's reveal, which is what makes "nobody sees the
+        // counterpart before submitting" true by construction rather than by checking. Otherwise the
+        // window runs from when the rental FINISHED, so writing on the last day does not hand the
+        // other party a fresh fortnight.
+        var revealAt = counterpart?.VisibleFrom
+            ?? (booking.FinishedAt ?? booking.ReturnedAt ?? booking.CreatedAt)
+                .AddDays((await rules.GetAsync(cancellationToken)).ReviewWindowDays);
+
         var review = Review.Leave(
             booking.Id,
             ReviewDirection.CustomerRatesDealer,
@@ -84,10 +101,18 @@ public sealed class ReviewHandlers(
             request.Comment,
             // The aggregate decides what "completed" means; this only reports the status.
             booking.CanBeReviewed,
-            clock.UtcNow);
+            revealAt,
+            now);
 
         if (review.IsFailure)
             return review.Error;
+
+        // Both sides are in, so neither can be a reply to the other.
+        if (counterpart is not null)
+        {
+            counterpart.Reveal(now);
+            review.Value.Reveal(now);
+        }
 
         await reviews.AddAsync(review.Value, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -114,6 +139,6 @@ public sealed class ReviewHandlers(
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return await reader.ListForGalleryAsync(request.DealerId, request.Page, cancellationToken);
+        return await reader.ListForGalleryAsync(request.DealerId, request.Page, clock.UtcNow, cancellationToken);
     }
 }

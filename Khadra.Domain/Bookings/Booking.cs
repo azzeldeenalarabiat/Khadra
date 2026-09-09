@@ -230,6 +230,18 @@ public sealed class Booking : AggregateRoot
         (Status == BookingStatus.Requested && now >= DecisionDeadline) ||
         (Status == BookingStatus.Approved && PaymentDeadline is { } paymentDeadline && now >= paymentDeadline);
 
+    /// <summary>
+    /// Whether this booking is still LIVE: it holds the vehicle and no window has closed on it.
+    /// </summary>
+    /// <remarks>
+    /// The in-memory twin of <c>BookingHolds.Live</c>, which asks the same question in SQL. Stated
+    /// once, here, because it is now load-bearing for more than availability: it is the predicate a
+    /// gallery's access to a customer is granted on -- what they may see about the person they are
+    /// deciding about, for as long as they are deciding, and no longer. Two copies of that rule would
+    /// drift, and the way it would drift is a gallery keeping access after the booking ended.
+    /// </remarks>
+    public bool IsLive(DateTimeOffset now) => Status.HoldsVehicle && !HasLapsed(now);
+
     /// <summary>Whether <see cref="Cancel"/> would succeed right now.</summary>
     public bool CanBeCancelled(DateTimeOffset now) =>
         (Status == BookingStatus.Requested ||
@@ -431,6 +443,26 @@ public sealed class Booking : AggregateRoot
             now));
         return UnitResult.Success<Error>();
     }
+
+    /// <summary>
+    /// The instant from which the customer may report that the gallery never handed the car over:
+    /// the rental start plus the grace frozen on this booking.
+    /// </summary>
+    /// <remarks>
+    /// Exposed so a screen can say WHEN rather than offering a button the server refuses. A client
+    /// must not add the grace itself: the grace is frozen per booking, so two bookings made either
+    /// side of a settings change have different answers, and only the record knows which.
+    /// </remarks>
+    public DateTimeOffset NonDeliveryReportableFrom => Period.Start.Add(Terms.NonDeliveryGrace);
+
+    /// <summary>Whether the customer may report non-delivery right now.</summary>
+    /// <remarks>
+    /// The same three conditions <see cref="ReportDealerNonDelivery"/> enforces, minus the reason,
+    /// which the customer has not typed yet. Kept beside it so the button and the command cannot
+    /// drift: a screen that enables on this can never be refused for a reason it could have known.
+    /// </remarks>
+    public bool CanReportNonDelivery(DateTimeOffset now) =>
+        Status == BookingStatus.Confirmed && now >= NonDeliveryReportableFrom;
 
     // Spec 5.5: the dealer approved and then failed to hand the car over. The penalty is a RANGE
     // because the owner has not settled on a tier (spec 2.2); an Admin picks inside it on a ticket.

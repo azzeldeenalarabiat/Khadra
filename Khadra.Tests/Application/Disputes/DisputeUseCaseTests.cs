@@ -13,6 +13,7 @@ using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Tests.Support;
@@ -90,8 +91,10 @@ public sealed class DisputeUseCaseTests
             Bookings, Tickets, new BookingPartyResolver(Dealers), Composer(), Uploads, Storage,
             FakeDocumentPolicy.Default, TestBusinessRules.Provider(), Clock, UnitOfWork);
 
+        public IPaymentRepository Payments { get; } = Substitute.For<IPaymentRepository>();
+
         public AdminDisputeHandlers Admin() => new(
-            Tickets, Bookings, Names, Composer(), new DisputeAuditor(AuditTrail, Actor, Clock), Actor, Clock, UnitOfWork);
+            Tickets, Bookings, Payments, Names, Composer(), new DisputeAuditor(AuditTrail, Actor, Clock), Actor, Clock, UnitOfWork);
     }
 
     /// <summary>A booking the customer cancelled after paying: terminal, with the deposit held and a penalty assessed.</summary>

@@ -137,4 +137,18 @@ export interface DeliverySettingsView {
   /** The ceiling the server enforces, so the form can refuse what the server would. */
   readonly maxFee: number;
   readonly currencyCode: string;
+  /**
+   * How many of this gallery's LISTED cars are not offered for delivery.
+   *
+   * A car takes its delivery flag from whether the gallery offered delivery when the car was SAVED,
+   * so a gallery that lists its fleet first and turns delivery on afterwards advertises a service
+   * none of its cars provides. This number is the only thing on any screen connecting those two
+   * facts, and it is the server's count -- the page does not load a fleet list to work it out.
+   */
+  readonly publishedCarsNotOfferedForDelivery: number;
+}
+
+/** What the bulk action changed, so a screen says a number rather than "done". */
+export interface FleetDeliveryResult {
+  readonly updated: number;
 }

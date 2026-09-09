@@ -90,6 +90,98 @@
               }
             </div>
           </div>
+
+          <!--
+            What the PLATFORM recorded, never what another gallery said. Aggregates only: no list of
+            ratings, no dates on individual ones, no reviewer. A rating dated last Tuesday would tell
+            this gallery when the customer rented from a competitor.
+
+            Every figure is the server's own count. Nothing here is derived in the browser, including
+            the rating average, which the server rounds to the decimal it is displayed to.
+          -->
+          <div class="sect-pad">
+            <div class="sect-h">
+              <span class="sect-t">{{ t('dealerBooking.history') }}</span>
+              <span class="sect-hint">{{ t('dealerBooking.historyHint') }}</span>
+            </div>
+
+            @if (reputationClosed()) {
+              <p class="state-text">{{ t('dealerBooking.historyClosed') }}</p>
+            } @else if (reputation(); as rep) {
+              @if (rep.hasHistory) {
+                <div class="kv">
+                  <span class="kv-key">{{ t('dealerBooking.ratedByGalleries') }}</span
+                  ><span class="kv-val">
+                    @if (rep.dealerRating.average !== null) {
+                      {{ rep.dealerRating.average }}
+                      <span class="sect-hint">{{
+                        t('dealerBooking.ratingsCount', { count: rep.dealerRating.count })
+                      }}</span>
+                    } @else {
+                      <span class="sect-hint">{{ t('dealerBooking.notRatedYet') }}</span>
+                    }
+                  </span>
+                </div>
+                <div class="kv">
+                  <span class="kv-key">{{ t('dealerBooking.completedRentals') }}</span
+                  ><span class="kv-val"
+                    >{{ rep.completedRentals }}
+                    <span class="sect-hint"
+                      >({{ rep.completedRentalsWithThisDealer }} {{ t('dealerBooking.withYou') }})</span
+                    ></span
+                  >
+                </div>
+                <div class="kv">
+                  <span class="kv-key">{{ t('dealerBooking.noShows') }}</span
+                  ><span class="kv-val">{{ rep.noShows }}</span>
+                </div>
+                <div class="kv">
+                  <span class="kv-key">{{ t('dealerBooking.lateCancellations') }}</span
+                  ><span class="kv-val">{{ rep.lateCancellations }}</span>
+                </div>
+                <div class="kv">
+                  <span class="kv-key">{{ t('dealerBooking.disputesAgainst') }}</span
+                  ><span class="kv-val">{{ rep.disputesResolvedAgainstCustomer }}</span>
+                </div>
+                <div class="kv">
+                  <span class="kv-key">{{ t('dealerBooking.customerSince') }}</span
+                  ><span class="kv-val">{{ dateTime(rep.customerSince) }}</span>
+                </div>
+              } @else {
+                <!-- An absent record and a bad one must not look the same. -->
+                <p class="state-text">{{ t('dealerBooking.noHistory') }}</p>
+              }
+            }
+          </div>
+
+          <!-- Rating the customer back (spec 5.6). A score and nothing else. -->
+          @if (canRateCustomer()) {
+            <div class="sect-pad">
+              <div class="sect-h">
+                <span class="sect-t">{{ t('dealerBooking.rateCustomer') }}</span>
+              </div>
+              <p class="state-text">{{ t('dealerBooking.rateCustomerHint') }}</p>
+              <div class="row row-gap-8">
+                @for (score of ratingChoices; track score) {
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    [disabled]="ratingBusy()"
+                    (click)="rateCustomer(score)"
+                  >
+                    {{ score }}
+                  </button>
+                }
+              </div>
+            </div>
+          } @else if (myCustomerRating(); as mine) {
+            <div class="sect-pad">
+              <div class="kv">
+                <span class="kv-key">{{ t('dealerBooking.youRated') }}</span
+                ><span class="kv-val">{{ mine.rating }}</span>
+              </div>
+            </div>
+          }
         </section>
 
         <section class="sect">

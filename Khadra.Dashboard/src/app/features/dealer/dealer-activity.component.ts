@@ -20,6 +20,9 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class DealerActivityComponent {
   protected readonly t = inject(I18nService).t;
+  // Server enum names, in the reader's language. Shared rather than per-component: the same enum
+  // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
+  protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly service = inject(DealerConsoleService);
 
   protected readonly page = this.service.activityPage;
@@ -37,7 +40,7 @@ export class DealerActivityComponent {
   protected readonly totalPages = computed(() => this.data()?.totalPages ?? 1);
 
   protected readonly failure = computed(() =>
-    this.resource.error() ? 'Activity could not be loaded. Nothing has been changed.' : null,
+    this.resource.error() ? this.t('dealerActivity.activityCouldNotBe') : null,
   );
 
   protected goTo(page: number): void {
@@ -66,16 +69,16 @@ export class DealerActivityComponent {
 
   protected describe(e: DealerActivityEntry): string {
     const labels: Record<string, string> = {
-      Requested: 'Requested — awaiting your answer',
-      Approved: 'Approved — awaiting the deposit',
-      Confirmed: 'Deposit paid — booking confirmed',
+      Requested: this.t('dealerActivity.requestedAwaitingYourAnswer'),
+      Approved: this.t('dealerActivity.approvedAwaitingTheDeposit'),
+      Confirmed: this.t('dealerActivity.depositPaidBookingConfirmed'),
       Rejected: 'Rejected',
-      PickedUp: 'Picked up',
+      PickedUp: this.t('status.pickedUp'),
       Returned: 'Returned',
       Completed: 'Completed',
       Cancelled: 'Cancelled',
-      NoShow: 'Marked no-show',
-      Expired: 'Expired unanswered',
+      NoShow: this.t('dealerActivity.markedNoShow'),
+      Expired: this.t('dealerActivity.expiredUnanswered'),
     };
     return labels[e.toStatus] ?? e.toStatus;
   }

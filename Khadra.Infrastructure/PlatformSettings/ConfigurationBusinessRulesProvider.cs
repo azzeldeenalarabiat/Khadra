@@ -29,7 +29,8 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
             current.MaxAdvanceBookingDays!.Value,
             current.MinimumBookingLeadTimeMinutes!.Value,
             current.MaxRentalDays!.Value,
-            current.NonDeliveryGraceHours!.Value,
+            current.NonDeliveryGraceMinutes!.Value,
+            current.ReviewWindowDays!.Value,
             current.EarliestVehicleModelYear));
     }
 }

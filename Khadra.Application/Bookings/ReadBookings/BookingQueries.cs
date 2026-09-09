@@ -4,6 +4,7 @@ using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers;
+using Khadra.Application.Payments;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
@@ -103,6 +104,7 @@ public sealed class GetBookingHandler(
     IBookingRepository bookings,
     IBookingReader reader,
     BookingPartyResolver parties,
+    BookingPaymentAvailability paymentAvailability,
     IClock clock)
     : IRequestHandler<GetBookingQuery, Result<BookingDto, Error>>
 {
@@ -121,6 +123,18 @@ public sealed class GetBookingHandler(
             return party.Error;
 
         var context = await reader.ContextAsync(booking.Id, cancellationToken);
+
+        // Only for the customer. The gallery and an administrator see the same booking without a
+        // payment verdict, because neither has a Pay button and neither should be told whether the
+        // customer currently has a checkout open.
+        if (party.Value == BookingParty.Customer)
+        {
+            context = context with
+            {
+                Payment = await paymentAvailability.ForAsync(booking, cancellationToken)
+            };
+        }
+
         return BookingDto.From(booking, context, clock.UtcNow);
     }
 }

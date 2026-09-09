@@ -1,0 +1,65 @@
+# What must never reach a build context.
+#
+# Both images are built from the REPOSITORY ROOT, because .NET restore needs
+# global.json, Directory.Build.props and Directory.Packages.props, and those live
+# here rather than beside a project. That makes this file load-bearing: without it
+# the context is the whole working tree, including a Flutter build, a node_modules
+# and every bin/obj on the machine — hundreds of megabytes shipped to the daemon
+# on every build, to be thrown away.
+
+# ── Secrets. First, because this is the one that matters. ─────────────────────
+# appsettings.Local.json holds the Postgres password, the JWT signing key and the
+# Brevo API key. It is gitignored, so it is not in the repository — but it IS on a
+# developer's disk, and a build context is not a git clone. Without this line a
+# local build would bake those secrets into an image layer, where they survive
+# even if a later layer deletes the file.
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+*.pfx
+*.p12
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+
+# ── Build output ──────────────────────────────────────────────────────────────
+**/bin/
+**/obj/
+**/dist/
+**/out/
+**/node_modules/
+**/.angular/
+**/.kotlin/
+
+# A stale local build of the console. The BFF Dockerfile builds the dashboard in a
+# Node stage and copies it into wwwroot; if a developer already ran `ng build` and
+# the result is sitting here, it would be published alongside the fresh one and
+# whichever wins is a coin toss.
+Khadra.Bff/wwwroot/
+
+# The customer app is not part of either image: the Flutter web build is static
+# and served separately. Its build directory alone is tens of megabytes.
+Khadra.Mobile/
+
+# ── Version control and tooling ───────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+.github/
+.vs/
+.vscode/
+.idea/
+.claude/
+.run/
+.config/
+
+# ── Things that are not inputs to a server build ──────────────────────────────
+docs/
+**/*.md
+!README.md
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+start-dev.ps1
+**/TestResults/

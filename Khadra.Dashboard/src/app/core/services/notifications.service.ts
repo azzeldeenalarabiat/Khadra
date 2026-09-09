@@ -5,6 +5,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter, firstValueFrom, map, startWith } from 'rxjs';
 import { NotificationFeed, NotificationItem } from '../models/notifications.api';
 import { SessionService } from './session.service';
+import { I18nService } from '../i18n/i18n.service';
 
 /**
  * The signed-in person's notifications.
@@ -19,6 +20,7 @@ import { SessionService } from './session.service';
  */
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
+  private readonly t = inject(I18nService).t;
   private readonly http = inject(HttpClient);
   private readonly session = inject(SessionService);
   private readonly base = '/api/v1/notifications';
@@ -68,40 +70,46 @@ export class NotificationsService {
    * rather than to an empty line, because a new kind should degrade, not disappear.
    */
   describe(item: NotificationItem): string {
-    const who = item.isMine ? 'You' : item.actorName;
-    const what = item.subjectReference ?? 'a booking';
+    // Named PARAMETERS rather than a template literal, and that is the whole reason this could not
+    // be keyed by codemod: Arabic does not put the actor and the object where English puts them, so
+    // the sentence has to be one message with two holes in it, not three pieces concatenated.
+    const who = item.isMine ? this.t('notifications.you') : item.actorName;
+    const what = item.subjectReference ?? this.t('notifications.aBooking');
+    const parts = { who, what };
 
     switch (item.kind) {
       // The one kind raised from outside the dealership. Its row carries no actor on purpose --
       // a customer's name is never copied into this table -- so it does not use `who`.
       case 'BookingRequested':
-        return `A customer requested ${what}`;
+        return this.t('notifications.customerRequested', { what });
       case 'BookingApproved':
-        return `${who} approved ${what}`;
+        return this.t('notifications.approved', parts);
       case 'BookingRejected':
-        return `${who} rejected ${what}`;
+        return this.t('notifications.rejected', parts);
       case 'BookingPickedUp':
-        return `${who} recorded the pickup for ${what}`;
+        return this.t('notifications.recordedPickup', parts);
       case 'BookingReturned':
-        return `${who} recorded the return for ${what}`;
+        return this.t('notifications.recordedReturn', parts);
+      case 'BookingConfirmed':
+        return this.t('notifications.customerPaid', { what });
       case 'DealerApproved':
-        return 'Your dealership was approved';
+        return this.t('notifications.dealerApproved');
       case 'DealerRejected':
-        return 'Your dealership’s application was rejected';
+        return this.t('notifications.dealerRejected');
       case 'DealerClarificationRequested':
-        return 'The platform asked for more on your application';
+        return this.t('notifications.dealerClarification');
       case 'DealerSuspended':
-        return 'Your dealership was suspended';
+        return this.t('notifications.dealerSuspended');
       case 'DealerReactivated':
-        return 'Your dealership is trading again';
+        return this.t('notifications.dealerReactivated');
       case 'StaffReactivated':
-        return `${who} reactivated a member of staff`;
+        return this.t('notifications.staffReactivated', { who });
       case 'ReportAccessGranted':
-        return `${who} gave you access to financial reports`;
+        return this.t('notifications.reportAccessGranted', { who });
       case 'ReportAccessRevoked':
-        return `${who} removed your access to financial reports`;
+        return this.t('notifications.reportAccessRevoked', { who });
       default:
-        return `${who} updated ${what}`;
+        return this.t('notifications.updated', parts);
     }
   }
 

@@ -9,6 +9,7 @@ using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Disputes.Repositories;
+using Khadra.Domain.Payments.Repositories;
 using MediatR;
 
 namespace Khadra.Application.Disputes.ResolveDispute;
@@ -66,6 +67,7 @@ public sealed class ResolveDisputeCommandValidator : AbstractValidator<ResolveDi
 public sealed class AdminDisputeHandlers(
     IDisputeTicketRepository tickets,
     IBookingRepository bookings,
+    IPaymentRepository payments,
     IDisputeAdminReader reader,
     DisputeViewComposer composer,
     DisputeAuditor auditor,
@@ -183,6 +185,18 @@ public sealed class AdminDisputeHandlers(
         if (closed.IsFailure)
             return closed.Error;
 
+        // The disposition is a MONEY INSTRUCTION, and this is where the customer's leg of it stops
+        // being a number on a screen. Recorded in this same save, so a resolution and the refund it
+        // ordered can never come apart; SENT later by the payment sweep, because reaching a provider
+        // is a network call that fails exactly when it matters most.
+        //
+        // The other two legs -- what the platform keeps and what goes to the dealer -- have no rail
+        // and are settled by hand. That is the standing gap the architecture doc records, not
+        // something this handler can close.
+        var refunded = await RecordCustomerRefundAsync(booking.Id, ticket.Id, disposition.Value.RefundToCustomer, now, cancellationToken);
+        if (refunded.IsFailure)
+            return refunded.Error;
+
         auditor.Record(
             ticket,
             booking,
@@ -199,5 +213,35 @@ public sealed class AdminDisputeHandlers(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await composer.ComposeAsync(ticket, booking, cancellationToken);
+    }
+
+    /// <summary>
+    /// Records what the resolution returns to the customer, against the payment that actually took it.
+    /// </summary>
+    /// <remarks>
+    /// Silent in three cases, each of which is correct rather than a gap:
+    /// nothing to refund; a booking whose deposit was never paid (its disposition is all zeros, which
+    /// <c>DepositDisposition.Create</c> already insists on); and a deposit taken before Payments
+    /// existed, which has no payment row to refund against and has to be settled by hand.
+    /// </remarks>
+    private async Task<UnitResult<Error>> RecordCustomerRefundAsync(
+        Id bookingId,
+        Id ticketId,
+        Money refundToCustomer,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (refundToCustomer.IsZero)
+            return UnitResult.Success<Error>();
+
+        var payment = await payments.GetAppliedForBookingAsync(bookingId, cancellationToken);
+        if (payment is null)
+            return UnitResult.Success<Error>();
+
+        // A FRESH Money: the disposition's instance is owned by the ticket, and EF must not see one
+        // value object tracked under two aggregates.
+        var amount = Money.Create(refundToCustomer.Amount, refundToCustomer.CurrencyCode);
+        var requested = payment.RequestRefund(amount, ticketId, now);
+        return requested.IsSuccess ? UnitResult.Success<Error>() : UnitResult.Failure(requested.Error);
     }
 }

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { TranslationKey } from '../../core/i18n/en';
 import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 
@@ -61,26 +62,26 @@ export class ResetPasswordComponent {
       this.done.set(true);
       setTimeout(() => void this.router.navigateByUrl('/sign-in'), 2500);
     } catch (error) {
-      this.problem.set(describe(error));
+      this.problem.set(describe(error, this.t));
     } finally {
       this.busy.set(false);
     }
   }
 }
 
-function describe(error: unknown): string {
+function describe(error: unknown, t: (key: TranslationKey) => string): string {
   if (!(error instanceof HttpErrorResponse))
-    return 'The service did not respond. Try again shortly.';
+    return t('common.noResponse');
 
   const code: string | undefined = error.error?.code;
   if (code === 'auth.invalid_token') {
-    return 'This link is invalid or has expired. Request a new one from the sign-in page.';
+    return t('resetPassword.thisLinkIsInvalid');
   }
   if (code === 'auth.password_policy' || error.status === 400) {
-    return error.error?.title ?? 'That password does not meet the policy. Try a longer one.';
+    return error.error?.title ?? t('acceptInvite.thatPasswordDoesNot');
   }
   if (error.status === 429) {
-    return 'Too many attempts. Wait a few minutes before trying again.';
+    return t('common.tooManyAttempts');
   }
-  return 'The service did not respond. Try again shortly.';
+  return t('common.noResponse');
 }

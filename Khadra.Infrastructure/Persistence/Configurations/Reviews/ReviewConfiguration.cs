@@ -42,6 +42,13 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
         entity.Navigation(review => review.Rating).IsRequired();
 
         entity.Property(review => review.Comment).HasMaxLength(2000);
+
+        // The blind window's instant, a real column rather than a computation over the window in force
+        // today: a window the owner shortens tomorrow must not retroactively expose a review written
+        // under a longer one. Every public read filters on it, so it is indexed with the columns those
+        // reads already filter by.
+        entity.Property(review => review.VisibleFrom).IsRequired();
+
         entity.Property(review => review.IsHidden).IsRequired();
         entity.Property(review => review.HiddenReason).HasMaxLength(500);
         entity.Property(review => review.CreatedAt).IsRequired();
@@ -53,6 +60,6 @@ internal sealed class ReviewConfiguration : IEntityTypeConfiguration<Review>
 
         // Every public read is "this gallery's reviews, newest first" and every rating is an average
         // over the same set. Added while the table is empty, which is the only cheap moment.
-        entity.HasIndex(review => new { review.SubjectId, review.Direction, review.CreatedAt });
+        entity.HasIndex(review => new { review.SubjectId, review.Direction, review.VisibleFrom });
     }
 }

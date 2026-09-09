@@ -93,8 +93,8 @@ export class DealerBookingsComponent {
     const error = this.list.error() as { status?: number; error?: { code?: string } } | undefined;
     if (!error) return null;
     if (error.error?.code === 'dealer.not_registered')
-      return 'This account is not part of a dealership.';
-    return 'Your bookings could not be loaded. Nothing has been changed.';
+      return this.t('employeeDash.thisAccountIsNot');
+    return this.t('dealerBookings.yourBookingsCouldNot');
   });
 
   protected count(tab: BookingTab): number | null {
@@ -158,7 +158,7 @@ export class DealerBookingsComponent {
       case 'Requested':
         return 'Pending';
       case 'Approved':
-        return 'Awaiting deposit';
+        return this.t('status.awaitingDeposit');
       case 'PickedUp':
         return 'Active';
       case 'NoShow':
@@ -199,7 +199,7 @@ export class DealerBookingsComponent {
   protected car(booking: BookingListItem): string {
     return booking.vehicle
       ? `${booking.vehicle.make} ${booking.vehicle.model} ${booking.vehicle.year}`
-      : 'Vehicle no longer listed';
+      : this.t('dealerBookings.vehicleNoLongerListed');
   }
 
   protected initials(name: string): string {

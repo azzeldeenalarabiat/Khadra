@@ -73,6 +73,42 @@ export class I18nService {
     return resolved ?? key;
   };
 
+  /**
+   * A status enum's name, as the reader's language says it.
+   *
+   * Every status on every screen comes from the server as an `Enumeration.Name` -- `PendingReview`,
+   * `NoShow`, `UnderReview` -- and a dozen screens were rendering that raw. An Arabic page read
+   * "PendingReview" in Latin script in the middle of a right-to-left sentence.
+   *
+   * One helper rather than a `statusLabel` per component, because the same enum shows up on the
+   * dealer queue, the fleet list, the bookings list, the dispute list and three dashboards, and a
+   * dozen copies of one mapping is a dozen places for a new member to be forgotten.
+   *
+   * <b>The fallback is the point.</b> A server enum can grow a member without asking this console,
+   * and a lookup table alone would render a new one as a blank or as a raw key. So an unknown name
+   * falls back to itself, split at the camel humps: "PartiallyRefunded" becomes "Partially
+   * refunded", which is wrong in Arabic but readable in both -- and far better than nothing, which
+   * is what a blank pill tells somebody deciding whether to approve a booking.
+   *
+   * <paramref name="scope"/> disambiguates the handful of names that mean different things in
+   * different contexts: `Approved` on a DEALER is a licence check that passed, and on a BOOKING it
+   * is a gallery saying yes, and Arabic does not use the same word for both.
+   */
+  readonly statusLabel = (name: string | null | undefined, scope?: 'booking'): string => {
+    if (!name) return '';
+
+    const camel = name.charAt(0).toLowerCase() + name.slice(1);
+    const scoped = scope === 'booking' ? `status.${camel}Booking` : null;
+    const key = (scoped && scoped in EN ? scoped : `status.${camel}`) as TranslationKey;
+
+    if (key in EN) return this.t(key);
+
+    // Unknown to this build. Split the humps and lower everything after the first letter, the way
+    // the audit screen has always rendered an action it does not know.
+    const spaced = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return spaced.charAt(0) + spaced.slice(1).toLowerCase();
+  };
+
   /** BCP 47 tag for `Intl`. Western digits are pinned; see FormatService. */
   localeTag(): string {
     return this.language() === 'ar' ? 'ar-JO-u-nu-latn' : 'en-GB';

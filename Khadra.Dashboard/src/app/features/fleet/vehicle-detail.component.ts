@@ -48,6 +48,9 @@ interface CalendarDay {
 })
 export class VehicleDetailComponent {
   protected readonly t = inject(I18nService).t;
+  // Server enum names, in the reader's language. Shared rather than per-component: the same enum
+  // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
+  protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly service = inject(FleetService);
   private readonly consoleData = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
@@ -110,8 +113,8 @@ export class VehicleDetailComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 404) return 'That car is not in your fleet, or has been removed.';
-    return 'The car could not be loaded. Nothing has been changed.';
+    if (error.status === 404) return this.t('vehicleDetail.thatCarIsNot');
+    return this.t('vehicleDetail.theCarCouldNot');
   });
 
   protected readonly current = computed(
@@ -129,9 +132,9 @@ export class VehicleDetailComponent {
     if (!c) return { label: '', tone: 'dim' };
     if (this.current()) return { label: this.t('vehicleDetail.onHire'), tone: 'accent' };
     if (c.status === 'Maintenance') return { label: this.t('vehicleDetail.offTheRoad'), tone: 'bad' };
-    if (c.status === 'Draft') return { label: 'Draft', tone: 'dim' };
-    if (c.status === 'Hidden') return { label: 'Hidden', tone: 'dim' };
-    return c.isBookable ? { label: 'Listed', tone: 'ok' } : { label: 'Blocked', tone: 'warn' };
+    if (c.status === 'Draft') return { label: this.t('status.draft'), tone: 'dim' };
+    if (c.status === 'Hidden') return { label: this.t('status.hidden'), tone: 'dim' };
+    return c.isBookable ? { label: this.t('status.listed'), tone: 'ok' } : { label: this.t('fleetList.blocked'), tone: 'warn' };
   });
 
   protected readonly subtitle = computed(() => {
@@ -153,13 +156,13 @@ export class VehicleDetailComponent {
     if (!c) return [];
     return [
       { k: 'Make / model', v: `${c.make} ${c.model}` },
-      { k: 'Year', v: String(c.year) },
-      { k: 'Colour', v: c.color ?? '—' },
-      { k: 'Transmission', v: c.transmission },
-      { k: 'Fuel', v: c.fuelType },
-      { k: 'Seats', v: String(c.seats) },
-      { k: 'Plate', v: c.plateNumber },
-      { k: 'Added', v: this.date(c.createdAt) },
+      { k: this.t('common.year'), v: String(c.year) },
+      { k: this.t('common.colour'), v: c.color ?? '—' },
+      { k: this.t('common.transmission'), v: c.transmission },
+      { k: this.t('common.fuel'), v: c.fuelType },
+      { k: this.t('common.seats'), v: String(c.seats) },
+      { k: this.t('dealerBooking.plate'), v: c.plateNumber },
+      { k: this.t('adminUsers.added'), v: this.date(c.createdAt) },
     ];
   });
 
@@ -168,24 +171,24 @@ export class VehicleDetailComponent {
     if (!c) return [];
     const delivery = this.dealer()?.delivery;
     return [
-      { k: 'Daily price', v: `${c.dailyRate.amount} ${c.dailyRate.currency}` },
-      { k: 'Security deposit', v: `${c.securityDeposit.amount} ${c.securityDeposit.currency}` },
+      { k: this.t('vehicleDetail.dailyPrice'), v: `${c.dailyRate.amount} ${c.dailyRate.currency}` },
+      { k: this.t('vehicleDetail.securityDeposit'), v: `${c.securityDeposit.amount} ${c.securityDeposit.currency}` },
       {
-        k: 'Mileage',
+        k: this.t('vehicleWizard.mileage'),
         v: c.mileage.isUnlimited
           ? 'Unlimited'
           : `${c.mileage.dailyLimitKm} km/day · ${c.mileage.excessFeePerKm?.amount ?? 0} ${c.mileage.excessFeePerKm?.currency ?? ''}/km over`,
       },
-      { k: 'Fuel policy', v: c.fuelPolicy === 'FullToFull' ? 'Full to full' : 'Same to same' },
+      { k: this.t('common.fuelPolicy'), v: c.fuelPolicy === 'FullToFull' ? this.t('vehicleWizard.fullToFull') : this.t('vehicleWizard.sameToSame') },
       {
-        k: 'Delivery',
+        k: this.t('common.delivery'),
         v: c.isDeliveryEligible
           ? delivery?.isEnabled
             ? `Eligible · radius ${delivery.radiusKm} km · fee set by the platform`
-            : 'Eligible, but delivery is switched off for your dealership'
-          : 'Pickup only',
+            : this.t('vehicleDetail.eligibleButDeliveryIs')
+          : this.t('vehicleDetail.pickupOnly'),
       },
-      { k: 'Insurance', v: 'Pending platform configuration', tone: 'dim' },
+      { k: this.t('vehicleDetail.insurance'), v: this.t('vehicleDetail.pendingPlatformConfiguration'), tone: 'dim' },
     ];
   });
 
@@ -212,13 +215,13 @@ export class VehicleDetailComponent {
         if (hold.status === 'Requested')
           return { n: i + 1, tag: 'Requested', tone: 'bad', bookingId: hold.bookingId };
         if (hold.status === 'Approved')
-          return { n: i + 1, tag: 'Awaiting deposit', tone: 'bad', bookingId: hold.bookingId };
+          return { n: i + 1, tag: this.t('status.awaitingDeposit'), tone: 'bad', bookingId: hold.bookingId };
         return { n: i + 1, tag: hold.reference, tone: 'warn', bookingId: hold.bookingId };
       }
       if (c && c.status === 'Maintenance')
-        return { n: i + 1, tag: 'Off the road', tone: 'dim', bookingId: null };
+        return { n: i + 1, tag: this.t('status.offTheRoad'), tone: 'dim', bookingId: null };
       if (c && c.status !== 'Active')
-        return { n: i + 1, tag: 'Not listed', tone: 'dim', bookingId: null };
+        return { n: i + 1, tag: this.t('vehicleDetail.notListed'), tone: 'dim', bookingId: null };
       return { n: i + 1, tag: 'Free', tone: 'ok', bookingId: null };
     });
   });
@@ -274,7 +277,7 @@ export class VehicleDetailComponent {
     return (
       {
         Requested: 'Pending',
-        Approved: 'Awaiting deposit',
+        Approved: this.t('status.awaitingDeposit'),
         Confirmed: 'Upcoming',
         PickedUp: 'Active',
         NoShow: 'No-show',
@@ -316,10 +319,10 @@ export class VehicleDetailComponent {
   } | null {
     const c = this.car();
     if (!c) return null;
-    if (c.status === 'Active') return { label: 'Hide', action: 'Hide', icon: 'eye-slash' };
+    if (c.status === 'Active') return { label: this.t('fleetList.hide'), action: 'Hide', icon: 'eye-slash' };
     if (c.status === 'Maintenance')
       return { label: this.t('vehicleDetail.backOnTheRoad'), action: 'ReturnFromMaintenance', icon: 'check-circle' };
-    return { label: 'Publish', action: 'Publish', icon: 'eye' };
+    return { label: this.t('fleetList.publish'), action: 'Publish', icon: 'eye' };
   }
 
   protected async changeStatus(action: VehicleStatusAction): Promise<void> {
@@ -333,20 +336,20 @@ export class VehicleDetailComponent {
       // Four actions, four outcomes. Returning from the garage lands on Hidden by design
       // (Vehicle.ReturnFromMaintenance), so it must not claim the car is bookable again.
       const told: Record<VehicleStatusAction, readonly [string, string]> = {
-        Publish: ['Published', 'Customers can see it now.'],
-        Hide: ['Hidden', 'Customers no longer see it.'],
-        SendToMaintenance: ['Off the road', 'It is not offered while it is off the road.'],
-        ReturnFromMaintenance: ['Back on the road', 'It is hidden until you publish it again.'],
+        Publish: ['Published', this.t('vehicleDetail.customersCanSeeIt')],
+        Hide: ['Hidden', this.t('vehicleDetail.customersNoLongerSee')],
+        SendToMaintenance: [this.t('status.offTheRoad'), this.t('vehicleDetail.itIsNotOffered')],
+        ReturnFromMaintenance: [this.t('fleetList.backOnTheRoad'), this.t('vehicleDetail.itIsHiddenUntil')],
       };
       const [title, body] = told[action];
       this.ui.showToast(title, body);
     } catch (error) {
       const problem = error as { error?: { code?: string; title?: string } };
       this.ui.showToast(
-        'That did not go through',
+        this.t('vehicleDetail.thatDidNotGo'),
         problem.error?.code === 'vehicle.no_photos'
-          ? 'Add at least one photo before publishing.'
-          : (problem.error?.title ?? 'The service did not respond.'),
+          ? this.t('vehicleDetail.addAtLeastOne')
+          : (problem.error?.title ?? this.t('vehicleDetail.theServiceDidNot')),
         'bad',
       );
     } finally {

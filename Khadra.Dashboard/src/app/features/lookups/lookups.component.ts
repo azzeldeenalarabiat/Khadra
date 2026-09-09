@@ -45,12 +45,12 @@ export class LookupsComponent {
   protected readonly kind = computed(() => this.kindFromRoute());
   protected readonly isCities = computed(() => this.kind() === 'cities');
 
-  protected readonly title = computed(() => (this.isCities() ? 'Cities & regions' : 'Car types'));
+  protected readonly title = computed(() => (this.isCities() ? 'Cities & regions' : this.t('lookups.carTypes')));
 
   protected readonly subtitle = computed(() =>
     this.isCities()
-      ? 'The places customers search in. A retired city stays on every dealership and booking that already names it.'
-      : 'The categories a car is listed under. A retired type stays on every vehicle that already names it.',
+      ? this.t('lookups.thePlacesCustomersSearch')
+      : this.t('lookups.theCategoriesACar'),
   );
 
   protected readonly activeCount = computed(
@@ -60,8 +60,8 @@ export class LookupsComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'Platform lookups are curated by administrators.';
-    return 'The list could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('lookups.platformLookupsAreCurated');
+    return this.t('lookups.theListCouldNot');
   });
 
   protected add(): void {
@@ -70,20 +70,20 @@ export class LookupsComponent {
       {
         icon: 'plus-circle',
         tone: 'accent',
-        title: cities ? 'Add a city' : 'Add a car type',
+        title: cities ? 'Add a city' : this.t('lookups.addACarType'),
         body: cities
-          ? 'Customers filter their search by this list, in whichever language they are using.'
-          : 'Dealers choose from this list when they list a car, and customers filter by it.',
+          ? this.t('lookups.customersFilterTheirSearch')
+          : this.t('lookups.dealersChooseFromThis'),
         fields: [
           {
             name: 'nameEn',
-            label: 'Name (English)',
+            label: this.t('lookups.nameEnglish'),
             type: 'text',
             placeholder: cities ? 'e.g. Amman' : 'e.g. Sedan',
           },
           {
             name: 'nameAr',
-            label: 'Name (Arabic)',
+            label: this.t('lookups.nameArabic'),
             type: 'text',
             placeholder: cities ? 'مثال: عمّان' : 'مثال: سيدان',
           },
@@ -107,8 +107,8 @@ export class LookupsComponent {
               ]
             : []),
         ],
-        confirm: cities ? 'Add city' : 'Add car type',
-        result: { title: 'Added', body: '', tone: 'ok' },
+        confirm: cities ? this.t('lookups.addCity') : this.t('lookups.addCarType'),
+        result: { title: this.t('adminUsers.added'), body: '', tone: 'ok' },
       },
       async (values) => {
         const body: Record<string, unknown> = {
@@ -128,7 +128,7 @@ export class LookupsComponent {
         await this.service.create(this.kind(), body);
         this.service.refresh();
       },
-      { title: 'Added', body: '' },
+      { title: this.t('adminUsers.added'), body: '' },
     );
   }
 
@@ -140,11 +140,11 @@ export class LookupsComponent {
         title: `Rename ${entry.nameEn}`,
         body: this.t('lookups.bothNamesChangeTogether'),
         fields: [
-          { name: 'nameEn', label: 'Name (English)', type: 'text', placeholder: '', value: entry.nameEn },
-          { name: 'nameAr', label: 'Name (Arabic)', type: 'text', placeholder: '', value: entry.nameAr },
+          { name: 'nameEn', label: this.t('lookups.nameEnglish'), type: 'text', placeholder: '', value: entry.nameEn },
+          { name: 'nameAr', label: this.t('lookups.nameArabic'), type: 'text', placeholder: '', value: entry.nameAr },
         ],
         confirm: 'Rename',
-        result: { title: 'Renamed', body: '', tone: 'ok' },
+        result: { title: this.t('lookups.renamed'), body: '', tone: 'ok' },
       },
       async (values) => {
         await this.service.rename(
@@ -155,7 +155,7 @@ export class LookupsComponent {
         );
         this.service.refresh();
       },
-      { title: 'Renamed', body: '' },
+      { title: this.t('lookups.renamed'), body: '' },
     );
   }
 
@@ -167,8 +167,8 @@ export class LookupsComponent {
         danger: !isActive,
         title: isActive ? `Restore ${entry.nameEn}?` : `Retire ${entry.nameEn}?`,
         body: isActive
-          ? 'It is offered again on new listings and searches.'
-          : 'It stops being offered on new listings and searches. Everything already using it is untouched — this is not a delete, and there is no delete.',
+          ? this.t('lookups.itIsOfferedAgain')
+          : this.t('lookups.itStopsBeingOffered'),
         confirm: isActive ? 'Restore' : 'Retire',
         result: {
           title: isActive ? 'Restored' : 'Retired',

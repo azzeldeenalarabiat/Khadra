@@ -17,10 +17,12 @@ using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Reviews.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Notifications;
+using Khadra.Infrastructure.Payments;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Infrastructure.PlatformSettings;
@@ -134,6 +136,26 @@ public static class DependencyInjection
                 "BusinessRules: MinimumBookingLeadTimeMinutes must be set to a positive number of minutes.")
             .Validate(options => options.MaxRentalDays is > 0,
                 "BusinessRules: MaxRentalDays must be set to a positive number of days.")
+            // Present, not positive: 0 is the owner's to choose and says a gallery is late at the
+            // agreed minute. Absence is the misconfiguration, and it had no check at all until
+            // 2026-09-08 -- the provider dereferences this with `!`, so a deleted key surfaced as a
+            // NullReferenceException on the first booking priced, not at startup.
+            .Validate(options => options.NonDeliveryGraceMinutes is not null,
+                "BusinessRules: NonDeliveryGraceMinutes must be set. Use 0 to allow an immediate report.")
+            // Positive, not merely present. Zero would reveal every review the instant it was written
+            // and close the window before the other party could answer, which is the blind window
+            // switched off by a typo rather than by a decision.
+            .Validate(options => options.ReviewWindowDays is > 0,
+                "BusinessRules: ReviewWindowDays must be set to a positive number of days.")
+            .ValidateOnStart();
+        services.AddOptions<PaymentOptions>()
+            .Bind(configuration.GetSection(PaymentOptions.SectionName))
+            .ValidateDataAnnotations()
+            // A session that outlived the booking's own payment window would take money the platform
+            // then has to give back. The margin has to be smaller than the session, or every checkout
+            // would be refused before it opened.
+            .Validate(options => options.CheckoutClosesBeforeDeadlineMinutes < options.CheckoutSessionMinutes,
+                "Payments: CheckoutClosesBeforeDeadlineMinutes must be less than CheckoutSessionMinutes.")
             .ValidateOnStart();
     }
 
@@ -160,6 +182,8 @@ public static class DependencyInjection
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IProviderEventReceiptRepository, ProviderEventReceiptRepository>();
         services.AddScoped<INotifier, Notifier>();
 
         AddReporting(services);
@@ -188,6 +212,7 @@ public static class DependencyInjection
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddScoped<IGalleryReviewReader, GalleryReviewReader>();
+        services.AddScoped<ICustomerReputationReader, CustomerReputationReader>();
         // The dashboard glance and the audit screen read one table with different questions: a fixed
         // seven-row feed, and a filtered, paged log. Two readers, deliberately.
         services.AddScoped<IAuditLogReader, AuditLogReader>();
@@ -195,6 +220,11 @@ public static class DependencyInjection
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();
+        services.AddSingleton<IPaymentSettings, PaymentSettings>();
+        // The ONLY implementation this build ships. See UnconfiguredPaymentProvider for why nothing
+        // that simulates a successful capture may ever be registered here.
+        services.AddSingleton<IPaymentProvider, UnconfiguredPaymentProvider>();
+        services.AddSingleton<IPaymentProviderProbe, PaymentProviderProbe>();
     }
 
     private static void AddSecurity(IServiceCollection services)

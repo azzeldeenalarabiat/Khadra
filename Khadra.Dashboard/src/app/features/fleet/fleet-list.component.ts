@@ -126,10 +126,10 @@ export class FleetListComponent {
       { status?: number; error?: { code?: string } } | undefined;
     if (!error) return null;
     if (error.error?.code === 'dealer.not_registered') {
-      return 'You have not submitted a dealer application yet, so there is no fleet to manage.';
+      return this.t('fleetList.youHaveNotSubmitted');
     }
-    if (error.status === 403) return 'Only dealer staff can manage a fleet.';
-    return 'Your fleet could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('fleetList.onlyDealerStaffCan');
+    return this.t('fleetList.yourFleetCouldNot');
   });
 
   protected isOnHire(car: Vehicle): boolean {
@@ -195,10 +195,10 @@ export class FleetListComponent {
     } catch (error) {
       const problem = error as { error?: { code?: string; title?: string } };
       this.ui.showToast(
-        'That did not go through',
+        this.t('vehicleDetail.thatDidNotGo'),
         problem.error?.code === 'vehicle.no_photos'
-          ? 'Add at least one photo before publishing.'
-          : (problem.error?.title ?? 'The service did not respond.'),
+          ? this.t('vehicleDetail.addAtLeastOne')
+          : (problem.error?.title ?? this.t('vehicleDetail.theServiceDidNot')),
         'bad',
       );
     } finally {

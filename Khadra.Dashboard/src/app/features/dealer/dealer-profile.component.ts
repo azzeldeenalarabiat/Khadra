@@ -121,18 +121,18 @@ export class DealerProfileComponent {
 
   protected readonly hoursSummary = computed(() => {
     const open = this.hours().filter((h) => !h.isClosed);
-    if (open.length === 0) return 'Closed all week';
+    if (open.length === 0) return this.t('dealerProfile.closedAllWeek');
     const first = open[0];
     const same = open.every((h) => h.opensAt === first.opensAt && h.closesAt === first.closesAt);
     return same
-      ? `${open.length === 7 ? 'Every day' : `${open.length} days a week`} · ${first.opensAt}–${first.closesAt}`
+      ? `${open.length === 7 ? this.t('dealerProfile.everyDay') : `${open.length} days a week`} · ${first.opensAt}–${first.closesAt}`
       : `Open ${open.length} days a week · hours vary`;
   });
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    return 'Your dealer page could not be loaded. Nothing has been changed.';
+    return this.t('dealerProfile.yourDealerPageCould');
   });
 
   protected reset(d: DealerProfile): void {
@@ -189,7 +189,7 @@ export class DealerProfileComponent {
         operatingHours: this.hours(),
       });
       this.service.refreshMe();
-      this.ui.showToast('Dealer page saved', 'Customers see the new details straight away.');
+      this.ui.showToast(this.t('dealerProfile.dealerPageSaved'), this.t('dealerProfile.customersSeeTheNew'));
     } catch (error) {
       const p = error as {
         error?: { code?: string; title?: string; errors?: Record<string, string[]> };
@@ -197,8 +197,8 @@ export class DealerProfileComponent {
       if (p.error?.errors) this.fieldErrors.set(p.error.errors);
       this.problem.set(
         p.error?.code === 'dealer.business_name_locked'
-          ? 'The business name is locked: it is the name your licence was verified against. Ask the platform if it has to change.'
-          : (p.error?.title ?? 'The service did not respond. Nothing has been changed.'),
+          ? this.t('dealerProfile.theBusinessNameIs')
+          : (p.error?.title ?? this.t('dealerDelivery.serviceDidNotRespond')),
       );
     } finally {
       this.busy.set(false);
@@ -215,15 +215,15 @@ export class DealerProfileComponent {
       await this.service.uploadBranding(kind, file);
       this.service.refreshMe();
       this.ui.showToast(
-        kind === 'logo' ? 'Logo updated' : 'Cover updated',
-        'It is live on your public page.',
+        kind === 'logo' ? this.t('dealerProfile.logoUpdated') : this.t('dealerProfile.coverUpdated'),
+        this.t('dealerProfile.itIsLiveOn'),
       );
     } catch (error) {
       const p = error as { error?: { code?: string; title?: string } };
       this.problem.set(
         p.error?.code === 'dealer.invalid_branding_type'
-          ? 'Use a JPEG, PNG or WebP image.'
-          : (p.error?.title ?? 'The upload did not go through. Nothing has been changed.'),
+          ? this.t('vehicleWizard.useAJpegPng')
+          : (p.error?.title ?? this.t('dealerProfile.theUploadDidNot')),
       );
     } finally {
       this.uploading.set(null);

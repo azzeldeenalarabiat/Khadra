@@ -56,16 +56,16 @@ export class SettingsComponent {
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     if (!error) return null;
-    if (error.status === 403) return 'Platform settings are for administrators.';
-    return 'The platform settings could not be loaded. Nothing has been changed.';
+    if (error.status === 403) return this.t('settings.platformSettingsAreFor');
+    return this.t('settings.thePlatformSettingsCould');
   });
 
   protected readonly moneyRows = computed<readonly KeyValue[]>(() => {
     const rules = this.view()?.rules;
     if (!rules) return [];
     return [
-      { k: 'Platform commission', v: `${rules.commissionPercent}%` },
-      { k: 'Booking deposit', v: `${rules.depositPercent}% of the rental total` },
+      { k: this.t('dealerReports.platformCommission'), v: `${rules.commissionPercent}%` },
+      { k: this.t('settings.bookingDeposit'), v: `${rules.depositPercent}% of the rental total` },
       // No delivery fee row: it is no longer a platform number. Each gallery sets its own on its
       // Delivery page, so there is no single figure this screen could honestly print.
     ];
@@ -75,11 +75,11 @@ export class SettingsComponent {
     const rules = this.view()?.rules;
     if (!rules) return [];
     return [
-      { k: 'Payment window', v: `${rules.paymentWindowHours} hours` },
-      { k: 'Free cancellation window', v: `${rules.freeCancellationWindowMinutes} minutes` },
-      { k: 'No-show timeout', v: `${rules.noShowTimeoutHours} hours` },
-      { k: 'Settlement window after return', v: `${rules.postReturnSettlementHours} hours` },
-      { k: 'Dealer application review SLA', v: `${rules.adminSlaHours} hours` },
+      { k: this.t('myBooking.paymentWindow'), v: `${rules.paymentWindowHours} hours` },
+      { k: this.t('myBooking.freeCancellationWindow'), v: `${rules.freeCancellationWindowMinutes} minutes` },
+      { k: this.t('myBooking.noShowTimeout'), v: `${rules.noShowTimeoutHours} hours` },
+      { k: this.t('myBooking.settlementWindowAfterReturn'), v: `${rules.postReturnSettlementHours} hours` },
+      { k: this.t('settings.dealerApplicationReviewSla'), v: `${rules.adminSlaHours} hours` },
     ];
   });
 
@@ -88,11 +88,11 @@ export class SettingsComponent {
     if (!rules) return [];
     return [
       {
-        k: 'Customer cancels after the free window',
+        k: this.t('settings.customerCancelsAfterThe'),
         v: `${rules.customerCancellationPenaltyPercent}% of the deposit`,
       },
       {
-        k: 'Dealer fails to deliver',
+        k: this.t('settings.dealerFailsToDeliver'),
         v: `${rules.dealerNonDeliveryPenaltyMinPercent}–${rules.dealerNonDeliveryPenaltyMaxPercent}% of the rental`,
       },
     ];
@@ -103,11 +103,11 @@ export class SettingsComponent {
     if (!rules) return [];
     return [
       {
-        k: 'Minimum renter age',
+        k: this.t('settings.minimumRenterAge'),
         // Null is a real state: nobody is refused on age. Printing a number here would invent one.
         v:
           rules.minimumRenterAge === null
-            ? 'Not set — nobody is refused on age'
+            ? this.t('settings.notSetNobodyIs')
             : `${rules.minimumRenterAge}`,
       },
     ];
