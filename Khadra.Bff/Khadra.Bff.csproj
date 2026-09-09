@@ -11,4 +11,8 @@
     <PackageReference Include="AspNetCore.HealthChecks.Redis" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Khadra.Tests" />
+  </ItemGroup>
+
 </Project>

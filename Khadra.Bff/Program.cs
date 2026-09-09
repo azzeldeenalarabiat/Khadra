@@ -50,7 +50,13 @@ builder.Services.AddExceptionHandler<BffExceptionHandler>();
 
 // Redis holds the encrypted session tickets and the Data Protection key ring, so every BFF replica can
 // read every session. Redis being down means nobody can sign in: fail fast at startup.
-var redis = await ConnectionMultiplexer.ConnectAsync(security.RedisConnection);
+//
+// Normalised first, because a managed platform hands this over as a redis:// URL and
+// StackExchange.Redis reads its own comma-separated form. Failing fast is right, but crash-looping
+// the console on the first deploy because the platform spelled the address the way every other
+// client library expects is not.
+var redis = await ConnectionMultiplexer.ConnectAsync(
+    RedisConnectionString.Normalise(security.RedisConnection));
 builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 builder.Services.AddStackExchangeRedisCache(options =>
 {

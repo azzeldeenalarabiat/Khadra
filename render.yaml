@@ -79,11 +79,15 @@ services:
 
       # Where emailed links point. The console, not the API: every link in a
       # verification, reset or invitation email is a page a person opens.
+      #
+      # Entered by hand rather than wired with fromService, and that is not laziness:
+      # fromService offers host, port and hostport, none of which carry a scheme. It
+      # would yield "khadra-bff.onrender.com", AppOptions validates this with [Url],
+      # and a bare hostname is not an absolute URL -- so the API would fail its own
+      # startup validation. Render prompts for it; give it the console's full
+      # https:// address, which Render shows once khadra-bff has deployed.
       - key: App__ClientBaseUrl
-        fromService:
-          name: khadra-bff
-          type: web
-          property: host
+        sync: false
 
       - key: Email__Provider
         value: Brevo
@@ -133,8 +137,11 @@ services:
       # no longer be decrypted.
       #
       # Render hands this over as a redis:// URL and StackExchange.Redis reads
-      # host:port form, so this is the same mismatch the Postgres URL had. It is
-      # NOT yet converted in code — see docs/deployment.md before first deploy.
+      # host:port form — the same mismatch the Postgres URL had. Converted in code
+      # (RedisConnectionString), so either form works. Worth knowing it mattered
+      # more here: the BFF awaits its Redis connection at startup and treats
+      # failure as fatal, so a URL would have crash-looped the console rather than
+      # producing one bad endpoint.
       - key: BffSecurity__RedisConnection
         fromService:
           name: khadra-redis
