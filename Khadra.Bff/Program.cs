@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Khadra.Bff;
@@ -175,7 +175,7 @@ builder.Services.AddReverseProxy()
 
 // The BFF is the outermost hop: a browser connects to it directly, so the address on the connection
 // IS the client and X-Forwarded-For arriving here was written by that client. Honouring it would let
-// the browser rename itself — and because AddClientAddress passes RemoteIpAddress on to the API as
+// the browser rename itself â€” and because AddClientAddress passes RemoteIpAddress on to the API as
 // the API's own X-Forwarded-For, a value invented here is laundered into the value the API trusts,
 // putting the caller back in charge of its rate-limit partition one hop further along.
 //
@@ -212,6 +212,29 @@ builder.Services.AddHealthChecks().AddRedis(redis, name: "redis", tags: ["ready"
 
 var app = builder.Build();
 
+// A TLS-terminating edge in front and nothing trusted is not a survivable combination HERE, and it
+// fails in a way nobody would diagnose from the symptom.
+//
+// The session and antiforgery cookies are __Host- prefixed with SecurePolicy.Always, which the
+// antiforgery system enforces by REFUSING to issue a token when Request.IsHttps is false. Behind an
+// edge that terminates TLS the request arrives as plain HTTP, so IsHttps is false unless
+// X-Forwarded-Proto is honoured -- and it is honoured only when the sender is trusted. With nothing
+// trusted, GET /bff/antiforgery answers 500, which is the FIRST call the sign-in page makes. The
+// console loads perfectly and nobody can sign in, with an exception that talks about SSL
+// configuration rather than about a proxy.
+//
+// So: in Production, say so at startup instead. Development is left alone, where the console is
+// reached over http://localhost and there is genuinely no proxy to name.
+if (trustedProxies.Length == 0 && !app.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "KnownProxies is empty. This BFF is behind something that terminates TLS -- otherwise it " +
+        "would not be reachable over https -- and without naming it, X-Forwarded-Proto is ignored, " +
+        "Request.IsHttps stays false, and the __Host- antiforgery cookie cannot be issued: every " +
+        "sign-in fails with a 500 while the console itself loads. Set the \"KnownProxies\" " +
+        "configuration array to the address or CIDR range the edge connects from.");
+}
+
 // Only when there is something to trust. With nothing named, RemoteIpAddress stays the address the
 // request actually came from, which is exactly right for the outermost hop.
 if (trustedProxies.Length > 0)
@@ -246,7 +269,39 @@ app.Use(async (context, next) =>
 });
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+// Static files, with the two caching rules a hashed SPA needs and does not get by default.
+//
+// Out of the box these responses carry an ETag and no Cache-Control, so a browser applies its own
+// heuristic and may reuse index.html without asking. index.html is the one file that must never be
+// reused: it names the content-hashed bundles, so a stale copy points at assets a deploy has already
+// replaced -- a console that loads unstyled, or not at all, for anyone who visited before. It bit
+// this deployment twice during testing, both times looking like a bug in the application.
+//
+// Everything else IS content-hashed, which means its name changes whenever its bytes do, so it can
+// be cached hard and immutably. The pairing is the point: revalidate the index, never revalidate the
+// assets it names.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+    {
+        var headers = context.Context.Response.GetTypedHeaders();
+        var path = context.File.Name;
+
+        if (path.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+        {
+            headers.CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, MustRevalidate = true };
+        }
+        else
+        {
+            headers.CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue
+            {
+                Public = true,
+                MaxAge = TimeSpan.FromDays(365),
+                Extensions = { new Microsoft.Net.Http.Headers.NameValueHeaderValue("immutable") },
+            };
+        }
+    },
+});
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -336,7 +391,15 @@ app.MapReverseProxy(proxyPipeline =>
 }).RequireAuthorization();
 
 // Serves the built Angular dashboard from wwwroot in production; in development ng serve proxies here.
-app.MapFallbackToFile("index.html").AllowAnonymous();
+// The SPA fallback serves index.html for every client-side route, and it does NOT go through the
+// static-file options above -- so the no-cache rule is repeated here or a deep link would still be
+// served from a stale copy.
+app.MapFallbackToFile("index.html", new StaticFileOptions
+{
+    OnPrepareResponse = context =>
+        context.Context.Response.GetTypedHeaders().CacheControl =
+            new Microsoft.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, MustRevalidate = true },
+}).AllowAnonymous();
 
 await app.RunAsync();
 
