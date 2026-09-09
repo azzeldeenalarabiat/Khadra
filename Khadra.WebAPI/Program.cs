@@ -436,40 +436,55 @@ public partial class Program
     {
         var configuration = services.GetRequiredService<IConfiguration>();
 
-        string host, database, user;
+        // Parsed and CONNECTED in two steps, so a failure can still say which host and which user it
+        // was attempting. The first version logged only the reason, and "password authentication
+        // failed for user \"postgres\"" does not answer the question that actually matters on a
+        // pooled database: whether the username carried the project reference it needs. Naming the
+        // attempt turns one more redeploy into a glance.
+        string identity;
+        string resolved;
         try
         {
-            var resolved = Khadra.Infrastructure.DependencyInjection.ResolveConnectionString(configuration);
+            resolved = Khadra.Infrastructure.DependencyInjection.ResolveConnectionString(configuration);
             var builder = new Npgsql.NpgsqlConnectionStringBuilder(resolved);
-            host = $"{builder.Host}:{builder.Port.ToString(CultureInfo.InvariantCulture)}";
-            database = builder.Database ?? "(none)";
-            user = builder.Username ?? "(none)";
-
-            await using var connection = new Npgsql.NpgsqlConnection(resolved);
-            await connection.OpenAsync().ConfigureAwait(false);
-            LogDatabaseReachable(logger, host, database, user);
+            identity =
+                $"{builder.Host}:{builder.Port.ToString(CultureInfo.InvariantCulture)}, " +
+                $"database {builder.Database ?? "(none)"}, as {builder.Username ?? "(none)"}";
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            // Deliberately broad: this is a diagnostic, and every way a connection string can be wrong
-            // -- unparseable, wrong host, refused, bad credentials, TLS -- must produce the line rather
-            // than a second failure on top of the first.
-            LogDatabaseUnreachable(logger, exception.Message, exception);
+            // The string could not even be read, so there is no host or user to name.
+            LogDatabaseUnreachable(logger, "(the connection string could not be parsed)", exception.Message, exception);
+            return;
+        }
+
+        try
+        {
+            await using var connection = new Npgsql.NpgsqlConnection(resolved);
+            await connection.OpenAsync().ConfigureAwait(false);
+            LogDatabaseReachable(logger, identity);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Deliberately broad: every way a connection can fail -- wrong host, refused, bad
+            // credentials, TLS -- must produce the line rather than a second failure on top of the first.
+            LogDatabaseUnreachable(logger, identity, exception.Message, exception);
         }
     }
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Database reachable at {Host}, database {Database}, as {User}.")]
-    internal static partial void LogDatabaseReachable(ILogger logger, string host, string database, string user);
+        Message = "Database reachable at {Identity}.")]
+    internal static partial void LogDatabaseReachable(ILogger logger, string identity);
 
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "DATABASE UNREACHABLE. Every request that reads or writes data will answer 500 and " +
                   "/health/ready will report unhealthy, while /health/live stays 200. Set " +
                   "ConnectionStrings__DefaultConnection to this deployment's database; both " +
-                  "postgres:// URL form and Npgsql keyword form are accepted. The failure was: {Reason}")]
-    internal static partial void LogDatabaseUnreachable(ILogger logger, string reason, Exception exception);
+                  "postgres:// URL form and Npgsql keyword form are accepted. Tried {Identity}. " +
+                  "The failure was: {Reason}")]
+    internal static partial void LogDatabaseUnreachable(ILogger logger, string identity, string reason, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,
