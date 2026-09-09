@@ -322,6 +322,22 @@ else
 {
     Program.LogNoTrustedProxy(app.Logger);
 }
+
+// Say out loud which database this is, and whether it can actually be reached.
+//
+// Without this, a wrong connection string is invisible until the first request that touches the
+// database, which answers 500 with a deliberately opaque body while /health/live still says 200 and
+// the platform reports a healthy deploy. That combination cost a production deployment most of a day:
+// the readiness probe knew, but nothing said WHY, and the reason -- host, database, credentials, TLS
+// -- is exactly what nobody can guess from outside.
+//
+// The password is never logged. Everything else is, because a connection string that names the wrong
+// host or the wrong database is the common mistake and it cannot be diagnosed without seeing them.
+//
+// It does NOT stop the application. A database that is briefly unreachable at boot is a normal event
+// on a managed platform, the readiness probe already reports it, and refusing to start would take
+// away the one endpoint that still works while somebody is fixing the configuration.
+await Program.ProbeDatabaseAsync(app.Services, app.Logger).ConfigureAwait(false);
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment())
@@ -414,6 +430,46 @@ public partial class Program
                   "shared by every client, so one caller's failed sign-ins spend everybody's budget. " +
                   "Name the BFF in KnownProxies.")]
     internal static partial void LogNoTrustedProxy(ILogger logger);
+
+    /// <summary>Opens one connection so a misconfigured database is a log line, not a mystery.</summary>
+    internal static async Task ProbeDatabaseAsync(IServiceProvider services, ILogger logger)
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+
+        string host, database, user;
+        try
+        {
+            var resolved = Khadra.Infrastructure.DependencyInjection.ResolveConnectionString(configuration);
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder(resolved);
+            host = $"{builder.Host}:{builder.Port.ToString(CultureInfo.InvariantCulture)}";
+            database = builder.Database ?? "(none)";
+            user = builder.Username ?? "(none)";
+
+            await using var connection = new Npgsql.NpgsqlConnection(resolved);
+            await connection.OpenAsync().ConfigureAwait(false);
+            LogDatabaseReachable(logger, host, database, user);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            // Deliberately broad: this is a diagnostic, and every way a connection string can be wrong
+            // -- unparseable, wrong host, refused, bad credentials, TLS -- must produce the line rather
+            // than a second failure on top of the first.
+            LogDatabaseUnreachable(logger, exception.Message, exception);
+        }
+    }
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Database reachable at {Host}, database {Database}, as {User}.")]
+    internal static partial void LogDatabaseReachable(ILogger logger, string host, string database, string user);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "DATABASE UNREACHABLE. Every request that reads or writes data will answer 500 and " +
+                  "/health/ready will report unhealthy, while /health/live stays 200. Set " +
+                  "ConnectionStrings__DefaultConnection to this deployment's database; both " +
+                  "postgres:// URL form and Npgsql keyword form are accepted. The failure was: {Reason}")]
+    internal static partial void LogDatabaseUnreachable(ILogger logger, string reason, Exception exception);
 
     [LoggerMessage(
         Level = LogLevel.Information,
