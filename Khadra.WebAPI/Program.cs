@@ -338,6 +338,32 @@ else
 // on a managed platform, the readiness probe already reports it, and refusing to start would take
 // away the one endpoint that still works while somebody is fixing the configuration.
 await Program.ProbeDatabaseAsync(app.Services, app.Logger).ConfigureAwait(false);
+
+// Report, ONCE, what the first request actually looked like on the wire.
+//
+// KnownProxies is guesswork until somebody sees the address the platform connects from, and the
+// consequence of guessing wrong is invisible: X-Forwarded-For is quietly ignored, every visitor
+// partitions on the same proxy address, and ten failed sign-ins by anyone locks the whole platform
+// out for fifteen minutes. Nothing in the logs says so, and no response header does either.
+//
+// One line, on the first request only, naming the peer, the header it carried, and the address the
+// middleware settled on. If the peer is not inside a configured range, or the resolved client is
+// the same as the peer, the ranges are wrong and this says so plainly.
+var firstRequestSeen = 0;
+app.Use(async (context, next) =>
+{
+    if (Interlocked.Exchange(ref firstRequestSeen, 1) == 0)
+    {
+        // Materialised before the call: the analyzer objects to work inside a logging argument,
+        // and this runs exactly once, so there is nothing to defer anyway.
+        var peer = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
+        var header = context.Request.Headers["X-Forwarded-For"].ToString();
+        var forwarded = header.Length > 0 ? header : "(absent)";
+        Program.LogFirstRequest(app.Logger, peer, forwarded, context.Request.IsHttps);
+    }
+
+    await next(context).ConfigureAwait(false);
+});
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment())
@@ -430,6 +456,14 @@ public partial class Program
                   "shared by every client, so one caller's failed sign-ins spend everybody's budget. " +
                   "Name the BFF in KnownProxies.")]
     internal static partial void LogNoTrustedProxy(ILogger logger);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "First request: connection came from {Peer}, X-Forwarded-For was {Forwarded}, " +
+                  "and the request is {Scheme}. If the client address the limiter uses ends up " +
+                  "equal to {Peer} for every visitor, KnownProxies does not cover {Peer} and " +
+                  "X-Forwarded-For is being ignored -- add the range that contains it.")]
+    internal static partial void LogFirstRequest(ILogger logger, string peer, string forwarded, bool scheme);
 
     /// <summary>Opens one connection so a misconfigured database is a log line, not a mystery.</summary>
     internal static async Task ProbeDatabaseAsync(IServiceProvider services, ILogger logger)
