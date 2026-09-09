@@ -285,7 +285,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
 builder.Services.AddHealthChecks()
     .AddNpgSql(
-        builder.Configuration.GetConnectionString(Khadra.Infrastructure.DependencyInjection.ConnectionStringName) ?? string.Empty,
+        Khadra.Infrastructure.DependencyInjection.ResolveConnectionString(builder.Configuration),
         name: "postgres",
         tags: ["ready"]);
 
