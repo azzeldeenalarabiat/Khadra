@@ -118,9 +118,13 @@ services:
       - key: KnownProxies__0
         value: "::1,127.0.0.0/8"
 
-      # Render's private network, which the load balancer sits on.
+      # Render's private network. The load balancer was observed on 10.x; the
+      # other two RFC 1918 ranges are here because the BFF-to-API private hop
+      # was never measured and a platform may assign from any of them. Nothing
+      # on the internet can source these, so covering all three costs nothing
+      # and a missing one fails silently as a collapsed rate-limit bucket.
       - key: KnownProxies__1
-        value: 10.0.0.0/8
+        value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 
       # Cloudflare, from cloudflare.com/ips-v4 — fetched 2026-09-10.
       # 172.64.0.0/13 is the one holding the edge observed above. These do NOT

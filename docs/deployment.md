@@ -63,7 +63,7 @@ Email__FromAddress="<a CONFIRMED sender on the Brevo account>"
 # Required — see "Who the client is", below. Values are for Render behind
 # Cloudflare; an entry may carry a comma-separated list.
 KnownProxies__0="::1,127.0.0.0/8"
-KnownProxies__1="10.0.0.0/8"
+KnownProxies__1="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
 KnownProxies__2="<the 15 ranges from cloudflare.com/ips-v4, comma-separated>"
 KnownProxies__3="<the 7 ranges from cloudflare.com/ips-v6, comma-separated>"
 ForwardedHeaders__ForwardLimit="3"
