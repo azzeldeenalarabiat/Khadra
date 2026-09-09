@@ -184,15 +184,27 @@ builder.Services.AddReverseProxy()
 // Unlike the API this does NOT refuse to start when empty: the BFF terminating TLS itself with no
 // edge in front is a perfectly ordinary deployment, and empty is the correct, safe answer for it.
 // Put a TLS-terminating edge in front and that edge belongs in this list and in the API's.
-var trustedProxies = builder.Configuration.GetSection("KnownProxies").Get<string[]>() ?? [];
+//
+// Each entry may itself be a comma-separated list. Behind Cloudflare the correct list is roughly
+// twenty-five ranges, and twenty-five KnownProxies__N variables typed into a dashboard is a
+// configuration nobody checks and one silent omission degrades -- so one variable may carry the lot.
+var trustedProxies = (builder.Configuration.GetSection("KnownProxies").Get<string[]>() ?? [])
+    .SelectMany(entry => entry.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    .ToArray();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    // How many proxies stand in front, counted from the RIGHT. One is correct behind a single edge
-    // this deployment owns; a managed platform usually has more, and Render fronts a service with
-    // Cloudflare AND its own load balancer. Configurable for the same reason the API's is, and it
-    // matters more here: get it wrong and X-Forwarded-Proto may resolve to something that is not
-    // https, which is enough to stop the __Host- antiforgery cookie being issued at all.
+    // How many proxies stand in front, counted from the RIGHT. It is a CEILING, not a target: the
+    // middleware re-checks trust at every hop against the address it just consumed, so the walk
+    // stops at the first address no range covers whatever this number says. Measured against the
+    // real production chain -- client, Cloudflare, Render's load balancer, peer ::1 -- raising it
+    // from 1 to 3 changed nothing at all while only the loopback hop was trusted.
+    //
+    // So it must equal the hop count exactly, and the reason to not simply set it high is narrow
+    // but real: when the visitor's OWN address falls inside a trusted range (a Cloudflare Worker
+    // fetching this origin), one hop too many consumes a value the visitor supplied, and they pick
+    // their own rate-limit partition. Measured: with a Worker visitor and junk prepended, a limit
+    // of 3 resolves the Worker and a limit of 4 resolves the junk.
     options.ForwardLimit = builder.Configuration.GetValue<int?>("ForwardedHeaders:ForwardLimit") ?? 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
@@ -329,6 +341,56 @@ if (trustedProxies.Length > 0)
         .ToString(System.Globalization.CultureInfo.InvariantCulture);
     BffDiagnostics.LogTrustedProxies(app.Logger, trustedList, hops);
 }
+
+// A standing check on the trust list, not a diagnostic to be pulled out later.
+//
+// Cloudflare sets Cf-Connecting-Ip to the address it accepted the connection from, overwriting
+// whatever the caller sent. On a request that genuinely came through Cloudflare it and the address
+// walked out of X-Forwarded-For are therefore the same fact arrived at two independent ways, and
+// they disagree in exactly the two cases this configuration can fail in -- neither of which
+// announces itself, and both of which look like a working system:
+//
+//   * Cloudflare published a range this list does not have, so the walk stopped a hop short and
+//     resolved a Cloudflare edge address instead of the visitor. Every visitor behind that edge
+//     then shares one rate-limit bucket.
+//   * the request reached this origin WITHOUT passing through Cloudflare and carried a forged
+//     Cf-Connecting-Ip. That is precisely why the header is cross-checked here and never used as
+//     the source of truth: believing it would hand the caller its own partition key.
+//
+// Capped: a real misconfiguration says so within the first few requests, and a warning on every
+// request is how a log stops being read.
+var clientMismatchesLogged = 0;
+app.Use(async (context, next) =>
+{
+    var claimed = context.Request.Headers["Cf-Connecting-Ip"].ToString();
+    var resolved = context.Connection.RemoteIpAddress;
+
+    if (claimed.Length > 0 && resolved is not null &&
+        IPAddress.TryParse(claimed, out var claimedAddress) &&
+        !SameAddress(claimedAddress, resolved) &&
+        Interlocked.Increment(ref clientMismatchesLogged) <= 5)
+    {
+        var resolvedText = resolved.ToString();
+        var forwardedFor = context.Request.Headers["X-Forwarded-For"].ToString();
+        BffDiagnostics.LogClientAddressMismatch(
+            app.Logger,
+            claimed,
+            resolvedText,
+            forwardedFor.Length > 0
+                ? forwardedFor
+                : "(nothing left -- consumed by the walk, or never sent)");
+    }
+
+    await next(context).ConfigureAwait(false);
+});
+
+// An IPv4 address that arrived over a dual-stack socket comes back as ::ffff:a.b.c.d, which is the
+// same host written another way. Comparing the strings would report every request as a mismatch.
+static bool SameAddress(IPAddress claimed, IPAddress resolved) =>
+    claimed.Equals(resolved) ||
+    (resolved.IsIPv4MappedToIPv6 && claimed.Equals(resolved.MapToIPv4())) ||
+    (claimed.IsIPv4MappedToIPv6 && claimed.MapToIPv4().Equals(resolved));
+
 if (!app.Environment.IsDevelopment())
     app.UseHsts();
 app.UseExceptionHandler();
@@ -583,6 +645,23 @@ internal static partial class BffDiagnostics
         Message = "Forwarded headers trusted from: {Proxies}, reading {ForwardLimit} hop(s) from " +
                   "the right.")]
     internal static partial void LogTrustedProxies(ILogger logger, string proxies, string forwardLimit);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "CLIENT ADDRESS DISAGREES WITH CLOUDFLARE. Cf-Connecting-Ip says {ClaimedClient} " +
+                  "but the X-Forwarded-For walk resolved {ResolvedClient}, leaving {ForwardedFor}. " +
+                  "Either a " +
+                  "Cloudflare range is missing from KnownProxies -- in which case the walk stopped " +
+                  "at a Cloudflare edge and every visitor behind it now shares one rate-limit " +
+                  "bucket -- or this request reached the origin without passing through Cloudflare " +
+                  "and its Cf-Connecting-Ip is forged. Check the published ranges at " +
+                  "cloudflare.com/ips-v4 and /ips-v6 against KnownProxies before assuming the " +
+                  "second.")]
+    internal static partial void LogClientAddressMismatch(
+        ILogger logger,
+        string claimedClient,
+        string resolvedClient,
+        string forwardedFor);
 
     [LoggerMessage(
         Level = LogLevel.Information,

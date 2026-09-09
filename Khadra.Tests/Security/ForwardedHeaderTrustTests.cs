@@ -147,6 +147,31 @@ public sealed class ForwardedHeaderTrustTests
         Assert.Contains("KnownProxies", failure.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// One variable may carry the whole list.
+    ///
+    /// Behind a managed edge the correct list is roughly twenty-five ranges — Cloudflare publishes
+    /// twenty-two — and twenty-five <c>KnownProxies__N</c> variables typed into a dashboard is a
+    /// configuration nobody re-reads, where a single omission silently stops the walk one hop short
+    /// and collapses every visitor behind that edge into one rate-limit bucket.
+    ///
+    /// Proven by consequence rather than by inspection: the entry below is not a parseable address,
+    /// so without splitting it the API refuses to start, and if it were split but not trusted the
+    /// rotation would be refused. Neither happens. The ragged spacing is deliberate.
+    /// </summary>
+    [Fact]
+    public async Task One_known_proxies_entry_may_carry_a_comma_separated_list()
+    {
+        using var factory = Api(
+            callerAddress: TheBff,
+            knownProxies: $"192.0.2.0/24, {TheBff} ,198.51.100.4");
+        using var client = factory.CreateClient();
+
+        var statuses = await RotateForwardedFor(client, sendHeader: true);
+
+        Assert.DoesNotContain(HttpStatusCode.TooManyRequests, statuses);
+    }
+
     /// <summary>Development still boots with nothing configured, so nobody is blocked locally.</summary>
     [Fact]
     public async Task Development_still_starts_without_a_known_proxy()
