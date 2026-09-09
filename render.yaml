@@ -133,8 +133,11 @@ services:
       # no longer be decrypted.
       #
       # Render hands this over as a redis:// URL and StackExchange.Redis reads
-      # host:port form, so this is the same mismatch the Postgres URL had. It is
-      # NOT yet converted in code — see docs/deployment.md before first deploy.
+      # host:port form — the same mismatch the Postgres URL had. Converted in code
+      # (RedisConnectionString), so either form works. Worth knowing it mattered
+      # more here: the BFF awaits its Redis connection at startup and treats
+      # failure as fatal, so a URL would have crash-looped the console rather than
+      # producing one bad endpoint.
       - key: BffSecurity__RedisConnection
         fromService:
           name: khadra-redis
