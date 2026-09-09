@@ -188,7 +188,12 @@ var trustedProxies = builder.Configuration.GetSection("KnownProxies").Get<string
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.ForwardLimit = 1;
+    // How many proxies stand in front, counted from the RIGHT. One is correct behind a single edge
+    // this deployment owns; a managed platform usually has more, and Render fronts a service with
+    // Cloudflare AND its own load balancer. Configurable for the same reason the API's is, and it
+    // matters more here: get it wrong and X-Forwarded-Proto may resolve to something that is not
+    // https, which is enough to stop the __Host- antiforgery cookie being issued at all.
+    options.ForwardLimit = builder.Configuration.GetValue<int?>("ForwardedHeaders:ForwardLimit") ?? 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
     foreach (var entry in trustedProxies)
