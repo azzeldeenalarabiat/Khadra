@@ -240,11 +240,67 @@ if (trustedProxies.Length == 0 && !app.Environment.IsDevelopment())
         "configuration array to the address or CIDR range the edge connects from.");
 }
 
+// What the first request looked like on the wire, and what the pipeline made of it.
+//
+// Registered BEFORE UseForwardedHeaders on purpose, and it reports from both sides of it: the
+// values are read on the way in, then the rest of the pipeline runs, then the same HttpContext is
+// read again on the way out. That ordering is not incidental -- ForwardedHeadersMiddleware CONSUMES
+// the entry it uses, removing it from X-Forwarded-For and overwriting RemoteIpAddress, so a
+// diagnostic placed after it can no longer say what actually arrived.
+//
+// It exists because the failure it diagnoses is unreadable from the symptom. If the peer is not
+// inside a trusted range, X-Forwarded-Proto is ignored, Request.IsHttps stays false, and the
+// __Host- antiforgery cookie is refused -- so /bff/antiforgery answers 500 with a message about SSL
+// configuration, on a console that otherwise loads perfectly.
+//
+// Once, not per request: this is a fact about the deployment, not about traffic.
+var firstRequestLogged = 0;
+app.Use(async (context, next) =>
+{
+    if (Interlocked.Exchange(ref firstRequestLogged, 1) != 0)
+    {
+        await next(context).ConfigureAwait(false);
+        return;
+    }
+
+    // Materialised now, before the forwarded-headers middleware rewrites or removes any of it.
+    var peer = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
+    var forwardedFor = context.Request.Headers["X-Forwarded-For"].ToString();
+    var forwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString();
+
+    await next(context).ConfigureAwait(false);
+
+    var forwardedForText = forwardedFor.Length > 0 ? forwardedFor : "(absent)";
+    var forwardedProtoText = forwardedProto.Length > 0 ? forwardedProto : "(absent)";
+    var resolvedClient = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
+    var scheme = context.Request.Scheme;
+    var isHttps = context.Request.IsHttps;
+    // Two messages, not one with a conditional tail: an operator reading a healthy log should not
+    // have to parse a sentence about failure to learn that nothing failed.
+    if (isHttps)
+    {
+        BffDiagnostics.LogFirstRequestHealthy(
+            app.Logger, peer, forwardedForText, forwardedProtoText, resolvedClient, scheme);
+    }
+    else
+    {
+        BffDiagnostics.LogFirstRequestNotHttps(
+            app.Logger, peer, forwardedForText, forwardedProtoText, resolvedClient, scheme);
+    }
+});
+
 // Only when there is something to trust. With nothing named, RemoteIpAddress stays the address the
 // request actually came from, which is exactly right for the outermost hop.
+//
+// This runs BEFORE HSTS, HTTPS redirection, authentication, authorization, antiforgery and the
+// proxy -- every one of which reads the scheme or the client address that this establishes.
 if (trustedProxies.Length > 0)
 {
     app.UseForwardedHeaders();
+    var trustedList = string.Join(", ", trustedProxies);
+    var hops = (builder.Configuration.GetValue<int?>("ForwardedHeaders:ForwardLimit") ?? 1)
+        .ToString(System.Globalization.CultureInfo.InvariantCulture);
+    BffDiagnostics.LogTrustedProxies(app.Logger, trustedList, hops);
 }
 if (!app.Environment.IsDevelopment())
     app.UseHsts();
@@ -487,3 +543,47 @@ internal sealed record BffLoginRequest(string Email, string Password);
 
 internal sealed record BffChangePasswordRequest(string CurrentPassword, string NewPassword);
 
+
+/// <summary>Startup and first-request diagnostics for the BFF.</summary>
+/// <remarks>
+/// A named class rather than log calls inline: CA1848 requires the source-generated path, and a
+/// top-level-statements Program has nowhere to put a partial method.
+/// </remarks>
+internal static partial class BffDiagnostics
+{
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Forwarded headers trusted from: {Proxies}, reading {ForwardLimit} hop(s) from " +
+                  "the right.")]
+    internal static partial void LogTrustedProxies(ILogger logger, string proxies, string forwardLimit);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "First request, forwarding honoured. Connection from {Peer}. X-Forwarded-For: " +
+                  "{ForwardedFor}. X-Forwarded-Proto: {ForwardedProto}. Resolved to client " +
+                  "{ResolvedClient} over {Scheme}, IsHttps True.")]
+    internal static partial void LogFirstRequestHealthy(
+        ILogger logger,
+        string peer,
+        string forwardedFor,
+        string forwardedProto,
+        string resolvedClient,
+        string scheme);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "FORWARDED HEADERS NOT HONOURED. The connection came from {Peer}, which no " +
+                  "configured KnownProxies range covers, so X-Forwarded-Proto ({ForwardedProto}) " +
+                  "was ignored and the request is being treated as {Scheme}. The __Host- " +
+                  "antiforgery cookie cannot be issued over a non-SSL request, so every sign-in " +
+                  "will fail at /bff/antiforgery with a 500 while the console itself loads. Add a " +
+                  "range containing {Peer} to KnownProxies. X-Forwarded-For was {ForwardedFor}; " +
+                  "the client resolved to {ResolvedClient}.")]
+    internal static partial void LogFirstRequestNotHttps(
+        ILogger logger,
+        string peer,
+        string forwardedFor,
+        string forwardedProto,
+        string resolvedClient,
+        string scheme);
+}
