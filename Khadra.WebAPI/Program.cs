@@ -251,9 +251,22 @@ var knownProxies = builder.Configuration.GetSection("KnownProxies").Get<string[]
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    // One hop. The BFF is the only proxy in front of the API, so only the address IT appends is
-    // read; anything the caller left further left in the header is ignored.
-    options.ForwardLimit = 1;
+    // How many proxies stand in front of this API, and therefore how many entries of
+    // X-Forwarded-For to believe. Counted from the RIGHT: the rightmost entry is the one the
+    // nearest proxy appended, and each additional hop reads one further left.
+    //
+    // One is right when the BFF is the only thing in front, which is the case on a single host
+    // with a proxy that this deployment owns. It is WRONG on a managed platform: Render, for
+    // one, fronts a service with Cloudflare and its own load balancer, so at one hop the address
+    // resolved is a piece of Render's infrastructure -- identical for every visitor. That does
+    // not open the spoofing hole the guard below exists to close, but it collapses every
+    // address-keyed limit into a single bucket, and ten failed sign-ins by anyone then lock the
+    // whole platform out for fifteen minutes.
+    //
+    // Configurable rather than fixed because the answer is a property of where this is deployed,
+    // not of the code, and getting it wrong is not visible until someone is locked out. Set it to
+    // the number of proxies actually in front, having MEASURED the header rather than assumed it.
+    options.ForwardLimit = builder.Configuration.GetValue<int?>("ForwardedHeaders:ForwardLimit") ?? 1;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
     foreach (var entry in knownProxies)
@@ -298,7 +311,12 @@ if (knownProxies.Length > 0)
 {
     app.UseForwardedHeaders();
     var trustedList = string.Join(", ", knownProxies);
-    Program.LogTrustedProxies(app.Logger, trustedList);
+    var forwardLimit = app.Services.GetRequiredService<IOptions<ForwardedHeadersOptions>>()
+        .Value.ForwardLimit;
+    // Formatted before the call, and with the invariant culture: a hop count is a protocol
+    // detail in a log line, not a number to be localised for whoever is reading.
+    var forwardLimitText = forwardLimit?.ToString(CultureInfo.InvariantCulture) ?? "all";
+    Program.LogTrustedProxies(app.Logger, trustedList, forwardLimitText);
 }
 else
 {
@@ -399,6 +417,8 @@ public partial class Program
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Rate limiting will identify clients by X-Forwarded-For, trusted only from: {Proxies}.")]
-    internal static partial void LogTrustedProxies(ILogger logger, string proxies);
+        Message = "Rate limiting will identify clients by X-Forwarded-For, trusted only from: " +
+                  "{Proxies}, reading {ForwardLimit} hop(s) from the right. If that resolves to a " +
+                  "platform address rather than a visitor, every caller shares one limit.")]
+    internal static partial void LogTrustedProxies(ILogger logger, string proxies, string forwardLimit);
 }
