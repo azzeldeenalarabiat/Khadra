@@ -159,10 +159,25 @@ public static class DependencyInjection
             .ValidateOnStart();
     }
 
+    /// <summary>
+    /// The database this application talks to, in the form Npgsql understands.
+    /// </summary>
+    /// <remarks>
+    /// Public because the health check needs the SAME value: a readiness probe testing a different
+    /// connection string from the one the DbContext uses could report healthy while every request
+    /// failed, which is worse than having no probe.
+    /// </remarks>
+    public static string ResolveConnectionString(IConfiguration configuration)
+    {
+        var configured = configuration.GetConnectionString(ConnectionStringName)
+            ?? throw new InvalidOperationException($"ConnectionStrings:{ConnectionStringName} is required.");
+
+        return PostgresConnectionString.Normalise(configured);
+    }
+
     private static void AddPersistence(IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString(ConnectionStringName)
-            ?? throw new InvalidOperationException($"ConnectionStrings:{ConnectionStringName} is required.");
+        var connectionString = ResolveConnectionString(configuration);
 
         services.AddDbContext<KhadraDbContext>(options =>
             options

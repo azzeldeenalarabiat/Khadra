@@ -46,6 +46,27 @@ RUN dotnet publish Khadra.WebAPI/Khadra.WebAPI.csproj \
     --no-restore \
     --output /app
 
+# The migration bundle, shipped INSIDE the image beside the app it matches.
+#
+# A bundle rather than `dotnet ef database update` at deploy time, for three
+# reasons: the runtime image has no SDK and no dotnet-ef, so the alternative is
+# shipping a second much larger image; the bundle is built from the same source
+# in the same step, so the schema and the code cannot drift apart; and it reads
+# its connection string from the environment rather than the command line, where
+# `docker inspect` and a process list would both show a database password.
+#
+# Framework-dependent, which is the default: it runs on the aspnet runtime already
+# in the final stage, so it adds a few hundred kilobytes rather than a self-contained
+# copy of .NET.
+RUN dotnet tool install --global dotnet-ef --version 10.* \
+ && /root/.dotnet/tools/dotnet-ef migrations bundle \
+      --project Khadra.Infrastructure \
+      --startup-project Khadra.WebAPI \
+      --configuration Release \
+      --no-build \
+      --force \
+      --output /app/efbundle
+
 # ── Runtime ───────────────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS final
 WORKDIR /app
