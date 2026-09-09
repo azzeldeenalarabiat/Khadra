@@ -254,38 +254,65 @@ if (trustedProxies.Length == 0 && !app.Environment.IsDevelopment())
 // configuration, on a console that otherwise loads perfectly.
 //
 // Once, not per request: this is a fact about the deployment, not about traffic.
-var firstRequestLogged = 0;
+// Report the forwarding facts for requests that can actually tell us something.
+//
+// The previous version logged the FIRST request and spent its one shot on a platform health probe:
+// a loopback connection from ::1 carrying no forwarding headers at all, arriving a minute before the
+// browser request that failed. That line said nothing about the real hop, and acting on it would have
+// meant trusting ::1 on the strength of a health check.
+//
+// So the trigger is the request that matters: /bff/antiforgery, the call that fails, plus the first
+// few arriving from anywhere other than loopback. Capped, because this is a diagnostic and not an
+// access log.
+//
+// EVERY forwarding header is reported verbatim rather than the two that were guessed at. Render fronts
+// services with Cloudflare, and Cloudflare states the original scheme in CF-Visitor as well as in
+// X-Forwarded-Proto; a platform sending one and not the other would otherwise be indistinguishable
+// from a platform sending neither.
+var forwardingLinesLogged = 0;
 app.Use(async (context, next) =>
 {
-    if (Interlocked.Exchange(ref firstRequestLogged, 1) != 0)
+    var peerAddress = context.Connection.RemoteIpAddress;
+    var fromLoopback = peerAddress is not null && IPAddress.IsLoopback(peerAddress);
+    var isAntiforgery = context.Request.Path.StartsWithSegments("/bff/antiforgery");
+
+    // A loopback request to anything else is a platform health probe: nothing to learn from it, and
+    // it is what consumed the previous diagnostic before the real request ever arrived.
+    if ((!isAntiforgery && fromLoopback) || Interlocked.Increment(ref forwardingLinesLogged) > 8)
     {
         await next(context).ConfigureAwait(false);
         return;
     }
 
-    // Materialised now, before the forwarded-headers middleware rewrites or removes any of it.
-    var peer = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
-    var forwardedFor = context.Request.Headers["X-Forwarded-For"].ToString();
-    var forwardedProto = context.Request.Headers["X-Forwarded-Proto"].ToString();
+    // Read on the way IN. ForwardedHeadersMiddleware consumes the entry it uses -- removing it from
+    // X-Forwarded-For and overwriting RemoteIpAddress -- so none of this survives to the way out.
+    var transportPeer = peerAddress?.ToString() ?? "(none)";
+    var forwardingHeaders = string.Join(" | ", context.Request.Headers
+        .Where(header =>
+            header.Key.StartsWith("X-Forwarded", StringComparison.OrdinalIgnoreCase) ||
+            header.Key.Equals("Forwarded", StringComparison.OrdinalIgnoreCase) ||
+            header.Key.Equals("X-Real-IP", StringComparison.OrdinalIgnoreCase) ||
+            header.Key.StartsWith("CF-", StringComparison.OrdinalIgnoreCase))
+        .Select(header => header.Key + ": " + header.Value.ToString()));
 
     await next(context).ConfigureAwait(false);
 
-    var forwardedForText = forwardedFor.Length > 0 ? forwardedFor : "(absent)";
-    var forwardedProtoText = forwardedProto.Length > 0 ? forwardedProto : "(absent)";
+    var headersText = forwardingHeaders.Length > 0
+        ? forwardingHeaders
+        : "(no forwarding headers of any kind)";
+    var path = context.Request.Path.Value ?? "/";
     var resolvedClient = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
     var scheme = context.Request.Scheme;
-    var isHttps = context.Request.IsHttps;
-    // Two messages, not one with a conditional tail: an operator reading a healthy log should not
-    // have to parse a sentence about failure to learn that nothing failed.
-    if (isHttps)
+
+    if (context.Request.IsHttps)
     {
-        BffDiagnostics.LogFirstRequestHealthy(
-            app.Logger, peer, forwardedForText, forwardedProtoText, resolvedClient, scheme);
+        BffDiagnostics.LogForwardingHealthy(
+            app.Logger, path, transportPeer, headersText, resolvedClient, scheme);
     }
     else
     {
-        BffDiagnostics.LogFirstRequestNotHttps(
-            app.Logger, peer, forwardedForText, forwardedProtoText, resolvedClient, scheme);
+        BffDiagnostics.LogForwardingNotHttps(
+            app.Logger, path, transportPeer, headersText, resolvedClient, scheme);
     }
 });
 
@@ -559,31 +586,31 @@ internal static partial class BffDiagnostics
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "First request, forwarding honoured. Connection from {Peer}. X-Forwarded-For: " +
-                  "{ForwardedFor}. X-Forwarded-Proto: {ForwardedProto}. Resolved to client " +
-                  "{ResolvedClient} over {Scheme}, IsHttps True.")]
-    internal static partial void LogFirstRequestHealthy(
+        Message = "Forwarding honoured on {Path}. Transport peer {TransportPeer}. Headers: " +
+                  "{ForwardingHeaders}. Resolved to client {ResolvedClient} over {Scheme}, " +
+                  "IsHttps True.")]
+    internal static partial void LogForwardingHealthy(
         ILogger logger,
-        string peer,
-        string forwardedFor,
-        string forwardedProto,
+        string path,
+        string transportPeer,
+        string forwardingHeaders,
         string resolvedClient,
         string scheme);
 
     [LoggerMessage(
         Level = LogLevel.Error,
-        Message = "FORWARDED HEADERS NOT HONOURED. The connection came from {Peer}, which no " +
-                  "configured KnownProxies range covers, so X-Forwarded-Proto ({ForwardedProto}) " +
-                  "was ignored and the request is being treated as {Scheme}. The __Host- " +
-                  "antiforgery cookie cannot be issued over a non-SSL request, so every sign-in " +
-                  "will fail at /bff/antiforgery with a 500 while the console itself loads. Add a " +
-                  "range containing {Peer} to KnownProxies. X-Forwarded-For was {ForwardedFor}; " +
-                  "the client resolved to {ResolvedClient}.")]
-    internal static partial void LogFirstRequestNotHttps(
+        Message = "REQUEST NOT SEEN AS HTTPS on {Path}. Transport peer {TransportPeer}. Headers: " +
+                  "{ForwardingHeaders}. Resolved to client {ResolvedClient} over {Scheme}. The " +
+                  "__Host- antiforgery cookie cannot be issued over a non-SSL request, so sign-in " +
+                  "fails here with a 500 while the console itself loads. If the headers above " +
+                  "CONTAIN a proto, add a range covering {TransportPeer} to KnownProxies. If they " +
+                  "contain NONE, the platform is not sending them and no KnownProxies value will " +
+                  "help.")]
+    internal static partial void LogForwardingNotHttps(
         ILogger logger,
-        string peer,
-        string forwardedFor,
-        string forwardedProto,
+        string path,
+        string transportPeer,
+        string forwardingHeaders,
         string resolvedClient,
         string scheme);
 }
