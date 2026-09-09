@@ -233,10 +233,16 @@ static bool IsLocalNetworkAppOrigin(string origin)
     };
 }
 
-// The API answers the BFF, never a browser directly, so the address on the connection is always the
-// BFF's. The BFF forwards the real client in X-Forwarded-For and the rate limiter partitions on the
-// result (see ClientAddress below); without that, one caller's brute-force attempt would spend the
-// budget of every other tenant behind the same proxy.
+// This API is reached two ways, and an earlier version of this comment claimed only the first.
+//
+//   * through the BFF, which proxies the admin console and forwards the real client in
+//     X-Forwarded-For, and
+//   * DIRECTLY by the customer mobile application, which calls the public address over the
+//     internet -- so the connection is fronted by the platform's own edge and the address on it is
+//     a piece of that edge, identical for every customer on earth.
+//
+// The rate limiter partitions on the result (see ClientAddress below); without the header, one
+// caller's brute-force attempt would spend the budget of every other tenant behind the same proxy.
 //
 // The header is therefore a SECURITY INPUT, and it is trusted only from the addresses named in
 // KnownProxies. The subtlety that made this a live vulnerability: ForwardedHeadersMiddleware only
@@ -247,7 +253,13 @@ static bool IsLocalNetworkAppOrigin(string origin)
 // rotating the header, including the 10-per-15-minutes cap that is the only brute-force protection
 // on password sign-in. Read once, here, so the pipeline below can decline to enable the middleware
 // at all rather than silently falling back into that state.
-var knownProxies = builder.Configuration.GetSection("KnownProxies").Get<string[]>() ?? [];
+//
+// Each entry may itself be a comma-separated list, because the correct list behind a managed edge
+// runs to roughly twenty-five ranges and twenty-five KnownProxies__N variables typed into a
+// dashboard is a configuration nobody re-reads, where one silent omission degrades the whole thing.
+var knownProxies = (builder.Configuration.GetSection("KnownProxies").Get<string[]>() ?? [])
+    .SelectMany(entry => entry.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    .ToArray();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -259,9 +271,25 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     // with a proxy that this deployment owns. It is WRONG on a managed platform: Render, for
     // one, fronts a service with Cloudflare and its own load balancer, so at one hop the address
     // resolved is a piece of Render's infrastructure -- identical for every visitor. That does
-    // not open the spoofing hole the guard below exists to close, but it collapses every
-    // address-keyed limit into a single bucket, and ten failed sign-ins by anyone then lock the
-    // whole platform out for fifteen minutes.
+    // not open the spoofing hole the guard below exists to close, but what it does instead is
+    // worse than the "everyone shares one bucket" this comment used to claim:
+    //
+    //   * CredentialSubject.PartitionKey keys an auth request on {address}|{account}, so with the
+    //     address constant the sign-in cap becomes a PER-ACCOUNT bucket shared between attacker
+    //     and victim. Ten requests a quarter hour, aimed at a named administrator, holds that
+    //     account shut indefinitely, and the victim cannot move out of the way.
+    //   * the address-only limits -- GlobalLimiter, Refresh, the public browsing ceiling -- do
+    //     collapse into one bucket for every visitor at once.
+    //   * every session records that same address, so "Where you are signed in" tells nobody
+    //     anything, including whoever is trying to measure this setting.
+    //
+    // It is a CEILING, not a target: trust is re-checked at each hop against the address just
+    // consumed, so the walk stops at the first address no configured range covers however high
+    // this is set. Raising it alone therefore does nothing -- measured against the real chain,
+    // 1, 2 and 3 all resolved the same address while only the loopback hop was trusted. It must
+    // equal the hop count exactly, and the reason not to simply set it high is narrow but real:
+    // when the visitor's own address falls inside a trusted range, one hop too many consumes a
+    // value the visitor supplied and lets them choose their own partition.
     //
     // Configurable rather than fixed because the answer is a property of where this is deployed,
     // not of the code, and getting it wrong is not visible until someone is locked out. Set it to
@@ -305,6 +333,50 @@ if (knownProxies.Length == 0 && !app.Environment.IsDevelopment())
         "Set the \"KnownProxies\" configuration array to the BFF's address(es).");
 }
 
+// Report the forwarding facts for the requests that can actually tell us something.
+//
+// Registered BEFORE UseForwardedHeaders, which is the whole point: that middleware CONSUMES the
+// entry it uses -- removing it from X-Forwarded-For and overwriting RemoteIpAddress -- so a version
+// registered after it, as this one was, reports the address the middleware decided on while calling
+// it "the connection came from", which is the one thing an operator reading it needs to be true.
+//
+// The trigger matters as much as the position. Logging the FIRST request spends the one shot on a
+// platform health probe: a loopback connection carrying no forwarding headers at all, arriving
+// before any real traffic. That happened on the BFF, and the line it produced would have argued for
+// trusting a health check. So: skip loopback probes, keep auth requests, and cap the rest.
+var forwardingLinesLogged = 0;
+app.Use(async (context, next) =>
+{
+    var peerAddress = context.Connection.RemoteIpAddress;
+    var fromLoopback = peerAddress is not null && IPAddress.IsLoopback(peerAddress);
+    var isAuth = context.Request.Path.StartsWithSegments("/api/v1/auth", StringComparison.OrdinalIgnoreCase);
+
+    if ((!isAuth && fromLoopback) || Interlocked.Increment(ref forwardingLinesLogged) > 8)
+    {
+        await next(context).ConfigureAwait(false);
+        return;
+    }
+
+    // Read on the way IN, before any of it is rewritten. Every forwarding header verbatim rather
+    // than the one that was guessed at: an edge sending CF-Visitor but not X-Forwarded-Proto is
+    // otherwise indistinguishable from an edge sending neither.
+    var transportPeer = peerAddress?.ToString() ?? "(none)";
+    var forwardingHeaders = string.Join(" | ", context.Request.Headers
+        .Where(header =>
+            header.Key.StartsWith("X-Forwarded", StringComparison.OrdinalIgnoreCase) ||
+            header.Key.Equals("Forwarded", StringComparison.OrdinalIgnoreCase) ||
+            header.Key.Equals("X-Real-IP", StringComparison.OrdinalIgnoreCase) ||
+            header.Key.StartsWith("CF-", StringComparison.OrdinalIgnoreCase))
+        .Select(header => header.Key + ": " + header.Value.ToString()));
+
+    await next(context).ConfigureAwait(false);
+
+    var headersText = forwardingHeaders.Length > 0 ? forwardingHeaders : "(no forwarding headers of any kind)";
+    var path = context.Request.Path.Value ?? "/";
+    var resolvedClient = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
+    Program.LogForwarding(app.Logger, path, transportPeer, headersText, resolvedClient, context.Request.IsHttps);
+});
+
 // Only when there is a proxy to trust. Left off, RemoteIpAddress stays the true connection address:
 // a poor partition key, but an honest one, and never one the caller chose.
 if (knownProxies.Length > 0)
@@ -339,31 +411,49 @@ else
 // away the one endpoint that still works while somebody is fixing the configuration.
 await Program.ProbeDatabaseAsync(app.Services, app.Logger).ConfigureAwait(false);
 
-// Report, ONCE, what the first request actually looked like on the wire.
+// A standing check on the trust list, not a diagnostic to be pulled out later.
 //
-// KnownProxies is guesswork until somebody sees the address the platform connects from, and the
-// consequence of guessing wrong is invisible: X-Forwarded-For is quietly ignored, every visitor
-// partitions on the same proxy address, and ten failed sign-ins by anyone locks the whole platform
-// out for fifteen minutes. Nothing in the logs says so, and no response header does either.
+// Cloudflare sets Cf-Connecting-Ip to the address it accepted the connection from, overwriting
+// whatever the caller sent, so on a request that genuinely came through Cloudflare it and the
+// address walked out of X-Forwarded-For are the same fact reached two independent ways. They
+// disagree in exactly the two ways this configuration fails, neither of which announces itself:
+// a Cloudflare range missing from KnownProxies (the walk stops a hop short and every visitor
+// behind that edge shares one bucket), or a request that never passed through Cloudflare carrying
+// a forged header -- which is why this cross-checks the header and never believes it.
 //
-// One line, on the first request only, naming the peer, the header it carried, and the address the
-// middleware settled on. If the peer is not inside a configured range, or the resolved client is
-// the same as the peer, the ranges are wrong and this says so plainly.
-var firstRequestSeen = 0;
+// Capped: a real misconfiguration says so in the first few requests, and a warning on every
+// request is how a log stops being read.
+var clientMismatchesLogged = 0;
 app.Use(async (context, next) =>
 {
-    if (Interlocked.Exchange(ref firstRequestSeen, 1) == 0)
+    var claimed = context.Request.Headers["Cf-Connecting-Ip"].ToString();
+    var resolved = context.Connection.RemoteIpAddress;
+
+    if (claimed.Length > 0 && resolved is not null &&
+        IPAddress.TryParse(claimed, out var claimedAddress) &&
+        !SameAddress(claimedAddress, resolved) &&
+        Interlocked.Increment(ref clientMismatchesLogged) <= 5)
     {
-        // Materialised before the call: the analyzer objects to work inside a logging argument,
-        // and this runs exactly once, so there is nothing to defer anyway.
-        var peer = context.Connection.RemoteIpAddress?.ToString() ?? "(none)";
-        var header = context.Request.Headers["X-Forwarded-For"].ToString();
-        var forwarded = header.Length > 0 ? header : "(absent)";
-        Program.LogFirstRequest(app.Logger, peer, forwarded, context.Request.IsHttps);
+        var resolvedText = resolved.ToString();
+        var forwardedFor = context.Request.Headers["X-Forwarded-For"].ToString();
+        Program.LogClientAddressMismatch(
+            app.Logger,
+            claimed,
+            resolvedText,
+            forwardedFor.Length > 0
+                ? forwardedFor
+                : "(nothing left -- consumed by the walk, or never sent)");
     }
 
     await next(context).ConfigureAwait(false);
 });
+
+// An IPv4 address that arrived over a dual-stack socket comes back as ::ffff:a.b.c.d -- the same
+// host written another way. Comparing the strings would call every request a mismatch.
+static bool SameAddress(IPAddress claimed, IPAddress resolved) =>
+    claimed.Equals(resolved) ||
+    (resolved.IsIPv4MappedToIPv6 && claimed.Equals(resolved.MapToIPv4())) ||
+    (claimed.IsIPv4MappedToIPv6 && claimed.MapToIPv4().Equals(resolved));
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment())
@@ -459,11 +549,36 @@ public partial class Program
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "First request: connection came from {Peer}, X-Forwarded-For was {Forwarded}, " +
-                  "and the request is {Scheme}. If the client address the limiter uses ends up " +
-                  "equal to {Peer} for every visitor, KnownProxies does not cover {Peer} and " +
-                  "X-Forwarded-For is being ignored -- add the range that contains it.")]
-    internal static partial void LogFirstRequest(ILogger logger, string peer, string forwarded, bool scheme);
+        Message = "Forwarding on {Path}. Transport peer {TransportPeer}. Headers: " +
+                  "{ForwardingHeaders}. Resolved to client {ResolvedClient}, IsHttps {IsHttps}. " +
+                  "If the resolved client equals the transport peer, or is the same platform " +
+                  "address for every visitor, KnownProxies does not cover the hop that sent these " +
+                  "headers and they are being ignored -- add the range containing it. If there are " +
+                  "no forwarding headers at all, nothing in KnownProxies will help.")]
+    internal static partial void LogForwarding(
+        ILogger logger,
+        string path,
+        string transportPeer,
+        string forwardingHeaders,
+        string resolvedClient,
+        bool isHttps);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "CLIENT ADDRESS DISAGREES WITH CLOUDFLARE. Cf-Connecting-Ip says {ClaimedClient} " +
+                  "but the X-Forwarded-For walk resolved {ResolvedClient}, leaving {ForwardedFor}. " +
+                  "Either a " +
+                  "Cloudflare range is missing from KnownProxies -- in which case the walk stopped " +
+                  "at a Cloudflare edge and every visitor behind it now shares one rate-limit " +
+                  "bucket -- or this request reached the origin without passing through Cloudflare " +
+                  "and its Cf-Connecting-Ip is forged. Check the published ranges at " +
+                  "cloudflare.com/ips-v4 and /ips-v6 against KnownProxies before assuming the " +
+                  "second.")]
+    internal static partial void LogClientAddressMismatch(
+        ILogger logger,
+        string claimedClient,
+        string resolvedClient,
+        string forwardedFor);
 
     /// <summary>Opens one connection so a misconfigured database is a log line, not a mystery.</summary>
     internal static async Task ProbeDatabaseAsync(IServiceProvider services, ILogger logger)

@@ -1981,3 +1981,76 @@ not mistaken for dead code and removed.
 A gallery sees a customer's history when they open the booking, not on the pending list. That is a
 scope decision rather than a privacy one — the list is already filtered to their own live requests —
 and a per-row summary would be a batch reader like `SummariseAsync`, built if galleries ask for it.
+
+## Production forwarded headers (2026-09-10)
+
+### 84. CLOSED — the console loaded but nobody could sign in, and the obvious fix was a trap
+
+**Status:** CLOSED 2026-09-10 · **Raised:** 2026-09-09
+
+`GET /bff/antiforgery` — the first call the sign-in page makes — answered 500 in production with
+`AntiforgeryOptions.Cookie.SecurePolicy = Always, but the current request is not an SSL request.`
+The console itself rendered perfectly, which is what made it read as an antiforgery bug rather than
+a networking one.
+
+It was neither. Render's router connects to the container over **loopback**, so the transport peer
+is `::1`; item 32 had deliberately cleared the framework's default trust of loopback on the grounds
+that inheriting it silently was not a decision. Correct in principle, and it made `::1` an untrusted
+sender, so `X-Forwarded-Proto: https` was discarded, `Request.IsHttps` stayed false, and antiforgery
+refused to issue a `__Host-` cookie over what it believed was plain HTTP.
+
+Two rounds of diagnostics were needed to see it, and the first was wrong in an instructive way: it
+logged the FIRST request and spent its one shot on a platform health probe — loopback, no forwarding
+headers at all — arriving a minute before the browser request that failed. Read literally, that line
+argued for trusting a health check. Retargeting it at `/bff/antiforgery` and at non-loopback requests
+produced the real chain.
+
+**The trap.** Trusting `::1` alone makes sign-in work, and it is tempting to stop there. It resolves
+every visitor to `10.24.207.134`, Render's load balancer. `CredentialSubject.PartitionKey` keys a
+sign-in on `{address}|{account}`, so a constant address turns the ten-per-fifteen-minutes cap into a
+**per-account bucket shared with the attacker**: aimed at a named administrator it holds that account
+shut indefinitely, and the victim cannot move out of the way. The address-only limits collapse
+outright, and every session records the same address, so "Where you are signed in" — the screen the
+deployment guide told people to measure this with — stops being able to tell anyone anything.
+
+`ForwardLimit` does not rescue it. It is a **ceiling, not a target**: trust is re-checked at each hop
+against the address just consumed, so the walk stops at the first untrusted address however high it
+is set. Measured on the real chain with only loopback trusted, 1, 2 and 3 resolved the identical
+address. The guidance in `docs/deployment.md` — "raise it by one and repeat" — could therefore never
+have worked, and has been rewritten.
+
+**Closed by:** trusting the whole chain that actually exists — loopback, `10.0.0.0/8`, and
+Cloudflare's 22 published ranges — with `ForwardLimit` at exactly 3. Not "trust everything": the
+guarantee is checked per request from the transport peer outward, and the only way to exploit it is
+to *connect* from a trusted range. Nothing on the internet can source `::1` or `10.x`, and only
+Cloudflare can source Cloudflare's. Cloudflare **appends** the address it accepted the connection
+from rather than replacing it, so anything a caller invents lands to the left of their true address
+and the right-to-left walk reaches the truth first.
+
+The limit is exactly 3 and must not be padded: when a visitor's own address falls inside a trusted
+range — a Cloudflare Worker fetching this origin — the walk does not stop at them, and one hop too
+many consumes a value they supplied. Measured: 3 resolves the Worker, 4 resolves the prepended junk.
+
+Both services now cross-check the resolved address against `Cf-Connecting-Ip`, which Cloudflare
+overwrites on ingress, and warn on disagreement — that catches a stale Cloudflare list and a request
+that never traversed Cloudflare, the only two ways this configuration fails. The header is
+cross-checked and never believed: using it as the source of truth would let a caller name its own
+partition, and its safety would rest on the service's Render plan, since paid plans can receive
+private-network traffic that free ones cannot.
+
+Regression tests: `Khadra.Tests/Security/ForwardedHeaderChainTests.cs` — eleven, run against the
+middleware directly, pinning the captured production chain, the loopback-only trap, the inert
+higher limit, the prepend attack, the exact-limit edge case, and the untrusted caller.
+
+**Also fixed here:** the API carried the same defect, and `Khadra.WebAPI/Program.cs` claimed in a
+comment that it "answers the BFF, never a browser directly" — false, because the customer mobile
+application calls it directly over the public address through the identical chain. Its list did not
+cover a `::1` peer either, so every mobile customer resolved to `::1` and `UseHsts` emitted no
+header, which is visible from outside and is how to confirm the fix landed.
+
+**Still open, for the owner:** which plan the `khadra` API service is on. Free Render web services
+cannot *receive* private network traffic, so if it is free the BFF must reach it over the public
+address and console traffic resolves Render's shared outbound address at the API. That cannot be
+fixed with a longer trust list — every Render tenant in the region shares those addresses, so
+trusting them would be a real spoofing hole. The fix is a paid plan or an explicit BFF-to-API trust
+channel. See `render.yaml`.

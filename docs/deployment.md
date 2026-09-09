@@ -60,11 +60,13 @@ Email__Provider="Brevo"
 Email__ApiKey="<brevo key>"
 Email__FromAddress="<a CONFIRMED sender on the Brevo account>"
 
-# Required — see "Who the client is", below
-KnownProxies__0="10.0.0.0/8"
-KnownProxies__1="172.16.0.0/12"
-KnownProxies__2="192.168.0.0/16"
-ForwardedHeaders__ForwardLimit="1"
+# Required — see "Who the client is", below. Values are for Render behind
+# Cloudflare; an entry may carry a comma-separated list.
+KnownProxies__0="::1,127.0.0.0/8"
+KnownProxies__1="10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+KnownProxies__2="<the 15 ranges from cloudflare.com/ips-v4, comma-separated>"
+KnownProxies__3="<the 7 ranges from cloudflare.com/ips-v6, comma-separated>"
+ForwardedHeaders__ForwardLimit="3"
 
 # Only for the very first boot, to invite the first administrator
 Admin__Bootstrap__Email="…"
@@ -133,27 +135,75 @@ means "trust anybody" — and the header is what every rate limit partitions on,
 including the 10-per-15-minutes cap that is the only brute-force protection on
 password sign-in. The API refuses to start rather than run that way.
 
-`ForwardedHeaders__ForwardLimit` is the other half, and it is the half that is
-easy to get wrong quietly. It counts hops **from the right**. One is correct when
-the only thing in front is a proxy this deployment owns. On a managed platform it
-usually is not: Render, for one, fronts a service with Cloudflare *and* its own
-load balancer, and puts the real visitor **first** in the header. Read one hop
-from the right there and you resolve a piece of the platform's infrastructure —
-the same address for every visitor on earth. That is not a spoofing hole, but it
-collapses every limit into one bucket, and ten failed sign-ins by anybody lock
-the whole platform out for fifteen minutes.
+`ForwardedHeaders__ForwardLimit` is the other half. It counts hops **from the
+right**, and it is a **ceiling, not a target**: trust is re-checked at every hop
+against the address just consumed, so the walk stops at the first address no
+configured range covers however high the number is.
 
-**Measure it; do not assume it.** Neither Render nor Cloudflare publishes a fixed
-inbound address, so there is no number to look up.
+That one sentence invalidates the procedure this page used to give — "raise it by
+one and repeat" can never work, because raising it alone does nothing. Measured
+against the real chain, with only the loopback hop trusted, limits of 1, 2 and 3
+resolved the identical address. **The trust list is what moves the walk; the limit
+only permits it.**
 
-1. Read the startup line: `Rate limiting will identify clients by
-   X-Forwarded-For, trusted only from: … , reading N hop(s) from the right.`
-2. Sign in from an address you know, and open **Profile → Where you are signed
-   in**. That screen shows the address the API recorded.
-3. Your own address means the count is right. A platform address means raise
-   `ForwardedHeaders__ForwardLimit` by one and repeat.
-4. Then prove the hole is shut: send `X-Forwarded-For: 1.2.3.4` from outside on a
-   sign-in and confirm the sessions screen still records your real address.
+### The chain on Render, as captured
+
+```
+transport peer      ::1                  Render's router, over loopback
+X-Forwarded-For     176.29.3.177,        the visitor
+                    172.69.173.136,      a Cloudflare edge
+                    10.24.207.134        Render's load balancer
+X-Forwarded-Proto   https
+Cf-Connecting-Ip    176.29.3.177
+```
+
+Three hops, so `ForwardLimit=3`, and every one of them has to be trusted:
+loopback, `10.0.0.0/8`, and Cloudflare's published ranges.
+
+**Trusting only `::1` is not enough, even though it makes sign-in start working.**
+It fixes the scheme, so the `__Host-` antiforgery cookie can be issued and the 500
+goes away — which is exactly what makes it tempting to stop there. But the walk
+then resolves `10.24.207.134`, Render's load balancer, for every visitor. The
+sign-in cap is keyed on `{address}|{account}`, so a constant address turns it into
+a *per-account* bucket shared with the attacker: ten requests a quarter hour aimed
+at a named administrator holds that account shut, and the victim cannot move out
+of the way. The address-only limits collapse outright, and every session records
+the same address, so "Where you are signed in" can no longer tell you anything.
+
+**Do not pad the limit "for safety" either.** When a visitor's own address falls
+inside a trusted range — a Cloudflare Worker fetching this origin — the walk does
+not stop at them, and one hop too many consumes a value they supplied. Measured:
+with a Worker visitor and a prepended entry, 3 resolves the Worker and 4 resolves
+the junk. The limit is part of the guarantee.
+
+### Why this is not "trust everything"
+
+The guarantee is checked per request from the transport peer outward, and the only
+way to exploit it is to *connect* from a trusted range. Nothing on the internet can
+source `::1` or `10.x`, and only Cloudflare can source Cloudflare's ranges.
+Cloudflare **appends** the address it accepted the connection from to whatever the
+caller sent rather than replacing it, so anything a caller invents lands to the
+*left* of their true address and the right-to-left walk reaches the truth first.
+
+### Confirming it
+
+1. Read the startup line: `Forwarded headers trusted from: … , reading 3 hop(s)
+   from the right.`
+2. Sign in and open **Profile → Where you are signed in**. It must show your own
+   address, not a `10.x` or a Cloudflare one.
+3. Watch for `CLIENT ADDRESS DISAGREES WITH CLOUDFLARE` in the log. Both services
+   cross-check the resolved address against `Cf-Connecting-Ip` — which Cloudflare
+   overwrites on ingress, so on a request that really came through Cloudflare the
+   two are the same fact reached two independent ways. A disagreement means either
+   a Cloudflare range is missing here (they change rarely, but they do change) or
+   the request never passed through Cloudflare. That header is cross-checked and
+   never believed: trusting it would let the caller name its own partition.
+4. Prove the hole is shut: send `X-Forwarded-For: 1.2.3.4` on a sign-in and
+   confirm the sessions screen still records your real address.
+
+Refresh the Cloudflare list from `cloudflare.com/ips-v4` and `/ips-v6` when the
+warning in step 3 appears. A stale list degrades toward resolving a Cloudflare
+edge — never toward believing a caller.
 
 ## Migrations
 

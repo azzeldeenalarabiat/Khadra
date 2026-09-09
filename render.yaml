@@ -83,32 +83,76 @@ services:
 
       # ── Who the client is ─────────────────────────────────────────────────
       #
-      # Not a formality. ForwardedHeadersMiddleware only checks the sender when
-      # it has something to check against, so an empty list means "trust
-      # anybody" — and here it is worse than that: the session and antiforgery
-      # cookies are __Host- prefixed with SecurePolicy.Always, and the
-      # antiforgery system REFUSES to issue a token when Request.IsHttps is
-      # false. Behind an edge that terminates TLS, IsHttps is false unless
-      # X-Forwarded-Proto is honoured. Get this wrong and the console loads
-      # perfectly and every sign-in returns 500.
+      # Not a formality, and no longer a guess. A production request was
+      # captured; this is the chain it presented:
       #
-      # The BFF now refuses to start in Production rather than run that way.
+      #   transport peer     ::1                 Render's router, over loopback
+      #   X-Forwarded-For    176.29.3.177,       the visitor
+      #                      172.69.173.136,     a Cloudflare edge
+      #                      10.24.207.134       Render's load balancer
+      #   X-Forwarded-Proto  https
       #
-      # These three ranges are a starting point, not an answer. Read the API's
-      # first-request log line, which names the address the platform actually
-      # connects from, and add the range containing it.
-      - key: KnownProxies__0
-        value: 10.0.0.0/8
-      - key: KnownProxies__1
-        value: 172.16.0.0/12
-      - key: KnownProxies__2
-        value: 192.168.0.0/16
+      # Every hop below is one of those, and the list is complete for that
+      # chain. Nothing here is a placeholder to be tuned later.
+      #
+      # Why it cannot be skipped: the session and antiforgery cookies are
+      # __Host- prefixed with SecurePolicy.Always, and antiforgery REFUSES to
+      # issue a token when Request.IsHttps is false. Behind an edge that
+      # terminates TLS, IsHttps is false unless X-Forwarded-Proto is honoured —
+      # and it is honoured only from a trusted sender. Get this wrong and the
+      # console loads perfectly while every sign-in returns 500.
+      #
+      # Why it cannot stop at the loopback hop, which is enough to fix that 500:
+      # the walk would then resolve 10.24.207.134 — Render's load balancer, the
+      # same address for every visitor on earth. The sign-in cap is keyed on
+      # {address}|{account}, so a constant address turns it into a per-account
+      # bucket shared with the attacker: ten requests a quarter hour aimed at a
+      # named administrator holds that account shut, and the victim cannot move
+      # out of the way.
+      #
+      # An entry may carry a comma-separated list, so this is five variables
+      # rather than twenty-five. A list nobody re-reads is a list with a hole
+      # in it, and one missing range silently costs a hop.
 
-      # Counted from the RIGHT. Render fronts services with Cloudflare AND its
-      # own load balancer, so one hop may resolve to a platform address rather
-      # than a visitor. Raise it if the sessions screen shows the wrong address.
+      # The platform router that connects to the container.
+      - key: KnownProxies__0
+        value: "::1,127.0.0.0/8"
+
+      # Render's private network. The load balancer was observed on 10.x; the
+      # other two RFC 1918 ranges are here because the BFF-to-API private hop
+      # was never measured and a platform may assign from any of them. Nothing
+      # on the internet can source these, so covering all three costs nothing
+      # and a missing one fails silently as a collapsed rate-limit bucket.
+      - key: KnownProxies__1
+        value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+      # Cloudflare, from cloudflare.com/ips-v4 — fetched 2026-09-10.
+      # 172.64.0.0/13 is the one holding the edge observed above. These do NOT
+      # overlap RFC 1918's 172.16.0.0/12.
+      - key: KnownProxies__2
+        value: "173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22"
+
+      # Cloudflare, from cloudflare.com/ips-v6 — fetched 2026-09-10.
+      - key: KnownProxies__3
+        value: "2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32"
+
+      # Counted from the RIGHT, and EXACTLY the hop count: visitor, Cloudflare,
+      # load balancer — three.
+      #
+      # It is a ceiling rather than a target. Trust is re-checked at each hop
+      # against the address just consumed, so the walk stops at the first
+      # address no range above covers however high this is set: measured on the
+      # real chain, 1, 2 and 3 all resolved the same address while only the
+      # loopback hop was trusted. Raising it alone fixes nothing.
+      #
+      # And it must not be padded "for safety". When a visitor's own address
+      # falls inside a trusted range — a Cloudflare Worker fetching this origin —
+      # the walk does not stop at them, and one hop too many consumes a value
+      # they supplied, letting them choose their own rate-limit partition.
+      # Measured: with a Worker visitor and a prepended entry, 3 resolves the
+      # Worker and 4 resolves the prepended junk.
       - key: ForwardedHeaders__ForwardLimit
-        value: "1"
+        value: "3"
 
   # ── The session store ──────────────────────────────────────────────────────
   #
@@ -149,3 +193,33 @@ services:
 #                        The key currently set begins 'xsmtpsib-', which is the
 #                        SMTP key; the API detects this and refuses it, so no
 #                        mail is delivered and no administrator can be invited.
+#
+#   KnownProxies__0..3   The SAME four values as above, and for the same reason.
+#   ForwardedHeaders__   The API is not only reached through the BFF: the
+#   ForwardLimit         customer mobile application calls it directly over the
+#                        public address, through the identical Cloudflare ->
+#                        load balancer -> loopback chain. Its list today is
+#                        10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 with a limit
+#                        of 1, none of which covers a ::1 peer — so every mobile
+#                        customer currently resolves to ::1, the sessions screen
+#                        records ::1, and UseHsts emits no header because the
+#                        request is not seen as HTTPS. That last one is visible
+#                        from outside and is how to confirm the fix landed.
+#
+# ── One question this repository cannot answer ───────────────────────────────
+#
+# Which PLAN the `khadra` API service is on, because it decides whether the two
+# prompted variables above may use the private address:
+#
+#   paid  ->  http://khadra:8080/ works. Prefer it: the API then sees this
+#             container as the peer and honours the X-Forwarded-For it sends.
+#
+#   free  ->  it does NOT. Render's free web services cannot RECEIVE private
+#             network traffic, so the BFF must use https://khadra.onrender.com/
+#             and console traffic leaves Render and comes back through the edge.
+#             The API then resolves Render's shared outbound address for every
+#             console request — one bucket for all of them. Do not try to fix
+#             that by trusting Render's egress addresses: every Render tenant in
+#             the region shares them, so any of them could then choose its own
+#             partition. That is a genuine spoofing hole, and the fix is a paid
+#             plan for the API, not a longer list.
