@@ -165,6 +165,11 @@ A city may carry a centre point. When it has one, the map opens there; when it d
 not, the form says *"The platform has not pinned this city yet, so the map cannot
 start there"* and asks the owner to place the pin.
 
+> Production currently has four cities — Amman, Al-Salt, Irbid, Zarqa — and **none
+> has a centre pinned**, so the second path is the one owners meet today. Pinning
+> each city's centre is a small administrative task that would open the map at
+> roughly the right place instead of asking every owner to find it.
+
 ### The map
 
 Leaflet over OpenStreetMap tiles, in `Khadra.Dashboard/src/app/shared/map/`. The
@@ -432,7 +437,8 @@ direction change rather than a second stylesheet. It is a hard rule in
 [`.claude/rules/frontend/angular-dashboard.md`](../.claude/rules/frontend/angular-dashboard.md).
 
 A test asserts the two dictionaries have the same keys, so a screen cannot ship with
-an English string and no Arabic one. `missing-ar.json` is currently empty.
+an English string and no Arabic one — and it currently passes, so nothing is
+untranslated.
 
 Money always carries its currency code. Dates and numbers go through
 `format.service.ts`, which respects the active locale.

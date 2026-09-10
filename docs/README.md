@@ -113,17 +113,50 @@ The Domain references no framework at all.
 
 ---
 
-## Current state, honestly
+## Current state
+
+Three categories, kept apart on purpose — "it works on `main`" and "it is running in
+production" are different claims, and conflating them is how a deploy gets skipped.
+
+### ✅ Live in production
 
 | | |
 |---|---|
-| Backend tests | **1093** |
-| Dashboard tests | **44** |
-| Mobile tests | **53** |
-| Bounded contexts built | Identity & Access, Dealers, Fleet, Bookings, Disputes, Reviews, Notifications, Auditing, Platform Settings, Payments |
-| Not built | Payouts, finance reporting, admin-editable platform settings — the console says so on the screen rather than showing an empty table |
-| Blocking launch | No merchant account (payments), and the items in [pre-launch-checklist.md](pre-launch-checklist.md) |
+| **API** | `https://khadra.onrender.com` — healthy, database reachable |
+| **BFF + console** | Deployed on Render, behind Cloudflare |
+| **Database** | Supabase PostgreSQL, schema applied, reached through the session pooler |
+| **Document storage** | **Private** Supabase bucket `khadra-documents`. The boot probe confirms it is reachable *and* private on every start |
+| **Email** | Brevo over HTTPS, confirmed sender |
+| **Forwarded headers** | Full Cloudflare → Render → loopback chain trusted, `ForwardLimit=3` |
+| **Administrator** | Bootstrapped; the invitation was accepted |
+| **Cities** | 4 — Amman, Al-Salt, Irbid, Zarqa. All active; **none has a centre pinned yet**, so the map asks the owner to place the pin rather than opening at the city |
 
-The console deliberately shows a "not built" screen for contexts that do not exist
-yet, naming what it will show and what is missing. That is better than a screen of
-zeros nobody can tell apart from real data.
+### 🔧 Built and tested, not yet exercised in production
+
+| | |
+|---|---|
+| Dealer registration → approval | The whole flow, including map, address and the three documents |
+| Booking lifecycle | Every transition except the ones that need a payment |
+| Disputes, reviews, fleet, employees, notifications | Built; awaiting real traffic |
+| Reverse geocoding | Optional. Set `Geocoding__Provider` + `__UserAgent` to enable; unset, the form asks the owner to type the address |
+
+### ⛔ Remaining pre-launch work
+
+| | |
+|---|---|
+| **Payments** | **No merchant account.** Every checkout is refused with `payments.provider_unavailable` and the boot log says `PAYMENTS ARE NOT ACCEPTED`. Nothing simulates success, deliberately — pre-launch item 76 |
+| Everything else | [pre-launch-checklist.md](pre-launch-checklist.md). An item comes off only by being fixed |
+
+### Tests
+
+| Backend | Dashboard | Mobile |
+|---|---|---|
+| **1093** | **44** | **53** |
+
+Two backend tests need PostgreSQL running; see [testing.md](testing.md).
+
+### Not built at all
+
+Payouts, finance reporting, admin-editable platform settings. The console shows a
+"not built" screen for these, naming what it will show and what is missing — better
+than a screen of zeros nobody can tell apart from real data.

@@ -5,6 +5,16 @@ Topology, configuration, deployment order and recovery.
 **No secret appears in this file.** Every credential is named, never written down.
 Real values live only in Render's environment and, for development, in user-secrets.
 
+> **What is live right now.** The API and the BFF are deployed and healthy. The
+> schema is applied. Documents are on the **private** Supabase bucket
+> `khadra-documents`, confirmed reachable and private by the boot probe. Brevo is
+> sending. The forwarded-header chain is trusted end to end. An administrator exists
+> and has accepted their invitation, and four cities are configured — Amman,
+> Al-Salt, Irbid, Zarqa, none with a centre point yet.
+>
+> The one thing still missing is a **merchant account**: no payment can be taken.
+> See [README.md](README.md#current-state) for the full breakdown.
+
 For what each individual setting *does* and what breaks without it, see
 [deployment.md](deployment.md). This page is about the system as a whole.
 
