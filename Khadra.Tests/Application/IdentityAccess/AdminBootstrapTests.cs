@@ -44,6 +44,10 @@ public sealed class AdminBootstrapTests
         public List<User> Added { get; } = [];
         public List<AuditEntry> Recorded { get; } = [];
         public List<VerificationToken> Issued { get; } = [];
+        // Recording, because several branches here do nothing on purpose, and "did nothing and said
+        // why" is the behaviour under test -- a silent decline is what leaves an operator with no
+        // way to tell a working bootstrap from an unread setting.
+        public RecordingLogger<AdminBootstrapper> Log { get; } = new();
 
         public Context()
         {
@@ -69,7 +73,7 @@ public sealed class AdminBootstrapTests
             AuditTrail,
             UnitOfWork,
             Clock,
-            NullLogger<AdminBootstrapper>.Instance);
+            Log);
     }
 
     private static User InvitedFounder() =>
@@ -319,5 +323,159 @@ public sealed class AdminBootstrapTests
             VerificationPurpose.AdminInvitation,
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
+    }
+}
+
+/// <summary>
+/// The two ways a configured bootstrap can decline, and what a first login actually requires.
+/// </summary>
+/// <remarks>
+/// Written while creating the first administrator on a live deployment. Both cases below produce a
+/// platform with no usable administrator, and before this neither said anything: the operator sets
+/// the variable, restarts, and no line in the log so much as mentions the subject — so the only
+/// conclusion available is that the setting was not read, which is the wrong problem.
+/// </remarks>
+public sealed class AdminBootstrapRefusalTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 9, 10, 10, 0, 0, TimeSpan.Zero);
+
+    private sealed record BootstrapSettings(string? Email, string? Phone, string? FullName)
+        : IAdminBootstrapSettings;
+
+    /// <summary>The collaborators, with the two the refusal paths actually turn on left to the test.</summary>
+    private sealed class AdminBootstrapTestBed
+    {
+        public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
+        public IVerificationTokenRepository Tokens { get; } = Substitute.For<IVerificationTokenRepository>();
+        public IEmailSender Email { get; } = Substitute.For<IEmailSender>();
+        public IAuthEmailComposer Composer { get; } = Substitute.For<IAuthEmailComposer>();
+        public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
+        public IAuditTrail AuditTrail { get; } = Substitute.For<IAuditTrail>();
+        public RecordingLogger<AdminBootstrapper> Log { get; } = new();
+        public List<User> Added { get; } = [];
+
+        public AdminBootstrapTestBed()
+        {
+            UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
+            Users.When(repo => repo.AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>()))
+                .Do(call => Added.Add(call.Arg<User>()));
+            Composer.AdminInvitation(Arg.Any<User>(), Arg.Any<string>())
+                .Returns(new EmailMessage("to@khadra.jo", "Name", "Subject", "<p>html</p>", "text"));
+        }
+
+        public AdminBootstrapper Bootstrapper() => new(
+            Users,
+            Tokens,
+            new FakePasswordHasher(),
+            new FakeOpaqueTokens(),
+            TestAuthPolicy.Default,
+            new BootstrapSettings("founder@khadra.jo", "0790000001", "Rania Haddad"),
+            new AuthEmailDispatcher(Composer, Email, NullLogger<AuthEmailDispatcher>.Instance),
+            AuditTrail,
+            UnitOfWork,
+            new TestClock(Now),
+            Log);
+    }
+
+    private static User InvitedAdmin(string email) =>
+        User.CreateInvitedAdmin(
+            EmailAddress.Create(email).Value,
+            PhoneNumber.Create("0790000001").Value,
+            PersonName.Create("Rania Haddad").Value,
+            PasswordHash.FromHash("unusable"),
+            Now);
+
+    /// <summary>
+    /// Reachable, and likeliest on exactly the deployment this matters for: the owner registered
+    /// through the customer app with the address they later configure here.
+    ///
+    /// The insert would hit the unique index on users.email and land in the race-loss catch, which
+    /// reports "created by another instance" — false, and it sends the reader hunting for a second
+    /// instance that does not exist.
+    /// </summary>
+    [Fact]
+    public async Task An_address_already_held_by_somebody_else_stops_startup_instead_of_blaming_a_race()
+    {
+        var context = new AdminBootstrapTestBed();
+        context.Users.AnyAdminExistsAsync(Arg.Any<CancellationToken>()).Returns(false);
+        context.Users.ExistsByEmailAsync(Arg.Any<EmailAddress>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => context.Bootstrapper().EnsureAsync(CancellationToken.None));
+
+        Assert.Contains("already exists with that address", failure.Message, StringComparison.Ordinal);
+        Assert.Empty(context.Added);
+    }
+
+    /// <summary>
+    /// The lockout case. An administrator exists for some OTHER address — including a soft-deleted
+    /// one, because AnyAdminExistsAsync ignores the query filter while GetByEmailAsync honours it, so
+    /// a deleted administrator both blocks the bootstrap and is invisible to the reissue path.
+    ///
+    /// Nothing can be done automatically and nothing should be, but it must be said out loud.
+    /// </summary>
+    [Fact]
+    public async Task An_administrator_at_a_different_address_is_reported_rather_than_ignored()
+    {
+        var context = new AdminBootstrapTestBed();
+        context.Users.AnyAdminExistsAsync(Arg.Any<CancellationToken>()).Returns(true);
+        context.Users.GetByEmailAsync(Arg.Any<EmailAddress>(), Arg.Any<CancellationToken>()).Returns((User?)null);
+
+        await context.Bootstrapper().EnsureAsync(CancellationToken.None);
+
+        Assert.Empty(context.Added);
+        Assert.Contains("ALREADY has an administrator", context.Log.AllText, StringComparison.Ordinal);
+    }
+
+    /// <summary>An account that holds the address but is not an administrator is named as such.</summary>
+    [Fact]
+    public async Task The_configured_address_belonging_to_a_non_administrator_is_reported()
+    {
+        var context = new AdminBootstrapTestBed();
+        context.Users.AnyAdminExistsAsync(Arg.Any<CancellationToken>()).Returns(true);
+        context.Users.GetByEmailAsync(Arg.Any<EmailAddress>(), Arg.Any<CancellationToken>())
+            .Returns(Users.Customer(email: "founder@khadra.jo"));
+
+        await context.Bootstrapper().EnsureAsync(CancellationToken.None);
+
+        Assert.Empty(context.Added);
+        Assert.Contains("is NOT an administrator", context.Log.AllText, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// What a first login actually requires, pinned because it is the question every operator asks.
+    ///
+    /// Forgot Password works on this account — no status or verification gate stands in its way, so a
+    /// link is issued and a password is set. It still does not produce a login: ResetPasswordHandler
+    /// changes the password and never touches IsEmailVerified, and CanAuthenticate refuses an
+    /// unverified address. The invitation is the only route, because accepting it is the only thing
+    /// that proves the mailbox.
+    /// </summary>
+    [Fact]
+    public void Resetting_the_password_does_not_let_an_unaccepted_administrator_sign_in()
+    {
+        var invited = InvitedAdmin("founder@khadra.jo");
+
+        // Exactly what ResetPasswordHandler does on a consumed reset token.
+        invited.ChangePassword(PasswordHash.FromHash("a-genuinely-chosen-password"), Now);
+
+        var refusal = invited.CanAuthenticate();
+        Assert.True(refusal.IsFailure);
+        Assert.Equal(IdentityErrors.EmailNotVerified.Code, refusal.Error.Code);
+    }
+
+    /// <summary>And the invitation, which does both, is what makes the account usable.</summary>
+    [Fact]
+    public void Accepting_the_invitation_verifies_the_address_and_sets_the_password_together()
+    {
+        var invited = InvitedAdmin("founder@khadra.jo");
+
+        // Exactly what AcceptInvitationCommand does.
+        invited.VerifyEmail(Now);
+        invited.ChangePassword(PasswordHash.FromHash("a-genuinely-chosen-password"), Now);
+
+        Assert.True(invited.CanAuthenticate().IsSuccess);
+        Assert.Same(UserRole.Admin, invited.Role);
+        Assert.True(invited.IsEmailVerified);
     }
 }

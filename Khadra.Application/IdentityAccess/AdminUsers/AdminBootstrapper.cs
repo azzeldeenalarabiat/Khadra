@@ -74,6 +74,28 @@ public sealed partial class AdminBootstrapper(
             return;
         }
 
+        // No administrator anywhere -- but the address itself may already belong to somebody.
+        //
+        // Reachable, and likely on exactly the deployment this matters for: an owner who registered
+        // through the customer app to try it out, with the address they later configure here. The
+        // insert would then hit the unique index on users.email and land in the race-loss catch
+        // below, which would report "created by another instance; this one did nothing" -- false,
+        // and it sends the reader looking for a second instance that does not exist.
+        //
+        // Fails startup rather than continuing, for the same reason the validation above does: the
+        // alternative is a platform with no administrator and a log line that misdirects whoever
+        // goes looking. ExistsByEmailAsync ignores the soft-delete filter, which is what the unique
+        // index does too, so this sees exactly what the insert would collide with.
+        if (await users.ExistsByEmailAsync(address.Value, cancellationToken))
+        {
+            throw new InvalidOperationException(
+                $"Admin:Bootstrap:Email is {settings.Email}, but an account already exists with that " +
+                "address and it is not an administrator (it may also be a soft-deleted one, which " +
+                "the unique index still covers). The bootstrap cannot take an address that is " +
+                "already in use. Either configure an address nobody holds, or promote/remove the " +
+                "existing account, and start again.");
+        }
+
         // The same unusable credential InviteAdminCommand creates: bytes hashed and discarded, so
         // there is no password until the invitation is accepted.
         var unusable = passwordHasher.Hash(Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
@@ -139,18 +161,46 @@ public sealed partial class AdminBootstrapper(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        // Every branch below says why it declined. Silence here is what makes a configured bootstrap
+        // that does nothing unexplainable: the operator sets the variable, restarts, and no line in
+        // the log mentions the subject at all -- so the only conclusion available is that the setting
+        // was not read, which sends them to the wrong problem. This project has now been caught twice
+        // by a branch that did nothing quietly; this one will not be the third.
         var existing = await users.GetByEmailAsync(address, cancellationToken);
-        if (existing is null
-            || existing.Role != UserRole.Admin
-            || existing.IsEmailVerified
-            || existing.Status != UserStatus.Active)
+        if (existing is null)
         {
+            // Note GetByEmailAsync honours the soft-delete filter while AnyAdminExistsAsync does not,
+            // so a soft-deleted administrator brings us here as well, and it is the case that would
+            // otherwise be unexplainable: an administrator "exists" for the purpose of the check
+            // above, and cannot be seen or invited by anything.
+            LogNotTheConfiguredAddress(logger, settings.Email ?? "(unset)");
+            return;
+        }
+
+        if (existing.Role != UserRole.Admin)
+        {
+            LogConfiguredAddressIsNotAnAdmin(logger, settings.Email ?? "(unset)");
+            return;
+        }
+
+        if (existing.IsEmailVerified)
+        {
+            // The ordinary steady state: the administrator accepted their invitation long ago. Worth
+            // one Information line so a restart can be seen to have considered it and moved on.
+            LogAlreadyAccepted(logger, settings.Email ?? "(unset)");
+            return;
+        }
+
+        if (existing.Status != UserStatus.Active)
+        {
+            LogConfiguredAdminSuspended(logger, settings.Email ?? "(unset)");
             return;
         }
 
         if (await verificationTokens.HasActiveAsync(
                 existing.Id, VerificationPurpose.AdminInvitation, now, cancellationToken))
         {
+            LogInvitationStillLive(logger, settings.Email ?? "(unset)");
             return;
         }
 
@@ -218,4 +268,41 @@ public sealed partial class AdminBootstrapper(
         Level = LogLevel.Information,
         Message = "The bootstrap administrator was created by another instance; this one did nothing.")]
     private static partial void LogRaceLost(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Admin:Bootstrap:Email is {Email}, but this platform ALREADY has an administrator " +
+                  "and it is not that address, so nothing was done and no invitation was sent. The " +
+                  "bootstrap only ever creates the FIRST administrator; every other one is invited " +
+                  "from inside the console by an administrator who is already signed in. If the " +
+                  "existing administrator cannot be signed into either, the platform is locked out " +
+                  "of its own console and needs the row looked at directly.")]
+    private static partial void LogNotTheConfiguredAddress(ILogger logger, string email);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Admin:Bootstrap:Email is {Email}, but that account exists and is NOT an " +
+                  "administrator, and the platform already has one elsewhere. Nothing was done. " +
+                  "Promote that account from the console instead, or configure a different address.")]
+    private static partial void LogConfiguredAddressIsNotAnAdmin(ILogger logger, string email);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "The bootstrap administrator {Email} has already accepted their invitation. " +
+                  "Nothing to do -- use Forgot Password if the password is lost.")]
+    private static partial void LogAlreadyAccepted(ILogger logger, string email);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "The bootstrap administrator {Email} has never accepted their invitation AND is " +
+                  "suspended, so no new invitation was sent. A suspended account cannot sign in even " +
+                  "after accepting; lift the suspension first.")]
+    private static partial void LogConfiguredAdminSuspended(ILogger logger, string email);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "The bootstrap administrator {Email} has not accepted yet, but their invitation is " +
+                  "still live, so no new one was sent. Use the link already in that mailbox; a " +
+                  "second one would only invalidate the first.")]
+    private static partial void LogInvitationStillLive(ILogger logger, string email);
 }
