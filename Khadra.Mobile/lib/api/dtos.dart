@@ -1438,6 +1438,41 @@ class BookingListItem {
       );
 }
 
+/// The one booking the landing surface shows, and WHY it was chosen.
+///
+/// The reason is a stable code, not a sentence: the wording is the app's, in the
+/// reader's own language. The app does not decide which booking this is — a
+/// deposit due within hours outranking a rental starting tomorrow is a judgement
+/// the platform owns, and a screen sorting a list by pickup date would have shown
+/// the rental and let the deposit expire unread.
+class NextBooking {
+  const NextBooking({required this.booking, required this.reason});
+
+  final BookingListItem booking;
+  final String reason;
+
+  /// Null when the customer has nothing live, which is the ordinary answer. The
+  /// screen renders nothing at all for it, never a placeholder card.
+  static NextBooking? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final booking = json['booking'];
+    if (booking is! Map<String, dynamic>) return null;
+
+    return NextBooking(
+      booking: BookingListItem.fromJson(booking),
+      reason: json['reason'] as String? ?? '',
+    );
+  }
+}
+
+/// Why one booking outranked the others, as the server names them.
+abstract final class NextBookingReasons {
+  static const awaitingPayment = 'AwaitingPayment';
+  static const inProgress = 'InProgress';
+  static const upcoming = 'Upcoming';
+  static const awaitingDecision = 'AwaitingDecision';
+}
+
 // ── Disputes ───────────────────────────────────────────────────────────────────
 
 class EvidenceLink {

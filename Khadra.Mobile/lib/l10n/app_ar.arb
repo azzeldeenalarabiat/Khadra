@@ -561,5 +561,11 @@
   "reputationDisagreeTitle": "هل هناك خطأ هنا؟",
   "reputationDisagreeBody": "كل رقم هنا جاء من حجز واحد. افتح الحجز الذي يخصه، وإذا كانت مهلة التسوية ما زالت مفتوحة يمكنك الاعتراض عليه من هناك.",
   "reputationSeeBookings": "عرض الحجوزات المنتهية",
-  "reputationWhoSeesThis": "لا يمكن للمكتب الاطلاع على هذا إلا أثناء بتّه في حجز معك أو خلال سريانه — لا قبل أن تطلب منه سيارة، ولا بعد انتهاء الحجز."
+  "reputationWhoSeesThis": "لا يمكن للمكتب الاطلاع على هذا إلا أثناء بتّه في حجز معك أو خلال سريانه — لا قبل أن تطلب منه سيارة، ولا بعد انتهاء الحجز.",
+  "landingWhereTo": "إلى أين أنت ذاهب؟",
+  "landingWhatKind": "أي نوع من السيارات؟",
+  "landingDepositDue": "العربون مستحق",
+  "landingRentalInProgress": "إيجارك جارٍ الآن",
+  "landingUpcomingRental": "إيجارك القادم",
+  "landingAwaitingOffice": "بانتظار ردّ مكتب التأجير"
 }

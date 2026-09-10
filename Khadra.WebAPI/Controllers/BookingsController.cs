@@ -55,6 +55,29 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
         return FromResult(result);
     }
 
+    /// <summary>
+    /// The one booking the caller most needs to see right now, or nothing.
+    /// </summary>
+    /// <remarks>
+    /// For the app's landing surface. Answers 200 with a null body when there is nothing live, which
+    /// is the ordinary case for most people most of the time — the screen renders nothing at all for
+    /// it, never a placeholder.
+    ///
+    /// Its own endpoint, rather than the app picking a row out of the list, because WHICH booking is
+    /// "next" is a ranking the platform owns: a deposit due within hours outranks a car already out,
+    /// which outranks one paid for and not yet collected, which outranks an unanswered request.
+    /// </remarks>
+    [HttpGet("next")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<ActionResult> Next(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new GetMyNextBookingQuery(actor.UserId!.Value, actor.Role!),
+            cancellationToken);
+        return FromResult(result);
+    }
+
     /// <summary>One booking in full. Answers 404 to anyone who is not a party to it.</summary>
     [HttpGet("{bookingId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK)]

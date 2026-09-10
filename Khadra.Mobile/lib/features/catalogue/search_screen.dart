@@ -11,8 +11,10 @@ import '../../core/providers.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../bookings/booking_providers.dart';
 import 'date_range_sheet.dart';
 import 'filter_sheet.dart';
+import 'landing.dart';
 import 'search_providers.dart';
 import 'vehicle_card.dart';
 
@@ -139,7 +141,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(searchResultsProvider.future),
+        onRefresh: () async {
+          // The landing card is on this screen and goes stale for the same
+          // reasons the results do -- an approval that landed while the app was
+          // closed is exactly what somebody pulls to find.
+          ref.invalidate(nextBookingProvider);
+          ref.invalidate(searchResultsProvider);
+          await ref.read(searchResultsProvider.future);
+        },
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
@@ -148,7 +157,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 padding: const EdgeInsets.fromLTRB(
                     Space.lg, Space.md, Space.lg, Space.sm),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // The landing state. Above the search box rather than below
+                    // it, because the thing it carries — a deposit falling due —
+                    // is more urgent than anything the customer came here to
+                    // look for.
+                    const SearchLanding(),
                     TextField(
                       controller: _searchController,
                       onChanged: _onSearchChanged,

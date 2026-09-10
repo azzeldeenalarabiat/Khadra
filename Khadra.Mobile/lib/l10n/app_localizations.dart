@@ -2893,6 +2893,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.'**
   String get reputationWhoSeesThis;
+
+  /// No description provided for @landingWhereTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Where are you going?'**
+  String get landingWhereTo;
+
+  /// No description provided for @landingWhatKind.
+  ///
+  /// In en, this message translates to:
+  /// **'What kind of car?'**
+  String get landingWhatKind;
+
+  /// No description provided for @landingDepositDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit is due'**
+  String get landingDepositDue;
+
+  /// No description provided for @landingRentalInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rental is under way'**
+  String get landingRentalInProgress;
+
+  /// No description provided for @landingUpcomingRental.
+  ///
+  /// In en, this message translates to:
+  /// **'Your next rental'**
+  String get landingUpcomingRental;
+
+  /// No description provided for @landingAwaitingOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting on the rental office'**
+  String get landingAwaitingOffice;
 }
 
 class _AppLocalizationsDelegate

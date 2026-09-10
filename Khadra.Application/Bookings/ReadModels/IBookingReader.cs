@@ -130,6 +130,45 @@ public static class BookingTabs
         tab is null || Names.Contains(tab.ToLowerInvariant());
 }
 
+/// <summary>
+/// The one booking a customer most needs to see when they open the app.
+/// </summary>
+/// <remarks>
+/// <para>
+/// It exists as a QUERY because "next" is a business judgement, not a sort. A booking whose deposit
+/// is due in three hours outranks a rental starting tomorrow, which outranks a request nobody has
+/// answered — and the app deciding that for itself would be a screen ranking bookings by a rule the
+/// server owns, drifting the moment a state is added.
+/// </para>
+/// <para>
+/// It matters more than a convenience. There is no push channel (pre-launch checklist item 73), so a
+/// customer learns their booking was approved by opening the app; the payment window is 24 hours for
+/// that reason alone. The landing surface is the only thing that can tell them, and until it did,
+/// approvals expired unread with the gallery's decision wasted and a car held for nothing.
+/// </para>
+/// </remarks>
+/// <param name="Reason">
+/// WHY this one was chosen, as a stable code the app maps to a sentence. Not an English phrase: the
+/// wording is the client's, in the reader's own language.
+/// </param>
+public sealed record NextBooking(BookingListItem Booking, string Reason);
+
+/// <summary>Why one booking outranked the others. Ordered most urgent first.</summary>
+public static class NextBookingReason
+{
+    /// <summary>Approved, and the deposit is owed before a deadline that will not wait.</summary>
+    public const string AwaitingPayment = "AwaitingPayment";
+
+    /// <summary>The car is out. Only the return date is ahead.</summary>
+    public const string InProgress = "InProgress";
+
+    /// <summary>Paid for and not yet collected.</summary>
+    public const string Upcoming = "Upcoming";
+
+    /// <summary>Asked for, and the gallery has not answered.</summary>
+    public const string AwaitingDecision = "AwaitingDecision";
+}
+
 public interface IBookingReader
 {
     Task<PagedResult<BookingListItem>> ListAsync(
@@ -143,4 +182,15 @@ public interface IBookingReader
         CancellationToken cancellationToken = default);
 
     Task<BookingContext> ContextAsync(Id bookingId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The customer's most pressing live booking, or null when they have none.
+    /// </summary>
+    /// <remarks>
+    /// Null is the ordinary answer for most people most of the time, and the landing surface renders
+    /// nothing at all for it — never a placeholder card.
+    /// </remarks>
+    Task<NextBooking?> NextForCustomerAsync(
+        Id customerId,
+        CancellationToken cancellationToken = default);
 }

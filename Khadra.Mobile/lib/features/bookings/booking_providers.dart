@@ -94,6 +94,24 @@ final bookingTabCountsProvider =
   return ref.watch(apiProvider).bookingTabCounts();
 });
 
+/// The one booking the landing surface shows, or null.
+///
+/// **Which booking is "next" is the server's answer, not this app's.** A deposit
+/// due within hours outranks a rental starting tomorrow, which outranks an
+/// unanswered request; a screen scanning `myBookings` for the earliest pickup
+/// would have shown the rental and let the deposit expire unread.
+///
+/// It matters because there is no push channel yet: a customer learns their
+/// booking was approved by opening the app, and the 24-hour payment window exists
+/// for that reason. The first screen they land on is the only thing that can tell
+/// them in time.
+final nextBookingProvider =
+    FutureProvider.autoDispose<NextBooking?>((ref) async {
+  final session = ref.watch(sessionProvider);
+  if (!session.isSignedIn) return null;
+  return ref.watch(apiProvider).nextBooking();
+});
+
 /// One booking in full.
 final bookingProvider =
     FutureProvider.autoDispose.family<Booking, String>((ref, bookingId) async {
@@ -137,6 +155,10 @@ void invalidateBookings(WidgetRef ref, {String? bookingId}) {
     ref.invalidate(myReviewProvider(bookingId));
   }
   ref.invalidate(bookingTabCountsProvider);
+  // The landing card too. A booking cancelled on its detail screen must not be
+  // sitting on the browse tab as "your next rental" when the customer gets back
+  // to it — which is exactly the tab they return to.
+  ref.invalidate(nextBookingProvider);
   for (final tab in BookingTabs.ordered) {
     ref.invalidate(myBookingsProvider(tab));
   }

@@ -1756,4 +1756,22 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get reputationWhoSeesThis =>
       'لا يمكن للمكتب الاطلاع على هذا إلا أثناء بتّه في حجز معك أو خلال سريانه — لا قبل أن تطلب منه سيارة، ولا بعد انتهاء الحجز.';
+
+  @override
+  String get landingWhereTo => 'إلى أين أنت ذاهب؟';
+
+  @override
+  String get landingWhatKind => 'أي نوع من السيارات؟';
+
+  @override
+  String get landingDepositDue => 'العربون مستحق';
+
+  @override
+  String get landingRentalInProgress => 'إيجارك جارٍ الآن';
+
+  @override
+  String get landingUpcomingRental => 'إيجارك القادم';
+
+  @override
+  String get landingAwaitingOffice => 'بانتظار ردّ مكتب التأجير';
 }

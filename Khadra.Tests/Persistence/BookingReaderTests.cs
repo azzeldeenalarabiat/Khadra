@@ -143,4 +143,116 @@ public sealed class BookingReaderTests : IDisposable
     }
 
     private KhadraDbContext NewContext() => new(_options);
+
+    // ── The landing surface's one booking ────────────────────────────────────
+
+    private readonly Id _customerId = Id.New();
+
+    private Task<NextBooking?> NextAsync()
+    {
+        var context = NewContext();
+        return new BookingReader(context).NextForCustomerAsync(_customerId);
+    }
+
+    private async Task SaveMineAsync(params Booking[] bookings)
+    {
+        await using var context = NewContext();
+        context.Bookings.AddRange(bookings);
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>Most people, most of the time. The screen renders nothing, never a placeholder.</summary>
+    [Fact]
+    public async Task A_customer_with_nothing_live_has_no_next_booking()
+    {
+        // Somebody else's live booking must not surface on this customer's landing.
+        await SaveMineAsync(Build.ApprovedBooking(customerId: Id.New(), dealerId: _dealerId));
+
+        Assert.Null(await NextAsync());
+    }
+
+    /// <summary>
+    /// The ranking, and the reason it is the server's to make.
+    /// </summary>
+    /// <remarks>
+    /// With no push channel (pre-launch checklist item 73) a customer learns their booking was
+    /// approved by opening the app, which is exactly why the payment window is 24 hours. An approval
+    /// owing a deposit therefore outranks a rental starting tomorrow -- and an app sorting by pickup
+    /// date would have shown the rental and let the deposit expire unread.
+    /// </remarks>
+    [Fact]
+    public async Task A_deposit_that_is_due_outranks_everything_else()
+    {
+        var awaitingPayment = Build.ApprovedBooking(customerId: _customerId, dealerId: _dealerId);
+        var startingSooner = Build.ConfirmedBooking(customerId: _customerId, dealerId: _dealerId);
+        var unanswered = Build.Booking(customerId: _customerId, dealerId: _dealerId);
+
+        await SaveMineAsync(startingSooner, unanswered, awaitingPayment);
+
+        var next = await NextAsync();
+
+        Assert.NotNull(next);
+        Assert.Equal(awaitingPayment.Id.Value, next.Booking.BookingId);
+        Assert.Equal(NextBookingReason.AwaitingPayment, next.Reason);
+    }
+
+    [Fact]
+    public async Task A_car_already_out_outranks_one_not_yet_collected()
+    {
+        var collected = Build.ConfirmedBooking(customerId: _customerId, dealerId: _dealerId);
+        collected.RecordPickup(BookingParty.Dealer, Id.New(), collected.Period.Start);
+        var later = Build.ConfirmedBooking(customerId: _customerId, dealerId: _dealerId);
+
+        await SaveMineAsync(later, collected);
+
+        var next = await NextAsync();
+
+        Assert.Equal(collected.Id.Value, next!.Booking.BookingId);
+        Assert.Equal(NextBookingReason.InProgress, next.Reason);
+    }
+
+    [Fact]
+    public async Task An_unanswered_request_is_the_last_thing_shown_and_still_shown()
+    {
+        var unanswered = Build.Booking(customerId: _customerId, dealerId: _dealerId);
+        await SaveMineAsync(unanswered);
+
+        var next = await NextAsync();
+
+        Assert.Equal(unanswered.Id.Value, next!.Booking.BookingId);
+        Assert.Equal(NextBookingReason.AwaitingDecision, next.Reason);
+    }
+
+    /// <summary>Of two of the same kind, the one that needs attention SOONEST.</summary>
+    [Fact]
+    public async Task The_soonest_of_two_upcoming_rentals_wins_whatever_order_they_were_booked_in()
+    {
+        var later = Build.ConfirmedBooking(
+            now: Build.Now.AddDays(30), customerId: _customerId, dealerId: _dealerId);
+        var sooner = Build.ConfirmedBooking(customerId: _customerId, dealerId: _dealerId);
+
+        // Saved with the LATER one first, so a fallback to insertion order would pick it.
+        await SaveMineAsync(later, sooner);
+
+        var next = await NextAsync();
+
+        Assert.Equal(sooner.Id.Value, next!.Booking.BookingId);
+        Assert.True(sooner.Period.Start < later.Period.Start);
+    }
+
+    /// <summary>A booking that has ended is not "next" by any reading.</summary>
+    [Fact]
+    public async Task A_finished_or_cancelled_booking_is_never_next()
+    {
+        var cancelled = Build.ConfirmedBooking(customerId: _customerId, dealerId: _dealerId);
+        cancelled.Cancel(BookingParty.Customer, _customerId, "changed plans", Build.Now);
+
+        var expired = Build.ApprovedBooking(customerId: _customerId, dealerId: _dealerId);
+        expired.ExpireUnpaid(expired.PaymentDeadline!.Value.AddMinutes(1));
+
+        await SaveMineAsync(cancelled, expired);
+
+        Assert.Null(await NextAsync());
+    }
+
 }

@@ -1736,4 +1736,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reputationWhoSeesThis =>
       'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.';
+
+  @override
+  String get landingWhereTo => 'Where are you going?';
+
+  @override
+  String get landingWhatKind => 'What kind of car?';
+
+  @override
+  String get landingDepositDue => 'Your deposit is due';
+
+  @override
+  String get landingRentalInProgress => 'Your rental is under way';
+
+  @override
+  String get landingUpcomingRental => 'Your next rental';
+
+  @override
+  String get landingAwaitingOffice => 'Waiting on the rental office';
 }

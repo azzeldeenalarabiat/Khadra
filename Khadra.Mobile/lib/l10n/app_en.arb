@@ -594,5 +594,11 @@
   "reputationDisagreeTitle": "Something here is wrong?",
   "reputationDisagreeBody": "Each of these came from one booking. Open the booking it belongs to, and if the settlement window is still open you can dispute it there.",
   "reputationSeeBookings": "See finished bookings",
-  "reputationWhoSeesThis": "An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards."
+  "reputationWhoSeesThis": "An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.",
+  "landingWhereTo": "Where are you going?",
+  "landingWhatKind": "What kind of car?",
+  "landingDepositDue": "Your deposit is due",
+  "landingRentalInProgress": "Your rental is under way",
+  "landingUpcomingRental": "Your next rental",
+  "landingAwaitingOffice": "Waiting on the rental office"
 }

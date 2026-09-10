@@ -272,6 +272,13 @@ class KhadraApi {
     return body.map((key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0));
   }
 
+  /// The one booking the customer most needs to see, or null.
+  ///
+  /// Answers 200 with a null body when there is nothing live, which is the
+  /// ordinary case for most people most of the time.
+  Future<NextBooking?> nextBooking() async =>
+      NextBooking.maybe(await _client.get<dynamic>('/api/v1/bookings/next'));
+
   Future<Booking> booking(String bookingId) async =>
       Booking.fromJson(_object(await _client.get<dynamic>('/api/v1/bookings/$bookingId')));
 
