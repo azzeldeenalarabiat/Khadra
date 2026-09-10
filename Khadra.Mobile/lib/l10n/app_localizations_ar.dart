@@ -1688,4 +1688,72 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errorPaymentRefused => 'رُفضت هذه الدفعة. جرّب بطاقة أخرى.';
+
+  @override
+  String get reputationGroupTitle => 'سجلك لدى المكاتب';
+
+  @override
+  String get reputationTitle => 'كيف تراك المكاتب';
+
+  @override
+  String get reputationIntro =>
+      'عندما تطلب سيارة من مكتب، هذا ما تخبره به خضرا عنك. لا شيء غير ذلك — لا بيانات تواصل، ولا مستندات، ولا أي شيء عن المكتب الذي استأجرت منه.';
+
+  @override
+  String get reputationNoHistoryTitle => 'لا شيء في سجلك بعد';
+
+  @override
+  String get reputationNoHistoryBody =>
+      'لم تُنهِ أي إيجار على خضرا، ولم يُسجَّل عليك شيء. لا ترى المكاتب سوى منذ متى وأنت صاحب حساب.';
+
+  @override
+  String get reputationRatingLabel => 'تقييم المكاتب لك';
+
+  @override
+  String reputationRatingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'من $count مكتب',
+      many: 'من $count مكتباً',
+      few: 'من $count مكاتب',
+      two: 'من مكتبين',
+      one: 'من مكتب واحد',
+      zero: 'من لا مكتب',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reputationNotRatedYet =>
+      'لم يقيّمك أي مكتب بعد. لا يمكن للمكتب تقييمك إلا بعد انتهاء الإيجار، ويبقى تقييمه مخفياً حتى يُنشر تقييمك له أيضاً.';
+
+  @override
+  String get reputationRecordTitle => 'سجلك';
+
+  @override
+  String get reputationCompletedRentals => 'إيجارات منتهية';
+
+  @override
+  String get reputationNoShows => 'مرات لم تُستلم فيها السيارة';
+
+  @override
+  String get reputationLateCancellations => 'إلغاءات قُدِّرت عليها غرامة';
+
+  @override
+  String get reputationDisputesLost => 'نزاعات حُسمت ضدك';
+
+  @override
+  String get reputationDisagreeTitle => 'هل هناك خطأ هنا؟';
+
+  @override
+  String get reputationDisagreeBody =>
+      'كل رقم هنا جاء من حجز واحد. افتح الحجز الذي يخصه، وإذا كانت مهلة التسوية ما زالت مفتوحة يمكنك الاعتراض عليه من هناك.';
+
+  @override
+  String get reputationSeeBookings => 'عرض الحجوزات المنتهية';
+
+  @override
+  String get reputationWhoSeesThis =>
+      'لا يمكن للمكتب الاطلاع على هذا إلا أثناء بتّه في حجز معك أو خلال سريانه — لا قبل أن تطلب منه سيارة، ولا بعد انتهاء الحجز.';
 }

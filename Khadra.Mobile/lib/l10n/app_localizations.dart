@@ -2791,6 +2791,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That payment was refused. Try a different card.'**
   String get errorPaymentRefused;
+
+  /// No description provided for @reputationGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your standing'**
+  String get reputationGroupTitle;
+
+  /// No description provided for @reputationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How offices see you'**
+  String get reputationTitle;
+
+  /// No description provided for @reputationIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'When you ask an office for a car, this is what Khadra tells them about you. Nothing else — no contact details, no documents, and nothing about which office you rented from.'**
+  String get reputationIntro;
+
+  /// No description provided for @reputationNoHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing on your record yet'**
+  String get reputationNoHistoryTitle;
+
+  /// No description provided for @reputationNoHistoryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not finished a rental on Khadra, and nothing has been recorded against you. Offices see only how long you have had an account.'**
+  String get reputationNoHistoryBody;
+
+  /// No description provided for @reputationRatingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating from offices'**
+  String get reputationRatingLabel;
+
+  /// No description provided for @reputationRatingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{From 1 office} other{From {count} offices}}'**
+  String reputationRatingCount(int count);
+
+  /// No description provided for @reputationNotRatedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No office has rated you yet. An office can only rate you after a rental is finished, and their rating stays hidden until yours of them is published too.'**
+  String get reputationNotRatedYet;
+
+  /// No description provided for @reputationRecordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your record'**
+  String get reputationRecordTitle;
+
+  /// No description provided for @reputationCompletedRentals.
+  ///
+  /// In en, this message translates to:
+  /// **'Rentals finished'**
+  String get reputationCompletedRentals;
+
+  /// No description provided for @reputationNoShows.
+  ///
+  /// In en, this message translates to:
+  /// **'Times a car was not collected'**
+  String get reputationNoShows;
+
+  /// No description provided for @reputationLateCancellations.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancellations with a penalty assessed'**
+  String get reputationLateCancellations;
+
+  /// No description provided for @reputationDisputesLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Disputes settled against you'**
+  String get reputationDisputesLost;
+
+  /// No description provided for @reputationDisagreeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Something here is wrong?'**
+  String get reputationDisagreeTitle;
+
+  /// No description provided for @reputationDisagreeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Each of these came from one booking. Open the booking it belongs to, and if the settlement window is still open you can dispute it there.'**
+  String get reputationDisagreeBody;
+
+  /// No description provided for @reputationSeeBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'See finished bookings'**
+  String get reputationSeeBookings;
+
+  /// No description provided for @reputationWhoSeesThis.
+  ///
+  /// In en, this message translates to:
+  /// **'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.'**
+  String get reputationWhoSeesThis;
 }
 
 class _AppLocalizationsDelegate

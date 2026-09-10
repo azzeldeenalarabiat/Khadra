@@ -1671,4 +1671,69 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorPaymentRefused =>
       'That payment was refused. Try a different card.';
+
+  @override
+  String get reputationGroupTitle => 'Your standing';
+
+  @override
+  String get reputationTitle => 'How offices see you';
+
+  @override
+  String get reputationIntro =>
+      'When you ask an office for a car, this is what Khadra tells them about you. Nothing else — no contact details, no documents, and nothing about which office you rented from.';
+
+  @override
+  String get reputationNoHistoryTitle => 'Nothing on your record yet';
+
+  @override
+  String get reputationNoHistoryBody =>
+      'You have not finished a rental on Khadra, and nothing has been recorded against you. Offices see only how long you have had an account.';
+
+  @override
+  String get reputationRatingLabel => 'Your rating from offices';
+
+  @override
+  String reputationRatingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'From $count offices',
+      one: 'From 1 office',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reputationNotRatedYet =>
+      'No office has rated you yet. An office can only rate you after a rental is finished, and their rating stays hidden until yours of them is published too.';
+
+  @override
+  String get reputationRecordTitle => 'Your record';
+
+  @override
+  String get reputationCompletedRentals => 'Rentals finished';
+
+  @override
+  String get reputationNoShows => 'Times a car was not collected';
+
+  @override
+  String get reputationLateCancellations =>
+      'Cancellations with a penalty assessed';
+
+  @override
+  String get reputationDisputesLost => 'Disputes settled against you';
+
+  @override
+  String get reputationDisagreeTitle => 'Something here is wrong?';
+
+  @override
+  String get reputationDisagreeBody =>
+      'Each of these came from one booking. Open the booking it belongs to, and if the settlement window is still open you can dispute it there.';
+
+  @override
+  String get reputationSeeBookings => 'See finished bookings';
+
+  @override
+  String get reputationWhoSeesThis =>
+      'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.';
 }

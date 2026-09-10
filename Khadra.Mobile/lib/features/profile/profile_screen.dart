@@ -88,6 +88,20 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              _Group(
+                title: l10n.reputationGroupTitle,
+                children: [
+                  // No badge. A badge would run the reputation reader on every
+                  // visit to this tab, for a figure that changes a few times a
+                  // year — and a customer with one bad mark would carry it on
+                  // every screen they open.
+                  _Row(
+                    icon: Icons.workspace_premium_outlined,
+                    label: l10n.reputationTitle,
+                    onTap: () => context.push(Routes.reputation),
+                  ),
+                ],
+              ),
             ] else
               Padding(
                 padding: const EdgeInsets.all(Space.lg),

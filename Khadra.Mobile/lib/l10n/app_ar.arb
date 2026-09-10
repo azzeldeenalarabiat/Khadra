@@ -544,5 +544,22 @@
   "errorDisputeReasonRequired": "اذكر ما الذي حدث قبل فتح النزاع.",
   "errorDisputeStatementRequired": "اكتب شيئاً قبل إضافته إلى النزاع.",
   "errorDisputeEvidenceFailed": "تعذّر رفع أحد الملفات. حاول إرفاقه مجدداً.",
-  "errorPaymentRefused": "رُفضت هذه الدفعة. جرّب بطاقة أخرى."
+  "errorPaymentRefused": "رُفضت هذه الدفعة. جرّب بطاقة أخرى.",
+  "reputationGroupTitle": "سجلك لدى المكاتب",
+  "reputationTitle": "كيف تراك المكاتب",
+  "reputationIntro": "عندما تطلب سيارة من مكتب، هذا ما تخبره به خضرا عنك. لا شيء غير ذلك — لا بيانات تواصل، ولا مستندات، ولا أي شيء عن المكتب الذي استأجرت منه.",
+  "reputationNoHistoryTitle": "لا شيء في سجلك بعد",
+  "reputationNoHistoryBody": "لم تُنهِ أي إيجار على خضرا، ولم يُسجَّل عليك شيء. لا ترى المكاتب سوى منذ متى وأنت صاحب حساب.",
+  "reputationRatingLabel": "تقييم المكاتب لك",
+  "reputationRatingCount": "{count, plural, =0{من لا مكتب} =1{من مكتب واحد} =2{من مكتبين} few{من {count} مكاتب} many{من {count} مكتباً} other{من {count} مكتب}}",
+  "reputationNotRatedYet": "لم يقيّمك أي مكتب بعد. لا يمكن للمكتب تقييمك إلا بعد انتهاء الإيجار، ويبقى تقييمه مخفياً حتى يُنشر تقييمك له أيضاً.",
+  "reputationRecordTitle": "سجلك",
+  "reputationCompletedRentals": "إيجارات منتهية",
+  "reputationNoShows": "مرات لم تُستلم فيها السيارة",
+  "reputationLateCancellations": "إلغاءات قُدِّرت عليها غرامة",
+  "reputationDisputesLost": "نزاعات حُسمت ضدك",
+  "reputationDisagreeTitle": "هل هناك خطأ هنا؟",
+  "reputationDisagreeBody": "كل رقم هنا جاء من حجز واحد. افتح الحجز الذي يخصه، وإذا كانت مهلة التسوية ما زالت مفتوحة يمكنك الاعتراض عليه من هناك.",
+  "reputationSeeBookings": "عرض الحجوزات المنتهية",
+  "reputationWhoSeesThis": "لا يمكن للمكتب الاطلاع على هذا إلا أثناء بتّه في حجز معك أو خلال سريانه — لا قبل أن تطلب منه سيارة، ولا بعد انتهاء الحجز."
 }

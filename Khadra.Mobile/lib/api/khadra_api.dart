@@ -450,6 +450,16 @@ class KhadraApi {
         await _client.get<dynamic>('/api/v1/bookings/$bookingId/review'),
       );
 
+  /// What galleries are told about the caller.
+  ///
+  /// Aggregates only — a rating, five counts and an account age. No per-review
+  /// rows and no dates on individual ratings, because a rating dated last Tuesday
+  /// would tell a gallery when this customer rented from a competitor.
+  Future<CustomerReputation> myReputation() async =>
+      CustomerReputation.fromJson(_object(
+        await _client.get<dynamic>('/api/v1/customers/me/reputation'),
+      ));
+
   Future<MyReview> leaveReview({
     required String bookingId,
     required int rating,

@@ -20,6 +20,7 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/profile/edit_profile_screen.dart';
 import '../features/profile/change_password_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/profile/reputation_screen.dart';
 import '../features/profile/sessions_screen.dart';
 import '../features/reviews/leave_review_screen.dart';
 import '../features/reviews/reviews_screen.dart';
@@ -46,6 +47,7 @@ abstract final class Routes {
   static const editProfile = '/profile/edit';
   static const changePassword = '/profile/password';
   static const sessions = '/profile/sessions';
+  static const reputation = '/profile/reputation';
 
   static String vehicle(String id) => '/vehicle/$id';
   static String gallery(String id) => '/gallery/$id';
@@ -83,6 +85,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         Routes.editProfile,
         Routes.changePassword,
         Routes.sessions,
+        Routes.reputation,
       };
 
       final needsAccount = guarded.contains(location) ||
@@ -232,6 +235,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const ChangePasswordScreen(),
       ),
       GoRoute(path: Routes.sessions, builder: (_, __) => const SessionsScreen()),
+      GoRoute(
+        path: Routes.reputation,
+        builder: (_, __) => const ReputationScreen(),
+      ),
     ],
   );
 });

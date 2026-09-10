@@ -1674,6 +1674,68 @@ class NotificationFeed {
       );
 }
 
+// ── Reputation ─────────────────────────────────────────────────────────────────
+
+/// What the platform tells a GALLERY about this customer — shown to the customer.
+///
+/// A semi-private score somebody cannot see is what privacy law objects to, and
+/// it is the only way a customer learns of a wrong no-show while the window to
+/// dispute it is still open.
+///
+/// Every figure is the server's, and the app derives nothing from them: no grade,
+/// no colour band, no "trust level". `hasHistory` in particular is the server's
+/// own answer, so "no history yet" and "a clean record" cannot be confused by a
+/// screen adding up zeros.
+///
+/// `completedRentalsWithThisDealer` is deliberately ABSENT. It is always zero in
+/// the self view — there is no gallery asking — and "0 rentals with this office"
+/// on a customer's own screen is nonsense rather than a fact.
+class CustomerReputation {
+  const CustomerReputation({
+    required this.averageRating,
+    required this.ratingCount,
+    required this.completedRentals,
+    required this.noShows,
+    required this.lateCancellations,
+    required this.disputesResolvedAgainstCustomer,
+    required this.customerSince,
+    required this.hasHistory,
+  });
+
+  /// Null when nobody has rated this customer. Never zero: zero is a real score
+  /// on a one-to-five scale and would read as the worst on the platform.
+  final num? averageRating;
+  final int ratingCount;
+
+  final int completedRentals;
+  final int noShows;
+  final int lateCancellations;
+  final int disputesResolvedAgainstCustomer;
+  final DateTime customerSince;
+  final bool hasHistory;
+
+  /// Whether anything here is worth explaining rather than just reporting.
+  bool get hasMarks =>
+      noShows > 0 || lateCancellations > 0 || disputesResolvedAgainstCustomer > 0;
+
+  static CustomerReputation fromJson(Map<String, dynamic> json) {
+    final rating = json['dealerRating'] as Map<String, dynamic>? ?? const {};
+    return CustomerReputation(
+      averageRating: rating['average'] as num?,
+      ratingCount: _int(rating['count']),
+      completedRentals: _int(json['completedRentals']),
+      noShows: _int(json['noShows']),
+      lateCancellations: _int(json['lateCancellations']),
+      disputesResolvedAgainstCustomer:
+          _int(json['disputesResolvedAgainstCustomer']),
+      customerSince: _requiredDateTime(json['customerSince']),
+      // The SERVER's verdict, not a sum of the fields above. Recomputing it here
+      // would be a screen deciding what counts as a history.
+      hasHistory: json['hasHistory'] as bool? ?? false,
+    );
+  }
+}
+
 // ── Reviews ────────────────────────────────────────────────────────────────────
 
 class GalleryReview {

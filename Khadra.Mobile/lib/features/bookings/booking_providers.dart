@@ -115,6 +115,17 @@ final disputeProvider =
   return ref.watch(apiProvider).dispute(ticketId);
 });
 
+/// What galleries are told about the caller.
+///
+/// `autoDispose`, and asked for only by the screen that shows it. The reader
+/// behind it walks every finished booking this customer has, which is fine on a
+/// page opened a few times a year and would be waste on a tab opened daily —
+/// which is also why there is no badge for it on the profile row.
+final myReputationProvider =
+    FutureProvider.autoDispose<CustomerReputation>((ref) async {
+  return ref.watch(apiProvider).myReputation();
+});
+
 /// Re-reads everything a booking action could have changed.
 ///
 /// Called after a cancel, a review or a dispute. Invalidating the list and the
