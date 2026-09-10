@@ -6,7 +6,9 @@
         <div class="state-title">{{ t('dealerReview.couldntLoadThisApplication') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            {{ t('common.retry') }}
+          </button>
         </div>
       </div>
     </section>
@@ -30,8 +32,8 @@
         </div>
         <div class="detail-meta">
           CR {{ application.commercialRegistrationNumber }} ·
-          {{ application.submittedDocuments.length }} of
-          {{ application.requiredDocuments.length }} {{ t('dealerReview.documentsSubmitted') }}
+          {{ application.submittedDocuments.length }} of {{ application.requiredDocuments.length }}
+          {{ t('dealerReview.documentsSubmitted') }}
           {{ application.submittedAt | date: 'dd MMM yyyy, HH:mm' }}
         </div>
       </div>
@@ -57,6 +59,37 @@
               </div>
             }
           </div>
+        </section>
+
+        <!--
+          Where the business says it is, for the administrator checking it against a licence. It used
+          to be a pair of decimal degrees in a row of text, which is not something a person can check
+          anything against.
+        -->
+        <section class="sect sect-pad stack stack-9">
+          <div class="sect-h">
+            <kh-icon name="map-pin" class="kpi-icon" />
+            <span class="sect-t">{{ t('dealerReview.whereItIs') }}</span>
+          </div>
+
+          @if (dealer(); as profile) {
+            @if (profile.address; as address) {
+              <div class="user-text">
+                {{ address.street ? address.street + '، ' + address.area : address.area }}
+              </div>
+            } @else {
+              <div class="field-hint">{{ t('dealerReview.noAddressRecorded') }}</div>
+            }
+            @if (cityName(); as city) {
+              <div class="field-hint">{{ city }}</div>
+            }
+            <kh-map
+              [latitude]="profile.latitude"
+              [longitude]="profile.longitude"
+              [label]="t('dealerReview.whereItIs')"
+              size="short"
+            />
+          }
         </section>
 
         <section class="sect">
@@ -89,7 +122,8 @@
                 <!-- No count in the sentence: the header above already reads "n of m documents",
                      and "all three" was a number this screen had no way to know. -->
                 <span class="banner-body">
-                  {{ t('dealerReview.missing') }} {{ missing().join(', ') }}{{ t('dealerReview.everyOneOfThese') }}
+                  {{ t('dealerReview.missing') }} {{ missing().join(', ')
+                  }}{{ t('dealerReview.everyOneOfThese') }}
                 </span>
               </div>
             </div>
@@ -99,7 +133,9 @@
 
       <div class="stack stack-14">
         <section class="sect">
-          <div class="sect-h"><span class="sect-t">{{ t('dealerReview.applicationTimeline') }}</span></div>
+          <div class="sect-h">
+            <span class="sect-t">{{ t('dealerReview.applicationTimeline') }}</span>
+          </div>
           <div class="sect-pad">
             <kh-timeline [steps]="timeline()" />
           </div>

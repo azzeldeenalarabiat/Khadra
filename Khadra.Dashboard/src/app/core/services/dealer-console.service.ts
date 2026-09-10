@@ -1,4 +1,4 @@
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient, HttpParams, httpResource } from '@angular/common/http';
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
@@ -16,7 +16,7 @@ import {
   ReportPeriod,
   UpdateProfileRequest,
 } from '../models/dealer-console.api';
-import { DealerProfile } from '../models/dealers.api';
+import { AddressSuggestion, DealerProfile } from '../models/dealers.api';
 import { loaded } from './loaded';
 import { SessionService } from './session.service';
 
@@ -250,6 +250,36 @@ export class DealerConsoleService {
     // The gate reads `me`, and it currently holds the 404 that sent the owner here.
     this.me.reload();
     return dealer;
+  }
+
+  /**
+   * What a map pin might be called, so the application form can offer it.
+   *
+   * A READ. It fills fields the applicant can still change, and what is submitted is whatever they
+   * leave in them — the server never reads this on the way in. Proxied through our own API because
+   * the console's CSP is `connect-src 'self'`, and because the provider's rate limit is per server,
+   * which only the server can hold to.
+   *
+   * Failure is ORDINARY here, not exceptional: the provider is rate limited to about one request a
+   * second for everyone, and may have nothing recorded at a given point. Both end with the applicant
+   * typing the address, so the caller gets null and the form says why rather than throwing.
+   */
+  async suggestAddress(
+    latitude: number,
+    longitude: number,
+    language: string,
+  ): Promise<AddressSuggestion | null> {
+    const query = new HttpParams()
+      .set('latitude', latitude)
+      .set('longitude', longitude)
+      .set('language', language);
+    try {
+      return await firstValueFrom(
+        this.http.get<AddressSuggestion>('/api/v1/dealers/address-suggestions', { params: query }),
+      );
+    } catch {
+      return null;
+    }
   }
 
   // ── The dealer page (spec 4.1) ──

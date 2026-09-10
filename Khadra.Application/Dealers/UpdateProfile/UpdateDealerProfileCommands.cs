@@ -6,6 +6,7 @@ using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.Dtos;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
+using Khadra.Domain.PlatformSettings.Repositories;
 using MediatR;
 
 namespace Khadra.Application.Dealers.UpdateProfile;
@@ -23,7 +24,10 @@ public sealed record UpdateDealerProfileCommand(
     string? Description,
     double Latitude,
     double Longitude,
-    IReadOnlyList<DayScheduleInput> OperatingHours) : ICommand<Result<DealerProfileDto, Error>>;
+    IReadOnlyList<DayScheduleInput> OperatingHours,
+    Id? CityId = null,
+    string? AddressArea = null,
+    string? AddressStreet = null) : ICommand<Result<DealerProfileDto, Error>>;
 
 /// <summary>Step one of a logo or cover upload: where to PUT the bytes.</summary>
 public sealed record RequestBrandingUploadCommand(Id OwnerUserId, string Kind, string ContentType)
@@ -53,6 +57,10 @@ public sealed class UpdateDealerProfileCommandValidator : AbstractValidator<Upda
         RuleFor(command => command.Description).MaximumLength(2000);
         RuleFor(command => command.Latitude).InclusiveBetween(-90, 90);
         RuleFor(command => command.Longitude).InclusiveBetween(-180, 180);
+        // Length only. Whether the pair forms a usable address is DealerAddress.Create's decision,
+        // so the rule lives in one place and the error the owner sees is the domain's own wording.
+        RuleFor(command => command.AddressArea).MaximumLength(DealerAddress.AreaMaxLength);
+        RuleFor(command => command.AddressStreet).MaximumLength(DealerAddress.StreetMaxLength);
         RuleFor(command => command.OperatingHours).NotNull().Must(hours => hours.Count == 7)
             .WithMessage("Opening hours must cover all seven days.");
         RuleForEach(command => command.OperatingHours).ChildRules(day =>
@@ -84,6 +92,7 @@ public sealed class SetBrandingCommandValidator : AbstractValidator<SetBrandingC
 
 public sealed class DealerProfileHandlers(
     DealerMembershipResolver membership,
+    ICityRepository cities,
     IUploadTicketService uploads,
     IDocumentStorage storage,
     IDocumentPolicySettings policy,
@@ -117,7 +126,20 @@ public sealed class DealerProfileHandlers(
         if (hours.IsFailure)
             return hours.Error;
 
-        var updated = dealer.UpdateProfile(name.Value, location.Value, hours.Value, request.Description, dealer.CityId);
+        // The city was previously frozen at whatever submission set: the command had no CityId at
+        // all, and the handler forwarded dealer.CityId back into itself, so an owner who moved --
+        // or picked wrongly on the application -- could never correct it. It now travels with the
+        // rest of the form, and is checked against the lookup exactly as submission checks it.
+        var city = await ResolveCityAsync(request.CityId, cancellationToken);
+        if (city.IsFailure)
+            return city.Error;
+
+        var address = ResolveAddress(request.AddressArea, request.AddressStreet);
+        if (address.IsFailure)
+            return address.Error;
+
+        var updated = dealer.UpdateProfile(
+            name.Value, location.Value, hours.Value, request.Description, request.CityId, address.Value);
         if (updated.IsFailure)
             return updated.Error;
 
@@ -227,4 +249,23 @@ public sealed class DealerProfileHandlers(
             "image/webp" => ".webp",
             _ => ".jpg"
         };
+
+    /// <summary>Null stays null; anything named must name an ACTIVE city.</summary>
+    private async Task<UnitResult<Error>> ResolveCityAsync(Id? cityId, CancellationToken cancellationToken)
+    {
+        if (cityId is null) return UnitResult.Success<Error>();
+        var city = await cities.GetByIdAsync(cityId.Value, cancellationToken);
+        return city is null || !city.IsActive
+            ? UnitResult.Failure(DealerErrors.UnknownCity)
+            : UnitResult.Success<Error>();
+    }
+
+    /// <summary>No area and no street means no address at all, which is allowed.</summary>
+    private static Result<DealerAddress?, Error> ResolveAddress(string? area, string? street)
+    {
+        if (string.IsNullOrWhiteSpace(area) && string.IsNullOrWhiteSpace(street))
+            return (DealerAddress?)null;
+        var address = DealerAddress.Create(area, street);
+        return address.IsFailure ? address.Error : (DealerAddress?)address.Value;
+    }
 }

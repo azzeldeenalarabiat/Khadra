@@ -677,6 +677,19 @@ export const AR = {
   'dealerApply.chooseACity': 'اختر مدينة…',
   'dealerApply.chooseACityOr':
     'اختر مدينة، أو اكتب خط العرض وخط الطول، وستظهر الخريطة لتضع المؤشر بدقة.',
+  'dealerApply.clearThePin': 'مسح المؤشر',
+  'dealerApply.clickTheMapTo': 'انقر على الخريطة في موقع معرضك، أو استخدم موقعك الحالي. يمكنك سحب المؤشر بعدها ليصبح على الباب تماماً.',
+  'dealerApply.couldNotFindYou': 'تعذّر على جهازك تحديد موقعك. انقر على الخريطة بدلاً من ذلك.',
+  'dealerApply.findingYou': 'جارٍ تحديد موقعك…',
+  'dealerApply.locationPermissionRefused': 'لم يُمنح المتصفح إذناً بمشاركة موقعك. انقر على الخريطة بدلاً من ذلك، أو اسمح بالوصول إلى الموقع لهذا الموقع وحاول مرة أخرى.',
+  'dealerApply.thisBrowserCannot': 'لا يستطيع هذا المتصفح مشاركة موقعك. انقر على الخريطة لوضع المؤشر.',
+  'dealerApply.useMyLocation': 'استخدم موقعي الحالي',
+  'dealerApply.whereYourGalleryIs': 'موقع معرضك',
+  'dealerApply.area': 'المنطقة',
+  'dealerApply.street': 'الشارع',
+  'dealerApply.theNeighbourhoodACustomer': 'المنطقة التي يذكرها الزبون لسائق التكسي.',
+  'dealerApply.manyStreetsHaveNo': 'كثير من الشوارع بلا اسم مسجّل. اتركه فارغاً إن كان كذلك.',
+  'dealerApply.lookingUpThatSpot': 'جارٍ البحث عن هذا الموقع…',
   'dealerApply.city': 'المدينة',
   'dealerApply.commercialRegistrationNumber': 'رقم السجل التجاري',
   'dealerApply.galleryName': 'اسم المعرض',
@@ -902,6 +915,8 @@ export const AR = {
   'dealerReview.rejectApplication': 'رفض الطلب',
   'dealerReview.requestClarification': 'طلب توضيح',
   'dealerReview.suspendDealer': 'إيقاف المعرض',
+  'dealerReview.whereItIs': 'الموقع',
+  'dealerReview.noAddressRecorded': 'لا يوجد عنوان مسجّل. المؤشر أدناه هو الموقع الذي حدده مقدّم الطلب.',
   'dealerReview.verificationDocuments': 'وثائق التحقق',
 
   // Admin lists, lookups, platform settings, dealer settings, employee console, shared widgets.

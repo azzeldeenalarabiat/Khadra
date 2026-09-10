@@ -4,6 +4,7 @@ using Khadra.Application.Dealers;
 using Khadra.Application.Dealers.UpdateProfile;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
+using Khadra.Domain.PlatformSettings.Repositories;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
@@ -43,8 +44,10 @@ public sealed class DealerProfileTests
             return dealer;
         }
 
+        public ICityRepository Cities { get; } = Substitute.For<ICityRepository>();
+
         public DealerProfileHandlers Handlers() => new(
-            new DealerMembershipResolver(Dealers), Uploads, Storage, FakeDocumentPolicy.Default, Clock, UnitOfWork);
+            new DealerMembershipResolver(Dealers), Cities, Uploads, Storage, FakeDocumentPolicy.Default, Clock, UnitOfWork);
     }
 
     private static IReadOnlyList<DayScheduleInput> Week(string fridayOpens = "14:00", bool saturdayClosed = true) =>

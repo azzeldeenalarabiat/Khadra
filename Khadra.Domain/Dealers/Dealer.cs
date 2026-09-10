@@ -21,6 +21,14 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     public CommercialRegistrationNumber CommercialRegistration { get; private set; } = null!;
     public GeoPoint Location { get; private set; } = null!;
     public Id? CityId { get; private set; }
+
+    /// <summary>
+    /// Where the gallery is IN WORDS, for a person to read. Null until an owner records one.
+    ///
+    /// The pin remains the authoritative location -- every distance and every delivery decision runs
+    /// on it -- and this never contradicts it, because both are set from the same form in one write.
+    /// </summary>
+    public DealerAddress? Address { get; private set; }
     public OperatingHours OperatingHours { get; private set; } = null!;
     public DealerVerificationStatus VerificationStatus { get; private set; } = null!;
     // Rejection reason or clarification note from the last admin decision.
@@ -66,7 +74,8 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         DateTimeOffset now,
         TimeSpan reviewSla,
         string? description = null,
-        Id? cityId = null)
+        Id? cityId = null,
+        DealerAddress? address = null)
     {
         ArgumentNullException.ThrowIfNull(businessName);
         ArgumentNullException.ThrowIfNull(commercialRegistration);
@@ -84,6 +93,7 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
             OperatingHours = operatingHours,
             Description = Trim(description, 2000),
             CityId = cityId,
+            Address = address,
             VerificationStatus = DealerVerificationStatus.PendingReview,
             Delivery = DeliverySettings.Disabled,
             SubmittedAt = now,
@@ -250,7 +260,8 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         GeoPoint location,
         OperatingHours operatingHours,
         string? description,
-        Id? cityId)
+        Id? cityId,
+        DealerAddress? address)
     {
         ArgumentNullException.ThrowIfNull(businessName);
         ArgumentNullException.ThrowIfNull(location);
@@ -268,6 +279,7 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         OperatingHours = operatingHours;
         Description = Trim(description, 2000);
         CityId = cityId;
+        Address = address;
         return UnitResult.Success<Error>();
     }
 

@@ -52,7 +52,26 @@ type DocumentKey = (typeof REQUIRED_DOCUMENTS)[number]['key'];
   imports: [IconComponent, MapComponent],
 })
 export class DealerApplyComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+
+  /**
+   * The city list in the reader's own language.
+   *
+   * The dropdown printed `nameEn` whatever the language was, so an Arabic applicant chose their
+   * city from a list of English names in an otherwise Arabic, right-to-left form. Both names come
+   * from the same curated row, so this is a display choice and not a second source of truth; the
+   * value submitted is the row's id either way. Falls back to the other name rather than showing an
+   * empty option, because a lookup row is allowed to be half-translated and an unnamed option is
+   * unpickable.
+   */
+  protected readonly cityOptions = computed(() => {
+    const arabic = this.i18n.lang() === 'ar';
+    return this.cities().map((city) => ({
+      id: city.id,
+      name: (arabic ? city.nameAr || city.nameEn : city.nameEn || city.nameAr).trim(),
+    }));
+  });
   private readonly console = inject(DealerConsoleService);
   private readonly lookups = inject(LookupsService);
   private readonly ui = inject(ConsoleUiService);
@@ -101,9 +120,52 @@ export class DealerApplyComponent {
   protected readonly latNumber = computed(() => Number(this.latitude()));
   protected readonly lngNumber = computed(() => Number(this.longitude()));
 
+  protected readonly area = signal('');
+  protected readonly street = signal('');
+  /** Whether the applicant has typed here. A suggestion never overwrites their own words. */
+  private readonly areaTouched = signal(false);
+  private readonly streetTouched = signal(false);
+  protected readonly suggesting = signal(false);
+  /**
+   * The provider's own licence line, printed beside the fields it filled.
+   *
+   * From the server rather than written into the template: open-data licences require attribution
+   * where the data is shown, and a literal here would be a claim about the source that stops being
+   * true the day the provider changes.
+   */
+  protected readonly attribution = signal<string | null>(null);
+
+  protected readonly locating = signal(false);
+  /** An i18n KEY, never a sentence: a stored sentence stays in the language it was written in. */
+  protected readonly locationProblem = signal<TranslationKey | null>(null);
+
+  /**
+   * Where the map LOOKS, which is not the same question as where the gallery is.
+   *
+   * Until a pin is placed there is no answer to the second question, and inventing one would be the
+   * worst outcome: a pin at a default centre reads as a location the applicant chose, and they could
+   * submit it without ever noticing. So the camera opens on the country, the map draws no pin (see
+   * kh-map's `hasPin`), and the first click is what makes a choice.
+   *
+   * These constants are a viewport, not business data. Nothing is stored from them, nothing is shown
+   * as a fact, and the moment a pin exists they stop being consulted. The city's own recorded centre
+   * takes over as soon as an administrator has pinned one and the applicant picks it.
+   */
+  private static readonly CountryView = { latitude: 31.24, longitude: 36.51, zoom: 7 } as const;
+
+  protected readonly mapLatitude = computed(() =>
+    this.coordsValid() ? this.latNumber() : DealerApplyComponent.CountryView.latitude,
+  );
+  protected readonly mapLongitude = computed(() =>
+    this.coordsValid() ? this.lngNumber() : DealerApplyComponent.CountryView.longitude,
+  );
+  protected readonly mapZoom = computed(() =>
+    this.coordsValid() ? 14 : DealerApplyComponent.CountryView.zoom,
+  );
+
   protected readonly missingDocuments = computed(() =>
-    REQUIRED_DOCUMENTS.filter((document) => !this.files()[document.key]).map(
-      (document) => this.t(document.labelKey),
+    REQUIRED_DOCUMENTS.filter((document) => !this.files()[document.key]).map((document) =>
+      this.t(document.labelKey),
     ),
   );
 
@@ -134,8 +196,95 @@ export class DealerApplyComponent {
   }
 
   protected moveTo(point: { latitude: number; longitude: number }): void {
+    this.locationProblem.set(null);
     this.latitude.set(String(point.latitude));
     this.longitude.set(String(point.longitude));
+    void this.suggestFor(point.latitude, point.longitude);
+  }
+
+  /**
+   * Offers what the pin might be called, into fields the applicant can still change.
+   *
+   * Only from a DELIBERATE pin move — a click or a drag — never from picking a city, which sets the
+   * coordinates to that city's centre: geocoding a city centre returns some arbitrary downtown
+   * street and would fill the form with an address belonging to nobody.
+   *
+   * Nothing the applicant has typed is overwritten. A suggestion is a suggestion; silently replacing
+   * a corrected area on the next nudge of the pin is how somebody submits an address they had
+   * already fixed.
+   */
+  private async suggestFor(latitude: number, longitude: number): Promise<void> {
+    this.suggesting.set(true);
+    try {
+      const suggestion = await this.console.suggestAddress(latitude, longitude, this.i18n.lang());
+      // Null covers every ordinary failure -- switched off, rate limited, nothing recorded there.
+      // The applicant types the address, which is what they did before this existed.
+      if (!suggestion) return;
+
+      if (!this.areaTouched() && suggestion.area) this.area.set(suggestion.area);
+      if (!this.streetTouched() && suggestion.street) this.street.set(suggestion.street);
+      // Only ever a pre-selection, and only when the server matched exactly one curated city.
+      if (!this.cityId() && suggestion.suggestedCityId) this.cityId.set(suggestion.suggestedCityId);
+      this.attribution.set(suggestion.attribution);
+    } finally {
+      this.suggesting.set(false);
+    }
+  }
+
+  /** Typing marks the field as the applicant's, so no later suggestion overwrites it. */
+  protected typeArea(value: string): void {
+    this.areaTouched.set(true);
+    this.area.set(value);
+  }
+
+  protected typeStreet(value: string): void {
+    this.streetTouched.set(true);
+    this.street.set(value);
+  }
+
+  /** Takes the pin off the map and empties the two fields, so nothing half-chosen is submitted. */
+  protected clearPin(): void {
+    this.locationProblem.set(null);
+    this.latitude.set('');
+    this.longitude.set('');
+  }
+
+  /**
+   * Drops the pin where the browser says the applicant is.
+   *
+   * Every branch reports a REASON rather than failing quietly. A permission prompt the applicant
+   * dismissed, a device with no fix, and a browser too old to have the API are three different
+   * situations with three different remedies, and "nothing happened" covers all of them badly.
+   * The map stays usable by hand whichever one it is.
+   */
+  protected useMyLocation(): void {
+    if (!navigator.geolocation) {
+      this.locationProblem.set('dealerApply.thisBrowserCannot');
+      return;
+    }
+
+    this.locating.set(true);
+    this.locationProblem.set(null);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        this.locating.set(false);
+        this.moveTo({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      (error) => {
+        this.locating.set(false);
+        this.locationProblem.set(
+          error.code === error.PERMISSION_DENIED
+            ? 'dealerApply.locationPermissionRefused'
+            : 'dealerApply.couldNotFindYou',
+        );
+      },
+      // A gallery is a fixed address, so a slow accurate fix beats a fast vague one -- and a cached
+      // position from another part of town would put the pin somewhere plausible and wrong.
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
   }
 
   protected attach(key: DocumentKey, event: Event): void {
@@ -163,6 +312,9 @@ export class DealerApplyComponent {
     form.append('closesAt', this.closesAt());
     if (this.description().trim()) form.append('description', this.description().trim());
     if (this.cityId()) form.append('cityId', this.cityId());
+    // What is in the fields, which is what the applicant confirmed -- not what the geocoder said.
+    if (this.area().trim()) form.append('addressArea', this.area().trim());
+    if (this.street().trim()) form.append('addressStreet', this.street().trim());
     for (const document of REQUIRED_DOCUMENTS) {
       const file = this.files()[document.key];
       if (file) form.append(document.key, file, file.name);

@@ -54,6 +54,20 @@ export class MapComponent implements OnDestroy {
 
   /** Whether the reader can move the pin. Read-only by default: most maps here only show a place. */
   readonly editable = input(false);
+
+  /**
+   * Whether a place has actually been CHOSEN yet.
+   *
+   * False draws the map with no pin at all, centred on wherever latitude/longitude point — a camera
+   * position, not an answer. It exists because the alternative was worse: the applicant's map was
+   * rendered only once valid coordinates existed, so the one tool for choosing a location appeared
+   * only after the location had been chosen. With no cities to seed a centre from, the sole way
+   * through the form was typing raw decimal degrees by hand.
+   *
+   * A pin drawn at the fallback centre would be worse still, because it would look like an answer
+   * nobody gave, and the applicant could submit it without noticing.
+   */
+  readonly hasPin = input(true);
   readonly zoom = input(14);
   /** Kilometres. Draws the delivery radius around the pin, to scale, when set. */
   readonly radiusKm = input<number | null>(null);
@@ -98,7 +112,9 @@ export class MapComponent implements OnDestroy {
       this.map.setView(at, zoom, { animate: false });
       this.marker?.setLatLng(at);
       this.marker?.dragging?.[editable ? 'enable' : 'disable']();
-      this.drawRadius(at, radius);
+      // The pin joins the map the moment a place is chosen, and leaves if the choice is cleared.
+      this.showPin(this.hasPin());
+      this.drawRadius(this.hasPin() ? at : null, radius);
     });
   }
 
@@ -162,18 +178,23 @@ export class MapComponent implements OnDestroy {
         iconSize: [22, 22],
         iconAnchor: [11, 11],
       }),
-    }).addTo(map);
+    });
 
     marker.on('dragend', () => this.publish(marker.getLatLng()));
     map.on('click', (event: L.LeafletMouseEvent) => {
       if (!this.editable()) return;
       marker.setLatLng(event.latlng);
+      // The first click on an unpinned map is what CHOOSES the place, so the pin has to appear as
+      // well as move. Without this the applicant clicks, the coordinates fill in beside the map,
+      // and the map itself still shows nothing.
+      this.showPin(true);
       this.publish(event.latlng);
     });
 
     this.map = map;
     this.marker = marker;
-    this.drawRadius(at, this.radiusKm());
+    this.showPin(this.hasPin());
+    this.drawRadius(this.hasPin() ? at : null, this.radiusKm());
     this.ready.set(true);
 
     // Leaflet measures its container once and caches that size. Two different things can go wrong,
@@ -225,9 +246,24 @@ export class MapComponent implements OnDestroy {
     }
   }
 
-  private drawRadius(at: L.LatLng, radiusKm: number | null): void {
+  /**
+   * Adds or removes the pin without destroying it, so its drag handlers survive.
+   *
+   * Leaflet has no "hidden marker": a marker is either on the map or it is not. Toggling opacity
+   * instead would leave an invisible thing that still answers clicks and drags.
+   */
+  private showPin(visible: boolean): void {
+    const map = this.map;
+    const marker = this.marker;
+    if (!map || !marker) return;
+    if (visible && !map.hasLayer(marker)) marker.addTo(map);
+    else if (!visible && map.hasLayer(marker)) marker.remove();
+  }
+
+  private drawRadius(at: L.LatLng | null, radiusKm: number | null): void {
     if (!this.map) return;
-    if (radiusKm === null || !Number.isFinite(radiusKm) || radiusKm <= 0) {
+    // No pin means no place to draw a radius around, whatever the radius says.
+    if (at === null || radiusKm === null || !Number.isFinite(radiusKm) || radiusKm <= 0) {
       this.ring?.remove();
       this.ring = null;
       return;

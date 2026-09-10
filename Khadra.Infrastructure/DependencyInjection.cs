@@ -21,6 +21,7 @@ using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Reviews.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
+using Khadra.Infrastructure.Geocoding;
 using Khadra.Infrastructure.Notifications;
 using Khadra.Infrastructure.Payments;
 using Khadra.Infrastructure.Persistence;
@@ -47,6 +48,7 @@ public static class DependencyInjection
         AddPersistence(services, configuration);
         AddSecurity(services);
         AddNotifications(services, configuration);
+        AddGeocoding(services, configuration);
 
         services.AddSingleton<IBusinessRulesProvider, ConfigurationBusinessRulesProvider>();
 
@@ -255,6 +257,67 @@ public static class DependencyInjection
         services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddSingleton<IDocumentLinkSigner, HmacDocumentLinkSigner>();
         services.AddSingleton<IUploadTicketService, HmacUploadTicketService>();
+    }
+
+    /// <summary>
+    /// The reverse-geocoding proxy, which turns a map pin into words for a form to offer.
+    /// </summary>
+    /// <remarks>
+    /// Server-side on purpose. The console's CSP is <c>connect-src 'self'</c>, so the browser cannot
+    /// call a provider directly — and going through the API is the better answer anyway: the
+    /// provider's rate limit is per SERVER, which only the server can enforce, and an owner's
+    /// coordinates never leave this origin from their own browser.
+    ///
+    /// Absent by default, exactly as payments are. A platform that has not chosen a provider asks
+    /// nobody, and the form says to type the address.
+    /// </remarks>
+    private static void AddGeocoding(IServiceCollection services, IConfiguration configuration)
+    {
+        var configured = configuration[$"{GeocodingOptions.SectionName}:Provider"];
+        var provider = configured?.Trim() ?? GeocodingOptions.NoProvider;
+        services.Configure<GeocodingOptions>(configuration.GetSection(GeocodingOptions.SectionName));
+
+        if (string.Equals(provider, GeocodingOptions.NominatimProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            var options = configuration.GetSection(GeocodingOptions.SectionName).Get<GeocodingOptions>()
+                ?? new GeocodingOptions();
+
+            // Refused at startup, not per request. Nominatim blocks callers that do not identify
+            // themselves, and a block is indistinguishable from the feature never having worked --
+            // every suggestion just fails, for everyone, with nothing saying why.
+            if (string.IsNullOrWhiteSpace(options.UserAgent))
+            {
+                throw new InvalidOperationException(
+                    $"{GeocodingOptions.SectionName}:Provider is '{GeocodingOptions.NominatimProvider}' " +
+                    $"but {GeocodingOptions.SectionName}:UserAgent is not set. Nominatim's usage policy " +
+                    "requires a User-Agent that identifies the application and gives a contact, and it " +
+                    "blocks callers that do not — set something like " +
+                    "\"Khadra/1.0 (+https://khadra.example; ops@khadra.example)\".");
+            }
+
+            services.AddMemoryCache();
+            services.AddHttpClient(NominatimReverseGeocoder.HttpClientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(options.UserAgent);
+            });
+            services.AddSingleton<IReverseGeocoder, NominatimReverseGeocoder>();
+            return;
+        }
+
+        if (!string.Equals(provider, GeocodingOptions.NoProvider, StringComparison.OrdinalIgnoreCase)
+            && provider.Length > 0)
+        {
+            // The same silent-fallback trap the email transport had: an unrecognised name used to
+            // mean "the feature quietly does nothing".
+            throw new InvalidOperationException(
+                $"{GeocodingOptions.SectionName}:Provider is \"{configured}\", which is not a provider " +
+                $"this API has. Use '{GeocodingOptions.NominatimProvider}' or " +
+                $"'{GeocodingOptions.NoProvider}'.");
+        }
+
+        services.AddSingleton<IReverseGeocoder, UnconfiguredReverseGeocoder>();
     }
 
     private static void AddNotifications(IServiceCollection services, IConfiguration configuration)

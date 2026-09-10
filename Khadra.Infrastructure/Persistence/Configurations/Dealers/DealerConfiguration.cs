@@ -49,6 +49,30 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
         });
         entity.Navigation(dealer => dealer.Location).IsRequired();
 
+        // The address in words, beside the pin. OPTIONAL as a whole -- a dealer registered before
+        // this existed has none, and no backfill invents one.
+        //
+        // Both properties are mapped explicitly, as every owned type here must be: they are get-only,
+        // and EF includes a property by convention only when it has a setter, so anything left to
+        // convention is silently dropped with no error.
+        //
+        // `Area` is REQUIRED inside the optional address, and that is load-bearing rather than
+        // decorative. An optional owned type whose columns are all nullable cannot be told apart from
+        // an absent one -- EF warns about exactly this and materialises an all-null dependent as
+        // null -- so with both nullable, "an address is at least an area" would hold only in Create
+        // and not in the schema. No `Navigation(...).IsRequired()`, which is what keeps the address
+        // itself optional.
+        entity.OwnsOne(dealer => dealer.Address, address =>
+        {
+            address.Property(value => value.Area)
+                .HasColumnName("address_area")
+                .HasMaxLength(DealerAddress.AreaMaxLength)
+                .IsRequired();
+            address.Property(value => value.Street)
+                .HasColumnName("address_street")
+                .HasMaxLength(DealerAddress.StreetMaxLength);
+        });
+
         entity.OwnsOne(dealer => dealer.Delivery, delivery =>
         {
             delivery.Property(settings => settings.IsEnabled).HasColumnName("delivery_enabled").IsRequired();

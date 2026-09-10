@@ -4,6 +4,36 @@ namespace Khadra.Domain.Dealers;
 
 public static class DealerErrors
 {
+    public static readonly Error InvalidAddressArea =
+        Error.Validation(
+            "dealer.invalid_address_area",
+            "An address needs the area it is in. The street is optional, because many are unnamed.");
+
+    public static readonly Error AddressAreaTooLong =
+        Error.Validation(
+            "dealer.address_area_too_long",
+            $"The area cannot be longer than {DealerAddress.AreaMaxLength} characters.");
+
+    public static readonly Error InvalidAddressStreet =
+        Error.Validation(
+            "dealer.invalid_address_street",
+            "The street contains characters that cannot be stored. Leave it blank if it has no name.");
+
+    public static readonly Error AddressStreetTooLong =
+        Error.Validation(
+            "dealer.address_street_too_long",
+            $"The street cannot be longer than {DealerAddress.StreetMaxLength} characters.");
+
+    /// <summary>
+    /// A city id that names no active city. Validation rather than not-found on purpose: this is one
+    /// field of a submitted form being wrong, so it belongs with the other 400s the form can produce
+    /// rather than presenting as a missing page.
+    /// </summary>
+    public static readonly Error UnknownCity =
+        Error.Validation(
+            "dealer.unknown_city",
+            "That city is not one the platform currently lists. Choose one from the list.");
+
     public static readonly Error InvalidBusinessName =
         Error.Validation("dealer.invalid_business_name", "The business name must be between 2 and 150 characters.");
 

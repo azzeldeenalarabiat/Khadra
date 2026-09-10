@@ -4,6 +4,7 @@ using Khadra.Application.Dealers.Dtos;
 using Khadra.Application.Dealers.GetMyDealer;
 using Khadra.Application.Dealers.ReviewDealer;
 using Khadra.Application.Dealers.SubmitDealerProfile;
+using Khadra.Application.Dealers.SuggestAddress;
 using Khadra.Application.Dealers.UpdateDeliverySettings;
 using Khadra.Application.Dealers.UpdateProfile;
 using Khadra.Application.Fleet.ManageVehicles;
@@ -12,6 +13,7 @@ using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Khadra.WebAPI.Controllers;
 
@@ -77,7 +79,9 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
                     closesAt,
                     form.Description,
                     form.CityId is null ? null : Id.From(form.CityId.Value),
-                    uploads),
+                    uploads,
+                    form.AddressArea,
+                    form.AddressStreet),
                 cancellationToken);
 
             return FromResult(result, created => Created($"/api/v1/dealers/{created.DealerId}", created));
@@ -87,6 +91,43 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
             foreach (var stream in streams)
                 await stream.DisposeAsync();
         }
+    }
+
+    /// <summary>
+    /// What a map pin might be called, so the application form can offer it.
+    /// </summary>
+    /// <remarks>
+    /// A READ that suggests into a form; it stores nothing, and nothing on a write path calls it.
+    /// What is saved is whatever the owner leaves in the fields.
+    ///
+    /// It lives here rather than under <c>me</c> because an applicant has no dealer yet — this is the
+    /// screen where they are creating one. DealerOwner-only and rate limited all the same: the
+    /// provider behind it allows roughly one request per second for the entire server, so an
+    /// unauthenticated or unlimited endpoint would be a way for anyone to spend that budget and take
+    /// the feature away from every applicant at once.
+    ///
+    /// 503 means the service is unreachable, throttled or switched off; 404 means the provider has
+    /// nothing recorded at that point. Both end the same way for the applicant — they type it — and
+    /// the form says which happened.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.DealerOwner)]
+    [EnableRateLimiting(RateLimitPolicies.Geocode)]
+    [HttpGet("address-suggestions")]
+    [ProducesResponseType<AddressSuggestionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult> SuggestAddress(
+        [FromQuery] double latitude,
+        [FromQuery] double longitude,
+        [FromQuery] string? language,
+        CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new SuggestDealerAddressQuery(latitude, longitude, language ?? "en"),
+            cancellationToken);
+
+        return FromResult(result, Ok);
     }
 
     /// <summary>
@@ -313,6 +354,13 @@ public sealed class SubmitDealerForm
 
     [Required]
     public string ClosesAt { get; init; } = "20:00";
+
+    /// <summary>The neighbourhood, in the owner's own words. Optional, like the street beside it.</summary>
+    [StringLength(100)]
+    public string? AddressArea { get; init; }
+
+    [StringLength(200)]
+    public string? AddressStreet { get; init; }
 
     [StringLength(2000)]
     public string? Description { get; init; }

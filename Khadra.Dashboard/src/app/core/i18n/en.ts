@@ -487,6 +487,8 @@ export const EN = {
   'dealerReview.rejectApplication': 'Reject application',
   'dealerReview.requestClarification': 'Request clarification',
   'dealerReview.suspendDealer': 'Suspend dealer',
+  'dealerReview.whereItIs': 'Where it is',
+  'dealerReview.noAddressRecorded': 'No address recorded. The pin below is the location the applicant gave.',
   'dealerReview.verificationDocuments': 'Verification documents',
 
   // Bookings list (admin).
@@ -858,6 +860,19 @@ export const EN = {
   'dealerApply.chooseACity': 'Choose a city…',
   'dealerApply.chooseACityOr':
     'Choose a city, or type a latitude and longitude, and the map will appear so you can place the pin exactly.',
+  'dealerApply.clearThePin': 'Clear the pin',
+  'dealerApply.clickTheMapTo': 'Click the map where your gallery is, or use your current location. You can drag the pin afterwards to put it on the door.',
+  'dealerApply.couldNotFindYou': 'Your device could not work out where you are. Click the map instead.',
+  'dealerApply.findingYou': 'Finding you…',
+  'dealerApply.locationPermissionRefused': 'This browser was not given permission to share your location. Click the map instead, or allow location for this site and try again.',
+  'dealerApply.thisBrowserCannot': 'This browser cannot share your location. Click the map to place the pin.',
+  'dealerApply.useMyLocation': 'Use my current location',
+  'dealerApply.whereYourGalleryIs': 'Where your gallery is',
+  'dealerApply.area': 'Area',
+  'dealerApply.street': 'Street',
+  'dealerApply.theNeighbourhoodACustomer': 'The neighbourhood a customer would name to a taxi driver.',
+  'dealerApply.manyStreetsHaveNo': 'Many streets have no recorded name. Leave it blank if yours does not.',
+  'dealerApply.lookingUpThatSpot': 'Looking up that spot…',
   'dealerApply.city': 'City',
   'dealerApply.commercialRegistrationNumber': 'Commercial registration number',
   'dealerApply.galleryName': 'Gallery name',
