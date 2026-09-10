@@ -1,6 +1,10 @@
 using CSharpFunctionalExtensions;
 using Khadra.Domain.Bookings.Events;
 using Khadra.Domain.Common;
+// Cross-context, and by VALUE only: CustomerDocumentType is IdentityAccess's smart enum, used here
+// the way AuditEntry uses UserRole. No navigation, no EF relationship -- the document itself is
+// referenced by Id, as the cross-context rule requires.
+using Khadra.Domain.IdentityAccess;
 
 namespace Khadra.Domain.Bookings;
 
@@ -18,6 +22,7 @@ public sealed class Booking : AggregateRoot
 {
     private readonly List<HandoverRecord> _handovers = [];
     private readonly List<BookingStatusChange> _statusHistory = [];
+    private readonly List<RenterDocumentReview> _renterDocumentReviews = [];
 
     public BookingReference Reference { get; private set; } = null!;
     public Id CustomerId { get; private set; }
@@ -101,6 +106,10 @@ public sealed class Booking : AggregateRoot
     public IReadOnlyCollection<HandoverRecord> Handovers => _handovers.AsReadOnly();
     public IReadOnlyCollection<BookingStatusChange> StatusHistory =>
         _statusHistory.OrderBy(change => change.OccurredAt).ToList();
+
+    /// <summary>What this dealership has recorded looking at, for this booking's renter (spec 5.1).</summary>
+    public IReadOnlyCollection<RenterDocumentReview> RenterDocumentReviews =>
+        _renterDocumentReviews.AsReadOnly();
 
     private Booking()
     {
@@ -241,6 +250,63 @@ public sealed class Booking : AggregateRoot
     /// drift, and the way it would drift is a gallery keeping access after the booking ended.
     /// </remarks>
     public bool IsLive(DateTimeOffset now) => Status.HoldsVehicle && !HasLapsed(now);
+
+    // ── The renter's paperwork, as this dealership checked it (spec 5.1) ─────────────────────────
+
+    /// <summary>
+    /// What this dealership recorded about one particular UPLOAD, or null.
+    /// </summary>
+    /// <remarks>
+    /// Keyed on the upload instant as well as the document id, because a document row is a SLOT --
+    /// "your licence front" -- whose file is replaced in place when the renter re-photographs it. A
+    /// review found by id alone would answer for a file that no longer exists.
+    /// </remarks>
+    public RenterDocumentReview? FindRenterDocumentReview(Id documentId, DateTimeOffset documentUploadedAt) =>
+        _renterDocumentReviews.SingleOrDefault(review =>
+            review.DocumentId == documentId && review.DocumentUploadedAt == documentUploadedAt);
+
+    /// <summary>
+    /// Records that this dealership looked at one of the renter's documents.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Gated on <see cref="IsLive"/>, the same predicate that decides whether the gallery may SEE the
+    /// document at all. Stating it here rather than only in the handler is what stops the two drifting
+    /// -- a dealership able to record a review of something it can no longer open would be writing a
+    /// claim it cannot support.
+    /// </para>
+    /// <para>
+    /// Deliberately does NOT settle a booking whose window has lapsed, which is what
+    /// <c>CancelMyBookingCommand</c> does on its own path. A gallery opening a licence must not be
+    /// able to expire a booking as a side effect of looking at it; the clock's job stays the clock's.
+    /// </para>
+    /// <para>
+    /// Strict about repeats: the caller asks <see cref="FindRenterDocumentReview"/> first and answers
+    /// with what is already there. Recording twice would move the timestamp, and "when did this
+    /// dealership first check the licence" is the whole value of the record.
+    /// </para>
+    /// </remarks>
+    public Result<RenterDocumentReview, Error> RecordRenterDocumentReview(
+        Id documentId,
+        CustomerDocumentType documentType,
+        DateTimeOffset documentUploadedAt,
+        Id reviewedByUserId,
+        string reviewedByName,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(documentType);
+
+        if (!IsLive(now))
+            return BookingErrors.RenterDocumentsNotAvailable;
+
+        if (FindRenterDocumentReview(documentId, documentUploadedAt) is not null)
+            return BookingErrors.RenterDocumentAlreadyReviewed;
+
+        var review = RenterDocumentReview.Record(
+            Id, documentId, documentType, documentUploadedAt, reviewedByUserId, reviewedByName, now);
+        _renterDocumentReviews.Add(review);
+        return review;
+    }
 
     /// <summary>Whether <see cref="Cancel"/> would succeed right now.</summary>
     public bool CanBeCancelled(DateTimeOffset now) =>

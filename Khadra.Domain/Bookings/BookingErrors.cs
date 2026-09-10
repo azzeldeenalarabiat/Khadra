@@ -200,4 +200,31 @@ public static class BookingErrors
 
     public static readonly Error ExtensionRequiresActiveRental =
         Error.Conflict("booking.extension_requires_active_rental", "A booking can only be extended while the vehicle is out on rental.");
+
+    /// <summary>
+    /// The gallery asked for the renter's paperwork on a booking that is no longer live.
+    /// </summary>
+    /// <remarks>
+    /// The twin of <c>review.reputation_not_available</c>, and deliberately the same shape: a gallery
+    /// may see what the platform holds about the person in front of them for as long as they are
+    /// deciding about, or holding, a booking with them -- and no longer. A 409 rather than a 403
+    /// because nothing is wrong with the caller: the window they were entitled to has closed.
+    /// </remarks>
+    public static readonly Error RenterDocumentsNotAvailable = Error.Conflict(
+        "booking.renter_documents_not_available",
+        "A renter's documents are only visible while you have a live booking with them.");
+
+    /// <summary>
+    /// This dealership has already recorded a review of this exact upload.
+    /// </summary>
+    /// <remarks>
+    /// Raised by the aggregate, and deliberately NOT what the endpoint answers: the handler asks
+    /// first and returns the existing record with 200, because a second click on a slow connection
+    /// must not read as a failure. This exists so the aggregate stays strict for any other caller --
+    /// recording twice would move the timestamp, and "when did this dealership first check the
+    /// licence" is the whole value of the record.
+    /// </remarks>
+    public static readonly Error RenterDocumentAlreadyReviewed = Error.Conflict(
+        "booking.renter_document_already_reviewed",
+        "This document has already been reviewed for this booking.");
 }

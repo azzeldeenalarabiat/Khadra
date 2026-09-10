@@ -174,3 +174,52 @@ export interface PagedResult<T> {
   readonly totalCount: number;
   readonly totalPages: number;
 }
+
+/** The four documents spec 5.1 asks a renter for. The server's own enum names. */
+export type RenterDocumentType =
+  'DrivingLicenceFront' | 'DrivingLicenceBack' | 'NationalId' | 'Passport';
+
+/**
+ * One of the renter's documents on a booking this gallery is handling
+ * (`GET /bookings/{id}/renter-documents`).
+ *
+ * There is NO url and NO storage key on this shape, and that is deliberate rather than an oversight
+ * the console should work around. The bytes come from a sibling endpoint that re-checks the booking
+ * relationship on every request, so the only thing the browser ever holds is a booking id and a
+ * document id it was given. Never build an address from anything else here.
+ */
+/**
+ * What THIS dealership recorded about looking at one document.
+ *
+ * "Reviewed by the dealer", never "verified". It says a named member of the gallery's staff opened
+ * the file the renter uploaded and satisfied themselves. Khadra checks nothing, and the panel says so
+ * in as many words beside the control.
+ */
+export interface DealerDocumentReview {
+  readonly reviewedAt: string;
+  readonly reviewedByUserId: string;
+  readonly reviewedByName: string;
+}
+
+export interface RenterDocument {
+  readonly documentId: string;
+  readonly type: RenterDocumentType;
+  /** What the download will actually be served as. The console never guesses it from the type. */
+  readonly contentType: string;
+  /** When the renter filed THIS version. Re-photographing a document replaces it in place. */
+  readonly uploadedAt: string;
+  /**
+   * Null when this dealership has not reviewed this upload — including when it reviewed an earlier
+   * one and the renter has since sent a better photograph. The SERVER decides that; never compare
+   * two dates here.
+   */
+  readonly dealerReview: DealerDocumentReview | null;
+}
+
+/** What the gallery may see about the renter's paperwork, while the booking is live. */
+export interface RenterDocuments {
+  readonly documents: readonly RenterDocument[];
+  readonly isComplete: boolean;
+  /** The types the renter has not filed. The SERVER decides this; the console never derives it. */
+  readonly missing: readonly RenterDocumentType[];
+}

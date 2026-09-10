@@ -46,10 +46,19 @@ family, so a stolen refresh token cannot be replayed alongside the legitimate on
 
 ---
 
-## Documents are reached one way only
+## Documents are reached through this platform, never by address
 
 The storage bucket is **private**, and the platform mints **no Supabase URL at all**
-— not public, and not signed.
+— not public, and not signed. Signed storage URLs were considered and rejected: they
+are a second way in that our authorisation never sees and that we cannot revoke.
+
+There are two ways to earn a private file, and which one applies depends on **how
+long the grant lasts**.
+
+**A signed link, where the right is stable for a session.** An administrator
+reviewing a dealership, a customer opening their own passport, either party to a
+dispute ticket. Authorising once and delivering later costs nothing, because nothing
+can change in five minutes that would take the right away.
 
 ```
 API mints an HMAC-signed link, 5 minutes, on OUR domain
@@ -58,14 +67,95 @@ API mints an HMAC-signed link, 5 minutes, on OUR domain
   → streamed back with Cache-Control: no-store, private
 ```
 
-Signed storage URLs were considered and rejected: they are a second way in that our
-authorisation never sees and that we cannot revoke. This way there is one
-authorisation path and one clock.
+**A booking-scoped stream, where the right is not stable.** A gallery reading the
+licence of the person they are handing a car to (spec 5.1, checklist item 63) may do
+so for exactly as long as `Booking.IsLive` — which ends the instant a decision window
+closes or the car comes back.
+
+```
+GET /api/v1/bookings/{bookingId}/renter-documents/{documentId}
+  → dealer staff policy, then membership → this dealership's booking → the booking is LIVE
+  → the customer is read OFF THE BOOKING, and the document must be theirs
+  → the API reads the bytes with its own credential
+  → streamed back with Cache-Control: no-store, private
+```
+
+A signed link would have been wrong here twice over. It is a five-minute grant that
+outlives the predicate that issued it, so a gallery would keep access after the
+booking ended. And its token is `base64url(storageKey)`, which puts
+`customers/{customerUserId}/…` into a gallery's browser — a customer identifier the
+platform is otherwise careful never to hand them, and the raw storage key that must
+not leave the server. **Nothing but a booking id and a document id reaches the
+browser**, and both are re-checked against the caller on every request.
+
+Do not "harmonise" the two paths. Checklist items 14 and 63 record why they differ.
 
 Details that matter:
 
 - **A bad or stale signature answers 404, not 403.** A 403 would confirm the
-  document exists to someone holding nothing but a guessed key.
+  document exists to someone holding nothing but a guessed key. Same rule on the
+  booking-scoped route: a booking that is not this dealership's is `404
+  booking.not_found`, and a document id that is not this renter's is `404
+  documents.not_found`, so neither confirms that the id names anything real.
+- **A closed window is a 409, not a 403.** Once the booking stops being live the
+  gallery gets `booking.renter_documents_not_available`, the twin of
+  `review.reputation_not_available`. Nothing is wrong with the caller; the window
+  they were entitled to has closed, and the console says so rather than reporting a
+  broken platform.
+- **The renter route is not gated on the dealership being able to trade.** A
+  suspended gallery may still record a pickup on a booking approved before the
+  suspension, so gating the licence on trading would leave them handing a car to a
+  stranger while the platform refused to show them who the stranger is — item 63 in
+  a different costume. Membership (owner, or an *active* employee) is the gate.
+
+### Every disclosure leaves a record that cannot be edited
+
+`document_access_entries` holds one row per `Viewed` and per `Reviewed`: who, which
+dealership, which booking, which renter, which document and which UPLOAD of it, and
+when. Append-only twice over — `KhadraDbContext` refuses to persist a modified or
+deleted `IAppendOnly` record, and a Postgres trigger refuses `UPDATE`, `DELETE` and
+`TRUNCATE` for anything that bypasses the application.
+
+- **No record, no disclosure.** The `Viewed` row is committed *before* a byte is
+  streamed, and a failure to write it fails the request. The insert goes to the same
+  database on the same connection as the reads that just authorised the call, so it
+  adds no failure mode that was not already there — and serving anyway would make
+  "the log shows nobody looked" stop meaning anything during exactly the incident
+  somebody would later be investigating.
+- **Nothing in it can reach a file.** Every column is an id, an instant, an enum or
+  a name already snapshotted elsewhere. No storage key, no URL, no bucket, no
+  content type. A disclosure log carrying the key would be a second way into the
+  documents it exists to protect.
+- **No de-duplication.** Three opens are three rows. Repetition is itself evidence —
+  an employee opening a passport forty times is what such a log exists to surface —
+  and collapsing rows at write time cannot be undone, while noise can always be
+  collapsed at read time.
+- **The metadata listing is deliberately NOT logged.** It fires on every
+  booking-detail open with nobody pressing anything, and it describes what exists
+  rather than revealing it. Item 86 records that limit rather than overclaiming that
+  every access is logged.
+- **The renter is on the row by id.** "Who has seen my documents" is an index scan on
+  the customer's own id, not a join through `customer_documents` — which is exactly
+  the table that may have been emptied by the time anybody asks.
+
+### "Reviewed by dealer" is not "verified by Khadra"
+
+A gallery can record that it checked a renter's document. That record says a named
+member of its staff opened the file; it makes no claim that the document is genuine,
+current, or registered with any authority. **The platform verifies nothing** —
+`CustomerDocument.MarkVerified` is still unreachable, and item 27 is where whether
+anyone ever will gets decided.
+
+Two consequences in the code, both deliberate:
+
+- The platform's own `CustomerDocument.Status` is **not on the dealer's DTO at all**.
+  It can take the value `Verified`, and beside a gallery's own review that would read
+  as a Khadra guarantee. Taking a field back after galleries have seen it is a
+  contract change, so it never goes out.
+- The review is keyed on `(booking, document, upload instant)`. `CustomerDocument.Replace`
+  keeps the row id and swaps the file, so a review keyed on the id alone would survive
+  a re-upload and show "reviewed by dealer" over a photograph nobody at the dealership
+  had seen — item 63's failure, reopened by the feature meant to close it.
 - **A refused credential is never reported as a missing document.** Letting a 401
   fall through to "not found" would make a revoked key look like a platform that had
   never stored anything — and nobody would go and read the configuration.

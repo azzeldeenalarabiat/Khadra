@@ -12,7 +12,7 @@ no Render feature and no connection string leaving the browser.
 
 Generated with `dotnet ef migrations script --idempotent`, so it is safe to run
 again — each migration is wrapped in a check against `__EFMigrationsHistory`.
-Creates 22 tables plus that history table, the `btree_gist` extension, and the
+Creates 25 tables plus that history table, the `btree_gist` extension, and the
 `bookings_one_hold_per_vehicle` exclusion constraint that stops two live bookings
 overlapping on one vehicle.
 
@@ -43,10 +43,16 @@ BEFORE   anon reading users: 0            (readable)
 AFTER    anon reading users: ERROR: permission denied for table users
          anon reading customer_documents: ERROR: permission denied
          app  reading users: 0            (unaffected)
-         tables with RLS: 23/23
+         tables with RLS: 25/25
 ```
 
 Run 1 then 2, in the Supabase SQL editor.
+
+**Script 2 must be re-run after every migration that adds a table.** It loops over
+`pg_tables`, so it needs no editing — but a table created after the last run has RLS
+off and is published through PostgREST until it does. `document_access_entries` is
+the table that made this worth stating: it records who opened which customer's
+passport, and it is exactly what the anon key must never reach.
 
 ## 3. `verify-admin.sql`
 

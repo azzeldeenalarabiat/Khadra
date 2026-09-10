@@ -1450,3 +1450,60 @@ button.cal-day[disabled] {
   background: var(--c);
   flex: none;
 }
+
+/* ── The renter's identity papers on a booking (spec 5.1, pre-launch item 63) ──────────────────
+   The gallery checks a licence against the person at the counter, so a revealed document has to be
+   big enough to read a name and a date off. Nothing is fetched until they ask: these are
+   photographs of a private individual's passport, and a page that loaded them on open would put
+   them in front of whoever walked past. */
+.renter-docs {
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.renter-doc {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.renter-doc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.renter-doc-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Pushes the action to the far edge in both directions; `auto` on the inline-start margin is the
+   logical form, so it lands on the left under dir="rtl" without a second rule. */
+.renter-doc-actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.renter-doc-meta {
+  font-size: 11px;
+  color: var(--text-42);
+}
+
+/* The revealed document. A cap rather than a fixed size: a licence photographed in portrait and one
+   in landscape both have to fit without the panel jumping. */
+.renter-doc-preview {
+  display: block;
+  inline-size: 100%;
+  max-block-size: 420px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-divider);
+  background: var(--color-neutral-100);
+}

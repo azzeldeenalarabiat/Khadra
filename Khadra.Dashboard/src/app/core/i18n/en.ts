@@ -356,7 +356,8 @@ export const EN = {
   'auth.register.galleryNextBody':
     'Once you sign in, you submit the gallery itself — its name, its commercial registration and its licence papers. An administrator checks them before you can list cars.',
   // Why a registration was refused. Keyed off the server's stable `code`; the sentence is ours.
-  'auth.register.err.noResponse': 'The service did not respond. Nothing was created; try again shortly.',
+  'auth.register.err.noResponse':
+    'The service did not respond. Nothing was created; try again shortly.',
   'auth.register.err.emailTaken':
     'An account already exists for this email address. Sign in instead, or use another address.',
   'auth.register.err.phoneTaken': 'An account already exists for this phone number.',
@@ -488,7 +489,8 @@ export const EN = {
   'dealerReview.requestClarification': 'Request clarification',
   'dealerReview.suspendDealer': 'Suspend dealer',
   'dealerReview.whereItIs': 'Where it is',
-  'dealerReview.noAddressRecorded': 'No address recorded. The pin below is the location the applicant gave.',
+  'dealerReview.noAddressRecorded':
+    'No address recorded. The pin below is the location the applicant gave.',
   'dealerReview.verificationDocuments': 'Verification documents',
 
   // Bookings list (admin).
@@ -712,8 +714,10 @@ export const EN = {
   'dealerBooking.customer': 'Customer',
   'dealerBooking.history': 'History on Khadra',
   'dealerBooking.historyHint': 'What the platform recorded. Not shared by other galleries.',
-  'dealerBooking.noHistory': 'No history on Khadra yet. This is their first booking on the platform.',
-  'dealerBooking.historyClosed': 'A customer\u2019s history is shown only while this booking is live.',
+  'dealerBooking.noHistory':
+    'No history on Khadra yet. This is their first booking on the platform.',
+  'dealerBooking.historyClosed':
+    'A customer\u2019s history is shown only while this booking is live.',
   'dealerBooking.ratedByGalleries': 'Rated by galleries',
   'dealerBooking.ratingsCount': 'from {count} rating(s)',
   'dealerBooking.notRatedYet': 'Not rated yet',
@@ -728,8 +732,6 @@ export const EN = {
     'A score only \u2014 there is no comment. Other galleries see the average, never who gave it. Yours stays hidden until the customer rates you or the window closes.',
   'dealerBooking.youRated': 'You rated this customer',
   'dealerBooking.rateSaved': 'Rating saved.',
-  'dealerBooking.documentsOnFileAre':
-    'Documents on file are checked by the platform, not shown here',
   'dealerBooking.financial': 'Financial',
   'dealerBooking.freeCancellation': 'Free cancellation',
   'dealerBooking.openADispute': 'Open a dispute',
@@ -804,7 +806,8 @@ export const EN = {
   'dealerDelivery.radiusMustBeBetween': 'The radius must be between 0 and {max} km.',
   'dealerDelivery.serviceDidNotRespond': 'The service did not respond. Nothing has been changed.',
   'dealerDelivery.switchedOnTitle': 'Delivery switched on',
-  'dealerDelivery.switchedOnBody': 'Customers within {radius} km of your location can ask for delivery.',
+  'dealerDelivery.switchedOnBody':
+    'Customers within {radius} km of your location can ask for delivery.',
   'dealerDelivery.switchedOffTitle': 'Delivery switched off',
   'dealerDelivery.switchedOffBody': 'Customers will collect from your location only.',
   'dealerDelivery.unsavedChanges': 'Unsaved changes',
@@ -861,17 +864,23 @@ export const EN = {
   'dealerApply.chooseACityOr':
     'Choose a city, or type a latitude and longitude, and the map will appear so you can place the pin exactly.',
   'dealerApply.clearThePin': 'Clear the pin',
-  'dealerApply.clickTheMapTo': 'Click the map where your gallery is, or use your current location. You can drag the pin afterwards to put it on the door.',
-  'dealerApply.couldNotFindYou': 'Your device could not work out where you are. Click the map instead.',
+  'dealerApply.clickTheMapTo':
+    'Click the map where your gallery is, or use your current location. You can drag the pin afterwards to put it on the door.',
+  'dealerApply.couldNotFindYou':
+    'Your device could not work out where you are. Click the map instead.',
   'dealerApply.findingYou': 'Finding you…',
-  'dealerApply.locationPermissionRefused': 'This browser was not given permission to share your location. Click the map instead, or allow location for this site and try again.',
-  'dealerApply.thisBrowserCannot': 'This browser cannot share your location. Click the map to place the pin.',
+  'dealerApply.locationPermissionRefused':
+    'This browser was not given permission to share your location. Click the map instead, or allow location for this site and try again.',
+  'dealerApply.thisBrowserCannot':
+    'This browser cannot share your location. Click the map to place the pin.',
   'dealerApply.useMyLocation': 'Use my current location',
   'dealerApply.whereYourGalleryIs': 'Where your gallery is',
   'dealerApply.area': 'Area',
   'dealerApply.street': 'Street',
-  'dealerApply.theNeighbourhoodACustomer': 'The neighbourhood a customer would name to a taxi driver.',
-  'dealerApply.manyStreetsHaveNo': 'Many streets have no recorded name. Leave it blank if yours does not.',
+  'dealerApply.theNeighbourhoodACustomer':
+    'The neighbourhood a customer would name to a taxi driver.',
+  'dealerApply.manyStreetsHaveNo':
+    'Many streets have no recorded name. Leave it blank if yours does not.',
   'dealerApply.lookingUpThatSpot': 'Looking up that spot…',
   'dealerApply.city': 'City',
   'dealerApply.commercialRegistrationNumber': 'Commercial registration number',
@@ -1133,6 +1142,49 @@ export const EN = {
 
   // A verification document tile.
   'docTile.openSecurePreview': 'Open secure preview',
+
+  // What a private document will be served as. From the server's own content type, never guessed.
+  'docFormat.pdf': 'PDF',
+  'docFormat.jpeg': 'JPEG image',
+  'docFormat.png': 'PNG image',
+  'docFormat.webp': 'WebP image',
+
+  // The renter's identity papers, on the dealer's booking screen (spec 5.1).
+  'renterDocs.title': 'Renter’s documents',
+  'renterDocs.hint': 'Check these against the person in front of you before handing over the car.',
+  'renterDocs.type.drivingLicenceFront': 'Driving licence — front',
+  'renterDocs.type.drivingLicenceBack': 'Driving licence — back',
+  'renterDocs.type.nationalId': 'National ID',
+  'renterDocs.type.passport': 'Passport',
+  'renterDocs.viewLicence': 'View driving licence',
+  'renterDocs.hideLicence': 'Hide documents',
+  'renterDocs.view': 'View',
+  'renterDocs.hide': 'Hide',
+  'renterDocs.openInANewTab': 'Open in a new tab',
+  'renterDocs.uploaded': 'Uploaded',
+  'renterDocs.notOnFile': 'Not on file: {documents}',
+  'renterDocs.nothingOnFile':
+    'This renter has not uploaded any documents. You cannot complete the licence check from the console.',
+  'renterDocs.closed': 'A renter’s documents are shown only while this booking is live.',
+  'renterDocs.failed': 'The documents could not be loaded. Nothing has changed.',
+  'renterDocs.imageFailed': 'That document could not be opened. Try again.',
+  'renterDocs.notVerifiedByThePlatform':
+    'Khadra does not verify these. What you see is what the renter uploaded.',
+
+  // Recording that the DEALERSHIP checked a document. Never "verified by Khadra": the platform
+  // authenticates nothing, and the notice below says so in the same breath as the control.
+  'renterDocs.reviewedByDealer': 'Reviewed by dealer',
+  'renterDocs.notReviewed': 'Not reviewed',
+  'renterDocs.markAsReviewed': 'Mark as reviewed',
+  'renterDocs.reviewedAt': 'Reviewed',
+  'renterDocs.reviewedBy': 'Reviewed by',
+  'renterDocs.reviewSaved': 'Recorded as reviewed by your dealership.',
+  'renterDocs.reviewFailed': 'That could not be recorded. Nothing has changed.',
+  'renterDocs.reviewMeaning':
+    'Marking a document as reviewed records that your dealership looked at it. It is not a check by Khadra: the platform does not confirm that a document is genuine, current, or registered with any authority.',
+
+  // Joins a list of names into a sentence. Arabic uses its own comma.
+  'common.listSeparator': ', ',
 
   // Toasts.
   'toast.dismiss': 'Dismiss',
@@ -1486,7 +1538,8 @@ export const EN = {
   'dealerDashboard.heldForTheirDates': 'held for their dates',
   'dealerDashboard.revenueThisMonth': 'Revenue · this month',
   'dealerDashboard.occupancyRate': 'Occupancy rate',
-  'dealerBooking.theAnswerWindowHasClosed': 'The answer window has closed. This request can only be rejected now.',
+  'dealerBooking.theAnswerWindowHasClosed':
+    'The answer window has closed. This request can only be rejected now.',
   'dealerEmployees.staffIsTheOwners': 'Staff is the owner’s to manage',
   'dealerEmployees.whoWorksHereWhat':
     'Who works here, what they may see, and who is invited or deactivated are the dealer owner’s decisions. Your own access is on the Settings screen.',

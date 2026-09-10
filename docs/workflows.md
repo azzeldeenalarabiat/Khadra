@@ -268,7 +268,10 @@ next deploy.
 ### How a document is read
 
 The bucket is private and **no Supabase URL is ever minted** — not public, not
-signed. Instead:
+signed. There are two routes in, chosen by how long the reader's right lasts.
+
+**A signed link, for a right that is stable for a session** — an admin reviewing a
+dealership, a customer opening their own paperwork, either party to a dispute:
 
 ```
 API mints an HMAC-signed link, 5 minutes, on OUR domain
@@ -278,8 +281,57 @@ API mints an HMAC-signed link, 5 minutes, on OUR domain
   → streamed back with Cache-Control: no-store, private
 ```
 
-One authorisation path, one clock, and nothing to revoke on the storage provider's
-side. Reasoning in [security.md](security.md#documents-are-reached-one-way-only).
+**A booking-scoped stream, for a right that can end at any moment** — the gallery
+checking the licence of the person they are handing a car to (spec 5.1):
+
+```
+GET  /api/v1/bookings/{bookingId}/renter-documents             → what is on file
+GET  /api/v1/bookings/{bookingId}/renter-documents/{id}        → the bytes
+POST /api/v1/bookings/{bookingId}/renter-documents/{id}/review → the gallery checked it
+  → dealer-staff policy
+  → membership: the owner, or an ACTIVE employee
+  → the booking is this dealership's, else 404 booking.not_found
+  → the booking is LIVE, else 409 booking.renter_documents_not_available
+  → the renter is read OFF the booking; a document that is not theirs is 404
+  → streamed back with Cache-Control: no-store, private
+```
+
+The whole check runs again on every byte-serving request, so access ends the instant
+the booking stops being live rather than when a link happens to expire. Nothing but
+two ids reaches the browser: no storage key, no signature, no customer id.
+
+### Recording that the gallery checked a document
+
+`POST …/review` records that this dealership looked. **It is not a verification.**
+The wording on screen is "reviewed by dealer" / "تمت مراجعتها من المعرض", and the
+panel says in as many words that Khadra does not confirm a document is genuine,
+current or registered anywhere.
+
+- **No request body.** The reviewer comes from the validated token and the timestamp
+  from the server clock, so neither is on the wire to be forged.
+- **Reviewing is allowed exactly where viewing is.** The same `Booking.IsLive` gate,
+  enforced inside the aggregate as well as the handler, so the action disappears at
+  the instant the access does — with the same 409 code, which the console already
+  renders as "your window has closed".
+- **Safe to press twice.** A repeat answers 200 with the review that already exists,
+  timestamp intact, and writes no second audit row. A true simultaneous double-submit
+  loses at a unique index and answers 409 `data.conflict`.
+- **One reviewer, the first.** A colleague pressing it afterwards does not take the
+  credit; their own looking is already on the log as `Viewed`.
+- **A re-photographed document needs a new look.** The review is keyed on the upload
+  instant, so replacing the file clears the badge.
+
+### The disclosure log
+
+Every `Viewed` and every `Reviewed` writes a row to `document_access_entries`: who,
+dealership, booking, renter, document, upload instant, action, when. Append-only in
+the application and in the database (`UPDATE`, `DELETE` and `TRUNCATE` all refused).
+No storage key, no URL, no bytes. The `Viewed` row commits before the response body,
+and a view that cannot be recorded is not served. Reasoning in
+[security.md](security.md#every-disclosure-leaves-a-record-that-cannot-be-edited).
+
+Reasoning in
+[security.md](security.md#documents-are-reached-through-this-platform-never-by-address).
 
 ### The presigned upload ticket
 

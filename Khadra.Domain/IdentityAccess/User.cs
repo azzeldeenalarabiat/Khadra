@@ -198,10 +198,49 @@ public sealed class User : AggregateRoot, ISoftDeletable
     /// international driving permit is still an open owner decision (spec 2.2), so it is not required
     /// here and this will need revisiting once that is settled.
     /// </summary>
-    public bool HasCompleteRenterDocuments =>
-        _documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceFront) &&
-        _documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceBack) &&
-        _documents.Any(document => document.Type.IsIdentity);
+    public bool HasCompleteRenterDocuments => MissingRenterDocumentTypes().Count == 0;
+
+    /// <summary>
+    /// Which of the required renter documents this person has not filed, in the order they are asked
+    /// for.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than in a handler because TWO screens ask it and they must not disagree: the
+    /// customer's own checklist tells them what to upload, and the gallery's handover panel says what
+    /// it could not show them. Computed separately in each place, a change to the rule -- an
+    /// international driving permit for foreign renters, once spec 2.2 settles it -- would land in one
+    /// list and not the other, and the gallery would be the one told the paperwork was complete.
+    /// <see cref="HasCompleteRenterDocuments"/> is the same rule asked as a yes/no, so the two cannot
+    /// drift either.
+    ///
+    /// The identity slot is ONE requirement with two possible answers (spec 5.1: a national ID for a
+    /// local renter, a passport for a foreign one), so it names the document this particular person
+    /// owes rather than both.
+    ///
+    /// A METHOD, not a property, and that is load-bearing rather than style. EF discovers navigations
+    /// before it checks for a setter, so a get-only collection property of a reference type becomes a
+    /// navigation candidate -- and this one made EF try to map CustomerDocumentType as an entity,
+    /// failing the whole model build with "no suitable constructor" and taking every test that
+    /// touches a DbContext with it. A method is invisible to that convention, so no configuration has
+    /// to know this computation exists. Anything else derived from <see cref="Documents"/> should be
+    /// a method for the same reason.
+    /// </remarks>
+    public IReadOnlyList<CustomerDocumentType> MissingRenterDocumentTypes()
+    {
+        var missing = new List<CustomerDocumentType>();
+        if (!_documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceFront))
+            missing.Add(CustomerDocumentType.DrivingLicenceFront);
+        if (!_documents.Any(document => document.Type == CustomerDocumentType.DrivingLicenceBack))
+            missing.Add(CustomerDocumentType.DrivingLicenceBack);
+        if (!_documents.Any(document => document.Type.IsIdentity))
+        {
+            missing.Add(IsForeignNational
+                ? CustomerDocumentType.Passport
+                : CustomerDocumentType.NationalId);
+        }
+
+        return missing;
+    }
 
     public CustomerDocument? FindDocument(Id documentId) =>
         _documents.SingleOrDefault(document => document.Id == documentId);

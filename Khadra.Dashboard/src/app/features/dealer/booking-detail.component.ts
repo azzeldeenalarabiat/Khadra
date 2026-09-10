@@ -9,7 +9,7 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
-import { KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
+import { KeyValue, TimelineStep, Tone, toneClass } from '../../core/models/console.models';
 import { Booking } from '../../core/models/bookings.api';
 import { DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
@@ -20,8 +20,10 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { BookingDecisions } from './booking-decisions';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { toRenterDocumentsPanel } from './renter-documents.presenter';
 
 /**
  * One booking, from the dealer's side (design: Dealer Console, `isBooking`).
@@ -40,6 +42,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 export class DealerBookingDetailComponent {
   protected readonly t = inject(I18nService).t;
   protected readonly statusLabel = inject(I18nService).statusLabel;
+  private readonly format = inject(FormatService);
   private readonly service = inject(DealerBookingsService);
   private readonly console = inject(DealerConsoleService);
   private readonly disputes = inject(DealerDisputesService);
@@ -55,6 +58,13 @@ export class DealerBookingDetailComponent {
 
   constructor() {
     effect(() => this.service.viewing.set(this.bookingId()));
+    // Moving to another booking puts every open document away. A passport left on screen from the
+    // previous customer is the kind of leak nobody notices until it is in front of the wrong person.
+    effect(() => {
+      this.bookingId();
+      this.revealed.set(new Set());
+      this.brokenPreviews.set(new Set());
+    });
   }
 
   protected readonly resource = this.service.booking;
@@ -119,7 +129,8 @@ export class DealerBookingDetailComponent {
   protected readonly meta = computed(() => {
     const b = this.booking();
     if (!b) return '';
-    const method = b.pickupMethod === 'Delivery' ? 'delivery' : this.t('dealerBooking.pickupAtYourLocation');
+    const method =
+      b.pickupMethod === 'Delivery' ? 'delivery' : this.t('dealerBooking.pickupAtYourLocation');
     return `Requested ${this.dateTime(b.requestedAt ?? b.createdAt)} · ${b.customerName} · ${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'} · ${method}`;
   });
 
@@ -158,14 +169,167 @@ export class DealerBookingDetailComponent {
    * booking is no longer live, so the gallery's access has ended (409 from the server), or the
    * request has not landed yet. Neither is an error to show.
    */
-  protected readonly reputation = computed(() => this.service.reputation.value() ?? null);
+  // Through `loaded`, not `value() ?? null`. The `??` never runs: `Resource.value()` THROWS in the
+  // error state rather than returning undefined, and the error state is this panel's normal answer
+  // once the booking stops being live. Read raw, `reputationClosed` threw during change detection
+  // and took the whole screen with it — the failure `loaded()` was written for.
+  protected readonly reputation = loaded(this.service.reputation);
 
   /** True when the access rule -- not a failure -- is why there is nothing to show. */
   protected readonly reputationClosed = computed(
     () => this.service.reputation.status() === 'error' && !this.reputation(),
   );
 
-  protected readonly myCustomerRating = computed(() => this.service.customerRating.value() ?? null);
+  protected readonly myCustomerRating = loaded(this.service.customerRating);
+
+  // ── The renter's identity papers (spec 5.1, pre-launch item 63) ───────────────────────────────
+
+  /**
+   * What the documents panel is showing.
+   *
+   * Derived from the resource's OWN status and status code, never from "did the request fail". The
+   * server has two failures here that mean opposite things: 409 is the access rule working — the
+   * booking is no longer live and the window has closed — and anything else is a fault the gallery
+   * should retry. Rendering both as "the service did not respond" is the mistake the frontend rules
+   * describe, and here it would tell a gallery the platform is broken when it is behaving exactly as
+   * designed.
+   */
+  private readonly renterDocumentsValue = loaded(this.service.renterDocuments);
+
+  protected readonly renterDocuments = computed(() =>
+    toRenterDocumentsPanel(
+      this.service.renterDocuments.status(),
+      // Through `loaded`, NEVER `value()` directly. `Resource.value()` throws in the error state, and
+      // 409 — a booking that is no longer live — is this panel's most ordinary answer. Read raw, the
+      // computed would throw during change detection on every Returned, Completed, Cancelled,
+      // Expired, Rejected and NoShow booking, taking the whole detail screen down with it rather
+      // than showing the one sentence it was written to show.
+      this.renterDocumentsValue() ?? undefined,
+      (this.service.renterDocuments.error() as { error?: { code?: string } } | undefined)?.error
+        ?.code,
+      this.bookingId() ?? '',
+      (bookingId, documentId) => this.service.renterDocumentUrl(bookingId, documentId),
+      this.t,
+      (iso) => this.format.dateTime(iso),
+    ),
+  );
+
+  /**
+   * Which documents are on screen right now.
+   *
+   * Nothing is fetched until the gallery asks. These are photographs of a named private
+   * individual's passport and licence, and a booking screen that loaded them unbidden would put
+   * them in front of everyone who opens the page and everyone standing behind them — including on
+   * bookings nobody is handing over today.
+   */
+  private readonly revealed = signal<ReadonlySet<string>>(new Set());
+
+  /** Ids whose image the browser could not load, so the tile says so instead of showing a gap. */
+  protected readonly brokenPreviews = signal<ReadonlySet<string>>(new Set());
+
+  /** The tiles, or none. Read separately so the template never narrows the union itself. */
+  protected readonly renterTiles = computed(() => {
+    const panel = this.renterDocuments();
+    return panel.kind === 'ready' ? panel.tiles : [];
+  });
+
+  /** The sentence naming what the renter has not filed, or null when nothing is outstanding. */
+  protected readonly renterMissing = computed(() => {
+    const panel = this.renterDocuments();
+    return panel.kind === 'ready' ? panel.missing : null;
+  });
+
+  protected readonly closedNote = computed(() => {
+    const panel = this.renterDocuments();
+    return panel.kind === 'closed' ? panel.note : '';
+  });
+
+  protected readonly failedNote = computed(() => {
+    const panel = this.renterDocuments();
+    return panel.kind === 'failed' ? panel.note : '';
+  });
+
+  protected readonly toneClass = toneClass;
+
+  protected isRevealed(documentId: string): boolean {
+    return this.revealed().has(documentId);
+  }
+
+  protected isBroken(documentId: string): boolean {
+    return this.brokenPreviews().has(documentId);
+  }
+
+  /** True once anything is showing, so the section-level control can offer to put it away again. */
+  protected readonly anyRevealed = computed(() => this.revealed().size > 0);
+
+  protected toggleDocument(documentId: string): void {
+    this.revealed.update((shown) => {
+      const next = new Set(shown);
+      if (!next.delete(documentId)) next.add(documentId);
+      return next;
+    });
+    this.brokenPreviews.update((broken) => {
+      const next = new Set(broken);
+      next.delete(documentId);
+      return next;
+    });
+  }
+
+  /**
+   * The licence check itself: both sides at once, which is what spec 5.1 asks the gallery to do.
+   *
+   * Pressed again, it puts EVERYTHING away rather than only the licence — a gallery that has finished
+   * with the counter wants the screen clear, and leaving a passport open because it was revealed by a
+   * different button is not a distinction worth defending in front of a customer.
+   */
+  protected toggleLicence(): void {
+    if (this.anyRevealed()) {
+      this.revealed.set(new Set());
+      this.brokenPreviews.set(new Set());
+      return;
+    }
+
+    const panel = this.renterDocuments();
+    if (panel.kind !== 'ready') return;
+    this.revealed.set(
+      new Set(panel.tiles.filter((tile) => tile.isLicence).map((tile) => tile.documentId)),
+    );
+  }
+
+  protected previewFailed(documentId: string): void {
+    this.brokenPreviews.update((broken) => new Set(broken).add(documentId));
+  }
+
+  /** Which document is being recorded right now, so its own button can say so and be disabled. */
+  protected readonly reviewingDocumentId = signal<string | null>(null);
+
+  /**
+   * Records that this dealership checked one document.
+   *
+   * Nothing about the reviewer or the time is sent: the server takes both from the validated token
+   * and its own clock. The guard here is only against a double click producing two requests — the
+   * server is idempotent anyway, and answers the second with the first review, timestamp intact.
+   */
+  protected async markReviewed(documentId: string): Promise<void> {
+    const b = this.booking();
+    if (!b || this.reviewingDocumentId()) return;
+
+    this.reviewingDocumentId.set(documentId);
+    this.problem.set(null);
+    try {
+      await this.service.reviewRenterDocument(b.bookingId, documentId);
+      // Re-read rather than patching a local copy: the review that now stands is the SERVER's, and
+      // on a repeat that is the original one with its original timestamp.
+      this.service.renterDocuments.reload();
+      this.ui.showToast(this.t('renterDocs.reviewedByDealer'), this.t('renterDocs.reviewSaved'));
+    } catch (error: unknown) {
+      // A 409 here means the window closed between the listing and the click. The panel's own state
+      // will say so on the next load; this line is for everything else.
+      this.problem.set(describe(error, this.t));
+    } finally {
+      this.reviewingDocumentId.set(null);
+    }
+  }
 
   /**
    * Whether the gallery may rate this customer now.
@@ -192,7 +356,7 @@ export class DealerBookingDetailComponent {
     try {
       await this.service.rateCustomer(b.bookingId, rating);
       this.service.refresh();
-      this.ui.showToast(this.t("dealerBooking.rateCustomer"), this.t("dealerBooking.rateSaved"));
+      this.ui.showToast(this.t('dealerBooking.rateCustomer'), this.t('dealerBooking.rateSaved'));
     } catch (error: unknown) {
       this.problem.set(describe(error, this.t));
     } finally {
@@ -203,9 +367,19 @@ export class DealerBookingDetailComponent {
   protected readonly vehicleRows = computed<readonly KeyValue[]>(() => {
     const b = this.booking();
     if (!b) return [];
-    if (!b.vehicle) return [{ k: this.t('dealerBooking.vehicle'), v: this.t('dealerBooking.noLongerListed'), tone: 'dim' }];
+    if (!b.vehicle)
+      return [
+        {
+          k: this.t('dealerBooking.vehicle'),
+          v: this.t('dealerBooking.noLongerListed'),
+          tone: 'dim',
+        },
+      ];
     return [
-      { k: this.t('dealerBooking.vehicle'), v: `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` },
+      {
+        k: this.t('dealerBooking.vehicle'),
+        v: `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}`,
+      },
       { k: this.t('dealerBooking.plate'), v: b.vehicle.plateNumber },
       { k: this.t('common.colour'), v: b.vehicle.color ?? '—' },
       {
@@ -221,14 +395,23 @@ export class DealerBookingDetailComponent {
     return [
       { k: this.t('dealerBooking.start'), v: this.dateTime(b.periodStart) },
       { k: this.t('dealerBooking.end'), v: this.dateTime(b.periodEnd) },
-      { k: this.t('dealerBooking.duration'), v: `${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'}` },
+      {
+        k: this.t('dealerBooking.duration'),
+        v: `${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'}`,
+      },
       {
         k: this.t('vehicleWizard.mileage'),
         v: b.pricing.mileageUnlimited
           ? 'Unlimited'
           : `${b.pricing.mileageDailyLimitKm} km/day, ${b.pricing.mileageExcessFeePerKm?.amount ?? 0} ${b.pricing.dailyRate.currency}/km over`,
       },
-      { k: this.t('common.fuel'), v: b.pricing.fuelPolicy === 'FullToFull' ? this.t('vehicleWizard.fullToFull') : this.t('vehicleWizard.sameToSame') },
+      {
+        k: this.t('common.fuel'),
+        v:
+          b.pricing.fuelPolicy === 'FullToFull'
+            ? this.t('vehicleWizard.fullToFull')
+            : this.t('vehicleWizard.sameToSame'),
+      },
     ];
   });
 
@@ -236,7 +419,9 @@ export class DealerBookingDetailComponent {
     const b = this.booking();
     if (!b) return [];
     if (b.pickupMethod !== 'Delivery' || !b.deliveryLocation) {
-      return [{ k: this.t('dealerBooking.method'), v: this.t('dealerBooking.collectedFromYourLocation') }];
+      return [
+        { k: this.t('dealerBooking.method'), v: this.t('dealerBooking.collectedFromYourLocation') },
+      ];
     }
     return [
       { k: this.t('dealerBooking.method'), v: 'Delivery' },
@@ -274,7 +459,10 @@ export class DealerBookingDetailComponent {
         v: `${b.pricing.rentalTotal.amount}`,
       },
       { k: this.t('dealerBooking.deliveryFeeYours'), v: `${b.pricing.deliveryFee.amount}` },
-      { k: this.t('dealerBooking.securityDepositHeldPer'), v: `${b.pricing.securityDeposit.amount}` },
+      {
+        k: this.t('dealerBooking.securityDepositHeldPer'),
+        v: `${b.pricing.securityDeposit.amount}`,
+      },
       {
         k: `Deposit paid by card (${b.pricing.depositPercent}%)`,
         v: paidDeposit ? `${b.pricing.depositAmount.amount}` : '0',
@@ -289,14 +477,29 @@ export class DealerBookingDetailComponent {
             },
           ]
         : settling
-          ? [{ k: this.t('dealerBooking.balanceCollectedInCash'), v: `${b.pricing.balanceDue.amount}` }]
-          : [{ k: this.t('common.deposit'), v: this.t('dealerBooking.heldPendingSettlementSee'), dim: true }]),
+          ? [
+              {
+                k: this.t('dealerBooking.balanceCollectedInCash'),
+                v: `${b.pricing.balanceDue.amount}`,
+              },
+            ]
+          : [
+              {
+                k: this.t('common.deposit'),
+                v: this.t('dealerBooking.heldPendingSettlementSee'),
+                dim: true,
+              },
+            ]),
       {
         k: `Platform commission · ${b.terms.commissionPercent}% (frozen on this booking)`,
         // Computed by the API at the frozen rate; the console never multiplies money.
         v: `−${b.commissionAmount.amount}`,
       },
-      { k: this.t('dealerReports.netPayout'), v: this.t('dealerReports.notAvailableYet'), dim: true },
+      {
+        k: this.t('dealerReports.netPayout'),
+        v: this.t('dealerReports.notAvailableYet'),
+        dim: true,
+      },
     ];
   });
 
@@ -457,7 +660,9 @@ export class DealerBookingDetailComponent {
   }
 
   protected carName(b: Booking): string {
-    return b.vehicle ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` : this.t('dealerBooking.theVehicle');
+    return b.vehicle
+      ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}`
+      : this.t('dealerBooking.theVehicle');
   }
 
   protected dateTime(iso: string): string {
@@ -492,7 +697,10 @@ export class DealerBookingDetailComponent {
   }
 
   private actor(party: string, userId: string | null): string {
-    if (party === 'Dealer') return userId ? this.t('dealerBooking.byYourStaff') : this.t('dealerBooking.byYourDealership');
+    if (party === 'Dealer')
+      return userId
+        ? this.t('dealerBooking.byYourStaff')
+        : this.t('dealerBooking.byYourDealership');
     if (party === 'Customer') return this.t('dealerBooking.byTheCustomer');
     return this.t('dealerBooking.byThePlatform');
   }
@@ -515,6 +723,13 @@ function describe(error: unknown, t: (key: TranslationKey) => string): string {
       return t('dealerBooking.aDisputeIsAlready');
     case 'dispute.invalid_evidence_type':
       return t('dealerBooking.evidenceMustBeA');
+    // The window closed between the listing and the click. The panel says the same thing on its next
+    // load; this is what the gallery reads in the meantime.
+    case 'booking.renter_documents_not_available':
+      return t('renterDocs.closed');
+    case 'documents.not_found':
+    case 'booking.not_found':
+      return t('renterDocs.reviewFailed');
     default:
       return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
   }

@@ -106,24 +106,14 @@ public sealed class ListCustomerDocumentsHandler(IUserRepository users)
         if (user is null)
             return IdentityErrors.UserNotFound;
 
-        var held = user.Documents.Select(document => document.Type).ToList();
-        var missing = new List<string>();
-        if (!held.Contains(CustomerDocumentType.DrivingLicenceFront))
-            missing.Add(CustomerDocumentType.DrivingLicenceFront.Name);
-        if (!held.Contains(CustomerDocumentType.DrivingLicenceBack))
-            missing.Add(CustomerDocumentType.DrivingLicenceBack.Name);
-        if (!held.Any(type => type.IsIdentity))
-        {
-            // Spec 5.1: a local renter files a national ID, a foreign one a passport.
-            missing.Add(user.IsForeignNational
-                ? CustomerDocumentType.Passport.Name
-                : CustomerDocumentType.NationalId.Name);
-        }
-
         return new CustomerDocumentsDto(
             [.. user.Documents.OrderBy(document => document.Type.Id).Select(CustomerDocumentDto.From)],
             user.HasCompleteRenterDocuments,
-            missing);
+            // The aggregate's rule, not this handler's copy of it. The gallery's handover panel asks
+            // the same question through a different endpoint, and a rule stated twice is a rule that
+            // drifts -- the way it would drift is the customer being told their paperwork is complete
+            // while the gallery is told something is missing.
+            [.. user.MissingRenterDocumentTypes().Select(type => type.Name)]);
     }
 }
 

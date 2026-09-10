@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using CSharpFunctionalExtensions;
 using Khadra.Domain.Common;
+using Khadra.Domain.IdentityAccess;
 using Entity = Khadra.Domain.Common.Entity;
 using ValueObject = Khadra.Domain.Common.ValueObject;
 
@@ -192,4 +193,98 @@ public sealed class BookingStatusChange : Entity
             Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
             OccurredAt = now
         };
+}
+
+/// <summary>
+/// A record that this dealership LOOKED at one of the renter's documents (spec 5.1).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>This is not a verification, and the wording is load-bearing.</b> It says that the gallery
+/// handling this booking opened the file the renter uploaded and satisfied itself. It makes no claim
+/// that the document is authentic, current, or checked against any register — Khadra does not do
+/// that, and pre-launch item 27 is where whether anyone ever will gets decided. The platform's own
+/// <c>CustomerDocument.Status</c> is a separate, still-unused field and this deliberately does not
+/// touch it.
+/// </para>
+/// <para>
+/// It hangs off the BOOKING, not off the document, because that is what it is a fact about. Two
+/// galleries renting to the same customer each check the licence for themselves, and neither one's
+/// look says anything about the other's.
+/// </para>
+/// <para>
+/// <b><see cref="DocumentUploadedAt"/> is part of the identity of the thing reviewed, not decoration.</b>
+/// <c>CustomerDocument.Replace</c> keeps the row's id and swaps the file underneath it — that is what
+/// makes a re-photographed licence a replacement rather than a pile of attempts. A review keyed on
+/// the document id alone would therefore survive the swap, and the console would show "reviewed by
+/// dealer" over a file nobody at the dealership has ever seen, at the moment the car is handed over.
+/// That is item 63's failure reopened by the feature meant to close it. The upload instant is the
+/// version, and a new photograph needs a new look.
+/// </para>
+/// </remarks>
+public sealed class RenterDocumentReview : Entity
+{
+    public const int MaxReviewerNameLength = 200;
+
+    public Id BookingId { get; private set; }
+
+    /// <summary>The document, by id only: it belongs to IdentityAccess and is never navigated to.</summary>
+    public Id DocumentId { get; private set; }
+
+    /// <summary>Which paper it was, so the record still reads if the document row is ever gone.</summary>
+    public CustomerDocumentType DocumentType { get; private set; } = null!;
+
+    /// <summary>Which UPLOAD was reviewed. See the remarks: this is half the key.</summary>
+    public DateTimeOffset DocumentUploadedAt { get; private set; }
+
+    public Id ReviewedByUserId { get; private set; }
+
+    /// <summary>
+    /// The reviewer's name as it was at the time.
+    /// </summary>
+    /// <remarks>
+    /// Snapshotted rather than looked up, the same rule <c>AuditEntry.ActorName</c> follows: "reviewed
+    /// by Layla Haddad" has to keep reading correctly after she leaves the dealership and her employee
+    /// row is deactivated, which is exactly when someone goes looking for who checked the licence.
+    /// </remarks>
+    public string ReviewedByName { get; private set; } = null!;
+
+    public DateTimeOffset ReviewedAt { get; private set; }
+
+    private RenterDocumentReview()
+    {
+    }
+
+    private RenterDocumentReview(Id id) : base(id)
+    {
+    }
+
+    internal static RenterDocumentReview Record(
+        Id bookingId,
+        Id documentId,
+        CustomerDocumentType documentType,
+        DateTimeOffset documentUploadedAt,
+        Id reviewedByUserId,
+        string reviewedByName,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(documentType);
+        if (bookingId.IsEmpty || documentId.IsEmpty)
+            throw new DomainException("A document review requires a booking and a document.");
+        if (reviewedByUserId.IsEmpty)
+            throw new DomainException("A document review requires the person who made it.");
+        if (string.IsNullOrWhiteSpace(reviewedByName))
+            throw new DomainException("A document review requires the reviewer's name.");
+
+        return new RenterDocumentReview(Id.New())
+        {
+            BookingId = bookingId,
+            DocumentId = documentId,
+            DocumentType = documentType,
+            DocumentUploadedAt = documentUploadedAt,
+            ReviewedByUserId = reviewedByUserId,
+            ReviewedByName = reviewedByName.Trim()[..Math.Min(reviewedByName.Trim().Length, MaxReviewerNameLength)],
+            ReviewedAt = now
+        };
+    }
 }

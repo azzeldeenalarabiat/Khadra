@@ -15,7 +15,7 @@ namespace Khadra.Domain.Auditing;
 //   application can quietly rewrite is not an audit trail.
 // - PreviousValue and NewValue are short display strings, never serialised entities. Nothing secret
 //   (hashes, tokens, contact details) is written here; every admin can read this table.
-public sealed class AuditEntry : AggregateRoot
+public sealed class AuditEntry : AggregateRoot, IAppendOnly
 {
     public const int MaxValueLength = 400;
     public const int MaxReasonLength = 1000;

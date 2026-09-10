@@ -40,10 +40,9 @@ public sealed class DocumentsController(
         if (content is null)
             return NotFound();
 
-        // No-store: an identity document must not linger in a shared proxy or the browser cache.
-        Response.Headers.CacheControl = "no-store, private";
-        // The same helper the review screen labels its tiles with, so what an Admin was told they
-        // were opening is what they actually receive.
-        return File(content, DocumentContentTypes.ForStorageKey(storageKey));
+        // The shared delivery path (no-store, private), and the same content-type helper the review
+        // screen labels its tiles with, so what an Admin was told they were opening is what they
+        // actually receive.
+        return PrivateDocument(content, DocumentContentTypes.ForStorageKey(storageKey));
     }
 }

@@ -29,6 +29,28 @@ public abstract class ApiControllerBase : ControllerBase
             ? onSuccess?.Invoke() ?? NoContent()
             : Failure(result.Error);
 
+    /// <summary>
+    /// Puts the bytes of a PRIVATE document on the wire, the one way this platform does it.
+    /// </summary>
+    /// <remarks>
+    /// Shared rather than repeated, because there are now two ways to EARN a private file — a signed
+    /// link the platform minted, and a live booking relationship re-checked per request — and only
+    /// one way it should ever be delivered. Two copies of these headers would drift, and the way they
+    /// would drift is one of them losing <c>no-store</c> and an identity document settling into a
+    /// shared proxy.
+    ///
+    /// No <c>fileDownloadName</c>: a name would have to be invented (keys are generated guids) or
+    /// taken from what the customer typed, and neither is something to hand a caller.
+    /// </remarks>
+    protected FileStreamResult PrivateDocument(Stream content, string contentType)
+    {
+        // An identity document must not linger in a shared proxy or the browser's disk cache.
+        Response.Headers.CacheControl = "no-store, private";
+        // Belt and braces on a body the caller did not name: nothing here is ever a page.
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(content, contentType);
+    }
+
     // RFC 9457 ProblemDetails with a stable machine `code`; validation details go under `errors`.
     protected ObjectResult Failure(Error error)
     {

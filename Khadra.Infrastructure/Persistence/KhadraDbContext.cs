@@ -25,6 +25,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<DisputeTicket> DisputeTickets => Set<DisputeTicket>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<DocumentAccessEntry> DocumentAccessEntries => Set<DocumentAccessEntry>();
     public DbSet<CarType> CarTypes => Set<CarType>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -125,12 +126,14 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     // be closed with a FOR EACH STATEMENT ... ON TRUNCATE trigger before real audit data exists.
     private void GuardAuditTrailIsAppendOnly()
     {
-        foreach (var entry in ChangeTracker.Entries<AuditEntry>())
+        // Every IAppendOnly record, not just AuditEntry. It named that one type until the document
+        // access log arrived, which would have been append-only in intention and mutable in fact.
+        foreach (var entry in ChangeTracker.Entries<IAppendOnly>())
         {
             if (entry.State is EntityState.Modified or EntityState.Deleted)
             {
                 throw new InvalidOperationException(
-                    "Audit entries are append-only: an existing entry cannot be modified or deleted.");
+                    $"{entry.Entity.GetType().Name} is append-only: an existing record cannot be modified or deleted.");
             }
         }
     }

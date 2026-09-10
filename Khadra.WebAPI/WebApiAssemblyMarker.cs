@@ -63,4 +63,26 @@ public static class RateLimitPolicies
     /// one provider rather than for a crowd of browsers behind one address.
     /// </remarks>
     public const string Webhook = "webhook";
+
+    /// <summary>
+    /// A signed-in person reading private documents they have already been authorised for.
+    /// </summary>
+    /// <remarks>
+    /// Its own bucket rather than <see cref="Auth"/>, which is the wrong shape for a GET that serves
+    /// images. <c>CredentialSubject</c> only names a subject for a POST body under
+    /// <c>/api/v1/auth</c>, so on a GET that policy silently degrades to ten requests a minute per
+    /// ADDRESS — and one gallery's office NAT, or a Jordanian carrier, is one address. A handover
+    /// screen opens three or four documents at once, and two colleagues doing that would lock out
+    /// the whole network from the one screen the platform built to stop cars being handed to
+    /// strangers.
+    ///
+    /// <b>This is keyed on the address too, and cannot be keyed on the account.</b> The rate limiter
+    /// runs BEFORE authentication in the pipeline, so <c>context.User</c> is still the empty
+    /// principal when the partitioner asks for a subject claim; a per-account bucket would need
+    /// <c>UseRateLimiter</c> moved below <c>UseAuthentication</c>, which would make every
+    /// over-the-limit request pay the security-stamp read before being refused. <see cref="Geocode"/>
+    /// has the same shape and the same limitation. What this policy actually buys is a ceiling twelve
+    /// times higher than <see cref="Auth"/>, which is what a screen that loads several images needs.
+    /// </remarks>
+    public const string PrivateDocuments = "private-documents";
 }

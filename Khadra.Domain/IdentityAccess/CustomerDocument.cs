@@ -40,9 +40,25 @@ public sealed class CustomerDocumentStatus : Enumeration
 /// A customer's identity paperwork.
 ///
 /// Only the storage KEY lives here, never a URL. Spec 7 is explicit that these are sensitive personal
-/// data: they sit in access-controlled storage and are reached through short-lived signed links, and
-/// only by the customer themselves or a dealer holding an active booking request from them. Putting a
-/// URL on the record is what would make that impossible to enforce later.
+/// data: they sit in access-controlled storage and are reached only through this platform's own
+/// authenticated endpoints, never by an address anyone can hold. Putting a URL on the record is what
+/// would make that impossible to enforce later.
+///
+/// Two callers may reach a file, and they are served DIFFERENTLY on purpose:
+/// <list type="bullet">
+/// <item>
+/// The customer themselves, through a short-lived signed link (<c>GET /customers/me/documents/{id}/link</c>).
+/// Their right to their own paperwork is stable for the whole session, so authorising once and
+/// delivering later costs nothing.
+/// </item>
+/// <item>
+/// A dealer holding a LIVE booking with them, through <c>GET /bookings/{id}/renter-documents/{documentId}</c>,
+/// which streams the bytes and re-checks the relationship on every request. That right is not stable
+/// -- it ends the instant <c>Booking.IsLive</c> does -- so a signed link would be a grant that
+/// outlived the rule that issued it, and its token would put the storage key in a gallery's browser.
+/// Deliberately not the signer; see pre-launch items 14 and 63 before "harmonising" the two.
+/// </item>
+/// </list>
 /// </summary>
 public sealed class CustomerDocument : Entity
 {

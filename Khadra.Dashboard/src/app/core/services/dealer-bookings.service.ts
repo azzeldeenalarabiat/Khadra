@@ -1,7 +1,13 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Booking, BookingListItem, PagedResult } from '../models/bookings.api';
+import {
+  Booking,
+  BookingListItem,
+  PagedResult,
+  RenterDocument,
+  RenterDocuments,
+} from '../models/bookings.api';
 import { DealerConsoleService } from './dealer-console.service';
 
 /**
@@ -114,6 +120,49 @@ export class DealerBookingsService {
     return id ? `${this.base}/${id}/customer-rating` : undefined;
   });
 
+  /**
+   * The renter's identity paperwork on the booking being viewed (spec 5.1).
+   *
+   * Describes the documents; it carries no address for any of them. Answers 409 once the booking is
+   * no longer live — the gallery may look while they are deciding about, or holding, a booking with
+   * that person, and no longer — which the panel shows as "nothing to see here now" rather than as a
+   * failure, because it is the access rule working rather than breaking.
+   */
+  readonly renterDocuments = httpResource<RenterDocuments>(() => {
+    const id = this.viewing();
+    return id ? `${this.base}/${id}/renter-documents` : undefined;
+  });
+
+  /**
+   * Where the bytes of one document live, for an `&lt;img src&gt;` or a new tab.
+   *
+   * Built from the two ids the console was GIVEN — the booking it is showing and a document id from
+   * the listing above — and from nothing else. There is no key, no signature and no expiry to carry:
+   * the server re-runs the whole authorization on this request, so the address is only ever as good
+   * as the session and the booking behind it.
+   *
+   * It goes through the BFF like every other call, so the browser holds no token.
+   */
+  renterDocumentUrl(bookingId: string, documentId: string): string {
+    return `${this.base}/${encodeURIComponent(bookingId)}/renter-documents/${encodeURIComponent(documentId)}`;
+  }
+
+  /**
+   * Records that this dealership CHECKED one of the renter's documents.
+   *
+   * No body: the reviewer is the signed-in person and the timestamp is the server's, so neither is
+   * on the wire to be tampered with. The response carries the review that now stands — which on a
+   * second press is the FIRST one, timestamp and all.
+   */
+  reviewRenterDocument(bookingId: string, documentId: string): Promise<RenterDocument> {
+    return firstValueFrom(
+      this.http.post<RenterDocument>(
+        `${this.renterDocumentUrl(bookingId, documentId)}/review`,
+        null,
+      ),
+    );
+  }
+
   rateCustomer(bookingId: string, rating: number): Promise<CustomerRating> {
     return firstValueFrom(
       this.http.post<CustomerRating>(`${this.base}/${bookingId}/customer-rating`, { rating }),
@@ -127,6 +176,11 @@ export class DealerBookingsService {
     this.booking.reload();
     this.reputation.reload();
     this.customerRating.reload();
+    // A decision changes whether the booking is still live, and the renter panel's whole content
+    // hangs off that. Without this, approving a request leaves the paperwork on screen after the
+    // server has stopped serving it — or, worse, keeps saying it is unavailable after a rejection
+    // was undone.
+    this.renterDocuments.reload();
     // The dashboard tiles and the activity trail are read from bookings too, and neither belongs to
     // this service; without this the dealer's own decision is missing from both until a page reload.
     this.console.refreshDerived();

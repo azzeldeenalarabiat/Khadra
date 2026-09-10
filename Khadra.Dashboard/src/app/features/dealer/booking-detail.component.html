@@ -6,8 +6,12 @@
         <div class="state-title">{{ t('common.couldntLoadThisBooking') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">{{ t('common.backToBookings') }}</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            {{ t('common.retry') }}
+          </button>
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/bookings">{{
+            t('common.backToBookings')
+          }}</a>
         </div>
       </div>
     </section>
@@ -44,9 +48,7 @@
             {{ t('common.reject') }}
           </button>
         } @else if (b.status === 'Requested') {
-          <span class="page-sub"
-            >{{ t('dealerBooking.yourDealershipCannotTrade') }}</span
-          >
+          <span class="page-sub">{{ t('dealerBooking.yourDealershipCannotTrade') }}</span>
         }
         @if (canPickUp()) {
           <button type="button" class="btn btn-primary btn-md" (click)="pickUp()">
@@ -75,9 +77,6 @@
           <div class="sect-h">
             <kh-icon name="user" class="kpi-icon" />
             <span class="sect-t">{{ t('dealerBooking.customer') }}</span>
-            <span class="sect-hint"
-              >{{ t('dealerBooking.documentsOnFileAre') }}</span
-            >
           </div>
           <div class="sect-pad row row-gap-14">
             <div class="customer-avatar">{{ initials(b.customerName) }}</div>
@@ -127,7 +126,8 @@
                   ><span class="kv-val"
                     >{{ rep.completedRentals }}
                     <span class="sect-hint"
-                      >({{ rep.completedRentalsWithThisDealer }} {{ t('dealerBooking.withYou') }})</span
+                      >({{ rep.completedRentalsWithThisDealer }}
+                      {{ t('dealerBooking.withYou') }})</span
                     ></span
                   >
                 </div>
@@ -184,12 +184,183 @@
           }
         </section>
 
+        <!--
+          The renter's identity papers (spec 5.1, pre-launch item 63).
+
+          Spec 5.1 makes the gallery the party who checks a renter's licence, and until this panel
+          existed they could not: the rule was written on CustomerDocument and no endpoint
+          implemented it.
+
+          Nothing here is fetched until the gallery presses the button. These are photographs of a
+          named private individual's passport and driving licence, and a screen that loaded them on
+          open would put them in front of everyone who walks past the counter, on every booking,
+          whether or not anybody is handing a car over today.
+
+          There is no URL, no storage key and no signature anywhere in this markup. Each preview
+          points at /api/v1/bookings/{id}/renter-documents/{documentId} — two ids the console was
+          given — and the server re-runs the whole authorization on every one of those requests.
+        -->
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="file-lock" class="kpi-icon" />
+            <span class="sect-t">{{ t('renterDocs.title') }}</span>
+            <span class="sect-hint">{{ t('renterDocs.hint') }}</span>
+          </div>
+
+          @switch (renterDocuments().kind) {
+            @case ('loading') {
+              <div class="sect-pad">
+                <p class="state-text">{{ t('common.working') }}</p>
+              </div>
+            }
+            @case ('closed') {
+              <!-- The access rule working, not a failure: this gallery's window has closed. -->
+              <div class="sect-pad">
+                <p class="state-text">{{ closedNote() }}</p>
+              </div>
+            }
+            @case ('failed') {
+              <div class="sect-pad">
+                <p class="state-text">{{ failedNote() }}</p>
+                <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">
+                  {{ t('common.tryAgain') }}
+                </button>
+              </div>
+            }
+            @case ('ready') {
+              @if (renterTiles().length === 0) {
+                <!-- An absent record and a broken one must not look the same. -->
+                <div class="sect-pad">
+                  <p class="state-text">{{ t('renterDocs.nothingOnFile') }}</p>
+                  @if (renterMissing(); as missing) {
+                    <div class="banner s-bad">
+                      <kh-icon name="warning" class="banner-icon" />
+                      <span class="banner-body">{{ missing }}</span>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="sect-pad">
+                  <button type="button" class="btn btn-primary btn-sm" (click)="toggleLicence()">
+                    {{ anyRevealed() ? t('renterDocs.hideLicence') : t('renterDocs.viewLicence') }}
+                  </button>
+                  <p class="state-text">{{ t('renterDocs.notVerifiedByThePlatform') }}</p>
+                </div>
+
+                <div class="renter-docs">
+                  @for (doc of renterTiles(); track doc.documentId) {
+                    <div class="renter-doc">
+                      <div class="renter-doc-head">
+                        <span class="renter-doc-title">{{ doc.label }}</span>
+                        <!-- The ONLY status on this tile, and it is the dealership's own. There is
+                             no platform verdict beside it: Khadra verifies nothing, and a second
+                             badge would invite the reading that one of them is a guarantee. -->
+                        <span class="pill" [class]="toneClass(doc.tone)">{{ doc.status }}</span>
+                        <div class="renter-doc-actions">
+                          @if (doc.isImage) {
+                            <button
+                              type="button"
+                              class="btn btn-secondary btn-xs"
+                              (click)="toggleDocument(doc.documentId)"
+                            >
+                              {{
+                                isRevealed(doc.documentId)
+                                  ? t('renterDocs.hide')
+                                  : t('renterDocs.view')
+                              }}
+                            </button>
+                          }
+                          <!-- A PDF is not an <img>; it opens in its own tab, through the same
+                               authorised endpoint. -->
+                          <a
+                            class="btn btn-secondary btn-xs"
+                            [href]="doc.href"
+                            target="_blank"
+                            rel="noopener"
+                            >{{ t('renterDocs.openInANewTab') }}</a
+                          >
+                          <!-- Once reviewed it stays reviewed: there is no un-review, and pressing
+                               again would only return the record that is already there. The control
+                               is replaced by what it recorded. -->
+                          @if (!doc.isReviewed) {
+                            <button
+                              type="button"
+                              class="btn btn-primary btn-xs"
+                              [disabled]="reviewingDocumentId() !== null"
+                              (click)="markReviewed(doc.documentId)"
+                            >
+                              {{
+                                reviewingDocumentId() === doc.documentId
+                                  ? t('common.working')
+                                  : t('renterDocs.markAsReviewed')
+                              }}
+                            </button>
+                          }
+                        </div>
+                      </div>
+                      <div class="renter-doc-meta">
+                        {{ doc.format }} · {{ t('renterDocs.uploaded') }} {{ doc.uploadedAt }}
+                      </div>
+                      @if (doc.reviewedBy; as reviewer) {
+                        <div class="renter-doc-meta">
+                          {{ t('renterDocs.reviewedBy') }} {{ reviewer }}
+                        </div>
+                      }
+                      @if (doc.isImage && isRevealed(doc.documentId)) {
+                        @if (isBroken(doc.documentId)) {
+                          <!-- A failed image is a failed REQUEST, never a permission verdict: the
+                               panel above already knows whether this gallery may look. -->
+                          <p class="state-text">{{ t('renterDocs.imageFailed') }}</p>
+                        } @else {
+                          <img
+                            class="renter-doc-preview"
+                            [src]="doc.href"
+                            [alt]="doc.label"
+                            (error)="previewFailed(doc.documentId)"
+                          />
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+
+                @if (renterMissing(); as missing) {
+                  <div class="sect-pad">
+                    <div class="banner s-bad">
+                      <kh-icon name="warning" class="banner-icon" />
+                      <span class="banner-body">{{ missing }}</span>
+                    </div>
+                  </div>
+                }
+
+                <!--
+                  What "reviewed" means, next to the thing that says it.
+
+                  The badge above is the DEALERSHIP's own record of having looked. It is not a check
+                  by Khadra, and a gallery reading a green pill beside a licence is exactly the person
+                  who might otherwise assume it was. The platform verifies no customer document at
+                  all, so the notice is not a disclaimer about an edge case — it is the whole truth of
+                  what the status means.
+                -->
+                <div class="sect-pad">
+                  <div class="banner s-dim">
+                    <kh-icon name="info" class="banner-icon" />
+                    <span class="banner-body">{{ t('renterDocs.reviewMeaning') }}</span>
+                  </div>
+                </div>
+              }
+            }
+          }
+        </section>
+
         <section class="sect">
           <div class="sect-h">
             <kh-icon name="car-simple" class="kpi-icon" />
             <span class="sect-t">{{ t('dealerBooking.vehicle') }}</span>
             @if (b.vehicle) {
-              <a class="sect-hint auth-link" [routerLink]="['/dealer/fleet', b.vehicle.vehicleId]"
+              <a
+                class="sect-hint auth-link"
+                [routerLink]="['/dealer/fleet', b.vehicle.vehicleId]"
                 >{{ t('dealerBooking.openVehicle') }}</a
               >
             }
@@ -216,7 +387,9 @@
         <div class="dc-split-even">
           <section class="sect">
             <div class="sect-h">
-              <kh-icon name="calendar-blank" class="kpi-icon" /><span class="sect-t">{{ t('dealerBooking.rental') }}</span>
+              <kh-icon name="calendar-blank" class="kpi-icon" /><span class="sect-t">{{
+                t('dealerBooking.rental')
+              }}</span>
             </div>
             <div class="sect-pad kv-narrow">
               @for (row of rentalRows(); track row.k) {
@@ -229,7 +402,9 @@
           </section>
           <section class="sect">
             <div class="sect-h">
-              <kh-icon name="moped" class="kpi-icon" /><span class="sect-t">{{ t('dealerBooking.pickup') }}</span>
+              <kh-icon name="moped" class="kpi-icon" /><span class="sect-t">{{
+                t('dealerBooking.pickup')
+              }}</span>
             </div>
             <div class="sect-pad kv-narrow">
               @for (row of pickupRows(); track row.k) {
@@ -247,7 +422,8 @@
             <kh-icon name="currency-circle-dollar" class="kpi-icon" />
             <span class="sect-t">{{ t('dealerBooking.financial') }}</span>
             <span class="sect-hint"
-              >{{ t('dealerBooking.allAmountsIn') }} {{ b.pricing.totalPrice.currency }} {{ t('dealerBooking.frozenOnThisBooking') }}</span
+              >{{ t('dealerBooking.allAmountsIn') }} {{ b.pricing.totalPrice.currency }}
+              {{ t('dealerBooking.frozenOnThisBooking') }}</span
             >
           </div>
           <div class="sect-pad">
@@ -269,9 +445,7 @@
             <div class="sect-h">
               <kh-icon name="scales" class="kpi-icon" />
               <span class="sect-t">{{ t('dealerBooking.openADispute') }}</span>
-              <span class="sect-hint"
-                >{{ t('dealerBooking.thePlatformAnswersWithin') }}</span
-              >
+              <span class="sect-hint">{{ t('dealerBooking.thePlatformAnswersWithin') }}</span>
             </div>
             <div class="sect-pad stack stack-10">
               @if (problem(); as message) {
@@ -303,7 +477,9 @@
                   (change)="attachEvidence($event)"
                 />
                 @if (evidenceNames().length) {
-                  <div class="field-hint">{{ t('dealerBooking.attached') }} {{ evidenceNames().join(', ') }}</div>
+                  <div class="field-hint">
+                    {{ t('dealerBooking.attached') }} {{ evidenceNames().join(', ') }}
+                  </div>
                 } @else {
                   <div class="field-hint">
                     {{ t('dealerBooking.photosOrAPdf') }}
@@ -339,7 +515,8 @@
               <div class="history-line">
                 <span class="k-label">{{ h.type }} · {{ dateTime(h.recordedAt) }}</span
                 ><span class="num"
-                  >{{ h.odometerKm ?? '—' }} {{ t('dealerBooking.kmFuel') }} {{ h.fuelLevel ?? '—' }}</span
+                  >{{ h.odometerKm ?? '—' }} {{ t('dealerBooking.kmFuel') }}
+                  {{ h.fuelLevel ?? '—' }}</span
                 >
               </div>
               @if (h.notes) {
@@ -347,7 +524,7 @@
               }
               @if (h.cashCollected) {
                 <div class="page-sub">
-                  {{ t('dealerBooking.cashCollected') }} {{ h.cashCollected | money }} 
+                  {{ t('dealerBooking.cashCollected') }} {{ h.cashCollected | money }}
                 </div>
               }
             }
@@ -358,7 +535,8 @@
           <section class="sect sect-pad stack stack-9">
             <span class="k">{{ t('common.penaltyAssessed') }}</span>
             <div class="history-line">
-              <span class="k-label">{{ t('dealerBooking.attributedTo') }}</span><span>{{ b.penalty.attributedTo }}</span>
+              <span class="k-label">{{ t('dealerBooking.attributedTo') }}</span
+              ><span>{{ b.penalty.attributedTo }}</span>
             </div>
             <div class="history-line">
               <span class="k-label">{{ t('dealerBooking.amount') }}</span
@@ -390,11 +568,17 @@
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerBooking.freeCancellation') }}</span
-            ><span class="num">{{ b.terms.freeCancellationWindowHours }}{{ t('dealerBooking.hAfterApproval') }}</span>
+            ><span class="num"
+              >{{ b.terms.freeCancellationWindowHours
+              }}{{ t('dealerBooking.hAfterApproval') }}</span
+            >
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerBooking.settlementWindow') }}</span
-            ><span class="num">{{ b.terms.postReturnSettlementWindowHours }}{{ t('dealerBooking.hAfterReturn') }}</span>
+            ><span class="num"
+              >{{ b.terms.postReturnSettlementWindowHours
+              }}{{ t('dealerBooking.hAfterReturn') }}</span
+            >
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerBooking.rulesVersion') }}</span

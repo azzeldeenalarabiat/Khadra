@@ -151,14 +151,12 @@ export const AR = {
   'notBuilt.payouts.purpose': 'ما يستحقه كل معرض بعد العمولة، ودفعات السداد التي صُرفت له.',
   'notBuilt.payouts.blocked':
     'تحتاج التحويلات إلى سياق المدفوعات، وهو لم يُبنَ. تُحتسب العمولة وتُعرض لكل حجز بالنسبة المجمَّدة عليه، لكن لا شيء يجدول أو يسجّل دفعة لمعرض.',
-  'notBuilt.payouts.instead':
-    'يرى المعرض إيراداته وعمولته بالنسب المجمَّدة في شاشة تقاريره أصلًا.',
+  'notBuilt.payouts.instead': 'يرى المعرض إيراداته وعمولته بالنسب المجمَّدة في شاشة تقاريره أصلًا.',
   'notBuilt.finance.purpose':
     'إيرادات المنصة: العمولة المحصّلة، والعربونات المحتجزة، والمبالغ المستردة، وما هو مستحق للغير.',
   'notBuilt.finance.blocked':
     'كل رقم في هذه الشاشة مصدره سياق المدفوعات، وهو لم يُبنَ. وعرض العمولة وحدها سيُقرأ على أنه مال مقبوض، ولم يُقبض شيء.',
-  'notBuilt.reviews.purpose':
-    'تقييمات العملاء للمعارض وتقييمات المعارض للعملاء، وقائمة مراجعتها.',
+  'notBuilt.reviews.purpose': 'تقييمات العملاء للمعارض وتقييمات المعارض للعملاء، وقائمة مراجعتها.',
   'notBuilt.reviews.blocked':
     'كيان التقييم موجود في نموذج المجال لكن بلا جدول ولا مستودع ولا بيانات. وإلى أن يوجد، يظهر للمعرض بلا تقييمات «لا توجد تقييمات بعد» بدلًا من رقم لم يمنحه أحد.',
   'notBuilt.notifications.purpose':
@@ -174,13 +172,11 @@ export const AR = {
   'notLive.reviews.body':
     'تقييمات العملاء لم تُفعَّل بعد. وعند تفعيلها، سيتيح كل حجز مكتمل للعميل أن يقيّم معرضك ويتيح لك أن تقيّم العميل، وتظهر التقييمات هنا وفي صفحتك العامة.',
   'notLive.reviews.point1': 'ترتبط التقييمات بالحجوزات المكتملة فقط — لا تقييمات مجهولة.',
-  'notLive.reviews.point2':
-    'حتى ذلك الحين، تعرض صفحتك العامة «لا توجد تقييمات بعد» بدلًا من رقم.',
+  'notLive.reviews.point2': 'حتى ذلك الحين، تعرض صفحتك العامة «لا توجد تقييمات بعد» بدلًا من رقم.',
   'notLive.reviews.point3': 'لا شيء تفعله الآن يؤثر في تقييم مستقبلي.',
   'notLive.notifications.body':
     'سجل الإشعارات لم يُفعَّل بعد. واليوم تعرض لوحة التحكم أصلًا كل ما يحتاج إلى انتباهك: الطلبات المعلّقة، وعمليات التسليم والإعادة المستحقة، والإعادات المتأخرة.',
-  'notLive.notifications.point1':
-    'تظهر طلبات الحجز في لوحة التحكم فور دفع العميل للعربون.',
+  'notLive.notifications.point1': 'تظهر طلبات الحجز في لوحة التحكم فور دفع العميل للعربون.',
   'notLive.notifications.point2': 'تُرسَل دعوات الموظفين وروابط كلمات المرور بالبريد الإلكتروني.',
 
   'notLive.notifications.point3': 'ستصل تنبيهات التطبيق والرسائل النصية مع تطبيق العملاء.',
@@ -261,8 +257,7 @@ export const AR = {
   'auth.signIn.suspended.text':
     'تواصل مع الدعم لمراجعة الحساب. إعادة تعيين كلمة المرور لن تعيد إليك صلاحية الدخول.',
   'auth.signIn.unverified.title': 'أكّد عنوان بريدك الإلكتروني أولًا',
-  'auth.signIn.unverified.text':
-    'أرسلنا رابط تأكيد عند إنشاء الحساب. افتحه، ثم سجّل الدخول.',
+  'auth.signIn.unverified.text': 'أرسلنا رابط تأكيد عند إنشاء الحساب. افتحه، ثم سجّل الدخول.',
   'auth.signIn.unverified.action': 'إرسال رابط جديد',
   'auth.signIn.rateLimited.title': 'محاولات كثيرة جدًا',
   'auth.signIn.rateLimited.vague':
@@ -275,8 +270,7 @@ export const AR = {
     other: 'أعد المحاولة بعد {count} دقيقة تقريبًا.',
   },
   'auth.signIn.unavailable.title': 'تسجيل الدخول غير متاح',
-  'auth.signIn.unavailable.text':
-    'لم تستجب الخدمة. لم يتغيّر شيء في حسابك؛ أعد المحاولة بعد قليل.',
+  'auth.signIn.unavailable.text': 'لم تستجب الخدمة. لم يتغيّر شيء في حسابك؛ أعد المحاولة بعد قليل.',
 
   'auth.field.email': 'البريد الإلكتروني',
   'auth.field.password': 'كلمة المرور',
@@ -340,8 +334,7 @@ export const AR = {
   'auth.register.err.emailTaken':
     'يوجد حساب مسجَّل بهذا البريد الإلكتروني. سجّل الدخول، أو استخدم عنوانًا آخر.',
   'auth.register.err.phoneTaken': 'يوجد حساب مسجَّل بهذا الرقم.',
-  'auth.register.err.invalidPhone':
-    'أدخل رقم هاتف أردني بالصيغة 07XXXXXXXX أو ‎+9627XXXXXXXX‎.',
+  'auth.register.err.invalidPhone': 'أدخل رقم هاتف أردني بالصيغة 07XXXXXXXX أو ‎+9627XXXXXXXX‎.',
   'auth.register.err.rateLimited':
     'محاولات كثيرة جدًا من هذه الشبكة. انتظر بضع دقائق قبل المحاولة مرة أخرى.',
   'auth.register.err.rejected': 'رُفضت البيانات. تحقّق منها وأعد المحاولة.',
@@ -551,7 +544,6 @@ export const AR = {
     'درجة فقط — لا يوجد تعليق. ترى المكاتب الأخرى المعدل فقط، ولا تعرف من منحه. يبقى تقييمك مخفيّاً حتى يُقيّمك العميل أو تنتهي المدة.',
   'dealerBooking.youRated': 'لقد قيّمت هذا العميل',
   'dealerBooking.rateSaved': 'تم حفظ التقييم.',
-  'dealerBooking.documentsOnFileAre': 'تتحقق المنصة من الوثائق المحفوظة، ولا تُعرض هنا',
   'dealerBooking.financial': 'المالية',
   'dealerBooking.freeCancellation': 'الإلغاء المجاني',
   'dealerBooking.openADispute': 'فتح نزاع',
@@ -678,11 +670,14 @@ export const AR = {
   'dealerApply.chooseACityOr':
     'اختر مدينة، أو اكتب خط العرض وخط الطول، وستظهر الخريطة لتضع المؤشر بدقة.',
   'dealerApply.clearThePin': 'مسح المؤشر',
-  'dealerApply.clickTheMapTo': 'انقر على الخريطة في موقع معرضك، أو استخدم موقعك الحالي. يمكنك سحب المؤشر بعدها ليصبح على الباب تماماً.',
+  'dealerApply.clickTheMapTo':
+    'انقر على الخريطة في موقع معرضك، أو استخدم موقعك الحالي. يمكنك سحب المؤشر بعدها ليصبح على الباب تماماً.',
   'dealerApply.couldNotFindYou': 'تعذّر على جهازك تحديد موقعك. انقر على الخريطة بدلاً من ذلك.',
   'dealerApply.findingYou': 'جارٍ تحديد موقعك…',
-  'dealerApply.locationPermissionRefused': 'لم يُمنح المتصفح إذناً بمشاركة موقعك. انقر على الخريطة بدلاً من ذلك، أو اسمح بالوصول إلى الموقع لهذا الموقع وحاول مرة أخرى.',
-  'dealerApply.thisBrowserCannot': 'لا يستطيع هذا المتصفح مشاركة موقعك. انقر على الخريطة لوضع المؤشر.',
+  'dealerApply.locationPermissionRefused':
+    'لم يُمنح المتصفح إذناً بمشاركة موقعك. انقر على الخريطة بدلاً من ذلك، أو اسمح بالوصول إلى الموقع لهذا الموقع وحاول مرة أخرى.',
+  'dealerApply.thisBrowserCannot':
+    'لا يستطيع هذا المتصفح مشاركة موقعك. انقر على الخريطة لوضع المؤشر.',
   'dealerApply.useMyLocation': 'استخدم موقعي الحالي',
   'dealerApply.whereYourGalleryIs': 'موقع معرضك',
   'dealerApply.area': 'المنطقة',
@@ -809,14 +804,12 @@ export const AR = {
   'dealerDelivery.carsNotOfferedBody':
     '{count} من سياراتك المعروضة يمكن استلامها من موقعك فقط، لأنها حُفظت قبل تفعيل التوصيل. لن يراها العملاء قابلة للتوصيل حتى تغيّر ذلك.',
   'dealerDelivery.offerOnListedCars': 'أتح التوصيل لهذه السيارات',
-  'dealerDelivery.offerOnListedCarsHint':
-    'يمكنك إيقاف التوصيل لأي سيارة من صفحتها لاحقاً.',
+  'dealerDelivery.offerOnListedCarsHint': 'يمكنك إيقاف التوصيل لأي سيارة من صفحتها لاحقاً.',
   'dealerDelivery.offeringOnListedCars': 'جارٍ تحديث سياراتك…',
   'dealerDelivery.offeredOnListedCars': 'أصبح التوصيل متاحاً لـ {count} سيارة.',
   'dealerDelivery.saving': 'جارٍ الحفظ…',
   'dealerDelivery.saveSettings': 'احفظ إعدادات التوصيل',
-  'dealerDelivery.couldntLoadNothingChanged':
-    'تعذّر تحميل إعدادات التوصيل. لم يتغيّر شيء.',
+  'dealerDelivery.couldntLoadNothingChanged': 'تعذّر تحميل إعدادات التوصيل. لم يتغيّر شيء.',
   'dealerDelivery.radiusMustBeBetween': 'يجب أن يكون نطاق التوصيل بين 0 و{max} كم.',
   'dealerDelivery.serviceDidNotRespond': 'لم تستجب الخدمة. لم يتغيّر شيء.',
   'dealerDelivery.switchedOnTitle': 'تم تفعيل التوصيل',
@@ -916,7 +909,8 @@ export const AR = {
   'dealerReview.requestClarification': 'طلب توضيح',
   'dealerReview.suspendDealer': 'إيقاف المعرض',
   'dealerReview.whereItIs': 'الموقع',
-  'dealerReview.noAddressRecorded': 'لا يوجد عنوان مسجّل. المؤشر أدناه هو الموقع الذي حدده مقدّم الطلب.',
+  'dealerReview.noAddressRecorded':
+    'لا يوجد عنوان مسجّل. المؤشر أدناه هو الموقع الذي حدده مقدّم الطلب.',
   'dealerReview.verificationDocuments': 'وثائق التحقق',
 
   // Admin lists, lookups, platform settings, dealer settings, employee console, shared widgets.
@@ -1036,6 +1030,44 @@ export const AR = {
     'لم تسجّل شيئًا بعد. وتظهر هنا الطلبات التي تردّ عليها وعمليات التسليم التي تسجّلها، باسمك.',
   'employeeDashboard.yourRecentActivity': 'نشاطك الأخير',
   'docTile.openSecurePreview': 'فتح معاينة آمنة',
+
+  'docFormat.pdf': 'ملف PDF',
+  'docFormat.jpeg': 'صورة JPEG',
+  'docFormat.png': 'صورة PNG',
+  'docFormat.webp': 'صورة WebP',
+
+  'renterDocs.title': 'وثائق المستأجر',
+  'renterDocs.hint': 'طابِق هذه الوثائق مع الشخص الذي أمامك قبل تسليم السيارة.',
+  'renterDocs.type.drivingLicenceFront': 'رخصة القيادة — الوجه الأمامي',
+  'renterDocs.type.drivingLicenceBack': 'رخصة القيادة — الوجه الخلفي',
+  'renterDocs.type.nationalId': 'الهوية الوطنية',
+  'renterDocs.type.passport': 'جواز السفر',
+  'renterDocs.viewLicence': 'عرض رخصة القيادة',
+  'renterDocs.hideLicence': 'إخفاء الوثائق',
+  'renterDocs.view': 'عرض',
+  'renterDocs.hide': 'إخفاء',
+  'renterDocs.openInANewTab': 'فتح في تبويب جديد',
+  'renterDocs.uploaded': 'تاريخ الرفع',
+  'renterDocs.notOnFile': 'غير مرفوع: {documents}',
+  'renterDocs.nothingOnFile':
+    'لم يرفع هذا المستأجر أي وثيقة. لا يمكنك إتمام التحقق من الرخصة من لوحة التحكم.',
+  'renterDocs.closed': 'تُعرض وثائق المستأجر فقط ما دام هذا الحجز قائماً.',
+  'renterDocs.failed': 'تعذّر تحميل الوثائق. لم يتغيّر شيء.',
+  'renterDocs.imageFailed': 'تعذّر فتح هذه الوثيقة. حاول مرة أخرى.',
+  'renterDocs.notVerifiedByThePlatform':
+    'لا تتحقق خضراء من هذه الوثائق. ما تراه هو ما رفعه المستأجر.',
+
+  'renterDocs.reviewedByDealer': 'تمت مراجعتها من المعرض',
+  'renterDocs.notReviewed': 'لم تُراجَع',
+  'renterDocs.markAsReviewed': 'تمت المراجعة',
+  'renterDocs.reviewedAt': 'تاريخ المراجعة',
+  'renterDocs.reviewedBy': 'راجعها',
+  'renterDocs.reviewSaved': 'سُجّلت المراجعة باسم معرضك.',
+  'renterDocs.reviewFailed': 'تعذّر تسجيل المراجعة. لم يتغيّر شيء.',
+  'renterDocs.reviewMeaning':
+    'تسجيل مراجعة الوثيقة يعني أن معرضك اطّلع عليها. وهذا ليس تحققاً من خضراء: فالمنصة لا تؤكد أن الوثيقة أصلية أو سارية أو مسجّلة لدى أي جهة رسمية.',
+
+  'common.listSeparator': '، ',
   'toast.dismiss': 'إغلاق',
   'map.centreOnThePin': 'التوسيط على المؤشر',
   'map.dragThePinOr': 'اسحب المؤشر، أو انقر على الخريطة، لتغيير موقعك.',

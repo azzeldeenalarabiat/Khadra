@@ -5,9 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Khadra.Infrastructure.Persistence.Repositories;
 
-// Write-side repository: every read loads the WHOLE booking, handovers and status history included,
-// because the caller is about to transition it and the aggregate appends to both. Lists for screens
-// go through the reader ports, never through here.
+// Write-side repository: every read loads the WHOLE booking -- handovers, status history and the
+// dealership's document reviews -- because the caller is about to transition it and the aggregate
+// appends to them. Lists for screens go through the reader ports, never through here.
 //
 // The "due for" queries return CANDIDATES, not verdicts. The windows they are judged against (payment
 // deadline aside) are frozen inside each booking's own Terms document, so the database can only say
@@ -136,5 +136,9 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
     private IQueryable<Booking> WithChildren() =>
         context.Bookings
             .Include(booking => booking.Handovers)
-            .Include(booking => booking.StatusHistory);
+            .Include(booking => booking.StatusHistory)
+            // The dealership's document reviews. Loaded with the rest because the aggregate refuses a
+            // duplicate review by looking at this collection, and a check against a collection EF
+            // never filled would pass every time.
+            .Include(booking => booking.RenterDocumentReviews);
 }
