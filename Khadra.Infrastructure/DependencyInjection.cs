@@ -47,6 +47,7 @@ public static class DependencyInjection
         AddOptions(services, configuration);
         AddPersistence(services, configuration);
         AddSecurity(services);
+        AddDocumentStorage(services, configuration);
         AddNotifications(services, configuration);
         AddGeocoding(services, configuration);
 
@@ -254,9 +255,134 @@ public static class DependencyInjection
         services.AddSingleton<IAdminBootstrapSettings, AdminBootstrapSettings>();
         services.AddSingleton<IAccessTokenSettings, AccessTokenSettings>();
         services.AddSingleton<IDocumentPolicySettings, DocumentPolicySettings>();
-        services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
         services.AddSingleton<IDocumentLinkSigner, HmacDocumentLinkSigner>();
         services.AddSingleton<IUploadTicketService, HmacUploadTicketService>();
+    }
+
+    /// <summary>
+    /// Where sensitive documents live: this machine's disk, or a private Supabase bucket.
+    /// </summary>
+    /// <remarks>
+    /// Local is the default and stays the answer for development and the tests. Production sets
+    /// Supabase, because a container's filesystem is not storage: it is deleted on every deploy, and
+    /// with it every licence scan and every customer's identity document.
+    ///
+    /// Nothing about the port, the link signer or the controllers changes between the two. A document
+    /// is reached the same way either way — a link this platform signed, checked by this platform,
+    /// streamed by this platform. The bucket is private and no signed URL is ever minted.
+    /// </remarks>
+    private static void AddDocumentStorage(IServiceCollection services, IConfiguration configuration)
+    {
+        var configured = configuration[$"{DocumentStorageOptions.SectionName}:Provider"];
+        var provider = configured?.Trim() ?? DocumentStorageOptions.LocalProvider;
+
+        if (string.Equals(provider, DocumentStorageOptions.SupabaseProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            var supabase = configuration
+                .GetSection($"{DocumentStorageOptions.SectionName}:{nameof(DocumentStorageOptions.Supabase)}")
+                .Get<SupabaseStorageOptions>() ?? new SupabaseStorageOptions();
+
+            // All three, named individually. "Supabase storage is misconfigured" sends somebody
+            // hunting through four settings; naming the missing one ends the search.
+            var missing = new[]
+            {
+                string.IsNullOrWhiteSpace(supabase.Url) ? $"{DocumentStorageOptions.SectionName}:Supabase:Url" : null,
+                string.IsNullOrWhiteSpace(supabase.Bucket) ? $"{DocumentStorageOptions.SectionName}:Supabase:Bucket" : null,
+                string.IsNullOrWhiteSpace(supabase.ServiceKey) ? $"{DocumentStorageOptions.SectionName}:Supabase:ServiceKey" : null,
+            }.Where(name => name is not null).ToList();
+
+            if (missing.Count > 0)
+            {
+                // Fatal, and fatal at BOOT. The alternative is a platform that starts, serves every
+                // other screen, and fails only when somebody uploads a licence scan -- which is the
+                // failure this whole change exists to stop happening quietly.
+                throw new InvalidOperationException(
+                    $"{DocumentStorageOptions.SectionName}:Provider is " +
+                    $"'{DocumentStorageOptions.SupabaseProvider}' but these are not set: " +
+                    $"{string.Join(", ", missing)}. The bucket must already exist and must be PRIVATE, " +
+                    "and the key must be the project's service_role key.");
+            }
+
+            if (!Uri.TryCreate(supabase.Url, UriKind.Absolute, out var baseUrl))
+            {
+                throw new InvalidOperationException(
+                    $"{DocumentStorageOptions.SectionName}:Supabase:Url is not an absolute URL. It is the " +
+                    "project address, e.g. https://abcdefgh.supabase.co");
+            }
+
+            // https everywhere except loopback. The rule exists because identity documents must not
+            // cross a network in the clear -- and a request to 127.0.0.1 crosses no network at all,
+            // which is what makes a local stand-in testable without loosening the rule that matters.
+            // Any other host, including one on a private network, must be https.
+            if (!string.Equals(baseUrl.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                && !baseUrl.IsLoopback)
+            {
+                throw new InvalidOperationException(
+                    $"{DocumentStorageOptions.SectionName}:Supabase:Url must be https. Identity documents " +
+                    "and licence scans do not travel over plain HTTP. (http is accepted only for a " +
+                    "loopback address, where there is no network to travel over.)");
+            }
+
+            // The nested object is NOT covered by ValidateDataAnnotations -- it does not recurse -- so
+            // its own [Range] never runs and a zero would surface as an exception on the first upload.
+            if (supabase.TimeoutSeconds is < 1 or > 120)
+            {
+                throw new InvalidOperationException(
+                    $"{DocumentStorageOptions.SectionName}:Supabase:TimeoutSeconds must be between 1 and 120.");
+            }
+
+            // The bucket is interpolated into a URL path, so it is held to the shape Supabase itself
+            // allows rather than trusted.
+            if (!System.Text.RegularExpressions.Regex.IsMatch(supabase.Bucket!, @"^[a-z0-9][a-z0-9._-]{1,99}$"))
+            {
+                throw new InvalidOperationException(
+                    $"{DocumentStorageOptions.SectionName}:Supabase:Bucket may contain only lowercase " +
+                    "letters, digits, dot, underscore and hyphen.");
+            }
+
+            services.AddHttpClient(SupabaseDocumentStorage.HttpClientName, client =>
+            {
+                // Every path in the provider is relative to this, so the trailing slash is load-bearing:
+                // without it, Uri resolution drops the /storage/v1 segment and every call 404s.
+                client.BaseAddress = new Uri(baseUrl, "/storage/v1/");
+                client.Timeout = TimeSpan.FromSeconds(supabase.TimeoutSeconds);
+
+                // apikey ALWAYS; Authorization only for a JWT.
+                //
+                // Supabase is retiring the legacy `service_role` JWT in favour of `sb_secret_…` keys,
+                // and the new ones are REFUSED if sent as a Bearer token -- storage-api tries to parse
+                // it as a JWT and answers "Invalid JWT". Sending the bearer header only when the key
+                // actually is a JWT means both kinds work, and the platform does not acquire a
+                // deprecation deadline it will meet by breaking.
+                client.DefaultRequestHeaders.Add("apikey", supabase.ServiceKey);
+                if (supabase.ServiceKey!.StartsWith("eyJ", StringComparison.Ordinal))
+                {
+                    client.DefaultRequestHeaders.Authorization =
+                        new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", supabase.ServiceKey);
+                }
+            })
+            // Trace-level HttpClient logging prints request headers verbatim, and one of these is a
+            // key that can read every object in the project.
+            .RedactLoggedHeaders(["apikey", "Authorization"]);
+
+            services.AddSingleton<IDocumentStorage, SupabaseDocumentStorage>();
+            services.AddSingleton<IDocumentStoreProbe, SupabaseStoreProbe>();
+            return;
+        }
+
+        if (!string.Equals(provider, DocumentStorageOptions.LocalProvider, StringComparison.OrdinalIgnoreCase)
+            && provider.Length > 0)
+        {
+            // The same silent-fallback trap the mail transport had, and it would be worse here: an
+            // unrecognised name would quietly choose the store that loses everything on redeploy.
+            throw new InvalidOperationException(
+                $"{DocumentStorageOptions.SectionName}:Provider is \"{configured}\", which is not a store " +
+                $"this API has. Use '{DocumentStorageOptions.LocalProvider}' or " +
+                $"'{DocumentStorageOptions.SupabaseProvider}'.");
+        }
+
+        services.AddSingleton<IDocumentStorage, LocalDocumentStorage>();
+        services.AddSingleton<IDocumentStoreProbe, LocalStoreProbe>();
     }
 
     /// <summary>

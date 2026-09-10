@@ -376,6 +376,26 @@ if (app.Environment.IsProduction())
             "'xkeysib-' and Email__FromAddress set to a sender Brevo has confirmed), 'Resend', or " +
             "'Smtp'. Set it to the bare word, with no surrounding quotes.");
     }
+
+    // And production must not keep documents on the container's own disk.
+    //
+    // Exactly the same trap, one setting along, and with a worse consequence: Local is the DEFAULT,
+    // so a forgotten variable does not fail — it accepts every upload, reports success, and deletes
+    // the lot on the next deploy. What goes with it is licence scans an administrator approved a
+    // business against, and identity papers the platform was trusted to hold.
+    //
+    // IsProduction, not !IsDevelopment, for the same reason as above: a test host legitimately keeps
+    // files on disk, and ApiSmokeTests and ForwardedHeaderTrustTests boot as "Testing" and "Staging".
+    var documentStore = builder.Configuration[$"{DocumentStorageOptions.SectionName}:Provider"]?.Trim();
+    if (string.IsNullOrEmpty(documentStore)
+        || string.Equals(documentStore, DocumentStorageOptions.LocalProvider, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Documents:Provider keeps uploaded documents on this container's filesystem, which is " +
+            "deleted on every deploy. That is the default when the setting is missing, so this is " +
+            "most likely an unset variable. Set Documents__Provider to 'Supabase', with " +
+            "Documents__Supabase__Url, __Bucket and __ServiceKey, and create the bucket PRIVATE first.");
+    }
 }
 
 // Report the forwarding facts for the requests that can actually tell us something.
@@ -538,6 +558,7 @@ using (var bootstrapScope = app.Services.CreateScope())
 // the only way to find out it was misconfigured was for someone to register and wait at an inbox
 // nothing was coming to. Never fatal: a mail outage must not stop the API serving everything else.
 await MailStartupCheck.ReportAsync(app.Services);
+await DocumentStoreStartupCheck.ReportAsync(app.Services);
 
 // And whether a deposit can be taken. Today the answer is always no, because no provider is
 // configured; the point of the line is that nobody has to discover it from a customer.

@@ -253,15 +253,70 @@ exists crash-loops.
 
 ## Uploaded documents outlive the container
 
-`Documents__RootPath` defaults to `App_Data/documents` **inside the container**.
-On a platform with an ephemeral filesystem — Render included — that directory is
-gone on the next deploy, taking every gallery's commercial registration and every
-customer's licence and passport with it.
+`Documents:Provider` decides where they go, and the default is not the production
+answer:
 
-Attach persistent storage and point `Documents__RootPath` at it. Two things
-follow from the image running as the non-root `app` user: the mount must be
-writable by that user, and these files belong in the backup plan beside
-`pg_dump`, because they are identity papers and they are not in the database.
+| Value | Where files go |
+|---|---|
+| `Local` (default) | `Documents__RootPath` **inside the container** — deleted on every deploy |
+| `Supabase` | a **private** Supabase Storage bucket — survives restarts and redeploys |
+
+Production must set `Supabase`. The API **refuses to start** in Production on
+`Local`, or with `Documents__Provider` unset, because Local is the default and a
+forgotten variable would otherwise accept every upload, report success, and delete
+the lot on the next deploy — taking the licence scans an administrator approved a
+business against, and identity papers the platform was trusted to hold.
+
+```bash
+Documents__Provider="Supabase"
+Documents__Supabase__Url="https://<project-ref>.supabase.co"
+Documents__Supabase__Bucket="khadra-documents"
+Documents__Supabase__ServiceKey="<a secret key for the project>"
+```
+
+Bare values in a dashboard field — the quotes above are shell syntax.
+
+### Create the bucket first, and create it private
+
+The API will not create it. A bucket created by accident is a bucket whose
+visibility nobody chose.
+
+Supabase dashboard → **Storage** → **New bucket**:
+
+- Name: `khadra-documents`
+- **Public: OFF** — this is the whole design
+- File size limit: `8 MB`, matching `Documents:MaximumSizeBytes`
+- Allowed MIME types: `image/jpeg, image/png, image/webp, application/pdf`
+
+The last two are defence in depth; the API already refuses anything else.
+
+No RLS policies are needed: a private bucket refuses the anon and authenticated
+keys outright, and a secret key bypasses RLS by design.
+
+**The API checks this at every boot** and refuses to start if the bucket is
+missing, the credential is refused, or **the bucket is public**. That last check
+exists because it is the one failure the application could never notice by itself:
+it never asks for a public URL, so a bucket flipped public in the dashboard would
+look, from inside, exactly like a working private one — while every document in it
+was readable by anyone with the object name.
+
+### No URL ever leaves the server
+
+Documents are reached exactly as they always were: an administrator opens a
+short-lived link **this platform signed, on this platform's domain**, the API
+checks the HMAC, and the bytes are streamed back with `Cache-Control: no-store,
+private`. Supabase signed URLs are deliberately not used — they would be a second
+way in that our authorisation never sees and that we cannot revoke.
+
+### The key is wide; narrow the project instead
+
+A secret key bypasses RLS across the **whole project**, including Postgres. Khadra
+uses no PostgREST, so **disable the Data API** (Settings → API) or remove `public`
+from the exposed schemas. After that the key reaches Storage and nothing else.
+Create one key dedicated to this API so it can be revoked on its own.
+
+These files are identity papers and they are not in the database, so they belong
+in the backup plan beside `pg_dump`.
 
 ## Images
 

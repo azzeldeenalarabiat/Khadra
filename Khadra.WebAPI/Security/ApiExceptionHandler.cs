@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,11 @@ internal sealed partial class ApiExceptionHandler(
             BadHttpRequestException => (StatusCodes.Status400BadRequest, "The request is malformed.", "request.malformed"),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, "The record was changed by another request. Reload and try again.", "concurrency.conflict"),
             DbUpdateException => (StatusCodes.Status409Conflict, "The request conflicts with existing data.", "data.conflict"),
+            // Not a server error: an upload ticket is spent once, so a second write at the same key is
+            // refused rather than allowed to replace evidence somebody has already read. For a client
+            // retrying after a lost response this is the good news -- the bytes are stored, and the
+            // next step is the confirmation call, not another upload.
+            DocumentAlreadyExistsException => (StatusCodes.Status409Conflict, "That upload is already stored.", "upload.already_stored"),
             DomainException => (StatusCodes.Status400BadRequest, "The request violates a business rule.", "domain.invalid"),
             OperationCanceledException => (StatusCodes.Status499ClientClosedRequest, "The request was cancelled.", "request.cancelled"),
             _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred.", "server.error")
