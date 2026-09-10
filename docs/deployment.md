@@ -54,7 +54,9 @@ Double underscore is the separator: `Authentication__Jwt__SigningKey` sets
 ConnectionStrings__DefaultConnection="Host=…;Port=5432;Database=khadra;Username=…;Password=…;SSL Mode=Require;Trust Server Certificate=true"
 Authentication__Jwt__SigningKey="<openssl rand -base64 48>"
 
-# Required — the process starts without these and behaves wrongly
+# Required — the process starts without these and behaves wrongly.
+# NOTE the quotes below are SHELL syntax. In a dashboard field, enter the bare
+# value — see "Quotes are not part of the value", below.
 App__ClientBaseUrl="https://console.example.com"
 Email__Provider="Brevo"
 Email__ApiKey="<brevo key>"
@@ -73,6 +75,40 @@ Admin__Bootstrap__Email="…"
 Admin__Bootstrap__FullName="…"
 Admin__Bootstrap__Phone="…"
 ```
+
+## Quotes are not part of the value
+
+The block above is shell syntax, and a shell strips the quotes before the process
+ever sees the value. **A dashboard field does not.** Paste `Email__Provider="Brevo"`
+into Render's value box and the setting is the five characters `"Brevo"`, quotes
+included — which matches no transport.
+
+That mattered more than it sounds. Until this was guarded, an unrecognised provider
+selected the **Logging** transport silently: every message was written to the log
+and delivered to nobody, while registration, invitation and password reset all
+reported success and the startup line said `Email ready`. It took days of
+production debugging to find.
+
+Both halves are now refused at startup:
+
+- an unrecognised `Email:Provider` throws, naming the value **in quotes** so a
+  stray quote or trailing space is visible rather than guessed at;
+- `Logging` — or the setting being absent, which selects it, because it is the
+  default — throws in **Production** specifically. Other environments still boot
+  on it, because a test host legitimately has no mail server.
+
+So enter the **bare word**: `Brevo`, not `"Brevo"`.
+
+| Setting | Enter exactly |
+|---|---|
+| `Email__Provider` | `Brevo` |
+| `Email__ApiKey` | the key from app.brevo.com/settings/keys/api, beginning `xkeysib-` (the `xsmtpsib-` SMTP key is refused) |
+| `Email__FromAddress` | an address **confirmed** under Brevo's Senders, Domains & Dedicated IPs |
+| `App__ClientBaseUrl` | the console's `https://` address, no trailing slash |
+
+Confirm it from the boot log, category `Khadra.Email`: `Email ready. Brevo accepted
+the API key over HTTPS. Sending as …, a confirmed sender`. Anything beginning
+`EMAIL WILL NOT BE DELIVERED` names what is wrong.
 
 Leave `ASPNETCORE_ENVIRONMENT` unset. It defaults to Production, and several
 guards — the `KnownProxies` one especially — deliberately do nothing in

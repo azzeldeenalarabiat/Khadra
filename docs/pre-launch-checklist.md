@@ -2054,3 +2054,70 @@ address and console traffic resolves Render's shared outbound address at the API
 fixed with a longer trust list — every Render tenant in the region shares those addresses, so
 trusting them would be a real spoofing hole. The fix is a paid plan or an explicit BFF-to-API trust
 channel. See `render.yaml`.
+
+## Mail delivery (2026-09-10)
+
+### 85. CLOSED — every email "sent" successfully to nobody, for days
+
+**Status:** CLOSED 2026-09-10 · **Raised:** 2026-09-10
+
+`POST /api/v1/auth/forgot-password` answered `202 Accepted` and logged
+`Handled ForgotPasswordCommand in 975 ms`, and no request to Brevo followed. Registration,
+administrator invitation and password reset were all in the same state: reported as sent, delivered to
+nobody.
+
+The transport is chosen by matching a string from configuration, and the branch that caught everything
+unrecognised registered `LoggingEmailSender` — **silently**. That sender accepts every message, writes
+it to the log, and returns success, so `AuthEmailDispatcher` reported a successful send, the handler
+returned success, and the screen told people a link was on its way.
+
+Three things had to line up to hide it for as long as it did, and each is worth keeping:
+
+1. **The startup check said `Email ready`.** `LoggingTransportProbe` reported `IsReady = true`, so
+   `MailStartupCheck` logged, at Information: *"Email ready. Email:Provider is 'Logging'. Messages are
+   written to the log and delivered to nobody."* A sentence at war with itself, whose first two words
+   are the only part anyone scanning a boot log reads.
+2. **`Logging` is the DEFAULT.** `EmailOptions.Provider` defaults to it, so forgetting the variable
+   selects it. Nothing outside Development objected.
+3. **`docs/deployment.md` showed the value in shell quoting** — `Email__Provider="Brevo"`. A shell
+   strips those quotes; a dashboard field keeps them, and `"Brevo"` matches no transport, so following
+   the documentation exactly produced the fault.
+
+**Closed by:** an unrecognised `Email:Provider` now throws at startup in every environment, naming the
+value in quotes so a stray quote or trailing space is visible rather than inferred; `Logging` — or the
+setting being absent — throws in **Production** specifically (`IsProduction`, not `!IsDevelopment`, so
+test hosts on "Testing" and "Staging" still boot, having legitimately no mail server); the probe
+reports NOT ready and names the value it read; the docs give bare values in a table with the shell/
+dashboard distinction stated; and `render.yaml` lists `Email__Provider` beside the key.
+
+**Also closed here — the reason was unknowable from outside.** `ForgotPasswordHandler` returned
+success from three different situations and left no trace of which. It now logs one line per outcome
+(1300 unusable address, 1301 no account, 1302 account exists but is soft-deleted, 1303 handed to the
+transport, 1304 transport refused), keyed by correlation id and, where known, user id. The public
+response is unchanged and must stay unchanged — it is the same 202 whatever happened, or the form
+becomes a way to ask who holds an account — so the reason goes where an operator can read it and a
+caller cannot. The address, the raw token and the link are never logged, and
+`ForgotPasswordDiagnosticsTests` asserts their absence rather than trusting the next person to
+remember. `AddJsonConsole` now includes scopes, so events 1100 and 1200 carry the RequestId that
+produced them instead of only a timestamp.
+
+**Answered while tracing, so nobody re-asks:** neither account status nor email verification blocks a
+reset. A suspended person still owns their address, and somebody who never confirmed theirs is exactly
+the person likely to have forgotten the password — refusing them would lock the account permanently.
+`CanAuthenticate` still refuses a suspended sign-in, so the link buys them nothing. Pinned by test.
+
+**Open, for the owner — LIVE CREDENTIALS IN THE LOG.** If the Logging transport was the cause, every
+message it handled is in Render's log **including its link**, and those links are working credentials
+for as long as their token lives: password reset 60 minutes, email verification 24 hours, employee and
+administrator invitation **7 days**. A logged administrator invitation is a seven-day credential to
+become the platform administrator. Search the retention window for event 1200 or the text
+`accept-invitation` and, for anything still inside its lifetime, consume it:
+`UPDATE verification_tokens SET consumed_at = now() WHERE consumed_at IS NULL AND purpose = '…'`.
+Nobody loses anything — they ask again. Do **not** "invalidate by requesting a new one" while the
+Logging transport is still selected, because that writes a fresh live link to the same log.
+
+**Related:** item 37 (the enumeration trade-off in reporting a failed send). Worth appending there:
+the no-account path is one database round trip while the account path is three plus an HTTPS call, so
+the response time distinguishes them — a channel that is open always, not only while mail is broken.
+Queuing the send, as item 37 already proposes, removes the provider call from the request path and
+shrinks it; equalising the remaining round trips would be the rest.
