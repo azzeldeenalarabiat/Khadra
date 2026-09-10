@@ -709,6 +709,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingsEmptyAction => 'Find a car';
 
   @override
+  String get bookingsEmptyTabTitle => 'Nothing in this list';
+
+  @override
+  String get bookingsEmptyTabBody =>
+      'You have bookings, but none of them are in this one. Try another tab.';
+
+  @override
   String get bookingsSignedOutTitle => 'Sign in to see your bookings';
 
   @override

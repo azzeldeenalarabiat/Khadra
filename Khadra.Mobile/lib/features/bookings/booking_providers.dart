@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/dtos.dart';
+import '../../core/paging.dart';
 import '../../core/providers.dart';
 
 /// The tabs the platform defines, in the order a customer reads them.
@@ -34,13 +35,53 @@ abstract final class BookingTabs {
 final selectedBookingTabProvider =
     StateProvider<String>((ref) => BookingTabs.all);
 
-/// One page of the caller's bookings for one tab.
-final myBookingsProvider = FutureProvider.autoDispose
-    .family<Paged<BookingListItem>, String>((ref, tab) async {
-  final session = ref.watch(sessionProvider);
-  if (!session.isSignedIn) return Paged.empty();
-  return ref.watch(apiProvider).myBookings(tab: tab, pageSize: 50);
-});
+/// The caller's bookings for one tab, a page at a time.
+///
+/// It used to ask for fifty and stop. Fifty is not a page size, it is a silent
+/// truncation: a customer's booking HISTORY is the one list on this app that
+/// only grows, and the fifty-first rental simply did not exist as far as the
+/// screen was concerned.
+class MyBookingsNotifier
+    extends AutoDisposeFamilyAsyncNotifier<PagedList<BookingListItem>, String> {
+  static const _pageSize = 20;
+
+  @override
+  Future<PagedList<BookingListItem>> build(String tab) async {
+    final session = ref.watch(sessionProvider);
+    if (!session.isSignedIn) return const PagedList<BookingListItem>.empty();
+    return _fetch(tab, page: 1, existing: const []);
+  }
+
+  Future<void> loadMore() async {
+    await loadNextPage<BookingListItem>(
+      current: state.valueOrNull,
+      emit: (next) => state = AsyncData(next),
+      fetch: (page, existing) => _fetch(arg, page: page, existing: existing),
+    );
+  }
+
+  Future<PagedList<BookingListItem>> _fetch(
+    String tab, {
+    required int page,
+    required List<BookingListItem> existing,
+  }) async {
+    final result = await ref
+        .read(apiProvider)
+        .myBookings(tab: tab, page: page, pageSize: _pageSize);
+
+    return PagedList<BookingListItem>(
+      items: [...existing, ...result.items],
+      page: result.page,
+      total: result.totalCount,
+      hasMore: result.hasNext,
+    );
+  }
+}
+
+final myBookingsProvider = AsyncNotifierProvider.autoDispose
+    .family<MyBookingsNotifier, PagedList<BookingListItem>, String>(
+  MyBookingsNotifier.new,
+);
 
 /// How many bookings sit behind each tab.
 ///

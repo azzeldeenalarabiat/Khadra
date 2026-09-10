@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/format/booking_presentation.dart';
+import '../../core/paging.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -13,11 +16,49 @@ import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import 'notification_providers.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  final _scrollController = ScrollController();
+  late final EndOfListLoader _loader = EndOfListLoader(
+    controller: _scrollController,
+    onReachEnd: () => unawaited(_loadMore()),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _loader; // Attaches the listener.
+  }
+
+  @override
+  void dispose() {
+    _loader.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMore() async {
+    try {
+      await ref.read(notificationsProvider.notifier).loadMore();
+    } on ApiFailure catch (failure) {
+      if (!mounted) return;
+      showKhadraMessage(
+        context,
+        failure.messageFor(AppLocalizations.of(context)),
+        isError: true,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final session = ref.watch(sessionProvider);
 
@@ -37,22 +78,25 @@ class NotificationsScreen extends ConsumerWidget {
     }
 
     final feed = ref.watch(notificationsProvider);
+    // The server's count over the WHOLE feed, so the action appears for somebody
+    // whose only unread alert is four pages down.
+    final unread = ref.watch(notificationsProvider.notifier).unreadCount;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.notificationsTitle),
         actions: [
-          if (feed.valueOrNull != null && feed.value!.unreadCount > 0)
+          if (feed.hasValue && unread > 0)
             TextButton(
-              onPressed: () => _markAllRead(context, ref),
+              onPressed: _markAllRead,
               child: Text(l10n.notificationsMarkAllRead),
             ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(notificationsProvider);
           ref.invalidate(unreadNotificationCountProvider);
+          ref.invalidate(notificationsProvider);
           await ref.read(notificationsProvider.future);
         },
         child: switch (feed) {
@@ -61,7 +105,7 @@ class NotificationsScreen extends ConsumerWidget {
               message: ApiFailure.from(error).messageFor(l10n),
               onRetry: () => ref.invalidate(notificationsProvider),
             ),
-          AsyncData(:final value) when value.items.isEmpty => ListView(
+          AsyncData(:final value) when value.isEmpty => ListView(
               children: [
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.55,
@@ -74,10 +118,13 @@ class NotificationsScreen extends ConsumerWidget {
               ],
             ),
           AsyncData(:final value) => ListView.separated(
+              controller: _scrollController,
               padding: const EdgeInsets.only(bottom: Space.bottomInset),
-              itemCount: value.items.length,
+              itemCount: value.items.length + 1,
               separatorBuilder: (_, __) => const Divider(height: 1, indent: 64),
-              itemBuilder: (_, index) => _NotificationRow(item: value.items[index]),
+              itemBuilder: (_, index) => index == value.items.length
+                  ? PagedListFooter(list: value)
+                  : _NotificationRow(item: value.items[index]),
             ),
           _ => const KhadraLoading(),
         },
@@ -85,14 +132,14 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _markAllRead(BuildContext context, WidgetRef ref) async {
+  Future<void> _markAllRead() async {
     final l10n = AppLocalizations.of(context);
     try {
       await ref.read(apiProvider).markAllNotificationsRead();
       ref.invalidate(notificationsProvider);
       ref.invalidate(unreadNotificationCountProvider);
     } on ApiFailure catch (failure) {
-      if (context.mounted) {
+      if (mounted) {
         showKhadraMessage(context, failure.messageFor(l10n), isError: true);
       }
     }

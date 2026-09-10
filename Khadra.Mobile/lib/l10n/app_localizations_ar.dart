@@ -718,6 +718,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingsEmptyAction => 'ابحث عن سيارة';
 
   @override
+  String get bookingsEmptyTabTitle => 'لا شيء في هذه القائمة';
+
+  @override
+  String get bookingsEmptyTabBody =>
+      'لديك حجوزات، لكن لا شيء منها في هذه القائمة. جرّب تبويباً آخر.';
+
+  @override
   String get bookingsSignedOutTitle => 'سجّل الدخول لعرض حجوزاتك';
 
   @override

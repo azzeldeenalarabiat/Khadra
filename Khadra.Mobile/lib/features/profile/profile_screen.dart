@@ -20,137 +20,147 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.profileTitle)),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: Space.bottomInset),
-        children: [
-          if (session.isSignedIn) ...[
-            _AccountHeader(
-              name: session.user!.fullName,
-              email: session.user!.email,
-              memberSince: formats == null
-                  ? null
-                  : l10n.profileMemberSince(
-                      formats.longDate(session.user!.createdAt)),
-              verified: session.user!.isEmailVerified,
-            ),
-            if (!session.user!.isEmailVerified)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    Space.lg, 0, Space.lg, Space.lg),
-                child: KhadraNotice(
-                  title: l10n.profileEmailUnverified,
-                  body: l10n.authVerifyEmailWhy,
-                  tone: NoticeTone.warn,
-                  icon: Icons.mark_email_unread_outlined,
-                  action: OutlinedButton(
-                    onPressed: () => context.push(
-                      Uri(
-                        path: Routes.verifyEmail,
-                        queryParameters: {'email': session.user!.email},
-                      ).toString(),
+      body: RefreshIndicator(
+        // The account and the document checklist are BOTH read here, and both
+        // go stale while the app is open: an email verified in a browser, or a
+        // licence approved by the office, changes what this screen should say.
+        // Without this the only way to see either was to sign out.
+        onRefresh: () async {
+          ref.invalidate(myDocumentsProvider);
+          await ref.read(sessionProvider.notifier).reload();
+        },
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: Space.bottomInset),
+          children: [
+            if (session.isSignedIn) ...[
+              _AccountHeader(
+                name: session.user!.fullName,
+                email: session.user!.email,
+                memberSince: formats == null
+                    ? null
+                    : l10n.profileMemberSince(
+                        formats.longDate(session.user!.createdAt)),
+                verified: session.user!.isEmailVerified,
+              ),
+              if (!session.user!.isEmailVerified)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      Space.lg, 0, Space.lg, Space.lg),
+                  child: KhadraNotice(
+                    title: l10n.profileEmailUnverified,
+                    body: l10n.authVerifyEmailWhy,
+                    tone: NoticeTone.warn,
+                    icon: Icons.mark_email_unread_outlined,
+                    action: OutlinedButton(
+                      onPressed: () => context.push(
+                        Uri(
+                          path: Routes.verifyEmail,
+                          queryParameters: {'email': session.user!.email},
+                        ).toString(),
+                      ),
+                      child: Text(l10n.authResendVerification),
                     ),
-                    child: Text(l10n.authResendVerification),
+                  ),
+                ),
+              _Group(
+                title: l10n.profilePersonalDetails,
+                children: [
+                  _Row(
+                    icon: Icons.person_outline,
+                    label: l10n.profileEdit,
+                    onTap: () => context.push(Routes.editProfile),
+                  ),
+                  _DocumentsRow(),
+                ],
+              ),
+              _Group(
+                title: l10n.profileSecurity,
+                children: [
+                  _Row(
+                    icon: Icons.lock_outline,
+                    label: l10n.authChangePassword,
+                    onTap: () => context.push(Routes.changePassword),
+                  ),
+                  _Row(
+                    icon: Icons.devices_outlined,
+                    label: l10n.profileSessions,
+                    onTap: () => context.push(Routes.sessions),
+                  ),
+                ],
+              ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.all(Space.lg),
+                child: KhadraCard(
+                  child: Column(
+                    children: [
+                      const KhadraWordmark(logoSize: 64),
+                      const SizedBox(height: Space.lg),
+                      Text(
+                        l10n.bookingsSignedOutBody,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: KhadraColors.neutral600,
+                            fontSize: 14,
+                            height: 1.5),
+                      ),
+                      const SizedBox(height: Space.lg),
+                      FilledButton(
+                        onPressed: () => context.push(Routes.signIn),
+                        child: Text(l10n.authSignIn),
+                      ),
+                      const SizedBox(height: Space.sm),
+                      OutlinedButton(
+                        onPressed: () => context.push(Routes.register),
+                        child: Text(l10n.authSignUp),
+                      ),
+                    ],
                   ),
                 ),
               ),
+
+            const _LanguageGroup(),
+
             _Group(
-              title: l10n.profilePersonalDetails,
+              title: l10n.profileAbout,
               children: [
-                _Row(
-                  icon: Icons.person_outline,
-                  label: l10n.profileEdit,
-                  onTap: () => context.push(Routes.editProfile),
-                ),
-                _DocumentsRow(),
-              ],
-            ),
-            _Group(
-              title: l10n.profileSecurity,
-              children: [
-                _Row(
-                  icon: Icons.lock_outline,
-                  label: l10n.authChangePassword,
-                  onTap: () => context.push(Routes.changePassword),
-                ),
-                _Row(
-                  icon: Icons.devices_outlined,
-                  label: l10n.profileSessions,
-                  onTap: () => context.push(Routes.sessions),
+                Padding(
+                  padding: const EdgeInsets.all(Space.lg),
+                  child: Text(
+                    l10n.profileAboutBody,
+                    style: const TextStyle(
+                        fontSize: 14, height: 1.55, color: KhadraColors.neutral700),
+                  ),
                 ),
               ],
             ),
-          ] else
-            Padding(
-              padding: const EdgeInsets.all(Space.lg),
-              child: KhadraCard(
+
+            if (session.isSignedIn) ...[
+              const SizedBox(height: Space.sm),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Space.lg),
                 child: Column(
                   children: [
-                    const KhadraWordmark(logoSize: 64),
-                    const SizedBox(height: Space.lg),
-                    Text(
-                      l10n.bookingsSignedOutBody,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: KhadraColors.neutral600,
-                          fontSize: 14,
-                          height: 1.5),
-                    ),
-                    const SizedBox(height: Space.lg),
-                    FilledButton(
-                      onPressed: () => context.push(Routes.signIn),
-                      child: Text(l10n.authSignIn),
+                    OutlinedButton.icon(
+                      onPressed: () => _signOut(context, ref, allDevices: false),
+                      icon: const Icon(Icons.logout, size: 18),
+                      label: Text(l10n.authSignOut),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: KhadraColors.bad,
+                        side: const BorderSide(color: KhadraColors.bad),
+                      ),
                     ),
                     const SizedBox(height: Space.sm),
-                    OutlinedButton(
-                      onPressed: () => context.push(Routes.register),
-                      child: Text(l10n.authSignUp),
+                    TextButton(
+                      onPressed: () => _signOut(context, ref, allDevices: true),
+                      child: Text(l10n.authSignOutEverywhere),
                     ),
                   ],
                 ),
               ),
-            ),
-
-          const _LanguageGroup(),
-
-          _Group(
-            title: l10n.profileAbout,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(Space.lg),
-                child: Text(
-                  l10n.profileAboutBody,
-                  style: const TextStyle(
-                      fontSize: 14, height: 1.55, color: KhadraColors.neutral700),
-                ),
-              ),
             ],
-          ),
-
-          if (session.isSignedIn) ...[
-            const SizedBox(height: Space.sm),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-              child: Column(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _signOut(context, ref, allDevices: false),
-                    icon: const Icon(Icons.logout, size: 18),
-                    label: Text(l10n.authSignOut),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: KhadraColors.bad,
-                      side: const BorderSide(color: KhadraColors.bad),
-                    ),
-                  ),
-                  const SizedBox(height: Space.sm),
-                  TextButton(
-                    onPressed: () => _signOut(context, ref, allDevices: true),
-                    child: Text(l10n.authSignOutEverywhere),
-                  ),
-                ],
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }

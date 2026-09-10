@@ -1280,6 +1280,18 @@ abstract class AppLocalizations {
   /// **'Find a car'**
   String get bookingsEmptyAction;
 
+  /// No description provided for @bookingsEmptyTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in this list'**
+  String get bookingsEmptyTabTitle;
+
+  /// No description provided for @bookingsEmptyTabBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You have bookings, but none of them are in this one. Try another tab.'**
+  String get bookingsEmptyTabBody;
+
   /// No description provided for @bookingsSignedOutTitle.
   ///
   /// In en, this message translates to:

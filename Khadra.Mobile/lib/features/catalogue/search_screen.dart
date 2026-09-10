@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
+import '../../core/paging.dart';
 import '../../core/providers.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
@@ -29,30 +31,26 @@ class SearchScreen extends ConsumerStatefulWidget {
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
+  late final EndOfListLoader _loader = EndOfListLoader(
+    controller: _scrollController,
+    onReachEnd: () => unawaited(_loadMore()),
+  );
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
     _searchController.text = ref.read(searchFilterProvider).text ?? '';
-    _scrollController.addListener(_onScroll);
+    _loader; // Attaches the listener.
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
     _searchController.dispose();
-    _scrollController.removeListener(_onScroll);
+    _loader.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 600) {
-      unawaited(_loadMore());
-    }
   }
 
   Future<void> _loadMore() async {
@@ -232,9 +230,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   List<Widget> _resultSlivers(
     AppLocalizations l10n,
     SearchFilter filter,
-    SearchResults results,
+    PagedList<CatalogueListing> results,
   ) {
-    if (results.listings.isEmpty) {
+    if (results.isEmpty) {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
@@ -266,7 +264,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.md),
           child: Text(
-            l10n.searchResults(results.totalCount),
+            // The SERVER's count over the whole catalogue, not the length of the
+            // pages loaded so far.
+            l10n.searchResults(results.total),
             style: const TextStyle(
                 color: KhadraColors.neutral600, fontSize: 13),
           ),
@@ -275,10 +275,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
         sliver: SliverList.separated(
-          itemCount: results.listings.length,
+          itemCount: results.items.length,
           separatorBuilder: (_, __) => const SizedBox(height: Space.lg),
-          itemBuilder: (_, index) =>
-              VehicleCard(listing: results.listings[index]),
+          itemBuilder: (_, index) => VehicleCard(listing: results.items[index]),
         ),
       ),
       SliverToBoxAdapter(
@@ -287,7 +286,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               Space.lg, 0, Space.lg, Space.bottomInset),
           child: Column(
             children: [
-              if (results.loadingMore) const KhadraLoading(compact: true),
+              PagedListFooter(list: results),
               // The rating shown on every card is the GALLERY's. Saying so once at
               // the foot of the list is the honest way to explain a number that
               // would otherwise look like a score for the car.

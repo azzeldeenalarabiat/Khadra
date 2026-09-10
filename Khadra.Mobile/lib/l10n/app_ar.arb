@@ -235,6 +235,8 @@
   "bookingsEmptyTitle": "لا شيء هنا بعد",
   "bookingsEmptyBody": "ستظهر هنا الحجوزات التي تنشئها.",
   "bookingsEmptyAction": "ابحث عن سيارة",
+  "bookingsEmptyTabTitle": "لا شيء في هذه القائمة",
+  "bookingsEmptyTabBody": "لديك حجوزات، لكن لا شيء منها في هذه القائمة. جرّب تبويباً آخر.",
   "bookingsSignedOutTitle": "سجّل الدخول لعرض حجوزاتك",
   "bookingsSignedOutBody": "حجوزاتك ومستنداتك وتنبيهاتك في حسابك.",
 

@@ -247,6 +247,8 @@
   "bookingsEmptyTitle": "Nothing here yet",
   "bookingsEmptyBody": "Bookings you make will show up here.",
   "bookingsEmptyAction": "Find a car",
+  "bookingsEmptyTabTitle": "Nothing in this list",
+  "bookingsEmptyTabBody": "You have bookings, but none of them are in this one. Try another tab.",
   "bookingsSignedOutTitle": "Sign in to see your bookings",
   "bookingsSignedOutBody": "Your bookings, documents and alerts live in your account.",
 

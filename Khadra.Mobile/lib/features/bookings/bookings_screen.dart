@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/format/booking_presentation.dart';
 import '../../core/format/formats.dart';
+import '../../core/paging.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -14,11 +17,49 @@ import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import 'booking_providers.dart';
 
-class BookingsScreen extends ConsumerWidget {
+class BookingsScreen extends ConsumerStatefulWidget {
   const BookingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BookingsScreen> createState() => _BookingsScreenState();
+}
+
+class _BookingsScreenState extends ConsumerState<BookingsScreen> {
+  final _scrollController = ScrollController();
+  late final EndOfListLoader _loader = EndOfListLoader(
+    controller: _scrollController,
+    onReachEnd: () => unawaited(_loadMore()),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _loader; // Attaches the listener.
+  }
+
+  @override
+  void dispose() {
+    _loader.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMore() async {
+    final tab = ref.read(selectedBookingTabProvider);
+    try {
+      await ref.read(myBookingsProvider(tab).notifier).loadMore();
+    } on ApiFailure catch (failure) {
+      if (!mounted) return;
+      showKhadraMessage(
+        context,
+        failure.messageFor(AppLocalizations.of(context)),
+        isError: true,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final session = ref.watch(sessionProvider);
 
@@ -83,35 +124,65 @@ class BookingsScreen extends ConsumerWidget {
               message: ApiFailure.from(error).messageFor(l10n),
               onRetry: () => ref.invalidate(myBookingsProvider(tab)),
             ),
-          AsyncData(:final value) when value.items.isEmpty => ListView(
-              // Inside a scroll view so pull-to-refresh still works on an empty
-              // list, which is exactly when somebody is most likely to try it.
-              children: [
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.55,
-                  child: KhadraEmpty(
-                    icon: Icons.event_note_outlined,
-                    title: l10n.bookingsEmptyTitle,
-                    body: l10n.bookingsEmptyBody,
-                    action: FilledButton(
-                      onPressed: () => context.go(Routes.search),
-                      child: Text(l10n.bookingsEmptyAction),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          AsyncData(:final value) when value.isEmpty =>
+            _empty(l10n, tab, counts),
           AsyncData(:final value) when formats != null => ListView.separated(
+              controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(
                   Space.lg, Space.lg, Space.lg, Space.bottomInset),
-              itemCount: value.items.length,
+              // One extra row for the footer, which is where the next page's
+              // spinner lives.
+              itemCount: value.items.length + 1,
               separatorBuilder: (_, __) => const SizedBox(height: Space.md),
-              itemBuilder: (_, index) =>
-                  _BookingRow(booking: value.items[index], formats: formats),
+              itemBuilder: (_, index) => index == value.items.length
+                  ? PagedListFooter(list: value)
+                  : _BookingRow(booking: value.items[index], formats: formats),
             ),
           _ => const KhadraLoading(),
         },
       ),
+    );
+  }
+
+  /// Nothing here — but WHICH nothing.
+  ///
+  /// "You have no bookings yet, go and find a car" is the right thing to say to
+  /// somebody who has never booked. It is the wrong thing to say to somebody with
+  /// four live rentals who has tapped Disputed, and it was said to both.
+  Widget _empty(AppLocalizations l10n, String tab, Map<String, int> counts) {
+    // The database's own count over EVERY tab, not the length of this one.
+    final hasAnyBooking = (counts[BookingTabs.all] ?? 0) > 0;
+    final filtered = tab != BookingTabs.all && hasAnyBooking;
+
+    return ListView(
+      // Inside a scroll view so pull-to-refresh still works on an empty list,
+      // which is exactly when somebody is most likely to try it.
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.55,
+          child: filtered
+              ? KhadraEmpty(
+                  icon: Icons.filter_list_off_outlined,
+                  title: l10n.bookingsEmptyTabTitle,
+                  body: l10n.bookingsEmptyTabBody,
+                  action: OutlinedButton(
+                    onPressed: () => ref
+                        .read(selectedBookingTabProvider.notifier)
+                        .state = BookingTabs.all,
+                    child: Text(l10n.bookingsTabAll),
+                  ),
+                )
+              : KhadraEmpty(
+                  icon: Icons.event_note_outlined,
+                  title: l10n.bookingsEmptyTitle,
+                  body: l10n.bookingsEmptyBody,
+                  action: FilledButton(
+                    onPressed: () => context.go(Routes.search),
+                    child: Text(l10n.bookingsEmptyAction),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 

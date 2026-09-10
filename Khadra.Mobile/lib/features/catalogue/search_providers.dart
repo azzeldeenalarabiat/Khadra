@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/dtos.dart';
-import '../../core/api/api_failure.dart';
+import '../../core/paging.dart';
 import '../../core/providers.dart';
 
 /// How a customer has narrowed the search.
@@ -112,73 +112,36 @@ class SearchFilter {
 final searchFilterProvider =
     StateProvider<SearchFilter>((ref) => const SearchFilter());
 
-/// One page of results, plus whatever pages were loaded before it.
-class SearchResults {
-  const SearchResults({
-    required this.listings,
-    required this.totalCount,
-    required this.page,
-    required this.hasMore,
-    this.loadingMore = false,
-  });
-
-  final List<CatalogueListing> listings;
-  final int totalCount;
-  final int page;
-  final bool hasMore;
-  final bool loadingMore;
-
-  static const empty =
-      SearchResults(listings: [], totalCount: 0, page: 1, hasMore: false);
-}
-
 /// The catalogue, paged.
 ///
 /// `AsyncNotifier` rather than a `FutureProvider` because the list ACCUMULATES:
 /// page two is appended to page one, and only a change of filter starts over.
-class SearchResultsNotifier extends AutoDisposeAsyncNotifier<SearchResults> {
+class SearchResultsNotifier
+    extends AutoDisposeAsyncNotifier<PagedList<CatalogueListing>> {
+  static const _pageSize = 20;
+
   @override
-  Future<SearchResults> build() async {
+  Future<PagedList<CatalogueListing>> build() async {
     // Rebuilds whenever the filter changes, which is what resets paging.
     final filter = ref.watch(searchFilterProvider);
     return _fetch(filter, page: 1, existing: const []);
   }
 
   Future<void> loadMore() async {
-    final current = state.valueOrNull;
-    if (current == null || !current.hasMore || current.loadingMore) return;
-
-    state = AsyncData(SearchResults(
-      listings: current.listings,
-      totalCount: current.totalCount,
-      page: current.page,
-      hasMore: current.hasMore,
-      loadingMore: true,
-    ));
-
     final filter = ref.read(searchFilterProvider);
-    try {
-      state = AsyncData(
-        await _fetch(filter, page: current.page + 1, existing: current.listings),
-      );
-    } on ApiFailure {
-      // The pages already loaded are still good. Replacing them with an error
-      // because page three failed would throw away what the customer is reading.
-      state = AsyncData(SearchResults(
-        listings: current.listings,
-        totalCount: current.totalCount,
-        page: current.page,
-        hasMore: current.hasMore,
-      ));
-      rethrow;
-    }
+    await loadNextPage<CatalogueListing>(
+      current: state.valueOrNull,
+      emit: (next) => state = AsyncData(next),
+      fetch: (page, existing) =>
+          _fetch(filter, page: page, existing: existing),
+    );
   }
 
-  Future<SearchResults> _fetch(
-    SearchFilter filter,
-    { required int page,
-    required List<CatalogueListing> existing }
-  ) async {
+  Future<PagedList<CatalogueListing>> _fetch(
+    SearchFilter filter, {
+    required int page,
+    required List<CatalogueListing> existing,
+  }) async {
     final result = await ref.read(apiProvider).searchVehicles(
           cityId: filter.cityId,
           carTypeId: filter.carTypeId,
@@ -192,20 +155,20 @@ class SearchResultsNotifier extends AutoDisposeAsyncNotifier<SearchResults> {
           pickupAt: filter.hasDates ? filter.pickupAt : null,
           returnAt: filter.hasDates ? filter.returnAt : null,
           page: page,
-          pageSize: 20,
+          pageSize: _pageSize,
         );
 
-    return SearchResults(
-      listings: [...existing, ...result.items],
-      totalCount: result.totalCount,
+    return PagedList<CatalogueListing>(
+      items: [...existing, ...result.items],
       page: result.page,
+      total: result.totalCount,
       hasMore: result.hasNext,
     );
   }
 }
 
-final searchResultsProvider =
-    AutoDisposeAsyncNotifierProvider<SearchResultsNotifier, SearchResults>(
+final searchResultsProvider = AutoDisposeAsyncNotifierProvider<
+    SearchResultsNotifier, PagedList<CatalogueListing>>(
   SearchResultsNotifier.new,
 );
 
