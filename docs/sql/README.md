@@ -47,3 +47,28 @@ AFTER    anon reading users: ERROR: permission denied for table users
 ```
 
 Run 1 then 2, in the Supabase SQL editor.
+
+## 3. `verify-admin.sql`
+
+Read-only. Answers "is there an administrator, who is it, and can they actually sign in?"
+
+The platform deliberately reveals none of that over HTTP — Forgot Password returns
+the same 202 whether or not the account exists, because anything else turns that
+form into a way to ask who holds an account. So the database is the only honest
+place to look, and this is the query to look with.
+
+Read `is_email_verified` first. An administrator ROW is not the same thing as a
+usable login: an invitation that was never accepted leaves the address unverified,
+and `CanAuthenticate` refuses it. **A password reset does not fix that** — resetting
+changes the password without verifying the address. Only the invitation link does
+both, in one step.
+
+It also answers the question to ask *before* setting `Admin__Bootstrap__Email`: is
+that address already taken? The unique index on `users.email` covers soft-deleted
+rows, so a customer account made while testing the phone app will block it.
+
+The one destructive statement on the page is commented out and explains itself: it
+consumes every live verification link, which is the remedy if messages were written
+to the log while `Email:Provider` selected the Logging transport. Each of those log
+lines carries a working link — an hour for a reset, a day for verification, seven
+days for an invitation.
