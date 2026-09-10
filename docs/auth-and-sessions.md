@@ -1,5 +1,12 @@
 # Authentication and Sessions
 
+The reference: token lifetimes, storage, and the session contract.
+
+For the surrounding narrative see [workflows.md §1](workflows.md#1-accounts-and-authentication)
+(registration, verification, reset, invitations) and
+[security.md](security.md#sessions-the-browser-never-holds-an-api-token) (why the
+browser holds no token, and what the security stamp is for).
+
 ## Two clients, one contract
 
 - **Flutter customer app** calls `Khadra.WebAPI` directly with bearer tokens and stores the refresh token in secure device storage.

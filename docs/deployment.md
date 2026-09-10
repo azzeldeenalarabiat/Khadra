@@ -1,5 +1,9 @@
 # Deploying Khadra
 
+The per-setting reference: what each variable is, and what breaks without it. For
+the system as a whole — topology, service relationships, deployment order and
+recovery — see [production.md](production.md).
+
 Written after a first deployment to Render failed three times in a row, each on a
 different missing setting. The API validates its configuration at startup and
 refuses to run when something is missing rather than starting in a state that is
