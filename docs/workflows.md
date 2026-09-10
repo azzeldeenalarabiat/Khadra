@@ -268,7 +268,10 @@ next deploy.
 ### How a document is read
 
 The bucket is private and **no Supabase URL is ever minted** — not public, not
-signed. Instead:
+signed. There are two routes in, chosen by how long the reader's right lasts.
+
+**A signed link, for a right that is stable for a session** — an admin reviewing a
+dealership, a customer opening their own paperwork, either party to a dispute:
 
 ```
 API mints an HMAC-signed link, 5 minutes, on OUR domain
@@ -278,8 +281,26 @@ API mints an HMAC-signed link, 5 minutes, on OUR domain
   → streamed back with Cache-Control: no-store, private
 ```
 
-One authorisation path, one clock, and nothing to revoke on the storage provider's
-side. Reasoning in [security.md](security.md#documents-are-reached-one-way-only).
+**A booking-scoped stream, for a right that can end at any moment** — the gallery
+checking the licence of the person they are handing a car to (spec 5.1):
+
+```
+GET /api/v1/bookings/{bookingId}/renter-documents          → what is on file
+GET /api/v1/bookings/{bookingId}/renter-documents/{id}     → the bytes
+  → dealer-staff policy
+  → membership: the owner, or an ACTIVE employee
+  → the booking is this dealership's, else 404 booking.not_found
+  → the booking is LIVE, else 409 booking.renter_documents_not_available
+  → the renter is read OFF the booking; a document that is not theirs is 404
+  → streamed back with Cache-Control: no-store, private
+```
+
+The whole check runs again on every byte-serving request, so access ends the instant
+the booking stops being live rather than when a link happens to expire. Nothing but
+two ids reaches the browser: no storage key, no signature, no customer id.
+
+Reasoning in
+[security.md](security.md#documents-are-reached-through-this-platform-never-by-address).
 
 ### The presigned upload ticket
 

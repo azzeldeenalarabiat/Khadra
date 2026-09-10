@@ -188,6 +188,17 @@ builder.Services.AddRateLimiter(options =>
     // is there to stop a scraper, not to ration customers.
     options.AddPolicy(RateLimitPolicies.Public, context =>
         RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(1200, TimeSpan.FromMinutes(1), queueLimit: 20)));
+    // Private documents a signed-in person has already been authorised for. A handover screen opens
+    // three or four at once, and the auth policy — which on a GET has no credential subject to key
+    // on — would ration a whole NAT'd gallery to ten a minute. Twelve times that, and queued rather
+    // than refused, because an <img> cannot act on a 429.
+    //
+    // Keyed on the address: this middleware runs BEFORE UseAuthentication, so there is no subject
+    // claim here to key on however much one would prefer it. See RateLimitPolicies.PrivateDocuments.
+    options.AddPolicy(RateLimitPolicies.PrivateDocuments, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ClientAddress(context),
+            _ => FixedWindow(120, TimeSpan.FromMinutes(1), queueLimit: 10)));
     // A provider catching up after an outage delivers a burst, and each delivery is somebody's
     // money. Queued rather than rejected for the same reason: a 429 makes the provider retry later,
     // which is strictly worse than making it wait a moment now.

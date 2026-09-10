@@ -96,8 +96,23 @@ Admin opens a licence scan
   → streamed back with Cache-Control: no-store, private
 ```
 
-No storage URL exists anywhere in that chain. See
-[security.md](security.md#documents-are-reached-one-way-only).
+### Renter document request
+
+The gallery's right to a renter's licence lasts exactly as long as the booking is
+live, so it is re-checked per request instead of frozen into a link:
+
+```
+Gallery presses "View driving licence" on a booking
+  → browser GETs /api/v1/bookings/{bookingId}/renter-documents/{documentId}
+  → API re-runs the whole rule: dealer staff → membership → this dealership's
+    booking → the booking is LIVE → the document belongs to that booking's renter
+  → API reads the bytes from the private bucket
+  → streamed back with Cache-Control: no-store, private
+```
+
+No storage URL exists anywhere in either chain, and the second one puts no storage
+key in the browser either. See
+[security.md](security.md#documents-are-reached-through-this-platform-never-by-address).
 
 ---
 

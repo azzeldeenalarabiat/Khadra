@@ -97,4 +97,72 @@ public sealed class CustomerDocumentTests
         Assert.NotNull(user.FindDocument(document.Id));
         Assert.Null(user.FindDocument(Khadra.Domain.Common.Id.New()));
     }
+
+    // ── What is still outstanding ───────────────────────────────────────────────────────────────
+    //
+    // The aggregate answers this, rather than each caller working it out, because TWO screens ask:
+    // the customer's own checklist and the gallery's handover panel. Stated twice, the rule would
+    // drift -- and the way it would drift is one of them being told the paperwork is complete.
+
+    [Fact]
+    public void A_renter_who_has_filed_nothing_is_missing_all_three()
+    {
+        var user = Customer();
+
+        Assert.Equal(
+            ["DrivingLicenceFront", "DrivingLicenceBack", "NationalId"],
+            user.MissingRenterDocumentTypes().Select(type => type.Name));
+    }
+
+    [Fact]
+    public void The_identity_slot_names_the_document_this_particular_renter_owes()
+    {
+        // Spec 5.1: one requirement with two possible answers -- a national ID for a local renter, a
+        // passport for a foreign one. Naming both would tell a customer to file two documents when
+        // either will do, and tell a gallery that something is absent when nothing is.
+        var local = Customer();
+        var foreigner = Foreigner();
+
+        Assert.Contains(CustomerDocumentType.NationalId, local.MissingRenterDocumentTypes());
+        Assert.DoesNotContain(CustomerDocumentType.Passport, local.MissingRenterDocumentTypes());
+
+        Assert.Contains(CustomerDocumentType.Passport, foreigner.MissingRenterDocumentTypes());
+        Assert.DoesNotContain(CustomerDocumentType.NationalId, foreigner.MissingRenterDocumentTypes());
+    }
+
+    [Fact]
+    public void A_foreign_renters_passport_closes_the_identity_slot()
+    {
+        var user = Foreigner();
+        user.AttachDocument(CustomerDocumentType.Passport, "customers/a/1.jpg", "image/jpeg", 10, Now);
+
+        Assert.DoesNotContain(CustomerDocumentType.Passport, user.MissingRenterDocumentTypes());
+        Assert.Equal(
+            ["DrivingLicenceFront", "DrivingLicenceBack"],
+            user.MissingRenterDocumentTypes().Select(type => type.Name));
+    }
+
+    [Fact]
+    public void Nothing_is_missing_once_the_set_is_complete_and_the_two_answers_agree()
+    {
+        // The pair that must never disagree: an empty missing list and a complete record are the
+        // same fact, and a screen reads one or the other depending on what it is saying.
+        var user = Customer();
+        user.AttachDocument(CustomerDocumentType.DrivingLicenceFront, "customers/a/1.jpg", "image/jpeg", 10, Now);
+        user.AttachDocument(CustomerDocumentType.DrivingLicenceBack, "customers/a/2.jpg", "image/jpeg", 10, Now);
+        user.AttachDocument(CustomerDocumentType.NationalId, "customers/a/3.jpg", "image/jpeg", 10, Now);
+
+        Assert.Empty(user.MissingRenterDocumentTypes());
+        Assert.True(user.HasCompleteRenterDocuments);
+    }
+
+    private static User Foreigner() =>
+        User.RegisterCustomer(
+            Khadra.Domain.IdentityAccess.EmailAddress.Create("visitor@example.com").Value,
+            Khadra.Domain.IdentityAccess.PhoneNumber.Create("0791111111").Value,
+            Khadra.Domain.IdentityAccess.PersonName.Create("Sara Haddad").Value,
+            Khadra.Domain.IdentityAccess.PasswordHash.FromHash("hash"),
+            Now,
+            Users.AdultBirthDate,
+            isForeignNational: true);
 }

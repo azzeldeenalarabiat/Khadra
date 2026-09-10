@@ -75,9 +75,6 @@
           <div class="sect-h">
             <kh-icon name="user" class="kpi-icon" />
             <span class="sect-t">{{ t('dealerBooking.customer') }}</span>
-            <span class="sect-hint"
-              >{{ t('dealerBooking.documentsOnFileAre') }}</span
-            >
           </div>
           <div class="sect-pad row row-gap-14">
             <div class="customer-avatar">{{ initials(b.customerName) }}</div>
@@ -181,6 +178,132 @@
                 ><span class="kv-val">{{ mine.rating }}</span>
               </div>
             </div>
+          }
+        </section>
+
+        <!--
+          The renter's identity papers (spec 5.1, pre-launch item 63).
+
+          Spec 5.1 makes the gallery the party who checks a renter's licence, and until this panel
+          existed they could not: the rule was written on CustomerDocument and no endpoint
+          implemented it.
+
+          Nothing here is fetched until the gallery presses the button. These are photographs of a
+          named private individual's passport and driving licence, and a screen that loaded them on
+          open would put them in front of everyone who walks past the counter, on every booking,
+          whether or not anybody is handing a car over today.
+
+          There is no URL, no storage key and no signature anywhere in this markup. Each preview
+          points at /api/v1/bookings/{id}/renter-documents/{documentId} — two ids the console was
+          given — and the server re-runs the whole authorization on every one of those requests.
+        -->
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="file-lock" class="kpi-icon" />
+            <span class="sect-t">{{ t('renterDocs.title') }}</span>
+            <span class="sect-hint">{{ t('renterDocs.hint') }}</span>
+          </div>
+
+          @switch (renterDocuments().kind) {
+            @case ('loading') {
+              <div class="sect-pad">
+                <p class="state-text">{{ t('common.working') }}</p>
+              </div>
+            }
+            @case ('closed') {
+              <!-- The access rule working, not a failure: this gallery's window has closed. -->
+              <div class="sect-pad">
+                <p class="state-text">{{ closedNote() }}</p>
+              </div>
+            }
+            @case ('failed') {
+              <div class="sect-pad">
+                <p class="state-text">{{ failedNote() }}</p>
+                <button type="button" class="btn btn-secondary btn-sm" (click)="reload()">
+                  {{ t('common.tryAgain') }}
+                </button>
+              </div>
+            }
+            @case ('ready') {
+              @if (renterTiles().length === 0) {
+                <!-- An absent record and a broken one must not look the same. -->
+                <div class="sect-pad">
+                  <p class="state-text">{{ t('renterDocs.nothingOnFile') }}</p>
+                  @if (renterMissing(); as missing) {
+                    <div class="banner s-bad">
+                      <kh-icon name="warning" class="banner-icon" />
+                      <span class="banner-body">{{ missing }}</span>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="sect-pad">
+                  <button type="button" class="btn btn-primary btn-sm" (click)="toggleLicence()">
+                    {{ anyRevealed() ? t('renterDocs.hideLicence') : t('renterDocs.viewLicence') }}
+                  </button>
+                  <p class="state-text">{{ t('renterDocs.notVerifiedByThePlatform') }}</p>
+                </div>
+
+                <div class="renter-docs">
+                  @for (doc of renterTiles(); track doc.documentId) {
+                    <div class="renter-doc">
+                      <div class="renter-doc-head">
+                        <span class="renter-doc-title">{{ doc.label }}</span>
+                        <span class="pill" [class]="toneClass(doc.tone)">{{
+                          statusLabel(doc.status)
+                        }}</span>
+                        <div class="renter-doc-actions">
+                          @if (doc.isImage) {
+                            <button
+                              type="button"
+                              class="btn btn-secondary btn-xs"
+                              (click)="toggleDocument(doc.documentId)"
+                            >
+                              {{ isRevealed(doc.documentId) ? t('renterDocs.hide') : t('renterDocs.view') }}
+                            </button>
+                          }
+                          <!-- A PDF is not an <img>; it opens in its own tab, through the same
+                               authorised endpoint. -->
+                          <a
+                            class="btn btn-secondary btn-xs"
+                            [href]="doc.href"
+                            target="_blank"
+                            rel="noopener"
+                            >{{ t('renterDocs.openInANewTab') }}</a
+                          >
+                        </div>
+                      </div>
+                      <div class="renter-doc-meta">
+                        {{ doc.format }} · {{ t('renterDocs.uploaded') }} {{ doc.uploadedAt }}
+                      </div>
+                      @if (doc.isImage && isRevealed(doc.documentId)) {
+                        @if (isBroken(doc.documentId)) {
+                          <!-- A failed image is a failed REQUEST, never a permission verdict: the
+                               panel above already knows whether this gallery may look. -->
+                          <p class="state-text">{{ t('renterDocs.imageFailed') }}</p>
+                        } @else {
+                          <img
+                            class="renter-doc-preview"
+                            [src]="doc.href"
+                            [alt]="doc.label"
+                            (error)="previewFailed(doc.documentId)"
+                          />
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+
+                @if (renterMissing(); as missing) {
+                  <div class="sect-pad">
+                    <div class="banner s-bad">
+                      <kh-icon name="warning" class="banner-icon" />
+                      <span class="banner-body">{{ missing }}</span>
+                    </div>
+                  </div>
+                }
+              }
+            }
           }
         </section>
 

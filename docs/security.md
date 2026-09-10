@@ -46,10 +46,19 @@ family, so a stolen refresh token cannot be replayed alongside the legitimate on
 
 ---
 
-## Documents are reached one way only
+## Documents are reached through this platform, never by address
 
 The storage bucket is **private**, and the platform mints **no Supabase URL at all**
-— not public, and not signed.
+— not public, and not signed. Signed storage URLs were considered and rejected: they
+are a second way in that our authorisation never sees and that we cannot revoke.
+
+There are two ways to earn a private file, and which one applies depends on **how
+long the grant lasts**.
+
+**A signed link, where the right is stable for a session.** An administrator
+reviewing a dealership, a customer opening their own passport, either party to a
+dispute ticket. Authorising once and delivering later costs nothing, because nothing
+can change in five minutes that would take the right away.
 
 ```
 API mints an HMAC-signed link, 5 minutes, on OUR domain
@@ -58,14 +67,46 @@ API mints an HMAC-signed link, 5 minutes, on OUR domain
   → streamed back with Cache-Control: no-store, private
 ```
 
-Signed storage URLs were considered and rejected: they are a second way in that our
-authorisation never sees and that we cannot revoke. This way there is one
-authorisation path and one clock.
+**A booking-scoped stream, where the right is not stable.** A gallery reading the
+licence of the person they are handing a car to (spec 5.1, checklist item 63) may do
+so for exactly as long as `Booking.IsLive` — which ends the instant a decision window
+closes or the car comes back.
+
+```
+GET /api/v1/bookings/{bookingId}/renter-documents/{documentId}
+  → dealer staff policy, then membership → this dealership's booking → the booking is LIVE
+  → the customer is read OFF THE BOOKING, and the document must be theirs
+  → the API reads the bytes with its own credential
+  → streamed back with Cache-Control: no-store, private
+```
+
+A signed link would have been wrong here twice over. It is a five-minute grant that
+outlives the predicate that issued it, so a gallery would keep access after the
+booking ended. And its token is `base64url(storageKey)`, which puts
+`customers/{customerUserId}/…` into a gallery's browser — a customer identifier the
+platform is otherwise careful never to hand them, and the raw storage key that must
+not leave the server. **Nothing but a booking id and a document id reaches the
+browser**, and both are re-checked against the caller on every request.
+
+Do not "harmonise" the two paths. Checklist items 14 and 63 record why they differ.
 
 Details that matter:
 
 - **A bad or stale signature answers 404, not 403.** A 403 would confirm the
-  document exists to someone holding nothing but a guessed key.
+  document exists to someone holding nothing but a guessed key. Same rule on the
+  booking-scoped route: a booking that is not this dealership's is `404
+  booking.not_found`, and a document id that is not this renter's is `404
+  documents.not_found`, so neither confirms that the id names anything real.
+- **A closed window is a 409, not a 403.** Once the booking stops being live the
+  gallery gets `booking.renter_documents_not_available`, the twin of
+  `review.reputation_not_available`. Nothing is wrong with the caller; the window
+  they were entitled to has closed, and the console says so rather than reporting a
+  broken platform.
+- **The renter route is not gated on the dealership being able to trade.** A
+  suspended gallery may still record a pickup on a booking approved before the
+  suspension, so gating the licence on trading would leave them handing a car to a
+  stranger while the platform refused to show them who the stranger is — item 63 in
+  a different costume. Membership (owner, or an *active* employee) is the gate.
 - **A refused credential is never reported as a missing document.** Letting a 401
   fall through to "not found" would make a revoked key look like a platform that had
   never stored anything — and nobody would go and read the configuration.

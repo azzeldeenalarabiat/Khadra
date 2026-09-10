@@ -298,6 +298,15 @@ on screen is wider than the check behind it, and licence documents are spec 7 pr
 against `ICurrentActor` on the way back in), and put an admin policy on the endpoints that serve
 dealer and customer documents.
 
+**Not the whole document surface any more (2026-09-10).** Item 63 needed a gallery to read a renter's
+licence, and that grant is not stable for a session — it ends the instant `Booking.IsLive` does — so
+it is served by `GET /bookings/{id}/renter-documents/{documentId}`, which re-runs the full
+authorization per request and mints no link at all. That route is therefore **out of scope for this
+item**: there is no signature to bind, and no storage key in the browser to leak. Three flows still
+use the signer and still want this fix: the admin dealer review, the customer's own paperwork, and
+dispute evidence. Do not "harmonise" the renter route back onto the signer to tidy this up — that
+would reintroduce both problems at once.
+
 ### 15. An upload ticket can be replayed and will overwrite the file it names
 
 **Status:** open · **Raised:** 2026-09-04
@@ -1472,26 +1481,65 @@ whatever the booking's state — a gateway must never be made to retry forever.
 
 ### 63. HARD BLOCKER — a dealer cannot see the documents they are required to check
 
-**Status:** open · **Raised:** 2026-09-07 · **Owner: hard requirement before real launch**
+**Status:** the ENDPOINT AND SCREEN are built (2026-09-10); the item stays **open** on the
+verification question below · **Raised:** 2026-09-07 · **Owner: hard requirement before real launch**
 
-Spec 5.1 makes the dealer the party who checks a renter's licence. They cannot. `CustomerDocument`
-already scopes viewing to the customer themselves *and to a dealer with an active booking request* —
-the rule is written, and no endpoint implements it. There is no way, anywhere in the platform, for
+Spec 5.1 makes the dealer the party who checks a renter's licence. They could not. `CustomerDocument`
+already scoped viewing to the customer themselves *and to a dealer with an active booking request* —
+the rule was written, and no endpoint implemented it. There was no way, anywhere in the platform, for
 the gallery handing over a car to look at the licence of the person taking it.
 
-Since 2026-09-07 the booking-creation guard requires only that a licence and an identity document
-have been UPLOADED. Nothing verifies them: `MarkVerified` and `MarkRejected` are `internal` with no
-public path, so every document on the platform sits in `PendingReview` for ever. The guard is a
-checkbox, and the owner has accepted it as one **for development only**.
+**What was built (2026-09-10).**
 
-The owner has recorded this as a hard requirement, not a nice-to-have. Handing a real car to a real
-stranger on an unverified claim is the failure this closes.
+```
+GET /api/v1/bookings/{bookingId}/renter-documents          → what is on file
+GET /api/v1/bookings/{bookingId}/renter-documents/{id}     → the bytes
+```
 
-**To close:** an endpoint that mints a short-lived signed link to a customer's licence and identity
-document, authorised exactly as `CustomerDocument` already says — the dealer of a booking that is
-live, for as long as it is live, and no longer. Then the dealer console screen that shows them at the
-handover, and a decision (item 27) on whether an admin reviews documents at all or the dealer's
-look at pickup is the check.
+`[Authorize(SecurityPolicies.DealerStaff)]`, and then, on **every** request including each
+byte-serving one:
+
+1. `DealerMembershipResolver` — the owner, or an **active** employee (a deactivated one has no
+   standing, spec 4.2);
+2. the booking is this dealership's, else `404 booking.not_found` — never 403, which would confirm
+   another gallery's id is real;
+3. `Booking.IsLive(now)`, else `409 booking.renter_documents_not_available`;
+4. the renter is read **off the booking**, and a document that is not theirs is `404
+   documents.not_found`.
+
+Nothing the caller sends establishes a relationship. There is no customer id and no bare document id
+to substitute, so a dealer session cannot be turned into a lookup service over the customer base —
+the same argument, and the same shape, as `customer-reputation`.
+
+**It deliberately does NOT mint a signed link,** which is what this entry used to propose. Two
+reasons, both fatal to that plan. A five-minute link is a five-minute grant that outlives the
+predicate which issued it, so a gallery would keep access after the booking stopped being live — the
+opposite of "for as long as it is live, and no longer". And `HmacDocumentLinkSigner`'s token is
+`base64url(storageKey)`, which would put `customers/{customerUserId}/…` into a gallery's browser: the
+raw storage key, carrying a customer identifier the platform is otherwise careful never to hand them.
+Streaming re-checks the rule instead. See item 14, and `CustomerDocument`'s own doc comment.
+
+**It is deliberately NOT gated on the dealership being able to trade.** `CanActOnBookings` guards
+approve and reject, and copying it here — the obvious thing to do, since `customer-reputation` uses
+it — would leave a suspended gallery handing over a car it is still permitted to hand over while the
+platform refused to show it who the renter is. That is this item reopened in a different costume.
+`RenterDocumentAccessTests.A_suspended_dealership_can_still_see_the_licence_of_a_car_it_is_holding`
+exists to stop it.
+
+Console: the booking detail screen's "Renter's documents" panel. Nothing is fetched until the gallery
+presses **View driving licence** — these are photographs of a private individual's passport, and a
+screen that loaded them on open would put them in front of whoever walked past the counter. English
+and Arabic, RTL-correct through logical properties.
+
+**Why this is still open.** Nothing on the platform verifies a document. `MarkVerified` and
+`MarkRejected` remain `internal` with no public path, so every document still sits in `PendingReview`
+for ever, and the booking-creation guard still asks only that files were UPLOADED. The gallery can now
+look — which was the missing half — but the platform makes no claim about what they are looking at,
+and the panel says so in as many words.
+
+**To close:** the item 27 decision — whether an admin reviews documents at all, or the dealer's look
+at pickup **is** the check and should record a verification against the record. Until one of those
+exists, "a dealer checked the licence" is something the platform hopes rather than knows.
 
 ### 64. A free hold is renewable, so the 72-hour ceiling is per request, not per customer
 
@@ -2121,3 +2169,31 @@ the no-account path is one database round trip while the account path is three p
 the response time distinguishes them — a channel that is open always, not only while mail is broken.
 Queuing the send, as item 37 already proposes, removes the provider call from the request path and
 shrinks it; equalising the remaining round trips would be the rest.
+
+## Privacy (2026-09-10)
+
+### 86. A gallery reading a renter's passport leaves only a log line
+
+**Status:** open · **Raised:** 2026-09-10 · **Owner decision needed**
+
+Item 63 gave galleries a way to open a renter's driving licence and identity document. That is a
+spec 7 disclosure of a named private individual's papers to a commercial third party, and the only
+record of it is a structured log event (4200, `RenterDocumentHandlers`) naming the actor, the
+booking, the document and its type.
+
+A log is not a record. It rotates, it is not queryable by the person it concerns, and on the current
+hosting it is retained for days rather than years. If a customer ever asks "who looked at my
+passport, and when", the platform can answer only for as long as the log survives — and if a gallery
+denies having looked, there is nothing to put against them.
+
+`IAuditTrail` is not the answer as it stands. It is the ADMIN's trail by design, and it commits inside
+a writing handler's own transaction so the record and the action land together; a read has no
+transaction to join, and every opened image would be a write on the request path.
+
+**To close, if the owner wants it durable:** a `DocumentDisclosure` append-only record in
+IdentityAccess — who, which document, which booking, when — written on the byte-serving route only
+(not the listing, which describes rather than reveals), with its own retention answer. Then decide
+whether the customer sees it, which is the part that makes it worth having.
+
+**Or accept it deliberately,** and record that the log is the whole record, so nobody later assumes
+there is a table to query.

@@ -728,8 +728,6 @@ export const EN = {
     'A score only \u2014 there is no comment. Other galleries see the average, never who gave it. Yours stays hidden until the customer rates you or the window closes.',
   'dealerBooking.youRated': 'You rated this customer',
   'dealerBooking.rateSaved': 'Rating saved.',
-  'dealerBooking.documentsOnFileAre':
-    'Documents on file are checked by the platform, not shown here',
   'dealerBooking.financial': 'Financial',
   'dealerBooking.freeCancellation': 'Free cancellation',
   'dealerBooking.openADispute': 'Open a dispute',
@@ -1133,6 +1131,38 @@ export const EN = {
 
   // A verification document tile.
   'docTile.openSecurePreview': 'Open secure preview',
+
+  // What a private document will be served as. From the server's own content type, never guessed.
+  'docFormat.pdf': 'PDF',
+  'docFormat.jpeg': 'JPEG image',
+  'docFormat.png': 'PNG image',
+  'docFormat.webp': 'WebP image',
+
+  // The renter's identity papers, on the dealer's booking screen (spec 5.1).
+  'renterDocs.title': 'Renter’s documents',
+  'renterDocs.hint': 'Check these against the person in front of you before handing over the car.',
+  'renterDocs.type.drivingLicenceFront': 'Driving licence — front',
+  'renterDocs.type.drivingLicenceBack': 'Driving licence — back',
+  'renterDocs.type.nationalId': 'National ID',
+  'renterDocs.type.passport': 'Passport',
+  'renterDocs.viewLicence': 'View driving licence',
+  'renterDocs.hideLicence': 'Hide documents',
+  'renterDocs.view': 'View',
+  'renterDocs.hide': 'Hide',
+  'renterDocs.openInANewTab': 'Open in a new tab',
+  'renterDocs.uploaded': 'Uploaded',
+  'renterDocs.notOnFile': 'Not on file: {documents}',
+  'renterDocs.nothingOnFile':
+    'This renter has not uploaded any documents. You cannot complete the licence check from the console.',
+  'renterDocs.closed':
+    'A renter’s documents are shown only while this booking is live.',
+  'renterDocs.failed': 'The documents could not be loaded. Nothing has changed.',
+  'renterDocs.imageFailed': 'That document could not be opened. Try again.',
+  'renterDocs.notVerifiedByThePlatform':
+    'Khadra does not verify these. What you see is what the renter uploaded.',
+
+  // Joins a list of names into a sentence. Arabic uses its own comma.
+  'common.listSeparator': ', ',
 
   // Toasts.
   'toast.dismiss': 'Dismiss',
