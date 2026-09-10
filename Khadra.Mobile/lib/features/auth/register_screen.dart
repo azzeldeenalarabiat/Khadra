@@ -108,7 +108,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = failure.messageFor(l10n);
+        _error = failure.messageFor(
+          l10n,
+          config: ref.read(appConfigProvider).valueOrNull,
+        );
       });
     }
   }
@@ -119,6 +122,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final config = ref.watch(appConfigProvider);
     final formats = ref.watch(formatsProvider);
     final minimumAge = config.valueOrNull?.minimumRenterAge;
+    final passwordPolicy = ref.watch(passwordPolicyProvider);
 
     return AuthScaffold(
       title: l10n.authCreateAccountTitle,
@@ -167,9 +171,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 KhadraPasswordField(
                   controller: _password,
                   label: l10n.authPassword,
-                  helper: l10n.authPasswordRules,
+                  // The rule and its sentence are both the PLATFORM's, from
+                  // /app-config -- not an 8 and a promise typed into this file.
+                  helper: Validate.passwordRules(l10n, passwordPolicy),
+                  maxLength: passwordPolicy?.maximumLength,
                   autofillHints: const [AutofillHints.newPassword],
-                  validator: (value) => Validate.password(l10n, value),
+                  validator: (value) =>
+                      Validate.password(l10n, value, policy: passwordPolicy),
                 ),
               ],
             ),

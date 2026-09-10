@@ -2,6 +2,7 @@ using Khadra.Application.Common.Ports;
 using Khadra.Application.PlatformSettings.AppConfig;
 using Khadra.Domain.Common;
 using Khadra.Domain.Fleet;
+using Khadra.Domain.IdentityAccess;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -17,7 +18,9 @@ namespace Khadra.Tests.Application.PlatformSettings;
 /// </remarks>
 public sealed class AppConfigTests
 {
-    private static GetAppConfigHandler Handler(int? minimumRenterAge = 21)
+    private static GetAppConfigHandler Handler(
+        int? minimumRenterAge = 21,
+        int passwordMinimumLength = 8)
     {
         var calendar = Substitute.For<IReportingCalendar>();
         calendar.TimeZoneId.Returns("Asia/Amman");
@@ -26,10 +29,14 @@ public sealed class AppConfigTests
         documents.MaximumSizeBytes.Returns(8L * 1024 * 1024);
         documents.AllowedContentTypes.Returns(["image/jpeg", "image/png", "application/pdf"]);
 
+        var authPolicy = Substitute.For<IAuthPolicySettings>();
+        authPolicy.PasswordMinimumLength.Returns(passwordMinimumLength);
+
         return new GetAppConfigHandler(
             calendar,
             TestBusinessRules.Provider(minimumRenterAge: minimumRenterAge),
-            documents);
+            documents,
+            authPolicy);
     }
 
     [Fact]
@@ -143,5 +150,42 @@ public sealed class AppConfigTests
         Assert.Equal(
             Enumeration.GetAll<FuelType>().Select(fuel => fuel.Name).OrderBy(name => name),
             config.Vocabularies.FuelTypes.Select(entry => entry.Name).OrderBy(name => name));
+    }
+
+    [Fact]
+    public async Task It_publishes_what_makes_a_password_acceptable()
+    {
+        var config = (await Handler(passwordMinimumLength: 12)
+            .Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        var password = config.Password;
+
+        // The CONFIGURED figure, not the shipped default. Without this the app goes on promising 8
+        // the day the owner raises it, and accepts a 9-character password the server then refuses.
+        Assert.Equal(12, password.MinimumLength);
+        Assert.Equal(PasswordPolicy.MaximumLength, password.MaximumLength);
+        Assert.True(password.RequiresLetter);
+        Assert.True(password.RequiresDigit);
+        Assert.False(password.AllowsWhitespace);
+    }
+
+    [Fact]
+    public async Task The_published_minimum_is_never_below_the_one_enforced()
+    {
+        // A configured minimum below the absolute floor is possible -- `AuthOptions` allows 8..64,
+        // and nothing stops a future default or a bad environment value going lower. Publishing the
+        // raw figure would then PROMISE a password the validator refuses, which is worse than
+        // publishing nothing: the app would clear it locally and the server would still say no.
+        var config = (await Handler(passwordMinimumLength: 4)
+            .Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        Assert.Equal(PasswordPolicy.AbsoluteMinimumLength, config.Password.MinimumLength);
+        Assert.Equal(
+            PasswordPolicy.EffectiveMinimum(4),
+            config.Password.MinimumLength);
+
+        // And the same expression really is the one that judges.
+        var refused = PasswordPolicy.Validate(new string('a', 4) + "1", 4);
+        Assert.True(refused.IsFailure);
     }
 }

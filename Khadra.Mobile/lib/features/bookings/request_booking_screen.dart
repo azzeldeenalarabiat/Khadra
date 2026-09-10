@@ -94,7 +94,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
       body: switch (vehicle) {
         AsyncData(:final value) => _body(l10n, formats, value, quote),
         AsyncError(:final error) => KhadraError(
-            message: ApiFailure.from(error).messageFor(l10n),
+            message: ApiFailure.from(error).messageFor(l10n, config: _config),
           ),
         _ => const KhadraLoading(),
       },
@@ -113,6 +113,11 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
 
   bool get _needsDeliveryPoint =>
       _pickupMethod == _delivery && _deliveryPoint == null;
+
+  /// The platform's own published bounds, for the failures whose sentence needs
+  /// one. Null until `/app-config` answers, and every message that reads it has a
+  /// figure-less version for that case.
+  AppConfig? get _config => ref.read(appConfigProvider).valueOrNull;
 
   Widget _body(
     AppLocalizations l10n,
@@ -276,7 +281,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
 
   Widget _quoteProblem(AppLocalizations l10n, ApiFailure failure) =>
       KhadraNotice(
-        title: failure.messageFor(l10n),
+        title: failure.messageFor(l10n, config: _config),
         tone: NoticeTone.bad,
       );
 
@@ -333,7 +338,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
 
       setState(() {
         _submitting = false;
-        _error = failure.messageFor(l10n);
+        _error = failure.messageFor(l10n, config: _config);
       });
     }
   }

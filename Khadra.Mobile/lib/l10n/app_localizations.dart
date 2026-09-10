@@ -479,8 +479,14 @@ abstract class AppLocalizations {
   /// No description provided for @authPasswordRules.
   ///
   /// In en, this message translates to:
-  /// **'At least 8 characters, with a letter and a number.'**
-  String get authPasswordRules;
+  /// **'{count, plural, =1{At least 1 character, with a letter and a number.} other{At least {count} characters, with a letter and a number.}}'**
+  String authPasswordRules(int count);
+
+  /// No description provided for @authPasswordRulesLengthOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{At least 1 character.} other{At least {count} characters.}}'**
+  String authPasswordRulesLengthOnly(int count);
 
   /// No description provided for @authVerifyEmailTitle.
   ///
@@ -2441,8 +2447,32 @@ abstract class AppLocalizations {
   /// No description provided for @validationPasswordShort.
   ///
   /// In en, this message translates to:
-  /// **'Use at least 8 characters.'**
-  String get validationPasswordShort;
+  /// **'{count, plural, =1{Use at least 1 character.} other{Use at least {count} characters.}}'**
+  String validationPasswordShort(int count);
+
+  /// No description provided for @validationPasswordLong.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Use at most 1 character.} other{Use at most {count} characters.}}'**
+  String validationPasswordLong(int count);
+
+  /// No description provided for @validationPasswordLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a letter.'**
+  String get validationPasswordLetter;
+
+  /// No description provided for @validationPasswordDigit.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a number.'**
+  String get validationPasswordDigit;
+
+  /// No description provided for @validationPasswordSpaces.
+  ///
+  /// In en, this message translates to:
+  /// **'A password cannot contain spaces.'**
+  String get validationPasswordSpaces;
 
   /// No description provided for @validationPasswordMatch.
   ///
@@ -2581,6 +2611,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Too many requests. Wait a moment and try again.'**
   String get errorRateLimited;
+
+  /// No description provided for @errorAuthInvalidName.
+  ///
+  /// In en, this message translates to:
+  /// **'A name must be between 2 and 150 characters.'**
+  String get errorAuthInvalidName;
+
+  /// No description provided for @errorAuthPasswordUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'That is the password you already have. Choose a different one.'**
+  String get errorAuthPasswordUnchanged;
+
+  /// No description provided for @errorAuthInvalidDateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'That date of birth is not valid.'**
+  String get errorAuthInvalidDateOfBirth;
+
+  /// No description provided for @errorAuthUnderageBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Renters on Khadra must be at least {age} years old.'**
+  String errorAuthUnderageBy(int age);
+
+  /// No description provided for @errorBookingAccountCannotBook.
+  ///
+  /// In en, this message translates to:
+  /// **'This account cannot make bookings.'**
+  String get errorBookingAccountCannotBook;
+
+  /// No description provided for @errorBookingNotYours.
+  ///
+  /// In en, this message translates to:
+  /// **'That booking belongs to somebody else.'**
+  String get errorBookingNotYours;
+
+  /// No description provided for @errorBookingAlreadyFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking has already ended.'**
+  String get errorBookingAlreadyFinished;
+
+  /// No description provided for @errorBookingNotAwaitingPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking is not waiting on a payment.'**
+  String get errorBookingNotAwaitingPayment;
+
+  /// No description provided for @errorBookingDisputeOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking cannot settle while a dispute on it is open.'**
+  String get errorBookingDisputeOpen;
+
+  /// No description provided for @errorBookingTooSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'That pickup time is too soon. Choose a later one.'**
+  String get errorBookingTooSoon;
+
+  /// No description provided for @errorBookingTooSoonBy.
+  ///
+  /// In en, this message translates to:
+  /// **'A rental must start at least {minutes} minutes from now.'**
+  String errorBookingTooSoonBy(int minutes);
+
+  /// No description provided for @errorBookingRentalTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'That rental is longer than we can book. Choose a shorter one.'**
+  String get errorBookingRentalTooLong;
+
+  /// No description provided for @errorBookingBeyondHorizon.
+  ///
+  /// In en, this message translates to:
+  /// **'That is further ahead than we can book. Choose an earlier date.'**
+  String get errorBookingBeyondHorizon;
+
+  /// No description provided for @errorBookingBeyondHorizonBy.
+  ///
+  /// In en, this message translates to:
+  /// **'A rental cannot be booked more than {days} days ahead.'**
+  String errorBookingBeyondHorizonBy(int days);
+
+  /// No description provided for @errorBookingOutsideOpeningHours.
+  ///
+  /// In en, this message translates to:
+  /// **'This office is closed at that time. Choose a time while they are open, or have the car delivered.'**
+  String get errorBookingOutsideOpeningHours;
+
+  /// No description provided for @errorBookingDeliveryOutOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'That spot is outside this office’s delivery area. Choose one closer to them.'**
+  String get errorBookingDeliveryOutOfRange;
+
+  /// No description provided for @errorBookingDeliveryLocationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose where the car should be brought.'**
+  String get errorBookingDeliveryLocationRequired;
+
+  /// No description provided for @errorDocumentTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is larger than the upload limit.'**
+  String get errorDocumentTooLarge;
+
+  /// No description provided for @errorDocumentUnsupportedType.
+  ///
+  /// In en, this message translates to:
+  /// **'That file type is not accepted. Upload a JPEG, PNG or PDF.'**
+  String get errorDocumentUnsupportedType;
+
+  /// No description provided for @errorDocumentNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'That document is no longer there.'**
+  String get errorDocumentNotFound;
+
+  /// No description provided for @errorReviewWindowClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'The time to review this booking has passed.'**
+  String get errorReviewWindowClosed;
+
+  /// No description provided for @errorReviewInvalidRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a rating between one and five stars.'**
+  String get errorReviewInvalidRating;
+
+  /// No description provided for @errorReviewCommentTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'That comment is longer than we can take.'**
+  String get errorReviewCommentTooLong;
+
+  /// No description provided for @errorDisputeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'That dispute was not found.'**
+  String get errorDisputeNotFound;
+
+  /// No description provided for @errorDisputeNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'This dispute is no longer open.'**
+  String get errorDisputeNotOpen;
+
+  /// No description provided for @errorDisputeNotYoursToWithdraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the party who opened a dispute can withdraw it.'**
+  String get errorDisputeNotYoursToWithdraw;
+
+  /// No description provided for @errorDisputeReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Say what went wrong before opening a dispute.'**
+  String get errorDisputeReasonRequired;
+
+  /// No description provided for @errorDisputeStatementRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Write something before adding it to the dispute.'**
+  String get errorDisputeStatementRequired;
+
+  /// No description provided for @errorDisputeEvidenceFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'One of the files did not upload. Try attaching it again.'**
+  String get errorDisputeEvidenceFailed;
+
+  /// No description provided for @errorPaymentRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'That payment was refused. Try a different card.'**
+  String get errorPaymentRefused;
 }
 
 class _AppLocalizationsDelegate

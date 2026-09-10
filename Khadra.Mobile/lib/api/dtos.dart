@@ -115,6 +115,7 @@ class AppConfig {
     required this.maxRentalDays,
     required this.paymentWindowHours,
     required this.documents,
+    required this.password,
     required this.vocabularies,
   });
 
@@ -133,6 +134,13 @@ class AppConfig {
   final int maxRentalDays;
   final int paymentWindowHours;
   final DocumentLimits documents;
+
+  /// What makes a password acceptable, so the app states the platform's rule
+  /// rather than a copy of it. Null when this server is older than the field, or
+  /// when the config has not arrived — in which case the app describes no rule at
+  /// all and lets the server judge, which is the only honest fallback.
+  final PasswordPolicy? password;
+
   final Vocabularies vocabularies;
 
   static AppConfig fromJson(Map<String, dynamic> json) => AppConfig(
@@ -147,9 +155,58 @@ class AppConfig {
         paymentWindowHours: _int(json['paymentWindowHours'], 24),
         documents: DocumentLimits.fromJson(
             json['documents'] as Map<String, dynamic>? ?? const {}),
+        // NO default. Every other field here falls back to the shipped figure,
+        // which is right for a bound the picker cannot open without — but a
+        // password rule invented on the phone is the exact drift this field
+        // exists to end, and `?? 8` would reintroduce it wearing a different hat.
+        password: PasswordPolicy.maybe(json['password']),
         vocabularies: Vocabularies.fromJson(
             json['vocabularies'] as Map<String, dynamic>? ?? const {}),
       );
+}
+
+/// What the platform will accept as a password.
+///
+/// The app used to hold this itself — a minimum of 8 and the sentence "with a
+/// letter and a number" — while the server's minimum is configurable from 8 to
+/// 64. The day the owner raised it, every installed phone would have gone on
+/// promising 8, accepting a 9-character password locally, and showing the
+/// server's English refusal on the registration screen.
+///
+/// The SENTENCE is still the app's, composed from these flags, because "at least
+/// {n} characters" in Arabic needs plural forms that a C# interpolation cannot
+/// produce. The RULE is the server's.
+class PasswordPolicy {
+  const PasswordPolicy({
+    required this.minimumLength,
+    required this.maximumLength,
+    required this.requiresLetter,
+    required this.requiresDigit,
+    required this.allowsWhitespace,
+  });
+
+  final int minimumLength;
+
+  /// bcrypt's input cap, not a policy choice.
+  final int maximumLength;
+
+  final bool requiresLetter;
+  final bool requiresDigit;
+  final bool allowsWhitespace;
+
+  static PasswordPolicy? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final minimum = json['minimumLength'];
+    if (minimum is! num) return null;
+
+    return PasswordPolicy(
+      minimumLength: minimum.toInt(),
+      maximumLength: _int(json['maximumLength'], 72),
+      requiresLetter: json['requiresLetter'] as bool? ?? false,
+      requiresDigit: json['requiresDigit'] as bool? ?? false,
+      allowsWhitespace: json['allowsWhitespace'] as bool? ?? true,
+    );
+  }
 }
 
 /// Sent rather than assumed because the dinar has THREE decimals.

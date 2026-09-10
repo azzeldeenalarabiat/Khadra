@@ -74,6 +74,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final passwordPolicy = ref.watch(passwordPolicyProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.authChangePassword)),
@@ -97,8 +98,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 KhadraPasswordField(
                   controller: _next,
                   label: l10n.authNewPassword,
-                  helper: l10n.authPasswordRules,
-                  validator: (value) => Validate.password(l10n, value),
+                  helper: Validate.passwordRules(l10n, passwordPolicy),
+                  maxLength: passwordPolicy?.maximumLength,
+                  validator: (value) =>
+                      Validate.password(l10n, value, policy: passwordPolicy),
                 ),
                 KhadraPasswordField(
                   controller: _confirm,

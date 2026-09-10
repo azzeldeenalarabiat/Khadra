@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../api/dtos.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -175,6 +176,7 @@ class KhadraPasswordField extends StatefulWidget {
     this.onSubmitted,
     this.autofillHints,
     this.errorText,
+    this.maxLength,
   });
 
   final TextEditingController controller;
@@ -185,6 +187,11 @@ class KhadraPasswordField extends StatefulWidget {
   final VoidCallback? onSubmitted;
   final Iterable<String>? autofillHints;
   final String? errorText;
+
+  /// The platform's own cap, from `/app-config`. Null leaves the field
+  /// unbounded and lets the server refuse — better than a 72 typed in here,
+  /// which is bcrypt's limit today and this app's guess tomorrow.
+  final int? maxLength;
 
   @override
   State<KhadraPasswordField> createState() => _KhadraPasswordFieldState();
@@ -205,7 +212,7 @@ class _KhadraPasswordFieldState extends State<KhadraPasswordField> {
         autofillHints: widget.autofillHints,
         errorText: widget.errorText,
         forceLtr: true,
-        maxLength: 72,
+        maxLength: widget.maxLength,
         suffix: IconButton(
           onPressed: () => setState(() => _hidden = !_hidden),
           icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
@@ -279,10 +286,58 @@ abstract final class Validate {
     return ok ? null : l10n.validationPhone;
   }
 
-  static String? password(AppLocalizations l10n, String? value) {
+  /// A password, judged against the PLATFORM's rule.
+  ///
+  /// [policy] comes from `/app-config`. Null means the config has not arrived —
+  /// a reset-password deep link can render before it does — and the only honest
+  /// answer then is to check that something was typed and let the server judge
+  /// the rest. It must never fall back to a number, because a number here is a
+  /// second copy of a configurable rule and the whole reason this takes a
+  /// parameter.
+  ///
+  /// **Never call this on the sign-in screen.** The server deliberately checks
+  /// only that a sign-in password is present: raising the minimum must not lock
+  /// out somebody whose password predates it.
+  static String? password(
+    AppLocalizations l10n,
+    String? value, {
+    PasswordPolicy? policy,
+  }) {
     final text = value ?? '';
     if (text.isEmpty) return l10n.validationRequired;
-    return text.length < 8 ? l10n.validationPasswordShort : null;
+    if (policy == null) return null;
+
+    if (text.length < policy.minimumLength) {
+      return l10n.validationPasswordShort(policy.minimumLength);
+    }
+    if (text.length > policy.maximumLength) {
+      return l10n.validationPasswordLong(policy.maximumLength);
+    }
+    if (policy.requiresLetter && !text.contains(RegExp('[A-Za-z]'))) {
+      return l10n.validationPasswordLetter;
+    }
+    if (policy.requiresDigit && !text.contains(RegExp(r'\d'))) {
+      return l10n.validationPasswordDigit;
+    }
+    if (!policy.allowsWhitespace && text.contains(RegExp(r'\s'))) {
+      return l10n.validationPasswordSpaces;
+    }
+    return null;
+  }
+
+  /// The rule, as a sentence under the field.
+  ///
+  /// Composed from the flags rather than sent by the server: the field-level
+  /// messages above have to be the app's anyway, and "{n} characters" in Arabic
+  /// needs plural forms that a server-side interpolation cannot produce. Null
+  /// when there is no policy to describe — better a field with no helper than a
+  /// helper describing a rule nobody is applying.
+  static String? passwordRules(AppLocalizations l10n, PasswordPolicy? policy) {
+    if (policy == null) return null;
+    if (policy.requiresLetter && policy.requiresDigit) {
+      return l10n.authPasswordRules(policy.minimumLength);
+    }
+    return l10n.authPasswordRulesLengthOnly(policy.minimumLength);
   }
 
   static String? maxLength(AppLocalizations l10n, String? value, int max) =>

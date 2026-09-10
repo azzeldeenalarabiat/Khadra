@@ -69,6 +69,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final passwordPolicy = ref.watch(passwordPolicyProvider);
     final token = widget.token;
 
     if (token == null || token.isEmpty) {
@@ -116,8 +117,10 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
               KhadraPasswordField(
                 controller: _password,
                 label: l10n.authNewPassword,
-                helper: l10n.authPasswordRules,
-                validator: (value) => Validate.password(l10n, value),
+                helper: Validate.passwordRules(l10n, passwordPolicy),
+                maxLength: passwordPolicy?.maximumLength,
+                validator: (value) =>
+                    Validate.password(l10n, value, policy: passwordPolicy),
               ),
               KhadraPasswordField(
                 controller: _confirm,

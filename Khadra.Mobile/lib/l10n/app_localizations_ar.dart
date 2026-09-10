@@ -208,7 +208,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authNoAccount => 'جديد على خضرا؟';
 
   @override
-  String get authPasswordRules => 'ثمانية أحرف على الأقل، تتضمن حرفاً ورقماً.';
+  String authPasswordRules(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count حرف على الأقل، تتضمن حرفاً ورقماً.',
+      many: '$count حرفاً على الأقل، تتضمن حرفاً ورقماً.',
+      few: '$count أحرف على الأقل، تتضمن حرفاً ورقماً.',
+      two: 'حرفان على الأقل، يتضمنان حرفاً ورقماً.',
+      one: 'حرف واحد على الأقل، يتضمن حرفاً ورقماً.',
+      zero: 'حرف واحد على الأقل، يتضمن حرفاً ورقماً.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String authPasswordRulesLengthOnly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count حرف على الأقل.',
+      many: '$count حرفاً على الأقل.',
+      few: '$count أحرف على الأقل.',
+      two: 'حرفان على الأقل.',
+      one: 'حرف واحد على الأقل.',
+      zero: 'حرف واحد على الأقل.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get authVerifyEmailTitle => 'فعّل بريدك الإلكتروني';
@@ -1436,7 +1463,44 @@ class AppLocalizationsAr extends AppLocalizations {
   String get validationPhone => 'أدخل رقم هاتف أردني، مثل 0791234567.';
 
   @override
-  String get validationPasswordShort => 'استخدم ثمانية أحرف على الأقل.';
+  String validationPasswordShort(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'استخدم $count حرف على الأقل.',
+      many: 'استخدم $count حرفاً على الأقل.',
+      few: 'استخدم $count أحرف على الأقل.',
+      two: 'استخدم حرفين على الأقل.',
+      one: 'استخدم حرفاً واحداً على الأقل.',
+      zero: 'استخدم حرفاً واحداً على الأقل.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String validationPasswordLong(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'استخدم $count حرف كحد أقصى.',
+      many: 'استخدم $count حرفاً كحد أقصى.',
+      few: 'استخدم $count أحرف كحد أقصى.',
+      two: 'استخدم حرفين كحد أقصى.',
+      one: 'استخدم حرفاً واحداً كحد أقصى.',
+      zero: 'لا يمكن استخدام أي حرف.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get validationPasswordLetter => 'أضف حرفاً.';
+
+  @override
+  String get validationPasswordDigit => 'أضف رقماً.';
+
+  @override
+  String get validationPasswordSpaces =>
+      'لا يمكن أن تحتوي كلمة المرور على مسافات.';
 
   @override
   String get validationPasswordMatch => 'كلمتا المرور غير متطابقتين.';
@@ -1513,4 +1577,115 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errorRateLimited => 'طلبات كثيرة. انتظر لحظة وحاول مجدداً.';
+
+  @override
+  String get errorAuthInvalidName =>
+      'يجب أن يتراوح الاسم بين حرفين و150 حرفاً.';
+
+  @override
+  String get errorAuthPasswordUnchanged =>
+      'هذه هي كلمة المرور الحالية. اختر واحدة مختلفة.';
+
+  @override
+  String get errorAuthInvalidDateOfBirth => 'تاريخ الميلاد هذا غير صالح.';
+
+  @override
+  String errorAuthUnderageBy(int age) {
+    return 'يجب ألا يقل عمر المستأجر على خضرا عن $age عاماً.';
+  }
+
+  @override
+  String get errorBookingAccountCannotBook =>
+      'لا يمكن لهذا الحساب إجراء حجوزات.';
+
+  @override
+  String get errorBookingNotYours => 'هذا الحجز يعود لشخص آخر.';
+
+  @override
+  String get errorBookingAlreadyFinished => 'انتهى هذا الحجز بالفعل.';
+
+  @override
+  String get errorBookingNotAwaitingPayment => 'هذا الحجز لا ينتظر أي دفعة.';
+
+  @override
+  String get errorBookingDisputeOpen =>
+      'لا يمكن تسوية هذا الحجز ما دام هناك نزاع مفتوح عليه.';
+
+  @override
+  String get errorBookingTooSoon =>
+      'موعد الاستلام قريب أكثر من اللازم. اختر موعداً لاحقاً.';
+
+  @override
+  String errorBookingTooSoonBy(int minutes) {
+    return 'يجب أن يبدأ الإيجار بعد $minutes دقيقة على الأقل من الآن.';
+  }
+
+  @override
+  String get errorBookingRentalTooLong =>
+      'مدة هذا الإيجار أطول مما يمكن حجزه. اختر مدة أقصر.';
+
+  @override
+  String get errorBookingBeyondHorizon =>
+      'هذا التاريخ أبعد مما يمكن حجزه. اختر تاريخاً أقرب.';
+
+  @override
+  String errorBookingBeyondHorizonBy(int days) {
+    return 'لا يمكن الحجز قبل أكثر من $days يوماً من موعد الإيجار.';
+  }
+
+  @override
+  String get errorBookingOutsideOpeningHours =>
+      'المكتب مغلق في هذا الوقت. اختر وقتاً ضمن ساعات العمل، أو اطلب توصيل السيارة.';
+
+  @override
+  String get errorBookingDeliveryOutOfRange =>
+      'هذا الموقع خارج نطاق التوصيل لهذا المكتب. اختر موقعاً أقرب إليه.';
+
+  @override
+  String get errorBookingDeliveryLocationRequired =>
+      'حدّد المكان الذي تريد إحضار السيارة إليه.';
+
+  @override
+  String get errorDocumentTooLarge => 'حجم هذا الملف أكبر من الحد المسموح به.';
+
+  @override
+  String get errorDocumentUnsupportedType =>
+      'نوع هذا الملف غير مقبول. ارفع صورة JPEG أو PNG أو ملف PDF.';
+
+  @override
+  String get errorDocumentNotFound => 'لم يعد هذا المستند موجوداً.';
+
+  @override
+  String get errorReviewWindowClosed => 'انتهت مهلة تقييم هذا الحجز.';
+
+  @override
+  String get errorReviewInvalidRating =>
+      'اختر تقييماً من نجمة واحدة إلى خمس نجوم.';
+
+  @override
+  String get errorReviewCommentTooLong => 'هذا التعليق أطول مما يمكن قبوله.';
+
+  @override
+  String get errorDisputeNotFound => 'لم يُعثر على هذا النزاع.';
+
+  @override
+  String get errorDisputeNotOpen => 'لم يعد هذا النزاع مفتوحاً.';
+
+  @override
+  String get errorDisputeNotYoursToWithdraw =>
+      'لا يمكن سحب النزاع إلا من الطرف الذي فتحه.';
+
+  @override
+  String get errorDisputeReasonRequired => 'اذكر ما الذي حدث قبل فتح النزاع.';
+
+  @override
+  String get errorDisputeStatementRequired =>
+      'اكتب شيئاً قبل إضافته إلى النزاع.';
+
+  @override
+  String get errorDisputeEvidenceFailed =>
+      'تعذّر رفع أحد الملفات. حاول إرفاقه مجدداً.';
+
+  @override
+  String get errorPaymentRefused => 'رُفضت هذه الدفعة. جرّب بطاقة أخرى.';
 }

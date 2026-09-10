@@ -210,8 +210,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authNoAccount => 'New to Khadra?';
 
   @override
-  String get authPasswordRules =>
-      'At least 8 characters, with a letter and a number.';
+  String authPasswordRules(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'At least $count characters, with a letter and a number.',
+      one: 'At least 1 character, with a letter and a number.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String authPasswordRulesLengthOnly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'At least $count characters.',
+      one: 'At least 1 character.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get authVerifyEmailTitle => 'Verify your email';
@@ -1420,7 +1438,35 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a Jordanian mobile number, like 0791234567.';
 
   @override
-  String get validationPasswordShort => 'Use at least 8 characters.';
+  String validationPasswordShort(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Use at least $count characters.',
+      one: 'Use at least 1 character.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String validationPasswordLong(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Use at most $count characters.',
+      one: 'Use at most 1 character.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get validationPasswordLetter => 'Add a letter.';
+
+  @override
+  String get validationPasswordDigit => 'Add a number.';
+
+  @override
+  String get validationPasswordSpaces => 'A password cannot contain spaces.';
 
   @override
   String get validationPasswordMatch => 'The two passwords do not match.';
@@ -1508,4 +1554,121 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorRateLimited =>
       'Too many requests. Wait a moment and try again.';
+
+  @override
+  String get errorAuthInvalidName =>
+      'A name must be between 2 and 150 characters.';
+
+  @override
+  String get errorAuthPasswordUnchanged =>
+      'That is the password you already have. Choose a different one.';
+
+  @override
+  String get errorAuthInvalidDateOfBirth => 'That date of birth is not valid.';
+
+  @override
+  String errorAuthUnderageBy(int age) {
+    return 'Renters on Khadra must be at least $age years old.';
+  }
+
+  @override
+  String get errorBookingAccountCannotBook =>
+      'This account cannot make bookings.';
+
+  @override
+  String get errorBookingNotYours => 'That booking belongs to somebody else.';
+
+  @override
+  String get errorBookingAlreadyFinished => 'This booking has already ended.';
+
+  @override
+  String get errorBookingNotAwaitingPayment =>
+      'This booking is not waiting on a payment.';
+
+  @override
+  String get errorBookingDisputeOpen =>
+      'This booking cannot settle while a dispute on it is open.';
+
+  @override
+  String get errorBookingTooSoon =>
+      'That pickup time is too soon. Choose a later one.';
+
+  @override
+  String errorBookingTooSoonBy(int minutes) {
+    return 'A rental must start at least $minutes minutes from now.';
+  }
+
+  @override
+  String get errorBookingRentalTooLong =>
+      'That rental is longer than we can book. Choose a shorter one.';
+
+  @override
+  String get errorBookingBeyondHorizon =>
+      'That is further ahead than we can book. Choose an earlier date.';
+
+  @override
+  String errorBookingBeyondHorizonBy(int days) {
+    return 'A rental cannot be booked more than $days days ahead.';
+  }
+
+  @override
+  String get errorBookingOutsideOpeningHours =>
+      'This office is closed at that time. Choose a time while they are open, or have the car delivered.';
+
+  @override
+  String get errorBookingDeliveryOutOfRange =>
+      'That spot is outside this office’s delivery area. Choose one closer to them.';
+
+  @override
+  String get errorBookingDeliveryLocationRequired =>
+      'Choose where the car should be brought.';
+
+  @override
+  String get errorDocumentTooLarge =>
+      'That file is larger than the upload limit.';
+
+  @override
+  String get errorDocumentUnsupportedType =>
+      'That file type is not accepted. Upload a JPEG, PNG or PDF.';
+
+  @override
+  String get errorDocumentNotFound => 'That document is no longer there.';
+
+  @override
+  String get errorReviewWindowClosed =>
+      'The time to review this booking has passed.';
+
+  @override
+  String get errorReviewInvalidRating =>
+      'Choose a rating between one and five stars.';
+
+  @override
+  String get errorReviewCommentTooLong =>
+      'That comment is longer than we can take.';
+
+  @override
+  String get errorDisputeNotFound => 'That dispute was not found.';
+
+  @override
+  String get errorDisputeNotOpen => 'This dispute is no longer open.';
+
+  @override
+  String get errorDisputeNotYoursToWithdraw =>
+      'Only the party who opened a dispute can withdraw it.';
+
+  @override
+  String get errorDisputeReasonRequired =>
+      'Say what went wrong before opening a dispute.';
+
+  @override
+  String get errorDisputeStatementRequired =>
+      'Write something before adding it to the dispute.';
+
+  @override
+  String get errorDisputeEvidenceFailed =>
+      'One of the files did not upload. Try attaching it again.';
+
+  @override
+  String get errorPaymentRefused =>
+      'That payment was refused. Try a different card.';
 }

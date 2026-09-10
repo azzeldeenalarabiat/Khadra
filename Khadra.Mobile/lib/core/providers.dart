@@ -108,6 +108,16 @@ final appConfigProvider = FutureProvider<AppConfig>((ref) async {
   return ref.watch(apiProvider).appConfig();
 });
 
+/// What the platform will accept as a password, or null until it has said.
+///
+/// Its own provider because three screens ask the same question — register,
+/// reset and change — and each of them would otherwise reach into the config the
+/// same way. Null while the config is in flight, and the validator's contract is
+/// that null means "let the server judge", never "assume the old default".
+final passwordPolicyProvider = Provider<PasswordPolicy?>(
+  (ref) => ref.watch(appConfigProvider).valueOrNull?.password,
+);
+
 final citiesProvider = FutureProvider<List<Lookup>>((ref) async {
   ref.keepAlive();
   return ref.watch(apiProvider).cities();

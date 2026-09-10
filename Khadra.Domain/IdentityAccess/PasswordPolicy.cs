@@ -9,9 +9,19 @@ public static class PasswordPolicy
     public const int AbsoluteMinimumLength = 8;
     public const int MaximumLength = 72;
 
+    /// <summary>The minimum actually enforced, given a configured one.</summary>
+    /// <remarks>
+    /// Its own method because two places need the same answer and they must not drift: the check
+    /// below, and `/app-config`, which publishes the figure so a client can state the rule and
+    /// refuse a password before spending a request on it. A published minimum SMALLER than the
+    /// enforced one would be worse than none — it would promise something the server then refuses.
+    /// </remarks>
+    public static int EffectiveMinimum(int configuredMinimum) =>
+        Math.Max(configuredMinimum, AbsoluteMinimumLength);
+
     public static UnitResult<Error> Validate(string? password, int minimumLength)
     {
-        var effectiveMinimum = Math.Max(minimumLength, AbsoluteMinimumLength);
+        var effectiveMinimum = EffectiveMinimum(minimumLength);
 
         if (string.IsNullOrEmpty(password))
             return UnitResult.Failure(IdentityErrors.WeakPassword("A password is required."));
