@@ -194,6 +194,20 @@ services:
 #                        SMTP key; the API detects this and refuses it, so no
 #                        mail is delivered and no administrator can be invited.
 #
+#   Email__Provider      Must be the bare word 'Brevo'. NOT '"Brevo"' — the
+#                        quotes in docs/deployment.md are shell syntax, and a
+#                        dashboard field keeps them, so the value becomes five
+#                        characters that match no transport. Until this was
+#                        guarded, anything unrecognised silently selected the
+#                        Logging transport: every message written to the log and
+#                        delivered to nobody, while every send reported success.
+#                        Both an unrecognised value and 'Logging' in Production
+#                        now refuse to start.
+#
+#   Email__FromAddress   An address CONFIRMED under Brevo's Senders, Domains &
+#                        Dedicated IPs. An unconfirmed one is refused per
+#                        message, at send time, by Brevo rather than by us.
+#
 #   KnownProxies__0..3   The SAME four values as above, and for the same reason.
 #   ForwardedHeaders__   The API is not only reached through the BFF: the
 #   ForwardLimit         customer mobile application calls it directly over the

@@ -1,3 +1,4 @@
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess;
 using Khadra.Application.IdentityAccess.ForgotPassword;
@@ -24,6 +25,10 @@ internal sealed class AuthHandlerTestContext
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
     public IAuthEmailComposer EmailComposer { get; } = Substitute.For<IAuthEmailComposer>();
     public IEmailSender EmailSender { get; init; } = Substitute.For<IEmailSender>();
+    public ICurrentActor Actor { get; } = Substitute.For<ICurrentActor>();
+    // Recording rather than null, so a test can assert what the reason line says AND that the
+    // address never reaches it.
+    public RecordingLogger<ForgotPasswordHandler> ForgotPasswordLog { get; } = new();
     public IBusinessRulesProvider BusinessRules { get; } = TestBusinessRules.Provider();
     public IReportingCalendar Calendar { get; } = TestBusinessRules.Calendar();
 
@@ -64,7 +69,8 @@ internal sealed class AuthHandlerTestContext
         UserRepository, VerificationTokens, OpaqueTokens, Policy, Clock, UnitOfWork, Emails);
 
     public ForgotPasswordHandler ForgotPassword() => new(
-        UserRepository, VerificationTokens, OpaqueTokens, Policy, Clock, UnitOfWork, Emails);
+        UserRepository, VerificationTokens, OpaqueTokens, Policy, Clock, UnitOfWork, Emails,
+        Actor, ForgotPasswordLog);
 
     public User KnownUser(User user)
     {

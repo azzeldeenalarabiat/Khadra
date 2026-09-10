@@ -262,7 +262,12 @@ public static class DependencyInjection
         // Four transports, one switch. `Resend` talks HTTPS and needs only an API key; `Smtp` covers
         // Gmail and any relay that speaks it (Brevo: smtp-relay.brevo.com:587, username = your login,
         // password = an SMTP key), so a second provider needs no code, only configuration.
-        var provider = configuration[$"{EmailOptions.SectionName}:Provider"] ?? EmailOptions.LoggingProvider;
+        // Trimmed, because this arrives from an environment variable and a trailing space selects a
+        // different transport than the one somebody typed. The match below is by string, and the
+        // else-branch is silent by construction, so every way of getting it slightly wrong lands on
+        // the transport that delivers nothing.
+        var configuredProvider = configuration[$"{EmailOptions.SectionName}:Provider"];
+        var provider = configuredProvider?.Trim() ?? EmailOptions.LoggingProvider;
         if (string.Equals(provider, EmailOptions.ResendProvider, StringComparison.OrdinalIgnoreCase))
         {
             services.AddHttpClient(ResendEmailSender.HttpClientName, client =>
@@ -293,10 +298,29 @@ public static class DependencyInjection
             services.AddSingleton<IEmailSender, SmtpEmailSender>();
             services.AddSingleton<IEmailTransportProbe, SmtpTransportProbe>();
         }
-        else
+        else if (provider.Length == 0
+            || string.Equals(provider, EmailOptions.LoggingProvider, StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IEmailSender, LoggingEmailSender>();
-            services.AddSingleton<IEmailTransportProbe, LoggingTransportProbe>();
+            // Given the value that was read, so the startup line can say WHY this transport was
+            // chosen rather than only that it was.
+            services.AddSingleton<IEmailTransportProbe>(_ => new LoggingTransportProbe(configuredProvider));
+        }
+        else
+        {
+            // The else-branch used to be this one, silently. Every way of getting the name slightly
+            // wrong -- a typo, a stray quote from a documentation example pasted whole into a
+            // dashboard field, a trailing comma -- selected the transport that delivers to nobody,
+            // and the platform then reported every registration and password reset as successful.
+            //
+            // The value is quoted so a space or a quote character inside it is visible; unquoted,
+            // 'Brevo' and '"Brevo" ' look identical in a log.
+            throw new InvalidOperationException(
+                $"Email:Provider is \"{configuredProvider}\", which is not a transport this API has. " +
+                $"Use one of: {EmailOptions.BrevoProvider}, {EmailOptions.ResendProvider}, " +
+                $"{EmailOptions.SmtpProvider}, {EmailOptions.LoggingProvider}. Note the quotes around " +
+                "the value above are this message's own -- if the value inside them has quotes or " +
+                "spaces of its own, that is the problem: set the variable to the bare word.");
         }
 
         services.AddSingleton<IAuthEmailComposer, AuthEmailComposer>();

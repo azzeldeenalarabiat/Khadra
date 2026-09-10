@@ -79,10 +79,44 @@ internal sealed class SmtpTransportProbe(IOptions<EmailOptions> options) : IEmai
     }
 }
 
-/// <summary>The counterpart for the Logging provider, which writes mail to the log and never fails.</summary>
-internal sealed class LoggingTransportProbe : IEmailTransportProbe
+/// <summary>
+/// The counterpart for the Logging provider, which writes mail to the log and delivers nothing.
+/// </summary>
+/// <remarks>
+/// This used to report READY, and the line it produced at startup was
+/// <c>"Email ready. Email:Provider is 'Logging'. Messages are written to the log and delivered to
+/// nobody."</c> — a sentence that contradicts itself, and whose first two words are the only part an
+/// operator scanning a boot log reads. It is the reason a production platform ran for days believing
+/// mail worked while every password reset went to a log file.
+///
+/// Nothing is ready here. <c>IsConfigured</c> is the field that says "not a failure, just unfinished
+/// setup", which is exactly what choosing this transport in production is, so the startup check now
+/// says EMAIL WILL NOT BE DELIVERED and says it at Warning.
+///
+/// It stays non-fatal on purpose. Development runs on this when Mailpit is not up, and an API that
+/// refused to start without a mail server would be worse than one that says clearly it has none.
+/// </remarks>
+internal sealed class LoggingTransportProbe(string? configuredProvider = null) : IEmailTransportProbe
 {
     public Task<EmailTransportStatus> CheckAsync(CancellationToken cancellationToken = default) =>
-        Task.FromResult(new EmailTransportStatus(true, true, true,
-            "Email:Provider is 'Logging'. Messages are written to the log and delivered to nobody."));
+        Task.FromResult(new EmailTransportStatus(false, false, false, Describe(configuredProvider)));
+
+    private static string Describe(string? configuredProvider)
+    {
+        // Naming the value that was actually read turns "why is it Logging?" into "because
+        // Email__Provider says 'Brevoo'". The transport is chosen by string match, so a typo, a
+        // stray quote or a trailing space selects this transport and nothing else would say so.
+        var chosenBecause = string.IsNullOrWhiteSpace(configuredProvider)
+            ? "Email:Provider is not set, which selects the Logging transport"
+            : string.Equals(configuredProvider.Trim(), EmailOptions.LoggingProvider, StringComparison.OrdinalIgnoreCase)
+                ? "Email:Provider is 'Logging'"
+                : $"Email:Provider is '{configuredProvider}', which matches no known transport, so the " +
+                  "Logging one was selected";
+
+        return chosenBecause +
+            " — so NOTHING IS DELIVERED. Every verification, invitation and password-reset message " +
+            "is written to this log and sent to nobody. Set Email__Provider to 'Brevo' (with " +
+            "Email__ApiKey beginning 'xkeysib-' and Email__FromAddress set to a confirmed sender), " +
+            "'Resend', or 'Smtp'.";
+    }
 }

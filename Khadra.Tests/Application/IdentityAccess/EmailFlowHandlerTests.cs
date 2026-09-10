@@ -123,14 +123,10 @@ public sealed class ResendVerificationHandlerTests
 
 public sealed class ForgotPasswordHandlerTests
 {
-    private static ForgotPasswordHandler Handler(AuthHandlerTestContext context) => new(
-        context.UserRepository,
-        context.VerificationTokens,
-        context.OpaqueTokens,
-        context.Policy,
-        context.Clock,
-        context.UnitOfWork,
-        context.Emails);
+    // Delegated rather than assembled again: this helper drifted from the harness the moment the
+    // handler took a new collaborator, and a second copy of a constructor call is a second place to
+    // remember.
+    private static ForgotPasswordHandler Handler(AuthHandlerTestContext context) => context.ForgotPassword();
 
     [Fact]
     public async Task Unknown_accounts_succeed_silently()

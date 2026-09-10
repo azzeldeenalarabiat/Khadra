@@ -27,7 +27,11 @@ var builder = WebApplication.CreateBuilder(args);
 var environmentName = builder.Environment.EnvironmentName;
 
 builder.Logging.ClearProviders();
-builder.Logging.AddJsonConsole();
+// Scopes included, so every line carries the RequestId that produced it. Without them the only thing
+// tying a delivery failure (event 1100) or a logged message (1200) to the request that caused it is
+// the timestamp, which stops being enough the moment two people ask for a password reset in the same
+// second -- and those are exactly the lines somebody reads when a reset produced no email.
+builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 if (builder.Environment.IsDevelopment())
     builder.Logging.AddDebug();
 
@@ -331,6 +335,38 @@ if (knownProxies.Length == 0 && !app.Environment.IsDevelopment())
         "KnownProxies is empty. The API must be told which address the BFF connects from, or it " +
         "cannot trust X-Forwarded-For and cannot tell one client from another when rate limiting. " +
         "Set the \"KnownProxies\" configuration array to the BFF's address(es).");
+}
+
+// Production must not run on the transport that delivers to nobody.
+//
+// It is the DEFAULT -- EmailOptions.Provider is "Logging" -- so forgetting the variable selects it,
+// and until now nothing stopped that. The platform then behaves exactly as though mail worked:
+// registration succeeds, an invitation "is sent", a password reset answers 202, and every message is
+// written to this log and delivered to no one. It cost days of production debugging to notice, and
+// the thing that hid it was the startup line reading "Email ready" for this very transport.
+//
+// IsProduction, deliberately, rather than the !IsDevelopment shape the guard above uses: a test host
+// legitimately has no mail server, and ApiSmokeTests and ForwardedHeaderTrustTests boot as "Testing"
+// and "Staging" on this transport. Render leaves ASPNETCORE_ENVIRONMENT unset, which defaults to
+// Production -- so this bites exactly where it should.
+//
+// Fatal, unlike MailStartupCheck. That check is about a transport being briefly unreachable, which
+// must not stop the API serving everything else. This is a configuration error fixed by setting one
+// variable, and it is the same category as an empty proxy list: better refused at boot than
+// discovered by somebody waiting at an inbox.
+if (app.Environment.IsProduction())
+{
+    var mailProvider = builder.Configuration[$"{EmailOptions.SectionName}:Provider"]?.Trim();
+    if (string.IsNullOrEmpty(mailProvider)
+        || string.Equals(mailProvider, EmailOptions.LoggingProvider, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "Email:Provider selects the Logging transport, which writes every message to the log and " +
+            "delivers nothing. That is the default when the setting is missing, so this is most " +
+            "likely an unset variable. Set Email__Provider to 'Brevo' (with Email__ApiKey beginning " +
+            "'xkeysib-' and Email__FromAddress set to a sender Brevo has confirmed), 'Resend', or " +
+            "'Smtp'. Set it to the bare word, with no surrounding quotes.");
+    }
 }
 
 // Report the forwarding facts for the requests that can actually tell us something.
