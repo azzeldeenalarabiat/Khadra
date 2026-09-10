@@ -72,3 +72,16 @@ consumes every live verification link, which is the remedy if messages were writ
 to the log while `Email:Provider` selected the Logging transport. Each of those log
 lines carries a working link — an hour for a reset, a day for verification, seven
 days for an invitation.
+
+## 4. `2026-09-10-dealer-address.sql`
+
+The one migration this schema gained after the first deployment: the two nullable
+address columns on `dealers`. Idempotent, like everything here — it checks
+`__EFMigrationsHistory` and records itself, so running it twice is a no-op.
+
+Additive and nullable, which is what makes it safe to apply BEFORE the new build
+is deployed: EF names its columns explicitly in every query, so the running older
+API neither sees nor touches them.
+
+`khadra-schema.sql` above already contains it, for a database being created from
+scratch. This file is for the one that already exists.
