@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<AccountRegistrar>();
         services.AddScoped<IdentityAccess.AdminUsers.AdminBootstrapper>();
         services.AddScoped<Auditing.AdminActionRecorder>();
+        services.AddScoped<Auditing.DocumentAccessRecorder>();
         services.AddScoped<Dealers.DealerReviewAuditor>();
         services.AddScoped<Dealers.DealerMembershipResolver>();
         services.AddScoped<EmployeeAccountProvisioner>();

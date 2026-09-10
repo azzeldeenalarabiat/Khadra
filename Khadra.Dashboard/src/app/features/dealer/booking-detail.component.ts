@@ -129,7 +129,8 @@ export class DealerBookingDetailComponent {
   protected readonly meta = computed(() => {
     const b = this.booking();
     if (!b) return '';
-    const method = b.pickupMethod === 'Delivery' ? 'delivery' : this.t('dealerBooking.pickupAtYourLocation');
+    const method =
+      b.pickupMethod === 'Delivery' ? 'delivery' : this.t('dealerBooking.pickupAtYourLocation');
     return `Requested ${this.dateTime(b.requestedAt ?? b.createdAt)} · ${b.customerName} · ${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'} · ${method}`;
   });
 
@@ -299,6 +300,37 @@ export class DealerBookingDetailComponent {
     this.brokenPreviews.update((broken) => new Set(broken).add(documentId));
   }
 
+  /** Which document is being recorded right now, so its own button can say so and be disabled. */
+  protected readonly reviewingDocumentId = signal<string | null>(null);
+
+  /**
+   * Records that this dealership checked one document.
+   *
+   * Nothing about the reviewer or the time is sent: the server takes both from the validated token
+   * and its own clock. The guard here is only against a double click producing two requests — the
+   * server is idempotent anyway, and answers the second with the first review, timestamp intact.
+   */
+  protected async markReviewed(documentId: string): Promise<void> {
+    const b = this.booking();
+    if (!b || this.reviewingDocumentId()) return;
+
+    this.reviewingDocumentId.set(documentId);
+    this.problem.set(null);
+    try {
+      await this.service.reviewRenterDocument(b.bookingId, documentId);
+      // Re-read rather than patching a local copy: the review that now stands is the SERVER's, and
+      // on a repeat that is the original one with its original timestamp.
+      this.service.renterDocuments.reload();
+      this.ui.showToast(this.t('renterDocs.reviewedByDealer'), this.t('renterDocs.reviewSaved'));
+    } catch (error: unknown) {
+      // A 409 here means the window closed between the listing and the click. The panel's own state
+      // will say so on the next load; this line is for everything else.
+      this.problem.set(describe(error, this.t));
+    } finally {
+      this.reviewingDocumentId.set(null);
+    }
+  }
+
   /**
    * Whether the gallery may rate this customer now.
    *
@@ -324,7 +356,7 @@ export class DealerBookingDetailComponent {
     try {
       await this.service.rateCustomer(b.bookingId, rating);
       this.service.refresh();
-      this.ui.showToast(this.t("dealerBooking.rateCustomer"), this.t("dealerBooking.rateSaved"));
+      this.ui.showToast(this.t('dealerBooking.rateCustomer'), this.t('dealerBooking.rateSaved'));
     } catch (error: unknown) {
       this.problem.set(describe(error, this.t));
     } finally {
@@ -335,9 +367,19 @@ export class DealerBookingDetailComponent {
   protected readonly vehicleRows = computed<readonly KeyValue[]>(() => {
     const b = this.booking();
     if (!b) return [];
-    if (!b.vehicle) return [{ k: this.t('dealerBooking.vehicle'), v: this.t('dealerBooking.noLongerListed'), tone: 'dim' }];
+    if (!b.vehicle)
+      return [
+        {
+          k: this.t('dealerBooking.vehicle'),
+          v: this.t('dealerBooking.noLongerListed'),
+          tone: 'dim',
+        },
+      ];
     return [
-      { k: this.t('dealerBooking.vehicle'), v: `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` },
+      {
+        k: this.t('dealerBooking.vehicle'),
+        v: `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}`,
+      },
       { k: this.t('dealerBooking.plate'), v: b.vehicle.plateNumber },
       { k: this.t('common.colour'), v: b.vehicle.color ?? '—' },
       {
@@ -353,14 +395,23 @@ export class DealerBookingDetailComponent {
     return [
       { k: this.t('dealerBooking.start'), v: this.dateTime(b.periodStart) },
       { k: this.t('dealerBooking.end'), v: this.dateTime(b.periodEnd) },
-      { k: this.t('dealerBooking.duration'), v: `${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'}` },
+      {
+        k: this.t('dealerBooking.duration'),
+        v: `${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'}`,
+      },
       {
         k: this.t('vehicleWizard.mileage'),
         v: b.pricing.mileageUnlimited
           ? 'Unlimited'
           : `${b.pricing.mileageDailyLimitKm} km/day, ${b.pricing.mileageExcessFeePerKm?.amount ?? 0} ${b.pricing.dailyRate.currency}/km over`,
       },
-      { k: this.t('common.fuel'), v: b.pricing.fuelPolicy === 'FullToFull' ? this.t('vehicleWizard.fullToFull') : this.t('vehicleWizard.sameToSame') },
+      {
+        k: this.t('common.fuel'),
+        v:
+          b.pricing.fuelPolicy === 'FullToFull'
+            ? this.t('vehicleWizard.fullToFull')
+            : this.t('vehicleWizard.sameToSame'),
+      },
     ];
   });
 
@@ -368,7 +419,9 @@ export class DealerBookingDetailComponent {
     const b = this.booking();
     if (!b) return [];
     if (b.pickupMethod !== 'Delivery' || !b.deliveryLocation) {
-      return [{ k: this.t('dealerBooking.method'), v: this.t('dealerBooking.collectedFromYourLocation') }];
+      return [
+        { k: this.t('dealerBooking.method'), v: this.t('dealerBooking.collectedFromYourLocation') },
+      ];
     }
     return [
       { k: this.t('dealerBooking.method'), v: 'Delivery' },
@@ -406,7 +459,10 @@ export class DealerBookingDetailComponent {
         v: `${b.pricing.rentalTotal.amount}`,
       },
       { k: this.t('dealerBooking.deliveryFeeYours'), v: `${b.pricing.deliveryFee.amount}` },
-      { k: this.t('dealerBooking.securityDepositHeldPer'), v: `${b.pricing.securityDeposit.amount}` },
+      {
+        k: this.t('dealerBooking.securityDepositHeldPer'),
+        v: `${b.pricing.securityDeposit.amount}`,
+      },
       {
         k: `Deposit paid by card (${b.pricing.depositPercent}%)`,
         v: paidDeposit ? `${b.pricing.depositAmount.amount}` : '0',
@@ -421,14 +477,29 @@ export class DealerBookingDetailComponent {
             },
           ]
         : settling
-          ? [{ k: this.t('dealerBooking.balanceCollectedInCash'), v: `${b.pricing.balanceDue.amount}` }]
-          : [{ k: this.t('common.deposit'), v: this.t('dealerBooking.heldPendingSettlementSee'), dim: true }]),
+          ? [
+              {
+                k: this.t('dealerBooking.balanceCollectedInCash'),
+                v: `${b.pricing.balanceDue.amount}`,
+              },
+            ]
+          : [
+              {
+                k: this.t('common.deposit'),
+                v: this.t('dealerBooking.heldPendingSettlementSee'),
+                dim: true,
+              },
+            ]),
       {
         k: `Platform commission · ${b.terms.commissionPercent}% (frozen on this booking)`,
         // Computed by the API at the frozen rate; the console never multiplies money.
         v: `−${b.commissionAmount.amount}`,
       },
-      { k: this.t('dealerReports.netPayout'), v: this.t('dealerReports.notAvailableYet'), dim: true },
+      {
+        k: this.t('dealerReports.netPayout'),
+        v: this.t('dealerReports.notAvailableYet'),
+        dim: true,
+      },
     ];
   });
 
@@ -589,7 +660,9 @@ export class DealerBookingDetailComponent {
   }
 
   protected carName(b: Booking): string {
-    return b.vehicle ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}` : this.t('dealerBooking.theVehicle');
+    return b.vehicle
+      ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}`
+      : this.t('dealerBooking.theVehicle');
   }
 
   protected dateTime(iso: string): string {
@@ -624,7 +697,10 @@ export class DealerBookingDetailComponent {
   }
 
   private actor(party: string, userId: string | null): string {
-    if (party === 'Dealer') return userId ? this.t('dealerBooking.byYourStaff') : this.t('dealerBooking.byYourDealership');
+    if (party === 'Dealer')
+      return userId
+        ? this.t('dealerBooking.byYourStaff')
+        : this.t('dealerBooking.byYourDealership');
     if (party === 'Customer') return this.t('dealerBooking.byTheCustomer');
     return this.t('dealerBooking.byThePlatform');
   }
@@ -647,6 +723,13 @@ function describe(error: unknown, t: (key: TranslationKey) => string): string {
       return t('dealerBooking.aDisputeIsAlready');
     case 'dispute.invalid_evidence_type':
       return t('dealerBooking.evidenceMustBeA');
+    // The window closed between the listing and the click. The panel says the same thing on its next
+    // load; this is what the gallery reads in the meantime.
+    case 'booking.renter_documents_not_available':
+      return t('renterDocs.closed');
+    case 'documents.not_found':
+    case 'booking.not_found':
+      return t('renterDocs.reviewFailed');
     default:
       return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
   }

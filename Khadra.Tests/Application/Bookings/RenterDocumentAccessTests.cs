@@ -1,15 +1,19 @@
+using Khadra.Application.Auditing;
 using Khadra.Application.Bookings.RenterDocuments;
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
+using Khadra.Domain.Auditing;
+using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Tests.Support;
-using Microsoft.Extensions.Logging.Abstractions;
+
 using NSubstitute;
 
 namespace Khadra.Tests.Application.Bookings;
@@ -32,69 +36,11 @@ public sealed class RenterDocumentAccessTests
 {
     private static readonly DateTimeOffset Now = Build.Now;
 
-    private sealed class Context
-    {
-        public IBookingRepository Bookings { get; } = Substitute.For<IBookingRepository>();
-        public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
-        public FakeDocumentStorage Storage { get; } = new();
-        public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
-        public TestClock Clock { get; } = new(Now);
-
-        public Dealer Dealer { get; }
-        public Id OwnerUserId { get; }
-        public User Renter { get; }
-
-        public Context(bool trading = true)
-        {
-            OwnerUserId = Id.New();
-            Dealer = trading ? Build.ApprovedDealer(Now, OwnerUserId) : Suspended(OwnerUserId);
-            Dealers.GetByOwnerUserIdAsync(OwnerUserId, Arg.Any<CancellationToken>()).Returns(Dealer);
-
-            Renter = Build.Customer(Now);
-            Users.GetByIdAsync(Renter.Id, Arg.Any<CancellationToken>()).Returns(Renter);
-        }
-
-        private static Dealer Suspended(Id ownerUserId)
-        {
-            var dealer = Build.ApprovedDealer(Now, ownerUserId);
-            dealer.Suspend(Id.New(), "Under investigation.", Now);
-            return dealer;
-        }
-
-        /// <summary>Hires an employee and makes the repository answer for them the way EF would.</summary>
-        public Id HireEmployee(bool active = true)
-        {
-            var userId = Id.New();
-            var employee = Dealer.HireEmployee(userId, canViewReports: false, Now).Value;
-            if (!active)
-                Dealer.DeactivateEmployee(employee.Id, Now);
-
-            // The staff lookup matches an inactive row too, on purpose: the resolver is what decides
-            // they have no standing, and these tests exist to prove it still does.
-            Dealers.GetByStaffUserIdAsync(userId, Arg.Any<CancellationToken>()).Returns(Dealer);
-            return userId;
-        }
-
-        public Booking Given(Booking booking)
-        {
-            Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
-            return booking;
-        }
-
-        public RenterDocumentHandlers Handlers() => new(
-            Bookings,
-            Users,
-            Storage,
-            new DealerMembershipResolver(Dealers),
-            Clock,
-            NullLogger<RenterDocumentHandlers>.Instance);
-    }
-
-    private static Booking Confirmed(Context context) =>
+    private static Booking Confirmed(RenterDocumentFixture context) =>
         context.Given(Build.ConfirmedBooking(
             Now, customerId: context.Renter.Id, dealerId: context.Dealer.Id));
 
-    private static Booking Requested(Context context) =>
+    private static Booking Requested(RenterDocumentFixture context) =>
         context.Given(Build.Booking(Now, customerId: context.Renter.Id, dealerId: context.Dealer.Id));
 
     // ── Who may look ────────────────────────────────────────────────────────────────────────────
@@ -102,7 +48,7 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task The_owner_of_the_dealership_holding_the_car_sees_the_paperwork()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
 
         var result = await context.Handlers().Handle(
@@ -121,7 +67,7 @@ public sealed class RenterDocumentAccessTests
         // Spec 4.2 gives an employee the booking desk, and POST /bookings/{id}/pickup asks only for
         // membership. An employee who can hand the car over but cannot check the licence would be
         // item 63 reopened one role down.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var employeeUserId = context.HireEmployee();
         var booking = Confirmed(context);
 
@@ -137,7 +83,7 @@ public sealed class RenterDocumentAccessTests
     {
         // Spec 4.2: their access ends immediately. The repository still answers for them -- their
         // past decisions name them -- so this is the resolver's job, not the lookup's.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var employeeUserId = context.HireEmployee(active: false);
         var booking = Confirmed(context);
 
@@ -153,7 +99,7 @@ public sealed class RenterDocumentAccessTests
     {
         // The headline rule: no dealer reaches another dealer's customer documents. NOT FOUND rather
         // than forbidden, so a gallery probing ids cannot tell a real booking from an invented one.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var strangerOwnerId = Id.New();
         var stranger = Build.ApprovedDealer(Now, strangerOwnerId, "Zarqa Auto Lease", "654321");
         context.Dealers.GetByOwnerUserIdAsync(strangerOwnerId, Arg.Any<CancellationToken>()).Returns(stranger);
@@ -172,7 +118,7 @@ public sealed class RenterDocumentAccessTests
     {
         // The same probe against the streaming route. The listing and the stream re-run the SAME
         // check; neither inherits a verdict from the other.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var strangerOwnerId = Id.New();
         var stranger = Build.ApprovedDealer(Now, strangerOwnerId, "Zarqa Auto Lease", "654321");
         context.Dealers.GetByOwnerUserIdAsync(strangerOwnerId, Arg.Any<CancellationToken>()).Returns(stranger);
@@ -180,7 +126,7 @@ public sealed class RenterDocumentAccessTests
         var licence = context.Renter.Documents.First(document => document.Type.IsLicence);
 
         var result = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(strangerOwnerId, booking.Id, licence.Id), default);
+            new OpenRenterDocumentCommand(strangerOwnerId, booking.Id, licence.Id), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(BookingErrors.NotFound.Code, result.Error.Code);
@@ -189,7 +135,7 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task Somebody_with_no_dealership_at_all_is_refused()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
 
         var result = await context.Handlers().Handle(
@@ -207,7 +153,7 @@ public sealed class RenterDocumentAccessTests
         // trading. Tightening this to DealerMembership.CanActOnBookings -- which the reputation
         // endpoint uses, and which is the obvious thing to copy -- would leave a suspended gallery
         // handing a car to a stranger while the platform refused to show them who the stranger is.
-        var context = new Context(trading: false);
+        var context = new RenterDocumentFixture(trading: false);
         var booking = Confirmed(context);
 
         var result = await context.Handlers().Handle(
@@ -224,13 +170,13 @@ public sealed class RenterDocumentAccessTests
     {
         // The stream re-runs the whole rule rather than trusting a listing that succeeded earlier,
         // and an employee let go between the two is exactly the case that distinguishes those.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var employeeUserId = context.HireEmployee(active: false);
         var booking = Confirmed(context);
         var licence = context.Renter.Documents.First(document => document.Type.IsLicence);
 
         var result = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(employeeUserId, booking.Id, licence.Id), default);
+            new OpenRenterDocumentCommand(employeeUserId, booking.Id, licence.Id), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(DealerErrors.NotRegistered.Code, result.Error.Code);
@@ -242,7 +188,7 @@ public sealed class RenterDocumentAccessTests
         // PickedUp is the handover state itself and the one this feature exists for. Every other
         // positive test uses Confirmed or Requested, so without this the state at the counter is the
         // one nothing covers.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
         booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, Now);
         context.Given(booking);
@@ -257,7 +203,7 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task An_approval_still_inside_its_payment_window_grants_access()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = context.Given(Build.ApprovedBooking(
             Now, customerId: context.Renter.Id, dealerId: context.Dealer.Id));
 
@@ -272,7 +218,7 @@ public sealed class RenterDocumentAccessTests
     {
         // CustomerDocument's own rule: "a dealer holding an active booking request from them". The
         // gallery is deciding, and the licence is part of what they are deciding on.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Requested(context);
 
         var result = await context.Handlers().Handle(
@@ -286,7 +232,7 @@ public sealed class RenterDocumentAccessTests
     {
         // The clock has already decided; only the status is behind. Access must end with the CLOCK,
         // not with whatever job eventually updates the row -- there is no such job for this today.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Requested(context);
         context.Clock.UtcNow = booking.DecisionDeadline.AddSeconds(1);
 
@@ -301,7 +247,7 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task An_approval_whose_payment_window_lapsed_no_longer_grants_access()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = context.Given(Build.ApprovedBooking(
             Now, customerId: context.Renter.Id, dealerId: context.Dealer.Id));
         context.Clock.UtcNow = booking.PaymentDeadline!.Value.AddSeconds(1);
@@ -318,7 +264,7 @@ public sealed class RenterDocumentAccessTests
     {
         // Returned is settlement, not custody. The gallery had the whole rental to look; a dispute
         // goes through the ticket and an administrator.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
         booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, Now);
         booking.RecordReturn(BookingParty.Dealer, context.OwnerUserId, Now.AddDays(1));
@@ -334,7 +280,7 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task A_cancelled_booking_closes_the_window_immediately()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Requested(context);
         booking.Cancel(BookingParty.Customer, booking.CustomerId, null, Now);
         context.Given(booking);
@@ -351,13 +297,13 @@ public sealed class RenterDocumentAccessTests
     {
         // A handover screen holds a document id for minutes. The listing that produced it succeeded;
         // this must still refuse, because the check is re-run rather than inherited.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Requested(context);
         var licence = context.Renter.Documents.First(document => document.Type.IsLicence);
         context.Clock.UtcNow = booking.DecisionDeadline.AddSeconds(1);
 
         var result = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(context.OwnerUserId, booking.Id, licence.Id), default);
+            new OpenRenterDocumentCommand(context.OwnerUserId, booking.Id, licence.Id), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(BookingErrors.RenterDocumentsNotAvailable.Code, result.Error.Code);
@@ -368,13 +314,13 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task The_bytes_come_back_with_the_type_the_listing_promised()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
         var licence = context.Renter.Documents.First(
             document => document.Type == CustomerDocumentType.DrivingLicenceFront);
 
         var result = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(context.OwnerUserId, booking.Id, licence.Id), default);
+            new OpenRenterDocumentCommand(context.OwnerUserId, booking.Id, licence.Id), default);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("image/jpeg", result.Value.ContentType);
@@ -386,13 +332,13 @@ public sealed class RenterDocumentAccessTests
     {
         // Swapping the document id in the URL is the obvious attack, and it must not even confirm
         // that the id names a real file. NOT FOUND, never forbidden.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
         var somebodyElse = Build.Customer(Now, email: "omar@example.jo", phone: "0797654321");
         var theirLicence = somebodyElse.Documents.First(document => document.Type.IsLicence);
 
         var result = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(context.OwnerUserId, booking.Id, theirLicence.Id), default);
+            new OpenRenterDocumentCommand(context.OwnerUserId, booking.Id, theirLicence.Id), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(IdentityErrors.DocumentNotFound.Code, result.Error.Code);
@@ -402,11 +348,11 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task An_invented_document_id_is_not_found()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
 
         var result = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(context.OwnerUserId, booking.Id, Id.New()), default);
+            new OpenRenterDocumentCommand(context.OwnerUserId, booking.Id, Id.New()), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(IdentityErrors.DocumentNotFound.Code, result.Error.Code);
@@ -418,7 +364,7 @@ public sealed class RenterDocumentAccessTests
         // Both sides derive the content type from the KEY, so a licence stored as a PDF cannot be
         // labelled as a photograph on the tile and then served as a PDF. The admin review screen made
         // exactly that mistake by guessing from the document's type.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var renter = Build.Customer(Now, hasLicence: false, hasIdentity: false);
         renter.AttachDocument(
             CustomerDocumentType.DrivingLicenceFront,
@@ -433,7 +379,7 @@ public sealed class RenterDocumentAccessTests
             new ViewRenterDocumentsQuery(context.OwnerUserId, booking.Id), default);
 
         var opened = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(
+            new OpenRenterDocumentCommand(
                 context.OwnerUserId, booking.Id, Id.From(listing.Value.Documents[0].DocumentId)),
             default);
 
@@ -449,14 +395,14 @@ public sealed class RenterDocumentAccessTests
         // combination no real customer can be in, and one a client could read as "complete". A
         // gallery about to hand over a car to a deleted account must not be told the paperwork is
         // fine.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
         context.Users.GetByIdAsync(context.Renter.Id, Arg.Any<CancellationToken>()).Returns((User?)null);
 
         var listing = await context.Handlers().Handle(
             new ViewRenterDocumentsQuery(context.OwnerUserId, booking.Id), default);
         var opened = await context.Handlers().Handle(
-            new OpenRenterDocumentQuery(context.OwnerUserId, booking.Id, Id.New()), default);
+            new OpenRenterDocumentCommand(context.OwnerUserId, booking.Id, Id.New()), default);
 
         Assert.True(listing.IsFailure);
         Assert.Equal(IdentityErrors.UserNotFound.Code, listing.Error.Code);
@@ -468,25 +414,20 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task A_row_whose_file_has_gone_is_not_found_rather_than_a_broken_platform()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
         var licence = context.Renter.Documents.First(document => document.Type.IsLicence);
         var storage = Substitute.For<IDocumentStorage>();
         storage.OpenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Stream?)null);
 
-        var handlers = new RenterDocumentHandlers(
-            context.Bookings,
-            context.Users,
-            storage,
-            new DealerMembershipResolver(context.Dealers),
-            context.Clock,
-            NullLogger<RenterDocumentHandlers>.Instance);
-
-        var result = await handlers.Handle(
-            new OpenRenterDocumentQuery(context.OwnerUserId, booking.Id, licence.Id), default);
+        var result = await context.Handlers(storage).Handle(
+            new OpenRenterDocumentCommand(context.OwnerUserId, booking.Id, licence.Id), default);
 
         Assert.True(result.IsFailure);
         Assert.Equal(IdentityErrors.DocumentNotFound.Code, result.Error.Code);
+        // Nothing was disclosed, so nothing is recorded. A log that counted attempts on a file that
+        // does not exist would inflate the very number a customer would later be asking about.
+        Assert.Empty(context.Recorded);
     }
 
     // ── What the listing says ───────────────────────────────────────────────────────────────────
@@ -497,7 +438,7 @@ public sealed class RenterDocumentAccessTests
         // The booking exists and the gallery may see it; "they have filed nothing" is a true answer
         // about it. A 404 would make the screen unable to tell that apart from a booking that is not
         // theirs, and it needs to, to decide what to say.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var bare = Build.Customer(Now, hasLicence: false, hasIdentity: false);
         context.Users.GetByIdAsync(bare.Id, Arg.Any<CancellationToken>()).Returns(bare);
         var booking = context.Given(Build.ConfirmedBooking(
@@ -517,7 +458,7 @@ public sealed class RenterDocumentAccessTests
     [Fact]
     public async Task A_half_finished_renter_names_exactly_what_is_absent()
     {
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var partial = Build.Customer(Now, hasIdentity: false);
         context.Users.GetByIdAsync(partial.Id, Arg.Any<CancellationToken>()).Returns(partial);
         var booking = context.Given(Build.ConfirmedBooking(
@@ -537,7 +478,7 @@ public sealed class RenterDocumentAccessTests
         // Enforced by the type -- RenterDocumentDto has nowhere to put one -- and asserted anyway,
         // because the failure this guards against is somebody ADDING a field for convenience. Every
         // string on the shape is checked against the key the document actually has.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
         var keys = context.Renter.Documents.Select(document => document.StorageKey).ToList();
 
@@ -558,7 +499,7 @@ public sealed class RenterDocumentAccessTests
     {
         // A rejection note is addressed to the customer -- "the photograph is unreadable" -- and is
         // none of a gallery's business. CustomerDocumentDto carries it; this shape must not.
-        var context = new Context();
+        var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
 
         var result = await context.Handlers().Handle(

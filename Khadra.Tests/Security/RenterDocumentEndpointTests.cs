@@ -77,6 +77,20 @@ public sealed class RenterDocumentEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Recording_a_review_without_a_token_is_401()
+    {
+        // The write side is default-deny like everything else, and refused before the handler, so an
+        // anonymous caller cannot even establish that the booking exists.
+        using var client = _factory.CreateClient();
+
+        using var response = await client.PostAsync(
+            new Uri($"/api/v1/bookings/{BookingId}/renter-documents/{DocumentId}/review", UriKind.Relative),
+            content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     /// <summary>
     /// The controller is dealer staff only, and the whole feature rests on that one attribute.
     /// </summary>
@@ -177,7 +191,12 @@ public sealed class RenterDocumentEndpointTests : IDisposable
         // Belt and braces over the DTO's own shape: whatever is added to it later, nothing that looks
         // like a bucket path or a URL may reach a gallery's browser.
         var listing = new RenterDocumentsDto(
-            [new RenterDocumentDto(DocumentId, "DrivingLicenceFront", "PendingReview", "image/jpeg", DateTimeOffset.UtcNow)],
+            [new RenterDocumentDto(
+                DocumentId,
+                "DrivingLicenceFront",
+                "image/jpeg",
+                DateTimeOffset.UtcNow,
+                new DealerDocumentReviewDto(DateTimeOffset.UtcNow, Guid.CreateVersion7(), "Rami Haddad"))],
             IsComplete: false,
             ["NationalId"]);
         var controller = ControllerWith(Result.Success<RenterDocumentsDto, Error>(listing));
@@ -206,6 +225,80 @@ public sealed class RenterDocumentEndpointTests : IDisposable
         await controller.List(BookingId, default);
 
         Assert.Equal("no-store, private", controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task A_recorded_review_comes_back_private_and_says_who_made_it()
+    {
+        // The body names a document and a member of the gallery's staff. Private data on the way out,
+        // exactly as the listing is.
+        var reviewer = Guid.CreateVersion7();
+        var reviewed = new RenterDocumentDto(
+            DocumentId,
+            "DrivingLicenceFront",
+            "image/jpeg",
+            DateTimeOffset.UtcNow.AddDays(-1),
+            new DealerDocumentReviewDto(DateTimeOffset.UtcNow, reviewer, "Rami Haddad"));
+        var controller = ControllerWith(Result.Success<RenterDocumentDto, Error>(reviewed));
+
+        var result = await controller.Review(BookingId, DocumentId, default);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var rendered = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        Assert.Equal("no-store, private", controller.Response.Headers.CacheControl.ToString());
+        Assert.Contains("Rami Haddad", rendered, StringComparison.Ordinal);
+        // Never a platform verdict, and never a route back to the file.
+        Assert.DoesNotContain("Verified", rendered, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("customers/", rendered, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("http", rendered, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Reviewing_a_booking_that_is_no_longer_live_answers_the_same_409_as_the_view()
+    {
+        // The owner's requirement, at the transport: when access closes, the review action closes
+        // with it — and with the SAME code, so the console's existing "closed" branch covers both.
+        var controller = ControllerWith(
+            Result.Failure<RenterDocumentDto, Error>(BookingErrors.RenterDocumentsNotAvailable));
+
+        var result = await controller.Review(BookingId, DocumentId, default);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+        Assert.Equal(
+            "booking.renter_documents_not_available",
+            Assert.IsType<ProblemDetails>(problem.Value).Extensions["code"]);
+    }
+
+    [Fact]
+    public async Task Reviewing_another_dealerships_booking_answers_404_and_says_nothing_more()
+    {
+        var controller = ControllerWith(Result.Failure<RenterDocumentDto, Error>(BookingErrors.NotFound));
+
+        var result = await controller.Review(BookingId, DocumentId, default);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
+        Assert.Equal("booking.not_found", Assert.IsType<ProblemDetails>(problem.Value).Extensions["code"]);
+    }
+
+    /// <summary>
+    /// The review route takes no body at all, which is the security design rather than an omission.
+    /// </summary>
+    /// <remarks>
+    /// The reviewer comes from the validated token and the timestamp from the server clock, so there
+    /// is nothing on the wire to forge. A parameter here would be the beginning of trusting one.
+    /// </remarks>
+    [Fact]
+    public void The_review_action_accepts_nothing_but_the_two_route_ids()
+    {
+        var parameters = typeof(RenterDocumentsController)
+            .GetMethod(nameof(RenterDocumentsController.Review))!
+            .GetParameters();
+
+        Assert.Equal(
+            ["bookingId", "documentId", "cancellationToken"],
+            parameters.Select(parameter => parameter.Name));
     }
 
     /// <summary>The real controller over a substituted mediator, with a live response to write headers to.</summary>

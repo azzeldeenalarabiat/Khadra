@@ -1,4 +1,8 @@
-import { RenterDocument, RenterDocumentType, RenterDocuments } from '../../core/models/bookings.api';
+import {
+  RenterDocument,
+  RenterDocumentType,
+  RenterDocuments,
+} from '../../core/models/bookings.api';
 import { Tone } from '../../core/models/console.models';
 import { TranslationKey } from '../../core/i18n/en';
 import { MessageParams } from '../../core/i18n/language';
@@ -11,9 +15,19 @@ export interface RenterDocumentTile {
   readonly documentId: string;
   /** "Driving licence — front", in the reader's language. */
   readonly label: string;
-  /** The platform's own review status, translated. `PendingReview` for everything today. */
+  /**
+   * Whether THIS dealership has recorded checking this upload.
+   *
+   * The only status on the tile. There is deliberately no platform verdict beside it: Khadra
+   * verifies nothing, `CustomerDocument.Status` never leaves the server, and a second status here
+   * would invite the reading that one of them is a guarantee.
+   */
+  readonly isReviewed: boolean;
+  /** "Reviewed by dealer" or "Not reviewed", in the reader's language. */
   readonly status: string;
   readonly tone: Tone;
+  /** "Layla Haddad · 11 Sept 2026, 09:14", or null when nobody has recorded a check. */
+  readonly reviewedBy: string | null;
   /** The format the server will actually serve it as. Never guessed from the type. */
   readonly format: string;
   /** When the renter uploaded it, so a gallery can see a re-photographed document changed. */
@@ -117,33 +131,24 @@ function toTile(
   formatDate: (iso: string) => string,
 ): RenterDocumentTile {
   const typeKey = TYPE_LABELS[document.type];
+  const review = document.dealerReview;
   return {
     documentId: document.documentId,
     // An unknown type falls back to the server's own word rather than to a blank tile: a gallery
     // deciding whether to hand over a car is better served by "InternationalPermit" than by nothing.
     label: typeKey ? t(typeKey) : document.type,
-    status: document.status,
-    tone: statusTone(document.status),
+    isReviewed: review !== null,
+    // "Reviewed by dealer", never "verified". The tone follows: `ok` means THIS GALLERY has recorded
+    // a check, not that anybody authenticated the document.
+    status: review ? t('renterDocs.reviewedByDealer') : t('renterDocs.notReviewed'),
+    tone: review ? 'ok' : 'warn',
+    reviewedBy: review ? `${review.reviewedByName} · ${formatDate(review.reviewedAt)}` : null,
     format: formatLabel(document.contentType, t),
     uploadedAt: formatDate(document.uploadedAt),
     href: href(bookingId, document.documentId),
     isImage: document.contentType.startsWith('image/'),
-    isLicence:
-      document.type === 'DrivingLicenceFront' || document.type === 'DrivingLicenceBack',
+    isLicence: document.type === 'DrivingLicenceFront' || document.type === 'DrivingLicenceBack',
   };
-}
-
-/**
- * What a review status looks like.
- *
- * Everything is `PendingReview` today, and that is honest rather than reassuring on purpose: nothing
- * on the platform moves a customer document out of it (pre-launch item 63), so a green tick here
- * would be the screen inventing a verification that never happened.
- */
-function statusTone(status: string): Tone {
-  if (status === 'Verified') return 'ok';
-  if (status === 'Rejected') return 'bad';
-  return 'warn';
 }
 
 function formatLabel(contentType: string, t: Translate): string {

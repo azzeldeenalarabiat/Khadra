@@ -107,6 +107,55 @@ Details that matter:
   suspension, so gating the licence on trading would leave them handing a car to a
   stranger while the platform refused to show them who the stranger is — item 63 in
   a different costume. Membership (owner, or an *active* employee) is the gate.
+
+### Every disclosure leaves a record that cannot be edited
+
+`document_access_entries` holds one row per `Viewed` and per `Reviewed`: who, which
+dealership, which booking, which renter, which document and which UPLOAD of it, and
+when. Append-only twice over — `KhadraDbContext` refuses to persist a modified or
+deleted `IAppendOnly` record, and a Postgres trigger refuses `UPDATE`, `DELETE` and
+`TRUNCATE` for anything that bypasses the application.
+
+- **No record, no disclosure.** The `Viewed` row is committed *before* a byte is
+  streamed, and a failure to write it fails the request. The insert goes to the same
+  database on the same connection as the reads that just authorised the call, so it
+  adds no failure mode that was not already there — and serving anyway would make
+  "the log shows nobody looked" stop meaning anything during exactly the incident
+  somebody would later be investigating.
+- **Nothing in it can reach a file.** Every column is an id, an instant, an enum or
+  a name already snapshotted elsewhere. No storage key, no URL, no bucket, no
+  content type. A disclosure log carrying the key would be a second way into the
+  documents it exists to protect.
+- **No de-duplication.** Three opens are three rows. Repetition is itself evidence —
+  an employee opening a passport forty times is what such a log exists to surface —
+  and collapsing rows at write time cannot be undone, while noise can always be
+  collapsed at read time.
+- **The metadata listing is deliberately NOT logged.** It fires on every
+  booking-detail open with nobody pressing anything, and it describes what exists
+  rather than revealing it. Item 86 records that limit rather than overclaiming that
+  every access is logged.
+- **The renter is on the row by id.** "Who has seen my documents" is an index scan on
+  the customer's own id, not a join through `customer_documents` — which is exactly
+  the table that may have been emptied by the time anybody asks.
+
+### "Reviewed by dealer" is not "verified by Khadra"
+
+A gallery can record that it checked a renter's document. That record says a named
+member of its staff opened the file; it makes no claim that the document is genuine,
+current, or registered with any authority. **The platform verifies nothing** —
+`CustomerDocument.MarkVerified` is still unreachable, and item 27 is where whether
+anyone ever will gets decided.
+
+Two consequences in the code, both deliberate:
+
+- The platform's own `CustomerDocument.Status` is **not on the dealer's DTO at all**.
+  It can take the value `Verified`, and beside a gallery's own review that would read
+  as a Khadra guarantee. Taking a field back after galleries have seen it is a
+  contract change, so it never goes out.
+- The review is keyed on `(booking, document, upload instant)`. `CustomerDocument.Replace`
+  keeps the row id and swaps the file, so a review keyed on the id alone would survive
+  a re-upload and show "reviewed by dealer" over a photograph nobody at the dealership
+  had seen — item 63's failure, reopened by the feature meant to close it.
 - **A refused credential is never reported as a missing document.** Letting a 401
   fall through to "not found" would make a revoked key look like a platform that had
   never stored anything — and nobody would go and read the configuration.

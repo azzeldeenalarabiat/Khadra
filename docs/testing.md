@@ -11,8 +11,8 @@ Measured on `main` at the time of writing.
 
 | Suite | Command | Result |
 |---|---|---|
-| Backend | `dotnet test Khadra.slnx` | **1132 tests** |
-| Console | `npx ng test --watch=false` (in `Khadra.Dashboard`) | **63 tests**, 6 files |
+| Backend | `dotnet test Khadra.slnx` | **1181 tests** |
+| Console | `npx ng test --watch=false` (in `Khadra.Dashboard`) | **68 tests**, 6 files |
 | Mobile | `flutter test` (in `Khadra.Mobile`) | **53 tests** |
 
 > **Two backend tests need PostgreSQL.** `ForwardedHeaderTrustTests` and

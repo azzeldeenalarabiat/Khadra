@@ -145,6 +145,13 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         entity.Metadata.FindNavigation(nameof(Booking.StatusHistory))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
+        entity.HasMany(booking => booking.RenterDocumentReviews)
+            .WithOne()
+            .HasForeignKey(review => review.BookingId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.Metadata.FindNavigation(nameof(Booking.RenterDocumentReviews))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
         entity.HasIndex(booking => booking.Reference).IsUnique();
         entity.HasIndex(booking => booking.DealerId);
         entity.HasIndex(booking => booking.CustomerId);
@@ -235,5 +242,38 @@ internal sealed class BookingStatusChangeConfiguration : IEntityTypeConfiguratio
         entity.Property(change => change.OccurredAt).IsRequired();
 
         entity.HasIndex(change => new { change.BookingId, change.OccurredAt });
+    }
+}
+
+// What this dealership recorded looking at (spec 5.1, pre-launch item 63).
+//
+// The unique key is (booking, document, UPLOAD INSTANT), not (booking, document). A document row is
+// a SLOT whose file is replaced in place when the renter re-photographs it, keeping the same id — so
+// a two-column key would let a review made against the old photograph stand over the new one, and
+// the console would show "reviewed by dealer" on a file nobody at the dealership has ever seen, at
+// the moment the car is handed over.
+internal sealed class RenterDocumentReviewConfiguration : IEntityTypeConfiguration<RenterDocumentReview>
+{
+    public void Configure(EntityTypeBuilder<RenterDocumentReview> entity)
+    {
+        entity.ToTable("renter_document_reviews");
+        entity.HasKey(review => review.Id);
+        entity.Property(review => review.Id).HasConversion(IdConverter).ValueGeneratedNever();
+
+        ConfigureId(entity.Property(review => review.BookingId));
+        ConfigureId(entity.Property(review => review.DocumentId));
+        ConfigureId(entity.Property(review => review.ReviewedByUserId));
+        // An IdentityAccess smart enum, converted explicitly: left to convention EF tries to map
+        // CustomerDocumentType as an entity and the whole model build fails.
+        ConfigureEnumeration(entity.Property(review => review.DocumentType), 30);
+        entity.Property(review => review.DocumentUploadedAt).IsRequired();
+        entity.Property(review => review.ReviewedByName)
+            .HasMaxLength(RenterDocumentReview.MaxReviewerNameLength).IsRequired();
+        entity.Property(review => review.ReviewedAt).IsRequired();
+
+        // The floor under the handler's own check. Two clicks a millisecond apart both pass an
+        // in-memory "already reviewed?" test; this is what actually stops the second row.
+        entity.HasIndex(review => new { review.BookingId, review.DocumentId, review.DocumentUploadedAt })
+            .IsUnique();
     }
 }

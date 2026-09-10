@@ -213,4 +213,18 @@ public static class BookingErrors
     public static readonly Error RenterDocumentsNotAvailable = Error.Conflict(
         "booking.renter_documents_not_available",
         "A renter's documents are only visible while you have a live booking with them.");
+
+    /// <summary>
+    /// This dealership has already recorded a review of this exact upload.
+    /// </summary>
+    /// <remarks>
+    /// Raised by the aggregate, and deliberately NOT what the endpoint answers: the handler asks
+    /// first and returns the existing record with 200, because a second click on a slow connection
+    /// must not read as a failure. This exists so the aggregate stays strict for any other caller --
+    /// recording twice would move the timestamp, and "when did this dealership first check the
+    /// licence" is the whole value of the record.
+    /// </remarks>
+    public static readonly Error RenterDocumentAlreadyReviewed = Error.Conflict(
+        "booking.renter_document_already_reviewed",
+        "This document has already been reviewed for this booking.");
 }

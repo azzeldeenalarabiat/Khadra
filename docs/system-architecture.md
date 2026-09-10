@@ -107,8 +107,14 @@ Gallery presses "View driving licence" on a booking
   → API re-runs the whole rule: dealer staff → membership → this dealership's
     booking → the booking is LIVE → the document belongs to that booking's renter
   → API reads the bytes from the private bucket
+  → API COMMITS a `Viewed` row to document_access_entries — and if it cannot,
+    the bytes are not served
   → streamed back with Cache-Control: no-store, private
 ```
+
+Pressing "Mark as reviewed" walks the same rule and then writes two rows in one
+transaction: the review on the booking, and a `Reviewed` row on the log. It records
+that the DEALERSHIP looked — never that Khadra verified anything.
 
 No storage URL exists anywhere in either chain, and the second one puts no storage
 key in the browser either. See

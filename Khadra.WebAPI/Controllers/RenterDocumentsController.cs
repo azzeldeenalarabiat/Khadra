@@ -84,9 +84,51 @@ public sealed class RenterDocumentsController(ICurrentActor actor) : ApiControll
     public async Task<ActionResult> Open(Guid bookingId, Guid documentId, CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
-            new OpenRenterDocumentQuery(actor.UserId!.Value, Id.From(bookingId), Id.From(documentId)),
+            new OpenRenterDocumentCommand(actor.UserId!.Value, Id.From(bookingId), Id.From(documentId)),
             cancellationToken);
 
         return FromResult(result, opened => PrivateDocument(opened.Content, opened.ContentType));
+    }
+
+    /// <summary>
+    /// Records that this dealership CHECKED the document. Never "Khadra verified it".
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The record says a named member of this gallery's staff opened the file the renter uploaded and
+    /// satisfied themselves. It makes no claim about authenticity, validity or any government
+    /// register — Khadra checks nothing, and the console says so beside the control.
+    /// </para>
+    /// <para>
+    /// <b>There is no request body, and that is the security design.</b> The route names a booking and
+    /// a document; the reviewer comes from the validated token and the timestamp from the server
+    /// clock, so neither is on the wire to be forged. The document must belong to the renter of that
+    /// booking, and the renter is read off the booking rather than named by the caller.
+    /// </para>
+    /// <para>
+    /// <b>Safe to press twice.</b> A repeat answers 200 with the review that already exists, keeping
+    /// its original timestamp and writing no second disclosure record — a lost response must not read
+    /// as a failed click. A true simultaneous double-submit loses the race at a unique index and
+    /// answers 409 <c>data.conflict</c>; retrying then takes the ordinary path.
+    /// </para>
+    /// <para>
+    /// Reviewing is allowed exactly where viewing is, so the action disappears with the access: once
+    /// the booking stops being live this answers the same 409 the listing does.
+    /// </para>
+    /// </remarks>
+    [HttpPost("{documentId:guid}/review")]
+    [ProducesResponseType<RenterDocumentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> Review(Guid bookingId, Guid documentId, CancellationToken cancellationToken)
+    {
+        // Private data on the way back out, exactly as the listing is: this body names a document and
+        // who at the gallery looked at it.
+        Response.Headers.CacheControl = "no-store, private";
+
+        var result = await Mediator.Send(
+            new RecordRenterDocumentReviewCommand(actor.UserId!.Value, Id.From(bookingId), Id.From(documentId)),
+            cancellationToken);
+        return FromResult(result);
     }
 }

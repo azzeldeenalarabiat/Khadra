@@ -194,6 +194,7 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
         services.AddScoped<IAuditTrail, AuditTrail>();
+        services.AddScoped<IDocumentAccessLog, DocumentAccessLog>();
         services.AddScoped<IDealerRepository, DealerRepository>();
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<IBookingRepository, BookingRepository>();

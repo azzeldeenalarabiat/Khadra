@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { RenterDocument, RenterDocuments } from '../../core/models/bookings.api';
+import {
+  DealerDocumentReview,
+  RenterDocument,
+  RenterDocuments,
+} from '../../core/models/bookings.api';
 import { toRenterDocumentsPanel, Translate } from './renter-documents.presenter';
 import { EN } from '../../core/i18n/en';
 import { AR } from '../../core/i18n/ar';
@@ -13,7 +17,8 @@ import { resolveMessage } from '../../core/i18n/resolve';
  * that a lookup was called.
  */
 const en: Translate = (key, params) => resolveMessage(EN[key], params, 'en-GB', false) ?? key;
-const ar: Translate = (key, params) => resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key;
+const ar: Translate = (key, params) =>
+  resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key;
 
 const BOOKING = '01a08222-0228-7f9f-b051-fb28aca2ac4c';
 const DOCUMENT = '01a08222-65c0-7bba-933e-74274446bb9e';
@@ -27,7 +32,7 @@ const date = (iso: string) => `formatted:${iso}`;
 const document = (over: Partial<RenterDocument> = {}): RenterDocument => ({
   documentId: DOCUMENT,
   type: 'DrivingLicenceFront',
-  status: 'PendingReview',
+  dealerReview: null,
   contentType: 'image/jpeg',
   uploadedAt: '2026-09-01T09:00:00Z',
   ...over,
@@ -37,6 +42,14 @@ const answer = (over: Partial<RenterDocuments> = {}): RenterDocuments => ({
   documents: [document()],
   isComplete: false,
   missing: [],
+  ...over,
+});
+
+/** A review as the server sends one back: who looked, and when. Never a platform verdict. */
+const review = (over: Partial<DealerDocumentReview> = {}): DealerDocumentReview => ({
+  reviewedAt: '2026-09-02T09:00:00Z',
+  reviewedByUserId: '01a08222-79ac-7561-b80f-c8c1778cd4c7',
+  reviewedByName: 'Layla Haddad',
   ...over,
 });
 
@@ -153,25 +166,20 @@ describe('the renter-documents panel', () => {
       );
       const tiles = result.kind === 'ready' ? result.tiles : [];
 
-      expect(tiles.filter((tile) => tile.isLicence).map((tile) => tile.documentId)).toEqual(['a', 'b']);
+      expect(tiles.filter((tile) => tile.isLicence).map((tile) => tile.documentId)).toEqual([
+        'a',
+        'b',
+      ]);
     });
 
-    it('shows a document nobody has verified as pending, not as approved', () => {
-      // Nothing on the platform moves a customer document out of PendingReview (item 63), so a
-      // green tick here would be the screen inventing a verification that never happened.
+    it('shows a document nobody at the dealership has checked as not reviewed', () => {
       const result = panel('resolved', answer());
       const [tile] = result.kind === 'ready' ? result.tiles : [];
 
-      expect(tile.status).toBe('PendingReview');
+      expect(tile.isReviewed).toBe(false);
+      expect(tile.status).toBe('Not reviewed');
       expect(tile.tone).toBe('warn');
-    });
-
-    it('renders a status the console has never heard of without inventing a verdict', () => {
-      const result = panel('resolved', answer({ documents: [document({ status: 'Withdrawn' })] }));
-      const [tile] = result.kind === 'ready' ? result.tiles : [];
-
-      expect(tile.status).toBe('Withdrawn');
-      expect(tile.tone).toBe('warn');
+      expect(tile.reviewedBy).toBeNull();
     });
 
     it('formats the upload date through the caller rather than in the presenter', () => {
@@ -209,7 +217,10 @@ describe('the renter-documents panel', () => {
       // about it, and must not look like a failure or like a booking that is not theirs.
       const result = panel(
         'resolved',
-        answer({ documents: [], missing: ['DrivingLicenceFront', 'DrivingLicenceBack', 'NationalId'] }),
+        answer({
+          documents: [],
+          missing: ['DrivingLicenceFront', 'DrivingLicenceBack', 'NationalId'],
+        }),
       );
 
       expect(result.kind).toBe('ready');
@@ -262,6 +273,86 @@ describe('the renter-documents panel', () => {
       const note = result.kind === 'failed' ? result.note : '';
 
       expect(note).not.toMatch(/[A-Za-z]/);
+    });
+
+    it('says "reviewed by the dealership" in Arabic, and never "verified"', () => {
+      const result = panel(
+        'resolved',
+        answer({ documents: [document({ dealerReview: review() })] }),
+        undefined,
+        ar,
+      );
+      const [tile] = result.kind === 'ready' ? result.tiles : [];
+
+      expect(tile.status).toBe('تمت مراجعتها من المعرض');
+      // The word the owner ruled out. Arabic for "verified" is تحقق / موثّقة — neither belongs on a
+      // badge about what a GALLERY did.
+      expect(tile.status).not.toContain('موثّق');
+      expect(tile.status).not.toContain('تحقق');
+    });
+
+    it('names the unreviewed state in Arabic too', () => {
+      const result = panel('resolved', answer(), undefined, ar);
+      const [tile] = result.kind === 'ready' ? result.tiles : [];
+
+      expect(tile.status).toBe('لم تُراجَع');
+      expect(tile.status).not.toMatch(/[A-Za-z]/);
+    });
+  });
+
+  describe('the dealership’s own review', () => {
+    it('shows a reviewed document as reviewed BY THE DEALER, never as verified', () => {
+      // The wording the owner ruled on. "Reviewed by dealer" records that a gallery looked; it must
+      // never read as a Khadra guarantee of authenticity.
+      const result = panel(
+        'resolved',
+        answer({ documents: [document({ dealerReview: review() })] }),
+      );
+      const [tile] = result.kind === 'ready' ? result.tiles : [];
+
+      expect(tile.isReviewed).toBe(true);
+      expect(tile.status).toBe('Reviewed by dealer');
+      expect(tile.status).not.toMatch(/verif/i);
+      expect(tile.tone).toBe('ok');
+    });
+
+    it('names who recorded it and when', () => {
+      const result = panel(
+        'resolved',
+        answer({ documents: [document({ dealerReview: review() })] }),
+      );
+      const [tile] = result.kind === 'ready' ? result.tiles : [];
+
+      expect(tile.reviewedBy).toBe('Layla Haddad · formatted:2026-09-02T09:00:00Z');
+    });
+
+    it('trusts the server about whether a review still stands', () => {
+      // The panel NEVER compares the review date with the upload date. The server clears the review
+      // when the renter replaces the file, because it holds the upload instant the review was made
+      // against; a screen re-deriving that would drift in the direction that matters — a
+      // re-photographed licence still showing as checked.
+      const stale = panel(
+        'resolved',
+        answer({
+          documents: [document({ uploadedAt: '2026-09-09T09:00:00Z', dealerReview: null })],
+        }),
+      );
+      const [tile] = stale.kind === 'ready' ? stale.tiles : [];
+
+      expect(tile.isReviewed).toBe(false);
+      expect(tile.status).toBe('Not reviewed');
+    });
+
+    it('carries no platform verdict anywhere on the tile', () => {
+      // CustomerDocument.Status can take the value "Verified" and is deliberately not on the wire.
+      // If it ever comes back, this is what fails.
+      const result = panel(
+        'resolved',
+        answer({ documents: [document({ dealerReview: review() })] }),
+      );
+      const rendered = JSON.stringify(result);
+
+      expect(rendered).not.toMatch(/PendingReview|"Verified"|Rejected/);
     });
   });
 });

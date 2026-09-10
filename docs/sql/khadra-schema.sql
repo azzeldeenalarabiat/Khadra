@@ -1312,3 +1312,104 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+    CREATE TABLE document_access_entries (
+        id uuid NOT NULL,
+        occurred_at timestamp with time zone NOT NULL,
+        actor_user_id uuid NOT NULL,
+        actor_name character varying(200) NOT NULL,
+        actor_role character varying(20) NOT NULL,
+        dealer_id uuid NOT NULL,
+        booking_id uuid NOT NULL,
+        subject_user_id uuid NOT NULL,
+        document_id uuid NOT NULL,
+        document_type character varying(30) NOT NULL,
+        document_uploaded_at timestamp with time zone NOT NULL,
+        action character varying(20) NOT NULL,
+        correlation_id character varying(64),
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_document_access_entries PRIMARY KEY (id)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+    CREATE TABLE renter_document_reviews (
+        id uuid NOT NULL,
+        booking_id uuid NOT NULL,
+        document_id uuid NOT NULL,
+        document_type character varying(30) NOT NULL,
+        document_uploaded_at timestamp with time zone NOT NULL,
+        reviewed_by_user_id uuid NOT NULL,
+        reviewed_by_name character varying(200) NOT NULL,
+        reviewed_at timestamp with time zone NOT NULL,
+        CONSTRAINT pk_renter_document_reviews PRIMARY KEY (id),
+        CONSTRAINT fk_renter_document_reviews_bookings_booking_id FOREIGN KEY (booking_id) REFERENCES bookings (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+    CREATE INDEX ix_document_access_entries_booking_id_occurred_at ON document_access_entries (booking_id, occurred_at);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+    CREATE INDEX ix_document_access_entries_dealer_id_occurred_at_id ON document_access_entries (dealer_id, occurred_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+    CREATE INDEX ix_document_access_entries_subject_user_id_occurred_at_id ON document_access_entries (subject_user_id, occurred_at DESC, id DESC);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+    CREATE UNIQUE INDEX ix_renter_document_reviews_booking_id_document_id_document_upl ON renter_document_reviews (booking_id, document_id, document_uploaded_at);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+
+    CREATE OR REPLACE FUNCTION khadra_table_is_append_only()
+    RETURNS TRIGGER AS $$
+    BEGIN
+        RAISE EXCEPTION '%.% is append-only: % is not permitted', TG_TABLE_SCHEMA, TG_TABLE_NAME, TG_OP;
+    END;
+    $$ LANGUAGE plpgsql;
+
+    CREATE TRIGGER document_access_entries_append_only
+    BEFORE UPDATE OR DELETE ON document_access_entries
+    FOR EACH ROW EXECUTE FUNCTION khadra_table_is_append_only();
+
+    CREATE TRIGGER document_access_entries_no_truncate
+    BEFORE TRUNCATE ON document_access_entries
+    FOR EACH STATEMENT EXECUTE FUNCTION khadra_table_is_append_only();
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260910204753_RenterDocumentReviewAndAccessLog') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260910204753_RenterDocumentReviewAndAccessLog', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

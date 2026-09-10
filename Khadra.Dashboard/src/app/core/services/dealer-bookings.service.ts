@@ -1,7 +1,13 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Booking, BookingListItem, PagedResult, RenterDocuments } from '../models/bookings.api';
+import {
+  Booking,
+  BookingListItem,
+  PagedResult,
+  RenterDocument,
+  RenterDocuments,
+} from '../models/bookings.api';
 import { DealerConsoleService } from './dealer-console.service';
 
 /**
@@ -139,6 +145,22 @@ export class DealerBookingsService {
    */
   renterDocumentUrl(bookingId: string, documentId: string): string {
     return `${this.base}/${encodeURIComponent(bookingId)}/renter-documents/${encodeURIComponent(documentId)}`;
+  }
+
+  /**
+   * Records that this dealership CHECKED one of the renter's documents.
+   *
+   * No body: the reviewer is the signed-in person and the timestamp is the server's, so neither is
+   * on the wire to be tampered with. The response carries the review that now stands — which on a
+   * second press is the FIRST one, timestamp and all.
+   */
+  reviewRenterDocument(bookingId: string, documentId: string): Promise<RenterDocument> {
+    return firstValueFrom(
+      this.http.post<RenterDocument>(
+        `${this.renterDocumentUrl(bookingId, documentId)}/review`,
+        null,
+      ),
+    );
   }
 
   rateCustomer(bookingId: string, rating: number): Promise<CustomerRating> {

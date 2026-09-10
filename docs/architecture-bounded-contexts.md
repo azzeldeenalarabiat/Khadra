@@ -7,7 +7,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Context | Domain model | Persistence | Use cases and endpoints |
 |---|---|---|---|
 | Identity & Access | done | done | auth done; dashboard read model done |
-| Auditing | done | done | read model done; every dealer review decision writes an entry |
+| Auditing | done | done | read model done; every dealer review decision writes an entry; `document_access_entries` records every renter-document disclosure |
 | Dealers | done | done | **registration + full review lifecycle** (approve / reject / clarify / resubmit / suspend / reactivate) |
 | Fleet | done | done | dealer fleet management done; **customer catalogue done** (search, listing, gallery page) |
 | Bookings | done | done | dealer decisions and handover done; **quote done**; creation NOT built |

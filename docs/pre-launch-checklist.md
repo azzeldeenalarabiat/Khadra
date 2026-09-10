@@ -30,6 +30,16 @@ history — the reseed itself relies on being able to truncate.
 development seeder a documented way past it (drop and recreate around the reseed, or seed into a
 fresh database). Verify by attempting a `TRUNCATE audit_entries` and expecting failure.
 
+**Half of this is already done, and the pattern to copy is in the tree (2026-09-11).** The disclosure
+log added for item 86 ships with both guards from the start —
+`document_access_entries_no_truncate`, `FOR EACH STATEMENT`, sharing a generic
+`khadra_table_is_append_only()` function — and a `TRUNCATE` against it was verified to fail. It was
+NOT added to `audit_entries` in the same migration on purpose: this item carries an owner decision
+about the reseed workflow, and silently making a developer's database reset fail is not a side effect
+to slip into an unrelated change. The seeder it refers to was deleted on 2026-09-05, so the question
+is now only "what still truncates, and what should it do instead" — which is the owner's to answer.
+When it is answered, the trigger is two lines beside the existing one.
+
 ---
 
 ## Money
@@ -1479,10 +1489,9 @@ Two obligations for whoever builds it:
 `ConfirmDepositPaid` is idempotent by payment id, so a retry of the SAME payment is always a success
 whatever the booking's state — a gateway must never be made to retry forever.
 
-### 63. HARD BLOCKER — a dealer cannot see the documents they are required to check
+### 63. CLOSED — a dealer cannot see the documents they are required to check
 
-**Status:** the ENDPOINT AND SCREEN are built (2026-09-10); the item stays **open** on the
-verification question below · **Raised:** 2026-09-07 · **Owner: hard requirement before real launch**
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-07 · **Was: hard requirement before real launch**
 
 Spec 5.1 makes the dealer the party who checks a renter's licence. They could not. `CustomerDocument`
 already scoped viewing to the customer themselves *and to a dealer with an active booking request* —
@@ -1531,15 +1540,43 @@ presses **View driving licence** — these are photographs of a private individu
 screen that loaded them on open would put them in front of whoever walked past the counter. English
 and Arabic, RTL-correct through logical properties.
 
-**Why this is still open.** Nothing on the platform verifies a document. `MarkVerified` and
-`MarkRejected` remain `internal` with no public path, so every document still sits in `PendingReview`
-for ever, and the booking-creation guard still asks only that files were UPLOADED. The gallery can now
-look — which was the missing half — but the platform makes no claim about what they are looking at,
-and the panel says so in as many words.
+**What closed it (2026-09-11): the dealership can now RECORD that it checked.**
 
-**To close:** the item 27 decision — whether an admin reviews documents at all, or the dealer's look
-at pickup **is** the check and should record a verification against the record. Until one of those
-exists, "a dealer checked the licence" is something the platform hopes rather than knows.
+```
+POST /api/v1/bookings/{bookingId}/renter-documents/{documentId}/review
+```
+
+Same four gates, plus two decisions that are the point of the feature:
+
+- **It is not a verification, and the wording is load-bearing.** "Reviewed by dealer" /
+  "تمت مراجعتها من المعرض". The panel states beside the control that Khadra does not confirm a
+  document is genuine, current or registered with any authority. `CustomerDocument.MarkVerified` is
+  still unreachable and the platform's own `Status` field is **not on the dealer's DTO at all** — it
+  can take the value `Verified`, and beside a gallery's own review that would read as a platform
+  guarantee.
+- **The review is keyed on the UPLOAD, not just the document.** `CustomerDocument.Replace` keeps the
+  row id and swaps the file, so a review keyed on the id alone would survive a re-photograph and show
+  "reviewed by dealer" over a picture nobody at the dealership had seen — this item's own failure,
+  reopened by the feature meant to close it. Replacing the file clears the badge.
+
+No request body: the reviewer comes from the validated token and the timestamp from the server clock,
+so neither is forgeable. A repeat answers 200 with the review already there, timestamp intact. The
+first reviewer keeps the credit. Reviewing is allowed exactly where viewing is, enforced inside
+`Booking.RecordRenterDocumentReview` as well as the handler, so the action disappears with the access.
+
+Every view and every review writes an append-only row — see item 86, closed with this.
+
+**What this item does NOT claim, and never did.** Nothing on the platform verifies a document.
+The booking-creation guard still asks only that files were UPLOADED, and item 27 still decides
+whether an admin ever reviews them. What has changed is that the gallery can now look, and that
+looking and checking both leave a record. "A dealer checked the licence" is something the platform
+can now show; whether the document was genuine is not, and the screen does not pretend otherwise.
+
+Verified end to end on 2026-09-11 against a live server: owner and employee reviews, a second
+dealership refused 404 on both routes, the customer 403, anonymous 401, a cancelled booking 409, and
+the disclosure log written for all of it. Tests: `RenterDocumentAccessTests`,
+`RenterDocumentReviewTests` (application and domain), `DocumentAccessPersistenceTests`,
+`RenterDocumentEndpointTests`, `renter-documents.presenter.spec.ts`.
 
 ### 64. A free hold is renewable, so the 72-hour ceiling is per request, not per customer
 
@@ -2172,28 +2209,65 @@ shrinks it; equalising the remaining round trips would be the rest.
 
 ## Privacy (2026-09-10)
 
-### 86. A gallery reading a renter's passport leaves only a log line
+### 86. CLOSED — a gallery reading a renter's passport leaves only a log line
 
-**Status:** open · **Raised:** 2026-09-10 · **Owner decision needed**
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-10
 
 Item 63 gave galleries a way to open a renter's driving licence and identity document. That is a
 spec 7 disclosure of a named private individual's papers to a commercial third party, and the only
-record of it is a structured log event (4200, `RenterDocumentHandlers`) naming the actor, the
-booking, the document and its type.
+record of it was a structured log event — which rotates, is not queryable by the person it concerns,
+and on the current hosting is retained for days rather than years.
 
-A log is not a record. It rotates, it is not queryable by the person it concerns, and on the current
-hosting it is retained for days rather than years. If a customer ever asks "who looked at my
-passport, and when", the platform can answer only for as long as the log survives — and if a gallery
-denies having looked, there is nothing to put against them.
+**`document_access_entries` is now that record.** One row per disclosure and per review:
 
-`IAuditTrail` is not the answer as it stands. It is the ADMIN's trail by design, and it commits inside
-a writing handler's own transaction so the record and the action land together; a read has no
-transaction to join, and every opened image would be a write on the request path.
+| | |
+|---|---|
+| who | `actor_user_id`, `actor_name` (snapshotted), `actor_role` |
+| for whom | `dealer_id` |
+| under what authority | `booking_id` — the relationship IS the authorization |
+| about whom | `subject_user_id`, the renter |
+| what | `document_id`, `document_type`, `document_uploaded_at` |
+| which act | `action` — `Viewed` or `Reviewed` |
+| when | `occurred_at`, plus `correlation_id` to tie it to a request |
 
-**To close, if the owner wants it durable:** a `DocumentDisclosure` append-only record in
-IdentityAccess — who, which document, which booking, when — written on the byte-serving route only
-(not the listing, which describes rather than reveals), with its own retention answer. Then decide
-whether the customer sees it, which is the part that makes it worth having.
+Append-only twice: `KhadraDbContext` refuses to persist a modified or deleted `IAppendOnly` record
+(the guard used to name `AuditEntry` in its own type argument and is now general), and the Postgres
+triggers `document_access_entries_append_only` and `document_access_entries_no_truncate` refuse
+`UPDATE`, `DELETE` **and** `TRUNCATE` for anything that bypasses the application. All three refusals
+were exercised against the real database on 2026-09-11.
 
-**Or accept it deliberately,** and record that the log is the whole record, so nobody later assumes
-there is a table to query.
+Its own table rather than a row in `audit_entries`, and that is a readership decision. `AuditEntry`
+is the admin's trail — `IAuditFeedReader` puts its newest rows on the dashboard's activity glance,
+and three or four rows per handover would turn that feed into a list of licence openings. This record
+exists to answer a question the admin trail was never for, and `subject_user_id` is indexed so
+"who has seen my documents" is one index scan rather than a join through `customer_documents` —
+the table most likely to have been emptied by the time anybody asks.
+
+**Four decisions worth keeping, because each could be quietly reversed.**
+
+1. **No record, no disclosure.** The `Viewed` row is committed BEFORE any byte is streamed, and a
+   failure to write it fails the request. The insert goes to the same database on the same connection
+   as the reads that just authorised the call, so it adds no failure mode that was not already there.
+   Serving anyway would make "the log shows nobody looked" stop meaning anything during exactly the
+   incident somebody would later be investigating.
+2. **No de-duplication.** Three opens are three rows. Repetition is itself evidence, and collapsing at
+   write time cannot be undone; noise can always be collapsed at read time.
+3. **The metadata LISTING is not logged, and "every access is logged" would be an overclaim.** It
+   fires on every booking-detail open with nobody pressing anything, and it describes what exists
+   rather than revealing it. If that is ever wanted, it needs its own `Listed` action — never folded
+   into `Viewed`.
+4. **Nothing on the row can reach the file.** No storage key, no URL, no bucket, no content type. A
+   disclosure log carrying the key would be a second way into the documents it exists to protect.
+
+**Two things this closure deliberately leaves open, so nobody assumes otherwise.**
+
+- **Retention is "for ever", by construction.** There is no delete path, and the user ids on a row
+  outlive account deletion. Defensible for a disclosure record, but it is a decision, not a default —
+  reopen it if a retention policy is ever written.
+- **The customer cannot see their own log yet.** The table and the index are shaped for that question;
+  no endpoint asks it. That is the half that makes the record worth having to the person it is about,
+  and it needs a screen in the mobile app before it is real.
+
+Tests: `DocumentAccessPersistenceTests` (round trip, and the append-only guard on both tables),
+`RenterDocumentReviewTests` (a row per view, none for a refused view, none for a repeat review, none
+for the listing, and no storage key anywhere on a row).
