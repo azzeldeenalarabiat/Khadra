@@ -27,6 +27,19 @@ public static class RateLimitPolicies
     public const string Refresh = "refresh";
 
     /// <summary>
+    /// Address suggestions, which cost an outbound call to a provider that allows roughly one
+    /// request per second for the WHOLE server.
+    /// </summary>
+    /// <remarks>
+    /// Partitioned on the signed-in owner rather than the address: a Jordanian carrier NATs thousands
+    /// of subscribers behind one IPv4 address, so an address-keyed bucket would let one busy applicant
+    /// spend the budget of everybody on their network. Generous per person -- dragging a pin is a
+    /// normal thing to do a few times -- and no queue, because a form waiting is a form the applicant
+    /// has already given up on.
+    /// </remarks>
+    public const string Geocode = "geocode";
+
+    /// <summary>
     /// The anonymous catalogue: browsing, one listing, a quote, a gallery page, and the two lookups
     /// the filter chips need.
     /// </summary>

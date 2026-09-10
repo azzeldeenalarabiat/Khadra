@@ -19,6 +19,8 @@ import { DealerReview } from '../../core/models/dealers.api';
 import { DocTileComponent } from '../../shared/doc-tile/doc-tile.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
+import { MapComponent } from '../../shared/map/map.component';
+import { LookupsService } from '../../core/services/lookups.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 
 /**
@@ -33,10 +35,12 @@ import { I18nService } from '../../core/i18n/i18n.service';
   selector: 'kh-dealer-review',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './dealer-review.component.html',
-  imports: [DatePipe, RouterLink, IconComponent, DocTileComponent, TimelineComponent],
+  imports: [DatePipe, RouterLink, IconComponent, DocTileComponent, TimelineComponent, MapComponent],
 })
 export class DealerReviewComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  private readonly lookups = inject(LookupsService);
   private readonly service = inject(AdminDealersService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -66,6 +70,24 @@ export class DealerReviewComponent {
   }
 
   protected readonly dealer = computed(() => this.review()?.dealer ?? null);
+
+  /**
+   * The city's own NAME, resolved from the curated lookup the applicant chose from.
+   *
+   * Resolved here rather than carried on the DTO: the city belongs to PlatformSettings, and putting
+   * its name inside a DTO built from the Dealers aggregate would reach across a context boundary to
+   * denormalise a value that can be renamed. The lookup is already loaded for the filters.
+   */
+  protected readonly cityName = computed(() => {
+    const cityId = this.dealer()?.cityId;
+    if (!cityId) return null;
+
+    const city = (loaded(this.lookups.cities)() ?? []).find((candidate) => candidate.id === cityId);
+    if (!city) return null;
+
+    const arabic = this.i18n.lang() === 'ar';
+    return (arabic ? city.nameAr || city.nameEn : city.nameEn || city.nameAr).trim() || null;
+  });
 
   protected readonly initials = computed(() => {
     const name = this.dealer()?.businessName ?? '';
@@ -106,7 +128,11 @@ export class DealerReviewComponent {
     const review = this.review();
     if (!review) return { figure: '—', note: '', tone: 'dim' as Tone };
     if (review.dealer.verificationStatus !== 'PendingReview') {
-      return { figure: 'Settled', note: this.t('dealerReview.noDecisionOutstanding'), tone: 'ok' as Tone };
+      return {
+        figure: 'Settled',
+        note: this.t('dealerReview.noDecisionOutstanding'),
+        tone: 'ok' as Tone,
+      };
     }
 
     const now = this.now();
@@ -136,16 +162,30 @@ export class DealerReviewComponent {
     if (!review) return [];
     return [
       { k: this.t('dealerProfile.businessName'), v: review.dealer.businessName },
-      { k: this.t('dealerProfile.commercialRegistration'), v: review.dealer.commercialRegistrationNumber },
-      { k: this.t('dealerProfile.location'), v: `${review.latitude.toFixed(4)}, ${review.longitude.toFixed(4)}` },
+      {
+        k: this.t('dealerProfile.commercialRegistration'),
+        v: review.dealer.commercialRegistrationNumber,
+      },
+      {
+        k: this.t('dealerProfile.location'),
+        v: `${review.latitude.toFixed(4)}, ${review.longitude.toFixed(4)}`,
+      },
       { k: this.t('common.description'), v: review.description ?? '—' },
-      { k: this.t('dealerReview.submitted'), v: new Date(review.dealer.submittedAt).toLocaleString('en-GB') },
-      { k: this.t('dealersList.colReviewDue'), v: new Date(review.dealer.reviewDueAt).toLocaleString('en-GB') },
+      {
+        k: this.t('dealerReview.submitted'),
+        v: new Date(review.dealer.submittedAt).toLocaleString('en-GB'),
+      },
+      {
+        k: this.t('dealersList.colReviewDue'),
+        v: new Date(review.dealer.reviewDueAt).toLocaleString('en-GB'),
+      },
       // Active staff only — the same number the dealership sees on its own profile. The review
       // response used to carry a second count that included deactivated rows, so one dealership
       // had two staff figures depending on which screen an admin was looking at.
       { k: this.t('dealerEmployees.employees'), v: String(review.dealer.employeeCount) },
-      ...(review.dealer.reviewNote ? [{ k: this.t('dealerReview.lastReviewNote'), v: review.dealer.reviewNote }] : []),
+      ...(review.dealer.reviewNote
+        ? [{ k: this.t('dealerReview.lastReviewNote'), v: review.dealer.reviewNote }]
+        : []),
     ];
   });
 
@@ -267,13 +307,19 @@ export class DealerReviewComponent {
         body: this.t('dealerReview.theDealerWillBe'),
         note: this.t('dealerReview.thisDecisionIsRecorded'),
         confirm: this.t('dealerReview.approveDealer'),
-        result: { title: this.t('dealerReview.dealerApproved'), body: `${dealer.businessName} can now trade.` },
+        result: {
+          title: this.t('dealerReview.dealerApproved'),
+          body: `${dealer.businessName} can now trade.`,
+        },
       },
       async () => {
         await this.service.approve(dealer.dealerId);
         this.service.refresh();
       },
-      { title: this.t('dealerReview.dealerApproved'), body: `${dealer.businessName} can now trade.` },
+      {
+        title: this.t('dealerReview.dealerApproved'),
+        body: `${dealer.businessName} can now trade.`,
+      },
     );
   }
 
@@ -303,7 +349,11 @@ export class DealerReviewComponent {
         await this.service.reject(dealer.dealerId, values['reason'] ?? '');
         this.service.refresh();
       },
-      { title: this.t('dealerReview.applicationRejected'), body: `${dealer.businessName} was told why.`, tone: 'bad' },
+      {
+        title: this.t('dealerReview.applicationRejected'),
+        body: `${dealer.businessName} was told why.`,
+        tone: 'bad',
+      },
     );
   }
 
@@ -351,7 +401,12 @@ export class DealerReviewComponent {
         title: `Suspend ${dealer.businessName}?`,
         body: this.t('dealerReview.theyStopTradingImmediately'),
         fields: [
-          { name: this.t('myBooking.reason'), label: this.t('dealerDecide.reject.reasonLabel'), type: 'text', placeholder: this.t('dealerReview.whyIsThisDealer') },
+          {
+            name: this.t('myBooking.reason'),
+            label: this.t('dealerDecide.reject.reasonLabel'),
+            type: 'text',
+            placeholder: this.t('dealerReview.whyIsThisDealer'),
+          },
         ],
         confirm: this.t('dealerReview.suspendDealer'),
         result: { title: this.t('dealerReview.dealerSuspended'), body: '', tone: 'bad' },
@@ -384,7 +439,10 @@ export class DealerReviewComponent {
         await this.service.reactivate(dealer.dealerId);
         this.service.refresh();
       },
-      { title: this.t('dealerReview.dealerReactivated'), body: `${dealer.businessName} can trade again.` },
+      {
+        title: this.t('dealerReview.dealerReactivated'),
+        body: `${dealer.businessName} can trade again.`,
+      },
     );
   }
 

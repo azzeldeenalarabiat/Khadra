@@ -38,6 +38,29 @@ export interface DealerListItem {
   readonly reviewCount: number;
 }
 
+/** Where the gallery is in words, beside the pin. Null when the owner recorded none. */
+export interface DealerAddress {
+  readonly area: string;
+  readonly street: string | null;
+}
+
+/**
+ * What a map pin might be called, offered to the form the owner is filling in.
+ *
+ * Every field is a suggestion. What is stored is what the owner leaves in the inputs, so nothing
+ * here reaches the database unless they accept it.
+ */
+export interface AddressSuggestion {
+  readonly area: string | null;
+  readonly street: string | null;
+  /** The provider's name for the settlement — shown, never stored. */
+  readonly cityName: string | null;
+  /** A curated city whose name matches, when exactly one does. Pre-selects the dropdown. */
+  readonly suggestedCityId: string | null;
+  /** The provider's licence line. Printed as sent: an open-data licence requires attribution. */
+  readonly attribution: string;
+}
+
 export interface DealerProfile {
   readonly dealerId: string;
   readonly businessName: string;
@@ -58,6 +81,9 @@ export interface DealerProfile {
   readonly description: string | null;
   readonly latitude: number;
   readonly longitude: number;
+  /** The curated city row this gallery is filed under, and the address in words. Both optional. */
+  readonly cityId: string | null;
+  readonly address: DealerAddress | null;
   readonly operatingHours: readonly DaySchedule[];
   readonly delivery: DeliverySettings;
   /** Public, cacheable paths; null until the owner uploads one. */

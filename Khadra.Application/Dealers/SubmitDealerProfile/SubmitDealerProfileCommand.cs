@@ -6,6 +6,7 @@ using Khadra.Application.Dealers.Dtos;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.PlatformSettings.Repositories;
 using MediatR;
 
 namespace Khadra.Application.Dealers.SubmitDealerProfile;
@@ -36,7 +37,9 @@ public sealed record SubmitDealerProfileCommand(
     TimeOnly ClosesAt,
     string? Description,
     Id? CityId,
-    IReadOnlyList<DealerDocumentUpload> Documents) : ICommand<Result<DealerProfileDto, Error>>;
+    IReadOnlyList<DealerDocumentUpload> Documents,
+    string? AddressArea = null,
+    string? AddressStreet = null) : ICommand<Result<DealerProfileDto, Error>>;
 
 public sealed class SubmitDealerProfileCommandValidator : AbstractValidator<SubmitDealerProfileCommand>
 {
@@ -50,12 +53,17 @@ public sealed class SubmitDealerProfileCommandValidator : AbstractValidator<Subm
         RuleFor(command => command.Latitude).InclusiveBetween(-90, 90);
         RuleFor(command => command.Longitude).InclusiveBetween(-180, 180);
         RuleFor(command => command.Description).MaximumLength(2000);
+        // Length only. Whether the pair forms a usable address is DealerAddress.Create's decision,
+        // so the rule lives in one place and the error the owner sees is the domain's own wording.
+        RuleFor(command => command.AddressArea).MaximumLength(DealerAddress.AreaMaxLength);
+        RuleFor(command => command.AddressStreet).MaximumLength(DealerAddress.StreetMaxLength);
         RuleFor(command => command.Documents).NotEmpty();
     }
 }
 
 public sealed class SubmitDealerProfileHandler(
     IDealerRepository dealers,
+    ICityRepository cities,
     IDocumentStorage storage,
     IDocumentPolicySettings policy,
     IBusinessRulesProvider businessRules,
@@ -89,6 +97,24 @@ public sealed class SubmitDealerProfileHandler(
         if (location.IsFailure)
             return location.Error;
 
+        // The city id arrived from a dropdown, and a dropdown is not a guarantee. Until now it was
+        // stored exactly as sent, so a stale or tampered id was accepted and then quietly excluded
+        // the gallery from its own city filter forever -- CatalogueReader matches on CityId, and
+        // nothing anywhere reported the mismatch.
+        //
+        // Checked here rather than in the validator because it is a database question, and refused
+        // as Validation rather than NotFound because it is one field of a form being wrong, not a
+        // missing page.
+        var city = await ResolveCityAsync(request.CityId, cancellationToken);
+        if (city.IsFailure)
+            return city.Error;
+
+        // The address is the owner's own statement, taken from the form. The geocoder only ever
+        // suggests into that form; nothing on this path calls it.
+        var address = ResolveAddress(request.AddressArea, request.AddressStreet);
+        if (address.IsFailure)
+            return address.Error;
+
         var hours = OperatingHours.Uniform(request.OpensAt, request.ClosesAt);
         if (hours.IsFailure)
             return hours.Error;
@@ -116,7 +142,8 @@ public sealed class SubmitDealerProfileHandler(
             now,
             TimeSpan.FromHours(rules.AdminSlaHours),
             request.Description,
-            request.CityId);
+            request.CityId,
+            address.Value);
 
         foreach (var (type, upload) in uploads.Value)
         {
@@ -164,5 +191,28 @@ public sealed class SubmitDealerProfileHandler(
         }
 
         return resolved;
+    }
+
+    /// <summary>Null stays null; anything named must name an ACTIVE city.</summary>
+    private async Task<UnitResult<Error>> ResolveCityAsync(Id? cityId, CancellationToken cancellationToken)
+    {
+        if (cityId is null) return UnitResult.Success<Error>();
+
+        var city = await cities.GetByIdAsync(cityId.Value, cancellationToken);
+        // An inactive city is refused as firmly as a missing one: an administrator retired it, and a
+        // new gallery should not be filed under a heading the platform has stopped using.
+        return city is null || !city.IsActive
+            ? UnitResult.Failure(DealerErrors.UnknownCity)
+            : UnitResult.Success<Error>();
+    }
+
+    /// <summary>No area means no address at all, which is allowed. An area with a bad street is not.</summary>
+    private static Result<DealerAddress?, Error> ResolveAddress(string? area, string? street)
+    {
+        if (string.IsNullOrWhiteSpace(area) && string.IsNullOrWhiteSpace(street))
+            return (DealerAddress?)null;
+
+        var address = DealerAddress.Create(area, street);
+        return address.IsFailure ? address.Error : (DealerAddress?)address.Value;
     }
 }

@@ -12,6 +12,13 @@ namespace Khadra.Application.Dealers.Dtos;
 /// deleted). Letting a client recompute that from a status string is how the three conditions get
 /// forgotten one at a time.
 /// </summary>
+/// <summary>Where the gallery is in words, as the owner recorded it. Null when none is recorded.</summary>
+/// <remarks>
+/// Nested rather than two more top-level fields, so "there is no address" is one null instead of a
+/// pair a reader has to interpret. The pin beside it stays the authoritative location.
+/// </remarks>
+public sealed record DealerAddressDto(string Area, string? Street);
+
 public sealed record DealerProfileDto(
     Guid DealerId,
     string BusinessName,
@@ -43,7 +50,11 @@ public sealed record DealerProfileDto(
     // Who is asking. The console decides which controls to show from these, but every dealer
     // endpoint enforces the same answer server-side; these are hints, not permissions.
     bool IsOwner,
-    bool CanViewReports)
+    bool CanViewReports,
+    // The curated city row this gallery is filed under, and the address in words. Both optional:
+    // a gallery registered before either existed has neither, and nothing invents one.
+    Guid? CityId,
+    DealerAddressDto? Address)
 {
     public static DealerProfileDto From(Dealer dealer, Id? actorUserId = null)
     {
@@ -78,7 +89,9 @@ public sealed record DealerProfileDto(
             PublicImage(dealer.CoverStorageKey),
             dealer.Employees.Count(employee => employee.IsActive),
             isOwner,
-            actorUserId is { } viewer && dealer.CanViewReports(viewer));
+            actorUserId is { } viewer && dealer.CanViewReports(viewer),
+            dealer.CityId?.Value,
+            dealer.Address is null ? null : new DealerAddressDto(dealer.Address.Area, dealer.Address.Street));
     }
 
     /// <summary>The anonymous, cacheable path DealerImagesController serves branding from.</summary>

@@ -4,6 +4,8 @@ using Khadra.Application.Dealers.SubmitDealerProfile;
 using Khadra.Application.Dealers.UpdateDeliverySettings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
+using Khadra.Domain.PlatformSettings;
+using Khadra.Domain.PlatformSettings.Repositories;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
@@ -31,8 +33,10 @@ public sealed class DealerRegistrationTests
                 .Do(call => Added.Add(call.Arg<Dealer>()));
         }
 
+        public ICityRepository Cities { get; } = Substitute.For<ICityRepository>();
+
         public SubmitDealerProfileHandler Submit() => new(
-            Dealers, Storage, FakeDocumentPolicy.Default, TestBusinessRules.Provider(), Clock, UnitOfWork);
+            Dealers, Cities, Storage, FakeDocumentPolicy.Default, TestBusinessRules.Provider(), Clock, UnitOfWork);
 
         public UpdateDeliverySettingsHandler Delivery() => new(Dealers, Clock, UnitOfWork);
     }
@@ -206,5 +210,151 @@ public sealed class DealerRegistrationTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("dealer.not_approved", result.Error.Code);
+    }
+}
+
+/// <summary>
+/// The address the owner records, and the city they file the gallery under.
+/// </summary>
+/// <remarks>
+/// Both arrive from the same form as the pin, in one write. The reverse geocoder can OFFER values
+/// into that form through its own read endpoint, but it is deliberately absent from this handler's
+/// constructor: what is stored is what the owner confirmed, so a provider that is throttled, wrong
+/// about Jordan, or simply down cannot change what an administrator later checks against a licence.
+/// </remarks>
+public sealed class DealerApplicationLocationTests
+{
+    private static readonly Id Owner = Id.New();
+
+    private sealed class Context
+    {
+        public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
+        public ICityRepository Cities { get; } = Substitute.For<ICityRepository>();
+        public IDocumentStorage Storage { get; } = new FakeDocumentStorage();
+        public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
+        public TestClock Clock { get; } = new(Build.Now);
+        public List<Dealer> Added { get; } = [];
+
+        public Context()
+        {
+            UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
+            Dealers.When(repository => repository.AddAsync(Arg.Any<Dealer>(), Arg.Any<CancellationToken>()))
+                .Do(call => Added.Add(call.Arg<Dealer>()));
+        }
+
+        public SubmitDealerProfileHandler Submit() => new(
+            Dealers, Cities, Storage, FakeDocumentPolicy.Default, TestBusinessRules.Provider(), Clock, UnitOfWork);
+    }
+
+    private static DealerDocumentUpload Upload(string type) =>
+        new(type, $"{type}.jpg", "image/jpeg", 2048, new MemoryStream([1, 2, 3, 4]));
+
+    private static SubmitDealerProfileCommand Command(
+        Id? cityId = null,
+        string? area = null,
+        string? street = null) =>
+        new(
+            Owner,
+            "Petra Wheels",
+            "123456",
+            31.9539,
+            35.9106,
+            new TimeOnly(8, 0),
+            new TimeOnly(20, 0),
+            "Tourist car hire.",
+            cityId,
+            [.. new[] { "CommercialRegistration", "VehicleRegistration", "OwnerIdentity" }.Select(Upload)],
+            area,
+            street);
+
+    [Fact]
+    public async Task The_address_is_stored_exactly_as_the_owner_wrote_it()
+    {
+        var context = new Context();
+
+        var result = await context.Submit().Handle(
+            Command(area: "  Abdoun ", street: "Al-Kindi Street"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var dealer = Assert.Single(context.Added);
+        Assert.NotNull(dealer.Address);
+        // Tidied, not rewritten: the owner's words, with the stray spacing collapsed.
+        Assert.Equal("Abdoun", dealer.Address!.Area);
+        Assert.Equal("Al-Kindi Street", dealer.Address.Street);
+    }
+
+    /// <summary>An application without an address is complete; the pin is the location.</summary>
+    [Fact]
+    public async Task An_application_with_no_address_is_still_accepted()
+    {
+        var context = new Context();
+
+        var result = await context.Submit().Handle(Command(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Null(Assert.Single(context.Added).Address);
+    }
+
+    /// <summary>A street with no area is not half an address; it is an unusable one.</summary>
+    [Fact]
+    public async Task A_street_with_no_area_is_refused_before_anything_is_written()
+    {
+        var context = new Context();
+
+        var result = await context.Submit().Handle(
+            Command(street: "Al-Kindi Street"), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("dealer.invalid_address_area", result.Error.Code);
+        Assert.Empty(context.Added);
+    }
+
+    /// <summary>
+    /// The regression. The city id arrived from a dropdown and was stored exactly as sent, so a
+    /// stale or tampered id was accepted and then quietly excluded the gallery from its own city
+    /// filter forever -- the catalogue matches on CityId, and nothing anywhere reported the mismatch.
+    /// </summary>
+    [Fact]
+    public async Task A_city_that_does_not_exist_is_refused()
+    {
+        var context = new Context();
+        context.Cities.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns((City?)null);
+
+        var result = await context.Submit().Handle(Command(cityId: Id.New()), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("dealer.unknown_city", result.Error.Code);
+        Assert.Empty(context.Added);
+    }
+
+    /// <summary>
+    /// An inactive city is refused as firmly as a missing one: an administrator retired it, and a
+    /// new gallery should not be filed under a heading the platform has stopped using.
+    /// </summary>
+    [Fact]
+    public async Task A_retired_city_is_refused()
+    {
+        var context = new Context();
+        var city = City.Create("Amman", "عمان", 1, Build.Now, null).Value;
+        city.Deactivate();
+        context.Cities.GetByIdAsync(city.Id, Arg.Any<CancellationToken>()).Returns(city);
+
+        var result = await context.Submit().Handle(Command(cityId: city.Id), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("dealer.unknown_city", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task An_active_city_is_recorded_on_the_gallery()
+    {
+        var context = new Context();
+        var city = City.Create("Amman", "عمان", 1, Build.Now, null).Value;
+        context.Cities.GetByIdAsync(city.Id, Arg.Any<CancellationToken>()).Returns(city);
+
+        var result = await context.Submit().Handle(Command(cityId: city.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Equal(city.Id, Assert.Single(context.Added).CityId);
     }
 }

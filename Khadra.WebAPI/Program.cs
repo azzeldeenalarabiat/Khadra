@@ -174,6 +174,15 @@ builder.Services.AddRateLimiter(options =>
     // A refresh is per DEVICE, and a carrier address carries thousands of them.
     options.AddPolicy(RateLimitPolicies.Refresh, context =>
         RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(600, TimeSpan.FromMinutes(1))));
+    // Address suggestions spend an outbound call to a provider that allows about one request per
+    // second for the entire server, so this budget is the platform's, not one person's. Keyed on the
+    // signed-in owner: a carrier NATs thousands of subscribers behind one address, and an
+    // address-keyed bucket would let one applicant spend their whole network's share. No queue --
+    // a form waiting on a suggestion is a form whose owner has already started typing.
+    options.AddPolicy(RateLimitPolicies.Geocode, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst(KhadraClaimTypes.Subject)?.Value ?? ClientAddress(context),
+            _ => FixedWindow(20, TimeSpan.FromMinutes(1))));
     // Browsing is chatty and shared: a customer scrolling results and opening cars makes many reads,
     // and a whole mobile network arrives from one address. Read-only public prices, so the ceiling
     // is there to stop a scraper, not to ration customers.

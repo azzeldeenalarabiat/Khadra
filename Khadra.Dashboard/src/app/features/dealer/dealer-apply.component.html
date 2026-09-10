@@ -51,7 +51,10 @@
     </div>
 
     <div class="field">
-      <label for="apply-description">{{ t('common.description') }} <span class="field-hint">{{ t('dealerApply.optional') }}</span></label>
+      <label for="apply-description"
+        >{{ t('common.description') }}
+        <span class="field-hint">{{ t('dealerApply.optional') }}</span></label
+      >
       <textarea
         id="apply-description"
         class="input"
@@ -78,8 +81,8 @@
         (change)="chooseCity(fieldValue($event))"
       >
         <option value="">{{ t('dealerApply.chooseACity') }}</option>
-        @for (city of cities(); track city.id) {
-          <option [value]="city.id">{{ city.nameEn }}</option>
+        @for (city of cityOptions(); track city.id) {
+          <option [value]="city.id">{{ city.name }}</option>
         }
       </select>
       @if (cityHasNoCentre()) {
@@ -91,23 +94,91 @@
       }
     </div>
 
-    @if (coordsValid()) {
-      <kh-map
-        [latitude]="latNumber()"
-        [longitude]="lngNumber()"
-        [editable]="true"
-        [label]="'Where your gallery is'"
-        (moved)="moveTo($event)"
-      />
-    } @else {
+    <!--
+      The map is ALWAYS here, pinned or not. It used to render only once valid coordinates existed,
+      which made the one tool for choosing a location appear only after the location was chosen.
+    -->
+    <kh-map
+      [latitude]="mapLatitude()"
+      [longitude]="mapLongitude()"
+      [zoom]="mapZoom()"
+      [hasPin]="coordsValid()"
+      [editable]="true"
+      [label]="t('dealerApply.whereYourGalleryIs')"
+      (moved)="moveTo($event)"
+    />
+
+    <div class="row row-8 row-wrap">
+      <button
+        type="button"
+        class="btn btn-ghost"
+        [disabled]="busy() || locating()"
+        (click)="useMyLocation()"
+      >
+        <kh-icon name="map-pin" />
+        {{ locating() ? t('dealerApply.findingYou') : t('dealerApply.useMyLocation') }}
+      </button>
+      @if (coordsValid()) {
+        <button type="button" class="btn btn-ghost" [disabled]="busy()" (click)="clearPin()">
+          {{ t('dealerApply.clearThePin') }}
+        </button>
+      }
+    </div>
+
+    @if (!coordsValid()) {
       <div class="banner s-accent" role="status">
         <kh-icon name="map-pin" class="banner-icon" />
         <div class="banner-body">
-          <div class="banner-text">
-            {{ t('dealerApply.chooseACityOr') }}
-          </div>
+          <div class="banner-text">{{ t('dealerApply.clickTheMapTo') }}</div>
         </div>
       </div>
+    }
+    @if (locationProblem(); as problem) {
+      <div class="banner s-warn" role="alert">
+        <kh-icon name="warning" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-text">{{ t(problem) }}</div>
+        </div>
+      </div>
+    }
+
+    <div class="dc-split-even">
+      <div class="field">
+        <label for="apply-area">{{ t('dealerApply.area') }}</label>
+        <input
+          id="apply-area"
+          class="input user-text"
+          type="text"
+          maxlength="100"
+          [disabled]="busy()"
+          [value]="area()"
+          (input)="typeArea(fieldValue($event))"
+        />
+        <div class="field-hint">{{ t('dealerApply.theNeighbourhoodACustomer') }}</div>
+      </div>
+      <div class="field">
+        <label for="apply-street">
+          {{ t('dealerApply.street') }}
+          <span class="field-hint">{{ t('dealerApply.optional') }}</span>
+        </label>
+        <input
+          id="apply-street"
+          class="input user-text"
+          type="text"
+          maxlength="200"
+          [disabled]="busy()"
+          [value]="street()"
+          (input)="typeStreet(fieldValue($event))"
+        />
+        <div class="field-hint">{{ t('dealerApply.manyStreetsHaveNo') }}</div>
+      </div>
+    </div>
+
+    @if (suggesting()) {
+      <div class="field-hint">{{ t('dealerApply.lookingUpThatSpot') }}</div>
+    } @else if (attribution(); as licence) {
+      <!-- The provider's own words. Open-data licences require attribution where the data is shown. -->
+      <div class="field-hint ltr">{{ licence }}</div>
     }
 
     <div class="dc-split-even">
