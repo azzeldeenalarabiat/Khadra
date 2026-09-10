@@ -162,6 +162,71 @@ public sealed class EmployeeTests
         Assert.True(twice.IsFailure);
     }
 
+    /// <summary>
+    /// An invitation must not outlive the first real password.
+    ///
+    /// The link stays valid for seven days, and accepting it sets a password unconditionally — so a
+    /// held link was a working credential for that whole week EVEN AFTER the person had the account,
+    /// and using it would overwrite their password and take it from them.
+    ///
+    /// Not hypothetical. Every message sent while <c>Email:Provider</c> selected the Logging
+    /// transport was written to the application log WITH its link, so an invitation issued in that
+    /// window is readable by anyone who can read the log — and it would otherwise survive the owner
+    /// recovering the account by any other route (verifying the address, then a password reset).
+    ///
+    /// <c>PasswordChangedAt</c> is the precise test: null on every invited account, because only
+    /// <c>ChangePassword</c> ever sets it.
+    /// </summary>
+    [Fact]
+    public async Task An_invitation_stops_working_once_a_password_has_been_chosen_another_way()
+    {
+        var context = new Context();
+        await context.Handlers().Handle(Invite(OwnerId), CancellationToken.None);
+        var user = context.AddedUsers.Single();
+        var token = context.IssuedTokens.Single();
+        var raw = context.Opaque.Issued.Single().Value;
+        context.Tokens.GetByHashAsync(context.Opaque.Hash(raw), VerificationPurpose.EmployeeInvitation, Arg.Any<CancellationToken>())
+            .Returns(token);
+        context.Users.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+
+        // The person recovers the account without the link: verifies the address, then resets. That
+        // is what a password reset does -- change the password, nothing else.
+        user.VerifyEmail(Users.Now);
+        user.ChangePassword(PasswordHash.FromHash("chosen-by-the-real-owner"), Users.Now);
+        var theirHash = user.PasswordHash.Value;
+
+        // Somebody still holding the emailed link now tries to use it.
+        var stolen = await context.Accept().Handle(new AcceptInvitationCommand(raw, "Attacker1"), CancellationToken.None);
+
+        Assert.True(stolen.IsFailure);
+        Assert.Equal(theirHash, user.PasswordHash.Value);
+        Assert.True(user.CanAuthenticate().IsSuccess);
+    }
+
+    /// <summary>
+    /// And the legitimate detour still works: verifying the address first leaves the account with no
+    /// password at all, so the invitation is still the thing that sets one.
+    /// </summary>
+    [Fact]
+    public async Task Verifying_the_address_first_does_not_block_the_invitation()
+    {
+        var context = new Context();
+        await context.Handlers().Handle(Invite(OwnerId), CancellationToken.None);
+        var user = context.AddedUsers.Single();
+        var token = context.IssuedTokens.Single();
+        var raw = context.Opaque.Issued.Single().Value;
+        context.Tokens.GetByHashAsync(context.Opaque.Hash(raw), VerificationPurpose.EmployeeInvitation, Arg.Any<CancellationToken>())
+            .Returns(token);
+        context.Users.GetByIdAsync(user.Id, Arg.Any<CancellationToken>()).Returns(user);
+
+        user.VerifyEmail(Users.Now);
+
+        var accepted = await context.Accept().Handle(new AcceptInvitationCommand(raw, "Passw0rd1"), CancellationToken.None);
+
+        Assert.True(accepted.IsSuccess, accepted.IsFailure ? accepted.Error.Code : null);
+        Assert.True(user.CanAuthenticate().IsSuccess);
+    }
+
     [Fact]
     public async Task Resending_is_refused_once_the_invitation_was_accepted()
     {

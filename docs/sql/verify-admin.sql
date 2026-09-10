@@ -82,6 +82,29 @@ ORDER BY t.created_at DESC
 LIMIT 50;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- 3b. Retire a stranded administrator invitation. Run this BEFORE setting the
+--     bootstrap variables, if section 3 showed a LIVE AdminInvitation.
+-- ─────────────────────────────────────────────────────────────────────────────
+--
+-- Two reasons, and the first is a precondition rather than tidying:
+--
+--   * The bootstrapper declines to send a second invitation while one is live, and it
+--     cannot tell a link sitting in your inbox from a link sitting in a log. Leave one
+--     live and setting the variables does nothing for up to seven days.
+--   * A live invitation is a working credential for its whole life, and accepting one
+--     SETS a password. So whoever holds a leaked link could take the account even after
+--     you had recovered it. (The application now refuses an invitation once a password
+--     has been chosen — but only once that build is deployed.)
+--
+-- Costs nothing: the next start issues a fresh one.
+--
+-- UPDATE verification_tokens
+-- SET consumed_at = now()
+-- WHERE consumed_at IS NULL
+--   AND expires_at > now()
+--   AND purpose = 'AdminInvitation';
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 4. ONLY IF the mail transport was writing messages to the log.
 -- ─────────────────────────────────────────────────────────────────────────────
 --

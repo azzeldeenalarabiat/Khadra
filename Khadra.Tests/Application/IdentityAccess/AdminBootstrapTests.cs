@@ -403,8 +403,46 @@ public sealed class AdminBootstrapRefusalTests
         var failure = await Assert.ThrowsAsync<InvalidOperationException>(
             () => context.Bootstrapper().EnsureAsync(CancellationToken.None));
 
-        Assert.Contains("already exists with that address", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("the email address is", failure.Message, StringComparison.Ordinal);
         Assert.Empty(context.Added);
+    }
+
+    /// <summary>
+    /// The phone collides exactly the same way, and is the LIKELIER of the two: trying the customer
+    /// app on your own handset is the obvious first thing an owner does. ix_users_phone is unique and
+    /// not partial, so a soft-deleted row still holds the number.
+    /// </summary>
+    [Fact]
+    public async Task A_phone_number_already_held_by_somebody_else_stops_startup_too()
+    {
+        var context = new AdminBootstrapTestBed();
+        context.Users.AnyAdminExistsAsync(Arg.Any<CancellationToken>()).Returns(false);
+        context.Users.ExistsByEmailAsync(Arg.Any<EmailAddress>(), Arg.Any<CancellationToken>()).Returns(false);
+        context.Users.ExistsByPhoneAsync(Arg.Any<PhoneNumber>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => context.Bootstrapper().EnsureAsync(CancellationToken.None));
+
+        Assert.Contains("the phone number is", failure.Message, StringComparison.Ordinal);
+        Assert.Empty(context.Added);
+    }
+
+    /// <summary>
+    /// A collision that turns out to be a replica winning the race is not a misconfiguration. Asked
+    /// again rather than assumed, so the operator is not sent to look at settings that are correct.
+    /// </summary>
+    [Fact]
+    public async Task A_collision_that_is_actually_a_replica_winning_the_race_does_not_stop_startup()
+    {
+        var context = new AdminBootstrapTestBed();
+        context.Users.ExistsByEmailAsync(Arg.Any<EmailAddress>(), Arg.Any<CancellationToken>()).Returns(true);
+        // False on the first look, true by the time the collision is examined.
+        context.Users.AnyAdminExistsAsync(Arg.Any<CancellationToken>()).Returns(false, true);
+
+        await context.Bootstrapper().EnsureAsync(CancellationToken.None);
+
+        Assert.Empty(context.Added);
+        Assert.Contains("another instance won the race", context.Log.AllText, StringComparison.Ordinal);
     }
 
     /// <summary>
