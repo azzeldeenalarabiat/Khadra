@@ -208,6 +208,20 @@ services:
 #                        Dedicated IPs. An unconfirmed one is refused per
 #                        message, at send time, by Brevo rather than by us.
 #
+#   Documents__Provider  Must be the bare word 'Supabase'. Left unset it defaults
+#   Documents__Supabase  to 'Local', which keeps licence scans and identity papers
+#     __Url              on the container's own disk — deleted on every deploy.
+#     __Bucket           The API refuses to start in Production rather than do
+#     __ServiceKey       that quietly. __Url is https://<ref>.supabase.co,
+#                        __Bucket is a bucket you created PRIVATE beforehand, and
+#                        __ServiceKey is a project secret key. That key bypasses
+#                        row-level security across the whole project, so it goes
+#                        in Render's environment and nowhere else — never here,
+#                        never in a tracked appsettings file. See
+#                        docs/deployment.md, "Uploaded documents outlive the
+#                        container", for the bucket settings and for why the Data
+#                        API should be switched off alongside it.
+#
 #   KnownProxies__0..3   The SAME four values as above, and for the same reason.
 #   ForwardedHeaders__   The API is not only reached through the BFF: the
 #   ForwardLimit         customer mobile application calls it directly over the

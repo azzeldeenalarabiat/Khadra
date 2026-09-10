@@ -71,8 +71,30 @@ RUN dotnet tool install --global dotnet-ef --version 10.* \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS final
 WORKDIR /app
 
-# The runtime image ships a non-root `app` user; use it. A web server that can
-# write to its own binaries is a web server that can be persuaded to.
+# Documents:RootPath is "App_Data/documents", RELATIVE, so it resolves under this
+# working directory — and /app is root:root 755 in the base image while the server
+# runs as the unprivileged `app` user. So the very first document upload called
+# Directory.CreateDirectory("/app/App_Data/documents/dealers/<id>"), was refused,
+# and answered 500 "An unexpected error occurred".
+#
+# Nothing caught it earlier because nothing had ever reached it: uploading a file
+# needs a dealer owner who has registered, verified, signed in and filled in the
+# whole application form, and the first person to do that in production was the
+# first person to try writing a file at all.
+#
+# Created here rather than left to the application, so the ONE writable path is
+# declared in the image instead of appearing at runtime. Everything else under
+# /app stays root-owned and read-only to the server: a web server that can write
+# to its own binaries is a web server that can be persuaded to.
+#
+# NOT persistence. This directory lives and dies with the container, so on a
+# platform with an ephemeral filesystem every licence scan and every customer's
+# identity document is gone on the next deploy. Attach a disk and point
+# Documents__RootPath at it before real applications arrive — pre-launch
+# checklist, "Uploaded documents outlive the container".
+RUN mkdir -p /app/App_Data/documents && chown -R app:app /app/App_Data
+
+# The runtime image ships a non-root `app` user; use it.
 USER app
 
 # 8080 because Khadra.Bff already expects the API at http://khadra-webapi:8080/ —

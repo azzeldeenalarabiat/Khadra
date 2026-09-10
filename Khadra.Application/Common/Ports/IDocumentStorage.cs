@@ -4,6 +4,26 @@ namespace Khadra.Application.Common.Ports;
 public sealed record StoredDocument(string StorageKey, string ContentType, long SizeBytes);
 
 /// <summary>
+/// Something is already stored at that key, and storage refused to replace it.
+/// </summary>
+/// <remarks>
+/// Not a failure of the upload so much as the answer to a question the caller did not mean to ask.
+/// A presigned ticket commits to a key before the bytes exist and is meant to be spent ONCE; letting
+/// a second upload overwrite the first would mean the person who raised a dispute could swap the
+/// evidence after the other party and an administrator had read it, leaving the same key on the same
+/// record with different content inside.
+///
+/// So the second write is refused, and the API answers 409 rather than 500. For a client retrying
+/// after a lost response that is the good news: the bytes are already there, and the next step is the
+/// confirmation call, not another upload.
+/// </remarks>
+public sealed class DocumentAlreadyExistsException(string storageKey)
+    : Exception($"A document is already stored at '{storageKey}'.")
+{
+    public string StorageKey { get; } = storageKey;
+}
+
+/// <summary>
 /// Access-controlled storage for sensitive documents (spec 7).
 ///
 /// The contract deliberately returns a KEY, not a URL. Identity papers and dealer commercial

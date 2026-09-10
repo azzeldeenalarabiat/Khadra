@@ -43,7 +43,7 @@ internal sealed partial class LocalDocumentStorage : IDocumentStorage
 
         // The key is ours, not the uploader's. Only the extension survives from the supplied name,
         // and only from a fixed list, so a caller cannot write "..\\..\\appsettings.json".
-        var key = $"{SafeScope(scope)}/{Guid.CreateVersion7():N}{SafeExtension(fileName, contentType)}";
+        var key = $"{SafeScope(scope)}/{Guid.CreateVersion7():N}{DocumentKeys.Extension(fileName, contentType)}";
         var path = ResolveWithinRoot(key);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
@@ -66,9 +66,16 @@ internal sealed partial class LocalDocumentStorage : IDocumentStorage
         var path = ResolveWithinRoot(storageKey);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        // Create rather than overwrite: a ticket is meant to be spent once, and silently replacing an
-        // existing file would make a replayed ticket look successful.
-        await using var file = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        // CreateNew, not Create. The comment here always said "a ticket is meant to be spent once,
+        // and silently replacing an existing file would make a replayed ticket look successful" --
+        // while the code used FileMode.Create, which overwrites, and did exactly what the comment
+        // forbade. The gap was a real window: an evidence ticket outlives the dispute it was minted
+        // for, so whoever raised it could swap the file after the other party and an administrator
+        // had read it, leaving the same key on the same record with different bytes inside.
+        if (File.Exists(path))
+            throw new DocumentAlreadyExistsException(storageKey);
+
+        await using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         await content.CopyToAsync(file, cancellationToken);
 
         return new StoredDocument(storageKey, contentType, file.Length);
@@ -100,8 +107,7 @@ internal sealed partial class LocalDocumentStorage : IDocumentStorage
     /// </summary>
     private string ResolveWithinRoot(string storageKey)
     {
-        if (string.IsNullOrWhiteSpace(storageKey) || !KeyPattern().IsMatch(storageKey))
-            throw new InvalidOperationException("The document key is not valid.");
+        DocumentKeys.Validate(storageKey);
 
         var candidate = Path.GetFullPath(Path.Combine(_root, storageKey));
         var root = Path.GetFullPath(_root);
@@ -111,32 +117,7 @@ internal sealed partial class LocalDocumentStorage : IDocumentStorage
         return candidate;
     }
 
-    private static string SafeScope(string scope) =>
-        ScopePattern().IsMatch(scope ?? string.Empty)
-            ? scope!
-            : throw new InvalidOperationException("The document scope is not valid.");
+    private static string SafeScope(string scope) => DocumentKeys.ValidateScope(scope);
 
-    private static string SafeExtension(string fileName, string contentType)
-    {
-        var extension = Path.GetExtension(fileName ?? string.Empty).ToLowerInvariant();
-        if (extension is ".jpg" or ".jpeg" or ".png" or ".webp" or ".pdf")
-            return extension;
 
-        // Fall back to the declared type rather than storing an extension nobody vouched for.
-        return contentType?.ToLowerInvariant() switch
-        {
-            "image/png" => ".png",
-            "image/webp" => ".webp",
-            "application/pdf" => ".pdf",
-            _ => ".jpg"
-        };
-    }
-
-    [GeneratedRegex(@"^[a-z-]+/[0-9a-f-]+$")]
-    private static partial Regex ScopePattern();
-
-    // Scope, id, file. The scope may carry a hyphen (dealer-branding) and the file stem a word before
-    // its guid (logo-…, cover-…); nothing else, and never a path separator or a dot in the stem.
-    [GeneratedRegex(@"^[a-z-]+/[0-9a-f-]+/[0-9a-z-]+\.(jpg|jpeg|png|webp|pdf)$")]
-    private static partial Regex KeyPattern();
 }
