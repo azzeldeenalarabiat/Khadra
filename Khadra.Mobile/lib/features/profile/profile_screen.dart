@@ -298,8 +298,21 @@ class _DocumentsRow extends ConsumerWidget {
   }
 }
 
+/// The language switch, including the state it starts in.
+///
+/// **"Follow the device" is an option, not the absence of one.** Null is the
+/// default and the right one — a phone set to Arabic should open in Arabic
+/// without being asked — but rendering only `en` and `ar` against a null value
+/// left a fresh install showing two radios with NEITHER selected, which reads as
+/// a broken control rather than as a sensible default. It is also the only way
+/// back to following the device once a language has been chosen.
 class _LanguageGroup extends ConsumerWidget {
   const _LanguageGroup();
+
+  /// The sentinel for "follow the device". `RadioGroup` distinguishes options by
+  /// value, so the third one needs a value of its own rather than null — which
+  /// is exactly what a stored language being absent looks like.
+  static const _system = '';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -309,13 +322,14 @@ class _LanguageGroup extends ConsumerWidget {
     return _Group(
       title: l10n.profileLanguage,
       children: [
-        RadioGroup<String?>(
-          groupValue: current?.languageCode,
+        RadioGroup<String>(
+          groupValue: current?.languageCode ?? _system,
           onChanged: (value) => ref.read(localeProvider.notifier).set(
-                value == null ? null : Locale(value),
+                value == null || value == _system ? null : Locale(value),
               ),
           child: const Column(
             children: [
+              _LanguageOption(value: _system),
               _LanguageOption(value: 'en'),
               _LanguageOption(value: 'ar'),
             ],
@@ -334,13 +348,17 @@ class _LanguageOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return RadioListTile<String?>(
+    return RadioListTile<String>(
       value: value,
-      title: Text(
-        value == 'ar' ? l10n.profileLanguageArabic : l10n.profileLanguageEnglish,
-      ),
-      // The label is written in its OWN language, always: somebody who has the app
-      // in the wrong language has to be able to find their way out of it.
+      // A named language is written in its OWN language, always: somebody who
+      // has the app in the wrong one has to be able to find their way out of it.
+      // "Follow the device" names no language, so it is translated like any other
+      // sentence.
+      title: Text(switch (value) {
+        'ar' => l10n.profileLanguageArabic,
+        'en' => l10n.profileLanguageEnglish,
+        _ => l10n.profileLanguageSystem,
+      }),
       contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg),
     );
   }

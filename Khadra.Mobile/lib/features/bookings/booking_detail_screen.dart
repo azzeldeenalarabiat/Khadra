@@ -130,7 +130,7 @@ class _Body extends ConsumerWidget {
 
         if (booking.handovers.isNotEmpty) ...[
           const SizedBox(height: Space.xl),
-          KhadraSectionTitle(l10n.bookingHistory),
+          KhadraSectionTitle(l10n.bookingHandoversTitle),
           _Handovers(handovers: booking.handovers, formats: formats),
         ],
 
@@ -576,7 +576,20 @@ class _NonDeliveryDialogState extends State<_NonDeliveryDialog> {
   final _details = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // The Report button is gated on there being something typed, so the dialog
+    // has to rebuild as it IS typed. Without this listener the gate reads an
+    // empty controller for ever and the button never enables -- which made the
+    // whole non-delivery report unreachable.
+    _details.addListener(_onChanged);
+  }
+
+  void _onChanged() => setState(() {});
+
+  @override
   void dispose() {
+    _details.removeListener(_onChanged);
     _details.dispose();
     super.dispose();
   }
@@ -584,24 +597,29 @@ class _NonDeliveryDialogState extends State<_NonDeliveryDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final details = _details.text.trim();
 
     return AlertDialog(
       title: Text(l10n.nonDeliveryTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            l10n.nonDeliveryBody,
-            style: const TextStyle(fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: Space.lg),
-          KhadraField(
-            controller: _details,
-            label: l10n.nonDeliveryDetails,
-            maxLines: 4,
-            maxLength: 1000,
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.nonDeliveryBody,
+              style: const TextStyle(fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: Space.lg),
+            KhadraField(
+              controller: _details,
+              label: l10n.nonDeliveryDetails,
+              maxLines: 4,
+              maxLength: 1000,
+              autofocus: true,
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -609,9 +627,9 @@ class _NonDeliveryDialogState extends State<_NonDeliveryDialog> {
           child: Text(l10n.actionCancel),
         ),
         FilledButton(
-          onPressed: _details.text.trim().isEmpty
+          onPressed: details.isEmpty
               ? null
-              : () => Navigator.of(context).pop(_details.text.trim()),
+              : () => Navigator.of(context).pop(details),
           child: Text(l10n.nonDeliveryReport),
         ),
       ],

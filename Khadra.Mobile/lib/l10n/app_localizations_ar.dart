@@ -319,6 +319,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get searchPriceRange => 'السعر اليومي';
 
   @override
+  String get searchPriceFrom => 'من';
+
+  @override
+  String get searchPriceTo => 'إلى';
+
+  @override
+  String get searchPriceRangeInverted =>
+      'أعلى السعر أقل من أدناه، فلن تطابقه أي سيارة.';
+
+  @override
   String get searchDeliveryOnly => 'التوصيل إليّ فقط';
 
   @override
@@ -339,6 +349,16 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get searchDatesHelp =>
       'اختيار التواريخ يعرض السيارات المتاحة فقط، ويتيح لنا تسعير الإيجار.';
+
+  @override
+  String searchMaxRentalDays(int days) {
+    return 'لا يمكن أن تتجاوز مدة الإيجار $days يوماً.';
+  }
+
+  @override
+  String searchPickupTooSoon(String when) {
+    return 'أقرب موعد يمكن أن يبدأ فيه الإيجار هو $when.';
+  }
 
   @override
   String get searchClearDates => 'امسح التواريخ';
@@ -606,6 +626,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String bookTermsAnswerWindow(String hours) {
+    return 'أمام المكتب $hours ساعة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.';
+  }
+
+  @override
   String bookTermsPaymentWindow(String hours) {
     return 'بعد الموافقة، أمامك $hours ساعة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.';
   }
@@ -754,6 +779,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookingHistory => 'ما جرى';
+
+  @override
+  String get bookingHandoversTitle => 'الاستلام والإرجاع';
 
   @override
   String get bookingPrice => 'السعر';
@@ -1226,6 +1254,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get profileLanguage => 'اللغة';
+
+  @override
+  String get profileLanguageSystem => 'اتبع لغة جهازي';
 
   @override
   String get profileLanguageEnglish => 'English';

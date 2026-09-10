@@ -671,6 +671,11 @@ class _PriceBreakdown extends StatelessWidget {
   }
 }
 
+/// Windows arrive as fractional hours (0.5, 1, 24). Rendering "1.0 hours" reads
+/// like a computed value where a human chose a round number.
+String _hours(num value) =>
+    value == value.roundToDouble() ? value.round().toString() : value.toString();
+
 /// The rules this booking would freeze, in the server's own numbers.
 class _Terms extends StatelessWidget {
   const _Terms({required this.quote, required this.formats});
@@ -687,6 +692,9 @@ class _Terms extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // The gallery's own clock comes first: it is the wait the customer is
+          // agreeing to, and it starts the moment they press the button.
+          _Bullet(l10n.bookTermsAnswerWindow(_hours(terms.answerWindowHours))),
           _Bullet(l10n.bookTermsPayAfterApproval(
               _hours(terms.paymentWindowHours))),
           _Bullet(l10n.bookTermsPaymentWindow(
@@ -699,12 +707,6 @@ class _Terms extends StatelessWidget {
       ),
     );
   }
-
-  /// Windows arrive as fractional hours (0.5, 1, 24). Rendering "1.0 hours" reads
-  /// like a computed value where a human chose a round number.
-  static String _hours(num value) => value == value.roundToDouble()
-      ? value.round().toString()
-      : value.toString();
 }
 
 class _Bullet extends StatelessWidget {
@@ -796,6 +798,11 @@ class _SubmitBar extends StatelessWidget {
 /// The window is the BOOKING's, not `/app-config`'s: the booking froze its own
 /// terms, and quoting today's setting against a booking made under another would
 /// be the exact mistake the freezing exists to prevent.
+///
+/// It is also READ, not derived. This used to subtract `createdAt` from
+/// `decisionDeadline` — a second source for a figure the server already froze,
+/// which `.inHours` truncates: a 47.5-hour window read "47". `answerWindowHours`
+/// now travels on the terms.
 class _RequestSentDialog extends ConsumerWidget {
   const _RequestSentDialog({required this.booking, required this.galleryName});
 
@@ -805,10 +812,7 @@ class _RequestSentDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final answerHours = booking.decisionDeadline
-        .difference(booking.createdAt)
-        .inHours
-        .toString();
+    final answerHours = _hours(booking.terms.answerWindowHours);
 
     return AlertDialog(
       icon: const Icon(Icons.check_circle_outline,

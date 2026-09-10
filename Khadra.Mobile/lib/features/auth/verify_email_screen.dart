@@ -19,10 +19,22 @@ import 'auth_form_widgets.dart';
 /// booking that expires unread, with the gallery's decision wasted and a car held
 /// for nothing meanwhile. That is why the server refuses a booking without it.
 class VerifyEmailScreen extends ConsumerStatefulWidget {
-  const VerifyEmailScreen({super.key, this.token, this.email});
+  const VerifyEmailScreen({
+    super.key,
+    this.token,
+    this.email,
+    this.undelivered = false,
+  });
 
   final String? token;
   final String? email;
+
+  /// The account was created but the verification email did NOT go out.
+  ///
+  /// A real state, not a failure: registration succeeded and the transport did
+  /// not. Saying "check your inbox" here would send somebody to watch for a
+  /// message that is not coming.
+  final bool undelivered;
 
   @override
   ConsumerState<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
@@ -33,6 +45,10 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   bool _verified = false;
   bool _resent = false;
   String? _error;
+
+  /// Cleared by a successful resend: once one is on its way, the sentence saying
+  /// none was sent has stopped being true.
+  late bool _undelivered = widget.undelivered;
 
   @override
   void initState() {
@@ -82,6 +98,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       setState(() {
         _busy = false;
         _resent = true;
+        _undelivered = false;
       });
     } on ApiFailure catch (failure) {
       if (!mounted) return;
@@ -119,13 +136,25 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
     return AuthScaffold(
       title: l10n.authVerifyEmailTitle,
-      subtitle: email.isEmpty ? null : l10n.authVerifyEmailBody(email),
+      // No "we sent a link to …" when nothing was sent. The account exists and
+      // the link has to be asked for again, which the button below does.
+      subtitle: email.isEmpty || _undelivered
+          ? null
+          : l10n.authVerifyEmailBody(email),
       leading: IconButton(
         icon: const Icon(Icons.close),
         onPressed: () => context.go(Routes.search),
         tooltip: l10n.actionClose,
       ),
       children: [
+        if (_undelivered) ...[
+          KhadraNotice(
+            title: l10n.authEmailNotDelivered,
+            tone: NoticeTone.warn,
+            icon: Icons.unsubscribe_outlined,
+          ),
+          const SizedBox(height: Space.lg),
+        ],
         KhadraNotice(
           title: l10n.authVerifyEmailWhy,
           tone: NoticeTone.neutral,

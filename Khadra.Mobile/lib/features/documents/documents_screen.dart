@@ -69,10 +69,17 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     // renter must file is the platform's rule (and differs for a foreign national,
     // who files a passport rather than a national ID); the app's job is to render
     // the answer, not to hold a copy of the question.
+    //
+    // ORDERED, and that is the point. The set is `missing ∪ uploaded`, so with
+    // insertion order the tiles RESHUFFLED under the customer's finger: uploading
+    // the licence front moved it out of `missing` and down the list, and the next
+    // tile slid up under the tap. The app does not decide WHICH documents appear;
+    // it does decide that they stop moving.
     final wanted = <String>{
       ...documents.missing,
       ...documents.documents.map((document) => document.type),
-    };
+    }.toList()
+      ..sort(_byFilingOrder);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -215,6 +222,27 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
 
   static String _megabytes(int bytes) =>
       '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
+
+  /// The order somebody would fill these in: licence front, licence back, then
+  /// whichever identity document their account calls for.
+  ///
+  /// A type this build has never heard of sorts last, in its own alphabetical
+  /// order, rather than being dropped — the platform can add one at any time.
+  static int _byFilingOrder(String a, String b) {
+    const order = <String>[
+      DocumentTypes.drivingLicenceFront,
+      DocumentTypes.drivingLicenceBack,
+      DocumentTypes.nationalId,
+      DocumentTypes.passport,
+    ];
+    int rank(String type) {
+      final index = order.indexOf(type);
+      return index < 0 ? order.length : index;
+    }
+
+    final byRank = rank(a).compareTo(rank(b));
+    return byRank != 0 ? byRank : a.compareTo(b);
+  }
 }
 
 class _DocumentTile extends StatelessWidget {

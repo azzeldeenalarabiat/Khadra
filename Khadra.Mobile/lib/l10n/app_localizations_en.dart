@@ -320,6 +320,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchPriceRange => 'Price per day';
 
   @override
+  String get searchPriceFrom => 'From';
+
+  @override
+  String get searchPriceTo => 'To';
+
+  @override
+  String get searchPriceRangeInverted =>
+      'The top of the range is below the bottom, so nothing can match it.';
+
+  @override
   String get searchDeliveryOnly => 'Delivered to me only';
 
   @override
@@ -340,6 +350,16 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get searchDatesHelp =>
       'Choosing dates shows only the cars that are free, and lets us price the rental.';
+
+  @override
+  String searchMaxRentalDays(int days) {
+    return 'A rental cannot run longer than $days days.';
+  }
+
+  @override
+  String searchPickupTooSoon(String when) {
+    return 'The earliest a rental can start is $when.';
+  }
 
   @override
   String get searchClearDates => 'Clear the dates';
@@ -597,6 +617,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String bookTermsAnswerWindow(String hours) {
+    return 'The office has $hours hours to answer. The car is held for you until then.';
+  }
+
+  @override
   String bookTermsPaymentWindow(String hours) {
     return 'Once they approve, you have $hours hours to pay the deposit or the booking ends and the car goes back on the market.';
   }
@@ -746,6 +771,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookingHistory => 'What has happened';
+
+  @override
+  String get bookingHandoversTitle => 'Collection and return';
 
   @override
   String get bookingPrice => 'Price';
@@ -1221,6 +1249,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileLanguage => 'Language';
+
+  @override
+  String get profileLanguageSystem => 'Follow my device';
 
   @override
   String get profileLanguageEnglish => 'English';

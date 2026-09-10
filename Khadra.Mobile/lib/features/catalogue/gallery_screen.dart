@@ -102,6 +102,27 @@ class _GalleryBody extends ConsumerWidget {
                           style: const TextStyle(
                               fontSize: 21, fontWeight: FontWeight.w700),
                         ),
+                        if (ref.watch(cityNameProvider(gallery.cityId))
+                            case final city?) ...[
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.place_outlined,
+                                  size: 14, color: KhadraColors.neutral500),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  city,
+                                  style: const TextStyle(
+                                      color: KhadraColors.neutral600,
+                                      fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: Space.xs),
                         _RatingLine(gallery: gallery),
                       ],
@@ -143,7 +164,7 @@ class _GalleryBody extends ConsumerWidget {
                     for (final day in gallery.operatingHours)
                       KhadraDetailRow(
                         dense: true,
-                        label: _dayName(context, day.day),
+                        label: formats.weekday(day.day),
                         value: Text(
                           day.isClosed
                               ? l10n.galleryClosed
@@ -252,26 +273,6 @@ class _GalleryBody extends ConsumerWidget {
         },
       ],
     );
-  }
-
-  /// The day name from the platform's own `DayOfWeek`, rendered by Flutter's
-  /// locale data rather than a table of seven strings in the ARB files.
-  String _dayName(BuildContext context, String day) {
-    const order = <String>[
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    final index = order.indexOf(day);
-    if (index < 0) return day;
-    return MaterialLocalizations.of(context)
-        .formatFullDate(DateTime(2024, 1, 1 + index))
-        .split(',')
-        .first;
   }
 
   Future<void> _openInMaps(PublicGallery gallery) async {

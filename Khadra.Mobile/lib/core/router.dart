@@ -149,6 +149,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => VerifyEmailScreen(
           token: state.uri.queryParameters['token'],
           email: state.uri.queryParameters['email'],
+          // Registration sets this when the server accepted the account but
+          // could NOT send the verification email. Dropping it here left the
+          // screen telling somebody to watch an inbox nothing was sent to.
+          undelivered: state.uri.queryParameters['undelivered'] == '1',
         ),
       ),
 

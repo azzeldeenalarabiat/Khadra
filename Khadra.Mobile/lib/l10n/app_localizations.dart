@@ -662,6 +662,24 @@ abstract class AppLocalizations {
   /// **'Price per day'**
   String get searchPriceRange;
 
+  /// No description provided for @searchPriceFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get searchPriceFrom;
+
+  /// No description provided for @searchPriceTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get searchPriceTo;
+
+  /// No description provided for @searchPriceRangeInverted.
+  ///
+  /// In en, this message translates to:
+  /// **'The top of the range is below the bottom, so nothing can match it.'**
+  String get searchPriceRangeInverted;
+
   /// No description provided for @searchDeliveryOnly.
   ///
   /// In en, this message translates to:
@@ -703,6 +721,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Choosing dates shows only the cars that are free, and lets us price the rental.'**
   String get searchDatesHelp;
+
+  /// No description provided for @searchMaxRentalDays.
+  ///
+  /// In en, this message translates to:
+  /// **'A rental cannot run longer than {days} days.'**
+  String searchMaxRentalDays(int days);
+
+  /// No description provided for @searchPickupTooSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'The earliest a rental can start is {when}.'**
+  String searchPickupTooSoon(String when);
 
   /// No description provided for @searchClearDates.
   ///
@@ -1094,6 +1124,12 @@ abstract class AppLocalizations {
   /// **'Nothing is charged now. The office answers within {hours} hours, and only then does the deposit fall due.'**
   String bookTermsPayAfterApproval(String hours);
 
+  /// No description provided for @bookTermsAnswerWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'The office has {hours} hours to answer. The car is held for you until then.'**
+  String bookTermsAnswerWindow(String hours);
+
   /// No description provided for @bookTermsPaymentWindow.
   ///
   /// In en, this message translates to:
@@ -1369,6 +1405,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What has happened'**
   String get bookingHistory;
+
+  /// No description provided for @bookingHandoversTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collection and return'**
+  String get bookingHandoversTitle;
 
   /// No description provided for @bookingPrice.
   ///
@@ -2167,6 +2209,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Language'**
   String get profileLanguage;
+
+  /// No description provided for @profileLanguageSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow my device'**
+  String get profileLanguageSystem;
 
   /// No description provided for @profileLanguageEnglish.
   ///

@@ -117,6 +117,30 @@ class Formats {
     return DateFormat.yMMMd(locale).format(DateTime(year, month, day));
   }
 
+  /// The platform's own `DayOfWeek` name, as a weekday in the reader's language.
+  ///
+  /// `DateFormat.EEEE` on an anchor date, never a full date with its separator
+  /// sliced off: Arabic's date separator is U+060C (`،`) rather than a Latin
+  /// comma, so splitting on `,` returned the entire date string as the day name.
+  /// 1 January 2024 was a Monday, which is what the index counts from.
+  ///
+  /// An unrecognised name comes back unchanged — a day the platform adds later
+  /// should read as itself rather than vanish from an opening-hours table.
+  String weekday(String dayOfWeek) {
+    const order = <String>[
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    final index = order.indexOf(dayOfWeek);
+    if (index < 0) return dayOfWeek;
+    return DateFormat.EEEE(locale).format(DateTime(2024, 1, 1 + index));
+  }
+
   /// A `HH:mm[:ss]` opening time, without a date attached to it.
   String clock(String? isoTime) {
     if (isoTime == null || isoTime.isEmpty) return '';

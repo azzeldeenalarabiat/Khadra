@@ -55,6 +55,13 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
         maxDailyRate: num.tryParse(_maxPrice.text.trim()),
       );
 
+  /// A range that can never match anything: the top below the bottom.
+  bool get _priceRangeInverted {
+    final min = num.tryParse(_minPrice.text.trim());
+    final max = num.tryParse(_maxPrice.text.trim());
+    return min != null && max != null && max < min;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -154,28 +161,46 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 const SizedBox(height: Space.sm),
                 KhadraSectionTitle(l10n.searchPriceRange),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
+                      // Each end says which end it is. They read "Price range —
+                      // optional" and "Optional", which told a customer nothing
+                      // about which box was the cheap end.
                       child: KhadraField(
                         controller: _minPrice,
-                        label: '${l10n.searchPriceRange} — ${l10n.labelOptional}',
+                        label: l10n.searchPriceFrom,
                         keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
                         forceLtr: true,
+                        onChanged: (_) => setState(() {}),
                       ),
                     ),
                     const SizedBox(width: Space.md),
                     Expanded(
                       child: KhadraField(
                         controller: _maxPrice,
-                        label: l10n.labelOptional,
+                        label: l10n.searchPriceTo,
                         keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
                         forceLtr: true,
+                        onChanged: (_) => setState(() {}),
                       ),
                     ),
                   ],
                 ),
+                // An inverted range returns nothing at all, and a customer
+                // staring at "0 cars" has no way to see that the two boxes are
+                // the reason. Said before the search rather than after it.
+                if (_priceRangeInverted)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: Space.lg),
+                    child: Text(
+                      l10n.searchPriceRangeInverted,
+                      style: const TextStyle(
+                          color: KhadraColors.bad, fontSize: 13, height: 1.4),
+                    ),
+                  ),
 
                 SwitchListTile.adaptive(
                   value: _draft.deliveryOnly,
@@ -193,7 +218,9 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.lg),
               child: KhadraSubmitButton(
                 label: l10n.actionApply,
-                onPressed: () => Navigator.of(context).pop(_withPrices),
+                onPressed: _priceRangeInverted
+                    ? null
+                    : () => Navigator.of(context).pop(_withPrices),
               ),
             ),
           ),

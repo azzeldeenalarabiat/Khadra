@@ -118,15 +118,47 @@ class VehicleCard extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        listing.gallery.businessName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: KhadraColors.neutral700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            listing.gallery.businessName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: KhadraColors.neutral700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          // WHERE the car is. The API has sent a `cityId` on
+                          // every listing row since the catalogue shipped and no
+                          // screen rendered it, which left a marketplace whose
+                          // cards named a price and an office but not a town —
+                          // the first thing anyone comparing two cars needs.
+                          if (ref.watch(cityNameProvider(listing.gallery.cityId))
+                              case final city?)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.place_outlined,
+                                      size: 12, color: KhadraColors.neutral500),
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(
+                                      city,
+                                      style: const TextStyle(
+                                          color: KhadraColors.neutral500,
+                                          fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: Space.sm),

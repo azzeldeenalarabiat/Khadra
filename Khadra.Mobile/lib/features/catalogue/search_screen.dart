@@ -68,10 +68,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
   }
 
-  /// Typing does not fire a request per keystroke. Every one of these is a full
+  /// Typing does not fire a REQUEST per keystroke. Every one of these is a full
   /// catalogue query, and a Jordanian mobile network is not the place to send ten
   /// of them for one word.
+  ///
+  /// The repaint is not debounced, only the query: the clear button is drawn from
+  /// whether the box is empty, and waiting 350 ms to draw it made the control
+  /// appear a beat after the character that should have summoned it.
   void _onSearchChanged(String value) {
+    setState(() {});
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 350), () {
       final text = value.trim();
@@ -157,10 +162,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             ? null
                             : IconButton(
                                 icon: const Icon(Icons.clear),
+                                tooltip: l10n.actionClearAll,
                                 onPressed: () {
                                   _searchController.clear();
                                   _onSearchChanged('');
-                                  setState(() {});
                                 },
                               ),
                         contentPadding: const EdgeInsets.symmetric(

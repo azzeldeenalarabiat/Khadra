@@ -805,6 +805,7 @@ class QuoteTerms {
     required this.paymentWindowHours,
     required this.customerCancellationPenaltyPercent,
     required this.noShowTimeoutHours,
+    required this.answerWindowHours,
   });
 
   final num depositPercent;
@@ -813,6 +814,9 @@ class QuoteTerms {
   final num customerCancellationPenaltyPercent;
   final num noShowTimeoutHours;
 
+  /// How long the gallery has to answer, from the server rather than derived.
+  final num answerWindowHours;
+
   static QuoteTerms fromJson(Map<String, dynamic> json) => QuoteTerms(
         depositPercent: _num(json['depositPercent']),
         freeCancellationWindowHours: _num(json['freeCancellationWindowHours']),
@@ -820,6 +824,7 @@ class QuoteTerms {
         customerCancellationPenaltyPercent:
             _num(json['customerCancellationPenaltyPercent']),
         noShowTimeoutHours: _num(json['noShowTimeoutHours']),
+        answerWindowHours: _num(json['answerWindowHours']),
       );
 }
 
@@ -904,6 +909,7 @@ class BookingTerms {
     required this.freeCancellationWindowHours,
     required this.noShowTimeoutHours,
     required this.paymentWindowHours,
+    required this.answerWindowHours,
     required this.postReturnSettlementWindowHours,
     required this.customerCancellationPenaltyPercent,
     required this.rulesVersion,
@@ -914,6 +920,11 @@ class BookingTerms {
   final num freeCancellationWindowHours;
   final num noShowTimeoutHours;
   final num paymentWindowHours;
+
+  /// How long the gallery had to answer THIS request — the figure the booking
+  /// froze, not today's setting and not `decisionDeadline − createdAt`.
+  final num answerWindowHours;
+
   final num postReturnSettlementWindowHours;
   final num customerCancellationPenaltyPercent;
   final int rulesVersion;
@@ -924,6 +935,7 @@ class BookingTerms {
         freeCancellationWindowHours: _num(json['freeCancellationWindowHours']),
         noShowTimeoutHours: _num(json['noShowTimeoutHours']),
         paymentWindowHours: _num(json['paymentWindowHours']),
+        answerWindowHours: _num(json['answerWindowHours']),
         postReturnSettlementWindowHours:
             _num(json['postReturnSettlementWindowHours']),
         customerCancellationPenaltyPercent:

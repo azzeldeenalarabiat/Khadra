@@ -34,20 +34,28 @@ class VehicleScreen extends ConsumerWidget {
     final filter = ref.watch(searchFilterProvider);
     final formats = ref.watch(formatsProvider);
 
-    final vehicle = ref.watch(vehicleProvider((
+    final key = (
       id: vehicleId,
       from: filter.hasDates ? filter.pickupAt : null,
       to: filter.hasDates ? filter.returnAt : null,
-    )));
+    );
+    final vehicle = ref.watch(vehicleProvider(key));
 
     return Scaffold(
       body: switch (vehicle) {
         AsyncLoading() => const _VehicleScaffold(child: KhadraLoading()),
         AsyncError(:final error) => _VehicleScaffold(
-            child: _vehicleError(context, l10n, ApiFailure.from(error)),
+            child: _vehicleError(
+              context,
+              l10n,
+              ApiFailure.from(error),
+              () => ref.invalidate(vehicleProvider(key)),
+            ),
           ),
-        AsyncData(:final value) when formats != null =>
-          _VehicleBody(vehicle: value, formats: formats),
+        AsyncData(:final value) when formats != null => RefreshIndicator(
+            onRefresh: () => ref.refresh(vehicleProvider(key).future),
+            child: _VehicleBody(vehicle: value, formats: formats),
+          ),
         _ => const _VehicleScaffold(child: KhadraLoading()),
       },
       bottomNavigationBar: switch (vehicle) {
@@ -59,11 +67,16 @@ class VehicleScreen extends ConsumerWidget {
   }
 
   Widget _vehicleError(
-      BuildContext context, AppLocalizations l10n, ApiFailure failure) {
+    BuildContext context,
+    AppLocalizations l10n,
+    ApiFailure failure,
+    VoidCallback onRetry,
+  ) {
     // 404 covers every reason at once — no such car, a draft, a hidden one, one
     // whose gallery is suspended. The API answers the same to all of them so an
     // anonymous caller cannot enumerate a competitor's unpublished inventory, and
-    // the app must not pretend to know which it was.
+    // the app must not pretend to know which it was. Retrying a 404 would only
+    // fetch the same answer, so that branch offers the way out instead.
     if (failure.isNotFound) {
       return KhadraEmpty(
         icon: Icons.no_transfer_outlined,
@@ -75,7 +88,9 @@ class VehicleScreen extends ConsumerWidget {
         ),
       );
     }
-    return KhadraError(message: failure.messageFor(l10n));
+    // Everything else CAN be retried, and an error with no way forward on a
+    // pushed screen is a dead end: this one has no tabs under it.
+    return KhadraError(message: failure.messageFor(l10n), onRetry: onRetry);
   }
 }
 
@@ -368,15 +383,16 @@ class _AvailabilityLine extends StatelessWidget {
   }
 }
 
-class _GallerySummary extends StatelessWidget {
+class _GallerySummary extends ConsumerWidget {
   const _GallerySummary({required this.gallery, required this.formats});
 
   final PublicGallery gallery;
   final Formats formats;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final city = ref.watch(cityNameProvider(gallery.cityId));
 
     return KhadraCard(
       onTap: () => context.push(Routes.gallery(gallery.dealerId)),
@@ -407,6 +423,26 @@ class _GallerySummary extends StatelessWidget {
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700),
                     ),
+                    if (city != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.place_outlined,
+                                size: 13, color: KhadraColors.neutral500),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                city,
+                                style: const TextStyle(
+                                    color: KhadraColors.neutral600, fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 2),
                     if (gallery.averageRating != null && gallery.reviewCount > 0)
                       Row(

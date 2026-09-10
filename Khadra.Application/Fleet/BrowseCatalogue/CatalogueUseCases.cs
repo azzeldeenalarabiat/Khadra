@@ -84,7 +84,16 @@ public sealed record QuoteTerms(
     double FreeCancellationWindowHours,
     double PaymentWindowHours,
     decimal CustomerCancellationPenaltyPercent,
-    double NoShowTimeoutHours);
+    double NoShowTimeoutHours,
+    /// <summary>
+    /// How long the gallery would have to answer this request.
+    /// </summary>
+    /// <remarks>
+    /// The customer is agreeing to wait this long with a car held for them, so it belongs in the
+    /// terms they are shown before agreeing. It was missing, and the app had nothing to state it
+    /// from until a booking existed to subtract two of its timestamps.
+    /// </remarks>
+    double AnswerWindowHours);
 
 public sealed class SearchCatalogueHandler(
     ICatalogueReader catalogue,
@@ -311,7 +320,8 @@ public sealed class QuoteRentalHandler(
                 terms.FreeCancellationWindow.TotalHours,
                 terms.PaymentWindow.TotalHours,
                 terms.CustomerCancellationPenaltyPercent.Value,
-                terms.NoShowTimeout.TotalHours),
+                terms.NoShowTimeout.TotalHours,
+                terms.AnswerWindow.TotalHours),
             !taken);
     }
 }

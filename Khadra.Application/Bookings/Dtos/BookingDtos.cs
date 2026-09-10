@@ -203,6 +203,13 @@ public sealed record BookingTermsDto(
     double FreeCancellationWindowHours,
     double NoShowTimeoutHours,
     double PaymentWindowHours,
+    /// <summary>How long the gallery had to answer this request.</summary>
+    /// <remarks>
+    /// Frozen on the booking like every other figure here, and sent because a client otherwise has
+    /// to DERIVE it from `DecisionDeadline - CreatedAt` to say "they have 48 hours to answer" — a
+    /// second source for a number the server already owns, and one that rounds differently.
+    /// </remarks>
+    double AnswerWindowHours,
     double PostReturnSettlementWindowHours,
     decimal CustomerCancellationPenaltyPercent,
     decimal DealerPenaltyMinPercent,
@@ -218,6 +225,7 @@ public sealed record BookingTermsDto(
             terms.FreeCancellationWindow.TotalHours,
             terms.NoShowTimeout.TotalHours,
             terms.PaymentWindow.TotalHours,
+            terms.AnswerWindow.TotalHours,
             terms.PostReturnSettlementWindow.TotalHours,
             terms.CustomerCancellationPenaltyPercent.Value,
             terms.DealerPenaltyMinPercent.Value,

@@ -154,3 +154,27 @@ final isArabicProvider = Provider<bool>((ref) {
       WidgetsBinding.instance.platformDispatcher.locale.languageCode;
   return locale == 'ar';
 });
+
+/// The name of one city, in the reader's language, or null.
+///
+/// The catalogue carries a city as an ID — a listing row and a gallery page both
+/// do — and the NAME lives on the lookup, in both languages. Null covers three
+/// different things and all three mean the same to a screen: no city on the
+/// record, a city the lookup has not loaded yet, and an id the lookup does not
+/// know. Rendering the raw GUID for any of them would be worse than rendering
+/// nothing, so the caller omits the line.
+final cityNameProvider = Provider.family<String?, String?>((ref, cityId) {
+  if (cityId == null || cityId.isEmpty) return null;
+
+  final cities = ref.watch(citiesProvider).valueOrNull;
+  if (cities == null) return null;
+
+  final arabic = ref.watch(isArabicProvider);
+  for (final city in cities) {
+    if (city.id == cityId) {
+      final name = city.nameFor(arabic);
+      return name.isEmpty ? null : name;
+    }
+  }
+  return null;
+});

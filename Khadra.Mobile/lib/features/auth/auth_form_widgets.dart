@@ -88,6 +88,7 @@ class KhadraField extends StatelessWidget {
     this.validator,
     this.textInputAction,
     this.onSubmitted,
+    this.onChanged,
     this.maxLength,
     this.maxLines = 1,
     this.enabled = true,
@@ -96,6 +97,7 @@ class KhadraField extends StatelessWidget {
     this.suffix,
     this.errorText,
     this.forceLtr = false,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -107,6 +109,7 @@ class KhadraField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
   final VoidCallback? onSubmitted;
+  final ValueChanged<String>? onChanged;
   final int? maxLength;
   final int maxLines;
   final bool enabled;
@@ -120,6 +123,9 @@ class KhadraField extends StatelessWidget {
   /// and reorders what has been typed so far.
   final bool forceLtr;
 
+  /// For a field that IS the dialog it sits in. Never on a form with several.
+  final bool autofocus;
+
   @override
   Widget build(BuildContext context) {
     final field = TextFormField(
@@ -129,9 +135,11 @@ class KhadraField extends StatelessWidget {
       validator: validator,
       textInputAction: textInputAction,
       onFieldSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+      onChanged: onChanged,
       maxLength: maxLength,
       maxLines: obscure ? 1 : maxLines,
       enabled: enabled,
+      autofocus: autofocus,
       autofillHints: autofillHints,
       inputFormatters: inputFormatters,
       textDirection: forceLtr ? TextDirection.ltr : null,
