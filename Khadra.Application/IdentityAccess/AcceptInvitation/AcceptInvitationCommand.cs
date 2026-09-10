@@ -63,6 +63,24 @@ public sealed class AcceptInvitationHandler(
         if (user is null)
             return UnitResult.Failure(IdentityErrors.InvalidToken);
 
+        // An invitation must not outlive the first real password.
+        //
+        // PasswordChangedAt is null for every invited account -- the factories never set it, and only
+        // ChangePassword does -- so this is a precise "somebody has already chosen a password here".
+        // Without it an invitation stays a working credential for its whole seven days EVEN AFTER the
+        // owner has the account: accepting again would overwrite their password and hand the account
+        // to whoever still holds the link. That is not hypothetical here. Every message sent while
+        // Email:Provider selected the Logging transport was written to the application log WITH its
+        // link, so an invitation issued in that window is readable by anyone who can read the log,
+        // and it would otherwise survive the owner recovering the account by any other route.
+        //
+        // It does not block the legitimate path. An invited person has no password yet, and somebody
+        // who verified their address first (resend-verification issues its own token, and gates on
+        // the address rather than the role, so an invited administrator can use it) still has none
+        // until they choose one here.
+        if (user.PasswordChangedAt is not null)
+            return UnitResult.Failure(IdentityErrors.InvalidToken);
+
         // Accepting IS the proof of address: nobody else could have read the link. Then the first
         // real password replaces the unusable one; the stamp rotation and session revoke it raises
         // are harmless on an account that has never signed in.

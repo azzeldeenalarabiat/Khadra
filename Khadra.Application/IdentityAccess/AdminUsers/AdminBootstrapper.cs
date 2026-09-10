@@ -86,14 +86,37 @@ public sealed partial class AdminBootstrapper(
         // alternative is a platform with no administrator and a log line that misdirects whoever
         // goes looking. ExistsByEmailAsync ignores the soft-delete filter, which is what the unique
         // index does too, so this sees exactly what the insert would collide with.
-        if (await users.ExistsByEmailAsync(address.Value, cancellationToken))
+        // BOTH, because both are uniquely indexed (ix_users_email and ix_users_phone) and neither
+        // index is partial. Checking only the address would leave the phone to collide exactly the
+        // same way -- and the phone is the likelier of the two to be already taken, because trying
+        // the customer app on your own handset is the obvious first thing an owner does.
+        // InviteAdminCommand already checks both before inserting; this is that precedent, applied.
+        var addressTaken = await users.ExistsByEmailAsync(address.Value, cancellationToken);
+        var phoneTaken = await users.ExistsByPhoneAsync(phone.Value, cancellationToken);
+        if (addressTaken || phoneTaken)
         {
+            // Re-ask before blaming the configuration: a replica that won the race between the check
+            // above and this one has just created the administrator, and this row is that, not a
+            // conflict. Anything else is a genuine collision.
+            if (await users.AnyAdminExistsAsync(cancellationToken))
+            {
+                LogRaceObserved(logger);
+                return;
+            }
+
+            var taken = (addressTaken, phoneTaken) switch
+            {
+                (true, true) => "both the email address and the phone number are",
+                (true, false) => "the email address is",
+                _ => "the phone number is",
+            };
+
             throw new InvalidOperationException(
-                $"Admin:Bootstrap:Email is {settings.Email}, but an account already exists with that " +
-                "address and it is not an administrator (it may also be a soft-deleted one, which " +
-                "the unique index still covers). The bootstrap cannot take an address that is " +
-                "already in use. Either configure an address nobody holds, or promote/remove the " +
-                "existing account, and start again.");
+                $"Admin:Bootstrap cannot be used because {taken} already held by an existing account " +
+                "that is not an administrator. Soft-deleted accounts count: the unique indexes on " +
+                "users.email and users.phone are not partial, so a deleted row still holds its " +
+                "values. Configure an address and phone nobody holds, or deal with the existing " +
+                "account first, and start again.");
         }
 
         // The same unusable credential InviteAdminCommand creates: bytes hashed and discarded, so
@@ -268,6 +291,12 @@ public sealed partial class AdminBootstrapper(
         Level = LogLevel.Information,
         Message = "The bootstrap administrator was created by another instance; this one did nothing.")]
     private static partial void LogRaceLost(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "The configured email or phone is already taken AND an administrator now exists, " +
+                  "so another instance won the race and created it. This one did nothing.")]
+    private static partial void LogRaceObserved(ILogger logger);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
