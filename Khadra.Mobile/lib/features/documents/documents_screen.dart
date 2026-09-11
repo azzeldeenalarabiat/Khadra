@@ -276,19 +276,34 @@ class _DocumentTile extends StatelessWidget {
                           fontSize: 13, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
+                    // The STATE as a coloured line, not a badge at the end of the
+                    // row. "Waiting to be checked" is a sentence, and a lozenge
+                    // holding a sentence takes half a 375 screen -- which pushed
+                    // the paper's own name onto two lines to make room for it.
                     Text(
                       present
-                          ? l10n.documentsUploaded(
-                              formats.longDate(document!.uploadedAt))
+                          ? _statusLabel(l10n, document!.status)
                           : l10n.documentsMissing,
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: present
-                            ? KhadraColors.neutral600
+                            ? _statusColour(document!.status)
                             : KhadraColors.warn,
                       ),
                     ),
+                    if (present) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.documentsUploaded(
+                            formats.longDate(document!.uploadedAt)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: KhadraColors.neutral500,
+                        ),
+                      ),
+                    ],
                     // WHAT is on file, from the record rather than from the tile's
                     // own guess: the platform takes photographs and PDFs, and a
                     // customer replacing a document a year later deserves to know
@@ -311,11 +326,6 @@ class _DocumentTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (present)
-                KhadraBadge(
-                  label: _statusLabel(l10n, document!.status),
-                  colour: _statusColour(document!.status),
-                ),
             ],
           ),
           if (document?.reviewNote != null &&
