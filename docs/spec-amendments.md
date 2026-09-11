@@ -191,8 +191,16 @@ the moment the app opens, and the booking screen re-reads itself when its countd
 neither reaches a phone in a pocket. Pre-launch item 90 records it, and names an approval email as
 the cheapest thing that would close it.
 
-The window is capped at the rental start: a booking approved twenty minutes before pickup has twenty
-minutes, not two hours.
+**The window is never shortened to fit the rental. The approval is refused instead (2026-09-11).**
+A gallery may answer a request only up to `rental start − payment window`; past that the car is back
+on the market and the request expires unanswered. It used to be capped instead, so a booking approved
+twenty minutes before pickup got twenty minutes while the platform called it a two-hour window.
+
+That made the two settings dependent on each other, and forced the minimum lead time up from 120
+minutes to **240**: the gap between the lead time and the payment window is the whole of the time a
+gallery has to answer a request made at the earliest a customer may book for, and at 120/120 it was
+zero. Startup now refuses a configuration where the lead time does not strictly exceed the window.
+The second two hours is an engineering proposal awaiting the owner — pre-launch item 92.
 
 ### Free cancellation
 

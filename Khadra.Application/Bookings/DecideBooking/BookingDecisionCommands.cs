@@ -102,6 +102,7 @@ public sealed class BookingDecisionHandlers(
     DealerMembershipResolver membership,
     IBookingReader reader,
     DealerTeamNotifier team,
+    BookingEmailDispatcher emails,
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<ApproveBookingCommand, Result<BookingDto, Error>>,
@@ -121,12 +122,30 @@ public sealed class BookingDecisionHandlers(
         if (approved.IsFailure)
             return approved.Error;
 
-        return await CommitAsync(
+        var committed = await CommitAsync(
             loaded.Value,
             request.ActorUserId,
             NotificationKind.BookingApproved,
             cancellationToken,
             NotificationKind.YourBookingApproved);
+
+        if (committed.IsFailure)
+            return committed;
+
+        // AFTER the commit, and its outcome is deliberately discarded.
+        //
+        // The decision is already saved; a mail server having a bad minute cannot be allowed to
+        // report failure for something that happened, because the gallery would retry and be told
+        // the booking is not awaiting a decision. The dispatcher logs what went wrong and the
+        // approval stands either way.
+        //
+        // It is the only channel that reaches a customer who is not holding their phone. There is no
+        // push (item 73) and the deposit is owed within the frozen payment window; item 90 records
+        // how much rides on this message arriving.
+        var context = await reader.ContextAsync(loaded.Value.Id, cancellationToken);
+        await emails.SendApprovalAsync(committed.Value, context, request.Note, cancellationToken);
+
+        return committed;
     }
 
     public async Task<Result<BookingDto, Error>> Handle(RejectBookingCommand request, CancellationToken cancellationToken)

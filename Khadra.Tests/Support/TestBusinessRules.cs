@@ -22,10 +22,14 @@ internal static class TestBusinessRules
     // the owner on 2026-09-11.
     public const int PaymentWindowHours = 2;
 
-    // How far ahead of NOW a rental may start. A different rule that happens to be the same length,
-    // and the reason both are parameters: a test that asserts one of them has to be able to move
+    // How far ahead of NOW a rental may start. Four hours since 2026-09-11: the two below it are
+    // now RELATED, not merely both configured. A gallery may not approve unless the customer can
+    // still have the whole payment window, so the gap between these two numbers is the time a
+    // gallery has to answer a last-minute request — two hours here, and zero if they were equal.
+    //
+    // They stay separate parameters because a test that asserts one of them has to be able to move
     // the other, or code wired to the wrong clock passes.
-    public const int MinimumBookingLeadTimeMinutes = 120;
+    public const int MinimumBookingLeadTimeMinutes = 240;
 
     public static BusinessRules Values(
         int? minimumRenterAge = MinimumRenterAge,
@@ -76,6 +80,10 @@ internal static class TestBusinessRules
     public static IReportingCalendar Calendar()
     {
         var calendar = Substitute.For<IReportingCalendar>();
+        // The zone it claims to convert to. A substitute answers null for a string, and the approval
+        // email prints this beside the deadline — so without it the email would name no zone at all
+        // and the test asserting it does would be the only thing that noticed.
+        calendar.TimeZoneId.Returns("Asia/Amman");
         calendar.Today(Arg.Any<DateTimeOffset>())
             .Returns(call => DateOnly.FromDateTime(call.Arg<DateTimeOffset>().ToOffset(TimeSpan.FromHours(3)).DateTime));
         calendar.DayOf(Arg.Any<DateTimeOffset>())

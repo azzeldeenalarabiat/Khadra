@@ -103,10 +103,13 @@ class VehicleCard extends ConsumerWidget {
                         children: [
                           Text(
                             formats.money(listing.dailyRate),
+                            // The DARK green the design keeps for money. A price is
+                            // the first thing a reader looks for on a card and it is
+                            // not something to press.
                             style: const TextStyle(
                               fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: KhadraColors.accent,
+                              fontWeight: FontWeight.w800,
+                              color: KhadraColors.price,
                             ),
                           ),
                           Text(
@@ -219,7 +222,7 @@ class _Rating extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.star_rounded, size: 15, color: KhadraColors.warn),
+        const Icon(Icons.star_rounded, size: 15, color: KhadraColors.star),
         const SizedBox(width: 3),
         LatinRun(
           gallery.averageRating!.toStringAsFixed(1),

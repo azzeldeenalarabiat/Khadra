@@ -135,7 +135,9 @@ class _ImagePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-        color: KhadraColors.neutral100,
+        // The design's own empty-frame grey, a hair off the chip fill beside it so a
+        // missing photograph reads as a gap rather than as a surface.
+        color: KhadraColors.imagePlaceholder,
         child: Center(
           child: spinning
               ? const SizedBox(
@@ -275,6 +277,9 @@ class KhadraCard extends StatelessWidget {
         color: background ?? KhadraColors.surface,
         borderRadius: Radii.card,
         border: Border.all(color: borderColor ?? KhadraColors.neutral200),
+        // The design's single shadow, and it is almost nothing: surfaces are
+        // separated by the border, and this only lifts the card a hair off the page.
+        boxShadow: Shadows.card,
       ),
       padding: padding,
       child: child,
@@ -535,7 +540,7 @@ class KhadraStars extends StatelessWidget {
                   ? Icons.star_half_rounded
                   : Icons.star_outline_rounded,
           size: size,
-          color: rating == null ? KhadraColors.neutral300 : KhadraColors.warn,
+          color: rating == null ? KhadraColors.neutral300 : KhadraColors.star,
         );
 
         if (onChanged == null) return star;

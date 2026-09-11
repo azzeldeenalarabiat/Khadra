@@ -57,13 +57,23 @@ public sealed record BusinessRules(
     // price it was made under, so a long horizon means honouring a rate the gallery set months ago.
     int MaxAdvanceBookingDays,
     // The soonest a rental may start, counted from the moment the request is made. Settled by the
-    // owner at 120 minutes on 2026-09-07.
+    // owner at 120 minutes on 2026-09-07 and raised to 240 on 2026-09-11.
     //
-    // It exists because every window on a booking is capped at the rental start: without a floor, a
+    // It exists because every window on a booking ends at the rental start: without a floor, a
     // request made twenty minutes before pickup gives the dealer twenty minutes to answer, the
     // customer whatever is left to pay, and no free cancellation at all -- while the platform is
     // telling that same customer they have a payment window and the gallery that it has an answer
     // window. A lead time is what makes those promises keepable.
+    //
+    // It had to GROW when the owner ruled that an approval must leave the customer their whole
+    // payment window. The two are no longer independent: a gallery may answer only up to
+    // `rental start - PaymentWindow`, so the DIFFERENCE between this number and that one is the
+    // entire time a gallery has to answer a request made at the earliest a customer may book for.
+    // Equal values give it zero and every such request is born unapprovable, which is why startup
+    // refuses a configuration where this does not strictly exceed PaymentWindowHours.
+    //
+    // 240 is two hours of payment window plus two hours for a rental office to notice and answer.
+    // The second half is an engineering proposal, not an owner's figure -- see pre-launch item 92.
     int MinimumBookingLeadTimeMinutes,
     // The longest a single rental may run, in Amman calendar days -- the same days the rental is
     // BILLED in, so the number a customer is refused on is the number they were quoted.

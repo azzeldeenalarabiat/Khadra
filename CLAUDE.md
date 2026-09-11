@@ -86,4 +86,24 @@ everywhere else and this screen is not the exception. The name is read live and 
 filter, deliberately, so that deletion does not become the one reason a customer can tell apart. See
 pre-launch items 87-89 and `IShortlistReader`.
 
+**A gallery may not approve a booking late (2026-09-11).** An approval must leave the customer the
+WHOLE frozen `BookingTerms.PaymentWindow` before the rental starts, so `DecisionDeadline` is capped at
+`Period.Start - PaymentWindow` rather than at the rental start. Putting the rule in that one column is
+what keeps the availability predicate, the settlement sweep, the DTO flags and the console countdown
+correct without any of them being touched. `Approve` restates the invariant, which is NOT redundant
+for rows created before the change. Two consequences: `MinimumBookingLeadTimeMinutes` must STRICTLY
+exceed `PaymentWindowHours` (validated at startup; 240 against 120 today, and the extra two hours are
+an engineering proposal — pre-launch item 92), and an approval now emails the customer, after the
+commit, with failures logged and swallowed, because a mail server cannot be allowed to undo a
+decision a gallery has made.
+
+**The customer app's visual source of truth is the design handoff (2026-09-11)**, not
+`Khadra.Dashboard/src/styles/_tokens.scss`. `KhadraColors`, `Radii`, `Shadows` and `KhadraTheme` in
+`Khadra.Mobile/lib/core/theme/khadra_theme.dart` carry it, and NOTHING in that app names a colour or
+a radius outside that file — no `Color(0x...)`, no `BorderRadius.circular` in a screen. Keep it that
+way: it is what made adopting the handoff a change to a token list rather than a sweep through thirty
+screens. Latin is Manrope, Arabic is Noto Kufi Arabic, and the fallback ORDER is load-bearing because
+Kufi carries Latin too. The handoff is authoritative for LOOK ONLY: its BOOKING FLOW artboard shows
+pay-before-approval and a simulated declined payment, and this platform has ruled out both.
+
 **Minimum renter age: settled at 21** by the owner and enforced (`BusinessRules:MinimumRenterAge`, `RenterAgePolicy`). The spec still says "value pending Section 2 decision" in §5.1 and lists it as open in §2.2 — the document has not caught up with the decision. The code is right; the spec needs a revision.

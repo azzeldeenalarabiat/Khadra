@@ -39,10 +39,12 @@ public static class BookingWindowPolicy
         if (period.Start <= now)
             return UnitResult.Failure(BookingErrors.PeriodInThePast);
 
-        // The floor. Every window a booking carries -- the dealer's answer, the customer's payment,
-        // free cancellation -- is capped at the rental start, so without this they all collapse
-        // together on a booking made minutes before pickup, while the platform is still promising
-        // the customer a full payment window and the gallery a full answer window.
+        // The floor, and since 2026-09-11 it carries a second job. A booking's windows all end at
+        // the rental start, so without a floor they collapse together on a request made minutes
+        // before pickup. And because a gallery may no longer approve unless the customer can still
+        // have the WHOLE payment window, the gap between this floor and that window is the only time
+        // a gallery gets to answer a last-minute request -- which is why the two are validated at
+        // startup to be different numbers, and why moving one is a decision about the other.
         if (period.Start < now.Add(minimumLeadTime))
             return UnitResult.Failure(BookingErrors.TooSoon(minimumLeadTime));
 

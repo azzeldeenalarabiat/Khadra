@@ -490,7 +490,9 @@ public sealed class CreateBookingTests
             context.Command(pickupAt: Now.AddMinutes(90)), CancellationToken.None);
 
         Assert.Equal("booking.too_soon", result.Error.Code);
-        Assert.Contains("2 hours", result.Error.Message, StringComparison.Ordinal);
+        // The configured lead time, in the sentence. Four hours since 2026-09-11, when it had to grow
+        // past the payment window so a gallery would have time to answer a last-minute request.
+        Assert.Contains("4 hours", result.Error.Message, StringComparison.Ordinal);
         Assert.Empty(context.Added);
     }
 
@@ -498,11 +500,21 @@ public sealed class CreateBookingTests
     public async Task A_rental_exactly_at_the_lead_time_is_accepted()
     {
         var context = new Context();
+        // Wound back two hours, so a pickup exactly four hours later lands at three in the afternoon
+        // in Amman rather than on the stroke of closing. The lead time is what is being tested; the
+        // gallery's opening hours are a separate refusal with its own tests.
+        context.Clock.UtcNow = Now.AddHours(-2);
+        var pickupAt = context.Clock.UtcNow.AddHours(4);
 
         var result = await context.Handler().Handle(
-            context.Command(pickupAt: Now.AddHours(2)), CancellationToken.None);
+            context.Command(pickupAt: pickupAt), CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+
+        // And the gallery gets the difference between the two rules to answer in: four hours of lead
+        // time less the two-hour payment window. Zero would mean this booking was born unapprovable.
+        var booking = Assert.Single(context.Added);
+        Assert.Equal(pickupAt.AddHours(-2), booking.DecisionDeadline);
     }
 
     [Fact]

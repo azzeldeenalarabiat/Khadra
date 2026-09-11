@@ -124,6 +124,19 @@ public static class BookingErrors
     public static readonly Error DecisionWindowElapsed =
         Error.Conflict("booking.decision_window_elapsed", "This request expired before it was answered.");
 
+    /// <summary>The rental starts too soon for anybody to both answer and be paid.</summary>
+    /// <remarks>
+    /// Not reachable through the ordinary booking screens: BookingWindowPolicy keeps the rental
+    /// start beyond the lead time, and the lead time is validated at startup to EXCEED the payment
+    /// window, so there is always room for a decision and a payment. It exists because the aggregate
+    /// will not take that on trust — and because the day business rules become admin-editable
+    /// (pre-launch item 25) a pair of numbers can arrive that never passed a startup check.
+    /// </remarks>
+    public static readonly Error NoTimeToDecide =
+        Error.Validation(
+            "booking.no_time_to_decide",
+            "That rental starts too soon for the office to answer and for the deposit to be paid.");
+
     public static readonly Error NotAwaitingPayment =
         Error.Conflict("booking.not_awaiting_payment", "This booking is not awaiting payment.");
 

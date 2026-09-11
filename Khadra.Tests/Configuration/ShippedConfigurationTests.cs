@@ -59,7 +59,16 @@ public sealed class ShippedConfigurationTests
         var rules = Settings().GetProperty("BusinessRules");
 
         Assert.Equal(2, rules.GetProperty("PaymentWindowHours").GetInt32());
-        Assert.True(rules.TryGetProperty("MinimumBookingLeadTimeMinutes", out _));
+
+        // The RELATIONSHIP between the two, not the lead time's value, which AppConfigTests owns.
+        // Since 2026-09-11 an approval must leave the customer their whole payment window, so a lead
+        // time no longer than that window means every booking made at the earliest a customer may
+        // book for is impossible to approve — and the startup validation refuses to boot on it.
+        var leadTime = rules.GetProperty("MinimumBookingLeadTimeMinutes").GetInt32();
+        var paymentWindow = rules.GetProperty("PaymentWindowHours").GetInt32() * 60;
+        Assert.True(
+            leadTime > paymentWindow,
+            $"MinimumBookingLeadTimeMinutes ({leadTime}) must exceed the payment window ({paymentWindow} minutes).");
     }
 
     /// <summary>A hundred saved cars, settled by the owner on 2026-09-11.</summary>

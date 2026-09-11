@@ -81,21 +81,29 @@ public sealed class PaymentWindowTests
         Assert.Equal(Now.AddHours(8), booking.PaymentDeadline);
     }
 
-    /// <summary>The window still cannot outlive the rental it is holding.</summary>
+    /// <summary>An approval too close to pickup is REFUSED, not shortened.</summary>
     /// <remarks>
-    /// Shortening it to two hours makes this cap bite less often, not never: an approval ninety
-    /// minutes before pickup still gives ninety minutes, not two hours.
+    /// This test asserted the opposite until 2026-09-11. The window used to be capped at the rental
+    /// start, so a gallery approving ninety minutes before pickup handed the customer ninety minutes
+    /// and the platform called it a two-hour window. The owner's answer is that a gallery may not
+    /// accept a booking it cannot give the customer a fair chance to pay for — and the rule lives on
+    /// DecisionDeadline, so the car is already back on the market by then.
     /// </remarks>
     [Fact]
-    public async Task An_approval_close_to_pickup_gives_only_the_time_that_is_left()
+    public async Task An_approval_too_close_to_pickup_is_refused_rather_than_shortened()
     {
-        var start = Now.AddMinutes(90);
+        var start = Now.AddHours(8);
         var period = DateRange.Create(start, start.AddDays(2)).Value;
         var booking = await ApprovableBookingAsync(period);
 
-        Assert.True(booking.Approve(Id.New(), Now).IsSuccess);
+        // The gallery gets until two hours before pickup, and not a moment past it.
+        Assert.Equal(start.AddHours(-2), booking.DecisionDeadline);
 
-        Assert.Equal(start, booking.PaymentDeadline);
+        // Answered ninety minutes out: inside the window the customer would need to pay.
+        var approved = booking.Approve(Id.New(), start.AddMinutes(-90));
+
+        Assert.Equal("booking.decision_window_elapsed", approved.Error.Code);
+        Assert.Null(booking.PaymentDeadline);
     }
 
     /// <summary>Nothing expires until the window has actually elapsed, and then it does.</summary>

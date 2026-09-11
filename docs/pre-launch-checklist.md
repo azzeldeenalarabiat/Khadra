@@ -2398,22 +2398,98 @@ customer finds out their request was approved by opening the app. Two hours is e
 — asleep, at work, driving. Every approval missed that way is a gallery's decision wasted, a car held
 for nothing, and a customer who believes they booked a car and did not.
 
-Three things already soften it and none of them close it:
+**An approval email was built on 2026-09-11 and closes most of this.** `BookingEmailDispatcher`
+sends the customer a bilingual message over the transport that already sends verification mail,
+naming the car, the reference, the deposit, and the deadline as an ABSOLUTE Amman date and time
+rather than only as a duration. It is sent after the commit and its failure is logged and swallowed:
+a mail server having a bad minute cannot undo a gallery's decision.
 
-- `GET /bookings/next` puts the deposit on the landing screen the moment the app opens, ranked above
-  everything else (`NextBookingReason.AwaitingPayment`).
-- The booking screen carries a live countdown and now re-reads the booking when that countdown runs
-  out, so the screen never contradicts itself.
-- The deadline is capped at the rental start, so a short window is never shorter than the rental is
-  far away.
+What is left:
 
-An email on approval would close most of it and is not built either; the notification table exists
-and only ever reaches the app.
+- **Item 38 (no mail queue, no retry) is now on the critical path.** One failed send is probably one
+  expired booking. The transport retries within a single call (`Email:MaxAttempts`) and nothing
+  retries after it returns.
+- **There is nowhere to link the customer to** (item 91), so the email names the reference and says
+  to open the app.
+- **Push is still the only channel that reaches a phone in a pocket** (item 73). Email complements it
+  and does not replace it: a customer who reads mail once a day is still a customer who misses a
+  two-hour window.
 
-**To close:** item 73 ships, or the owner accepts the loss rate with the landing surface alone. This
-is not a reason to lengthen the window — that decision is made — it is a reason the window needs a
-channel behind it.
+The other two surfaces already built: `GET /bookings/next` puts the deposit on the landing screen the
+moment the app opens, ranked above everything else; and the booking screen re-reads itself when its
+countdown runs out, so a spent clock never sits under "Deposit is due".
+
+**To close:** item 73 ships, or the owner accepts the loss rate with email and the landing surface.
+This is not a reason to lengthen the window — that decision is made — it is a reason the window needs
+channels behind it.
 
 **Do not confuse this with `MinimumBookingLeadTimeMinutes`, also 120.** That one is how far ahead of
 now a rental may start. They are the same length today by coincidence and moving one must never move
 the other; `Khadra.Tests/Application/Bookings/PaymentWindowTests.cs` holds them apart.
+
+### 91. An approval email has nowhere to send the customer
+
+**Status:** open · **Raised:** 2026-09-11 · **Blocks:** the useful half of item 90
+
+`App:ClientBaseUrl` is the dealer and admin console. A customer following a link there lands on a
+sign-in that refuses them — worse than no link, because it reads as the platform being broken at the
+exact moment they are trying to pay.
+
+So `App:CustomerAppBaseUrl` exists and ships EMPTY, and while it is empty the approval email names the
+booking reference and tells the reader to open the app. That is true and useful, and it is one tap
+worse than it needs to be on a two-hour clock.
+
+**To close:** either a customer-facing web route that can show one booking, or an app link
+(`https://app.khadra.jo/bookings/{id}` with an Android `assetlinks.json` and an iOS
+`apple-app-site-association`, plus `flutter_deep_link` or the platform intent filters), then set the
+setting. The composer already renders the button the moment it is non-empty, and
+`BookingEmailComposerTests` covers both shapes.
+
+### 92. Two of the four hours' lead time are an engineering proposal, not a decision
+
+**Status:** open · **Raised:** 2026-09-11 · **Owner decision required**
+
+`BusinessRules:MinimumBookingLeadTimeMinutes` went from 120 to **240** on 2026-09-11. It was forced,
+but only half of it was decided.
+
+The owner ruled that a gallery may not approve unless the customer can still have the whole payment
+window. That makes the last approvable instant `rental start − 2 hours`, so the DIFFERENCE between
+the lead time and the payment window is the entire time a gallery has to answer a request made at the
+earliest a customer may book for. At 120 and 120 that difference was **zero**: every such request
+would have been born unapprovable, and the customer would have been told the office never responded.
+
+So the lead time had to exceed the payment window, and startup now refuses a configuration where it
+does not. Two hours of payment window is the owner's. The two hours on top — a rental office noticing
+and answering, with no push channel of its own either — is a guess made to keep the branch coherent.
+
+**What it costs the customer:** a car can no longer be booked for three hours from now. The earliest
+is four.
+
+**To close:** the owner names the time a gallery gets to answer a last-minute request. Anything above
+zero is valid configuration; anything at or below the payment window is refused at boot.
+
+### 93. The PDF upload path has never been exercised on a real device
+
+**Status:** open · **Raised:** 2026-09-11 · **Not a defect, a gap in what has been proved**
+
+PDF selection and upload shipped on 2026-09-11: `DocumentPicker` offers a file entry when the server
+advertises a non-image type, reads the content type from the file's leading bytes, and checks it and
+the size against `/app-config` before anything leaves the phone.
+
+**What has been proved:** the sheet, its server-driven labels and the whole accept/refuse decision, by
+unit tests and by driving the running app in a browser in both languages.
+
+**What has NOT been proved, and must not be described as end-to-end until it has:** the native
+ANDROID path, start to finish, on a real handset —
+
+1. the system file picker opening with the right filter,
+2. a PDF chosen from Drive, Downloads and a third-party file manager,
+3. the bytes reaching `POST /customers/me/documents` intact,
+4. the row persisting with `content_type = application/pdf` and the right size,
+5. the document reopening through a signed link and rendering.
+
+The browser harness cannot do it: `file_picker` opens the chooser with `input.click()`, which a
+browser refuses without a trusted user gesture, and the harness cannot produce one against a Flutter
+canvas. Steps 3–5 are equally unproven on iOS.
+
+**To close:** run the five steps on an Android device and an iPhone, and record the result here.

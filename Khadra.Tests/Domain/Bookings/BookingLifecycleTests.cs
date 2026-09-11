@@ -26,18 +26,47 @@ public sealed class BookingCreationTests
     }
 
     /// <summary>
-    /// A request for a car due out in an hour cannot sit unanswered for two days: the answer window
-    /// is capped at the rental start, the same way every other window on a booking is.
+    /// A request cannot sit unanswered up to the moment the car was due out: the answer window is
+    /// capped at the last instant an approval could still give the customer their whole payment
+    /// window.
     /// </summary>
     [Fact]
-    public void The_answer_window_never_runs_past_the_rental_start()
+    public void The_answer_window_stops_where_the_payment_window_has_to_begin()
     {
-        var start = Now.AddHours(1);
+        // A rental starting in three hours, with a twenty-minute payment window on the factory's
+        // terms. The gallery does NOT get until the rental starts: it gets until the last instant an
+        // approval could still hand the customer their whole twenty minutes.
+        var start = Now.AddHours(3);
         var period = DateRange.Create(start, start.AddDays(2)).Value;
+        var terms = Build.Terms(paymentWindow: TimeSpan.FromMinutes(20));
 
-        var booking = Build.Booking(period: period);
+        var booking = Build.Booking(period: period, terms: terms);
 
-        Assert.Equal(start, booking.DecisionDeadline);
+        Assert.Equal(start.AddMinutes(-20), booking.DecisionDeadline);
+    }
+
+    /// <summary>
+    /// A rental so near that nobody could both answer and be paid is refused outright.
+    /// </summary>
+    /// <remarks>
+    /// Unreachable through the booking screens — <c>BookingWindowPolicy</c> keeps the start beyond a
+    /// lead time that is validated at startup to exceed the payment window — and the aggregate
+    /// refuses it anyway, because that validation stops being the only route in on the day business
+    /// rules become admin-editable.
+    /// </remarks>
+    [Fact]
+    public void A_rental_too_near_for_a_decision_and_a_payment_is_refused()
+    {
+        var start = Now.AddMinutes(15);
+        var period = DateRange.Create(start, start.AddDays(2)).Value;
+        var terms = Build.Terms(paymentWindow: TimeSpan.FromMinutes(20));
+
+        var booking = Booking.Create(
+            Id.New(), Id.New(), Id.New(), period, PickupMethod.SelfPickup, null,
+            Build.Pricing(days: 2, pickupDate: Build.AmmanDate(start)), terms,
+            PaymentOption.DepositOnly, Now);
+
+        Assert.Equal("booking.no_time_to_decide", booking.Error.Code);
     }
 
     [Fact]
@@ -269,31 +298,128 @@ public sealed class BookingApprovalTests
         Assert.Contains(booking.DomainEvents, domainEvent => domainEvent is BookingApproved);
     }
 
+    /// <summary>
+    /// The payment window is never SHORTENED to fit the rental. The approval is refused instead.
+    /// </summary>
+    /// <remarks>
+    /// This asserted the opposite until 2026-09-11. A late approval used to hand the customer
+    /// whatever time was left — ten minutes, once — and the owner's answer is that a gallery may not
+    /// accept a booking it cannot give the customer a fair chance to pay for.
+    /// </remarks>
     [Fact]
-    public void The_payment_window_never_runs_past_the_rental_start()
+    public void An_approval_that_could_not_give_the_whole_payment_window_is_refused()
     {
-        // Approved ten minutes before pickup: a full 20-minute window would leave the deposit falling
-        // due after the car was already meant to be collected.
-        var start = Now.AddMinutes(10);
+        // Requested with plenty of room, and answered ninety minutes before pickup — inside the two
+        // hours the customer would need to pay.
+        var start = Now.AddHours(8);
         var period = DateRange.Create(start, start.AddDays(2)).Value;
-        var booking = Build.Booking(period: period);
+        var terms = Build.Terms(paymentWindow: TimeSpan.FromHours(2));
+        var booking = Build.Booking(period: period, terms: terms);
 
-        booking.Approve(Id.New(), Now);
+        var approved = booking.Approve(Id.New(), start.AddMinutes(-90));
 
-        Assert.Equal(start, booking.PaymentDeadline);
+        Assert.Equal("booking.decision_window_elapsed", approved.Error.Code);
+        Assert.Same(BookingStatus.Requested, booking.Status);
+        Assert.Null(booking.PaymentDeadline);
     }
 
+    /// <summary>
+    /// A booking REQUESTED before 2026-09-11 is refused on the invariant rather than the column.
+    /// </summary>
+    /// <remarks>
+    /// Rows created under the old rule carry a decision deadline capped at the rental start, so the
+    /// stored column would happily let a gallery approve one in its last ninety minutes and hand the
+    /// customer a deposit falling due after they were due to collect the car. That is the whole
+    /// reason <c>Approve</c> restates a rule the column already encodes, and the only way to stage it
+    /// is to write the old value onto the row the way a migration-less deploy leaves it.
+    /// </remarks>
+    [Fact]
+    public void A_booking_requested_under_the_old_rule_is_still_refused_late()
+    {
+        var start = Now.AddHours(8);
+        var period = DateRange.Create(start, start.AddDays(2)).Value;
+        var terms = Build.Terms(paymentWindow: TimeSpan.FromHours(2));
+        var booking = Build.Booking(period: period, terms: terms);
+
+        // The pre-2026-09-11 value: capped at the rental start, not at the last approvable instant.
+        typeof(Booking).GetProperty(nameof(Booking.DecisionDeadline))!.SetValue(booking, start);
+
+        var approved = booking.Approve(Id.New(), start.AddMinutes(-90));
+
+        Assert.Equal("booking.decision_window_elapsed", approved.Error.Code);
+        Assert.Null(booking.PaymentDeadline);
+    }
+
+    /// <summary>With room to spare, the customer gets the window in full and not a minute less.</summary>
+    [Fact]
+    public void An_approval_in_time_gives_the_window_in_full()
+    {
+        var start = Now.AddHours(6);
+        var period = DateRange.Create(start, start.AddDays(2)).Value;
+        var terms = Build.Terms(paymentWindow: TimeSpan.FromHours(2));
+        var booking = Build.Booking(period: period, terms: terms);
+
+        Assert.True(booking.Approve(Id.New(), Now.AddHours(1)).IsSuccess);
+
+        Assert.Equal(Now.AddHours(3), booking.PaymentDeadline);
+        Assert.True(booking.PaymentDeadline <= start);
+    }
+
+    /// <summary>
+    /// One tick before the last approvable instant still works, and the deadline lands exactly on
+    /// the rental start.
+    /// </summary>
+    [Fact]
+    public void The_last_approvable_instant_leaves_the_deposit_due_exactly_at_pickup()
+    {
+        var start = Now.AddHours(5);
+        var period = DateRange.Create(start, start.AddDays(2)).Value;
+        var terms = Build.Terms(paymentWindow: TimeSpan.FromHours(2));
+        var booking = Build.Booking(period: period, terms: terms);
+
+        // The deadline itself is exclusive; a tick inside it is not.
+        var lastMoment = booking.DecisionDeadline.AddTicks(-1);
+        Assert.True(booking.Approve(Id.New(), lastMoment).IsSuccess);
+
+        Assert.Equal(start.AddTicks(-1), booking.PaymentDeadline);
+    }
+
+    /// <summary>And ON the deadline it is refused, because the car is already back on the market.</summary>
+    [Fact]
+    public void An_approval_on_the_deadline_itself_is_refused()
+    {
+        var start = Now.AddHours(5);
+        var period = DateRange.Create(start, start.AddDays(2)).Value;
+        var terms = Build.Terms(paymentWindow: TimeSpan.FromHours(2));
+        var booking = Build.Booking(period: period, terms: terms);
+
+        var approved = booking.Approve(Id.New(), booking.DecisionDeadline);
+
+        Assert.Equal("booking.decision_window_elapsed", approved.Error.Code);
+    }
+
+    /// <summary>
+    /// The free-cancellation window IS still capped at the rental start, and that cap still bites.
+    /// </summary>
+    /// <remarks>
+    /// Unlike the payment window, which is now guaranteed to fit before the start: this one begins
+    /// when the deposit clears, which can be the last minute of the payment window, so an hour of
+    /// free cancellation can still reach past the moment the car was due to be collected.
+    /// </remarks>
     [Fact]
     public void The_free_cancellation_window_never_runs_past_the_rental_start()
     {
-        // Paid 20 minutes before pickup: a full hour of free cancellation would let the customer
-        // walk away after the car was already due to be collected.
-        var start = Now.AddMinutes(20);
+        var start = Now.AddHours(3);
         var period = DateRange.Create(start, start.AddDays(2)).Value;
-        var booking = Build.Booking(period: period);
-        booking.Approve(Id.New(), Now);
+        var terms = Build.Terms(
+            paymentWindow: TimeSpan.FromHours(2),
+            freeCancellationWindow: TimeSpan.FromHours(1));
+        var booking = Build.Booking(period: period, terms: terms);
+        booking.Approve(Id.New(), Now.AddMinutes(30));
 
-        booking.ConfirmDepositPaid(Id.New(), Now);
+        // Paid half an hour before pickup: a full hour of free cancellation would let the customer
+        // walk away after the car was already due to be collected.
+        booking.ConfirmDepositPaid(Id.New(), start.AddMinutes(-30));
 
         Assert.Equal(start, booking.FreeCancellationDeadline);
     }

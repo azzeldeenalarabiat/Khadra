@@ -685,8 +685,8 @@ class _PriceBreakdown extends StatelessWidget {
             value: Text(formats.money(pricing.depositAmount)),
             valueStyle: const TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: KhadraColors.accent,
+              fontWeight: FontWeight.w800,
+              color: KhadraColors.price,
             ),
           ),
           KhadraDetailRow(

@@ -139,6 +139,16 @@ public static class DependencyInjection
             // collapse while the platform was still promising each of them in full.
             .Validate(options => options.MinimumBookingLeadTimeMinutes is > 0,
                 "BusinessRules: MinimumBookingLeadTimeMinutes must be set to a positive number of minutes.")
+            // And STRICTLY longer than the payment window. Since 2026-09-11 a gallery may not
+            // approve unless the customer can still have the whole window to pay, so the gap between
+            // the request and the rental start is what a gallery gets to answer in. Equal values
+            // give it zero: every request made at the minimum lead time would be born unapprovable,
+            // and the customer would be told the office never responded. The difference between
+            // these two numbers IS the decision window, and the owner sets it by moving them.
+            .Validate(
+                options => options.MinimumBookingLeadTimeMinutes > options.PaymentWindowHours * 60,
+                "BusinessRules: MinimumBookingLeadTimeMinutes must be greater than PaymentWindowHours "
+                + "expressed in minutes, or a booking made at the minimum lead time can never be approved.")
             .Validate(options => options.MaxRentalDays is > 0,
                 "BusinessRules: MaxRentalDays must be set to a positive number of days.")
             // Present, not positive: 0 is the owner's to choose and says a gallery is late at the
@@ -522,5 +532,6 @@ public static class DependencyInjection
         }
 
         services.AddSingleton<IAuthEmailComposer, AuthEmailComposer>();
+        services.AddSingleton<IBookingEmailComposer, BookingEmailComposer>();
     }
 }

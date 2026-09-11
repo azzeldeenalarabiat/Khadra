@@ -65,6 +65,42 @@ flutter:
   assets:
     - assets/brand/
 
+  # The approved design is SET in these. A system UI face is a different typeface
+  # on every phone the app runs on, so the design would be approximate everywhere
+  # and identical nowhere.
+  #
+  # Two families, because one cannot do it: Manrope contains no Arabic at all —
+  # not one letter, not the Arabic comma — and Noto Kufi Arabic is the face the
+  # handoff itself names for Arabic. Flutter falls back per GLYPH, so Manrope
+  # sets the Latin and the figures and Kufi catches every Arabic character,
+  # including inside a mixed sentence. See KhadraTheme for the ordering, which is
+  # load-bearing.
+  #
+  # Both are SIL Open Font License 1.1, which permits bundling in an application.
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-400.ttf
+          weight: 400
+        - asset: assets/fonts/Manrope-500.ttf
+          weight: 500
+        - asset: assets/fonts/Manrope-600.ttf
+          weight: 600
+        - asset: assets/fonts/Manrope-700.ttf
+          weight: 700
+        - asset: assets/fonts/Manrope-800.ttf
+          weight: 800
+    - family: Noto Kufi Arabic
+      fonts:
+        - asset: assets/fonts/NotoKufiArabic-400.ttf
+          weight: 400
+        - asset: assets/fonts/NotoKufiArabic-500.ttf
+          weight: 500
+        - asset: assets/fonts/NotoKufiArabic-600.ttf
+          weight: 600
+        - asset: assets/fonts/NotoKufiArabic-700.ttf
+          weight: 700
+
   # NO BUNDLED FONT, matching the console's decision in _tokens.scss: font fallback is
   # per GLYPH, so Latin renders in the platform's UI face while Arabic -- which that
   # face may not cover at all -- picks the first fallback that does. Naming the
