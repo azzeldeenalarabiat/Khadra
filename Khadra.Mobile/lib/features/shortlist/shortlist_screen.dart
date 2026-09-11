@@ -11,7 +11,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
-import '../catalogue/vehicle_card.dart';
+import '../catalogue/vehicle_row.dart';
 import 'shortlist_providers.dart';
 
 /// The cars a customer has saved.
@@ -135,7 +135,11 @@ class _SavedListState extends ConsumerState<_SavedList> {
       itemCount: value.length,
       separatorBuilder: (_, __) => const SizedBox(height: Space.lg),
       itemBuilder: (_, index) => switch (value[index]) {
-        SavedVehicle(listing: final listing?) => VehicleCard(listing: listing),
+        SavedVehicle(listing: final listing?) => VehicleRow(
+            listing: listing,
+            dense: true,
+            trailing: VehicleRowSaveButton(vehicleId: listing.vehicleId),
+          ),
         final gone => _Unavailable(saved: gone, formats: formats),
       },
     );
@@ -218,7 +222,7 @@ class _UnavailableState extends ConsumerState<_Unavailable> {
                         horizontal: Space.sm, vertical: 4),
                     decoration: BoxDecoration(
                       color: KhadraColors.neutral100,
-                      borderRadius: const BorderRadius.all(Radii.sm),
+                      borderRadius: Radii.pill,
                     ),
                     child: Text(
                       l10n.shortlistUnavailable.toUpperCase(),

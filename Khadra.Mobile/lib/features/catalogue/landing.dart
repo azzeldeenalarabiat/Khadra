@@ -81,7 +81,7 @@ class _NextBookingCard extends ConsumerWidget {
               height: 52,
               child: KhadraImage(
                 url: booking.vehicle?.coverImageUrl,
-                borderRadius: const BorderRadius.all(Radii.md),
+                borderRadius: Radii.field,
               ),
             ),
             const SizedBox(width: Space.md),

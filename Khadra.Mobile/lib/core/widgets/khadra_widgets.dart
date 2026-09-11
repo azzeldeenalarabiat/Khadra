@@ -77,6 +77,35 @@ void khadraLeave(BuildContext context, String fallback) {
 /// renders nothing at all in that case, which leaves a customer on a pushed screen
 /// with no navigation and no tabs: on the web there is no way out but the browser's
 /// own back, and on a phone the gesture quits the app.
+/// The title of a screen that is somewhere you ARRIVE, not somewhere you opened.
+///
+/// The design has two title sizes and one rule for choosing: a screen you can go
+/// back from wears 16, and a screen that is the root of a tab wears 20. The rule
+/// is about the back arrow, not about which screen it is — so Saved cars, which
+/// the handoff draws as a tab at 20, is 16 here because this app reaches it from
+/// Profile and it has an arrow.
+///
+/// 20 fits at 375 with room to spare; the app bar has no leading control on these
+/// screens, which is the whole reason the design can afford the larger size.
+class KhadraLargeTitle extends StatelessWidget {
+  const KhadraLargeTitle(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.4,
+          color: KhadraColors.text,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+}
+
 class KhadraBack extends StatelessWidget {
   const KhadraBack({super.key, required this.fallback});
 
@@ -84,7 +113,19 @@ class KhadraBack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IconButton(
-        icon: const BackButtonIcon(),
+        // A plain CHEVRON, which is what the design draws, rather than Material's
+        // arrow-with-a-shaft. It is on fifteen screens, it is the single most
+        // repeated glyph in the app, and it is one icon to change.
+        //
+        // `Directionality` mirrors it: in Arabic the chevron points right, which
+        // is the direction "back" actually is. `BackButtonIcon` did this for us
+        // and naming an icon directly gives it up, so it is done here instead.
+        icon: Icon(
+          Directionality.of(context) == TextDirection.rtl
+              ? Icons.chevron_right
+              : Icons.chevron_left,
+          size: 26,
+        ),
         tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         onPressed: () => khadraLeave(context, fallback),
       );
@@ -220,32 +261,48 @@ class KhadraEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(Space.xl),
+        padding: const EdgeInsets.symmetric(
+            horizontal: Space.xl, vertical: Space.xxl + Space.lg),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 52, color: KhadraColors.neutral300),
+            // The icon sits IN something. A bare 52px glyph floating above the
+            // text reads as a failure; the design's rounded grey tile reads as a
+            // place where something will be.
+            Container(
+              width: 54,
+              height: 54,
+              decoration: const BoxDecoration(
+                color: KhadraColors.neutral100,
+                borderRadius: Radii.card,
+              ),
+              child: Icon(icon, size: 24, color: KhadraColors.neutral500),
+            ),
             const SizedBox(height: Space.lg),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
                 color: KhadraColors.text,
               ),
             ),
             if (body != null) ...[
-              const SizedBox(height: Space.sm),
+              const SizedBox(height: 7),
               Text(
                 body!,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    color: KhadraColors.neutral600, fontSize: 15, height: 1.45),
+                  color: KhadraColors.neutral600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  height: 1.5,
+                ),
               ),
             ],
             if (action != null) ...[
-              const SizedBox(height: Space.xl),
+              const SizedBox(height: 18),
               action!,
             ],
           ],
@@ -262,6 +319,7 @@ class KhadraCard extends StatelessWidget {
     this.onTap,
     this.borderColor,
     this.background,
+    this.borderRadius = Radii.card,
   });
 
   final Widget child;
@@ -270,12 +328,16 @@ class KhadraCard extends StatelessWidget {
   final Color? borderColor;
   final Color? background;
 
+  /// `Radii.card` by default; `Radii.row` for a list of papers or of a gallery's
+  /// cars, which the design draws a step tighter.
+  final BorderRadius borderRadius;
+
   @override
   Widget build(BuildContext context) {
     final body = Container(
       decoration: BoxDecoration(
         color: background ?? KhadraColors.surface,
-        borderRadius: Radii.card,
+        borderRadius: borderRadius,
         border: Border.all(color: borderColor ?? KhadraColors.neutral200),
         // The design's single shadow, and it is almost nothing: surfaces are
         // separated by the border, and this only lifts the card a hair off the page.
@@ -291,7 +353,7 @@ class KhadraCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: Radii.card,
+        borderRadius: borderRadius,
         child: body,
       ),
     );
@@ -317,19 +379,21 @@ class KhadraBadge extends StatelessWidget {
         padding: const EdgeInsetsDirectional.only(
           start: Space.sm,
           end: Space.sm,
-          top: 5,
-          bottom: 5,
+          top: 4,
+          bottom: 4,
         ),
+        // A SOFT-cornered rectangle filled with a wash of its own colour, and no
+        // border. The design carries state on the fill alone; an outline as well
+        // turns a label into a second button on a card that already has one.
         decoration: BoxDecoration(
-          color: colour.withValues(alpha: 0.10),
-          borderRadius: Radii.chip,
-          border: Border.all(color: colour.withValues(alpha: 0.28)),
+          color: colour.withValues(alpha: 0.12),
+          borderRadius: Radii.pill,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 13, color: colour),
+              Icon(icon, size: 11, color: colour),
               const SizedBox(width: 4),
             ],
             Flexible(
@@ -339,8 +403,9 @@ class KhadraBadge extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: colour,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
                 ),
               ),
             ),

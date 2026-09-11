@@ -64,7 +64,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     if (!session.isSignedIn) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.notificationsTitle)),
+        appBar: AppBar(title: KhadraLargeTitle(l10n.notificationsTitle)),
         body: KhadraEmpty(
           icon: Icons.notifications_off_outlined,
           title: l10n.bookingsSignedOutTitle,
@@ -84,7 +84,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.notificationsTitle),
+        title: KhadraLargeTitle(l10n.notificationsTitle),
         actions: [
           if (feed.hasValue && unread > 0)
             TextButton(

@@ -16,7 +16,7 @@ import '../auth/auth_form_widgets.dart';
 import 'date_range_sheet.dart';
 import 'search_providers.dart';
 import '../shortlist/save_button.dart';
-import 'vehicle_card.dart';
+import 'vehicle_row.dart';
 
 /// One car in full, with the gallery behind it.
 ///
@@ -421,7 +421,7 @@ class _GallerySummary extends ConsumerWidget {
                     child: KhadraImage(
                       url: gallery.logoUrl,
                       fit: BoxFit.contain,
-                      borderRadius: const BorderRadius.all(Radii.sm),
+                      borderRadius: Radii.pill,
                     ),
                   ),
                 ),

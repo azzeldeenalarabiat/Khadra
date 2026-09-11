@@ -720,6 +720,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Verify your email address before booking. Your booking updates go there.';
 
   @override
+  String get bookingsViewBooking => 'View booking';
+
+  @override
   String get bookingsTitle => 'My bookings';
 
   @override

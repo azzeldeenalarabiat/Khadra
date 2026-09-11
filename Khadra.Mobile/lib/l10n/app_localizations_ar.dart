@@ -755,6 +755,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'فعّل بريدك الإلكتروني قبل الحجز. تحديثات حجزك تصل إليه.';
 
   @override
+  String get bookingsViewBooking => 'عرض الحجز';
+
+  @override
   String get bookingsTitle => 'حجوزاتي';
 
   @override

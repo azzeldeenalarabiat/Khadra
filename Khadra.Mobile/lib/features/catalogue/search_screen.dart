@@ -17,7 +17,7 @@ import 'date_range_sheet.dart';
 import 'filter_sheet.dart';
 import 'landing.dart';
 import 'search_providers.dart';
-import 'vehicle_card.dart';
+import 'vehicle_row.dart';
 
 /// The shop window.
 ///
@@ -304,7 +304,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         sliver: SliverList.separated(
           itemCount: results.items.length,
           separatorBuilder: (_, __) => const SizedBox(height: Space.lg),
-          itemBuilder: (_, index) => VehicleCard(listing: results.items[index]),
+          itemBuilder: (_, index) => VehicleRow(
+            listing: results.items[index],
+            trailing: VehicleRowSaveButton(
+              vehicleId: results.items[index].vehicleId,
+            ),
+          ),
         ),
       ),
       SliverToBoxAdapter(

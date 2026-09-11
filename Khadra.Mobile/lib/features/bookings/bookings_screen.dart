@@ -65,7 +65,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
 
     if (!session.isSignedIn) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.bookingsTitle)),
+        appBar: AppBar(title: KhadraLargeTitle(l10n.bookingsTitle)),
         body: KhadraEmpty(
           icon: Icons.lock_outline,
           title: l10n.bookingsSignedOutTitle,
@@ -85,7 +85,7 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.bookingsTitle),
+        title: KhadraLargeTitle(l10n.bookingsTitle),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: SizedBox(
@@ -279,11 +279,11 @@ class _BookingRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 76,
-                height: 58,
+                width: 92,
+                height: 74,
                 child: KhadraImage(
                   url: booking.vehicle?.coverImageUrl,
-                  borderRadius: const BorderRadius.all(Radii.md),
+                  borderRadius: Radii.field,
                 ),
               ),
               const SizedBox(width: Space.md),
@@ -291,69 +291,104 @@ class _BookingRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      // The car can be null: a booking is a financial record that
-                      // outlives the listing behind it.
-                      booking.vehicle?.title ?? booking.dealerName,
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    // The car and its state on ONE line, which is the design's
+                    // shape and also the order somebody reads in: which car, and
+                    // what is happening to it.
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            // The car can be null: a booking is a financial record
+                            // that outlives the listing behind it.
+                            booking.vehicle?.title ?? booking.dealerName,
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w800),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: Space.sm),
+                        KhadraBadge(
+                          label: BookingPresentation.label(l10n, booking.status),
+                          colour: BookingPresentation.colour(booking.status),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       booking.dealerName,
                       style: const TextStyle(
-                          color: KhadraColors.neutral600, fontSize: 12),
+                        color: KhadraColors.neutral600,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: Space.xs),
+                    const SizedBox(height: 6),
                     Text(
                       // The DAYS figure is frozen on the booking. Recomputing it
                       // from the two instants would answer a different question
                       // from the one the invoice was written against.
                       '${formats.dateRange(booking.periodStart, booking.periodEnd)} · ${l10n.bookDays(booking.days)}',
                       style: const TextStyle(
-                          color: KhadraColors.neutral600, fontSize: 12),
+                        color: KhadraColors.neutral800,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(height: 5),
+                    Text(
+                      formats.moneyOf(booking.totalPrice, booking.currency),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: KhadraColors.price,
+                      ),
+                    ),
+                    if (booking.hasLiveDispute) ...[
+                      const SizedBox(height: 6),
+                      KhadraBadge(
+                        label: l10n.bookingsTabDisputed,
+                        colour: KhadraColors.bad,
+                        icon: Icons.gavel_outlined,
+                      ),
+                    ],
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: Space.md),
+          const SizedBox(height: 11),
+          const Divider(height: 1),
+          const SizedBox(height: 11),
+          // The reference and the way in, on one line. The reference is what a
+          // customer and a gallery say to each other on the phone; the link is
+          // what the design puts opposite it so the card says where it goes.
           Row(
             children: [
-              KhadraBadge(
-                label: BookingPresentation.label(l10n, booking.status),
-                colour: BookingPresentation.colour(booking.status),
-                icon: BookingPresentation.icon(booking.status),
-              ),
-              if (booking.hasLiveDispute) ...[
-                const SizedBox(width: Space.sm),
-                KhadraBadge(
-                  label: l10n.bookingsTabDisputed,
-                  colour: KhadraColors.bad,
-                  icon: Icons.gavel_outlined,
+              Expanded(
+                child: LatinRun(
+                  booking.reference,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: KhadraColors.neutral500,
+                    letterSpacing: 0.4,
+                  ),
                 ),
-              ],
-              const Spacer(),
+              ),
+              const SizedBox(width: Space.sm),
               Text(
-                formats.moneyOf(booking.totalPrice, booking.currency),
+                l10n.bookingsViewBooking,
                 style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: KhadraColors.accent,
+                ),
               ),
             ],
-          ),
-          const SizedBox(height: Space.sm),
-          LatinRun(
-            booking.reference,
-            style: const TextStyle(
-              fontSize: 11,
-              color: KhadraColors.neutral500,
-              letterSpacing: 0.4,
-            ),
           ),
         ],
       ),

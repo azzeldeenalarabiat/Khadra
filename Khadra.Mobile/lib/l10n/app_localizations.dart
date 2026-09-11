@@ -1214,6 +1214,12 @@ abstract class AppLocalizations {
   /// **'Verify your email address before booking. Your booking updates go there.'**
   String get bookVerifyEmailFirst;
 
+  /// No description provided for @bookingsViewBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'View booking'**
+  String get bookingsViewBooking;
+
   /// No description provided for @bookingsTitle.
   ///
   /// In en, this message translates to:

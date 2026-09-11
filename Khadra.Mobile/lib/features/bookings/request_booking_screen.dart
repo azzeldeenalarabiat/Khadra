@@ -396,7 +396,7 @@ class _VehicleStrip extends StatelessWidget {
               height: 64,
               child: KhadraImage(
                 url: vehicle.imageUrls.isEmpty ? null : vehicle.imageUrls.first,
-                borderRadius: const BorderRadius.all(Radii.md),
+                borderRadius: Radii.field,
               ),
             ),
             const SizedBox(width: Space.md),

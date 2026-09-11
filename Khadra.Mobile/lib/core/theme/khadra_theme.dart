@@ -60,6 +60,11 @@ abstract final class KhadraColors {
   static const Color bad = Color(0xFFDC2626);
   static const Color badStrong = Color(0xFF991B1B);
 
+  /// The border and the fill the design gives a REJECTED document — the one row
+  /// on a screen that has to be findable without reading it.
+  static const Color badBorder = Color(0xFFFECACA);
+  static const Color badTint = Color(0xFFFEE2E2);
+
   /// A rating star. Amber rather than the brand green, so a score never reads as
   /// an action or as approval by the platform.
   static const Color star = Color(0xFFF59E0B);
@@ -82,26 +87,51 @@ abstract final class Space {
   static const double bottomInset = 96;
 }
 
-/// The handoff's radius system, which is softer than the console's throughout.
+/// The handoff's radius system, named by ROLE rather than by size.
 ///
-/// Three steps and two shapes built from them. The design uses 7–9px on pills and
-/// small tiles, 11–13px on fields and buttons, and 14–16px on cards; these are the
-/// middle of each of those bands rather than one value per artboard, because a
-/// radius scale a reader can feel is three steps, not nine.
+/// The design really does use different radii for different things — 7–8 on a
+/// badge, 12 on an input, 13 on a button, 14 on a list row, 16 on a card, 18 on
+/// the one card a screen leads with — and collapsing them to one value flattens a
+/// distinction a reader can feel. Naming them by size instead (`sm`, `md`, `lg`)
+/// just moves the problem: the call site then has to remember which size a
+/// document row is, and it drifts the first time somebody guesses.
+///
+/// So the raw steps are private to this file and every call site asks for a shape.
 abstract final class Radii {
-  /// Pills, badges, small thumbnails.
-  static const Radius sm = Radius.circular(8);
+  static const Radius _s8 = Radius.circular(8);
+  static const Radius _s12 = Radius.circular(12);
+  static const Radius _s13 = Radius.circular(13);
+  static const Radius _s14 = Radius.circular(14);
+  static const Radius _s16 = Radius.circular(16);
+  static const Radius _s18 = Radius.circular(18);
 
-  /// Fields, buttons, sheets' inner controls.
-  static const Radius md = Radius.circular(12);
+  /// A status badge, a spec chip, a thumbnail small enough to sit in a row.
+  static const BorderRadius pill = BorderRadius.all(_s8);
 
-  /// Cards, dialogs, the top of a bottom sheet.
-  static const Radius lg = Radius.circular(16);
+  /// An input, and the image inside a list row.
+  static const BorderRadius field = BorderRadius.all(_s12);
 
-  static const BorderRadius card = BorderRadius.all(lg);
-  static const BorderRadius field = BorderRadius.all(md);
-  static const BorderRadius pill = BorderRadius.all(sm);
+  /// A button. The design's own thirteen — between its fields and its rows,
+  /// which is what makes a button read as raised against the form around it.
+  static const BorderRadius button = BorderRadius.all(_s13);
+
+  /// A row in a list: a document, a vehicle on a gallery's page.
+  static const BorderRadius row = BorderRadius.all(_s14);
+
+  /// The standard card, and the top of a bottom sheet.
+  static const BorderRadius card = BorderRadius.all(_s16);
+
+  /// The one card a screen leads with, where the design goes a step softer.
+  static const BorderRadius feature = BorderRadius.all(_s18);
+
+  /// Fully round: a tab chip, a filter chip, an avatar.
   static const BorderRadius chip = BorderRadius.all(Radius.circular(999));
+
+  /// The top corners only, for a sheet that rises from the bottom edge.
+  static const BorderRadius sheetTop = BorderRadius.vertical(top: _s18);
+
+  /// The top corners of a card whose image runs to its edges.
+  static const BorderRadius cardTop = BorderRadius.vertical(top: _s18);
 }
 
 /// The one shadow in the design: `0 1px 2px rgba(17,24,39,.04)`.
@@ -206,14 +236,16 @@ abstract final class KhadraTheme {
         scrolledUnderElevation: 0.5,
         centerTitle: false,
         iconTheme: const IconThemeData(color: KhadraColors.text, size: 22),
-        // 800, which is the handoff's weight for a screen title. Manrope at 800 is a
-        // different voice from Manrope at 600 — it is what makes the design read as
-        // confident rather than administrative — and it is bundled for it.
+        // SIXTEEN, which is the design's size for a screen you can go back from —
+        // and most screens in this app are. A tab's own root asks for
+        // `KhadraLargeTitle` instead. 800 either way: Manrope at 800 is a different
+        // voice from Manrope at 600, and it is what makes the design read as
+        // confident rather than administrative.
         titleTextStyle: _style(
           color: KhadraColors.text,
-          fontSize: 18,
+          fontSize: 16,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.3,
+          letterSpacing: -0.2,
         ),
       ),
       cardTheme: CardThemeData(
@@ -353,7 +385,7 @@ abstract final class KhadraTheme {
         backgroundColor: KhadraColors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radii.lg),
+          borderRadius: Radii.sheetTop,
         ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(

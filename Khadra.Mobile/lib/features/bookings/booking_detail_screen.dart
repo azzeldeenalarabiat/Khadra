@@ -695,7 +695,7 @@ class _VehicleCard extends StatelessWidget {
             height: 60,
             child: KhadraImage(
               url: vehicle?.coverImageUrl,
-              borderRadius: const BorderRadius.all(Radii.md),
+              borderRadius: Radii.field,
             ),
           ),
           const SizedBox(width: Space.md),

@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/router.dart';
-import 'package:khadra_mobile/features/catalogue/vehicle_card.dart';
+import 'package:khadra_mobile/features/catalogue/vehicle_row.dart';
 import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/features/shortlist/shortlist_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
@@ -152,8 +152,10 @@ void main() {
       (tester) async {
     await pumpSavedCars(tester, saved: [unavailable()]);
 
-    // No catalogue card, which is the thing that routes to the vehicle screen.
-    expect(find.byType(VehicleCard), findsNothing);
+    // No catalogue row, which is the thing that routes to the vehicle screen —
+    // and the listed car above it in the same list DOES render one, so this is a
+    // real absence rather than a widget nothing on the screen uses.
+    expect(find.byType(VehicleRow), findsNothing);
 
     // And nothing else on the row is tappable except the remove button. An
     // InkWell or a GestureDetector here would be a route to a screen that 404s,
@@ -174,6 +176,15 @@ void main() {
         reason: 'An unavailable saved car must have no tap target but Remove.',
       );
     }
+  });
+
+  testWidgets('a listed car in the same list still renders its row', (tester) async {
+    await pumpSavedCars(tester, saved: [unavailable(), listed()]);
+
+    // The control for the assertion above: one of these two is bookable, and it
+    // gets the ordinary row.
+    expect(find.byType(VehicleRow), findsOneWidget);
+    expect(find.text('CURRENTLY UNAVAILABLE'), findsOneWidget);
   });
 
   testWidgets('removing one is the customer’s own tap, and only theirs',

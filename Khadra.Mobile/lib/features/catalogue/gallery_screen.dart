@@ -18,7 +18,7 @@ import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../shortlist/shortlist_providers.dart';
 import 'search_providers.dart';
-import 'vehicle_card.dart';
+import 'vehicle_row.dart';
 
 /// A rental office's public page.
 ///
@@ -92,7 +92,7 @@ class _GalleryBody extends ConsumerWidget {
                         child: KhadraImage(
                           url: gallery.logoUrl,
                           fit: BoxFit.contain,
-                          borderRadius: const BorderRadius.all(Radii.md),
+                          borderRadius: Radii.field,
                         ),
                       ),
                     ),
@@ -397,7 +397,10 @@ class _GalleryVehiclesState extends ConsumerState<_GalleryVehicles> {
         child: Column(
           children: [
             for (final listing in widget.listings) ...[
-              VehicleCard(listing: listing),
+              VehicleRow(
+                listing: listing,
+                trailing: VehicleRowSaveButton(vehicleId: listing.vehicleId),
+              ),
               const SizedBox(height: Space.lg),
             ],
           ],

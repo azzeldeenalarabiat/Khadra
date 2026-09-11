@@ -19,7 +19,7 @@ class ProfileScreen extends ConsumerWidget {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.profileTitle)),
+      appBar: AppBar(title: KhadraLargeTitle(l10n.profileTitle)),
       body: RefreshIndicator(
         // The account and the document checklist are BOTH read here, and both
         // go stale while the app is open: an email verified in a browser, or a
@@ -400,31 +400,55 @@ class _Group extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                Space.lg, Space.lg, Space.lg, Space.sm),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: KhadraColors.neutral600,
-                letterSpacing: 0.4,
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // A quiet uppercase label ABOVE the group rather than a grey band
+            // across the screen: the design lets the card do the separating, and
+            // the label only has to say what the card is.
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 2, bottom: 9),
+              child: Text(
+                title.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: KhadraColors.neutral500,
+                  letterSpacing: 0.7,
+                ),
               ),
             ),
-          ),
-          // A Material, not a Container. A ColoredBox here paints over the
-          // Scaffold canvas that the tiles ink onto, so every row in the group
-          // would swallow its own ripple -- and a tap with no feedback reads as a
-          // tap that did not land.
-          Material(
-            color: KhadraColors.surface,
-            child: Column(children: children),
-          ),
-        ],
+            // A Material, not a Container. A ColoredBox here paints over the
+            // Scaffold canvas that the tiles ink onto, so every row in the group
+            // would swallow its own ripple -- and a tap with no feedback reads as
+            // a tap that did not land. `clipBehavior` is what keeps the first and
+            // last rows' ink inside the rounded corners.
+            Material(
+              color: KhadraColors.surface,
+              shape: const RoundedRectangleBorder(
+                borderRadius: Radii.card,
+                side: BorderSide(color: KhadraColors.neutral200),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (var i = 0; i < children.length; i++) ...[
+                    if (i > 0)
+                      const Divider(
+                        height: 1,
+                        indent: Space.lg,
+                        endIndent: Space.lg,
+                        color: KhadraColors.divider,
+                      ),
+                    children[i],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 }
 
@@ -443,8 +467,14 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-        leading: Icon(icon, color: KhadraColors.neutral600),
-        title: Text(label, style: const TextStyle(fontSize: 15)),
+        leading: Icon(icon, color: KhadraColors.neutral600, size: 20),
+        horizontalTitleGap: Space.md,
+        minLeadingWidth: 20,
+        contentPadding: const EdgeInsetsDirectional.symmetric(horizontal: Space.lg),
+        title: Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
         // Bounded on purpose. A ListTile gives its trailing widget as much width
         // as it asks for, so an unbounded one crushes the title -- which is how
         // "My documents" ended up rendering one character per line.

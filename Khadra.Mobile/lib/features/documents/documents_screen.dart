@@ -232,14 +232,33 @@ class _DocumentTile extends StatelessWidget {
     final present = document != null;
 
     return KhadraCard(
+      // A document ROW, not a card: the design gives a list of papers a slightly
+      // tighter corner than the cards around it, which is what keeps a column of
+      // them reading as one list.
+      borderRadius: Radii.row,
+      padding: const EdgeInsets.all(13),
+      borderColor: document?.status == 'Rejected' ? KhadraColors.badBorder : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                _icon(type, document),
-                color: present ? KhadraColors.accent : KhadraColors.neutral400,
+              // The proportions of the thing itself — a licence or an identity
+              // card stood on its end, not a square icon.
+              Container(
+                width: 40,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: document?.status == 'Rejected'
+                      ? KhadraColors.badTint
+                      : KhadraColors.imagePlaceholder,
+                  borderRadius: Radii.pill,
+                ),
+                child: Icon(
+                  _icon(type, document),
+                  size: 20,
+                  color: present ? KhadraColors.accent : KhadraColors.neutral500,
+                ),
               ),
               const SizedBox(width: Space.md),
               Expanded(
