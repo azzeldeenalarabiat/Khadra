@@ -61,7 +61,10 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
       // can be priced without them, so the screen says so rather than showing an
       // empty summary.
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.bookTitle)),
+        appBar: AppBar(
+          leading: KhadraBack(fallback: Routes.vehicle(widget.vehicleId)),
+          title: Text(l10n.bookTitle),
+        ),
         body: KhadraEmpty(
           icon: Icons.date_range_outlined,
           title: l10n.searchChooseDates,
@@ -90,7 +93,10 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
     )));
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.bookTitle)),
+      appBar: AppBar(
+        leading: KhadraBack(fallback: Routes.vehicle(widget.vehicleId)),
+        title: Text(l10n.bookTitle),
+      ),
       body: switch (vehicle) {
         AsyncData(:final value) => _body(l10n, formats, value, quote),
         AsyncError(:final error) => KhadraError(

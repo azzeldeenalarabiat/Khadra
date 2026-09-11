@@ -1793,8 +1793,14 @@ abstract class AppLocalizations {
   /// No description provided for @disputeOpened.
   ///
   /// In en, this message translates to:
-  /// **'Your dispute is open. Khadra will look at it within {hours} hours.'**
-  String disputeOpened(String hours);
+  /// **'Your dispute is open. Khadra will answer by {deadline}.'**
+  String disputeOpened(String deadline);
+
+  /// No description provided for @disputeOpenedNoDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Your dispute is open. Khadra will answer it.'**
+  String get disputeOpenedNoDate;
 
   /// No description provided for @disputeViewTitle.
   ///

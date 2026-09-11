@@ -8,6 +8,7 @@ import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/format/formats.dart';
 import '../../core/providers.dart';
+import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -37,7 +38,10 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.documentsTitle)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.profile),
+        title: Text(l10n.documentsTitle),
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(myDocumentsProvider.future),
         child: switch (documents) {

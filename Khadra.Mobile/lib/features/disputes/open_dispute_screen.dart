@@ -113,11 +113,12 @@ class _OpenDisputeScreenState extends ConsumerState<OpenDisputeScreen> {
       invalidateBookings(ref, bookingId: widget.bookingId);
 
       if (!mounted) return;
+      final formats = ref.read(formatsProvider);
       showKhadraMessage(
         context,
-        l10n.disputeOpened(
-          dispute.slaDeadline.difference(dispute.openedAt).inHours.toString(),
-        ),
+        formats == null
+            ? l10n.disputeOpenedNoDate
+            : l10n.disputeOpened(formats.dateTime(dispute.slaDeadline)),
       );
       context.pushReplacement(Routes.dispute(dispute.ticketId));
     } on ApiFailure catch (failure) {
@@ -134,7 +135,10 @@ class _OpenDisputeScreenState extends ConsumerState<OpenDisputeScreen> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.disputeTitle)),
+      appBar: AppBar(
+        leading: KhadraBack(fallback: Routes.booking(widget.bookingId)),
+        title: Text(l10n.disputeTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
             Space.lg, Space.lg, Space.lg, Space.bottomInset),

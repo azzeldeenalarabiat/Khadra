@@ -77,7 +77,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     final passwordPolicy = ref.watch(passwordPolicyProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.authChangePassword)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.profile),
+        title: Text(l10n.authChangePassword),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
             Space.lg, Space.lg, Space.lg, Space.bottomInset),

@@ -74,7 +74,10 @@ class _LeaveReviewScreenState extends ConsumerState<LeaveReviewScreen> {
     final galleryName = booking.valueOrNull?.dealerName ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.reviewTitle)),
+      appBar: AppBar(
+        leading: KhadraBack(fallback: Routes.booking(widget.bookingId)),
+        title: Text(l10n.reviewTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
             Space.lg, Space.xl, Space.lg, Space.bottomInset),

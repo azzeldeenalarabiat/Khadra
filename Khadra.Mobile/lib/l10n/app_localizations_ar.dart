@@ -1039,9 +1039,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get disputeOpen => 'افتح النزاع';
 
   @override
-  String disputeOpened(String hours) {
-    return 'نزاعك مفتوح. ستنظر فيه خضرا خلال $hours ساعة.';
+  String disputeOpened(String deadline) {
+    return 'نزاعك مفتوح. سترد عليه خضرا قبل $deadline.';
   }
+
+  @override
+  String get disputeOpenedNoDate => 'نزاعك مفتوح. ستردّ عليه خضرا.';
 
   @override
   String get disputeViewTitle => 'النزاع';

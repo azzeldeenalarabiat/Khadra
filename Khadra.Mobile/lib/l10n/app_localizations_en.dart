@@ -1024,9 +1024,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get disputeOpen => 'Open the dispute';
 
   @override
-  String disputeOpened(String hours) {
-    return 'Your dispute is open. Khadra will look at it within $hours hours.';
+  String disputeOpened(String deadline) {
+    return 'Your dispute is open. Khadra will answer by $deadline.';
   }
+
+  @override
+  String get disputeOpenedNoDate =>
+      'Your dispute is open. Khadra will answer it.';
 
   @override
   String get disputeViewTitle => 'Dispute';
