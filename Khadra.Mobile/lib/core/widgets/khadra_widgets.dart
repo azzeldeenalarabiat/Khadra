@@ -107,12 +107,30 @@ class KhadraLargeTitle extends StatelessWidget {
 }
 
 class KhadraBack extends StatelessWidget {
-  const KhadraBack({super.key, required this.fallback});
+  const KhadraBack({super.key, required this.fallback, this.onSurface = false});
 
   final String fallback;
 
+  /// Sitting over a PHOTOGRAPH rather than on a bar, so it needs its own white
+  /// disc: a bare dark chevron disappears into the first car photographed at
+  /// night, and the save button beside it already has one.
+  final bool onSurface;
+
   @override
-  Widget build(BuildContext context) => IconButton(
+  Widget build(BuildContext context) {
+    final button = _button(context);
+    if (!onSurface) return button;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: KhadraColors.surface.withValues(alpha: 0.92),
+        shape: BoxShape.circle,
+      ),
+      child: button,
+    );
+  }
+
+  Widget _button(BuildContext context) => IconButton(
         // A plain CHEVRON, which is what the design draws, rather than Material's
         // arrow-with-a-shaft. It is on fifteen screens, it is the single most
         // repeated glyph in the app, and it is one icon to change.
@@ -483,6 +501,70 @@ class KhadraFieldLabel extends StatelessWidget {
             color: KhadraColors.neutral700,
           ),
         ),
+      );
+}
+
+/// The design's SPECIFICATIONS block: a two-column grid of small bordered
+/// tiles, each an uppercase label over its value.
+///
+/// A list of label/value rows says the same words, but a car's specification is
+/// six unrelated facts of the same weight, and a column makes the first one look
+/// like the heading for the rest.
+class KhadraSpecGrid extends StatelessWidget {
+  const KhadraSpecGrid({super.key, required this.specs});
+
+  final List<({String label, String value})> specs;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 10.0;
+          final width = (constraints.maxWidth - gap) / 2;
+
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final spec in specs)
+                SizedBox(
+                  width: width,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: Space.md, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: KhadraColors.surface,
+                      borderRadius: Radii.field,
+                      border: Border.all(color: KhadraColors.neutral200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          spec.label.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                            color: KhadraColors.neutral500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          spec.value,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       );
 }
 

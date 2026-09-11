@@ -132,7 +132,10 @@ class _VehicleBody extends ConsumerWidget {
           expandedHeight: 260,
           pinned: true,
           backgroundColor: KhadraColors.surface,
-          leading: const KhadraBack(fallback: Routes.search),
+          leading: const Padding(
+            padding: EdgeInsetsDirectional.only(start: Space.sm),
+            child: KhadraBack(fallback: Routes.search, onSurface: true),
+          ),
           actions: [
             Padding(
               padding: const EdgeInsetsDirectional.only(end: Space.sm),
@@ -209,30 +212,30 @@ class _VehicleBody extends ConsumerWidget {
 
             const SizedBox(height: Space.xl),
             KhadraSectionTitle(l10n.vehicleSpecifications),
-            KhadraCard(
-              child: Column(
-                children: [
-                  KhadraDetailRow(
-                    label: l10n.searchTransmission,
-                    value: Text(_vocabulary(
-                        ref, (v) => v.transmissions, vehicle.transmission, arabic)),
+            KhadraSpecGrid(
+              specs: [
+                (
+                  label: l10n.searchTransmission,
+                  value: _vocabulary(
+                      ref, (v) => v.transmissions, vehicle.transmission, arabic),
+                ),
+                (
+                  label: l10n.vehicleFuel,
+                  value: _vocabulary(
+                      ref, (v) => v.fuelTypes, vehicle.fuelType, arabic),
+                ),
+                (
+                  label: l10n.searchSeats,
+                  value: l10n.vehicleSeats(vehicle.seats),
+                ),
+                if (vehicle.carType != null)
+                  (
+                    label: l10n.searchCarType,
+                    value: vehicle.carType!.nameFor(arabic),
                   ),
-                  KhadraDetailRow(
-                    label: l10n.vehicleFuel,
-                    value: Text(_vocabulary(
-                        ref, (v) => v.fuelTypes, vehicle.fuelType, arabic)),
-                  ),
-                  KhadraDetailRow(
-                    label: l10n.searchSeats,
-                    value: Text(l10n.vehicleSeats(vehicle.seats)),
-                  ),
-                  if (vehicle.color != null && vehicle.color!.isNotEmpty)
-                    KhadraDetailRow(
-                      label: l10n.vehicleColour,
-                      value: Text(vehicle.color!),
-                    ),
-                ],
-              ),
+                if (vehicle.color != null && vehicle.color!.isNotEmpty)
+                  (label: l10n.vehicleColour, value: vehicle.color!),
+              ],
             ),
 
             const SizedBox(height: Space.xl),

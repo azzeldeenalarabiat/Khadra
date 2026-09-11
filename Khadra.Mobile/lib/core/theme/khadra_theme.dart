@@ -275,6 +275,26 @@ abstract final class KhadraTheme {
         thickness: 1,
         space: 1,
       ),
+      // Material draws an UNSELECTED radio or checkbox in near-black, which in
+      // this palette is the colour of a heading -- so an unmade choice ends up
+      // the heaviest mark on the screen.
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? KhadraColors.accent
+              : KhadraColors.neutral400,
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        side: const BorderSide(color: KhadraColors.neutral400, width: 1.5),
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? KhadraColors.accent
+              : Colors.transparent,
+        ),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(6))),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
