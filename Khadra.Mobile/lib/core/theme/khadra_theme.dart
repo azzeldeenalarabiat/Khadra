@@ -82,6 +82,10 @@ abstract final class Space {
   static const double xl = 24;
   static const double xxl = 32;
 
+  /// The padding INSIDE a content card, which the design sets a step below the
+  /// page gutter so a card does not read as a second, narrower page.
+  static const double card = 14;
+
   /// Enough room under a scrolling page that the last row clears a bottom bar or
   /// a floating action, on the phones that put a gesture handle there too.
   static const double bottomInset = 96;
@@ -99,6 +103,7 @@ abstract final class Space {
 /// So the raw steps are private to this file and every call site asks for a shape.
 abstract final class Radii {
   static const Radius _s8 = Radius.circular(8);
+  static const Radius _s10 = Radius.circular(10);
   static const Radius _s12 = Radius.circular(12);
   static const Radius _s13 = Radius.circular(13);
   static const Radius _s14 = Radius.circular(14);
@@ -124,11 +129,18 @@ abstract final class Radii {
   /// The one card a screen leads with, where the design goes a step softer.
   static const BorderRadius feature = BorderRadius.all(_s18);
 
-  /// Fully round: a tab chip, a filter chip, an avatar.
-  static const BorderRadius chip = BorderRadius.all(Radius.circular(999));
+  /// A choice chip in a filter or a quick-pick row.
+  ///
+  /// NOT a lozenge. There is not one fully rounded shape anywhere in the handoff
+  /// -- the softest corner it draws is the 22 on a sheet -- so a pill chip is the
+  /// one control that would announce it came from somewhere else.
+  static const BorderRadius chip = BorderRadius.all(_s10);
 
-  /// The top corners only, for a sheet that rises from the bottom edge.
-  static const BorderRadius sheetTop = BorderRadius.vertical(top: _s18);
+  /// The top corners only, for a sheet that rises from the bottom edge. The
+  /// design goes softer here than anywhere else — a sheet is a different surface
+  /// arriving, not a card that grew.
+  static const BorderRadius sheetTop =
+      BorderRadius.vertical(top: Radius.circular(22));
 
   /// The top corners of a card whose image runs to its edges.
   static const BorderRadius cardTop = BorderRadius.vertical(top: _s18);
@@ -270,7 +282,7 @@ abstract final class KhadraTheme {
           foregroundColor: Colors.white,
           disabledBackgroundColor: KhadraColors.neutral200,
           disabledForegroundColor: KhadraColors.neutral500,
-          shape: const RoundedRectangleBorder(borderRadius: Radii.field),
+          shape: const RoundedRectangleBorder(borderRadius: Radii.button),
           textStyle: _style(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
@@ -283,14 +295,16 @@ abstract final class KhadraTheme {
           foregroundColor: KhadraColors.accent,
           backgroundColor: KhadraColors.accent100,
           side: const BorderSide(color: KhadraColors.accent300),
-          shape: const RoundedRectangleBorder(borderRadius: Radii.field),
+          shape: const RoundedRectangleBorder(borderRadius: Radii.button),
           textStyle: _style(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: KhadraColors.accent,
-          textStyle: _style(fontSize: 15, fontWeight: FontWeight.w700),
+          // An inline link, not a third button: the design sets these two steps
+          // under the filled button they sit beside.
+          textStyle: _style(fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -326,14 +340,30 @@ abstract final class KhadraTheme {
       chipTheme: ChipThemeData(
         backgroundColor: KhadraColors.surface,
         selectedColor: KhadraColors.accent100,
-        side: const BorderSide(color: KhadraColors.neutral300),
-        shape: const RoundedRectangleBorder(borderRadius: Radii.chip),
-        labelStyle: _style(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: KhadraColors.text,
+        // A CHOSEN chip is tinted and outlined in the accent, not filled with it.
+        // A solid green lozenge in a row of white ones reads as a button somebody
+        // has not pressed yet; the tint reads as a choice already made.
+        side: WidgetStateBorderSide.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.selected)
+                ? KhadraColors.accent
+                : KhadraColors.neutral300,
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
+        shape: const RoundedRectangleBorder(borderRadius: Radii.chip),
+        labelStyle: WidgetStateTextStyle.resolveWith(
+          (states) => _style(
+            fontSize: 12,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w600,
+            color: states.contains(WidgetState.selected)
+                ? KhadraColors.price
+                : KhadraColors.neutral800,
+          ),
+        ),
+        showCheckmark: false,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: KhadraColors.surface,
@@ -384,6 +414,12 @@ abstract final class KhadraTheme {
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: KhadraColors.surface,
         surfaceTintColor: Colors.transparent,
+        // The design's scrim: near-black at 45%, so the page behind is still
+        // legible as context rather than blacked out.
+        modalBarrierColor: Color(0x73111827),
+        showDragHandle: true,
+        dragHandleColor: KhadraColors.neutral300,
+        dragHandleSize: Size(38, 4),
         shape: RoundedRectangleBorder(
           borderRadius: Radii.sheetTop,
         ),

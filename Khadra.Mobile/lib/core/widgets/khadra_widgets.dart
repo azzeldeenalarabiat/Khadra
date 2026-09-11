@@ -315,7 +315,7 @@ class KhadraCard extends StatelessWidget {
   const KhadraCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(Space.lg),
+    this.padding = const EdgeInsets.all(Space.card),
     this.onTap,
     this.borderColor,
     this.background,
@@ -440,7 +440,10 @@ class KhadraDetailRow extends StatelessWidget {
               child: Text(
                 label,
                 style: const TextStyle(
-                    color: KhadraColors.neutral600, fontSize: 14),
+                  color: KhadraColors.neutral600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(width: Space.md),
@@ -448,13 +451,37 @@ class KhadraDetailRow extends StatelessWidget {
               style: valueStyle ??
                   const TextStyle(
                     color: KhadraColors.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
               textAlign: TextAlign.end,
               child: value,
             ),
           ],
+        ),
+      );
+}
+
+/// The small label above ONE control -- a group of chips, a slider, a field.
+///
+/// Deliberately not a section title: inside a sheet the design drops to a quiet
+/// 12, because the sheet's own heading is already doing the shouting and a column
+/// of full-weight headings makes six controls look like six screens.
+class KhadraFieldLabel extends StatelessWidget {
+  const KhadraFieldLabel(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: KhadraColors.neutral700,
+          ),
         ),
       );
 }
@@ -475,9 +502,10 @@ class KhadraSectionTitle extends StatelessWidget {
               child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                   color: KhadraColors.text,
+                  letterSpacing: -0.2,
                 ),
               ),
             ),

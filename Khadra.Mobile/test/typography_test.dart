@@ -112,9 +112,24 @@ void main() {
 
       for (final entry in styles.entries) {
         expect(entry.value, isNotNull, reason: '${entry.key} is set by the theme');
-        expect(entry.value!.fontFamily, 'Manrope', reason: entry.key);
-        expect(entry.value!.fontFamilyFallback, contains('Noto Kufi Arabic'),
-            reason: '${entry.key} would render Arabic as empty boxes');
+
+        // A style can depend on the widget's STATE, and a state the theme forgot
+        // to give a family to renders Arabic as boxes on that state alone --
+        // which is the version nobody screenshots. So every state is checked,
+        // not just the resting one.
+        for (final states in <Set<WidgetState>>{
+          <WidgetState>{},
+          <WidgetState>{WidgetState.selected},
+          <WidgetState>{WidgetState.disabled},
+        }) {
+          final style = entry.value is WidgetStateTextStyle
+              ? (entry.value! as WidgetStateTextStyle).resolve(states)
+              : entry.value!;
+          final where = '${entry.key} ${states.isEmpty ? '(resting)' : states}';
+          expect(style.fontFamily, 'Manrope', reason: where);
+          expect(style.fontFamilyFallback, contains('Noto Kufi Arabic'),
+              reason: '$where would render Arabic as empty boxes');
+        }
       }
     });
   });
