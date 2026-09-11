@@ -8,6 +8,7 @@ using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.Reviews;
 using Khadra.Infrastructure.Persistence;
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Khadra.Infrastructure.Reporting;
@@ -121,40 +122,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             .ThenByDescending(vehicle => vehicle.Id)
             .Skip(page.Skip)
             .Take(page.PageSize)
-            .Select(vehicle => new CatalogueListing(
-                vehicle.Id.Value,
-                vehicle.Details.Make,
-                vehicle.Details.Model,
-                vehicle.Details.Year,
-                context.CarTypes
-                    .Where(carType => carType.Id == vehicle.CarTypeId)
-                    .Select(carType => new CatalogueCarType(carType.Id.Value, carType.NameEn, carType.NameAr))
-                    .FirstOrDefault(),
-                vehicle.Details.Transmission.Name,
-                vehicle.Details.FuelType.Name,
-                vehicle.Details.Seats,
-                vehicle.Images
-                    .Where(image => image.IsPrimary)
-                    .Select(image => VehicleImageDto.PublicPath + "/" + image.StorageKey)
-                    .FirstOrDefault(),
-                new MoneyDto(vehicle.DailyRate.Amount, vehicle.DailyRate.CurrencyCode),
-                vehicle.IsDeliveryEligible &&
-                    context.Dealers.Any(dealer => dealer.Id == vehicle.DealerId && dealer.Delivery.IsEnabled),
-                context.Dealers
-                    .Where(dealer => dealer.Id == vehicle.DealerId)
-                    .Select(dealer => new CatalogueGalleryLabel(
-                        dealer.Id.Value,
-                        dealer.BusinessName.Value,
-                        dealer.CityId == null ? null : dealer.CityId.Value.Value,
-                        dealer.LogoStorageKey == null
-                            ? null
-                            : DealerProfileDto.PublicImagePath + "/" + dealer.LogoStorageKey,
-                        // Filled in below, from ONE grouped query over every gallery on this page.
-                        // Correlating it here would make a twenty-card page do twenty extra
-                        // aggregates; SQL can average them all at once.
-                        null,
-                        0))
-                    .First()))
+            .Select(ToListing())
             .ToListAsync(cancellationToken);
 
         return new PagedResult<CatalogueListing>(
@@ -218,6 +186,78 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             [.. vehicle.Images.Select(image => VehicleImageDto.PublicPath + "/" + image.StorageKey)],
             gallery,
             isAvailable);
+    }
+
+
+    /// <summary>
+    /// One car as a catalogue row, defined once.
+    /// </summary>
+    /// <remarks>
+    /// Two callers build this shape -- the paged search and <c>ListByIdsAsync</c>, which a saved
+    /// list reads through -- and a second copy would drift the first time a field was added to one
+    /// of them. The rating is deliberately left null and 0 here: it is filled in afterwards by ONE
+    /// grouped query over every gallery on the page, because correlating it per row would make a
+    /// twenty-card page do twenty extra aggregates.
+    ///
+    /// A METHOD returning the expression rather than a static field, because it closes over the
+    /// DbContext; EF inlines a locally-bound expression the same way it inlines a literal one.
+    /// </remarks>
+    private Expression<Func<Vehicle, CatalogueListing>> ToListing() =>
+        vehicle => new CatalogueListing(
+            vehicle.Id.Value,
+            vehicle.Details.Make,
+            vehicle.Details.Model,
+            vehicle.Details.Year,
+            context.CarTypes
+                .Where(carType => carType.Id == vehicle.CarTypeId)
+                .Select(carType => new CatalogueCarType(carType.Id.Value, carType.NameEn, carType.NameAr))
+                .FirstOrDefault(),
+            vehicle.Details.Transmission.Name,
+            vehicle.Details.FuelType.Name,
+            vehicle.Details.Seats,
+            vehicle.Images
+                .Where(image => image.IsPrimary)
+                .Select(image => VehicleImageDto.PublicPath + "/" + image.StorageKey)
+                .FirstOrDefault(),
+            new MoneyDto(vehicle.DailyRate.Amount, vehicle.DailyRate.CurrencyCode),
+            vehicle.IsDeliveryEligible &&
+                context.Dealers.Any(dealer => dealer.Id == vehicle.DealerId && dealer.Delivery.IsEnabled),
+            context.Dealers
+                .Where(dealer => dealer.Id == vehicle.DealerId)
+                .Select(dealer => new CatalogueGalleryLabel(
+                    dealer.Id.Value,
+                    dealer.BusinessName.Value,
+                    dealer.CityId == null ? null : dealer.CityId.Value.Value,
+                    dealer.LogoStorageKey == null
+                        ? null
+                        : DealerProfileDto.PublicImagePath + "/" + dealer.LogoStorageKey,
+                    // Filled in by `WithRatingsAsync`, from ONE grouped query over every gallery in
+                    // the result. Correlating it here would make a twenty-card page do twenty extra
+                    // aggregates; SQL can average them all at once.
+                    null,
+                    0))
+                .First());
+
+    public async Task<IReadOnlyList<CatalogueListing>> ListByIdsAsync(
+        IReadOnlyCollection<Id> vehicleIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(vehicleIds);
+        if (vehicleIds.Count == 0) return [];
+
+        // Materialised first: EF translates Contains over a local List, not over an
+        // IReadOnlyCollection it cannot recognise as a parameter.
+        var wanted = vehicleIds.ToList();
+
+        // `Bookable()`, exactly as the search uses it. An id that is a draft, hidden, in
+        // maintenance, soft-deleted, or belongs to a gallery that may not trade simply does not
+        // come back -- and the caller cannot tell which, which is the point.
+        var items = await Bookable()
+            .Where(vehicle => wanted.Contains(vehicle.Id))
+            .Select(ToListing())
+            .ToListAsync(cancellationToken);
+
+        return await WithRatingsAsync(items, cancellationToken);
     }
 
     public Task<PublicGallery?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default) =>

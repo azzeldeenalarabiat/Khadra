@@ -2271,3 +2271,53 @@ the table most likely to have been emptied by the time anybody asks.
 Tests: `DocumentAccessPersistenceTests` (round trip, and the append-only guard on both tables),
 `RenterDocumentReviewTests` (a row per view, none for a refused view, none for a repeat review, none
 for the listing, and no storage key anywhere on a row).
+
+## Customer app completion (2026-09-11)
+
+### 87. Open owner decisions on the shortlist
+
+**Status:** open · **Raised:** 2026-09-11 · **Built:** 2026-09-11, at the owner's request
+
+Favourites were built as a `Shortlist` bounded context — aggregate, migration, four endpoints and the
+app screens. Three questions were answered with DEFAULTS rather than by the owner, in the pattern this
+project already uses for the dealer console's undecided settings. Each is recorded so it is a decision
+somebody can revisit, not a shape nobody chose.
+
+1. **Account-only, no device-local list.** The catalogue itself is anonymous and stays so, but saving
+   needs an account: a list kept on the phone would vanish with it, show nothing on a second one, and
+   become a merge problem the day the real one arrived. The heart on an anonymous card goes through
+   the ordinary sign-in redirect.
+2. **The cap is 50** (`BusinessRules:MaxShortlistEntries`). A guard against a list nobody can read and
+   a table one account can grow without bound, not a judgement about how many cars are worth
+   comparing. Validated at startup like its siblings; the app states the figure from the server's
+   refusal rather than holding its own copy.
+3. **A car that stops being listed keeps its row and is shown as "no longer listed", with no reason.**
+   Naming the reason would distinguish a hidden car from a deleted one from a suspended gallery's,
+   which the catalogue answers identically on purpose. Entries are NEVER auto-removed:
+   `Maintenance → Hidden → Active` is a normal round trip, and a list that edited itself on the way
+   through would lose a customer's choices without asking.
+
+**To close:** the owner confirms or changes all three.
+
+### 88. The shortlist is personal data and goes with the account
+
+**Status:** open · **Raised:** 2026-09-11 · **Depends on:** item 18 (account deletion)
+
+A shortlist is browsing interest about a named person. It is not soft-deletable — a removed entry is
+a customer saying they are no longer interested, and a tombstone of that retains personal data for no
+purpose anyone could name — but the LIST itself has to go when the account does, and account deletion
+does not exist yet.
+
+**To close:** whatever closes item 18 deletes `customer_shortlists` and its entries with the account.
+
+### 89. A shortlist has no dates, so it can say nothing about availability
+
+**Status:** closed by design · **Raised:** 2026-09-11
+
+Recorded so nobody later "improves" it. A saved car carries no rental period, and
+`CatalogueVehicle.IsAvailable` is null without one for exactly that reason — false would be a lie. The
+saved list therefore shows today's daily rate and says nothing about whether the car is free; a
+customer picks dates on the vehicle screen as they would from any other entry point.
+
+Adding a per-entry "available on the dates you last searched" would mean storing a search on a
+shortlist entry, which is a different feature wearing this one's clothes.

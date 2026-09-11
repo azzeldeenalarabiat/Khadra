@@ -86,7 +86,14 @@ public sealed record BusinessRules(
     int ReviewWindowDays,
     // The oldest model year a dealer may list. A guard against a mistyped year, not a statement
     // about what is worth renting; the console builds its year list from it so the two cannot drift.
-    int EarliestVehicleModelYear);
+    int EarliestVehicleModelYear,
+    // How many cars one customer may keep on their shortlist. A guard against a list nobody can read
+    // and a table one account can grow without bound -- not a judgement about how many cars are worth
+    // comparing. Configured rather than constant because it is a figure a screen states, and this
+    // project's rule is that such a figure is the owner's to move.
+    //
+    // A PROPOSAL at 50, not a decision. The owner has not been asked. See pre-launch item 84.
+    int MaxShortlistEntries);
 
 public interface IBusinessRulesProvider
 {

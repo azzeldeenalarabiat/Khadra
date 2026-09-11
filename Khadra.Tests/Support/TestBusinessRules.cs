@@ -14,9 +14,14 @@ internal static class TestBusinessRules
     // that cares about the bound passes its own.
     public const int EarliestVehicleModelYear = 1970;
 
+    // The shipped cap. A test about the cap itself passes a small one; everything else needs a
+    // figure high enough that saving a few cars never trips it.
+    public const int MaxShortlistEntries = 50;
+
     public static BusinessRules Values(
         int? minimumRenterAge = MinimumRenterAge,
-        int earliestVehicleModelYear = EarliestVehicleModelYear) => new(
+        int earliestVehicleModelYear = EarliestVehicleModelYear,
+        int maxShortlistEntries = MaxShortlistEntries) => new(
         CommissionPercent: 20m,
         DepositPercent: 20m,
         NoShowTimeoutHours: 8,
@@ -35,15 +40,17 @@ internal static class TestBusinessRules
         MaxRentalDays: 90,
         NonDeliveryGraceMinutes: 15,
         ReviewWindowDays: 14,
-        EarliestVehicleModelYear: earliestVehicleModelYear);
+        EarliestVehicleModelYear: earliestVehicleModelYear,
+        MaxShortlistEntries: maxShortlistEntries);
 
     public static IBusinessRulesProvider Provider(
         int? minimumRenterAge = MinimumRenterAge,
-        int earliestVehicleModelYear = EarliestVehicleModelYear)
+        int earliestVehicleModelYear = EarliestVehicleModelYear,
+        int maxShortlistEntries = MaxShortlistEntries)
     {
         var provider = Substitute.For<IBusinessRulesProvider>();
         provider.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(Values(minimumRenterAge, earliestVehicleModelYear));
+            .Returns(Values(minimumRenterAge, earliestVehicleModelYear, maxShortlistEntries));
         return provider;
     }
 

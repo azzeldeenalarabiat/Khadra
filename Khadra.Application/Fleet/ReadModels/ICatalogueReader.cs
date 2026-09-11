@@ -48,6 +48,31 @@ public interface ICatalogueReader
 
     /// <summary>A gallery's public page, or null if it is not one a customer may see.</summary>
     Task<PublicGallery?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The listings for a named set of cars, through the SAME visibility predicate as the search.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// For a screen that already holds ids and needs the cars behind them — today, a customer's
+    /// shortlist. It exists so that screen does not get its own copy of the listing projection and
+    /// its own idea of which cars a customer may see: two predicates drift, and the way they drift is
+    /// one of them showing a suspended gallery's car to somebody who saved it before the suspension.
+    /// </para>
+    /// <para>
+    /// An id that is not visible is simply ABSENT from the result — never an error, and never a row
+    /// saying why. The caller is expected to notice the gap and render it as "no longer listed": the
+    /// reason is exactly what this endpoint's silence is protecting, since a draft, a hidden car, a
+    /// suspended gallery's and an unknown id must stay indistinguishable.
+    /// </para>
+    /// <para>
+    /// No availability window: a set of ids carries no dates, and `IsAvailable` has no meaning
+    /// without a period to ask about.
+    /// </para>
+    /// </remarks>
+    Task<IReadOnlyList<CatalogueListing>> ListByIdsAsync(
+        IReadOnlyCollection<Id> vehicleIds,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

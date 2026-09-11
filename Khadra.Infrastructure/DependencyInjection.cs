@@ -8,6 +8,7 @@ using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.Reviews.ReadModels;
+using Khadra.Application.Shortlist.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Auditing.Repositories;
@@ -19,6 +20,7 @@ using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
 using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Reviews.Repositories;
+using Khadra.Domain.Shortlist.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Geocoding;
@@ -150,6 +152,10 @@ public static class DependencyInjection
             // switched off by a typo rather than by a decision.
             .Validate(options => options.ReviewWindowDays is > 0,
                 "BusinessRules: ReviewWindowDays must be set to a positive number of days.")
+            // Positive: the provider dereferences it with `!`, and a zero would be a shortlist
+            // that refuses every save while naming its own limit as nought.
+            .Validate(options => options.MaxShortlistEntries is > 0,
+                "BusinessRules: MaxShortlistEntries must be set to a positive number of cars.")
             .ValidateOnStart();
         services.AddOptions<PaymentOptions>()
             .Bind(configuration.GetSection(PaymentOptions.SectionName))
@@ -201,6 +207,7 @@ public static class DependencyInjection
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();
+        services.AddScoped<IShortlistRepository, ShortlistRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IProviderEventReceiptRepository, ProviderEventReceiptRepository>();
         services.AddScoped<INotifier, Notifier>();
@@ -231,6 +238,7 @@ public static class DependencyInjection
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddScoped<IGalleryReviewReader, GalleryReviewReader>();
+        services.AddScoped<IShortlistReader, ShortlistReader>();
         services.AddScoped<ICustomerReputationReader, CustomerReputationReader>();
         // The dashboard glance and the audit screen read one table with different questions: a fixed
         // seven-row feed, and a filtered, paged log. Two readers, deliberately.

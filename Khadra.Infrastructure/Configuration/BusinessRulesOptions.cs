@@ -100,4 +100,10 @@ public sealed class BusinessRulesOptions
     // move.
     [Range(1900, 2100)]
     public int EarliestVehicleModelYear { get; init; }
+
+    // How many cars a customer may keep saved. Nullable like the other figures a screen states, so
+    // a deleted key is a startup error rather than a silent zero -- which here would be a shortlist
+    // that refuses every save with no explanation.
+    [Range(1, 500)]
+    public int? MaxShortlistEntries { get; init; }
 }
