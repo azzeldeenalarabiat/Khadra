@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/dtos.dart';
@@ -21,19 +23,50 @@ import '../../core/providers.dart';
 class SavedVehiclesNotifier extends Notifier<Set<String>> {
   @override
   Set<String> build() {
-    // A sign-out must not leave the previous account's hearts on the screen.
-    ref.watch(sessionProvider.select((session) => session.isSignedIn));
+    // LISTENED to, not watched.
+    //
+    // Watching rebuilds this notifier on every change of sign-in state, which
+    // throws away the ids it has been shown — and a COLD START is exactly when
+    // that happens: the catalogue renders while the token rotation is still in
+    // flight, `learn` is skipped because nobody is signed in yet, and by the time
+    // the session resolves nothing asks again. Every heart stayed empty until the
+    // customer navigated away and back.
+    ref.listen<bool>(
+      sessionProvider.select((session) => session.isSignedIn),
+      (_, signedIn) {
+        if (!signedIn) {
+          // A sign-out must not leave the previous account's hearts on screen.
+          _shown.clear();
+          _asked.clear();
+          state = const <String>{};
+          return;
+        }
+        // Signed in now: nothing shown while the session was resolving was ever
+        // asked about.
+        unawaited(learn(_shown.toList()));
+      },
+    );
     return const <String>{};
   }
 
   bool contains(String vehicleId) => state.contains(vehicleId);
+
+  /// Every id a screen has rendered, whether or not it could be asked about yet.
+  final Set<String> _shown = <String>{};
+
+  /// The ids already answered for, so scrolling back up does not re-ask.
+  final Set<String> _asked = <String>{};
 
   /// Learns which of these the server says are saved.
   ///
   /// Merges rather than replaces: the answer is only about the ids ASKED about,
   /// so a second page's answer must not erase the first page's hearts.
   Future<void> learn(List<String> vehicleIds) async {
-    if (!ref.read(sessionProvider).isSignedIn || vehicleIds.isEmpty) return;
+    if (vehicleIds.isEmpty) return;
+    // Remembered even when it cannot be asked yet, so the sign-in listener above
+    // has something to catch up on.
+    _shown.addAll(vehicleIds);
+    if (!ref.read(sessionProvider).isSignedIn) return;
 
     final unknown = vehicleIds.where((id) => !_asked.contains(id)).toList();
     if (unknown.isEmpty) return;
@@ -55,8 +88,20 @@ class SavedVehiclesNotifier extends Notifier<Set<String>> {
     }
   }
 
-  /// The ids already asked about, so scrolling back up does not re-ask.
-  final Set<String> _asked = <String>{};
+  /// Takes these as saved without asking.
+  ///
+  /// For the SAVED LIST, where every row is saved by definition. Asking the
+  /// membership endpoint about the contents of the shortlist would be asking the
+  /// server to confirm what it has just said — and while nobody asked, that screen
+  /// drew an empty heart on every car it was showing precisely because it was
+  /// saved.
+  void markSaved(Iterable<String> vehicleIds) {
+    final ids = vehicleIds.toList();
+    if (ids.isEmpty) return;
+    _shown.addAll(ids);
+    _asked.addAll(ids);
+    state = {...state, ...ids};
+  }
 
   /// Saves or forgets, from what the HEART currently shows.
   ///

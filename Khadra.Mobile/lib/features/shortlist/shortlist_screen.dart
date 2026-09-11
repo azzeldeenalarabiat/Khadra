@@ -70,20 +70,68 @@ class ShortlistScreen extends ConsumerWidget {
                 ),
               ],
             ),
-          AsyncData(:final value) when formats != null => ListView.separated(
-              padding: const EdgeInsets.fromLTRB(
-                  Space.lg, Space.lg, Space.lg, Space.bottomInset),
-              itemCount: value.length,
-              separatorBuilder: (_, __) => const SizedBox(height: Space.lg),
-              itemBuilder: (_, index) => switch (value[index]) {
-                SavedVehicle(listing: final listing?) =>
-                  VehicleCard(listing: listing),
-                final gone => _NoLongerListed(saved: gone, formats: formats),
-              },
+          AsyncData(:final value) when formats != null => _SavedList(
+              saved: value,
+              formats: formats,
             ),
           _ => const KhadraLoading(),
         },
       ),
+    );
+  }
+}
+
+/// The rows, and the one thing they tell the heart.
+///
+/// Every car here is saved by definition, so the membership set is TOLD rather
+/// than asked. Without it the saved-cars screen drew an empty heart on every car
+/// it was showing — the set is filled per page of catalogue results, and a car
+/// that is no longer listed never appears on one.
+class _SavedList extends ConsumerStatefulWidget {
+  const _SavedList({required this.saved, required this.formats});
+
+  final List<SavedVehicle> saved;
+  final Formats formats;
+
+  @override
+  ConsumerState<_SavedList> createState() => _SavedListState();
+}
+
+class _SavedListState extends ConsumerState<_SavedList> {
+  @override
+  void initState() {
+    super.initState();
+    _tell();
+  }
+
+  @override
+  void didUpdateWidget(_SavedList old) {
+    super.didUpdateWidget(old);
+    _tell();
+  }
+
+  void _tell() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(savedVehiclesProvider.notifier).markSaved(
+            [for (final entry in widget.saved) entry.vehicleId],
+          );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final value = widget.saved;
+    final formats = widget.formats;
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(
+          Space.lg, Space.lg, Space.lg, Space.bottomInset),
+      itemCount: value.length,
+      separatorBuilder: (_, __) => const SizedBox(height: Space.lg),
+      itemBuilder: (_, index) => switch (value[index]) {
+        SavedVehicle(listing: final listing?) => VehicleCard(listing: listing),
+        final gone => _NoLongerListed(saved: gone, formats: formats),
+      },
     );
   }
 }

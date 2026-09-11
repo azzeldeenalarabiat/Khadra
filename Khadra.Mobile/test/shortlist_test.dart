@@ -121,6 +121,62 @@ void main() {
     expect(api.savedCalls, isEmpty);
   });
 
+  /// The cold start, which is how this was found.
+  ///
+  /// The catalogue renders while the token rotation is still in flight, so
+  /// `learn` is skipped — nobody is signed in yet. Until the notifier caught up,
+  /// every heart stayed empty until the customer navigated away and back.
+  test('ids shown before the session resolved are asked about once it does', () async {
+    api.saved = {'car-a'};
+    final container = await containerFor(signedIn: false);
+    final notifier = container.read(savedVehiclesProvider.notifier);
+
+    await notifier.learn(['car-a', 'car-b']);
+    expect(api.askedAbout, isEmpty, reason: 'nothing to ask with, yet');
+
+    // The rotation lands.
+    await container.read(sessionProvider.notifier).adoptTokens(FakeApi.fakeTokens());
+    // Let the listener's catch-up run.
+    await Future<void>.delayed(Duration.zero);
+
+    expect(api.askedAbout, isNotEmpty, reason: 'the catch-up never happened');
+    expect(api.askedAbout.last.toSet(), {'car-a', 'car-b'});
+    expect(container.read(savedVehiclesProvider), {'car-a'});
+  });
+
+  /// The saved-cars screen drew an empty heart on every car it was showing.
+  ///
+  /// The membership set is filled per page of CATALOGUE results, and a saved car
+  /// — especially one that is no longer listed — need never appear on one. The
+  /// screen knows its rows are saved, so it says so rather than asking.
+  test('the saved list can declare what it holds without a request', () async {
+    final container = await containerFor();
+    final notifier = container.read(savedVehiclesProvider.notifier);
+
+    notifier.markSaved(['car-gone', 'car-b']);
+
+    expect(container.read(savedVehiclesProvider), {'car-gone', 'car-b'});
+    expect(api.askedAbout, isEmpty);
+
+    // And they count as answered, so a catalogue page holding one does not
+    // re-ask.
+    await notifier.learn(['car-b']);
+    expect(api.askedAbout, isEmpty);
+  });
+
+  test("signing out clears the previous account's hearts", () async {
+    api.saved = {'car-a'};
+    final container = await containerFor();
+    final notifier = container.read(savedVehiclesProvider.notifier);
+    await notifier.learn(['car-a']);
+    expect(container.read(savedVehiclesProvider), contains('car-a'));
+
+    await container.read(sessionProvider.notifier).signOut();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(savedVehiclesProvider), isEmpty);
+  });
+
   test('signed out, nothing is asked and nothing is held', () async {
     final container = await containerFor(signedIn: false);
     final notifier = container.read(savedVehiclesProvider.notifier);
