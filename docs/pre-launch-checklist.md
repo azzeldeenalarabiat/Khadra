@@ -2529,3 +2529,47 @@ browser refuses without a trusted user gesture, and the harness cannot produce o
 canvas. Steps 3–5 are equally unproven on iOS.
 
 **To close:** run the five steps on an Android device and an iPhone, and record the result here.
+
+**Blocked by item 94 since 2026-09-11:** the Android app cannot currently be BUILT, so the five steps
+cannot be attempted on any handset, real or emulated. Close 94 first.
+
+### 94. The Android app does not build, and nothing caught it
+
+**Status:** open, BLOCKING · **Raised:** 2026-09-11 · **Needs an owner decision**
+
+`flutter build apk` fails. `file_picker` 11.0.3 applies its own Kotlin Gradle Plugin, and this
+toolchain has moved to Flutter's built-in Kotlin, which no longer links a plugin that does:
+
+    WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): file_picker
+    error: cannot find symbol
+      flutterEngine.getPlugins().add(new com.mr.flutter.plugin.filepicker.FilePickerPlugin());
+    symbol: class FilePickerPlugin
+
+No Android artifact of any kind can be produced. It is not a Dart error: `flutter analyze` is clean
+and all 127 Flutter tests pass, because the failure lives in Gradle and is only reachable by actually
+building for Android. Nothing in the branch ever did, which is how PDF upload came to be described as
+shipped while the app it ships in could not be compiled.
+
+**Why it is not a one-line bump.** Every `file_picker` 12.x needs `win32 ^6.3.0`;
+`flutter_secure_storage` 9.2.4 pulls `flutter_secure_storage_windows`, which pins `win32 ^5.0.0`.
+Version solving fails for every 12.x while secure storage stays on 9.x. So unblocking the build means
+moving `flutter_secure_storage` across a major version -- and that package holds the REFRESH TOKEN
+(`lib/core/session/session_store.dart`, `AndroidOptions(encryptedSharedPreferences: true)`).
+
+Its changelog makes the hop a decision rather than a version number:
+
+- **v10** deprecates `encryptedSharedPreferences` "due to Jetpack Crypto package deprecation" and
+  offers `migrateOnAlgorithmChange: true` to move existing data onto a new cipher backend.
+- **v11** removes the option outright, and says: "If you used a version prior to v10, upgrade to v10
+  first so existing data is migrated."
+
+Going 9 to 11 in one hop is the path its own authors tell you not to take: every refresh token already
+on a device is stranded, and the at-rest protection of an auth credential changes without a migration.
+
+**The owner's decision, and it is an auth decision under this project's own rules:**
+
+1. two hops -- 9.2.4 to 10.x with `migrateOnAlgorithmChange: true`, verified on a device, then 11.x; or
+2. one hop to 11.x, accepting that existing test installs are signed out; or
+3. something that removes the collision without touching the token store.
+
+**To close:** the app builds for Android, is installed, and runs. Item 93 then becomes attemptable.
