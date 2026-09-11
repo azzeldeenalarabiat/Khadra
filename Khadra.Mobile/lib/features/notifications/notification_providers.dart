@@ -10,8 +10,9 @@ import '../../core/providers.dart';
 ///
 /// POLLED, because there is no push channel on this platform yet (pre-launch
 /// checklist item 73). A customer learns their booking was approved by opening the
-/// app, which is also why the deposit payment window is 24 hours rather than the
-/// one hour first proposed.
+/// app — and since 2026-09-11 the deposit is owed within two hours of that
+/// approval, which makes the missing channel a real cost rather than a
+/// convenience (item 90).
 ///
 /// A minute is deliberately unhurried: the count is a nudge, not a countdown, and
 /// a phone on a Jordanian mobile network should not spend its battery on it.

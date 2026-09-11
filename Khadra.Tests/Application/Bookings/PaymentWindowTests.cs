@@ -74,18 +74,23 @@ public sealed class PaymentWindowTests
         var rules = settings.RootElement.GetProperty("BusinessRules");
 
         Assert.Equal(2, rules.GetProperty("PaymentWindowHours").GetInt32());
-        // Stated beside it, because the pair is the reason this file exists.
-        Assert.Equal(120, rules.GetProperty("MinimumBookingLeadTimeMinutes").GetInt32());
+        // The lead time is asserted to EXIST and not to equal anything. Pinning its value here would
+        // mean that the day the owner moves the lead time, the payment-window test fails — and the
+        // person reading that failure edits the number in front of them. AppConfigTests owns its
+        // value; what this file owns is that they are two settings.
+        Assert.True(rules.TryGetProperty("MinimumBookingLeadTimeMinutes", out _));
     }
 
     /// <summary>The figure the pricer freezes is the PAYMENT window, not the lead time.</summary>
     [Fact]
     public async Task The_frozen_payment_window_is_the_payment_rule_and_not_the_lead_time()
     {
-        // Deliberately different numbers, so a test that passed by coincidence cannot.
-        var terms = await ConfiguredTermsAsync(paymentWindowHours: 2, minimumBookingLeadTimeMinutes: 45);
+        // THREE, not the shipped two: a pricer that ignored the parameter entirely would return the
+        // default and this test would pass on it. And 45 minutes for the lead time, so a pricer
+        // reading the wrong clock cannot land on the right answer either.
+        var terms = await ConfiguredTermsAsync(paymentWindowHours: 3, minimumBookingLeadTimeMinutes: 45);
 
-        Assert.Equal(TimeSpan.FromHours(2), terms.PaymentWindow);
+        Assert.Equal(TimeSpan.FromHours(3), terms.PaymentWindow);
         Assert.NotEqual(TimeSpan.FromMinutes(45), terms.PaymentWindow);
         // And the gallery's clock is a third rule again: 48 hours to answer has nothing to do with
         // the customer's two hours to pay, and one screen has already confused those two.

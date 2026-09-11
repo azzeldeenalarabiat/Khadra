@@ -176,8 +176,8 @@ public sealed class BookingReaderTests : IDisposable
     /// </summary>
     /// <remarks>
     /// With no push channel (pre-launch checklist item 73) a customer learns their booking was
-    /// approved by opening the app, which is exactly why the payment window is 24 hours. An approval
-    /// owing a deposit therefore outranks a rental starting tomorrow -- and an app sorting by pickup
+    /// approved by opening the app -- and since 2026-09-11 they have two hours to pay. An approval
+    /// owing a deposit therefore outranks a rental starting tomorrow, and an app sorting by pickup
     /// date would have shown the rental and let the deposit expire unread.
     /// </remarks>
     [Fact]

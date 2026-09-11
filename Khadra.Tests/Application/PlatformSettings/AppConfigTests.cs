@@ -79,6 +79,16 @@ public sealed class AppConfigTests
         // has to be the platform's. TWO hours since 2026-09-11, the owner's decision — and not to be
         // confused with MinimumBookingLeadTimeMinutes, which is also 120 and is a different clock.
         Assert.Equal(2, config.PaymentWindowHours);
+
+        // The other 120, published on the same document, so a client reading both can tell them
+        // apart. This is the assertion that owns the lead time's value; PaymentWindowTests only
+        // asserts that the two settings exist separately.
+        Assert.Equal(120, config.MinimumBookingLeadTimeMinutes);
+        // Same length, different units, different questions. Written out because the equality is a
+        // coincidence and the next person to read it should know that.
+        Assert.Equal(
+            TimeSpan.FromHours(config.PaymentWindowHours),
+            TimeSpan.FromMinutes(config.MinimumBookingLeadTimeMinutes));
     }
 
     [Fact]

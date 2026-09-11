@@ -1386,7 +1386,15 @@ existing "at least one" validation makes a missing key fail at startup.
 
 ### 59. The deposit payment window is 24 hours only because nothing can tell the customer
 
-**Status:** open · **Raised:** 2026-09-07 · **Owner decision recorded**
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-07 · **Superseded by:** item 90
+
+The owner shortened `BusinessRules:PaymentWindowHours` from 24 to 2 on 2026-09-11, taking the other
+side of the trade this item described. Everything below was the reasoning for 24 and is kept as the
+record of it; what the shorter window now costs is item 90, which is open.
+
+It was configuration and not a constant precisely so this could happen without a release, and it did.
+
+The original entry follows.
 
 `BusinessRules:PaymentWindowHours` is 24. The number the flow wants is closer to one hour: a car sits
 held against nothing for the whole window, and a dealership that has said yes deserves an answer
@@ -1396,8 +1404,6 @@ It is 24 because there are no push notifications. A customer learns their bookin
 by opening the app. A one-hour window would auto-expire most bookings approved overnight or during a
 working day before the customer ever saw the approval, wasting the dealer's decision and losing the
 rental — a worse failure than a car held a day too long.
-
-It is configuration, not a constant, precisely so this can be shortened without a release.
 
 **To close:** once approval reaches a customer's phone (item 43's notification producers plus a push
 transport), shorten the window and say so on the screen that counts it down.
@@ -1457,8 +1463,8 @@ start, so all three collapse at once: the dealer gets twenty minutes to answer, 
 whatever is left to pay, and free cancellation is already over.
 
 None of that is wrong — a window that outlived the rental it governs would be worse — but the
-platform is meanwhile telling the customer, on `GET /api/v1/app-config`, that they have 24 hours to
-pay. Two answers to one question is the failure this endpoint exists to prevent.
+platform is meanwhile telling the customer, on `GET /api/v1/app-config`, that they have a full
+payment window. Two answers to one question is the failure this endpoint exists to prevent.
 
 **To close:** two things.
 
@@ -1578,13 +1584,18 @@ the disclosure log written for all of it. Tests: `RenterDocumentAccessTests`,
 `RenterDocumentReviewTests` (application and domain), `DocumentAccessPersistenceTests`,
 `RenterDocumentEndpointTests`, `renter-documents.presenter.spec.ts`.
 
-### 64. A free hold is renewable, so the 72-hour ceiling is per request, not per customer
+### 64. A free hold is renewable, so the ceiling is per request, not per customer
 
-**Status:** open by decision · **Raised:** 2026-09-07 · **Accepted exposure**
+**Status:** open by decision · **Raised:** 2026-09-07 · **Accepted exposure** · **Updated:** 2026-09-11
 
-A request holds a car for up to 48 hours unanswered, and an approval holds it a further 24 unpaid:
-72 hours, none of it paid for. Nothing then stops the same customer requesting the same car again the
+A request holds a car for up to 48 hours unanswered, and an approval holds it for the payment window
+unpaid, none of it paid for. Nothing then stops the same customer requesting the same car again the
 instant it expires, so one account can keep a car off the market indefinitely at no cost.
+
+The ceiling was 72 hours when this was raised. Shortening the payment window to 2 hours on 2026-09-11
+made it 50, which narrows the exposure without removing it: the 48 hours a gallery may take to answer
+is the bulk of it, and that window has not moved. The figure is the sum of two settings and is
+deliberately not written down in the code.
 
 The deposit used to make that expensive. Under "reserve now, pay after approval" nothing does.
 
@@ -1839,8 +1850,12 @@ is no push channel, so a customer learns their booking was approved only by open
 
 That is what forced the deposit payment window to 24 hours rather than the one hour first proposed
 (item 59): a shorter window would auto-expire most bookings approved overnight before the customer
-ever saw them. Shortening it is one configuration value once push exists, which is why it is not a
-constant.
+ever saw them.
+
+**The owner shortened it to 2 hours anyway on 2026-09-11 (item 90), so this is no longer a nicety.**
+The window now assumes a channel that does not exist. An approval email over the transport that
+already sends verification mail would close most of it and is far cheaper than FCM/APNs; it should be
+built before the first real gallery approves anything.
 
 **To close:** a push transport (FCM/APNs), a device-token registration endpoint, and a decision about
 which `NotificationKind`s justify waking a phone.
@@ -1966,6 +1981,32 @@ with the provider. Two details that will bite whoever writes the adapter:
   round-trip test, and it must REFUSE an amount it cannot represent exactly rather than round it.
 - **`ParseEvent` must verify over the exact bytes received.** The controller passes the raw body
   through unparsed for that reason; anything that deserialises and re-serialises breaks every signature.
+
+**Three things a 2-hour payment window (item 90) adds to this, raised 2026-09-11.** None of them can
+happen while `Provider` is `None` — no checkout can open at all — so they are conditions on closing
+this item rather than defects today.
+
+1. **The Pay button and the checkout door disagree for the last five minutes.**
+   `BookingPaymentAvailability.ForAsync` answers `CanPay = true` for the whole of `now <
+   PaymentDeadline`, while `OpenDepositCheckoutHandler` refuses from `PaymentDeadline -
+   CheckoutClosesBeforeDeadlineMinutes` (5). The app shows a Pay button under a countdown reading
+   "4 minutes left" and the tap answers 409. At 24 hours that margin was 0.3% of the window; at two
+   it is 4%, and the countdown is now something customers will be watching. Fix: one helper that both
+   sides call, a distinct `payments.checkout_window_closed` code, and `PayBy` reporting the instant
+   the door actually shuts.
+
+2. **A late approval can produce a booking nobody can pay — AN OWNER DECISION, not a fix to make
+   quietly.** `MinimumBookingLeadTimeMinutes` lets a rental start two hours from the request, and the
+   payment deadline is capped at the rental start. Approve such a booking inside the last five
+   minutes and the gallery has said yes to something that cannot be paid for; it will prepare a car
+   that expires. Worse with a real provider — several refuse a checkout session shorter than about
+   thirty minutes, which would make the un-payable tail 35 minutes, a quarter of a two-hour window.
+   The shape of a fix is `Approve` taking a minimum-payment-window parameter the way
+   `BookingWindowPolicy` takes `minimumLeadTime`, refusing with `booking.too_late_to_approve` and
+   leaving rejection allowed. It changes what a gallery may do, so the owner decides.
+
+3. **The provider's own session floor bounds the door, not our five minutes.** Whatever provider
+   closes this item, its minimum session lifetime has to be read and folded into the same helper.
 
 ### 77. Cancellation does not refund, and that is the owner's decision to make
 

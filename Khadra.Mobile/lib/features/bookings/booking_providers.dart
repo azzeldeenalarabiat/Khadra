@@ -102,9 +102,9 @@ final bookingTabCountsProvider =
 /// would have shown the rental and let the deposit expire unread.
 ///
 /// It matters because there is no push channel yet: a customer learns their
-/// booking was approved by opening the app, and the 24-hour payment window exists
-/// for that reason. The first screen they land on is the only thing that can tell
-/// them in time.
+/// booking was approved by opening the app, and since 2026-09-11 they have two
+/// hours to pay rather than a day. The first screen they land on is the only
+/// thing that can tell them in time.
 final nextBookingProvider =
     FutureProvider.autoDispose<NextBooking?>((ref) async {
   final session = ref.watch(sessionProvider);
