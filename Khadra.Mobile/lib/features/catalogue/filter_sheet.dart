@@ -271,16 +271,16 @@ class _ChipGroup extends StatelessWidget {
             spacing: Space.sm,
             runSpacing: Space.sm,
             children: [
-              ChoiceChip(
-                label: Text(anyLabel),
+              KhadraChoiceChip(
+                label: anyLabel,
                 selected: selected == null,
-                onSelected: (_) => onChanged(null),
+                onTap: () => onChanged(null),
               ),
               for (final option in options)
-                ChoiceChip(
-                  label: Text(option.label),
+                KhadraChoiceChip(
+                  label: option.label,
                   selected: selected == option.value,
-                  onSelected: (_) => onChanged(
+                  onTap: () => onChanged(
                       selected == option.value ? null : option.value),
                 ),
             ],

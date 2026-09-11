@@ -251,9 +251,26 @@ class VehicleRowSaveButton extends StatelessWidget {
 
   final String vehicleId;
 
+  /// A 44dp target that OCCUPIES 22 of layout height.
+  ///
+  /// It sits on the name line, and a 44-high button there would set the height
+  /// of that line: the office underneath would drop half a row away from the car
+  /// it belongs to, and the card would grow by the difference. The overflow
+  /// spills into the card's own padding, where there is nothing to collide with
+  /// and nothing clipping it, so the finger still gets its full 44.
+  static const double _line = 22;
+  static const double _target = 44;
+
   @override
-  Widget build(BuildContext context) =>
-      SaveButton(vehicleId: vehicleId, size: 20);
+  Widget build(BuildContext context) => SizedBox(
+        width: _target,
+        height: _line,
+        child: OverflowBox(
+          minHeight: _target,
+          maxHeight: _target,
+          child: SaveButton(vehicleId: vehicleId, size: 20),
+        ),
+      );
 }
 
 /// The price on the vehicle screen's sticky booking bar.

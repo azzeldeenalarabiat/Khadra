@@ -480,6 +480,57 @@ class KhadraDetailRow extends StatelessWidget {
       );
 }
 
+/// The design's choice chip: a bordered rounded rectangle that tints and takes
+/// an accent outline when it is the one chosen.
+///
+/// Drawn rather than themed from Material's `Chip`. Material sizes a chip's label
+/// box from the style's own metrics and clips what does not fit, and Noto Kufi
+/// Arabic's line box is deeper than Manrope's at the same point size -- so the
+/// city chips came out with the top and bottom sliced off every Arabic word
+/// while the English ones looked fine. A Container has no opinion about the
+/// script inside it.
+class KhadraChoiceChip extends StatelessWidget {
+  const KhadraChoiceChip({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: selected ? KhadraColors.accent100 : KhadraColors.surface,
+        borderRadius: Radii.chip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: Radii.chip,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: Radii.chip,
+              border: Border.all(
+                color:
+                    selected ? KhadraColors.accent : KhadraColors.neutral300,
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                color:
+                    selected ? KhadraColors.price : KhadraColors.neutral800,
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
 /// The small label above ONE control -- a group of chips, a slider, a field.
 ///
 /// Deliberately not a section title: inside a sheet the design drops to a quiet

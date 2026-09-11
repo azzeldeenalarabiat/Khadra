@@ -176,12 +176,12 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
               runSpacing: Space.sm,
               children: [
                 for (final reason in reasons)
-                  ChoiceChip(
-                    label: Text(reason.labelFor(arabic)),
+                  KhadraChoiceChip(
+                    label: reason.labelFor(arabic),
                     selected: _reasonCode == reason.name,
-                    onSelected: _busy
-                        ? null
-                        : (_) => setState(() {
+                    onTap: _busy
+                        ? () {}
+                        : () => setState(() {
                               _reasonCode = reason.name;
                               _error = null;
                             }),

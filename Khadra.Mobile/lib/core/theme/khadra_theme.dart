@@ -368,9 +368,15 @@ abstract final class KhadraTheme {
           ),
         ),
         shape: const RoundedRectangleBorder(borderRadius: Radii.chip),
+        // `height` is not decoration. Material sizes a chip's label box from
+        // these metrics and clips what does not fit, and Noto Kufi Arabic's line
+        // box is deeper than Manrope's at the same point size -- so without room
+        // reserved here an Arabic chip loses the top and bottom of every word
+        // while the English one beside it looks correct.
         labelStyle: WidgetStateTextStyle.resolveWith(
           (states) => _style(
             fontSize: 12,
+            height: 1.5,
             fontWeight: states.contains(WidgetState.selected)
                 ? FontWeight.w700
                 : FontWeight.w600,

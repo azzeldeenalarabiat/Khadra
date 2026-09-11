@@ -211,7 +211,10 @@ class _ChipRow extends StatelessWidget {
           children: [
             KhadraFieldLabel(title),
             SizedBox(
-              height: 38,
+              // Tall enough for ARABIC: Noto Kufi Arabic's line box is deeper
+              // than Manrope's at the same point size, and a horizontal list has
+              // to be given a height before it knows what is in it.
+              height: 42,
               // Scrolls rather than wraps: the number of cities is the platform's
               // to grow, and a wrapping block would push the results off screen
               // the day an administrator adds a dozen.
@@ -219,10 +222,11 @@ class _ChipRow extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 itemCount: options.length,
                 separatorBuilder: (_, __) => const SizedBox(width: Space.sm),
-                itemBuilder: (_, index) => ActionChip(
-                  label: Text(options[index].label),
-                  onPressed: () => onTap(options[index].value),
-                  visualDensity: VisualDensity.compact,
+                itemBuilder: (_, index) => Center(
+                  child: KhadraChoiceChip(
+                    label: options[index].label,
+                    onTap: () => onTap(options[index].value),
+                  ),
                 ),
               ),
             ),
