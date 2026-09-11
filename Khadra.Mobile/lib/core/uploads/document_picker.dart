@@ -147,19 +147,30 @@ class DocumentPicker {
   Future<_Picked?> _file() async {
     final extensions = _allowedExtensions();
 
-    final result = await FilePicker.pickFiles(
+    // pickFile, SINGULAR. `pickFiles` returns a list and its `allowMultiple`
+    // now defaults to true, so asking for files and then taking the one would
+    // silently drop a two-file selection on the floor and read as a cancel.
+    final file = await FilePicker.pickFile(
       type: extensions.isEmpty ? FileType.any : FileType.custom,
       allowedExtensions: extensions.isEmpty ? null : extensions,
-      withData: true,
-      allowMultiple: false,
     );
-
-    final files = result?.files ?? const <PlatformFile>[];
-    final file = files.length == 1 ? files.first : null;
     if (file == null) return null;
 
-    final bytes = file.bytes;
-    if (bytes == null) return _Picked(Uint8List(0), file.name, null);
+    Uint8List bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } on Exception {
+      // The picker can fail AFTER a file has been chosen -- a provider that has
+      // gone away, a name the platform will not open, a file too big to hold in
+      // memory. None of that is something to crash on, and empty bytes are
+      // already the refusal the check below gives the right words to.
+      return _Picked(Uint8List(0), file.name, null);
+    } finally {
+      // The picker COPIES the chosen file into this app's cache to give it a
+      // path. The bytes are in memory now, and a passport should not outlive
+      // the upload it was picked for.
+      await FilePicker.clearTemporaryFiles();
+    }
 
     // The NAME is a hint and the bytes are the evidence. `lookupMimeType` reads
     // the magic numbers when it is given them and falls back to the extension

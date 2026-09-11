@@ -23,7 +23,14 @@ dependencies:
   dio: ^5.7.0
 
   # The refresh token, and only the refresh token. Keychain / Keystore backed.
-  flutter_secure_storage: ^9.2.4
+  #
+  # HELD IN 10.x on purpose, and the caret is what holds it. v10 deprecates the
+  # Jetpack Crypto backend this app has been writing with and carries the
+  # migration off it; v11 REMOVES the option, and its changelog says to pass
+  # through v10 first or strand what is already stored. The second hop is taken
+  # once the first is proven on a device that actually holds a 9.x token --
+  # pre-launch item 94.
+  flutter_secure_storage: ^10.3.2
   # Per-viewer conveniences that are not secrets: the chosen language, the
   # first-run marker that clears a Keychain entry surviving an app deletion.
   shared_preferences: ^2.3.5
@@ -47,7 +54,10 @@ dependencies:
   # since the store was configured, so the app was refusing a file the platform
   # accepts. WHICH types are accepted is still the server's answer, never a list
   # held here.
-  file_picker: ^11.0.3
+  # 12.x, because 11.x applies its own Kotlin Gradle Plugin and this toolchain's
+  # built-in Kotlin no longer links one that does: the Android build failed with
+  # `cannot find symbol FilePickerPlugin` and no APK could be produced at all.
+  file_picker: ^12.3.0
   # What a file actually IS, read from its leading bytes rather than trusted from
   # its name. A .pdf that is really a JPEG is refused by the server either way;
   # the point is that the app sends the truth about what it is uploading.

@@ -21,7 +21,35 @@ class SessionStore {
   SessionStore({FlutterSecureStorage? secureStorage})
       : _secure = secureStorage ??
             const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
+              // The token MOVES HOUSE on the first read after this version ships.
+              //
+              // Until now it lived in EncryptedSharedPreferences, which is
+              // Google's Jetpack Crypto library, which Google deprecated. v10 of
+              // this package replaces it with its own ciphers and carries the
+              // existing data across on first access; v11 removes the old
+              // backend entirely and tells you to pass through v10 first or
+              // strand whatever is already stored. So the app sits on v10 until
+              // that move is proved on a handset that actually holds a token
+              // written by the old one -- pre-launch item 94.
+              //
+              // All three flags are STATED rather than left to their defaults.
+              // They decide what happens to an authentication credential, and a
+              // default is a decision nobody can find later.
+              aOptions: AndroidOptions(
+                // Carry the data to the new ciphers instead of losing it.
+                migrateOnAlgorithmChange: true,
+                // Keep a copy while the move is in progress. It exists for
+                // exactly the case that costs a person their session: the app
+                // being killed halfway through a one-time migration of the one
+                // credential that survives a restart.
+                migrateWithBackup: true,
+                // A token that cannot be decrypted is discarded rather than
+                // kept. It is the right answer for a credential that signing in
+                // again replaces: the alternative fails every call against a
+                // blob nothing can read, which is a session nobody can end.
+                // This is a CHANGE -- v9 defaulted it to false.
+                resetOnError: true,
+              ),
               iOptions: IOSOptions(
                 // The app refreshes on cold start, which can happen from a
                 // background launch before the first unlock of the day. Anything

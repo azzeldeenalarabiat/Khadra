@@ -2530,12 +2530,60 @@ canvas. Steps 3–5 are equally unproven on iOS.
 
 **To close:** run the five steps on an Android device and an iPhone, and record the result here.
 
-**Blocked by item 94 since 2026-09-11:** the Android app cannot currently be BUILT, so the five steps
-cannot be attempted on any handset, real or emulated. Close 94 first.
+#### Run 1 -- Android emulator (Pixel, API 36), 2026-09-11, debug build
+
+Four of the five steps pass. The fifth fails, for a reason that needs an owner decision.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | System file picker opens with the right filter | **PASS** -- Android's SAF opens; the sheet advertises `JPG · PNG · WEBP · PDF · up to 8 MB`, read from `/app-config`, not written down in the app |
+| 2 | A PDF chosen from Downloads | **PASS** |
+| 3 | Bytes reach `POST /customers/me/documents` | **PASS** -- `201`, 9.3 s on the emulator |
+| 4 | Row persists with the right type and size | **PASS** -- the listing reads back `PDF · 1 KB`, "Waiting to be checked", and survives a force-stop and cold restart |
+| 5 | Document reopens through a signed link and renders | **FAIL** -- the browser receives `401 Unauthorized` (ProblemDetails), never the PDF |
+
+Steps 2-4 were also exercised from a third-party source only in the sense that Downloads is one;
+Drive and a third-party file manager are still untried, and so is the whole path on iOS.
+
+#### Why step 5 fails, and why it is not a bug in either half
+
+`DocumentsController.Download` is deliberately protected twice. Its own XML comment says so: the
+signature proves the link was minted by this platform for this file and has not expired, and the
+inherited authentication requirement proves there is still a live session behind the request. There
+is no `[AllowAnonymous]`, and `Program.cs` sets a `FallbackPolicy` requiring an authenticated JWT
+bearer user, so the endpoint needs BOTH the signature and a bearer token.
+
+The customer app opens the link with `launchUrl(..., mode: LaunchMode.externalApplication)`. An
+external browser has no bearer token. So the link is minted correctly (`GET .../link` returns `200`),
+handed to Chrome, and refused.
+
+Neither side is wrong on its own. The dealer and admin consoles open the same endpoint successfully
+because they are browsers carrying a cookie session through the BFF. Nobody reconciled that with a
+native app whose only credential lives inside the app.
+
+**This is not a regression from the file_picker or secure-storage upgrade.** It has been true since
+the View button was written; it could not be observed until an Android build existed to press it on.
+
+#### The owner's decision
+
+1. **Fetch in-app.** The app already holds the bearer token: download the bytes itself and render or
+   share them. No change to the security model, but it is a real piece of client work -- a PDF
+   viewer or a share sheet -- and it is the only option that keeps both checks.
+2. **Make the signature sufficient.** Add `[AllowAnonymous]` to `Download` and rely on the signed,
+   expiring URL alone. One line, and it deletes the second check the comment argues for: a leaked URL
+   then works for anyone until it expires.
+3. **Mint a single-use token bound to the session** and accept it in place of the bearer. Keeps two
+   factors, costs a new concept and a store for the tokens.
+
+Until this is decided, the View button is dead on Android and the app should not claim otherwise.
+
+**Unblocked 2026-09-11:** item 94's first hop landed and `flutter build apk` produces an artifact
+again, so the five steps are attemptable. They still need a handset; nothing below claims otherwise.
 
 ### 94. The Android app does not build, and nothing caught it
 
-**Status:** open, BLOCKING · **Raised:** 2026-09-11 · **Needs an owner decision**
+**Status:** open, BLOCKING · **Raised:** 2026-09-11 · **Decided by the owner, 2026-09-11** ·
+**First hop landed; held open for the on-device migration test**
 
 `flutter build apk` fails. `file_picker` 11.0.3 applies its own Kotlin Gradle Plugin, and this
 toolchain has moved to Flutter's built-in Kotlin, which no longer links a plugin that does:
@@ -2572,4 +2620,110 @@ on a device is stranded, and the at-rest protection of an auth credential change
 2. one hop to 11.x, accepting that existing test installs are signed out; or
 3. something that removes the collision without touching the token store.
 
-**To close:** the app builds for Android, is installed, and runs. Item 93 then becomes attemptable.
+**The owner chose (1), the two-hop, on 2026-09-11**, with the reason stated: this is authentication
+credential storage, and the package author's own migration path is not to be skipped merely because
+there are no production users yet. The advisor had recommended (2) -- see the dissent below, which is
+recorded because it bears on the SECOND hop, not the first.
+
+#### First hop, landed 2026-09-11
+
+`flutter_secure_storage` 9.2.4 to **10.3.2**, `file_picker` 11.0.3 to **12.3.0**. `flutter build apk`
+produces an artifact again, and the KGP warning is gone.
+
+The root cause was never `file_picker` "applying KGP" as the warning implies. 11.0.3's
+`android/build.gradle` applies the Kotlin plugin only `if (!isAgp9OrAbove)`, and this app is on AGP
+9 -- so the `if` never fires. But Flutter's tooling decides whether to apply `kotlin-android` on a
+plugin's behalf by REGEX over its build file, and the regex matches the line inside the dead branch.
+Nobody applied Kotlin, so nothing compiled the `.kt` sources, so `FilePickerPlugin` did not exist.
+`android_file_picker` 1.1.1 (pulled in by 12.x) reads `android.builtInKotlin` itself and applies the
+plugin when it is false, which is the fix for exactly this configuration.
+
+Three other things changed with it, each recorded because none is a version number:
+
+- `AndroidOptions` now states `migrateOnAlgorithmChange: true`, `migrateWithBackup: true` and
+  `resetOnError: true` rather than leaning on defaults. `migrateWithBackup` keeps a copy while the
+  one-time move runs, which is what protects the credential if the app is killed mid-migration.
+  `resetOnError` is a BEHAVIOUR CHANGE: v9 defaulted it to false.
+- The `file_picker` call site moved to `pickFile` (singular). In 12.x `pickFiles` returns a list and
+  `allowMultiple` defaults to **true**, so the old "take the one file" guard would have silently read
+  a two-file selection as a cancel. `withData` is gone; bytes come from `readAsBytes()`.
+- `FilePicker.clearTemporaryFiles()` is now called after the bytes are read. The picker copies the
+  chosen file into this app's cache to give it a path, and a passport should not outlive its upload.
+
+**iOS minimum rises from 13.0 to 14.0.** `file_picker_darwin` 1.2.0 requires it. Three
+`IPHONEOS_DEPLOYMENT_TARGET` lines in the pbxproj were changed; this drops iOS 13 devices and is a
+product decision the owner should confirm before release. It cannot be verified from Windows -- the
+first Mac build is the test.
+
+**A build setting was wrong independently of any of this.** `android/gradle.properties` asked for
+`-Xmx8G -XX:MaxMetaspaceSize=4G` on a machine with 8 GB of RAM. The daemon died mid-build with
+"Gradle build daemon disappeared unexpectedly" and a JVM crash log saying "insufficient memory".
+That is not a Gradle bug and not a plugin problem; it would have hit any contributor on a 8-16 GB
+machine. Now `-Xmx3G -XX:MaxMetaspaceSize=1G`.
+
+#### The advisor's dissent, which matters for the SECOND hop
+
+The advisor read the plugin sources rather than the changelogs and recommended going straight to v11,
+on the grounds that v9's entries are unreadable to v11 but return `null` rather than throwing -- which
+is the "no session" path the app already handles -- so the whole cost of the direct hop is that each
+existing Android test install signs in once more.
+
+One finding from that review bears directly on the owner's stated reason for choosing the two-hop and
+must not be lost: **v10's migration is best-effort, not a guarantee.** On any failure it falls back to
+EncryptedSharedPreferences silently and never sets its `ENCRYPTED_PREFERENCES_MIGRATED` marker, so a
+device that fails the v10 migration is stranded by v11 anyway. The two-hop reduces the risk; it does
+not remove it. That is the argument for testing the migration on a real device rather than assuming
+it, which is what this item is now held open for.
+
+#### What is still unproved, and blocks closing this item
+
+**The migration itself has NOT been exercised.** Every install used for verification so far was a
+FRESH one, which takes the "no data to migrate" branch -- the branch that cannot fail. The test that
+matters is the one nobody has run:
+
+1. install a build with `flutter_secure_storage` **9.2.4** on a real Android device,
+2. sign in, and confirm a token is stored,
+3. upgrade IN PLACE to this build (10.3.2) -- no uninstall,
+4. cold-start, and confirm the session survives without a sign-in,
+5. confirm `shared_prefs/FlutterSecureStorage.xml` no longer holds the Tink-encrypted entries.
+
+Until step 4 passes on a handset, the two-hop has bought nothing that has been demonstrated.
+
+#### The eight health checks the owner asked for, on the Android emulator, 2026-09-11
+
+All eight pass. The storage assertions are made against the device's own
+`shared_prefs/FlutterSecureStorage.xml` through `run-as`, not inferred from the screen.
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Dependency resolution succeeds | **PASS** -- `flutter_secure_storage 10.3.2`, `file_picker 12.3.0` |
+| 2 | `flutter build apk` succeeds | **PASS** -- debug APK produced; the KGP warning is gone |
+| 3 | `flutter analyze` clean | **PASS** |
+| 4 | Full Flutter tests pass | **PASS** -- 127 |
+| 5 | Authentication from a fresh install | **PASS** -- `POST /auth/login 200`; the store goes from an empty `<map />` to exactly two entries, `khadra.refresh_token` and `khadra.refresh_expires_at` |
+| 6 | Refresh-token persistence across restart | **PASS** -- force-stop, cold start, `POST /auth/refresh 200`, profile restored without a sign-in |
+| 7 | Logout removes the credentials | **PASS** -- `POST /auth/logout 204`, store back to zero entries |
+| 8 | Expired/invalid refresh token | **PASS** -- password reset server-side revoked the family; cold start gave `POST /auth/refresh 401`, the app landed signed-out on Home, the store was emptied, and there was ONE 401, not a loop |
+
+A fresh install now writes `FlutterSecureKeyStorage.xml` holding an RSA-wrapped AES key -- v10's own
+cipher backend -- rather than Jetpack Crypto's Tink blobs. That is the new scheme working; it is NOT
+evidence that a migration works, because a fresh install has nothing to migrate.
+
+#### What is still unproved, and blocks closing this item
+
+**The migration itself has NOT been exercised.** Every install used for verification was a FRESH one,
+which takes the "no data to migrate" branch -- the branch that cannot fail. The test that matters is
+the one nobody has run:
+
+1. install a build with `flutter_secure_storage` **9.2.4** on a real Android device,
+2. sign in, and confirm a token is stored,
+3. upgrade IN PLACE to this build (10.3.2) -- no uninstall,
+4. cold-start, and confirm the session survives without a sign-in,
+5. confirm the Tink-encrypted entries are gone from `shared_prefs/FlutterSecureStorage.xml`.
+
+Until step 4 passes on a handset, the two-hop has bought nothing that has been demonstrated.
+
+**To close:** the app builds for Android (done), is installed and runs (done), the eight health checks
+pass (done), AND the 9.2.4 to 10.3.2 upgrade-in-place preserves an authenticated session on a real
+device (open). Only then is the second hop, 10.x to 11.x, worth taking -- and it reruns the same
+authentication and storage tests.
