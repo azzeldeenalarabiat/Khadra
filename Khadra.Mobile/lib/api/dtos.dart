@@ -458,6 +458,7 @@ class CustomerDocument {
     required this.documentId,
     required this.type,
     required this.status,
+    required this.contentType,
     required this.sizeBytes,
     required this.uploadedAt,
     required this.reviewNote,
@@ -466,6 +467,10 @@ class CustomerDocument {
   final String documentId;
   final String type;
   final String status;
+
+  /// What the server actually stored. Empty on a server that predates the field,
+  /// which the tile renders as nothing rather than as a guess.
+  final String contentType;
   final int sizeBytes;
   final DateTime uploadedAt;
   final String? reviewNote;
@@ -474,6 +479,7 @@ class CustomerDocument {
         documentId: json['documentId'] as String? ?? '',
         type: json['type'] as String? ?? '',
         status: json['status'] as String? ?? '',
+        contentType: json['contentType'] as String? ?? '',
         sizeBytes: _int(json['sizeBytes']),
         uploadedAt: _requiredDateTime(json['uploadedAt']),
         reviewNote: json['reviewNote'] as String?,

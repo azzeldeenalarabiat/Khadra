@@ -393,7 +393,17 @@
   "documentsReplace": "استبدال",
   "documentsView": "عرض",
   "documentsTakePhoto": "التقط صورة",
+  "documentsChoosePhoto": "اختر صورة",
   "documentsChooseFile": "اختر ملفاً",
+  "documentsFileLimits": "{kinds} · حتى {size}",
+  "@documentsFileLimits": {
+    "placeholders": { "kinds": { "type": "String" }, "size": { "type": "String" } }
+  },
+  "documentsFileUnreadable": "تعذّرت قراءة هذا الملف. اختره مرة أخرى أو التقط صورة للمستند بدلاً من ذلك.",
+  "documentsFileSummary": "{kind} · {size}",
+  "@documentsFileSummary": {
+    "placeholders": { "kind": { "type": "String" }, "size": { "type": "String" } }
+  },
   "documentsUploading": "جارٍ الرفع…",
   "documentsUploaded": "رُفع {when}",
   "@documentsUploaded": { "placeholders": { "when": { "type": "String" } } },

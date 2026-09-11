@@ -52,10 +52,16 @@ void main() {
     // on BOTH sides of the switch, because somebody who has the app in the wrong
     // one has to be able to find their way out of it. And a phone-number hint is
     // digits.
+    //
+    // `documentsFileSummary` is two placeholders and a separator — "PDF · 1.2 MB"
+    // — and both values are Latin whichever language is reading. There is nothing
+    // in it to translate, and inventing a difference would only be a way to
+    // satisfy this test.
     const identicalByDesign = {
       'profileLanguageEnglish',
       'profileLanguageArabic',
       'authPhoneHint',
+      'documentsFileSummary',
     };
 
     final untranslated = <String>[];

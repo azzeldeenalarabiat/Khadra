@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/dtos.dart';
@@ -10,6 +9,7 @@ import '../../core/format/formats.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
+import '../../core/uploads/document_picker.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import 'document_providers.dart';
@@ -125,76 +125,39 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     );
   }
 
+  /// Photograph it, choose a photo, or file the PDF somebody sent you.
+  ///
+  /// Which of those are offered, and what is accepted once one is chosen, are the
+  /// SERVER's answers — `/app-config` publishes the content types and the size
+  /// cap, and [DocumentPicker] does nothing but render them and check against
+  /// them. Checked here as well as on the server because the failure is
+  /// expensive: a customer on a Jordanian mobile network should not upload eight
+  /// megabytes to be told it was one too many.
   Future<void> _upload(String type) async {
-    final l10n = AppLocalizations.of(context);
-    final limits = ref.read(appConfigProvider).valueOrNull?.documents;
+    final picker =
+        DocumentPicker(ref.read(appConfigProvider).valueOrNull?.documents);
 
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: Text(l10n.documentsTakePhoto),
-              subtitle: Text(
-                l10n.documentsCameraNote,
-                style: const TextStyle(fontSize: 12),
-              ),
-              onTap: () => Navigator.of(context).pop(ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: Text(l10n.documentsChooseFile),
-              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
+    final choice = await picker.pick(context);
+    if (choice == null || !mounted) return;
 
-    if (source == null) return;
-
-    // JPEG is requested explicitly. An iPhone's camera writes HEIC by default,
-    // and the platform's accepted types are JPEG, PNG, WebP and PDF -- so without
-    // this every licence photo taken on an iPhone would be refused as an invalid
-    // content type.
-    final picked = await ImagePicker().pickImage(
-      source: source,
-      imageQuality: 88,
-      maxWidth: 2400,
-      requestFullMetadata: false,
-    );
-
-    if (picked == null || !mounted) return;
-
-    final bytes = await picked.readAsBytes();
-
-    // Checked here as well as on the server, because the failure is expensive: a
-    // customer on a Jordanian mobile network should not upload eight megabytes to
-    // be told it was one too many.
-    if (limits != null && bytes.length > limits.maximumSizeBytes) {
-      if (!mounted) return;
-      showKhadraMessage(
-        context,
-        l10n.documentsTooLarge(_megabytes(limits.maximumSizeBytes)),
-        isError: true,
-      );
-      return;
+    switch (choice) {
+      case DocumentRefused(:final message):
+        showKhadraMessage(context, message, isError: true);
+      case DocumentChosen(:final document):
+        await _send(type, document);
     }
+  }
 
+  Future<void> _send(String type, PickedDocument document) async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _uploading = type);
 
     try {
       await ref.read(apiProvider).uploadDocument(
             type: type,
-            bytes: bytes,
-            fileName: picked.name.toLowerCase().endsWith('.jpg') ||
-                    picked.name.toLowerCase().endsWith('.jpeg')
-                ? picked.name
-                : '${picked.name}.jpg',
-            contentType: 'image/jpeg',
+            bytes: document.bytes,
+            fileName: document.fileName,
+            contentType: document.contentType,
           );
 
       ref.invalidate(myDocumentsProvider);
@@ -223,9 +186,6 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       }
     }
   }
-
-  static String _megabytes(int bytes) =>
-      '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
 
   /// The order somebody would fill these in: licence front, licence back, then
   /// whichever identity document their account calls for.
@@ -278,7 +238,7 @@ class _DocumentTile extends StatelessWidget {
           Row(
             children: [
               Icon(
-                _icon(type),
+                _icon(type, document),
                 color: present ? KhadraColors.accent : KhadraColors.neutral400,
               ),
               const SizedBox(width: Space.md),
@@ -304,6 +264,24 @@ class _DocumentTile extends StatelessWidget {
                             : KhadraColors.warn,
                       ),
                     ),
+                    // WHAT is on file, from the record rather than from the tile's
+                    // own guess: the platform takes photographs and PDFs, and a
+                    // customer replacing a document a year later deserves to know
+                    // which of the two they filed. Isolated because it is a Latin
+                    // run inside an Arabic paragraph.
+                    if (present && document!.contentType.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        Formats.isolate(l10n.documentsFileSummary(
+                          DocumentPicker.kindOf(document!.contentType),
+                          DocumentPicker.formatBytes(document!.sizeBytes),
+                        )),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: KhadraColors.neutral500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -360,13 +338,23 @@ class _DocumentTile extends StatelessWidget {
     );
   }
 
-  static IconData _icon(String type) => switch (type) {
-        DocumentTypes.drivingLicenceFront ||
-        DocumentTypes.drivingLicenceBack =>
-          Icons.credit_card_outlined,
-        DocumentTypes.passport => Icons.book_outlined,
-        _ => Icons.badge_outlined,
-      };
+  /// The document's own icon, unless what is on file says otherwise.
+  ///
+  /// A licence filed as a PDF shows as a PDF. The type icon describes the paper
+  /// the platform asked for; once something is filed, the more useful fact is
+  /// what the customer actually sent.
+  static IconData _icon(String type, CustomerDocument? document) {
+    if (document != null && document.contentType.toLowerCase() == 'application/pdf') {
+      return Icons.picture_as_pdf_outlined;
+    }
+    return switch (type) {
+      DocumentTypes.drivingLicenceFront ||
+      DocumentTypes.drivingLicenceBack =>
+        Icons.credit_card_outlined,
+      DocumentTypes.passport => Icons.book_outlined,
+      _ => Icons.badge_outlined,
+    };
+  }
 
   static String _label(AppLocalizations l10n, String type) => switch (type) {
         DocumentTypes.drivingLicenceFront => l10n.documentsDrivingLicenceFront,

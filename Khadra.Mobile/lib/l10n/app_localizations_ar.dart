@@ -1235,7 +1235,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get documentsTakePhoto => 'التقط صورة';
 
   @override
+  String get documentsChoosePhoto => 'اختر صورة';
+
+  @override
   String get documentsChooseFile => 'اختر ملفاً';
+
+  @override
+  String documentsFileLimits(String kinds, String size) {
+    return '$kinds · حتى $size';
+  }
+
+  @override
+  String get documentsFileUnreadable =>
+      'تعذّرت قراءة هذا الملف. اختره مرة أخرى أو التقط صورة للمستند بدلاً من ذلك.';
+
+  @override
+  String documentsFileSummary(String kind, String size) {
+    return '$kind · $size';
+  }
 
   @override
   String get documentsUploading => 'جارٍ الرفع…';

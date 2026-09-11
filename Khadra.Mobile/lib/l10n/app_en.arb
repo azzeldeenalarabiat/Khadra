@@ -430,7 +430,19 @@
   "documentsReplace": "Replace",
   "documentsView": "View",
   "documentsTakePhoto": "Take a photo",
+  "documentsChoosePhoto": "Choose a photo",
   "documentsChooseFile": "Choose a file",
+  "documentsFileLimits": "{kinds} · up to {size}",
+  "@documentsFileLimits": {
+    "description": "Both values are read off /app-config's documents section. The app holds no list of accepted types and no size of its own.",
+    "placeholders": { "kinds": { "type": "String" }, "size": { "type": "String" } }
+  },
+  "documentsFileUnreadable": "That file could not be read. Choose it again, or take a photo of the document instead.",
+  "documentsFileSummary": "{kind} · {size}",
+  "@documentsFileSummary": {
+    "description": "What is actually on file, from the record: the server's stored content type and byte count, never guessed from the tile.",
+    "placeholders": { "kind": { "type": "String" }, "size": { "type": "String" } }
+  },
   "documentsUploading": "Uploading…",
   "documentsUploaded": "Uploaded {when}",
   "@documentsUploaded": { "placeholders": { "when": { "type": "String" } } },

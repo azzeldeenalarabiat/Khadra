@@ -42,6 +42,16 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   url_launcher: ^6.3.1
+  # A licence is a photograph; a passport scan emailed by an embassy is a PDF.
+  # image_picker cannot open one, and /app-config has advertised application/pdf
+  # since the store was configured, so the app was refusing a file the platform
+  # accepts. WHICH types are accepted is still the server's answer, never a list
+  # held here.
+  file_picker: ^11.0.3
+  # What a file actually IS, read from its leading bytes rather than trusted from
+  # its name. A .pdf that is really a JPEG is refused by the server either way;
+  # the point is that the app sends the truth about what it is uploading.
+  mime: ^2.1.0
 
 dev_dependencies:
   flutter_test:

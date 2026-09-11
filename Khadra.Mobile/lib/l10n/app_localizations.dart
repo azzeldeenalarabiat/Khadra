@@ -2054,11 +2054,35 @@ abstract class AppLocalizations {
   /// **'Take a photo'**
   String get documentsTakePhoto;
 
+  /// No description provided for @documentsChoosePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a photo'**
+  String get documentsChoosePhoto;
+
   /// No description provided for @documentsChooseFile.
   ///
   /// In en, this message translates to:
   /// **'Choose a file'**
   String get documentsChooseFile;
+
+  /// Both values are read off /app-config's documents section. The app holds no list of accepted types and no size of its own.
+  ///
+  /// In en, this message translates to:
+  /// **'{kinds} · up to {size}'**
+  String documentsFileLimits(String kinds, String size);
+
+  /// No description provided for @documentsFileUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'That file could not be read. Choose it again, or take a photo of the document instead.'**
+  String get documentsFileUnreadable;
+
+  /// What is actually on file, from the record: the server's stored content type and byte count, never guessed from the tile.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind} · {size}'**
+  String documentsFileSummary(String kind, String size);
 
   /// No description provided for @documentsUploading.
   ///
