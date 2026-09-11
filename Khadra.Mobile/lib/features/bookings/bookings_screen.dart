@@ -87,16 +87,18 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
       appBar: AppBar(
         title: KhadraLargeTitle(l10n.bookingsTitle),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
+          preferredSize: const Size.fromHeight(44),
           child: SizedBox(
-            height: 52,
+            height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: Space.lg),
               children: [
                 for (final name in BookingTabs.ordered)
                   Padding(
-                    padding: const EdgeInsetsDirectional.only(end: Space.sm),
+                    // Eighteen between tabs, which is what an underline needs to
+                    // read as a set rather than as one long rule.
+                    padding: const EdgeInsetsDirectional.only(end: 18),
                     child: _TabChip(
                       label: _tabLabel(l10n, name),
                       // The COUNT is the database's, over the whole tab, not the
@@ -213,21 +215,30 @@ class _TabChip extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: selected ? KhadraColors.accent : KhadraColors.surface,
-        borderRadius: Radii.chip,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: Radii.chip,
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: Space.lg, vertical: Space.sm),
-            decoration: BoxDecoration(
-              borderRadius: Radii.chip,
-              border: Border.all(
-                color: selected ? KhadraColors.accent : KhadraColors.neutral300,
+  Widget build(BuildContext context) {
+    final colour = selected ? KhadraColors.accent : KhadraColors.neutral600;
+
+    // An UNDERLINED tab, which is what the design draws — not a filled pill. A
+    // row of pills reads as five buttons competing with the cards under them;
+    // an underline is a position in a set, which is what a tab is.
+    //
+    // The count stays. It is the server's own figure and it is the reason
+    // somebody looks at a tab they are not on.
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 11, top: 4),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: selected ? KhadraColors.accent : Colors.transparent,
+                width: 2,
               ),
             ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 9),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -235,19 +246,19 @@ class _TabChip extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: selected ? Colors.white : KhadraColors.neutral700,
+                    fontWeight: FontWeight.w700,
+                    color: colour,
                   ),
                 ),
                 if (count > 0) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 5),
                   Text(
                     count.toString(),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: selected
-                          ? Colors.white.withValues(alpha: 0.85)
+                          ? KhadraColors.accent
                           : KhadraColors.neutral500,
                     ),
                   ),
@@ -256,7 +267,9 @@ class _TabChip extends StatelessWidget {
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _BookingRow extends StatelessWidget {

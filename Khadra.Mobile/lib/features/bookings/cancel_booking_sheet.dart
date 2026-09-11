@@ -127,7 +127,7 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
                   child: Text(
                     l10n.cancelTitle,
                     style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                        fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(

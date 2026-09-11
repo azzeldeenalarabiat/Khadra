@@ -91,7 +91,12 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       children: [
         Text(
           l10n.documentsIntro,
-          style: const TextStyle(fontSize: 14, height: 1.55),
+          style: const TextStyle(
+            fontSize: 13,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+            color: KhadraColors.neutral700,
+          ),
         ),
         const SizedBox(height: Space.lg),
 
@@ -112,7 +117,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             onUpload: () => _upload(type),
             onView: () => _view(documents.ofType(type)!),
           ),
-          const SizedBox(height: Space.md),
+          const SizedBox(height: Space.sm),
         ],
 
         const SizedBox(height: Space.lg),
@@ -268,7 +273,7 @@ class _DocumentTile extends StatelessWidget {
                     Text(
                       _label(l10n, type),
                       style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600),
+                          fontSize: 13, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -277,7 +282,8 @@ class _DocumentTile extends StatelessWidget {
                               formats.longDate(document!.uploadedAt))
                           : l10n.documentsMissing,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                         color: present
                             ? KhadraColors.neutral600
                             : KhadraColors.warn,
@@ -296,7 +302,8 @@ class _DocumentTile extends StatelessWidget {
                           DocumentPicker.formatBytes(document!.sizeBytes),
                         )),
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                           color: KhadraColors.neutral500,
                         ),
                       ),

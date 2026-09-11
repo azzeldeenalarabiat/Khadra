@@ -86,7 +86,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   child: Text(
                     l10n.searchFilters,
                     style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                        fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                 ),
                 TextButton(
@@ -159,7 +159,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 ),
 
                 const SizedBox(height: Space.sm),
-                KhadraSectionTitle(l10n.searchPriceRange),
+                KhadraFieldLabel(l10n.searchPriceRange),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -257,7 +257,7 @@ class _ChipGroup extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          KhadraSectionTitle(title),
+          KhadraFieldLabel(title),
           Wrap(
             spacing: Space.sm,
             runSpacing: Space.sm,

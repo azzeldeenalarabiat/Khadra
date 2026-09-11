@@ -268,34 +268,54 @@ class DailyRateLabel extends StatelessWidget {
     super.key,
     required this.formats,
     required this.rate,
+    this.size = 17,
+    this.stacked = false,
   });
 
   final Formats formats;
   final Money rate;
 
+  /// The price's own size; the unit sits two steps under it, as the design draws
+  /// it at both the sizes it uses (17 in the booking bar, 20 on the car itself).
+  final double size;
+
+  /// Put the unit on its own line, for the narrow right-hand column of a title
+  /// block where one long line would wrap in the middle of the amount.
+  final bool stacked;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
+    // One source for the unit, and it is the SAME translated string in both
+    // shapes: the amount is empty here because the price is typeset separately.
+    final unit = l10n.vehiclePerDay('').trim();
+    final amountStyle = TextStyle(
+      fontSize: size,
+      fontWeight: FontWeight.w800,
+      color: KhadraColors.price,
+    );
+    final unitStyle = TextStyle(
+      fontSize: size - 5,
+      fontWeight: FontWeight.w600,
+      color: KhadraColors.neutral600,
+    );
+
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(formats.money(rate), style: amountStyle, maxLines: 1),
+          Text(unit, style: unitStyle, maxLines: 1),
+        ],
+      );
+    }
+
     return Text.rich(
       TextSpan(
         children: [
-          TextSpan(
-            text: formats.money(rate),
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: KhadraColors.price,
-            ),
-          ),
-          TextSpan(
-            text: ' ${l10n.vehiclePerDay('')}',
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: KhadraColors.neutral600,
-            ),
-          ),
+          TextSpan(text: formats.money(rate), style: amountStyle),
+          TextSpan(text: ' $unit', style: unitStyle),
         ],
       ),
       maxLines: 1,

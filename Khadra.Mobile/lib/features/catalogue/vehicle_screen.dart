@@ -150,18 +150,48 @@ class _VehicleBody extends ConsumerWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.lg),
           sliver: SliverList.list(children: [
-            Text(
-              vehicle.title,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: Space.xs),
-            Text(
-              [
-                vehicle.year.toString(),
-                if (vehicle.carType != null) vehicle.carType!.nameFor(arabic),
-              ].join(' · '),
-              style: const TextStyle(
-                  color: KhadraColors.neutral600, fontSize: 14),
+            // Name on one side, the day rate on the other. The design shows the
+            // rate here AND in the bar, and both read the same field of the same
+            // response, so there is no second figure to drift.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vehicle.title,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        [
+                          vehicle.year.toString(),
+                          if (vehicle.carType != null)
+                            vehicle.carType!.nameFor(arabic),
+                        ].join(' · '),
+                        style: const TextStyle(
+                          color: KhadraColors.neutral600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: Space.md),
+                DailyRateLabel(
+                  formats: formats,
+                  rate: vehicle.dailyRate,
+                  size: 20,
+                  stacked: true,
+                ),
+              ],
             ),
             const SizedBox(height: Space.lg),
 

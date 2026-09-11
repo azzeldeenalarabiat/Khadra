@@ -241,14 +241,22 @@ class _AccountHeader extends StatelessWidget {
         child: KhadraCard(
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: KhadraColors.accent100,
+              // The design's monogram is a dark ROUNDED SQUARE, not a pale
+              // circle: it is the only heavy shape on the screen, and it is what
+              // tells somebody at a glance whose account this is.
+              Container(
+                width: 56,
+                height: 56,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: KhadraColors.price,
+                  borderRadius: Radii.feature,
+                ),
                 child: Text(
                   _initials(name),
                   style: const TextStyle(
-                    color: KhadraColors.accent,
-                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
                     fontSize: 18,
                   ),
                 ),
@@ -261,7 +269,7 @@ class _AccountHeader extends StatelessWidget {
                     Text(
                       name,
                       style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w700),
+                          fontSize: 17, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
                     // Latin inside an Arabic layout: isolated so the address does
@@ -269,22 +277,32 @@ class _AccountHeader extends StatelessWidget {
                     LatinRun(
                       email,
                       style: const TextStyle(
-                          color: KhadraColors.neutral600, fontSize: 13),
+                        color: KhadraColors.neutral600,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (memberSince != null) ...[
                       const SizedBox(height: 2),
                       Text(
                         memberSince!,
                         style: const TextStyle(
-                            color: KhadraColors.neutral500, fontSize: 12),
+                          color: KhadraColors.neutral500,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    if (verified) ...[
+                      const SizedBox(height: 6),
+                      KhadraBadge(
+                        label: AppLocalizations.of(context).authVerifiedTitle,
+                        colour: KhadraColors.accent,
                       ),
                     ],
                   ],
                 ),
               ),
-              if (verified)
-                const Icon(Icons.verified_outlined,
-                    color: KhadraColors.accent, size: 20),
             ],
           ),
         ),

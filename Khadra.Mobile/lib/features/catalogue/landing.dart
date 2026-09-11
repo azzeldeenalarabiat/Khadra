@@ -209,17 +209,9 @@ class _ChipRow extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: KhadraColors.neutral600,
-              ),
-            ),
-            const SizedBox(height: Space.sm),
+            KhadraFieldLabel(title),
             SizedBox(
-              height: 36,
+              height: 38,
               // Scrolls rather than wraps: the number of cities is the platform's
               // to grow, and a wrapping block would push the results off screen
               // the day an administrator adds a dozen.

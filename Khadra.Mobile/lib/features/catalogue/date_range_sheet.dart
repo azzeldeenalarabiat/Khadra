@@ -239,7 +239,7 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
                   child: Text(
                     l10n.searchChooseDates,
                     style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                        fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(
