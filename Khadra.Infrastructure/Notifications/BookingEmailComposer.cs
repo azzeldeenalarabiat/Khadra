@@ -57,12 +57,9 @@ internal sealed class BookingEmailComposer(
         var reference = booking.Reference;
         var trimmedNote = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
 
-        // The booking's own frozen window, in whole hours where it is one. The email states the rule
-        // this booking was made under, never the setting in force the day it is read.
+        // The booking's own frozen window. The email states the rule this booking was made under,
+        // never the setting in force the day it is read.
         var hours = booking.Terms.PaymentWindowHours;
-        var hoursText = hours == Math.Floor(hours)
-            ? ((int)hours).ToString(CultureInfo.InvariantCulture)
-            : hours.ToString("0.#", CultureInfo.InvariantCulture);
 
         var link = _customerAppUrl.Length == 0
             ? null
@@ -70,9 +67,9 @@ internal sealed class BookingEmailComposer(
 
         var arabic = new List<string>
         {
-            $"وافق {Html(gallery)} على حجزك لسيارة {Html(car)}.",
-            $"رقم الحجز: {Html(reference)}",
-            $"العربون المستحق: {Html(deposit)}",
+            $"وافق {Latin(gallery)} على حجزك لسيارة {Latin(car)}.",
+            $"رقم الحجز: {Latin(reference)}",
+            $"العربون المستحق: {Latin(deposit)}",
         };
         var english = new List<string>
         {
@@ -83,13 +80,13 @@ internal sealed class BookingEmailComposer(
 
         if (deadline is not null)
         {
-            arabic.Add($"ادفع قبل {Html(deadline)} ({hoursText} ساعة من الآن)، وإلا انتهى الحجز وعادت السيارة إلى السوق.");
-            english.Add($"Pay by {Html(deadline)} — {hoursText} hours from the approval — or the booking ends and the car goes back on the market.");
+            arabic.Add($"ادفع قبل {Latin(deadline)} ({ArabicHours(hours)} من الآن)، وإلا انتهى الحجز وعادت السيارة إلى السوق.");
+            english.Add($"Pay by {Html(deadline)} — {EnglishHours(hours)} from the approval — or the booking ends and the car goes back on the market.");
         }
 
         if (trimmedNote is not null)
         {
-            arabic.Add($"من المكتب: {Html(trimmedNote)}");
+            arabic.Add($"من المكتب: {Latin(trimmedNote)}");
             english.Add($"From the office: {Html(trimmedNote)}");
         }
 
@@ -144,6 +141,54 @@ internal sealed class BookingEmailComposer(
     }
 
     private static string Html(string value) => WebUtility.HtmlEncode(value);
+
+    /// <summary>
+    /// Encoded, and ISOLATED so the bidi algorithm cannot reorder it against Arabic neighbours.
+    /// </summary>
+    /// <remarks>
+    /// A gallery's name, a booking reference, a price and a date are all Latin runs, and every one of
+    /// them appears in the middle of an Arabic sentence here. Without an isolate the algorithm
+    /// resolves the run against whatever sits beside it: a reference reads backwards, a price loses
+    /// its currency code to the punctuation after it. The app already learned this the hard way in
+    /// <c>Formats.money</c>.
+    ///
+    /// U+2068 FIRST STRONG ISOLATE and U+2069 POP DIRECTIONAL ISOLATE rather than
+    /// <c>&lt;bdi&gt;</c>: these are plain characters, so the same string is correct in the HTML half
+    /// and in the plain-text half, and no mail client has to know the tag.
+    /// </remarks>
+    private static string Latin(string value) => $"\u2068{WebUtility.HtmlEncode(value)}\u2069";
+
+    /// <summary>
+    /// A count of hours in English, where a number in front of a noun is the whole of it.
+    /// </summary>
+    private static string EnglishHours(double hours) =>
+        hours == 1d ? "1 hour" : $"{Figure(hours)} hours";
+
+    /// <summary>
+    /// A count of hours in Arabic, which does not put a digit in front of a noun and leave it there.
+    /// </summary>
+    /// <remarks>
+    /// One is ساعة واحدة, two is a dual word with no digit at all, three to ten take the plural
+    /// ساعات, and eleven upwards return to the singular after the figure. Writing "2 ساعة" — which
+    /// this did until the payment window became two hours — is the shape a reader notices
+    /// immediately and the shape that says nobody who speaks the language read the message.
+    ///
+    /// The app spells the same rule out in ICU plurals (`countdownHours`); an email has no ICU, so
+    /// it is spelled out here, and the two are checked against each other by eye and by test.
+    /// </remarks>
+    private static string ArabicHours(double hours) => hours switch
+    {
+        1d => "ساعة واحدة",
+        2d => "ساعتان",
+        >= 3d and <= 10d when hours == Math.Floor(hours) => $"{Latin(Figure(hours))} ساعات",
+        _ => $"{Latin(Figure(hours))} ساعة",
+    };
+
+    /// <summary>A whole number without a decimal point, a fractional one with as few as it needs.</summary>
+    private static string Figure(double value) =>
+        value == Math.Floor(value)
+            ? ((int)value).ToString(CultureInfo.InvariantCulture)
+            : value.ToString("0.#", CultureInfo.InvariantCulture);
 
     private static IReadOnlyList<string> Plain(IEnumerable<string> htmlLines) =>
         [.. htmlLines.Select(line => WebUtility.HtmlDecode(line) ?? line)];

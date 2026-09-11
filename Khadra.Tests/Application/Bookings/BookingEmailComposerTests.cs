@@ -127,7 +127,68 @@ public sealed class BookingEmailComposerTests
 
         // And the duration beside it, from the booking's OWN frozen terms.
         Assert.Contains("2 hours from the approval", message.HtmlBody, StringComparison.Ordinal);
-        Assert.Contains("2 ساعة من الآن", message.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains("ساعتان من الآن", message.HtmlBody, StringComparison.Ordinal);
+    }
+
+    /// <summary>Arabic counts hours with words, not with a digit parked in front of a noun.</summary>
+    /// <remarks>
+    /// The app spells the same rule out in ICU plurals; an email has no ICU, so the composer spells
+    /// it out and this checks the two agree. "2 ساعة" is what it said until the payment window became
+    /// two hours, and it is the shape a reader notices immediately.
+    /// </remarks>
+    [Theory]
+    [InlineData(1, "ساعة واحدة", "1 hour")]
+    [InlineData(2, "ساعتان", "2 hours")]
+    [InlineData(3, "ساعات", "3 hours")]
+    [InlineData(10, "ساعات", "10 hours")]
+    [InlineData(24, "ساعة", "24 hours")]
+    public void The_hours_are_counted_the_way_each_language_counts(int hours, string arabic, string english)
+    {
+        var (booking, context) = Approved(paymentWindow: TimeSpan.FromHours(hours));
+
+        var message = Composer().BookingApproved(Build.Customer(), booking, context, note: null);
+
+        Assert.Contains(arabic, message.TextBody, StringComparison.Ordinal);
+        Assert.Contains(english, message.TextBody, StringComparison.Ordinal);
+        // Never a bare digit in front of the Arabic noun.
+        Assert.DoesNotContain($"{hours} ساعة من", message.TextBody, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Every Latin run inside the Arabic half is isolated, so the bidi algorithm cannot reorder it.
+    /// </summary>
+    /// <remarks>
+    /// A gallery's name, a reference, a price and a date are all Latin, all inside Arabic sentences
+    /// here, and without an isolate the algorithm resolves each against whatever sits beside it — a
+    /// reference reads backwards, a price loses its currency code to the comma after it. The app
+    /// learned this in `Formats.money`; the same characters do the same job in an inbox.
+    /// </remarks>
+    [Fact]
+    public void Latin_inside_the_Arabic_half_is_isolated()
+    {
+        var (booking, context) = Approved();
+
+        var message = Composer().BookingApproved(Build.Customer(), booking, context, note: null);
+        var arabicHalf = message.HtmlBody[..message.HtmlBody.IndexOf("<hr", StringComparison.Ordinal)];
+
+        // Whole runs, not fragments: the zone is part of the deadline's run, not a run of its own.
+        foreach (var run in new[]
+        {
+            "Rami Haddad Rentals",
+            booking.Reference,
+            "44.000 JOD",
+            "2026-09-03 15:00 (Asia/Amman)",
+        })
+        {
+            var at = arabicHalf.IndexOf(run, StringComparison.Ordinal);
+            Assert.True(at > 0, $"{run} appears in the Arabic half");
+            Assert.Equal('⁨', arabicHalf[at - 1]);
+            Assert.Equal('⁩', arabicHalf[at + run.Length]);
+        }
+
+        // The English half carries none of them: they would be noise in a left-to-right paragraph.
+        var englishHalf = message.HtmlBody[message.HtmlBody.IndexOf("<hr", StringComparison.Ordinal)..];
+        Assert.DoesNotContain('⁨', englishHalf);
     }
 
     [Fact]
