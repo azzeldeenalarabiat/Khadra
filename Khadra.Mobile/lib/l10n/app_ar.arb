@@ -406,6 +406,7 @@
   "@documentsFileLimits": {
     "placeholders": { "kinds": { "type": "String" }, "size": { "type": "String" } }
   },
+  "documentsOpenFailed": "تعذّر فتح هذا المستند على هذا الهاتف. ثبّت تطبيقاً لقراءة PDF أو حاول مرة أخرى.",
   "documentsFileUnreadable": "تعذّرت قراءة هذا الملف. اختره مرة أخرى أو التقط صورة للمستند بدلاً من ذلك.",
   "documentsFileSummary": "{kind} · {size}",
   "@documentsFileSummary": {

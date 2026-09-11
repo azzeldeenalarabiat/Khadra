@@ -1229,6 +1229,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get documentsOpenFailed =>
+      'That document could not be opened on this phone. Install a PDF reader, or try again.';
+
+  @override
   String get documentsFileUnreadable =>
       'That file could not be read. Choose it again, or take a photo of the document instead.';
 

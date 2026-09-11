@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../core/api/api_client.dart';
+import '../core/api/api_failure.dart';
 import '../core/api/auth_interceptor.dart';
 import 'dtos.dart';
 
@@ -399,6 +400,44 @@ class KhadraApi {
       SignedDocumentLink.fromJson(_object(
         await _client.get<dynamic>('/api/v1/customers/me/documents/$documentId/link'),
       ));
+
+  /// The document's BYTES, fetched by this app rather than handed to a browser.
+  ///
+  /// The download endpoint is protected twice on purpose -- the signature proves
+  /// the link was minted here for this file and has not expired, and the bearer
+  /// token proves there is still a live session behind the request. An external
+  /// browser carries neither the session nor any way to get one, so handing it
+  /// the URL produced a 401 and nothing else. This call goes through the SAME
+  /// authenticated client every other request uses, so both checks are satisfied
+  /// without loosening either.
+  Future<DocumentBytes> documentBytes(String url) async {
+    // `raw` rather than the wrapper, because this one response is bytes and not
+    // JSON -- so the DioException has to be turned into an ApiFailure here, the
+    // way the wrapper does for everything else. Without it a refused download
+    // would reach the screen as a Dio type nothing there catches.
+    try {
+      final response = await _client.raw.get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          // The body is a PDF or a photograph, not the JSON every other call wants.
+          headers: const {'Accept': '*/*'},
+          receiveTimeout: const Duration(seconds: 60),
+          validateStatus: (status) => status != null && status < 400,
+        ),
+      );
+
+      return DocumentBytes(
+        Uint8List.fromList(response.data ?? const <int>[]),
+        // What the SERVER says it is. The app does not re-derive it from the
+        // name: the storage key's extension is the platform's own record of
+        // the type.
+        response.headers.value('content-type')?.split(';').first.trim(),
+      );
+    } on DioException catch (error) {
+      throw ApiFailure.from(error);
+    }
+  }
 
   // ── Disputes ────────────────────────────────────────────────────────────────
 

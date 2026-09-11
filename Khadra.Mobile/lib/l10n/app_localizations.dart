@@ -2090,6 +2090,12 @@ abstract class AppLocalizations {
   /// **'{kinds} · up to {size}'**
   String documentsFileLimits(String kinds, String size);
 
+  /// No description provided for @documentsOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That document could not be opened on this phone. Install a PDF reader, or try again.'**
+  String get documentsOpenFailed;
+
   /// No description provided for @documentsFileUnreadable.
   ///
   /// In en, this message translates to:

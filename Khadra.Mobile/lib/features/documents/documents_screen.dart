@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
@@ -10,6 +9,7 @@ import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/uploads/document_picker.dart';
+import '../../core/uploads/document_viewer.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import 'document_providers.dart';
@@ -30,6 +30,10 @@ class DocumentsScreen extends ConsumerStatefulWidget {
 
 class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   String? _uploading;
+
+  /// Which document is being fetched and handed to a viewer, so the row can say
+  /// so: the bytes travel over the network and the wait is not instant.
+  String? _opening;
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +117,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             type: type,
             document: documents.ofType(type),
             uploading: _uploading == type,
+            opening: _opening == documents.ofType(type)?.documentId,
             formats: formats,
             onUpload: () => _upload(type),
             onView: () => _view(documents.ofType(type)!),
@@ -182,13 +187,42 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   /// wearing a disguise. The link is minted per view and expires.
   Future<void> _view(CustomerDocument document) async {
     final l10n = AppLocalizations.of(context);
+    setState(() => _opening = document.documentId);
+
     try {
+      // THIS APP fetches the bytes, not a browser.
+      //
+      // The download endpoint is protected twice and stays that way: the signed
+      // link proves the URL was minted here for this file and has not expired,
+      // and the bearer token proves there is still a live session behind the
+      // request. Handing the URL to an external browser satisfied only the
+      // first, so the server answered 401 and the customer saw a page of JSON.
+      // Fetching it here satisfies both without loosening either.
       final link = await ref.read(apiProvider).documentLink(document.documentId);
-      await launchUrl(Uri.parse(link.url), mode: LaunchMode.externalApplication);
-    } on ApiFailure catch (failure) {
-      if (mounted) {
-        showKhadraMessage(context, failure.messageFor(l10n), isError: true);
+      final fetched = await ref.read(apiProvider).documentBytes(link.url);
+
+      final opened = await DocumentViewer.open(
+        bytes: fetched.bytes,
+        contentType: fetched.contentType ?? document.contentType,
+        documentId: document.documentId,
+      );
+
+      if (!mounted) return;
+      setState(() => _opening = null);
+      if (!opened) {
+        showKhadraMessage(context, l10n.documentsOpenFailed, isError: true);
       }
+    } on ApiFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _opening = null);
+      showKhadraMessage(context, failure.messageFor(l10n), isError: true);
+    } on Exception {
+      // Writing the cache file, or the platform refusing to open it. Neither is
+      // something to crash on, and neither is an API failure with words of its
+      // own.
+      if (!mounted) return;
+      setState(() => _opening = null);
+      showKhadraMessage(context, l10n.documentsOpenFailed, isError: true);
     }
   }
 
@@ -219,6 +253,7 @@ class _DocumentTile extends StatelessWidget {
     required this.type,
     required this.document,
     required this.uploading,
+    required this.opening,
     required this.formats,
     required this.onUpload,
     required this.onView,
@@ -227,6 +262,10 @@ class _DocumentTile extends StatelessWidget {
   final String type;
   final CustomerDocument? document;
   final bool uploading;
+
+  /// The bytes are being fetched and written before a viewer can be handed them.
+  /// It is a network round trip, so the button has to say it is doing something.
+  final bool opening;
   final Formats formats;
   final VoidCallback onUpload;
   final VoidCallback onView;
@@ -361,8 +400,16 @@ class _DocumentTile extends StatelessWidget {
                 const SizedBox(width: Space.sm),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: onView,
-                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                    // Disabled WHILE fetching, so a second tap cannot start a
+                    // second download of the same licence.
+                    onPressed: opening ? null : onView,
+                    icon: opening
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.visibility_outlined, size: 18),
                     label: Text(l10n.documentsView),
                   ),
                 ),

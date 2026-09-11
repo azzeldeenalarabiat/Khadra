@@ -8,6 +8,8 @@
 // instinct is two, and where guessing renders 12.75 against a contract that says
 // 12.750.
 
+import 'dart:typed_data';
+
 import '../core/config/app_environment.dart';
 
 int _int(dynamic value, [int fallback = 0]) => switch (value) {
@@ -517,6 +519,17 @@ class CustomerDocuments {
     }
     return null;
   }
+}
+
+/// A document's bytes, and what the server said they are.
+class DocumentBytes {
+  const DocumentBytes(this.bytes, this.contentType);
+
+  final Uint8List bytes;
+
+  /// From the response header. Null when the server did not say, which is the
+  /// case the caller has to name a file for anyway.
+  final String? contentType;
 }
 
 class SignedDocumentLink {

@@ -1286,6 +1286,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get documentsOpenFailed =>
+      'تعذّر فتح هذا المستند على هذا الهاتف. ثبّت تطبيقاً لقراءة PDF أو حاول مرة أخرى.';
+
+  @override
   String get documentsFileUnreadable =>
       'تعذّرت قراءة هذا الملف. اختره مرة أخرى أو التقط صورة للمستند بدلاً من ذلك.';
 

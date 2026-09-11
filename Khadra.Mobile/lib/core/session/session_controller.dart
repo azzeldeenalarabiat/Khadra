@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/dtos.dart';
 import '../../api/khadra_api.dart';
 import '../api/api_failure.dart';
+import '../uploads/document_viewer.dart';
 import 'session_store.dart';
 
 /// Who is using the app, if anyone.
@@ -182,6 +183,7 @@ class SessionController extends StateNotifier<SessionState> {
     }
 
     await _store.clear();
+    await DocumentViewer.discard();
     state = const SessionState(status: SessionStatus.signedOut);
   }
 
@@ -214,6 +216,10 @@ class SessionController extends StateNotifier<SessionState> {
 
   Future<void> _end(SessionEndReason reason) async {
     await _store.clear();
+    // A licence fetched while signed in must not still be in the cache for
+    // whoever signs in next on the same phone. Clearing the token without
+    // clearing what the token was used to fetch would leave the document behind.
+    await DocumentViewer.discard();
     state = SessionState(status: SessionStatus.signedOut, endedReason: reason);
   }
 }

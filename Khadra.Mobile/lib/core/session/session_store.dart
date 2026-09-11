@@ -43,11 +43,32 @@ class SessionStore {
                 // being killed halfway through a one-time migration of the one
                 // credential that survives a restart.
                 migrateWithBackup: true,
-                // A token that cannot be decrypted is discarded rather than
-                // kept. It is the right answer for a credential that signing in
-                // again replaces: the alternative fails every call against a
-                // blob nothing can read, which is a session nobody can end.
-                // This is a CHANGE -- v9 defaulted it to false.
+                // A token that cannot be decrypted is DISCARDED. This is a
+                // change -- v9 defaulted it to false -- so what each setting
+                // actually does to a customer is written out here rather than
+                // left to a changelog.
+                //
+                // The plugin reaches this in two places
+                // (`FlutterSecureStorage.java`): when the one-time migration
+                // off the old backend fails, and when any single read or write
+                // throws afterwards.
+                //
+                // TRUE -- the store deletes the unreadable entries, marks itself
+                // migrated so it does not try again, and answers the next read
+                // normally. Here that is the refresh token and its expiry, and
+                // nothing else: `_refreshTokenKey` and `_refreshExpiresKey` are
+                // all this app keeps. `_restore` reads null, the session goes to
+                // signedOut, and the customer sees the app signed out with no
+                // error. They sign in again and it works. Nothing is lost --
+                // bookings, documents and the account itself live on the server.
+                //
+                // FALSE -- the plugin does NOT set its migrated marker, so every
+                // later call fails the same way. `_bounded` below swallows those
+                // failures by design, which means reads return null AND WRITES
+                // SILENTLY DO NOTHING: signing in appears to work, the token is
+                // never stored, and the customer is thrown out when the access
+                // token goes stale -- forever, on every launch, with no message.
+                // A store nobody can end is worse than a session nobody kept.
                 resetOnError: true,
               ),
               iOptions: IOSOptions(
