@@ -371,8 +371,10 @@ public sealed class Booking : AggregateRoot
         DepositPaymentId = depositPaymentId;
         // The free-cancellation window starts at PAYMENT, not at approval. Spec 5.5 measures it
         // from approval because under the old order payment came first, so approval was the moment
-        // of commitment. It is not any more: a customer who pays at hour 23 of a 24-hour window
-        // would otherwise have a free window that closed 22 hours before they committed anything.
+        // of commitment. It is not any more: a customer who pays near the end of the payment window
+        // would otherwise have a free window that closed before they committed anything. That gap
+        // was a whole day while the window was twenty-four hours; at two it is minutes, and the
+        // reasoning is the same either way, which is why this does not read the window's length.
         FreeCancellationDeadline = Cap(now.Add(Terms.FreeCancellationWindow), Period.Start);
         Transition(BookingStatus.Confirmed, BookingParty.Customer, CustomerId, null, now);
         AddDomainEvent(new BookingConfirmed(Id, DealerId, VehicleId, now));

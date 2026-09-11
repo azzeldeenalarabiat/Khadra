@@ -630,23 +630,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookTermsTitle => 'What you are agreeing to';
 
   @override
-  String bookTermsPayAfterApproval(String hours) {
-    return 'Nothing is charged now. The office answers within $hours hours, and only then does the deposit fall due.';
+  String get bookTermsPayAfterApproval =>
+      'Nothing is charged now. The deposit falls due only if they approve.';
+
+  @override
+  String bookTermsAnswerWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'The office has $hours hours to answer. The car is held for you until then.',
+      one:
+          'The office has 1 hour to answer. The car is held for you until then.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsAnswerWindow(String hours) {
-    return 'The office has $hours hours to answer. The car is held for you until then.';
+  String bookTermsPaymentWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'Once they approve, you have $hours hours to pay the deposit or the booking ends and the car goes back on the market.',
+      one:
+          'Once they approve, you have 1 hour to pay the deposit or the booking ends and the car goes back on the market.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsPaymentWindow(String hours) {
-    return 'Once they approve, you have $hours hours to pay the deposit or the booking ends and the car goes back on the market.';
-  }
-
-  @override
-  String bookTermsFreeCancellation(String hours) {
-    return 'Free cancellation for $hours hours after the deposit clears.';
+  String bookTermsFreeCancellation(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Free cancellation for $hours hours after the deposit clears.',
+      one: 'Free cancellation for 1 hour after the deposit clears.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -664,8 +685,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookDoneTitle => 'Request sent';
 
   @override
-  String bookDoneBody(String gallery, String hours) {
-    return '$gallery has your request and will answer within $hours hours. We will tell you as soon as they do.';
+  String bookDoneBody(String gallery, num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          '$gallery has your request and will answer within $hours hours. We will tell you as soon as they do.',
+      one:
+          '$gallery has your request and will answer within 1 hour. We will tell you as soon as they do.',
+    );
+    return '$_temp0';
   }
 
   @override

@@ -713,9 +713,17 @@ class _PriceBreakdown extends StatelessWidget {
 }
 
 /// Windows arrive as fractional hours (0.5, 1, 24). Rendering "1.0 hours" reads
-/// like a computed value where a human chose a round number.
-String _hours(num value) =>
-    value == value.roundToDouble() ? value.round().toString() : value.toString();
+/// like a computed value where a human chose a round number, so a whole one is
+/// narrowed to an int.
+///
+/// It stays a NUMBER rather than becoming a string, because the sentences these
+/// feed are ICU plurals: the count picks the wording. English needs "1 hour"
+/// against "2 hours", and Arabic needs a different word again at two — the
+/// payment window went to two hours on 2026-09-11 and read "2 \u0633\u0627\u0639\u0629",
+/// which is not how the language counts. A genuinely fractional window falls to
+/// the plural's `other` branch in both.
+num _hours(num value) =>
+    value == value.roundToDouble() ? value.round() : value;
 
 /// The rules this booking would freeze, in the server's own numbers.
 class _Terms extends StatelessWidget {
@@ -736,10 +744,8 @@ class _Terms extends StatelessWidget {
           // The gallery's own clock comes first: it is the wait the customer is
           // agreeing to, and it starts the moment they press the button.
           _Bullet(l10n.bookTermsAnswerWindow(_hours(terms.answerWindowHours))),
-          _Bullet(l10n.bookTermsPayAfterApproval(
-              _hours(terms.paymentWindowHours))),
-          _Bullet(l10n.bookTermsPaymentWindow(
-              _hours(terms.paymentWindowHours))),
+          _Bullet(l10n.bookTermsPayAfterApproval),
+          _Bullet(l10n.bookTermsPaymentWindow(_hours(terms.paymentWindowHours))),
           _Bullet(l10n.bookTermsFreeCancellation(
               _hours(terms.freeCancellationWindowHours))),
           _Bullet(l10n.bookTermsCancellationPenalty(

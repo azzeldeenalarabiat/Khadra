@@ -213,22 +213,31 @@
   "bookBalanceAtPickup": "Cash to the office at pick-up",
   "bookCalendarDaysNote": "Rentals are billed by calendar day in Amman, so a day is counted whether you keep the car for an hour of it or all of it.",
   "bookTermsTitle": "What you are agreeing to",
-  "bookTermsPayAfterApproval": "Nothing is charged now. The office answers within {hours} hours, and only then does the deposit fall due.",
-  "bookTermsAnswerWindow": "The office has {hours} hours to answer. The car is held for you until then.",
-  "@bookTermsAnswerWindow": { "placeholders": { "hours": { "type": "String" } } },
-  "@bookTermsPayAfterApproval": { "placeholders": { "hours": { "type": "String" } } },
-  "bookTermsPaymentWindow": "Once they approve, you have {hours} hours to pay the deposit or the booking ends and the car goes back on the market.",
-  "@bookTermsPaymentWindow": { "placeholders": { "hours": { "type": "String" } } },
-  "bookTermsFreeCancellation": "Free cancellation for {hours} hours after the deposit clears.",
-  "@bookTermsFreeCancellation": { "placeholders": { "hours": { "type": "String" } } },
+  "bookTermsPayAfterApproval": "Nothing is charged now. The deposit falls due only if they approve.",
+  "bookTermsAnswerWindow": "{hours, plural, =1{The office has 1 hour to answer. The car is held for you until then.} other{The office has {hours} hours to answer. The car is held for you until then.}}",
+  "@bookTermsAnswerWindow": {
+    "description": "The gallery's own clock, frozen on the booking. A plural because the owner may move it: at 1 the sentence has to say hour, and Arabic needs a different word again at 2.",
+    "placeholders": { "hours": { "type": "num" } }
+  },
+  "bookTermsPaymentWindow": "{hours, plural, =1{Once they approve, you have 1 hour to pay the deposit or the booking ends and the car goes back on the market.} other{Once they approve, you have {hours} hours to pay the deposit or the booking ends and the car goes back on the market.}}",
+  "@bookTermsPaymentWindow": {
+    "description": "Two hours since 2026-09-11, which is exactly why this is a plural: Arabic says the two-hour form with its own word, not the number.",
+    "placeholders": { "hours": { "type": "num" } }
+  },
+  "bookTermsFreeCancellation": "{hours, plural, =1{Free cancellation for 1 hour after the deposit clears.} other{Free cancellation for {hours} hours after the deposit clears.}}",
+  "@bookTermsFreeCancellation": {
+    "description": "One hour today, which read as 'for 1 hours' until this became a plural.",
+    "placeholders": { "hours": { "type": "num" } }
+  },
   "bookTermsCancellationPenalty": "Cancelling after that is assessed at {percent} of the deposit. Nothing is taken without a dispute being opened and settled.",
   "@bookTermsCancellationPenalty": { "placeholders": { "percent": { "type": "String" } } },
   "bookRequest": "Request this car",
   "bookRequesting": "Sending your request…",
   "bookDoneTitle": "Request sent",
-  "bookDoneBody": "{gallery} has your request and will answer within {hours} hours. We will tell you as soon as they do.",
+  "bookDoneBody": "{hours, plural, =1{{gallery} has your request and will answer within 1 hour. We will tell you as soon as they do.} other{{gallery} has your request and will answer within {hours} hours. We will tell you as soon as they do.}}",
   "@bookDoneBody": {
-    "placeholders": { "gallery": { "type": "String" }, "hours": { "type": "String" } }
+    "description": "The hours are the ANSWER window frozen on the booking just made, never the payment window: the two are different rules and were 48 and 2 on the day this was written.",
+    "placeholders": { "gallery": { "type": "String" }, "hours": { "type": "num" } }
   },
   "bookDoneReference": "Your reference is {reference}.",
   "@bookDoneReference": { "placeholders": { "reference": { "type": "String" } } },

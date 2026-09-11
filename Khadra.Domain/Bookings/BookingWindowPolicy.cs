@@ -41,8 +41,8 @@ public static class BookingWindowPolicy
 
         // The floor. Every window a booking carries -- the dealer's answer, the customer's payment,
         // free cancellation -- is capped at the rental start, so without this they all collapse
-        // together on a booking made minutes before pickup, while the platform is still publishing
-        // a 24-hour payment window on /app-config.
+        // together on a booking made minutes before pickup, while the platform is still promising
+        // the customer a full payment window and the gallery a full answer window.
         if (period.Start < now.Add(minimumLeadTime))
             return UnitResult.Failure(BookingErrors.TooSoon(minimumLeadTime));
 

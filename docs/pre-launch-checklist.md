@@ -2321,3 +2321,37 @@ customer picks dates on the vehicle screen as they would from any other entry po
 
 Adding a per-entry "available on the dates you last searched" would mean storing a search on a
 shortlist entry, which is a different feature wearing this one's clothes.
+
+### 90. Two hours to pay, and no way to tell the customer their booking was approved
+
+**Status:** open · **Raised:** 2026-09-11 · **Depends on:** item 73 (push notifications)
+
+The owner set the payment window to **two hours** on 2026-09-11, replacing the twenty-four that came
+in with the reserve-now-pay-later reordering (`BusinessRules:PaymentWindowHours`). The trade is
+deliberate and in the platform's favour: a car that a customer never pays for goes back on the market
+in two hours instead of a day, which is the difference between one lost rental and three.
+
+What it costs is the other half of the same fact. **There is no push channel** (item 73), so a
+customer finds out their request was approved by opening the app. Two hours is easy to miss entirely
+— asleep, at work, driving. Every approval missed that way is a gallery's decision wasted, a car held
+for nothing, and a customer who believes they booked a car and did not.
+
+Three things already soften it and none of them close it:
+
+- `GET /bookings/next` puts the deposit on the landing screen the moment the app opens, ranked above
+  everything else (`NextBookingReason.AwaitingPayment`).
+- The booking screen carries a live countdown and now re-reads the booking when that countdown runs
+  out, so the screen never contradicts itself.
+- The deadline is capped at the rental start, so a short window is never shorter than the rental is
+  far away.
+
+An email on approval would close most of it and is not built either; the notification table exists
+and only ever reaches the app.
+
+**To close:** item 73 ships, or the owner accepts the loss rate with the landing surface alone. This
+is not a reason to lengthen the window — that decision is made — it is a reason the window needs a
+channel behind it.
+
+**Do not confuse this with `MinimumBookingLeadTimeMinutes`, also 120.** That one is how far ahead of
+now a rental may start. They are the same length today by coincidence and moving one must never move
+the other; `Khadra.Tests/Application/Bookings/PaymentWindowTests.cs` holds them apart.

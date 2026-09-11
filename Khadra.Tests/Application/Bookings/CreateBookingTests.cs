@@ -181,7 +181,9 @@ public sealed class CreateBookingTests
         Assert.Equal(18m, booking.Pricing.DepositAmount.Amount);
         Assert.Equal(20m, booking.Terms.DepositPercent.Value);
         Assert.Equal(TimeSpan.FromHours(48), booking.Terms.AnswerWindow);
-        Assert.Equal(TimeSpan.FromHours(24), booking.Terms.PaymentWindow);
+        // TWO hours since 2026-09-11, and a different rule from the 120-minute lead time it now
+        // matches. PaymentWindowTests is where that pair is held apart on purpose.
+        Assert.Equal(TimeSpan.FromHours(2), booking.Terms.PaymentWindow);
         Assert.Equal(TimeSpan.FromHours(2), booking.Terms.TurnaroundBuffer);
         // The owner's 15 MINUTES, in the unit it was decided in. This assertion is the guard on the
         // unit itself: the value used to be configured in hours, and reading 15 through the old

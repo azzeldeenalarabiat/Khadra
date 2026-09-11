@@ -142,9 +142,11 @@ public static class BookingTabs
 /// </para>
 /// <para>
 /// It matters more than a convenience. There is no push channel (pre-launch checklist item 73), so a
-/// customer learns their booking was approved by opening the app; the payment window is 24 hours for
-/// that reason alone. The landing surface is the only thing that can tell them, and until it did,
-/// approvals expired unread with the gallery's decision wasted and a car held for nothing.
+/// customer learns their booking was approved by OPENING THE APP — and since 2026-09-11 they have
+/// two hours from the approval to pay, not a day. This is the only surface that can tell them in
+/// time, and until it existed approvals expired unread, with the gallery's decision wasted and a car
+/// held for nothing. Shortening the window made that worse, not better, which is why item 73 is now
+/// a dependency of the window rather than a nicety beside it (pre-launch item 90).
 /// </para>
 /// </remarks>
 /// <param name="Reason">

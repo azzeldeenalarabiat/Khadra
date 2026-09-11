@@ -47,13 +47,50 @@ class BookingDetailScreen extends ConsumerStatefulWidget {
 class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
   Timer? _tick;
 
+  /// How many times a spent deadline has been re-read. See [_askTheServerWhenTheClockRunsOut].
+  int _expiryReads = 0;
+
   @override
   void initState() {
     super.initState();
     // The countdown is rendered from the server's deadline; this only repaints it.
     _tick = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      _askTheServerWhenTheClockRunsOut();
+      setState(() {});
     });
+  }
+
+  /// Re-reads the booking once its own countdown has run out.
+  ///
+  /// The countdown is display only — the SERVER decides whether a booking is
+  /// over, and its settlement pass runs on a minute of its own. Without this the
+  /// screen sits on "Deposit of 24.000 JOD is due" above a clock reading zero
+  /// until the customer thinks to pull down, which is the app contradicting
+  /// itself on the one screen where the answer matters.
+  ///
+  /// It mattered less while the payment window was a day: nobody was watching
+  /// when it ran out. At two hours they very well might be.
+  ///
+  /// Capped at three reads — ninety seconds, comfortably past the sweep's own
+  /// minute — so a server that has not settled yet is asked a few times and then
+  /// left alone. This is a detail screen, not a poller.
+  void _askTheServerWhenTheClockRunsOut() {
+    if (_expiryReads >= 3) return;
+    final booking = ref.read(bookingProvider(widget.bookingId)).valueOrNull;
+    if (booking == null) return;
+
+    final deadline = booking.isAwaitingPayment
+        ? booking.paymentDeadline
+        : booking.isAwaitingDecision
+            ? booking.decisionDeadline
+            : null;
+    if (deadline == null || DateTime.now().toUtc().isBefore(deadline.toUtc())) {
+      return;
+    }
+
+    _expiryReads++;
+    invalidateBookings(ref, bookingId: widget.bookingId);
   }
 
   @override

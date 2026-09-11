@@ -158,4 +158,40 @@ void main() {
       reason: 'Arabic plurals missing =2/few/many: ${plurals.join(', ')}',
     );
   });
+
+  test('Arabic never declares a placeholder as a different type', () {
+    // app_ar.arb carries `@key` metadata of its own for some messages, and
+    // gen-l10n reads BOTH files' declarations. So a type changed in the template
+    // and not here fails the build with a message that names no key at all:
+    // turning three sentences into plurals said only "Placeholders used in
+    // plurals must be of type 'num' or 'int'", while the offending `String` sat
+    // in the Arabic file.
+    final conflicts = <String>[];
+
+    for (final key in messageKeys(english)) {
+      final template = english['@$key'];
+      final translation = arabic['@$key'];
+      if (template is! Map || translation is! Map) continue;
+
+      final declared = template['placeholders'];
+      final restated = translation['placeholders'];
+      if (declared is! Map || restated is! Map) continue;
+
+      for (final name in restated.keys) {
+        final here = restated[name];
+        final there = declared[name];
+        if (here is! Map || there is! Map) continue;
+
+        final templateType = there['type'];
+        final arabicType = here['type'];
+        if (templateType != arabicType) {
+          conflicts.add(
+            '$key.$name is $templateType in English and $arabicType in Arabic',
+          );
+        }
+      }
+    }
+
+    expect(conflicts, isEmpty, reason: conflicts.join('\n'));
+  });
 }

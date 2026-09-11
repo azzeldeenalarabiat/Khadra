@@ -648,23 +648,57 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookTermsTitle => 'ما توافق عليه';
 
   @override
-  String bookTermsPayAfterApproval(String hours) {
-    return 'لا يُخصم شيء الآن. يردّ المكتب خلال $hours ساعة، وعندها فقط يُستحق العربون.';
+  String get bookTermsPayAfterApproval =>
+      'لا يُخصم شيء الآن. لا يُستحق العربون إلا إذا وافقوا.';
+
+  @override
+  String bookTermsAnswerWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'أمام المكتب $hours ساعة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      many:
+          'أمام المكتب $hours ساعة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      few:
+          'أمام المكتب $hours ساعات للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      two: 'أمام المكتب ساعتان للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      one: 'أمام المكتب ساعة واحدة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsAnswerWindow(String hours) {
-    return 'أمام المكتب $hours ساعة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.';
+  String bookTermsPaymentWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'بعد الموافقة، أمامك $hours ساعة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      many:
+          'بعد الموافقة، أمامك $hours ساعة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      few:
+          'بعد الموافقة، أمامك $hours ساعات لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      two:
+          'بعد الموافقة، أمامك ساعتان لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      one:
+          'بعد الموافقة، أمامك ساعة واحدة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsPaymentWindow(String hours) {
-    return 'بعد الموافقة، أمامك $hours ساعة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.';
-  }
-
-  @override
-  String bookTermsFreeCancellation(String hours) {
-    return 'الإلغاء مجاني خلال $hours ساعة من دفع العربون.';
+  String bookTermsFreeCancellation(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'الإلغاء مجاني خلال $hours ساعة من دفع العربون.',
+      many: 'الإلغاء مجاني خلال $hours ساعة من دفع العربون.',
+      few: 'الإلغاء مجاني خلال $hours ساعات من دفع العربون.',
+      two: 'الإلغاء مجاني خلال ساعتين من دفع العربون.',
+      one: 'الإلغاء مجاني خلال ساعة واحدة من دفع العربون.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -682,8 +716,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookDoneTitle => 'أُرسل الطلب';
 
   @override
-  String bookDoneBody(String gallery, String hours) {
-    return 'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعة. سنخبرك فور ردّهم.';
+  String bookDoneBody(String gallery, num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعة. سنخبرك فور ردّهم.',
+      many:
+          'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعة. سنخبرك فور ردّهم.',
+      few:
+          'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعات. سنخبرك فور ردّهم.',
+      two: 'وصل طلبك إلى $gallery وسيردّون خلال ساعتين. سنخبرك فور ردّهم.',
+      one: 'وصل طلبك إلى $gallery وسيردّون خلال ساعة واحدة. سنخبرك فور ردّهم.',
+    );
+    return '$_temp0';
   }
 
   @override

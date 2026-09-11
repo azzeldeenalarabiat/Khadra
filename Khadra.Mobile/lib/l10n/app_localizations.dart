@@ -1127,26 +1127,26 @@ abstract class AppLocalizations {
   /// No description provided for @bookTermsPayAfterApproval.
   ///
   /// In en, this message translates to:
-  /// **'Nothing is charged now. The office answers within {hours} hours, and only then does the deposit fall due.'**
-  String bookTermsPayAfterApproval(String hours);
+  /// **'Nothing is charged now. The deposit falls due only if they approve.'**
+  String get bookTermsPayAfterApproval;
 
-  /// No description provided for @bookTermsAnswerWindow.
+  /// The gallery's own clock, frozen on the booking. A plural because the owner may move it: at 1 the sentence has to say hour, and Arabic needs a different word again at 2.
   ///
   /// In en, this message translates to:
-  /// **'The office has {hours} hours to answer. The car is held for you until then.'**
-  String bookTermsAnswerWindow(String hours);
+  /// **'{hours, plural, =1{The office has 1 hour to answer. The car is held for you until then.} other{The office has {hours} hours to answer. The car is held for you until then.}}'**
+  String bookTermsAnswerWindow(num hours);
 
-  /// No description provided for @bookTermsPaymentWindow.
+  /// Two hours since 2026-09-11, which is exactly why this is a plural: Arabic says the two-hour form with its own word, not the number.
   ///
   /// In en, this message translates to:
-  /// **'Once they approve, you have {hours} hours to pay the deposit or the booking ends and the car goes back on the market.'**
-  String bookTermsPaymentWindow(String hours);
+  /// **'{hours, plural, =1{Once they approve, you have 1 hour to pay the deposit or the booking ends and the car goes back on the market.} other{Once they approve, you have {hours} hours to pay the deposit or the booking ends and the car goes back on the market.}}'**
+  String bookTermsPaymentWindow(num hours);
 
-  /// No description provided for @bookTermsFreeCancellation.
+  /// One hour today, which read as 'for 1 hours' until this became a plural.
   ///
   /// In en, this message translates to:
-  /// **'Free cancellation for {hours} hours after the deposit clears.'**
-  String bookTermsFreeCancellation(String hours);
+  /// **'{hours, plural, =1{Free cancellation for 1 hour after the deposit clears.} other{Free cancellation for {hours} hours after the deposit clears.}}'**
+  String bookTermsFreeCancellation(num hours);
 
   /// No description provided for @bookTermsCancellationPenalty.
   ///
@@ -1172,11 +1172,11 @@ abstract class AppLocalizations {
   /// **'Request sent'**
   String get bookDoneTitle;
 
-  /// No description provided for @bookDoneBody.
+  /// The hours are the ANSWER window frozen on the booking just made, never the payment window: the two are different rules and were 48 and 2 on the day this was written.
   ///
   /// In en, this message translates to:
-  /// **'{gallery} has your request and will answer within {hours} hours. We will tell you as soon as they do.'**
-  String bookDoneBody(String gallery, String hours);
+  /// **'{hours, plural, =1{{gallery} has your request and will answer within 1 hour. We will tell you as soon as they do.} other{{gallery} has your request and will answer within {hours} hours. We will tell you as soon as they do.}}'**
+  String bookDoneBody(String gallery, num hours);
 
   /// No description provided for @bookDoneReference.
   ///

@@ -113,7 +113,6 @@ class AppConfig {
     required this.maxAdvanceBookingDays,
     required this.minimumBookingLeadTimeMinutes,
     required this.maxRentalDays,
-    required this.paymentWindowHours,
     required this.documents,
     required this.password,
     required this.vocabularies,
@@ -132,7 +131,6 @@ class AppConfig {
   final int maxAdvanceBookingDays;
   final int minimumBookingLeadTimeMinutes;
   final int maxRentalDays;
-  final int paymentWindowHours;
   final DocumentLimits documents;
 
   /// What makes a password acceptable, so the app states the platform's rule
@@ -152,7 +150,6 @@ class AppConfig {
         minimumBookingLeadTimeMinutes:
             _int(json['minimumBookingLeadTimeMinutes'], 120),
         maxRentalDays: _int(json['maxRentalDays'], 90),
-        paymentWindowHours: _int(json['paymentWindowHours'], 24),
         documents: DocumentLimits.fromJson(
             json['documents'] as Map<String, dynamic>? ?? const {}),
         // NO default. Every other field here falls back to the shipped figure,

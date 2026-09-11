@@ -76,8 +76,9 @@ public sealed class AppConfigTests
         var config = (await Handler().Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
 
         // The app tells the customer this on the screen where they are waiting for it, so the figure
-        // has to be the platform's. Twenty-four hours until push notifications exist to justify less.
-        Assert.Equal(24, config.PaymentWindowHours);
+        // has to be the platform's. TWO hours since 2026-09-11, the owner's decision — and not to be
+        // confused with MinimumBookingLeadTimeMinutes, which is also 120 and is a different clock.
+        Assert.Equal(2, config.PaymentWindowHours);
     }
 
     [Fact]

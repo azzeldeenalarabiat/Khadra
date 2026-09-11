@@ -136,7 +136,7 @@ public static class DependencyInjection
             // Not merely present but positive. Zero would mean a car could be booked for one minute
             // from now, and every window on that booking -- the dealer's answer, the customer's
             // payment, free cancellation -- is capped at the rental start, so all three would
-            // collapse while /app-config still advertised a 24-hour payment window.
+            // collapse while the platform was still promising each of them in full.
             .Validate(options => options.MinimumBookingLeadTimeMinutes is > 0,
                 "BusinessRules: MinimumBookingLeadTimeMinutes must be set to a positive number of minutes.")
             .Validate(options => options.MaxRentalDays is > 0,

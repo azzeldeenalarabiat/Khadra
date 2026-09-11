@@ -18,10 +18,21 @@ internal static class TestBusinessRules
     // figure high enough that saving a few cars never trips it.
     public const int MaxShortlistEntries = 50;
 
+    // How long a customer has to pay the deposit after a gallery APPROVES. Two hours, settled by
+    // the owner on 2026-09-11.
+    public const int PaymentWindowHours = 2;
+
+    // How far ahead of NOW a rental may start. A different rule that happens to be the same length,
+    // and the reason both are parameters: a test that asserts one of them has to be able to move
+    // the other, or code wired to the wrong clock passes.
+    public const int MinimumBookingLeadTimeMinutes = 120;
+
     public static BusinessRules Values(
         int? minimumRenterAge = MinimumRenterAge,
         int earliestVehicleModelYear = EarliestVehicleModelYear,
-        int maxShortlistEntries = MaxShortlistEntries) => new(
+        int maxShortlistEntries = MaxShortlistEntries,
+        int paymentWindowHours = PaymentWindowHours,
+        int minimumBookingLeadTimeMinutes = MinimumBookingLeadTimeMinutes) => new(
         CommissionPercent: 20m,
         DepositPercent: 20m,
         NoShowTimeoutHours: 8,
@@ -30,13 +41,13 @@ internal static class TestBusinessRules
         FreeCancellationWindowMinutes: 60,
         AdminSlaHours: 48,
         CustomerCancellationPenaltyPercent: 100m,
-        PaymentWindowHours: 24,
+        PaymentWindowHours: paymentWindowHours,
         BookingAnswerWindowHours: 48,
         PostReturnSettlementHours: 48,
         MinimumRenterAge: minimumRenterAge,
         TurnaroundMinutes: 120,
         MaxAdvanceBookingDays: 180,
-        MinimumBookingLeadTimeMinutes: 120,
+        MinimumBookingLeadTimeMinutes: minimumBookingLeadTimeMinutes,
         MaxRentalDays: 90,
         NonDeliveryGraceMinutes: 15,
         ReviewWindowDays: 14,
@@ -46,11 +57,18 @@ internal static class TestBusinessRules
     public static IBusinessRulesProvider Provider(
         int? minimumRenterAge = MinimumRenterAge,
         int earliestVehicleModelYear = EarliestVehicleModelYear,
-        int maxShortlistEntries = MaxShortlistEntries)
+        int maxShortlistEntries = MaxShortlistEntries,
+        int paymentWindowHours = PaymentWindowHours,
+        int minimumBookingLeadTimeMinutes = MinimumBookingLeadTimeMinutes)
     {
         var provider = Substitute.For<IBusinessRulesProvider>();
         provider.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(Values(minimumRenterAge, earliestVehicleModelYear, maxShortlistEntries));
+            .Returns(Values(
+                minimumRenterAge,
+                earliestVehicleModelYear,
+                maxShortlistEntries,
+                paymentWindowHours,
+                minimumBookingLeadTimeMinutes));
         return provider;
     }
 

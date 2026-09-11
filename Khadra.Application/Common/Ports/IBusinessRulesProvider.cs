@@ -23,9 +23,19 @@ public sealed record BusinessRules(
     // 100% of the deposit is the reading consistent with "deposit is forfeited" on a no-show.
     // Awaiting the owner's confirmation.
     decimal CustomerCancellationPenaltyPercent,
-    // How long a customer has to pay the deposit AFTER the dealer approves. Twenty-four hours,
-    // settled by the owner on 2026-09-07 with the reserve-now-pay-later reordering. Hours rather
-    // than minutes because 1440 reads like a typo and is one.
+    // How long a customer has to pay the deposit AFTER the dealer approves. TWO hours, settled by
+    // the owner on 2026-09-11, replacing the twenty-four they set on 2026-09-07 with the
+    // reserve-now-pay-later reordering.
+    //
+    // It is NOT MinimumBookingLeadTimeMinutes, which is also 120 and means something else entirely:
+    // that one is how far ahead of NOW a rental may start, and this one is how long after an
+    // APPROVAL the deposit may go unpaid. They are two clocks that happen to be the same length
+    // today, and moving one must never move the other.
+    //
+    // The shorter window costs something the owner has accepted: there is no push channel yet
+    // (pre-launch item 73), so a customer learns of an approval by opening the app, and two hours is
+    // easy to miss. What it buys is a car released back to the market in two hours instead of a day.
+    // See pre-launch item 90.
     int PaymentWindowHours,
     // How long the dealer has to answer a request before it expires and the car returns to the
     // market. Spec 3.1 always promised 48 hours; nothing enforced it, because a deposit gated the
@@ -52,8 +62,8 @@ public sealed record BusinessRules(
     // It exists because every window on a booking is capped at the rental start: without a floor, a
     // request made twenty minutes before pickup gives the dealer twenty minutes to answer, the
     // customer whatever is left to pay, and no free cancellation at all -- while the platform is
-    // telling that same customer, on /app-config, that they have 24 hours to pay. A lead time is
-    // what makes those promises keepable.
+    // telling that same customer they have a payment window and the gallery that it has an answer
+    // window. A lead time is what makes those promises keepable.
     int MinimumBookingLeadTimeMinutes,
     // The longest a single rental may run, in Amman calendar days -- the same days the rental is
     // BILLED in, so the number a customer is refused on is the number they were quoted.
