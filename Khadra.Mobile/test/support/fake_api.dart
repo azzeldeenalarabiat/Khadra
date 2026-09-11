@@ -147,6 +147,33 @@ class FakeApi extends KhadraApi {
     CancelToken? cancelToken,
   }) async =>
       const Paged(items: [], page: 1, pageSize: 20, totalCount: 0);
+
+  // ── Saved cars ──────────────────────────────────────────────────────────────
+
+  /// The saved LIST, which is a different question from the membership set a
+  /// heart asks — hence the name. `shortlist_test.dart` subclasses this with its
+  /// own `saved` set for the heart.
+  List<SavedVehicle> savedCars = const [];
+
+  final List<String> forgotten = <String>[];
+
+  @override
+  Future<List<SavedVehicle>> shortlist() async => savedCars;
+
+  @override
+  Future<Set<String>> savedAmong(List<String> vehicleIds) async => savedCars
+      .map((entry) => entry.vehicleId)
+      .toSet()
+      .intersection(vehicleIds.toSet());
+
+  @override
+  Future<void> forgetVehicle(String vehicleId) async {
+    forgotten.add(vehicleId);
+    savedCars = [
+      for (final entry in savedCars)
+        if (entry.vehicleId != vehicleId) entry,
+    ];
+  }
 }
 
 /// A [SessionStore] backed by two fields, so no test touches a real keystore.

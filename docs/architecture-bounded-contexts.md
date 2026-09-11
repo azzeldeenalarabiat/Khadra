@@ -206,14 +206,24 @@ answers 404 to would confirm that id exists, and anyone with an account could wa
 unpublished inventory a request at a time. One predicate, in one place, answering the same for a
 draft, a hidden car, one in maintenance, a suspended gallery's, a deleted one and an unknown id.
 
-**A saved car that stops being listed keeps its row.** `Maintenance -> Hidden -> Active` is a normal
-round trip for a gallery, and an entry auto-removed on the way through would be a customer's list
-quietly editing itself. `IShortlistReader` returns such an entry with its id and save date and NO
-listing — no name and above all no reason, because naming the reason would distinguish the cases the
-catalogue is shaped never to distinguish.
+**A saved car that stops being bookable keeps its row.** `Maintenance -> Hidden -> Active` is a
+normal round trip for a gallery, and an entry auto-removed on the way through would be a customer's
+list quietly editing itself. `IShortlistReader` returns such an entry NAMED — make, model, year and
+its gallery — with no listing beside it, and no reason.
 
-The cap is `BusinessRules:MaxShortlistEntries`, configured rather than constant, and it is a PROPOSAL
-at 50 — see the owner decisions below.
+The split is the point. Naming the car is safe because nothing reaches a shortlist that the public
+catalogue did not return first: `SaveVehicleCommand` refuses any id `ICatalogueReader.GetAsync`
+answers null to, so every name on this list is a car the customer was already shown. Naming the
+REASON would distinguish the cases the catalogue is shaped never to distinguish, and there is no
+field on the wire that could.
+
+The name is read live and **past the soft-delete filter**, which is a correctness requirement rather
+than a convenience: with the filter respected, a deleted car would come back unnamed while a hidden
+one came back named, and deletion would become the single de-listing reason a customer could tell
+apart.
+
+The cap is `BusinessRules:MaxShortlistEntries`, configured rather than constant, settled by the owner
+at 100 on 2026-09-11.
 
 ## Owner decisions required
 

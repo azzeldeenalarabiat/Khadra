@@ -102,7 +102,9 @@ public sealed record BusinessRules(
     // comparing. Configured rather than constant because it is a figure a screen states, and this
     // project's rule is that such a figure is the owner's to move.
     //
-    // A PROPOSAL at 50, not a decision. The owner has not been asked. See pre-launch item 84.
+    // SETTLED at 100 by the owner on 2026-09-11, replacing the 50 that was proposed when the context
+    // was built. The app never holds a copy: the refusal carries the figure and the screen repeats
+    // what it was told.
     int MaxShortlistEntries);
 
 public interface IBusinessRulesProvider

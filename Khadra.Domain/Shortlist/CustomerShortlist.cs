@@ -98,6 +98,10 @@ public sealed class CustomerShortlist : AggregateRoot
 /// It carries an id and the moment it was saved, and nothing else — no make, no model, no price. A
 /// snapshot of those would go stale the first time a gallery corrected a listing, and a screen
 /// rendering last month's price beside today's car is worse than a screen rendering neither.
+///
+/// The saved list DOES name a car it can no longer offer, but it reads that name live from the
+/// vehicle when the list is read (<c>IShortlistReader</c>), which is why there is still nothing to
+/// snapshot here.
 /// </remarks>
 public sealed class ShortlistEntry : Entity
 {

@@ -77,10 +77,13 @@ Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation p
 
 **Dealer console defaults awaiting a decision (2026-09-03):** a suspended dealer may still record a pickup on an already-approved booking (default: allowed; returns are always allowed); the business name is locked after approval (default: locked) while location and operating hours stay editable; the customer's contact details are never shown to the dealer (the console makes no promise about it); staff management (`/dealers/me/employees`) requires an approved, trading dealer, so the owner of a suspended dealer cannot deactivate an employee (default kept). Ask the owner before changing any of these.
 
-**Shortlist defaults awaiting a decision (2026-09-11):** favourites were built at the owner's request
-as a `Shortlist` context, with three answers taken as defaults — account-only with no device-local
-list; a cap of 50 (`BusinessRules:MaxShortlistEntries`); and a car that stops being listed keeping its
-row, shown as "no longer listed" with NO reason, never auto-removed. See pre-launch items 87-89. Ask
-the owner before changing any of them.
+**Shortlist, settled by the owner (2026-09-11):** favourites are a `Shortlist` context. Account-only,
+with no device-local list. The cap is **100** (`BusinessRules:MaxShortlistEntries`). A car that stops
+being bookable **keeps its row** and is shown as "Currently unavailable / غير متاحة حاليًا" — still
+named, with its gallery, and with no way to start a booking from it — **never auto-removed**, and
+**never with a reason**: hidden, in maintenance, suspended and deleted are answered identically
+everywhere else and this screen is not the exception. The name is read live and past the soft-delete
+filter, deliberately, so that deletion does not become the one reason a customer can tell apart. See
+pre-launch items 87-89 and `IShortlistReader`.
 
 **Minimum renter age: settled at 21** by the owner and enforced (`BusinessRules:MinimumRenterAge`, `RenterAgePolicy`). The spec still says "value pending Section 2 decision" in §5.1 and lists it as open in §2.2 — the document has not caught up with the decision. The code is right; the spec needs a revision.

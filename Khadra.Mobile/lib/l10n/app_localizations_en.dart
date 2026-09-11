@@ -1822,7 +1822,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Tap the heart on a car to keep it here while you compare.';
 
   @override
-  String get shortlistNoLongerListed => 'No longer listed';
+  String get shortlistUnavailable => 'Currently unavailable';
 
   @override
   String shortlistSavedOn(String date) {

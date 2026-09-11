@@ -1721,15 +1721,51 @@ class NotificationFeed {
 /// no reason for those, deliberately: naming the reason would distinguish cases
 /// the catalogue answers identically on purpose. The screen says "no longer
 /// listed" and offers to remove it.
+/// Enough to recognise a saved car that can no longer be booked.
+///
+/// Four fields, and the server sends no fifth: no reason, no status, no image and
+/// no gallery id. A hidden car, one in maintenance, a suspended gallery's and a
+/// deleted one are all answered identically on this platform, and a reason here
+/// would be the one place a customer could tell them apart.
+class SavedVehicleIdentity {
+  const SavedVehicleIdentity({
+    required this.make,
+    required this.model,
+    required this.year,
+    required this.galleryName,
+  });
+
+  final String make;
+  final String model;
+  final int year;
+  final String galleryName;
+
+  String get title => '$make $model';
+
+  static SavedVehicleIdentity fromJson(Map<String, dynamic> json) =>
+      SavedVehicleIdentity(
+        make: json['make'] as String? ?? '',
+        model: json['model'] as String? ?? '',
+        year: _int(json['year']),
+        galleryName: json['galleryName'] as String? ?? '',
+      );
+}
+
 class SavedVehicle {
   const SavedVehicle({
     required this.vehicleId,
     required this.savedAt,
+    required this.identity,
     required this.listing,
   });
 
   final String vehicleId;
   final DateTime savedAt;
+
+  /// What the car is called, sent for every entry whose car still exists at all.
+  final SavedVehicleIdentity? identity;
+
+  /// The live listing — present only while the car can actually be booked.
   final CatalogueListing? listing;
 
   bool get isStillListed => listing != null;
@@ -1737,6 +1773,10 @@ class SavedVehicle {
   static SavedVehicle fromJson(Map<String, dynamic> json) => SavedVehicle(
         vehicleId: json['vehicleId'] as String? ?? '',
         savedAt: _requiredDateTime(json['savedAt']),
+        identity: json['identity'] is Map<String, dynamic>
+            ? SavedVehicleIdentity.fromJson(
+                json['identity'] as Map<String, dynamic>)
+            : null,
         listing: json['listing'] is Map<String, dynamic>
             ? CatalogueListing.fromJson(json['listing'] as Map<String, dynamic>)
             : null,

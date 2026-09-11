@@ -628,7 +628,10 @@
   "shortlistRemove": "Remove from saved",
   "shortlistEmptyTitle": "Nothing saved yet",
   "shortlistEmptyBody": "Tap the heart on a car to keep it here while you compare.",
-  "shortlistNoLongerListed": "No longer listed",
+  "shortlistUnavailable": "Currently unavailable",
+  "@shortlistUnavailable": {
+    "description": "The owner's wording, settled 2026-09-11. CURRENTLY, because a gallery moving a car through Maintenance and back is routine and the entry is never removed for it. No reason is given: the catalogue answers hidden, in maintenance, suspended and deleted identically on purpose."
+  },
   "shortlistSavedOn": "Saved on {date}",
   "@shortlistSavedOn": { "placeholders": { "date": { "type": "String" } } },
   "errorShortlistFull": "Your saved list is full. Remove a car before saving another.",

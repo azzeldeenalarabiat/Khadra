@@ -2315,30 +2315,51 @@ for the listing, and no storage key anywhere on a row).
 
 ## Customer app completion (2026-09-11)
 
-### 87. Open owner decisions on the shortlist
+### 87. Owner decisions on the shortlist
 
-**Status:** open · **Raised:** 2026-09-11 · **Built:** 2026-09-11, at the owner's request
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-11 · **Built:** 2026-09-11, at the owner's request
 
 Favourites were built as a `Shortlist` bounded context — aggregate, migration, four endpoints and the
-app screens. Three questions were answered with DEFAULTS rather than by the owner, in the pattern this
-project already uses for the dealer console's undecided settings. Each is recorded so it is a decision
-somebody can revisit, not a shape nobody chose.
+app screens — with three questions answered by DEFAULTS rather than by the owner. All three were put
+to the owner on 2026-09-11 and settled the same day. This is the decision record; the wording here is
+the authority, because the design handoff it came from is not in `docs/design/`.
 
-1. **Account-only, no device-local list.** The catalogue itself is anonymous and stays so, but saving
-   needs an account: a list kept on the phone would vanish with it, show nothing on a second one, and
-   become a merge problem the day the real one arrived. The heart on an anonymous card goes through
-   the ordinary sign-in redirect.
-2. **The cap is 50** (`BusinessRules:MaxShortlistEntries`). A guard against a list nobody can read and
-   a table one account can grow without bound, not a judgement about how many cars are worth
-   comparing. Validated at startup like its siblings; the app states the figure from the server's
-   refusal rather than holding its own copy.
-3. **A car that stops being listed keeps its row and is shown as "no longer listed", with no reason.**
-   Naming the reason would distinguish a hidden car from a deleted one from a suspended gallery's,
-   which the catalogue answers identically on purpose. Entries are NEVER auto-removed:
-   `Maintenance → Hidden → Active` is a normal round trip, and a list that edited itself on the way
-   through would lose a customer's choices without asking.
+1. **Account-only, no device-local list. CONFIRMED.** The catalogue itself is anonymous and stays so,
+   but saving needs an account: a list kept on the phone would vanish with it, show nothing on a
+   second one, and become a merge problem the day the real one arrived. The heart on an anonymous
+   card goes through the ordinary sign-in redirect.
+2. **The cap is 100** (`BusinessRules:MaxShortlistEntries`), raised from the proposed 50. A guard
+   against a list nobody can read and a table one account can grow without bound, not a judgement
+   about how many cars are worth comparing. Validated at startup like its siblings, inside
+   `[Range(1, 500)]`. The refusal carries the figure and the app repeats what it was told; the app
+   holds no copy of the number.
 
-**To close:** the owner confirms or changes all three.
+   The list is one unpaged response. A hundred rows is about five search pages — acceptable, and the
+   point at which paging would be needed if the cap ever rose further, because the heart set is told
+   the whole list at once (`markSaved`).
+3. **A car that stops being bookable keeps its row, is shown as "Currently unavailable / غير متاحة
+   حاليًا", and cannot start a booking.** Entries are NEVER auto-removed: `Maintenance → Hidden →
+   Active` is a normal round trip, and a list that edited itself on the way through would lose a
+   customer's choices without asking.
+
+   The row still NAMES the car and its gallery, as the approved design does. That is safe because
+   nothing reaches a shortlist that the public catalogue did not return first — `SaveVehicleCommand`
+   refuses any id `ICatalogueReader.GetAsync` answers null to — so every name on the list is a car
+   this customer was already shown. What stays private is the REASON, and there is no field on the
+   wire that could carry one: hidden, in maintenance, suspended and soft-deleted must remain
+   indistinguishable.
+
+   The name is read live rather than snapshotted, so a gallery correcting a listing corrects the saved
+   row; and it is read **past the soft-delete filter**, which is a correctness requirement rather than
+   a convenience. With the filter respected, a deleted car would come back unnamed while a hidden one
+   came back named, and deletion would become the single de-listing reason a customer could tell
+   apart. `ShortlistPersistenceTests` asserts all four cases render alike.
+
+**Two consequences the owner should know, accepted as they stand:** a car that is deleted for good
+reads "Currently unavailable" for ever, because the platform will not say "deleted" and will not
+auto-remove; and unavailable entries count toward the cap, so a customer at 100 with thirty gone
+clears them one at a time. A "remove all unavailable" affordance would close the second and is not
+built.
 
 ### 88. The shortlist is personal data and goes with the account
 

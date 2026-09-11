@@ -580,7 +580,7 @@
   "shortlistRemove": "إزالة من المحفوظات",
   "shortlistEmptyTitle": "لم تحفظ شيئاً بعد",
   "shortlistEmptyBody": "اضغط على القلب في أي سيارة لتبقى هنا بينما تقارن.",
-  "shortlistNoLongerListed": "لم تعد معروضة",
+  "shortlistUnavailable": "غير متاحة حاليًا",
   "shortlistSavedOn": "حُفظت في {date}",
   "errorShortlistFull": "قائمة المحفوظات ممتلئة. أزل سيارة قبل حفظ أخرى.",
   "errorShortlistVehicleNotFound": "لم تعد هذه السيارة معروضة، فلا يمكن حفظها."

@@ -30,9 +30,12 @@ public sealed class ShortlistController(ICurrentActor actor) : ApiControllerBase
 {
     /// <summary>The caller's saved cars, newest save first.</summary>
     /// <remarks>
-    /// A car that is no longer listed comes back with its id and the date it was saved and nothing
-    /// else — no name, and no reason. Naming the reason would distinguish a hidden car from a deleted
-    /// one from a suspended gallery's, which the catalogue is deliberately shaped never to do.
+    /// A car the caller can no longer book comes back NAMED — make, model, year and its gallery —
+    /// with no listing beside it, and no reason. The name is safe because nothing reaches a shortlist
+    /// that the public catalogue did not return first: <c>SaveVehicleCommand</c> refuses any id
+    /// <c>ICatalogueReader.GetAsync</c> answers null to. The REASON is what stays private, because
+    /// naming it would distinguish a hidden car from a deleted one from a suspended gallery's, which
+    /// the catalogue is deliberately shaped never to do.
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]

@@ -14,9 +14,9 @@ internal static class TestBusinessRules
     // that cares about the bound passes its own.
     public const int EarliestVehicleModelYear = 1970;
 
-    // The shipped cap. A test about the cap itself passes a small one; everything else needs a
-    // figure high enough that saving a few cars never trips it.
-    public const int MaxShortlistEntries = 50;
+    // The shipped cap, settled by the owner at 100 on 2026-09-11. A test about the cap itself passes
+    // a small one; everything else needs a figure high enough that saving a few cars never trips it.
+    public const int MaxShortlistEntries = 100;
 
     // How long a customer has to pay the deposit after a gallery APPROVES. Two hours, settled by
     // the owner on 2026-09-11.

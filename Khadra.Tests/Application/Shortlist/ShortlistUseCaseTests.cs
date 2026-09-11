@@ -244,4 +244,36 @@ public sealed class ShortlistUseCaseTests
         await context.Shortlists.DidNotReceive().SavedAmongAsync(
             Arg.Any<Id>(), Arg.Any<IReadOnlyCollection<Id>>(), Arg.Any<CancellationToken>());
     }
+
+    /// <summary>
+    /// What a saved car's name is allowed to carry, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A reflection test, because the thing being protected is a SHAPE. The name exists so a car the
+    /// customer can no longer book is still recognisable to them; every field anybody might add to it
+    /// next undoes something the rest of this context is built on:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>a reason or a status would distinguish hidden from deleted from suspended, which the
+    /// catalogue, <c>ShortlistErrors</c> and <c>SaveVehicleCommand</c> all refuse to do;</item>
+    /// <item>an image URL would be a hidden car's photograph on the open internet, because vehicle
+    /// images are served from static storage by key;</item>
+    /// <item>a dealer id would invite a tap-through to a gallery page that answers 404;</item>
+    /// <item>a price would be a figure about a car nobody can book.</item>
+    /// </list>
+    /// </remarks>
+    [Fact]
+    public void The_name_on_a_saved_car_carries_nothing_else()
+    {
+        var fields = typeof(SavedVehicleIdentity)
+            .GetProperties()
+            .Select(property => property.Name)
+            // A positional record's compiler-generated member, not a field anybody declared.
+            .Where(name => name != "EqualityContract")
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(["GalleryName", "Make", "Model", "Year"], fields);
+    }
 }

@@ -1858,7 +1858,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'اضغط على القلب في أي سيارة لتبقى هنا بينما تقارن.';
 
   @override
-  String get shortlistNoLongerListed => 'لم تعد معروضة';
+  String get shortlistUnavailable => 'غير متاحة حاليًا';
 
   @override
   String shortlistSavedOn(String date) {

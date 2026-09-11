@@ -16,19 +16,25 @@ import 'shortlist_providers.dart';
 
 /// The cars a customer has saved.
 ///
-/// Two kinds of row, and the second is the interesting one. A car that is still
-/// listed renders as an ordinary catalogue card, with today's rate — never the
+/// Two kinds of row, and the second is the interesting one. A car that can still
+/// be booked renders as an ordinary catalogue card, with today's rate — never the
 /// price it had when it was saved, which would be a figure this screen made up.
-/// A car that is no longer listed renders as its own thing: the date it was
-/// saved, a sentence saying it has gone, and a way to remove it.
+/// A car that cannot renders as a quieter version of itself: still named, still
+/// carrying its gallery, marked **Currently unavailable**, with no price, no way
+/// through to it and no way to start a booking from it.
 ///
-/// **That second row names nothing and explains nothing**, because the server
-/// sends nothing: a hidden car, a deleted one, one in maintenance and a suspended
-/// gallery's are indistinguishable through the catalogue on purpose, and a reason
-/// here would undo that.
+/// **It names the car. It never names a reason**, because the server sends none:
+/// a hidden car, a deleted one, one in maintenance and a suspended gallery's are
+/// indistinguishable through the catalogue on purpose, and a reason here would
+/// undo that. Naming the car is not the same disclosure — nothing reaches this
+/// list that the customer was not shown in the catalogue first.
 ///
-/// Nothing on this screen says whether a car is AVAILABLE. A saved car carries no
-/// dates, and "is it free" has no answer without a period to ask about.
+/// **Nothing is ever removed for them.** `Maintenance → Hidden → Active` is a
+/// routine round trip for a gallery, and the owner settled on 2026-09-11 that an
+/// entry survives all of it. Only the customer's own tap removes a row.
+///
+/// Nothing on this screen says whether a car is AVAILABLE for dates. A saved car
+/// carries no dates, and "is it free" has no answer without a period to ask about.
 class ShortlistScreen extends ConsumerWidget {
   const ShortlistScreen({super.key});
 
@@ -130,74 +136,120 @@ class _SavedListState extends ConsumerState<_SavedList> {
       separatorBuilder: (_, __) => const SizedBox(height: Space.lg),
       itemBuilder: (_, index) => switch (value[index]) {
         SavedVehicle(listing: final listing?) => VehicleCard(listing: listing),
-        final gone => _NoLongerListed(saved: gone, formats: formats),
+        final gone => _Unavailable(saved: gone, formats: formats),
       },
     );
   }
 }
 
-/// A saved car the customer can no longer see.
-class _NoLongerListed extends ConsumerStatefulWidget {
-  const _NoLongerListed({required this.saved, required this.formats});
+/// A saved car the customer cannot book right now.
+///
+/// Held at three-quarter opacity, which is the design's way of saying "yours,
+/// still here, not actionable" — the card keeps its shape rather than becoming a
+/// different kind of object, so the list still reads as one list. There is
+/// deliberately no tap target anywhere on it and no price: a booking cannot start
+/// from here, and a rate for a car nobody can rent is a number with no meaning.
+class _Unavailable extends ConsumerStatefulWidget {
+  const _Unavailable({required this.saved, required this.formats});
 
   final SavedVehicle saved;
   final Formats formats;
 
   @override
-  ConsumerState<_NoLongerListed> createState() => _NoLongerListedState();
+  ConsumerState<_Unavailable> createState() => _UnavailableState();
 }
 
-class _NoLongerListedState extends ConsumerState<_NoLongerListed> {
+class _UnavailableState extends ConsumerState<_Unavailable> {
   bool _removing = false;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final identity = widget.saved.identity;
 
-    return KhadraCard(
-      background: KhadraColors.neutral100,
-      child: Row(
-        children: [
-          const Icon(Icons.no_transfer_outlined,
-              size: 28, color: KhadraColors.neutral400),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.shortlistNoLongerListed,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  // The only thing this row can honestly say about the car: when
-                  // its owner saved it.
-                  l10n.shortlistSavedOn(
-                      widget.formats.longDate(widget.saved.savedAt)),
-                  style: const TextStyle(
-                      color: KhadraColors.neutral600, fontSize: 12),
-                ),
-              ],
+    return Opacity(
+      opacity: 0.75,
+      child: KhadraCard(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Where the photograph would be. A real one is out of the question —
+            // vehicle images are served from static storage by key, so a URL for a
+            // car that has been withdrawn would be that car's photograph still on
+            // the open internet.
+            Container(
+              width: 76,
+              height: 60,
+              decoration: BoxDecoration(
+                color: KhadraColors.neutral100,
+                borderRadius: Radii.field,
+              ),
+              child: const Icon(Icons.directions_car_outlined,
+                  size: 22, color: KhadraColors.neutral400),
             ),
-          ),
-          _removing
-              ? const Padding(
-                  padding: EdgeInsets.all(Space.md),
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    // Named where the server could name it; where it could not,
+                    // the date it was saved is the only honest thing left to say.
+                    identity?.title ?? l10n.shortlistUnavailable,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                )
-              : IconButton(
-                  onPressed: _remove,
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: l10n.shortlistRemove,
-                  color: KhadraColors.neutral600,
-                ),
-        ],
+                  const SizedBox(height: 2),
+                  Text(
+                    identity?.galleryName ??
+                        l10n.shortlistSavedOn(
+                            widget.formats.longDate(widget.saved.savedAt)),
+                    style: const TextStyle(
+                        color: KhadraColors.neutral600, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: Space.sm),
+                  // The pill. No reason on it, and none available to put there.
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: Space.sm, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: KhadraColors.neutral100,
+                      borderRadius: const BorderRadius.all(Radii.sm),
+                    ),
+                    child: Text(
+                      l10n.shortlistUnavailable.toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                        color: KhadraColors.neutral600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _removing
+                ? const Padding(
+                    padding: EdgeInsets.all(Space.md),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    onPressed: _remove,
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: l10n.shortlistRemove,
+                    color: KhadraColors.neutral600,
+                  ),
+          ],
+        ),
       ),
     );
   }

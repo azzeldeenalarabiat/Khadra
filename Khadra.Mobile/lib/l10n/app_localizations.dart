@@ -2990,11 +2990,11 @@ abstract class AppLocalizations {
   /// **'Tap the heart on a car to keep it here while you compare.'**
   String get shortlistEmptyBody;
 
-  /// No description provided for @shortlistNoLongerListed.
+  /// The owner's wording, settled 2026-09-11. CURRENTLY, because a gallery moving a car through Maintenance and back is routine and the entry is never removed for it. No reason is given: the catalogue answers hidden, in maintenance, suspended and deleted identically on purpose.
   ///
   /// In en, this message translates to:
-  /// **'No longer listed'**
-  String get shortlistNoLongerListed;
+  /// **'Currently unavailable'**
+  String get shortlistUnavailable;
 
   /// No description provided for @shortlistSavedOn.
   ///
