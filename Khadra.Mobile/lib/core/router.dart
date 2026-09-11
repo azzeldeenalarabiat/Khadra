@@ -25,6 +25,7 @@ import '../features/profile/sessions_screen.dart';
 import '../features/reviews/leave_review_screen.dart';
 import '../features/reviews/reviews_screen.dart';
 import '../features/shell/app_shell.dart';
+import '../features/shortlist/shortlist_screen.dart';
 import '../features/shell/splash_screen.dart';
 import 'providers.dart';
 import 'session/session_controller.dart';
@@ -48,6 +49,7 @@ abstract final class Routes {
   static const changePassword = '/profile/password';
   static const sessions = '/profile/sessions';
   static const reputation = '/profile/reputation';
+  static const shortlist = '/profile/saved';
 
   static String vehicle(String id) => '/vehicle/$id';
   static String gallery(String id) => '/gallery/$id';
@@ -86,6 +88,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         Routes.changePassword,
         Routes.sessions,
         Routes.reputation,
+        Routes.shortlist,
       };
 
       final needsAccount = guarded.contains(location) ||
@@ -238,6 +241,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.reputation,
         builder: (_, __) => const ReputationScreen(),
+      ),
+      GoRoute(
+        path: Routes.shortlist,
+        builder: (_, __) => const ShortlistScreen(),
       ),
     ],
   );

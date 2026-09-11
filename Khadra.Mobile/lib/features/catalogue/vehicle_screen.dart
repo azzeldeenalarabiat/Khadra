@@ -15,6 +15,7 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'date_range_sheet.dart';
 import 'search_providers.dart';
+import '../shortlist/save_button.dart';
 import 'vehicle_card.dart';
 
 /// One car in full, with the gallery behind it.
@@ -132,6 +133,16 @@ class _VehicleBody extends ConsumerWidget {
           pinned: true,
           backgroundColor: KhadraColors.surface,
           leading: const KhadraBack(fallback: Routes.search),
+          actions: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: Space.sm),
+              child: SaveButton(
+                vehicleId: vehicle.vehicleId,
+                size: 24,
+                onSurface: true,
+              ),
+            ),
+          ],
           flexibleSpace: FlexibleSpaceBar(
             background: _Photos(urls: vehicle.imageUrls),
           ),

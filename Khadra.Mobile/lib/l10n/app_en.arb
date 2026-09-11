@@ -600,5 +600,15 @@
   "landingDepositDue": "Your deposit is due",
   "landingRentalInProgress": "Your rental is under way",
   "landingUpcomingRental": "Your next rental",
-  "landingAwaitingOffice": "Waiting on the rental office"
+  "landingAwaitingOffice": "Waiting on the rental office",
+  "shortlistTitle": "Saved cars",
+  "shortlistSave": "Save this car",
+  "shortlistRemove": "Remove from saved",
+  "shortlistEmptyTitle": "Nothing saved yet",
+  "shortlistEmptyBody": "Tap the heart on a car to keep it here while you compare.",
+  "shortlistNoLongerListed": "No longer listed",
+  "shortlistSavedOn": "Saved on {date}",
+  "@shortlistSavedOn": { "placeholders": { "date": { "type": "String" } } },
+  "errorShortlistFull": "Your saved list is full. Remove a car before saving another.",
+  "errorShortlistVehicleNotFound": "That car is no longer listed, so it cannot be saved."
 }

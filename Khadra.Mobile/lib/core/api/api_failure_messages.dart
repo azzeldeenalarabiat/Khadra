@@ -173,6 +173,13 @@ extension ApiFailureMessages on ApiFailure {
         'dispute.evidence_outside_booking' =>
           l10n.errorDisputeEvidenceFailed,
 
+        // ── Shortlist ────────────────────────────────────────────────────────
+        'shortlist.full' => l10n.errorShortlistFull,
+        // The catalogue answers the same to a draft, a hidden car, one in
+        // maintenance, a suspended gallery's and an unknown id, so the sentence
+        // says the one thing true of all of them.
+        'shortlist.vehicle_not_found' => l10n.errorShortlistVehicleNotFound,
+
         // ── Payments ─────────────────────────────────────────────────────────
         //
         // The booking screen normally shows this as a NOTICE rather than an

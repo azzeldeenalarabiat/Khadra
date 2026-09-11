@@ -335,6 +335,38 @@ class KhadraApi {
         body: {'details': details},
       )));
 
+  // ── Shortlist ───────────────────────────────────────────────────────────────
+
+  Future<List<SavedVehicle>> shortlist() async =>
+      (await _client.get<List<dynamic>>('/api/v1/customers/me/shortlist'))
+          .whereType<Map<String, dynamic>>()
+          .map(SavedVehicle.fromJson)
+          .toList();
+
+  /// Which of these cars are already saved.
+  ///
+  /// Asked per page of results so a heart can be drawn without loading the whole
+  /// list. It answers only about the ids NAMED, which is what keeps it from being
+  /// a way to read a shortlist through a screen that was never shown one.
+  Future<Set<String>> savedAmong(List<String> vehicleIds) async {
+    if (vehicleIds.isEmpty) return <String>{};
+
+    final response = await _client.get<List<dynamic>>(
+      '/api/v1/customers/me/shortlist/membership',
+      query: {'vehicleId': vehicleIds},
+    );
+    return response.map((entry) => '$entry').toSet();
+  }
+
+  /// Safe to repeat: saving what is already saved changes nothing and succeeds.
+  Future<void> saveVehicle(String vehicleId) =>
+      _client.put<dynamic>('/api/v1/customers/me/shortlist/$vehicleId');
+
+  /// Safe to repeat, and works for a car that is no longer listed — which is
+  /// precisely the entry somebody most wants gone.
+  Future<void> forgetVehicle(String vehicleId) =>
+      _client.delete<dynamic>('/api/v1/customers/me/shortlist/$vehicleId');
+
   // ── Documents ───────────────────────────────────────────────────────────────
 
   Future<CustomerDocuments> myDocuments() async => CustomerDocuments.fromJson(

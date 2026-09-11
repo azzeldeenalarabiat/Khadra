@@ -2929,6 +2929,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting on the rental office'**
   String get landingAwaitingOffice;
+
+  /// No description provided for @shortlistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved cars'**
+  String get shortlistTitle;
+
+  /// No description provided for @shortlistSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save this car'**
+  String get shortlistSave;
+
+  /// No description provided for @shortlistRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from saved'**
+  String get shortlistRemove;
+
+  /// No description provided for @shortlistEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing saved yet'**
+  String get shortlistEmptyTitle;
+
+  /// No description provided for @shortlistEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the heart on a car to keep it here while you compare.'**
+  String get shortlistEmptyBody;
+
+  /// No description provided for @shortlistNoLongerListed.
+  ///
+  /// In en, this message translates to:
+  /// **'No longer listed'**
+  String get shortlistNoLongerListed;
+
+  /// No description provided for @shortlistSavedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved on {date}'**
+  String shortlistSavedOn(String date);
+
+  /// No description provided for @errorShortlistFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved list is full. Remove a car before saving another.'**
+  String get errorShortlistFull;
+
+  /// No description provided for @errorShortlistVehicleNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'That car is no longer listed, so it cannot be saved.'**
+  String get errorShortlistVehicleNotFound;
 }
 
 class _AppLocalizationsDelegate

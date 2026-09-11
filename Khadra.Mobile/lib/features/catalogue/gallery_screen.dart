@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +16,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../shortlist/shortlist_providers.dart';
 import 'search_providers.dart';
 import 'vehicle_card.dart';
 
@@ -258,17 +261,7 @@ class _GalleryBody extends ConsumerWidget {
                 tone: NoticeTone.neutral,
               ),
             ),
-          AsyncData(:final value) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-              child: Column(
-                children: [
-                  for (final listing in value.items) ...[
-                    VehicleCard(listing: listing),
-                    const SizedBox(height: Space.lg),
-                  ],
-                ],
-              ),
-            ),
+          AsyncData(:final value) => _GalleryVehicles(listings: value.items),
           _ => const SizedBox.shrink(),
         },
       ],
@@ -368,6 +361,46 @@ class _MapPin extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      );
+}
+
+/// The gallery's cars, with a heart on each.
+///
+/// A widget of its own only so the membership question can be asked once for the
+/// whole set after the frame — writing to a provider while the tree that reads it
+/// is being built is not allowed, and the alternative is one request per card.
+class _GalleryVehicles extends ConsumerStatefulWidget {
+  const _GalleryVehicles({required this.listings});
+
+  final List<CatalogueListing> listings;
+
+  @override
+  ConsumerState<_GalleryVehicles> createState() => _GalleryVehiclesState();
+}
+
+class _GalleryVehiclesState extends ConsumerState<_GalleryVehicles> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ref.read(savedVehiclesProvider.notifier).learn(
+            [for (final listing in widget.listings) listing.vehicleId],
+          ));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+        child: Column(
+          children: [
+            for (final listing in widget.listings) ...[
+              VehicleCard(listing: listing),
+              const SizedBox(height: Space.lg),
+            ],
+          ],
         ),
       );
 }

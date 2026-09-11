@@ -1709,6 +1709,37 @@ class NotificationFeed {
       );
 }
 
+// ── Shortlist ──────────────────────────────────────────────────────────────────
+
+/// One car the customer saved.
+///
+/// [listing] is null when the car is no longer one they can see — hidden, in
+/// maintenance, its gallery suspended, withdrawn. The server returns no name and
+/// no reason for those, deliberately: naming the reason would distinguish cases
+/// the catalogue answers identically on purpose. The screen says "no longer
+/// listed" and offers to remove it.
+class SavedVehicle {
+  const SavedVehicle({
+    required this.vehicleId,
+    required this.savedAt,
+    required this.listing,
+  });
+
+  final String vehicleId;
+  final DateTime savedAt;
+  final CatalogueListing? listing;
+
+  bool get isStillListed => listing != null;
+
+  static SavedVehicle fromJson(Map<String, dynamic> json) => SavedVehicle(
+        vehicleId: json['vehicleId'] as String? ?? '',
+        savedAt: _requiredDateTime(json['savedAt']),
+        listing: json['listing'] is Map<String, dynamic>
+            ? CatalogueListing.fromJson(json['listing'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
 // ── Reputation ─────────────────────────────────────────────────────────────────
 
 /// What the platform tells a GALLERY about this customer — shown to the customer.

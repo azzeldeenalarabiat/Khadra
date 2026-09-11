@@ -1774,4 +1774,36 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get landingAwaitingOffice => 'بانتظار ردّ مكتب التأجير';
+
+  @override
+  String get shortlistTitle => 'السيارات المحفوظة';
+
+  @override
+  String get shortlistSave => 'احفظ هذه السيارة';
+
+  @override
+  String get shortlistRemove => 'إزالة من المحفوظات';
+
+  @override
+  String get shortlistEmptyTitle => 'لم تحفظ شيئاً بعد';
+
+  @override
+  String get shortlistEmptyBody =>
+      'اضغط على القلب في أي سيارة لتبقى هنا بينما تقارن.';
+
+  @override
+  String get shortlistNoLongerListed => 'لم تعد معروضة';
+
+  @override
+  String shortlistSavedOn(String date) {
+    return 'حُفظت في $date';
+  }
+
+  @override
+  String get errorShortlistFull =>
+      'قائمة المحفوظات ممتلئة. أزل سيارة قبل حفظ أخرى.';
+
+  @override
+  String get errorShortlistVehicleNotFound =>
+      'لم تعد هذه السيارة معروضة، فلا يمكن حفظها.';
 }

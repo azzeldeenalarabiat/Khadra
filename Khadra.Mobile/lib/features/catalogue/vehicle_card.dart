@@ -9,6 +9,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../shortlist/save_button.dart';
 
 /// One car, as a search result.
 ///
@@ -52,6 +53,13 @@ class VehicleCard extends ConsumerWidget {
                     icon: Icons.local_shipping_outlined,
                   ),
                 ),
+              // Opposite corner from the delivery badge, so neither hides the
+              // other on a car that is both.
+              PositionedDirectional(
+                top: Space.xs,
+                end: Space.xs,
+                child: SaveButton(vehicleId: listing.vehicleId, onSurface: true),
+              ),
             ],
           ),
           Padding(

@@ -70,6 +70,11 @@ class ProfileScreen extends ConsumerWidget {
                     label: l10n.profileEdit,
                     onTap: () => context.push(Routes.editProfile),
                   ),
+                  _Row(
+                    icon: Icons.favorite_border,
+                    label: l10n.shortlistTitle,
+                    onTap: () => context.push(Routes.shortlist),
+                  ),
                   _DocumentsRow(),
                 ],
               ),

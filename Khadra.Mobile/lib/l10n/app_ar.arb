@@ -567,5 +567,14 @@
   "landingDepositDue": "العربون مستحق",
   "landingRentalInProgress": "إيجارك جارٍ الآن",
   "landingUpcomingRental": "إيجارك القادم",
-  "landingAwaitingOffice": "بانتظار ردّ مكتب التأجير"
+  "landingAwaitingOffice": "بانتظار ردّ مكتب التأجير",
+  "shortlistTitle": "السيارات المحفوظة",
+  "shortlistSave": "احفظ هذه السيارة",
+  "shortlistRemove": "إزالة من المحفوظات",
+  "shortlistEmptyTitle": "لم تحفظ شيئاً بعد",
+  "shortlistEmptyBody": "اضغط على القلب في أي سيارة لتبقى هنا بينما تقارن.",
+  "shortlistNoLongerListed": "لم تعد معروضة",
+  "shortlistSavedOn": "حُفظت في {date}",
+  "errorShortlistFull": "قائمة المحفوظات ممتلئة. أزل سيارة قبل حفظ أخرى.",
+  "errorShortlistVehicleNotFound": "لم تعد هذه السيارة معروضة، فلا يمكن حفظها."
 }

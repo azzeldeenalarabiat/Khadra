@@ -12,6 +12,7 @@ import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../bookings/booking_providers.dart';
+import '../shortlist/shortlist_providers.dart';
 import 'date_range_sheet.dart';
 import 'filter_sheet.dart';
 import 'landing.dart';
@@ -247,6 +248,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     SearchFilter filter,
     PagedList<CatalogueListing> results,
   ) {
+    // ONE question for the whole page, asked after the frame rather than during
+    // it: a provider must not be written to while the tree that reads it is being
+    // built. The notifier skips ids it has already asked about, so scrolling back
+    // up costs nothing and a second page does not re-ask for the first.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(ref.read(savedVehiclesProvider.notifier).learn(
+            [for (final listing in results.items) listing.vehicleId],
+          ));
+    });
+
     if (results.isEmpty) {
       return [
         SliverFillRemaining(

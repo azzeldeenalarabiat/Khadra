@@ -1754,4 +1754,36 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get landingAwaitingOffice => 'Waiting on the rental office';
+
+  @override
+  String get shortlistTitle => 'Saved cars';
+
+  @override
+  String get shortlistSave => 'Save this car';
+
+  @override
+  String get shortlistRemove => 'Remove from saved';
+
+  @override
+  String get shortlistEmptyTitle => 'Nothing saved yet';
+
+  @override
+  String get shortlistEmptyBody =>
+      'Tap the heart on a car to keep it here while you compare.';
+
+  @override
+  String get shortlistNoLongerListed => 'No longer listed';
+
+  @override
+  String shortlistSavedOn(String date) {
+    return 'Saved on $date';
+  }
+
+  @override
+  String get errorShortlistFull =>
+      'Your saved list is full. Remove a car before saving another.';
+
+  @override
+  String get errorShortlistVehicleNotFound =>
+      'That car is no longer listed, so it cannot be saved.';
 }

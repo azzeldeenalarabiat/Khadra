@@ -75,6 +75,17 @@ class ApiClient {
             cancelToken: cancelToken,
           ));
 
+  Future<T> delete<T>(
+    String path, {
+    Options? options,
+    CancelToken? cancelToken,
+  }) =>
+      _send(() => _dio.delete<T>(
+            path,
+            options: options,
+            cancelToken: cancelToken,
+          ));
+
   /// A PUT to an ABSOLUTE url the server minted, with the same failure mapping as
   /// everything else.
   ///
