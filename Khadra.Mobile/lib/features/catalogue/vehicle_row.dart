@@ -20,9 +20,10 @@ import '../shortlist/save_button.dart';
 /// somebody is scanning gets four or five rows in the same height instead of one
 /// and a half, which is what a list is for.
 ///
-/// The trailing slot is the design's own: a View button on the saved list, a
-/// heart on search results. It is a real 48dp control rather than something
-/// overlaid on a 104px photograph.
+/// The trailing slot sits on the NAME line, which is where the design puts the
+/// only thing it trails a row with. It is not a third column: a column takes its
+/// width from the whole row, and the specification chips underneath are the part
+/// that runs out of room first -- in Arabic, and in English on a 375 screen.
 class VehicleRow extends ConsumerWidget {
   const VehicleRow({
     super.key,
@@ -83,6 +84,7 @@ class VehicleRow extends ConsumerWidget {
                     ),
                     const SizedBox(width: Space.sm),
                     _Rating(gallery: listing.gallery),
+                    if (trailing != null) trailing!,
                   ],
                 ),
                 const SizedBox(height: 3),
@@ -117,10 +119,6 @@ class VehicleRow extends ConsumerWidget {
               ],
             ),
           ),
-          if (trailing != null) ...[
-            const SizedBox(width: Space.sm),
-            trailing!,
-          ],
         ],
       ),
     );
@@ -296,7 +294,9 @@ class DailyRateLabel extends StatelessWidget {
       color: KhadraColors.price,
     );
     final unitStyle = TextStyle(
-      fontSize: size - 5,
+      // The unit is 12 at both sizes the design uses it -- it is a unit, not a
+      // smaller price, so it does not grow with the number beside it.
+      fontSize: 12,
       fontWeight: FontWeight.w600,
       color: KhadraColors.neutral600,
     );

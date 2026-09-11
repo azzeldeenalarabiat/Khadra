@@ -174,6 +174,10 @@ class _UnavailableState extends ConsumerState<_Unavailable> {
     return Opacity(
       opacity: 0.75,
       child: KhadraCard(
+        // The same 12 as the row beside it: an unavailable car is still one of
+        // the saved cars, and a card that measures differently reads as a
+        // different kind of thing.
+        padding: const EdgeInsets.all(Space.md),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -182,8 +186,8 @@ class _UnavailableState extends ConsumerState<_Unavailable> {
             // car that has been withdrawn would be that car's photograph still on
             // the open internet.
             Container(
-              width: 76,
-              height: 60,
+              width: 92,
+              height: 74,
               decoration: BoxDecoration(
                 color: KhadraColors.neutral100,
                 borderRadius: Radii.field,
@@ -201,21 +205,24 @@ class _UnavailableState extends ConsumerState<_Unavailable> {
                     // the date it was saved is the only honest thing left to say.
                     identity?.title ?? l10n.shortlistUnavailable,
                     style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700),
+                        fontSize: 14, fontWeight: FontWeight.w800),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     identity?.galleryName ??
                         l10n.shortlistSavedOn(
                             widget.formats.longDate(widget.saved.savedAt)),
                     style: const TextStyle(
-                        color: KhadraColors.neutral600, fontSize: 12),
+                      color: KhadraColors.neutral600,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: Space.sm),
+                  const SizedBox(height: 6),
                   // The pill. No reason on it, and none available to put there.
                   Container(
                     padding: const EdgeInsets.symmetric(
