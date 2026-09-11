@@ -2427,50 +2427,86 @@ channels behind it.
 now a rental may start. They are the same length today by coincidence and moving one must never move
 the other; `Khadra.Tests/Application/Bookings/PaymentWindowTests.cs` holds them apart.
 
-### 91. An approval email has nowhere to send the customer
+### 91. Customer deep linking — Android App Links and iOS Universal Links
 
-**Status:** open · **Raised:** 2026-09-11 · **Blocks:** the useful half of item 90
+**Status:** open · **Raised:** 2026-09-11 · **Owner decision recorded** · **Blocks:** the useful half
+of item 90
 
-`App:ClientBaseUrl` is the dealer and admin console. A customer following a link there lands on a
-sign-in that refuses them — worse than no link, because it reads as the platform being broken at the
-exact moment they are trying to pay.
+**`App:CustomerAppBaseUrl` stays EMPTY for now**, by the owner's decision on 2026-09-11, and the
+approval email names the booking reference and tells the reader to open the app. That is honest and
+it costs one tap on a two-hour clock.
 
-So `App:CustomerAppBaseUrl` exists and ships EMPTY, and while it is empty the approval email names the
-booking reference and tells the reader to open the app. That is true and useful, and it is one tap
-worse than it needs to be on a two-hour clock.
+**`App:ClientBaseUrl` must never be used for a customer link.** It is the dealer and admin console; a
+customer following it lands on a sign-in that refuses them, which reads as the platform being broken
+at the exact moment they are trying to pay. Two settings exist so that this cannot happen by
+accident, and `BookingEmailComposerTests` asserts the console URL never appears in a customer email.
 
-**To close:** either a customer-facing web route that can show one booking, or an app link
-(`https://app.khadra.jo/bookings/{id}` with an Android `assetlinks.json` and an iOS
-`apple-app-site-association`, plus `flutter_deep_link` or the platform intent filters), then set the
-setting. The composer already renders the button the moment it is non-empty, and
-`BookingEmailComposerTests` covers both shapes.
+**What it should become.** One customer-facing **HTTPS** link per booking —
+`https://<customer host>/bookings/{id}` — that opens the booking in the Khadra app when it is
+installed and, eventually, falls back to the customer website when it is not. Not a custom scheme
+(`khadra://`): a custom scheme cannot fall back, shows an ugly failure when the app is absent, and is
+not clickable in many mail clients. The same URL has to work in both cases, which is exactly what
+App Links and Universal Links are for.
 
-### 92. Two of the four hours' lead time are an engineering proposal, not a decision
+**To close, in order:**
 
-**Status:** open · **Raised:** 2026-09-11 · **Owner decision required**
+1. **A host.** Decide the customer-facing domain and stand up TLS on it.
+2. **Android App Links.** Serve `/.well-known/assetlinks.json` with the app's package name and the
+   release signing certificate's SHA-256 fingerprint; add an `intent-filter` with
+   `android:autoVerify="true"` for `https://<host>/bookings/*` to `AndroidManifest.xml`. Verify with
+   `adb shell pm get-app-links <package>` — a debug build signed with a different key will NOT verify,
+   which is the usual reason this looks broken in testing.
+3. **iOS Universal Links.** Serve `/.well-known/apple-app-site-association` (JSON, no extension, no
+   redirect, `application/json`) with the Team ID and bundle id; add the Associated Domains
+   entitlement `applinks:<host>`.
+4. **Routing in the app.** `go_router` already routes `/bookings/:id`; wire the incoming link to it
+   and decide what an unauthenticated open does — the session-aware redirect should send them to
+   sign-in and then ON to the booking, not drop them on the catalogue.
+5. **The web fallback**, whenever the customer website exists: the same URL rendering the booking, or
+   at minimum a page that names the reference and links to the store.
+6. **Then set `App:CustomerAppBaseUrl`** to that host. The composer renders the button the moment it
+   is non-empty; `BookingEmailComposerTests` already covers both shapes.
 
-`BusinessRules:MinimumBookingLeadTimeMinutes` went from 120 to **240** on 2026-09-11. It was forced,
-but only half of it was decided.
+**It is not only this email.** Booking confirmations, dispute updates and any later push notification
+want the same link, so whatever closes this should be one helper rather than a second URL built by
+hand somewhere else.
 
-The owner ruled that a gallery may not approve unless the customer can still have the whole payment
-window. That makes the last approvable instant `rental start − 2 hours`, so the DIFFERENCE between
-the lead time and the payment window is the entire time a gallery has to answer a request made at the
-earliest a customer may book for. At 120 and 120 that difference was **zero**: every such request
-would have been born unapprovable, and the customer would have been told the office never responded.
+### 92. The four-hour lead time, and why it is four
 
-So the lead time had to exceed the payment window, and startup now refuses a configuration where it
-does not. Two hours of payment window is the owner's. The two hours on top — a rental office noticing
-and answering, with no push channel of its own either — is a guess made to keep the branch coherent.
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-11 · **Owner decision recorded**
 
-**What it costs the customer:** a car can no longer be booked for three hours from now. The earliest
-is four.
+Settled: `MinimumBookingLeadTimeMinutes` is **240** and `PaymentWindowHours` is **2**. Both halves of
+the four hours are the owner's, and the reasoning is theirs too — a last-minute request gives the
+gallery roughly two hours to decide while preserving the customer's full two-hour payment window
+before the rental starts.
 
-**To close:** the owner names the time a gallery gets to answer a last-minute request. Anything above
-zero is valid configuration; anything at or below the payment window is refused at boot.
+The two numbers are RELATED, which is the part worth keeping in mind. A gallery may not approve
+unless the customer can still have the whole payment window, so the last approvable instant is
+`rental start − PaymentWindow`, and the DIFFERENCE between these two settings is the entire time a
+gallery has to answer a request made at the earliest a customer may book for. At 120 and 120 that
+difference was zero: every such request would have been born unapprovable and the customer would have
+been told the office never responded.
+
+**The invariant stays.** Startup refuses any configuration where the lead time does not STRICTLY
+exceed the payment window, with a message naming the relationship rather than the numbers
+(`Khadra.Infrastructure/DependencyInjection.cs`). `ShippedConfigurationTests` asserts the inequality
+rather than the values, so moving either number deliberately does not fail a test that was only ever
+about the pair.
+
+**What it costs the customer, accepted:** a car cannot be booked for three hours from now. The
+earliest is four.
+
+**If either number moves,** the other is a decision too. Raising the payment window without raising
+the lead time shrinks the gallery's decision window by the same amount, and the platform refuses to
+boot once it reaches zero.
 
 ### 93. The PDF upload path has never been exercised on a real device
 
-**Status:** open · **Raised:** 2026-09-11 · **Not a defect, a gap in what has been proved**
+**Status:** open · **Raised:** 2026-09-11 · **Held open by the owner, 2026-09-11** · **Not a defect,
+a gap in what has been proved**
+
+The owner's instruction: this stays open until the app is installed on an actual Android device and
+the whole path is walked — **select PDF → upload → persist → reopen/view**.
 
 PDF selection and upload shipped on 2026-09-11: `DocumentPicker` offers a file entry when the server
 advertises a non-image type, reads the content type from the file's leading bytes, and checks it and

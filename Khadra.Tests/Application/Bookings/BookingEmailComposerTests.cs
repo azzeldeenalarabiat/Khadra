@@ -285,6 +285,10 @@ public sealed class BookingEmailComposerTests
         Assert.Contains(expected, message.TextBody, StringComparison.Ordinal);
         // One link, offered to both readers. Two would invite a second tap on a page already open.
         Assert.Equal(2, Occurrences(message.HtmlBody, expected));
+        // And STILL never the console, configured or not. The two settings exist so that a customer
+        // cannot be sent to a sign-in that refuses them.
+        Assert.DoesNotContain("console.khadra.test", message.HtmlBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("console.khadra.test", message.TextBody, StringComparison.Ordinal);
     }
 
     [Fact]

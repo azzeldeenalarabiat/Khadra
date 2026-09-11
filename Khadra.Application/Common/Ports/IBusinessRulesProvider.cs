@@ -73,7 +73,8 @@ public sealed record BusinessRules(
     // refuses a configuration where this does not strictly exceed PaymentWindowHours.
     //
     // 240 is two hours of payment window plus two hours for a rental office to notice and answer.
-    // The second half is an engineering proposal, not an owner's figure -- see pre-launch item 92.
+    // SETTLED by the owner on 2026-09-11, both halves: the customer keeps a full two hours to pay,
+    // and a gallery gets roughly two hours to decide on a last-minute request.
     int MinimumBookingLeadTimeMinutes,
     // The longest a single rental may run, in Amman calendar days -- the same days the rental is
     // BILLED in, so the number a customer is refused on is the number they were quoted.

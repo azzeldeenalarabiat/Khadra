@@ -93,7 +93,7 @@ what keeps the availability predicate, the settlement sweep, the DTO flags and t
 correct without any of them being touched. `Approve` restates the invariant, which is NOT redundant
 for rows created before the change. Two consequences: `MinimumBookingLeadTimeMinutes` must STRICTLY
 exceed `PaymentWindowHours` (validated at startup; 240 against 120 today, and the extra two hours are
-an engineering proposal — pre-launch item 92), and an approval now emails the customer, after the
+both halves settled by the owner on 2026-09-11), and an approval now emails the customer, after the
 commit, with failures logged and swallowed, because a mail server cannot be allowed to undo a
 decision a gallery has made.
 

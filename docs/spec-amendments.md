@@ -200,7 +200,8 @@ That made the two settings dependent on each other, and forced the minimum lead 
 minutes to **240**: the gap between the lead time and the payment window is the whole of the time a
 gallery has to answer a request made at the earliest a customer may book for, and at 120/120 it was
 zero. Startup now refuses a configuration where the lead time does not strictly exceed the window.
-The second two hours is an engineering proposal awaiting the owner — pre-launch item 92.
+Both halves were settled by the owner on 2026-09-11: a last-minute request gives the gallery roughly
+two hours to decide while the customer keeps their full two hours to pay.
 
 ### Free cancellation
 
