@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Khadra.Application.Bookings;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -20,6 +19,10 @@ namespace Khadra.Tests.Application.Bookings;
 /// APPROVAL, and <c>MinimumBookingLeadTimeMinutes</c> is how far ahead of NOW a rental may start.
 /// They are the same length today and there is nothing in the type system to stop somebody wiring
 /// one where the other belongs, so it is asserted rather than assumed.
+/// </para>
+/// <para>
+/// These tests prove the window is CARRIED and ENFORCED at whatever length is configured.
+/// <c>ShippedConfigurationTests</c> proves that length is two.
 /// </para>
 /// </remarks>
 public sealed class PaymentWindowTests
@@ -48,38 +51,6 @@ public sealed class PaymentWindowTests
 
     private static async Task<Booking> ApprovableBookingAsync(DateRange? period = null) =>
         Build.Booking(Now, period: period, terms: await ConfiguredTermsAsync());
-
-    /// <summary>The shipped configuration is the owner's two hours, not anything else.</summary>
-    /// <remarks>
-    /// Read from the file that actually ships. Every other test here can only prove that whatever
-    /// number is configured is carried correctly — this is the one that proves WHICH number, and the
-    /// number is the whole of the owner's decision.
-    /// </remarks>
-    [Fact]
-    public void The_shipped_configuration_says_two_hours()
-    {
-        // Anchored on the file itself rather than on the solution, which has been renamed once
-        // already (.sln to .slnx) and would have taken this test with it.
-        var settingsPath = Path.Combine("Khadra.WebAPI", "appsettings.json");
-        var root = new DirectoryInfo(AppContext.BaseDirectory);
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, settingsPath)))
-            root = root.Parent;
-        Assert.NotNull(root);
-
-        // The file is JSON-with-comments, and nearly every number in it carries one saying who
-        // decided it and when.
-        using var settings = JsonDocument.Parse(
-            File.ReadAllText(Path.Combine(root.FullName, settingsPath)),
-            new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-        var rules = settings.RootElement.GetProperty("BusinessRules");
-
-        Assert.Equal(2, rules.GetProperty("PaymentWindowHours").GetInt32());
-        // The lead time is asserted to EXIST and not to equal anything. Pinning its value here would
-        // mean that the day the owner moves the lead time, the payment-window test fails — and the
-        // person reading that failure edits the number in front of them. AppConfigTests owns its
-        // value; what this file owns is that they are two settings.
-        Assert.True(rules.TryGetProperty("MinimumBookingLeadTimeMinutes", out _));
-    }
 
     /// <summary>The figure the pricer freezes is the PAYMENT window, not the lead time.</summary>
     [Fact]
