@@ -93,7 +93,7 @@
   "authSignInToBook": "Sign in to book this car",
   "authSessionExpired": "Your session ended. Sign in again.",
 
-  "navBrowse": "Browse",
+  "navHome": "Home",
   "navBookings": "Bookings",
   "navNotifications": "Alerts",
   "navProfile": "Profile",

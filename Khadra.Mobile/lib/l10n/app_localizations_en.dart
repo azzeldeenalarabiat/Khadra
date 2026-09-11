@@ -273,7 +273,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authSessionExpired => 'Your session ended. Sign in again.';
 
   @override
-  String get navBrowse => 'Browse';
+  String get navHome => 'Home';
 
   @override
   String get navBookings => 'Bookings';

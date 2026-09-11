@@ -560,11 +560,11 @@ abstract class AppLocalizations {
   /// **'Your session ended. Sign in again.'**
   String get authSessionExpired;
 
-  /// No description provided for @navBrowse.
+  /// No description provided for @navHome.
   ///
   /// In en, this message translates to:
-  /// **'Browse'**
-  String get navBrowse;
+  /// **'Home'**
+  String get navHome;
 
   /// No description provided for @navBookings.
   ///

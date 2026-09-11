@@ -85,7 +85,7 @@
   "authSignInToBook": "سجّل الدخول لحجز هذه السيارة",
   "authSessionExpired": "انتهت جلستك. سجّل الدخول من جديد.",
 
-  "navBrowse": "تصفّح",
+  "navHome": "الرئيسية",
   "navBookings": "حجوزاتي",
   "navNotifications": "التنبيهات",
   "navProfile": "حسابي",

@@ -278,7 +278,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authSessionExpired => 'انتهت جلستك. سجّل الدخول من جديد.';
 
   @override
-  String get navBrowse => 'تصفّح';
+  String get navHome => 'الرئيسية';
 
   @override
   String get navBookings => 'حجوزاتي';

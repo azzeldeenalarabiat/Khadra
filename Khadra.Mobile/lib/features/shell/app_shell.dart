@@ -52,7 +52,7 @@ class AppShell extends ConsumerWidget {
           NavigationDestination(
             icon: const Icon(Icons.search_outlined),
             selectedIcon: const Icon(Icons.search),
-            label: l10n.navBrowse,
+            label: l10n.navHome,
           ),
           NavigationDestination(
             icon: const Icon(Icons.event_note_outlined),
