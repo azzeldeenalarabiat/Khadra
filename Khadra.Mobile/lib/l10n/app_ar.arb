@@ -254,7 +254,7 @@
 
   "bookingReference": "الرقم المرجعي",
   "bookingWhen": "المدة",
-  "bookingWhere": "الاستلام",
+  "bookingWhere": "طريقة الاستلام",
   "bookingWhereDelivery": "يُوصَّل إليك",
   "bookingWhereSelfPickup": "تستلمها بنفسك",
   "bookingGallery": "مكتب التأجير",

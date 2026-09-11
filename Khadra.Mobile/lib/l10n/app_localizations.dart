@@ -1385,7 +1385,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookingWhere.
   ///
   /// In en, this message translates to:
-  /// **'Pick-up'**
+  /// **'How you get it'**
   String get bookingWhere;
 
   /// No description provided for @bookingWhereDelivery.

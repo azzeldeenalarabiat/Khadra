@@ -777,7 +777,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingWhen => 'When';
 
   @override
-  String get bookingWhere => 'Pick-up';
+  String get bookingWhere => 'How you get it';
 
   @override
   String get bookingWhereDelivery => 'Delivered to you';

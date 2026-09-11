@@ -268,7 +268,7 @@
 
   "bookingReference": "Reference",
   "bookingWhen": "When",
-  "bookingWhere": "Pick-up",
+  "bookingWhere": "How you get it",
   "bookingWhereDelivery": "Delivered to you",
   "bookingWhereSelfPickup": "You collect it",
   "bookingGallery": "Rental office",

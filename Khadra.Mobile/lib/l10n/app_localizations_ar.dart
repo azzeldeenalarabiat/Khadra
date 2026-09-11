@@ -794,7 +794,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingWhen => 'المدة';
 
   @override
-  String get bookingWhere => 'الاستلام';
+  String get bookingWhere => 'طريقة الاستلام';
 
   @override
   String get bookingWhereDelivery => 'يُوصَّل إليك';
