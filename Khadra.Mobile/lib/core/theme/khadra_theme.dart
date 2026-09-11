@@ -310,10 +310,7 @@ abstract final class KhadraTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: KhadraColors.surface,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: Space.lg,
-          vertical: Space.lg,
-        ),
+        contentPadding: const EdgeInsets.all(Space.card),
         border: const OutlineInputBorder(
           borderRadius: Radii.field,
           borderSide: BorderSide(color: KhadraColors.neutral300),

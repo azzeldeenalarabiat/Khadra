@@ -228,7 +228,7 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(Space.xl),
+        padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

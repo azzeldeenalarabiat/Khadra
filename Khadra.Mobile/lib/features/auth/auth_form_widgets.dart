@@ -49,8 +49,10 @@ class AuthScaffold extends StatelessWidget {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 26,
+                        height: 1.2,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
                         color: KhadraColors.text,
                       ),
                     ),
@@ -59,8 +61,9 @@ class AuthScaffold extends StatelessWidget {
                       Text(
                         subtitle!,
                         style: const TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           height: 1.5,
+                          fontWeight: FontWeight.w500,
                           color: KhadraColors.neutral600,
                         ),
                       ),
@@ -145,7 +148,6 @@ class KhadraField extends StatelessWidget {
       inputFormatters: inputFormatters,
       textDirection: forceLtr ? TextDirection.ltr : null,
       decoration: InputDecoration(
-        labelText: label,
         hintText: hint,
         helperText: helper,
         helperMaxLines: 3,
@@ -153,13 +155,32 @@ class KhadraField extends StatelessWidget {
         errorMaxLines: 3,
         suffixIcon: suffix,
         counterText: '',
-        alignLabelWithHint: maxLines > 1,
       ),
     );
 
+    // The label sits ABOVE the box, not inside it. The design draws it that way
+    // on every form it has, and it is the shape that survives Arabic: a floating
+    // label animating over a right-to-left field lands on the wrong end of it,
+    // and a long Arabic label shrinks to nothing on focus.
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.lg),
-      child: field,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 2, bottom: 7),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: KhadraColors.neutral700,
+              ),
+            ),
+          ),
+          field,
+        ],
+      ),
     );
   }
 }

@@ -79,7 +79,10 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
       builder: (context, controller) => Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.sm, 0),
+            // No top padding: the sheet's drag handle already stands the header off
+            // the edge, and adding to it opened a band of empty white above the
+            // one word that says what the sheet is.
+            padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.sm, 0),
             child: Row(
               children: [
                 Expanded(
@@ -108,7 +111,8 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
           Expanded(
             child: ListView(
               controller: controller,
-              padding: const EdgeInsets.fromLTRB(Space.xl, Space.lg, Space.xl, Space.xl),
+              padding: const EdgeInsets.fromLTRB(
+                  Space.lg, Space.md, Space.lg, Space.lg),
               children: [
                 _ChipGroup(
                   title: l10n.searchCity,
@@ -213,9 +217,14 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
               ],
             ),
           ),
+          // The button is a FOOTER, not the next thing in the list: the hairline
+          // is what stops it reading as an answer to whichever control happens to
+          // have scrolled to the bottom of the sheet.
+          const Divider(height: 1),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(Space.xl, 0, Space.xl, Space.lg),
+              padding: const EdgeInsets.fromLTRB(
+                  Space.lg, Space.md, Space.lg, Space.md),
               child: KhadraSubmitButton(
                 label: l10n.actionApply,
                 onPressed: _priceRangeInverted
