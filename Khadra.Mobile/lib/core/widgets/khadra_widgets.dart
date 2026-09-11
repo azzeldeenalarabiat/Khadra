@@ -1,6 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+// `show Bidi`: intl exports a TextDirection of its own, which shadows the
+// framework's and makes `TextDirection.rtl` stop resolving.
+import 'package:intl/intl.dart' show Bidi;
 
 import '../../l10n/app_localizations.dart';
 import '../theme/khadra_theme.dart';
@@ -567,6 +570,47 @@ class LatinRun extends StatelessWidget {
         textDirection: TextDirection.ltr,
         child: Text(text, style: style),
       );
+}
+
+/// Text somebody TYPED, laid out in the direction they typed it in.
+///
+/// A gallery writes its description in Arabic or in English, a customer writes a
+/// dispute statement in either, and the interface language says nothing about
+/// which. Rendering an English paragraph inside an Arabic layout puts its full
+/// stop at the wrong end — the gallery page showed ".open seven days a week",
+/// with the period orphaned at the start of the line — and an Arabic paragraph in
+/// an English layout has the mirror-image problem.
+///
+/// The direction comes from the TEXT, through the bidi algorithm's own
+/// first-strong rule, and the alignment follows it so the paragraph does not sit
+/// ragged against the wrong margin. Text with no strong character either way — a
+/// number, a plate — keeps the interface direction, which is the right default
+/// for something that reads the same both ways.
+///
+/// This is NOT for platform copy. Every string from the ARB files is written in
+/// the language it will be read in, and belongs in an ordinary [Text].
+class UserText extends StatelessWidget {
+  const UserText(this.text, {super.key, this.style, this.maxLines});
+
+  final String text;
+  final TextStyle? style;
+  final int? maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final rtl = Bidi.detectRtlDirectionality(text);
+    final direction = rtl ? TextDirection.rtl : TextDirection.ltr;
+
+    return Text(
+      text,
+      style: style,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      textDirection: direction,
+      // Start, not left: a paragraph reads from its own leading edge.
+      textAlign: rtl ? TextAlign.right : TextAlign.left,
+    );
+  }
 }
 
 /// Shows a message without stacking snack bars on top of each other.

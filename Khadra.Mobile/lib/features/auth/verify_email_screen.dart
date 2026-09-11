@@ -53,9 +53,32 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.token != null && widget.token!.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _verify(widget.token!));
-    }
+    _consumeIfPresent(null);
+  }
+
+  /// A token can arrive at a screen that is ALREADY on this route.
+  ///
+  /// It is the ordinary path, not an edge case: somebody registers, lands here,
+  /// opens their inbox, taps the link — and the app is already showing this
+  /// screen. go_router sees the same route with a different query, reuses the
+  /// widget, and `initState` never runs again. The link did nothing, silently,
+  /// and the customer was left looking at the screen that had just told them to
+  /// go and tap it.
+  @override
+  void didUpdateWidget(VerifyEmailScreen old) {
+    super.didUpdateWidget(old);
+    _consumeIfPresent(old.token);
+  }
+
+  void _consumeIfPresent(String? previousToken) {
+    final token = widget.token;
+    if (token == null || token.isEmpty || token == previousToken) return;
+
+    // After the frame, because this runs during a build on the update path and
+    // `_verify` sets state.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _verify(token);
+    });
   }
 
   Future<void> _verify(String token) async {

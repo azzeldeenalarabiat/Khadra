@@ -57,11 +57,36 @@ class Formats {
       decimalDigits: currency.minorUnits,
     ).format(amount);
 
-    // The code trails in both languages. Leading it in Arabic reads as an
-    // instruction rather than a price, and mixing a Latin code into an RTL run
-    // without an isolate makes the digits jump.
-    return isArabic ? '$digits $currencyCode' : '$currencyCode $digits';
+    // The code trails in Arabic. Leading it there reads as an instruction rather
+    // than a price.
+    final text = isArabic ? '$digits $currencyCode' : '$currencyCode $digits';
+
+    // ISOLATED, which this method said was necessary and did not do.
+    //
+    // A price is Latin digits beside a Latin currency code, and the bidi
+    // algorithm resolves that run against whatever sits next to it. Alone in an
+    // Arabic paragraph it came out right by luck; the moment anything joined it
+    // — "30.000 JOD × 4 أيام" on the price breakdown — the code detached from its
+    // amount and landed against the multiplication sign instead. One line read
+    // "30.000 JOD" and the line under it read "JOD 120.000", on the same card.
+    //
+    // FSI rather than LRI: it takes its direction from the first strong
+    // character, so the same wrapper is correct whichever way round the code and
+    // the digits are, and it stays correct if a currency is ever written in
+    // Arabic script.
+    return isolate(text);
   }
+
+  /// Wraps a run so the bidi algorithm cannot reorder it against its neighbours.
+  ///
+  /// U+2068 FIRST STRONG ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, written as
+  /// ESCAPES rather than as themselves: an invisible character in source reads as
+  /// nothing at all, and the analyzer refuses it for that reason.
+  ///
+  /// The isolate measures zero width and travels inside the string — which is
+  /// what makes it work in an interpolated sentence, where a widget-level
+  /// `Directionality` cannot reach.
+  static String isolate(String text) => '\u2068$text\u2069';
 
   /// A percentage as the server stated it: 20 renders "20%", 12.5 renders "12.5%".
   ///

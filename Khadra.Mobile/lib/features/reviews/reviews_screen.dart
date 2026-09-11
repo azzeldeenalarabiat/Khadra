@@ -152,7 +152,7 @@ class _ReviewCard extends StatelessWidget {
             ),
           ] else if (review.comment != null && review.comment!.isNotEmpty) ...[
             const SizedBox(height: Space.sm),
-            Text(
+            UserText(
               review.comment!,
               style: const TextStyle(fontSize: 14, height: 1.5),
             ),

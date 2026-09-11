@@ -138,7 +138,7 @@ class _GalleryBody extends ConsumerWidget {
                   gallery.description!.trim().isNotEmpty) ...[
                 const SizedBox(height: Space.xl),
                 KhadraSectionTitle(l10n.galleryAbout),
-                Text(
+                UserText(
                   gallery.description!,
                   style: const TextStyle(fontSize: 15, height: 1.55),
                 ),

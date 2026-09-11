@@ -868,7 +868,7 @@ class _Handovers extends StatelessWidget {
             if (handover.notes != null && handover.notes!.isNotEmpty)
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: Text(
+                child: UserText(
                   handover.notes!,
                   style: const TextStyle(fontSize: 13, height: 1.45),
                 ),
@@ -936,7 +936,7 @@ class _Timeline extends ConsumerWidget {
                       if (_reasonLine(l10n, change, rejectionReasons, arabic)
                           case final line?) ...[
                         const SizedBox(height: Space.xs),
-                        Text(
+                        UserText(
                           line,
                           style: const TextStyle(
                             fontSize: 13,

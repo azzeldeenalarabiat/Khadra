@@ -50,6 +50,34 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
   bool _submitting = false;
   String? _error;
 
+  /// So a refusal can be scrolled INTO VIEW.
+  ///
+  /// The submit button lives in a pinned bottom bar and the refusal renders at the
+  /// foot of a long list, which on a phone is well below the fold: a customer
+  /// pressed "request this car", the server answered "upload your licence first",
+  /// and nothing appeared to happen. The message was there; it was just somewhere
+  /// they had no reason to look.
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _revealError() {
+    // After the frame that renders the notice, so its height is part of the
+    // extent being scrolled to.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -136,6 +164,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
     final session = ref.watch(sessionProvider);
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(
           Space.lg, Space.lg, Space.lg, Space.bottomInset),
       children: [
@@ -346,6 +375,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
         _submitting = false;
         _error = failure.messageFor(l10n, config: _config);
       });
+      _revealError();
     }
   }
 }

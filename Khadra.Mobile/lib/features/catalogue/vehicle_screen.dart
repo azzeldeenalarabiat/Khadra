@@ -171,7 +171,7 @@ class _VehicleBody extends ConsumerWidget {
                 vehicle.description!.trim().isNotEmpty) ...[
               const SizedBox(height: Space.xl),
               KhadraSectionTitle(l10n.vehicleAbout),
-              Text(
+              UserText(
                 vehicle.description!,
                 style: const TextStyle(fontSize: 15, height: 1.55),
               ),

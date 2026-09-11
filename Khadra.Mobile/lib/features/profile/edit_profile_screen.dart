@@ -100,6 +100,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const SizedBox(height: Space.lg),
           ],
           Form(
+            // Re-validates as a field is corrected, so a message does not outlive the
+            // mistake it described. Without it the error stays until the next submit:
+            // "This is needed." sat under an email box that had just been filled in,
+            // which reads as the form refusing what was typed.
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             key: _formKey,
             child: Column(
               children: [
