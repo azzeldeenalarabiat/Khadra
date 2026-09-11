@@ -313,15 +313,25 @@ abstract final class KhadraTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: KhadraColors.surface,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: KhadraColors.accent100,
+        // NO indicator pill. The design marks the active tab by colouring the icon
+        // and its label green, and a filled lozenge behind one of five icons reads
+        // as a sixth control rather than as a state.
+        indicatorColor: Colors.transparent,
+        indicatorShape: const RoundedRectangleBorder(borderRadius: Radii.chip),
         elevation: 0,
-        height: 68,
+        height: 64,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => _style(
-            fontSize: 11,
-            fontWeight: states.contains(WidgetState.selected)
-                ? FontWeight.w700
-                : FontWeight.w600,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: states.contains(WidgetState.selected)
+                ? KhadraColors.accent
+                : KhadraColors.neutral600,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 22,
             color: states.contains(WidgetState.selected)
                 ? KhadraColors.accent
                 : KhadraColors.neutral600,

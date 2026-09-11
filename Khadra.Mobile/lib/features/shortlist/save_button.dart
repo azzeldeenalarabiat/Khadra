@@ -43,10 +43,13 @@ class SaveButton extends ConsumerWidget {
     final signedIn = ref.watch(sessionProvider).isSignedIn;
     final saved = signedIn && ref.watch(isSavedProvider(vehicleId));
 
+    // GREEN when saved, an outline in the text colour when not — the design's own
+    // heart. It was red, which in this palette is the colour of a refusal: a car
+    // somebody chose to keep should not wear the same colour as an error.
     final icon = Icon(
       saved ? Icons.favorite : Icons.favorite_border,
       size: size,
-      color: saved ? KhadraColors.badStrong : KhadraColors.neutral600,
+      color: saved ? KhadraColors.accent : KhadraColors.text,
     );
 
     final button = IconButton(
