@@ -304,16 +304,22 @@
   "@bookingFuelLevel": { "placeholders": { "percent": { "type": "String" } } },
   "bookingCashCollected": "المبلغ النقدي المستلم: {amount}",
   "@bookingCashCollected": { "placeholders": { "amount": { "type": "String" } } },
-  "bookingCountdownDays": "بقي {days} يوم و{hours} ساعة",
-  "@bookingCountdownDays": {
-    "placeholders": { "days": { "type": "int" }, "hours": { "type": "int" } }
+  "countdownDays": "{days, plural, =1{يوم واحد} =2{يومان} few{{days} أيام} many{{days} يوماً} other{{days} يوم}}",
+  "@countdownDays": {
+    "placeholders": { "days": { "type": "int" } }
   },
-  "bookingCountdownHours": "بقي {hours} ساعة و{minutes} دقيقة",
-  "@bookingCountdownHours": {
-    "placeholders": { "hours": { "type": "int" }, "minutes": { "type": "int" } }
+  "countdownHours": "{hours, plural, =1{ساعة واحدة} =2{ساعتان} few{{hours} ساعات} many{{hours} ساعة} other{{hours} ساعة}}",
+  "@countdownHours": { "placeholders": { "hours": { "type": "int" } } },
+  "countdownMinutes": "{minutes, plural, =1{دقيقة واحدة} =2{دقيقتان} few{{minutes} دقائق} many{{minutes} دقيقة} other{{minutes} دقيقة}}",
+  "@countdownMinutes": { "placeholders": { "minutes": { "type": "int" } } },
+  "countdownPair": "{first} و{second}",
+  "@countdownPair": {
+    "placeholders": { "first": { "type": "String" }, "second": { "type": "String" } }
   },
-  "bookingCountdownMinutes": "بقي {minutes} دقيقة",
-  "@bookingCountdownMinutes": { "placeholders": { "minutes": { "type": "int" } } },
+  "bookingCountdownLeft": "المتبقي {time}",
+  "@bookingCountdownLeft": {
+    "placeholders": { "time": { "type": "String" } }
+  },
   "bookingCountdownOver": "انتهى الوقت",
 
   "cancelTitle": "إلغاء هذا الحجز",

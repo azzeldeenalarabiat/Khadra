@@ -982,18 +982,55 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String bookingCountdownDays(int days, int hours) {
-    return 'بقي $days يوم و$hours ساعة';
+  String countdownDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days يوم',
+      many: '$days يوماً',
+      few: '$days أيام',
+      two: 'يومان',
+      one: 'يوم واحد',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookingCountdownHours(int hours, int minutes) {
-    return 'بقي $hours ساعة و$minutes دقيقة';
+  String countdownHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: '$hours ساعة',
+      many: '$hours ساعة',
+      few: '$hours ساعات',
+      two: 'ساعتان',
+      one: 'ساعة واحدة',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookingCountdownMinutes(int minutes) {
-    return 'بقي $minutes دقيقة';
+  String countdownMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes دقيقة',
+      many: '$minutes دقيقة',
+      few: '$minutes دقائق',
+      two: 'دقيقتان',
+      one: 'دقيقة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String countdownPair(String first, String second) {
+    return '$first و$second';
+  }
+
+  @override
+  String bookingCountdownLeft(String time) {
+    return 'المتبقي $time';
   }
 
   @override

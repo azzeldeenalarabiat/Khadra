@@ -333,16 +333,25 @@
   "@bookingFuelLevel": { "placeholders": { "percent": { "type": "String" } } },
   "bookingCashCollected": "Cash taken: {amount}",
   "@bookingCashCollected": { "placeholders": { "amount": { "type": "String" } } },
-  "bookingCountdownDays": "{days}d {hours}h left",
-  "@bookingCountdownDays": {
-    "placeholders": { "days": { "type": "int" }, "hours": { "type": "int" } }
+  "countdownDays": "{days}d",
+  "@countdownDays": {
+    "description": "A countdown is built from parts so Arabic can inflect each unit. English abbreviates and needs no plural; Arabic spells the unit out and needs all six categories.",
+    "placeholders": { "days": { "type": "int" } }
   },
-  "bookingCountdownHours": "{hours}h {minutes}m left",
-  "@bookingCountdownHours": {
-    "placeholders": { "hours": { "type": "int" }, "minutes": { "type": "int" } }
+  "countdownHours": "{hours}h",
+  "@countdownHours": { "placeholders": { "hours": { "type": "int" } } },
+  "countdownMinutes": "{minutes}m",
+  "@countdownMinutes": { "placeholders": { "minutes": { "type": "int" } } },
+  "countdownPair": "{first} {second}",
+  "@countdownPair": {
+    "description": "Joins the two largest units. Arabic joins with و; English with a space.",
+    "placeholders": { "first": { "type": "String" }, "second": { "type": "String" } }
   },
-  "bookingCountdownMinutes": "{minutes}m left",
-  "@bookingCountdownMinutes": { "placeholders": { "minutes": { "type": "int" } } },
+  "bookingCountdownLeft": "{time} left",
+  "@bookingCountdownLeft": {
+    "description": "Wraps the assembled parts. A NOUN phrase in Arabic rather than a verb, because an Arabic verb would have to agree in gender with whichever unit came first.",
+    "placeholders": { "time": { "type": "String" } }
+  },
   "bookingCountdownOver": "The time has run out",
 
   "cancelTitle": "Cancel this booking",

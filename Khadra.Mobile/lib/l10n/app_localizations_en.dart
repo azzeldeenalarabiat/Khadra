@@ -949,18 +949,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String bookingCountdownDays(int days, int hours) {
-    return '${days}d ${hours}h left';
+  String countdownDays(int days) {
+    return '${days}d';
   }
 
   @override
-  String bookingCountdownHours(int hours, int minutes) {
-    return '${hours}h ${minutes}m left';
+  String countdownHours(int hours) {
+    return '${hours}h';
   }
 
   @override
-  String bookingCountdownMinutes(int minutes) {
-    return '${minutes}m left';
+  String countdownMinutes(int minutes) {
+    return '${minutes}m';
+  }
+
+  @override
+  String countdownPair(String first, String second) {
+    return '$first $second';
+  }
+
+  @override
+  String bookingCountdownLeft(String time) {
+    return '$time left';
   }
 
   @override

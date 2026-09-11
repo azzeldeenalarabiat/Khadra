@@ -1616,23 +1616,35 @@ abstract class AppLocalizations {
   /// **'Cash taken: {amount}'**
   String bookingCashCollected(String amount);
 
-  /// No description provided for @bookingCountdownDays.
+  /// A countdown is built from parts so Arabic can inflect each unit. English abbreviates and needs no plural; Arabic spells the unit out and needs all six categories.
   ///
   /// In en, this message translates to:
-  /// **'{days}d {hours}h left'**
-  String bookingCountdownDays(int days, int hours);
+  /// **'{days}d'**
+  String countdownDays(int days);
 
-  /// No description provided for @bookingCountdownHours.
+  /// No description provided for @countdownHours.
   ///
   /// In en, this message translates to:
-  /// **'{hours}h {minutes}m left'**
-  String bookingCountdownHours(int hours, int minutes);
+  /// **'{hours}h'**
+  String countdownHours(int hours);
 
-  /// No description provided for @bookingCountdownMinutes.
+  /// No description provided for @countdownMinutes.
   ///
   /// In en, this message translates to:
-  /// **'{minutes}m left'**
-  String bookingCountdownMinutes(int minutes);
+  /// **'{minutes}m'**
+  String countdownMinutes(int minutes);
+
+  /// Joins the two largest units. Arabic joins with و; English with a space.
+  ///
+  /// In en, this message translates to:
+  /// **'{first} {second}'**
+  String countdownPair(String first, String second);
+
+  /// Wraps the assembled parts. A NOUN phrase in Arabic rather than a verb, because an Arabic verb would have to agree in gender with whichever unit came first.
+  ///
+  /// In en, this message translates to:
+  /// **'{time} left'**
+  String bookingCountdownLeft(String time);
 
   /// No description provided for @bookingCountdownOver.
   ///
