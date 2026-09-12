@@ -52,9 +52,13 @@ abstract final class DocumentViewer {
     try {
       final directory = Directory(await _directoryPath());
       if (directory.existsSync()) await directory.delete(recursive: true);
-    } on Exception {
-      // A cache the operating system has already reclaimed, or a file held open
-      // by the viewer. Neither is worth failing a sign-out over.
+    } on Object {
+      // EVERYTHING, not just Exception. A cache the operating system has already
+      // reclaimed, a file the viewer still holds open, a platform channel that
+      // is not there at all -- none of it is worth failing a sign-out over, and
+      // catching only Exception let a MissingPluginException escape and leave
+      // the session signed IN. Clearing a cache is cleanup; it must never be
+      // the reason somebody cannot leave.
     }
   }
 

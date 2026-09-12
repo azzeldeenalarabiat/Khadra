@@ -183,7 +183,8 @@ class SessionController extends StateNotifier<SessionState> {
     }
 
     await _store.clear();
-    await DocumentViewer.discard();
+    // Best-effort and deliberately not awaited; see _end below.
+    DocumentViewer.discard();
     state = const SessionState(status: SessionStatus.signedOut);
   }
 
@@ -219,7 +220,12 @@ class SessionController extends StateNotifier<SessionState> {
     // A licence fetched while signed in must not still be in the cache for
     // whoever signs in next on the same phone. Clearing the token without
     // clearing what the token was used to fetch would leave the document behind.
-    await DocumentViewer.discard();
+    //
+    // NOT awaited. The session has to end whether or not the cache can be
+    // reached: getTemporaryDirectory goes through a platform channel, and a
+    // channel that never answers would leave somebody pressing Sign out on a
+    // screen that stays signed in. The call swallows its own failures.
+    DocumentViewer.discard();
     state = SessionState(status: SessionStatus.signedOut, endedReason: reason);
   }
 }

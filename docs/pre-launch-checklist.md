@@ -2530,6 +2530,29 @@ canvas. Steps 3–5 are equally unproven on iOS.
 
 **To close:** run the five steps on an Android device and an iPhone, and record the result here.
 
+#### Run 2 -- Android emulator (Pixel, API 36), 2026-09-12: CLOSED for Android
+
+All five steps pass on the corrected build.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | System file picker with the right filter | **PASS** |
+| 2 | PDF chosen from Downloads | **PASS** |
+| 3 | Bytes reach `POST /customers/me/documents` | **PASS** -- 201 |
+| 4 | Row persists with the right type and size | **PASS** -- `PDF · 1 KB`, survived a force-stop AND an in-place 9.2.4 to 10.3.2 upgrade |
+| 5 | Reopens through a signed link and RENDERS | **PASS** -- `GET /api/v1/documents/...` answered 200 and the native viewer displayed the file’s own text |
+
+Step 5 was the failure. The fix was on the CLIENT and the backend keeps both protections: the app
+fetches the bytes over its own authenticated connection instead of handing the URL to a browser that
+can never carry a bearer token. Repeated in Arabic, where a freshly minted link also answered 200.
+
+The bytes are written to the app’s private cache under the document’s id, and
+`DocumentViewer.discard()` empties that directory when the session ends -- verified on the device:
+after sign-out `cache/khadra_documents` no longer exists.
+
+**Still open for iOS.** The whole path is unexercised there, and the first Mac build is also where
+the iOS 14 floor gets tested.
+
 #### Run 1 -- Android emulator (Pixel, API 36), 2026-09-11, debug build
 
 Four of the five steps pass. The fifth fails, for a reason that needs an owner decision.
@@ -2709,11 +2732,55 @@ A fresh install now writes `FlutterSecureKeyStorage.xml` holding an RSA-wrapped 
 cipher backend -- rather than Jetpack Crypto's Tink blobs. That is the new scheme working; it is NOT
 evidence that a migration works, because a fresh install has nothing to migrate.
 
-#### What is still unproved, and blocks closing this item
+#### The in-place upgrade, run and PASSED on 2026-09-12
 
-**The migration itself has NOT been exercised.** Every install used for verification was a FRESH one,
-which takes the "no data to migrate" branch -- the branch that cannot fail. The test that matters is
-the one nobody has run:
+The test that matters, on an Android emulator (Pixel, API 36):
+
+1. install a build with `flutter_secure_storage` **9.2.4** -- **done**, built from this branch with
+   the storage package pinned back and `AndroidOptions(encryptedSharedPreferences: true)` restored;
+2. sign in, and confirm a token is stored -- **done**: four entries appeared, two of them Tink-
+   encrypted key NAMES (`AX3dqTca...`, `AX3dqTdP...`) plus the two
+   `__androidx_security_crypto_*` keysets, which is exactly what Jetpack Crypto writes;
+3. upgrade IN PLACE to 10.3.2 -- **done**, `adb install -r`, no uninstall;
+4. cold-start, session survives without a sign-in -- **PASS**. The plugin logged it itself:
+
+        Found data in EncryptedSharedPreferences (deprecated)
+        Migrating data from EncryptedSharedPreferences to custom cipher storage...
+        Migrated key: khadra.refresh_token
+        Migrated key: khadra.refresh_expires_at
+        Migration complete: 2 items migrated
+        Migration completed successfully. Now using custom cipher storage.
+
+   and the server accepted the migrated credential: `POST /auth/refresh` answered **200** on that
+   cold start, with the account restored and no sign-in prompt;
+5. the store now holds v10’s own prefixed entries beside the now-inert Tink keysets.
+
+**The first attempt FAILED, and the cause is worth keeping.** `migrateWithBackup: true` -- added here
+as the careful choice, to keep a copy while the one-time move ran -- is what stopped the move
+happening at all. `FlutterSecureStorage.java:170` guards the whole EncryptedSharedPreferences
+migration with `if (!isAlreadyMigrated && !config.shouldMigrateWithBackup())` and defers it to "step
+6 of the backup-protected migration path", which is the ALGORITHM-CHANGE path -- and that never runs
+on a v9 store, because there are no v10 algorithm markers to have changed. Nothing was corrupted and
+nothing was lost; v10 simply never looked at the old store, treated the app as a fresh install, and
+the customer was signed out. Both flags are defensible on their names; only one combination works,
+and nothing but a real upgrade on a real install would have said so.
+
+**Also disproved: the `win32` override.** The advisor offered `dependency_overrides: win32: ^6.4.0`
+as an emergency way to keep 9.2.4 while unblocking `file_picker`. It RESOLVES but does not COMPILE:
+the Dart front end still type-checks `flutter_secure_storage_windows` 3.1.2 even for an Android
+target, and that package does not build against win32 6.x (`Too many positional arguments`,
+`WIN32_ERROR` vs `HRESULT`). Recorded so nobody reaches for it under pressure.
+
+#### What remains open
+
+Everything above was run on an EMULATOR, not a handset. The emulator is a real Android and the
+migration is a device-local operation, so this is strong evidence; a phone with a hardware-backed
+Keystore is still the last word, and the second hop (10.x to 11.x) has not been attempted and must
+rerun these same tests when it is.
+
+<!-- superseded plan, kept for the shape of the test -->
+
+**The original plan, for reference:**
 
 1. install a build with `flutter_secure_storage` **9.2.4** on a real Android device,
 2. sign in, and confirm a token is stored,
