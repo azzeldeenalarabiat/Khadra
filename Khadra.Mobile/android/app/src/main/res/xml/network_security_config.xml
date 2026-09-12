@@ -30,5 +30,6 @@
              (see lib/core/config/app_environment.dart). Add the address printed
              by `ipconfig` when the lease moves. -->
         <domain includeSubdomains="false">192.168.8.254</domain>
+        <domain includeSubdomains="false">192.168.1.156</domain>
     </domain-config>
 </network-security-config>

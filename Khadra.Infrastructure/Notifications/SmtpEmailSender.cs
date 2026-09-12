@@ -37,18 +37,31 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
         var attempts = Math.Max(1, _options.MaxAttempts);
         var perAttemptMs = Math.Max(1000, _options.TimeoutSeconds * 1000 / attempts);
 
+        // The budget is enforced HERE, by a clock, because SmtpClient.Timeout alone does not enforce
+        // it. That property bounds one socket operation, and SendOnceAsync performs four of them --
+        // connect, authenticate, send, disconnect -- so a single attempt could take four times its
+        // slice and three attempts twelve times it. TimeoutSeconds is documented as the TOTAL wait a
+        // caller may suffer; against a mail server that answered slowly it was really a floor, and a
+        // registration ran past the phone's own receive timeout because of it.
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, _options.TimeoutSeconds)));
+
         for (var attempt = 1; ; attempt++)
         {
             try
             {
-                await SendOnceAsync(mime, perAttemptMs, cancellationToken);
+                await SendOnceAsync(mime, perAttemptMs, budget.Token);
                 return;
             }
-            catch (Exception exception) when (attempt < attempts && IsTransient(exception))
+            catch (Exception exception) when (attempt < attempts && IsTransient(exception)
+                                             && !budget.IsCancellationRequested)
             {
                 // Deliberately no logging here: the dispatcher reports the final outcome, and a line
                 // per retry would make a recovered send look like a failure to anyone reading the log.
-                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                //
+                // A spent budget stops the retries even when the failure looks transient: another go
+                // cannot finish inside a window that has already closed.
+                await Task.Delay(TimeSpan.FromMilliseconds(250), budget.Token);
             }
         }
     }
