@@ -38,11 +38,22 @@ class SessionStore {
               aOptions: AndroidOptions(
                 // Carry the data to the new ciphers instead of losing it.
                 migrateOnAlgorithmChange: true,
-                // Keep a copy while the move is in progress. It exists for
-                // exactly the case that costs a person their session: the app
-                // being killed halfway through a one-time migration of the one
-                // credential that survives a restart.
-                migrateWithBackup: true,
+                // NOT `migrateWithBackup`. It reads like the safe choice -- keep
+                // a copy while the one-time move runs -- and it is the reason the
+                // move did not happen at all.
+                //
+                // `FlutterSecureStorage.java:170` guards the whole
+                // EncryptedSharedPreferences migration with
+                // `if (!isAlreadyMigrated && !config.shouldMigrateWithBackup())`,
+                // deferring it to "step 6 of the backup-protected migration
+                // path" -- which is the ALGORITHM-CHANGE path, and that never
+                // runs on a v9 store because there are no v10 algorithm markers
+                // to have changed. Turning the backup on therefore skips the only
+                // branch that can read Jetpack Crypto data.
+                //
+                // Measured, not reasoned: with it on, an in-place 9.2.4 to 10.3.2
+                // upgrade left the Tink entries untouched and the customer signed
+                // out. With it off the migration runs. See pre-launch item 94.
                 // A token that cannot be decrypted is DISCARDED. This is a
                 // change -- v9 defaulted it to false -- so what each setting
                 // actually does to a customer is written out here rather than
