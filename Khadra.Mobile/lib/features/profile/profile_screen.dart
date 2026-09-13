@@ -7,6 +7,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../auth/account_required.dart';
 import '../documents/document_providers.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -108,34 +109,15 @@ class ProfileScreen extends ConsumerWidget {
                 ],
               ),
             ] else
-              Padding(
-                padding: const EdgeInsets.all(Space.lg),
-                child: KhadraCard(
-                  child: Column(
-                    children: [
-                      const KhadraWordmark(logoSize: 64),
-                      const SizedBox(height: Space.lg),
-                      Text(
-                        l10n.bookingsSignedOutBody,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            color: KhadraColors.neutral600,
-                            fontSize: 14,
-                            height: 1.5),
-                      ),
-                      const SizedBox(height: Space.lg),
-                      FilledButton(
-                        onPressed: () => context.push(Routes.signIn),
-                        child: Text(l10n.authSignIn),
-                      ),
-                      const SizedBox(height: Space.sm),
-                      OutlinedButton(
-                        onPressed: () => context.push(Routes.register),
-                        child: Text(l10n.authSignUp),
-                      ),
-                    ],
-                  ),
-                ),
+              // The same panel Bookings and Alerts show, so the three cannot
+              // disagree about what an account is for or how to get one. The
+              // language group and About stay BELOW it: this tab is the one place
+              // a signed-out Arabic speaker can get the app out of English, which
+              // is why it is not gated.
+              AccountRequired(
+                icon: Icons.person_outline,
+                title: l10n.profileSignedOutTitle,
+                next: Routes.profile,
               ),
 
             const _LanguageGroup(),
@@ -218,7 +200,18 @@ class ProfileScreen extends ConsumerWidget {
 
     if (confirmed != true) return;
     await ref.read(sessionProvider.notifier).signOut(allDevices: allDevices);
-    if (context.mounted) context.go(Routes.search);
+
+    // Signing out returns the app to the UNAUTHENTICATED FLOW, which means the
+    // screen it starts at, not the catalogue behind it. Forgetting the entry
+    // choice is what makes the next launch land in the same place rather than
+    // contradicting the screen they were left on -- and Get Started's Sign in is
+    // the switch-account path, which is the neutral thing to show on a phone that
+    // has just been handed to somebody else.
+    //
+    // Only a DELIBERATE sign-out does this. An expiry or a suspension leaves the
+    // choice alone: that customer has an account and made their choice long ago.
+    await ref.read(entryChoiceProvider.notifier).forget();
+    if (context.mounted) context.go(Routes.welcome);
   }
 }
 
@@ -505,7 +498,7 @@ class _Row extends StatelessWidget {
                 Flexible(child: trailing!),
                 const SizedBox(width: Space.sm),
               ],
-              const Icon(Icons.chevron_right, color: KhadraColors.neutral400),
+              const KhadraDisclosure(),
             ],
           ),
         ),

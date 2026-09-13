@@ -82,7 +82,13 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             // No top padding: the sheet's drag handle already stands the header off
             // the edge, and adding to it opened a band of empty white above the
             // one word that says what the sheet is.
-            padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.sm, 0),
+            //
+            // DIRECTIONAL, because the two ends are not the same: the title needs
+            // the full inset and the close button sits tight against the far edge.
+            // Written as LTRB it put the wide inset on the left in Arabic too, so
+            // the heading floated off its own margin while the X pressed into it.
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                Space.lg, 0, Space.sm, 0),
             child: Row(
               children: [
                 Expanded(

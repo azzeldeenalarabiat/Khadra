@@ -135,15 +135,17 @@ class KhadraBack extends StatelessWidget {
         // arrow-with-a-shaft. It is on fifteen screens, it is the single most
         // repeated glyph in the app, and it is one icon to change.
         //
-        // `Directionality` mirrors it: in Arabic the chevron points right, which
-        // is the direction "back" actually is. `BackButtonIcon` did this for us
-        // and naming an icon directly gives it up, so it is done here instead.
-        icon: Icon(
-          Directionality.of(context) == TextDirection.rtl
-              ? Icons.chevron_right
-              : Icons.chevron_left,
-          size: 26,
-        ),
+        // NAMED ONCE, and not chosen by direction. `Icons.chevron_left` carries
+        // `matchTextDirection: true`, and the `Icon` widget mirrors any such glyph
+        // under an RTL `Directionality` itself — so this already points right in
+        // Arabic. Picking `chevron_right` for Arabic by hand, as this did, mirrors
+        // a glyph that was about to be mirrored anyway and lands back where it
+        // started: a back button pointing LEFT on every Arabic screen.
+        //
+        // `KhadraDisclosure` below is the same rule for the trailing chevron, and
+        // `rtl_audit_test` forbids the hand-written version so this cannot come
+        // back.
+        icon: Icon(Icons.chevron_left, size: 26),
         tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         onPressed: () => khadraLeave(context, fallback),
       );
@@ -501,6 +503,60 @@ class KhadraChoiceChip extends StatelessWidget {
   final VoidCallback onTap;
   final bool selected;
 
+  static const double _fontSize = 12;
+  static const double _padding = 9;
+  static const double _border = 1;
+
+  /// The height one of these takes at the reader's chosen text size.
+  ///
+  /// Exposed because one caller has to know BEFORE it builds one: a horizontal
+  /// list must be given a height, and the number that was written down there —
+  /// 42 — was measured in English at the default size. Arabic's line box is
+  /// deeper and a customer who has turned text up gets more of both, so a
+  /// constant is clipped in exactly the cases nobody takes a screenshot of.
+  ///
+  /// It reads the SAME constants the chip builds with, so the two cannot drift
+  /// the day the padding or the point size changes.
+  static double heightIn(BuildContext context) {
+    final ambient = DefaultTextStyle.of(context);
+
+    final painter = TextPainter(
+      // BOTH scripts in one line, and that is the point. A run of Latin is set in
+      // Manrope and a run of Arabic falls through to Noto Kufi Arabic, the two
+      // faces do not have the same metrics, and a line takes the taller of the
+      // runs it contains. Measuring either alphabet alone under-reports the other
+      // by a pixel or two — which is all it takes to shave the top off a word.
+      text: TextSpan(text: 'Aع', style: _styleIn(context, selected: true)),
+      // rtl-audit: allow — measuring a sample, not laying out a screen.
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      // The same height behaviour `Text` will be laid out with. Left to the
+      // default the painter and the widget can disagree, and the painter is the
+      // one that says the row is big enough. (No strut: the chip's `Text` sets
+      // none either, so the line height comes from the runs in both.)
+      textHeightBehavior: ambient.textHeightBehavior,
+    )..layout();
+
+    final height = painter.height;
+    painter.dispose();
+
+    // Ceiled: a paragraph is laid out in whole pixels and a row reserving 36.4 for
+    // a chip that takes 37 clips it by the rounding alone.
+    return height.ceilToDouble() + (_padding + _border) * 2;
+  }
+
+  /// Resolved against the ambient default so the measurement runs in the app's
+  /// own faces. A bare `TextStyle` names no family and would be measured in the
+  /// platform's, which is not what any of this renders in.
+  static TextStyle _styleIn(BuildContext context, {required bool selected}) =>
+      DefaultTextStyle.of(context).style.merge(
+            TextStyle(
+              fontSize: _fontSize,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              color: selected ? KhadraColors.price : KhadraColors.neutral800,
+            ),
+          );
+
   @override
   Widget build(BuildContext context) => Material(
         color: selected ? KhadraColors.accent100 : KhadraColors.surface,
@@ -509,25 +565,42 @@ class KhadraChoiceChip extends StatelessWidget {
           onTap: onTap,
           borderRadius: Radii.chip,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 13, vertical: _padding),
             decoration: BoxDecoration(
               borderRadius: Radii.chip,
               border: Border.all(
+                width: _border,
                 color:
                     selected ? KhadraColors.accent : KhadraColors.neutral300,
               ),
             ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color:
-                    selected ? KhadraColors.price : KhadraColors.neutral800,
-              ),
-            ),
+            child: Text(label, style: _styleIn(context, selected: selected)),
           ),
         ),
+      );
+}
+
+/// The chevron at the end of a row you can open.
+///
+/// It points the way the language runs — right in English, left in Arabic — and
+/// FLUTTER does that, not this widget. `Icons.chevron_right` is declared with
+/// `matchTextDirection: true`, and `Icon` flips any such glyph horizontally under
+/// an RTL `Directionality`. So the four screens that named it directly were
+/// right; what was wrong was the correction, which chose `chevron_left` for
+/// Arabic and had it mirrored straight back into pointing right.
+///
+/// This exists for the colour and for one place to look, not to pick the glyph.
+/// `rtl_audit_test` forbids picking one by hand anywhere.
+class KhadraDisclosure extends StatelessWidget {
+  const KhadraDisclosure({super.key, this.color});
+
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Icon(
+        Icons.chevron_right,
+        color: color ?? KhadraColors.neutral400,
       );
 }
 
@@ -798,6 +871,7 @@ class LatinRun extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Directionality(
+        // rtl-audit: allow — an isolate is exactly what this widget is for.
         textDirection: TextDirection.ltr,
         child: Text(text, style: style),
       );
@@ -830,6 +904,7 @@ class UserText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rtl = Bidi.detectRtlDirectionality(text);
+    // rtl-audit: allow — derived from the typed text, not from the interface.
     final direction = rtl ? TextDirection.rtl : TextDirection.ltr;
 
     return Text(
@@ -837,9 +912,12 @@ class UserText extends StatelessWidget {
       style: style,
       maxLines: maxLines,
       overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      // rtl-audit: allow — the direction comes from the TEXT, not the interface.
       textDirection: direction,
-      // Start, not left: a paragraph reads from its own leading edge.
-      textAlign: rtl ? TextAlign.right : TextAlign.left,
+      // Start, not left. It resolves against the direction set on the line above,
+      // which is the typed text's own — so this reads from the paragraph's leading
+      // edge whichever way that paragraph runs, and needs no second branch.
+      textAlign: TextAlign.start,
     );
   }
 }

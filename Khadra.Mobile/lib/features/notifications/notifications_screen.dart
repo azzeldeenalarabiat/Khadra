@@ -14,6 +14,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../auth/account_required.dart';
 import 'notification_providers.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -65,14 +66,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     if (!session.isSignedIn) {
       return Scaffold(
         appBar: AppBar(title: KhadraLargeTitle(l10n.notificationsTitle)),
-        body: KhadraEmpty(
+        body: AccountRequired(
           icon: Icons.notifications_off_outlined,
-          title: l10n.bookingsSignedOutTitle,
-          body: l10n.bookingsSignedOutBody,
-          action: FilledButton(
-            onPressed: () => context.push(Routes.signIn),
-            child: Text(l10n.authSignIn),
-          ),
+          title: l10n.notificationsSignedOutTitle,
+          next: Routes.notifications,
         ),
       );
     }

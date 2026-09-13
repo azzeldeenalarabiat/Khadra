@@ -15,6 +15,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../auth/account_required.dart';
 import 'booking_providers.dart';
 
 class BookingsScreen extends ConsumerStatefulWidget {
@@ -66,14 +67,10 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
     if (!session.isSignedIn) {
       return Scaffold(
         appBar: AppBar(title: KhadraLargeTitle(l10n.bookingsTitle)),
-        body: KhadraEmpty(
+        body: AccountRequired(
           icon: Icons.lock_outline,
           title: l10n.bookingsSignedOutTitle,
-          body: l10n.bookingsSignedOutBody,
-          action: FilledButton(
-            onPressed: () => context.push(Routes.signIn),
-            child: Text(l10n.authSignIn),
-          ),
+          next: Routes.bookings,
         ),
       );
     }

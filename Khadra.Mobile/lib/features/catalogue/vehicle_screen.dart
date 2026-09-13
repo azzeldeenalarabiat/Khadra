@@ -509,7 +509,7 @@ class _GallerySummary extends ConsumerWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: KhadraColors.neutral400),
+              const KhadraDisclosure(),
             ],
           ),
           const SizedBox(height: Space.md),

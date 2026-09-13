@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +14,11 @@ import '../../l10n/app_localizations.dart';
 import 'auth_form_widgets.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.next});
+
+  /// Where the customer was heading when they were asked for an account. Carried
+  /// through verification, so the tap that started all this is the one answered.
+  final String? next;
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -90,6 +96,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             isForeignNational: _isForeignNational,
           );
 
+      // Creating an account is a choice about how to use the app, so the Get
+      // Started screen has been answered and must not ask again.
+      //
+      // Not awaited, for the same reason as in `sign_in_screen.dart`: nothing
+      // between a server call that SUCCEEDED and the navigation that says so may
+      // wait on a disk write. The account exists whatever the preference does.
+      unawaited(ref.read(entryChoiceProvider.notifier).choose());
+
       if (!mounted) return;
 
       context.go(
@@ -101,6 +115,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             // way to that inbox, and the next screen must offer another link
             // rather than tell somebody to wait for one that is not coming.
             if (!registered.verificationEmailSent) 'undelivered': '1',
+            // Where they were heading before they were asked for an account.
+            if (widget.next != null) 'next': widget.next!,
           },
         ).toString(),
       );
@@ -241,7 +257,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               style: const TextStyle(color: KhadraColors.neutral600),
             ),
             TextButton(
-              onPressed: _busy ? null : () => context.go(Routes.signIn),
+              // `go`, not `push`: these two screens each offer the other, and
+              // pushing would let somebody stack a dozen of them. The destination
+              // still travels across.
+              onPressed: _busy
+                  ? null
+                  : () => context.go(routeWithNext(Routes.signIn, widget.next)),
               child: Text(l10n.authSignIn),
             ),
           ],

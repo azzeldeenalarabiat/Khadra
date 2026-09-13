@@ -85,6 +85,10 @@
   "authSignInToBook": "سجّل الدخول لحجز هذه السيارة",
   "authSessionExpired": "انتهت جلستك. سجّل الدخول من جديد.",
 
+  "welcomeTitle": "أهلاً بك في خضرا",
+  "welcomeBody": "تصفّح كل سيارات المنصة دون حساب. أما الحجز، وحفظ سيارة لوقت لاحق، ومتابعة الإيجار بعد بدئه، فتحتاج كلها إلى حساب.",
+  "welcomeBrowseAsGuest": "تصفّح كزائر",
+
   "navHome": "الرئيسية",
   "navBookings": "حجوزاتي",
   "navNotifications": "التنبيهات",
@@ -237,7 +241,10 @@
   "bookingsEmptyTabTitle": "لا شيء في هذه القائمة",
   "bookingsEmptyTabBody": "لديك حجوزات، لكن لا شيء منها في هذه القائمة. جرّب تبويباً آخر.",
   "bookingsSignedOutTitle": "سجّل الدخول لعرض حجوزاتك",
-  "bookingsSignedOutBody": "حجوزاتك ومستنداتك وتنبيهاتك في حسابك.",
+
+  "accountRequiredBody": "حجوزاتك وسياراتك المحفوظة ومستنداتك وتنبيهاتك في حسابك.",
+  "notificationsSignedOutTitle": "سجّل الدخول لعرض تنبيهاتك",
+  "profileSignedOutTitle": "سجّل الدخول إلى حسابك",
 
   "statusRequested": "بانتظار ردّ المكتب",
   "statusApproved": "موافق عليه — العربون مستحق",

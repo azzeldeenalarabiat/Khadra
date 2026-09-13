@@ -93,6 +93,10 @@
   "authSignInToBook": "Sign in to book this car",
   "authSessionExpired": "Your session ended. Sign in again.",
 
+  "welcomeTitle": "Welcome to Khadra",
+  "welcomeBody": "Browse every car on the platform without an account. You need one to book, to save a car for later, and to follow a rental once it starts.",
+  "welcomeBrowseAsGuest": "Browse as a guest",
+
   "navHome": "Home",
   "navBookings": "Bookings",
   "navNotifications": "Alerts",
@@ -263,7 +267,10 @@
   "bookingsEmptyTabTitle": "Nothing in this list",
   "bookingsEmptyTabBody": "You have bookings, but none of them are in this one. Try another tab.",
   "bookingsSignedOutTitle": "Sign in to see your bookings",
-  "bookingsSignedOutBody": "Your bookings, documents and alerts live in your account.",
+
+  "accountRequiredBody": "Your bookings, saved cars, documents and alerts live in your account.",
+  "notificationsSignedOutTitle": "Sign in to see your alerts",
+  "profileSignedOutTitle": "Sign in to your account",
 
   "statusRequested": "Waiting for the office",
   "statusApproved": "Approved — deposit due",

@@ -17,13 +17,12 @@ import 'package:khadra_mobile/l10n/app_localizations.dart';
 /// right in English and lost the top and bottom of every Arabic word, which is
 /// the kind of thing that only shows up on a screenshot in the other language.
 ///
-/// So the test is the question the layout actually asks: is the row tall enough
-/// for the tallest chip either language can produce?
+/// It was fixed with the number 42, measured once at the default text size. That
+/// is the same mistake one step along: this app honours text scaling to 1.4, and
+/// at 1.4 the Arabic chips were cropped again for every customer who had turned
+/// text up. The row now ASKS the chip how tall it is, so these tests ask the same
+/// question at both ends of the range instead of restating an answer.
 void main() {
-  /// The height `_ChipRow` gives its list. Kept here as the thing under test --
-  /// if somebody tightens it, this fails before a screenshot does.
-  const rowHeight = 42.0;
-
   // Without this the test renders in Flutter's own test face, where every glyph
   // is a square of the same size -- so a measurement taken here would say nothing
   // about the two real faces whose different line boxes are the whole point.
@@ -50,7 +49,16 @@ void main() {
     }
   });
 
-  Future<double> chipHeight(WidgetTester tester, Locale locale, String label) async {
+  /// Builds one chip and reports the three numbers that have to agree: what the
+  /// row reserves, what the chip takes, and what the words inside it need.
+  Future<({double row, double chip, double text})> measure(
+    WidgetTester tester,
+    Locale locale,
+    String label, {
+    double textScale = 1,
+  }) async {
+    late double row;
+
     await tester.pumpWidget(
       MaterialApp(
         locale: locale,
@@ -62,53 +70,66 @@ void main() {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child ?? const SizedBox.shrink(),
+        ),
         home: Scaffold(
           // UNCONSTRAINED on purpose: this is the height the chip wants, which is
           // the number the row has to be able to hold.
           body: Align(
             alignment: Alignment.topLeft,
-            child: KhadraChoiceChip(label: label, onTap: () {}),
+            child: Builder(builder: (context) {
+              // Read from INSIDE the tree, so it sees the same faces, the same
+              // default text style and the same text size the chip beside it does.
+              row = KhadraChoiceChip.heightIn(context);
+              return KhadraChoiceChip(label: label, onTap: () {});
+            }),
           ),
         ),
       ),
     );
     await tester.pump();
-    return tester.getSize(find.byType(KhadraChoiceChip)).height;
+
+    return (
+      row: row,
+      chip: tester.getSize(find.byType(KhadraChoiceChip)).height,
+      text: tester
+          .getSize(find.descendant(
+            of: find.byType(KhadraChoiceChip),
+            matching: find.byType(Text),
+          ))
+          .height,
+    );
   }
 
-  /// How much taller the chip is than the words inside it.
-  ///
-  /// Negative means the label has been squeezed into a box smaller than the text
-  /// it is painting, which is exactly what Material's own chip did to Arabic.
-  Future<double> slack(WidgetTester tester, Locale locale, String label) async {
-    await chipHeight(tester, locale, label);
-    final chip = tester.getSize(find.byType(KhadraChoiceChip)).height;
-    final text = tester
-        .getSize(find.descendant(
-          of: find.byType(KhadraChoiceChip),
-          matching: find.byType(Text),
-        ))
-        .height;
-    // 9 of padding each side, and a 1px border each side.
-    return chip - text - 20;
-  }
+  /// Real labels, in both scripts: a city, a car type, and the longest "any".
+  const labels = <(Locale, String)>[
+    (Locale('ar'), 'عمّان'),
+    (Locale('ar'), 'دفع رباعي'),
+    (Locale('ar'), 'كل الأنواع'),
+    (Locale('en'), 'Amman'),
+    (Locale('en'), 'Any type'),
+    (Locale('en'), 'Four wheel drive'),
+  ];
 
-  testWidgets('the chip row is tall enough for Arabic, not just for English',
+  /// The two ends of what this app allows. `main.dart` clamps scaling to
+  /// [0.9, 1.4], and both ends have to hold.
+  const scales = <double>[0.9, 1.0, 1.4];
+
+  testWidgets('the row reserves enough for any chip, at any text size',
       (tester) async {
-    // Real labels: a city, a car type, and the longest "any" option.
-    for (final label in <String>['عمّان', 'دفع رباعي', 'كل الأنواع']) {
-      final height = await chipHeight(tester, const Locale('ar'), label);
-      expect(
-        height,
-        lessThanOrEqualTo(rowHeight),
-        reason: '"$label" needs ${height}px and the row gives $rowHeight — it '
-            'will be clipped, and only in Arabic',
-      );
-    }
-
-    for (final label in <String>['Amman', 'Any type', 'Four wheel drive']) {
-      final height = await chipHeight(tester, const Locale('en'), label);
-      expect(height, lessThanOrEqualTo(rowHeight), reason: label);
+    for (final scale in scales) {
+      for (final (locale, label) in labels) {
+        final size = await measure(tester, locale, label, textScale: scale);
+        expect(
+          size.chip,
+          lessThanOrEqualTo(size.row),
+          reason: '"$label" at ${scale}x needs ${size.chip}px and the row gives '
+              '${size.row} — it will be clipped, and only in that combination',
+        );
+      }
     }
   });
 
@@ -117,17 +138,32 @@ void main() {
     // The chip must take its height FROM the text, in either script. A box sized
     // from a number somebody wrote down while looking at the English screen is
     // how the Arabic city chips lost the top and bottom of every word.
-    for (final (locale, label) in <(Locale, String)>[
-      (const Locale('ar'), 'عمّان'),
-      (const Locale('ar'), 'دفع رباعي'),
-      (const Locale('en'), 'Amman'),
-      (const Locale('en'), 'Four wheel drive'),
-    ]) {
-      expect(
-        await slack(tester, locale, label),
-        greaterThanOrEqualTo(0),
-        reason: '"$label" is painting into less height than it needs',
-      );
+    for (final scale in scales) {
+      for (final (locale, label) in labels) {
+        final size = await measure(tester, locale, label, textScale: scale);
+        // 9 of padding each side, and a 1px border each side.
+        final slack = size.chip - size.text - 20;
+        expect(
+          slack,
+          greaterThanOrEqualTo(0),
+          reason: '"$label" at ${scale}x is painting into less height than it needs',
+        );
+      }
     }
+  });
+
+  testWidgets('the reserved height does not depend on which language is showing',
+      (tester) async {
+    // The row is built once and holds whatever the lookup returns, which in
+    // Arabic is Arabic and in English is English — and a customer can switch
+    // between them without the list being rebuilt from scratch. So the number has
+    // to be the worst case over BOTH faces, not the one that happens to be on
+    // screen. Measuring a single alphabet is what made it a pixel short.
+    final arabic = await measure(tester, const Locale('ar'), 'عمّان');
+    final latin = await measure(tester, const Locale('en'), 'Amman');
+
+    expect(arabic.row, latin.row);
+    expect(arabic.chip, lessThanOrEqualTo(arabic.row));
+    expect(latin.chip, lessThanOrEqualTo(latin.row));
   });
 }

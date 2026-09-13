@@ -118,7 +118,7 @@ class _NextBookingCard extends ConsumerWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: KhadraColors.neutral400),
+            const KhadraDisclosure(),
           ],
         ),
       ),
@@ -214,7 +214,12 @@ class _ChipRow extends StatelessWidget {
               // Tall enough for ARABIC: Noto Kufi Arabic's line box is deeper
               // than Manrope's at the same point size, and a horizontal list has
               // to be given a height before it knows what is in it.
-              height: 42,
+              //
+              // ASKED, not written down. It was 42, which is right for Arabic at
+              // the default text size and wrong the moment a customer turns text
+              // up — this app honours scaling to 1.4, and the chips were cropped
+              // top and bottom for anybody who uses it.
+              height: KhadraChoiceChip.heightIn(context),
               // Scrolls rather than wraps: the number of cities is the platform's
               // to grow, and a wrapping block would push the results off screen
               // the day an administrator adds a dozen.

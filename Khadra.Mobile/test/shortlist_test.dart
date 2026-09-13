@@ -20,7 +20,13 @@ void main() {
   /// hands back, so nothing here depends on a test-only door into the session.
   Future<ProviderContainer> containerFor({bool signedIn = true}) async {
     final container = ProviderContainer(
-      overrides: [apiProvider.overrideWithValue(api)],
+      overrides: [
+        apiProvider.overrideWithValue(api),
+        // The token store reads preferences for its ownership marker; there are
+        // none in a test, which the store treats as "cannot tell" and so trusts
+        // what it holds.
+        sharedPreferencesProvider.overrideWithValue(null),
+      ],
     );
     addTearDown(container.dispose);
 

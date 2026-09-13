@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,10 +26,17 @@ class VerifyEmailScreen extends ConsumerStatefulWidget {
     this.token,
     this.email,
     this.undelivered = false,
+    this.next,
   });
 
   final String? token;
   final String? email;
+
+  /// Where the customer was heading before an account, and then a verified
+  /// address, turned out to be needed. Honoured only by Continue, once they are
+  /// actually verified — the two "look around" ways off this screen mean the
+  /// catalogue, which is what they say.
+  final String? next;
 
   /// The account was created but the verification email did NOT go out.
   ///
@@ -151,7 +160,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           const SizedBox(height: Space.sm),
           KhadraSubmitButton(
             label: l10n.actionContinue,
-            onPressed: () => context.go(Routes.search),
+            onPressed: () => context.go(widget.next ?? Routes.search),
           ),
         ],
       );
@@ -166,7 +175,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           : l10n.authVerifyEmailBody(email),
       leading: IconButton(
         icon: const Icon(Icons.close),
-        onPressed: () => context.go(Routes.search),
+        // The app's entry point, which decides between Get Started and Home the
+        // same way a launch does. Going straight to the catalogue skipped Get
+        // Started for somebody who opened this link on a device that had never
+        // answered it — a second phone, or a reinstall.
+        onPressed: () => context.go(Routes.splash),
         tooltip: l10n.actionClose,
       ),
       children: [
@@ -217,7 +230,13 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         const SizedBox(height: Space.lg),
         Center(
           child: TextButton(
-            onPressed: () => context.go(Routes.search),
+            // This IS the guest choice, in as many words, so it is recorded like
+            // one — otherwise somebody who took it would be asked again by the Get
+            // Started screen on the next launch.
+            onPressed: () {
+              unawaited(ref.read(entryChoiceProvider.notifier).choose());
+              context.go(Routes.search);
+            },
             child: Text(l10n.authBrowseInstead),
           ),
         ),

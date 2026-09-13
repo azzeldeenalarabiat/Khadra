@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The name under the launcher icon, and the one Android reads out in the app
+        info screen. It lived in AndroidManifest.xml as a literal, which Android
+        cannot translate: a phone set to Arabic showed "Khadra" beside an app whose
+        every other word was Arabic.
+
+        This is the DEFAULT, used for every language but Arabic. It is the Latin
+        wordmark on the logo, deliberately: it is a brand name, not a sentence.
+    -->
+    <string name="app_name">Khadra</string>
+</resources>

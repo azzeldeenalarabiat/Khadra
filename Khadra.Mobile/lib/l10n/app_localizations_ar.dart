@@ -278,6 +278,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authSessionExpired => 'انتهت جلستك. سجّل الدخول من جديد.';
 
   @override
+  String get welcomeTitle => 'أهلاً بك في خضرا';
+
+  @override
+  String get welcomeBody =>
+      'تصفّح كل سيارات المنصة دون حساب. أما الحجز، وحفظ سيارة لوقت لاحق، ومتابعة الإيجار بعد بدئه، فتحتاج كلها إلى حساب.';
+
+  @override
+  String get welcomeBrowseAsGuest => 'تصفّح كزائر';
+
+  @override
   String get navHome => 'الرئيسية';
 
   @override
@@ -804,7 +814,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingsSignedOutTitle => 'سجّل الدخول لعرض حجوزاتك';
 
   @override
-  String get bookingsSignedOutBody => 'حجوزاتك ومستنداتك وتنبيهاتك في حسابك.';
+  String get accountRequiredBody =>
+      'حجوزاتك وسياراتك المحفوظة ومستنداتك وتنبيهاتك في حسابك.';
+
+  @override
+  String get notificationsSignedOutTitle => 'سجّل الدخول لعرض تنبيهاتك';
+
+  @override
+  String get profileSignedOutTitle => 'سجّل الدخول إلى حسابك';
 
   @override
   String get statusRequested => 'بانتظار ردّ المكتب';

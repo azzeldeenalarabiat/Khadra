@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/router.dart';
@@ -9,6 +10,7 @@ import 'package:khadra_mobile/core/session/session_controller.dart';
 import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/features/profile/profile_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'support/fake_api.dart';
@@ -27,6 +29,17 @@ import 'support/fake_api.dart';
 void main() {
   setUpAll(tz_data.initializeTimeZones);
 
+  /// The preferences the entry choice is remembered in, and the router sign-out
+  /// leaves through. Both are set by `pumpProfile` and read by the tests that care,
+  /// rather than widening a tuple every caller would have to unpack.
+  late SharedPreferences preferences;
+  late GoRouter router;
+
+  /// What `EntryChoice` persists under. Signing out has to clear it, which is what
+  /// returns the app to the unauthenticated flow on the NEXT launch as well as on
+  /// this one.
+  const chosenKey = 'khadra.entry_chosen';
+
   Future<(FakeApi, FakeSessionStore, ProviderContainer)> pumpProfile(
     WidgetTester tester, {
     Locale locale = const Locale('en'),
@@ -40,10 +53,15 @@ void main() {
     final api = FakeApi();
     final store = FakeSessionStore();
 
+    // A customer who is signed in has made their choice, so the flag starts set --
+    // which is the only state from which these tests can show it being cleared.
+    SharedPreferences.setMockInitialValues({chosenKey: true});
+    preferences = await SharedPreferences.getInstance();
+
     final container = ProviderContainer(overrides: [
       apiProvider.overrideWithValue(api),
       sessionStoreProvider.overrideWithValue(store),
-      sharedPreferencesProvider.overrideWithValue(null),
+      sharedPreferencesProvider.overrideWithValue(preferences),
       // The alerts badge polls on a one-minute loop for ever. Left alone it holds
       // a pending timer past the end of every test; it is not what any of these
       // are about.
@@ -60,7 +78,7 @@ void main() {
     // The REAL router, not a stub. Sign-out ends by leaving the screen, and where
     // it lands is decided by the redirect that also guards every account route --
     // so a stub router would test a route table this app does not have.
-    final router = container.read(routerProvider);
+    router = container.read(routerProvider);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -121,6 +139,57 @@ void main() {
     // Ended by a tap, not by the server. The sign-in screen must NOT accuse the
     // session of expiring.
     expect(container.read(sessionProvider).endedReason, isNull);
+  });
+
+  testWidgets('signing out returns the app to the unauthenticated flow',
+      (tester) async {
+    final (_, store, container) = await pumpProfile(tester);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Sign out'));
+    await tester.pumpAndSettle();
+    await confirm(tester);
+
+    // Get Started, not the catalogue. Somebody signing out is leaving the device or
+    // switching accounts, and Get Started's Sign in IS the switch-account path --
+    // the neutral thing to show on a phone that has just been handed over.
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      Routes.welcome,
+    );
+
+    // And forgotten on the DEVICE, so the next launch lands in the same place
+    // rather than contradicting the screen they were left on.
+    expect(store.refreshToken, isNull);
+    expect(container.read(entryChoiceProvider), isFalse);
+    expect(preferences.getBool(chosenKey), isNull);
+  });
+
+  testWidgets('a 401 arriving after a sign-out does not rewrite it as expired',
+      (tester) async {
+    final (_, store, container) = await pumpProfile(tester);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Sign out'));
+    await tester.pumpAndSettle();
+    await confirm(tester);
+
+    expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+
+    // The race this exists for: sign-out clears the tokens and every authenticated
+    // request already in flight comes back 401 -- the alerts badge polls on a
+    // one-minute loop, the bookings list is usually mid-fetch. `AuthInterceptor`
+    // finds no refresh token and calls exactly this.
+    await container.read(sessionProvider.notifier).endSession();
+    await tester.pumpAndSettle();
+
+    // Still a clean sign-out. The customer who had just tapped Sign out must not be
+    // told on the next screen that their session ran out.
+    expect(container.read(sessionProvider).status, SessionStatus.signedOut);
+    expect(container.read(sessionProvider).endedReason, isNull);
+
+    // The clearing still ran, though -- arriving here twice is not a reason to
+    // leave a token behind.
+    expect(store.refreshToken, isNull);
+    expect(store.clearCalls, greaterThan(1));
   });
 
   testWidgets('cancelling the dialog changes nothing', (tester) async {

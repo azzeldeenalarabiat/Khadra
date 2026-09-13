@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Arabic, matching `appName` in the ARB files. The two have to agree: one is
+        what the launcher says and the other is what the app says about itself once
+        it is open.
+    -->
+    <string name="app_name">خضرا</string>
+</resources>

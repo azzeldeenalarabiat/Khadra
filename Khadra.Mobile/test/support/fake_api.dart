@@ -73,6 +73,40 @@ class FakeApi extends KhadraApi {
   @override
   Future<AuthUser> me() async => fakeUser();
 
+  /// The account the next `signIn` hands back. Settable because an UNVERIFIED one
+  /// takes a different path off the form — it can sign in and still not book.
+  AuthUser signInAs = fakeUser();
+  int signInCalls = 0;
+  ApiFailure? signInFailure;
+
+  @override
+  Future<AuthTokens> signIn(String email, String password) async {
+    signInCalls++;
+    final failure = signInFailure;
+    if (failure != null) throw failure;
+
+    final tokens = fakeTokens();
+    return AuthTokens(
+      accessToken: tokens.accessToken,
+      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+      refreshToken: tokens.refreshToken,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
+      user: signInAs,
+    );
+  }
+
+  final List<String> verifiedTokens = <String>[];
+
+  @override
+  Future<void> verifyEmail(String token) async => verifiedTokens.add(token);
+
+  /// Nothing needs the customer's attention unless a test says so. Null is the
+  /// ordinary answer and the landing card renders nothing for it.
+  NextBooking? next;
+
+  @override
+  Future<NextBooking?> nextBooking() async => next;
+
   @override
   Future<void> signOut(String refreshToken, {bool allDevices = false}) async {
     signOutCalls++;
@@ -176,33 +210,69 @@ class FakeApi extends KhadraApi {
   }
 }
 
-/// A [SessionStore] backed by two fields, so no test touches a real keystore.
+/// The token store, in memory.
+///
+/// It keeps the real one's OWNERSHIP rule rather than only its storage: a token is
+/// readable when this install claims it and invisible when it does not. That is
+/// what makes a sign-out stick even when a delete fails, so a fake that ignored it
+/// would let a test pass on a session the app could not actually end.
 class FakeSessionStore extends SessionStore {
-  FakeSessionStore({this.refreshToken});
+  FakeSessionStore({this.refreshToken, this.owned = true});
 
   String? refreshToken;
   DateTime? refreshExpiry;
   int clearCalls = 0;
 
-  @override
-  Future<void> clearIfReinstalled() async {}
+  /// Whether this install claims the token below. See `SessionStore.sessionIsOwned`.
+  bool owned;
+
+  /// Set behind the store's back, the way a Keychain entry survives an app being
+  /// deleted or a failed delete leaves one behind.
+  void plantDisownedToken(String token, DateTime expiresAt) {
+    refreshToken = token;
+    refreshExpiry = expiresAt.toUtc();
+    owned = false;
+  }
 
   @override
-  Future<String?> readRefreshToken() async => refreshToken;
+  bool get sessionIsOwned => owned;
 
   @override
-  Future<DateTime?> readRefreshExpiry() async => refreshExpiry;
+  Future<void> discardDisownedTokens() async {
+    if (owned) return;
+    await clear();
+  }
+
+  @override
+  Future<void> disownSession() async => owned = false;
+
+  /// When true the store stops ANSWERING, the way a locked keystore does: reads
+  /// come back null without that meaning the token is gone.
+  bool unreadable = false;
+
+  // `readRefreshToken` is deliberately NOT overridden -- the real one delegates to
+  // this, so a test that fakes only the outcome cannot have the two disagree.
+  @override
+  Future<({String? token, bool answered})> readRefreshTokenOutcome() async =>
+      unreadable
+          ? (token: null, answered: false)
+          : (token: owned ? refreshToken : null, answered: true);
+
+  @override
+  Future<DateTime?> readRefreshExpiry() async => owned ? refreshExpiry : null;
 
   @override
   Future<void> saveRefreshToken(String token, DateTime expiresAt) async {
     refreshToken = token;
     refreshExpiry = expiresAt.toUtc();
+    owned = true;
   }
 
   @override
   Future<void> clear() async {
     clearCalls++;
     clearAccessToken();
+    owned = false;
     refreshToken = null;
     refreshExpiry = null;
   }

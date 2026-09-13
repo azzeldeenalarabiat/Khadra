@@ -2462,6 +2462,12 @@ App Links and Universal Links are for.
 4. **Routing in the app.** `go_router` already routes `/bookings/:id`; wire the incoming link to it
    and decide what an unauthenticated open does — the session-aware redirect should send them to
    sign-in and then ON to the booking, not drop them on the catalogue.
+
+   That half is already built, as of 2026-09-12, and the Get Started gate does not get in its way:
+   the gate is consulted at `/` ONLY, so a link opening any other route is untouched, and a guarded
+   route opened before the session resolves parks its destination on `/?next=…`, which carries it
+   through `/welcome` to the sign-in form and back out to the booking. `test/entry_gate_test.dart`
+   covers both. What remains here is the link arriving at the app at all, which is steps 1-3.
 5. **The web fallback**, whenever the customer website exists: the same URL rendering the booking, or
    at minimum a page that names the reference and links to the store.
 6. **Then set `App:CustomerAppBaseUrl`** to that host. The composer renders the button the moment it
@@ -2794,3 +2800,122 @@ Until step 4 passes on a handset, the two-hop has bought nothing that has been d
 pass (done), AND the 9.2.4 to 10.3.2 upgrade-in-place preserves an authenticated session on a real
 device (open). Only then is the second hop, 10.x to 11.x, worth taking -- and it reruns the same
 authentication and storage tests.
+
+### 95. The cold-start rotation is not single-flight with the interceptor's
+
+**Status:** open · **Raised:** 2026-09-12 · **Pre-existing; found while building the Get Started flow**
+
+`SessionController._restore` calls `refresh()` directly, and `AuthInterceptor._refreshOnce` is the
+thing that serialises rotations. They do not share that gate, so the two CAN present the same refresh
+token at the same moment.
+
+It is reachable, not theoretical: public routes deliberately render before the session resolves (that
+is what keeps `/verify-email?token=…` working from a cold start), so opening the app on a car or a
+gallery starts the catalogue's requests while `restore` is still rotating. Every one of those goes
+through `onRequest`, which reads the stored token and refreshes it when the access token is stale —
+which it always is at launch.
+
+The server's 60-second reuse grace covers most of it, and the `xmin` concurrency check turns the
+loser into a 401 rather than a family revocation. But a 401 on the refresh endpoint IS a verdict to
+this app, so the customer can be signed out on arrival, on a session that was perfectly valid.
+
+**To close:** route `_restore`'s rotation through the same single-flight the interceptor owns — or
+have `onRequest` wait while the session is `unknown`, which is the shorter change and costs the first
+request of a cold start nothing it was not already waiting for.
+
+### 96. Upgrading past the install marker signs every device out once
+
+**Status:** open, one-time · **Raised:** 2026-09-12
+
+`khadra.session_owned` replaced `khadra.install_marker` on 2026-09-12 (see `docs/auth-and-sessions.md`).
+A device upgrading in place from a build that wrote the OLD key has no `session_owned`, so its
+perfectly good refresh token is disowned, discarded, and the app opens on Get Started asking the
+customer to sign in again.
+
+That is the safe direction and it is deliberate — the alternative is trusting a marker that was never
+written — but it is a real one-time sign-out for every installed tester, and it will look like a bug
+to whoever reports it.
+
+**To close:** nothing to fix. Delete this item once the fleet has been through it, or fold the
+migration into the same on-device test as item 94, which already installs an old build and upgrades
+in place.
+
+### 97. The launcher icon has no themed (monochrome) layer
+
+**Status:** open, needs a DESIGN decision · **Raised:** 2026-09-13
+
+The Android launcher icon is real as of 2026-09-13: an adaptive icon built from
+`assets/brand/khadra-logo.png` by `tools/make_launcher_icons.dart` and
+`flutter_launcher_icons`, on brand green, sized to Android's 66/108 safe zone.
+`test/launcher_icon_test.dart` keeps it from rotting.
+
+What it does NOT have is `adaptive_icon_monochrome`. Android 13 and later let a
+customer theme every icon to their wallpaper, and an app with no monochrome layer
+is left in full colour among a screen of tinted ones — visible, and visibly the
+odd one out.
+
+It was left out rather than derived, because a themed icon is a single-colour
+SILHOUETTE and this mark is a filled circular badge: flattening it gives a plain
+disc with no car and no wordmark in it, which is less recognisable than the
+full-colour icon Android falls back to. Deriving one automatically would have
+shipped something worse while looking like the box was ticked.
+
+**To close:** the owner supplies, or approves, a single-colour mark — the car
+alone is the obvious candidate, as a path rather than a photograph of a badge.
+Then add `adaptive_icon_monochrome` to `flutter_launcher_icons.yaml`, re-run the
+two commands, and extend `launcher_icon_test.dart` to require the third layer.
+
+**Also open, and smaller:** the iOS icon set is untouched. `flutter_launcher_icons`
+is configured `ios: false` deliberately — nothing in this environment can look at
+an iOS build, and a generated icon nobody has seen is worse than a placeholder
+somebody knows is a placeholder. The same two commands do iOS the day there is a
+device to check it on.
+
+### 98. Arabic is rendered with Latin letter-spacing
+
+**Status:** open · **Raised:** 2026-09-13 · **Found by the RTL audit; NOT fixed**
+
+Fourteen styles in `Khadra.Mobile/lib` set `letterSpacing`, from -0.6 to +0.7: the
+theme's own title styles, `KhadraLargeTitle`, `KhadraBadge`, `KhadraSpecGrid`,
+`KhadraSectionTitle` and several screens. Flutter inserts that tracking between
+every glyph, including between the joined letters of an Arabic word.
+
+The console already ruled on this and says why, in `Khadra.Dashboard/src/styles/_rtl.scss`:
+
+> Arabic is cursive: the letters in a word are joined. `letter-spacing` prises
+> those joins apart, so a tracked caption does not render as wide Arabic, it
+> renders as broken Arabic.
+
+It zeroes tracking under `:lang(ar)` and brings the emphasis back with weight. The
+customer app has no equivalent, so every tracked label on it — the section headings
+on Profile, the badges on a booking, the spec grid on a car — is drawn with its
+Arabic joins opened up. It is cosmetic, not functional, which is why it was
+recorded rather than rushed at the end of an unrelated pass.
+
+`test/rtl_audit_test.dart` deliberately does NOT yet fail on this; the source scan
+cannot tell which styles land on Arabic text and which never can.
+
+**To close:** one helper that returns the tracking for Latin and zero for Arabic,
+resolved from `Localizations.localeOf(context)`; the three styles inside
+`KhadraTheme` take it through a `light({bool arabic})` parameter, since they are
+built before there is a context. Then add `letterSpacing:` outside
+`khadra_theme.dart` to the audit so a new one cannot be added without going through
+it, and check a screenshot of the Profile section headings in Arabic before and
+after.
+
+### 99. The seat filter is a list typed into the screen
+
+**Status:** open · **Raised:** 2026-09-13 · **Found by the RTL audit; NOT fixed**
+
+`Khadra.Mobile/lib/features/catalogue/filter_sheet.dart` builds its "minimum seats"
+chips from `const [2, 4, 5, 7]`. Every other group in that sheet is served by the
+platform — cities and car types from the lookup endpoints, transmissions from
+`/app-config`'s vocabularies — and this one is four numbers somebody chose.
+
+It is the standing rule broken in miniature: a list a customer sees that no API
+sent. It is not dangerous the way an invented price would be, but it is the same
+class, and the day the platform lists a nine-seat van the filter cannot find it.
+
+**To close:** serve the seat options from `/app-config` vocabularies beside
+transmissions, or get the owner's explicit exception recorded here. It is one
+vocabulary and the app already knows how to render one.

@@ -560,6 +560,24 @@ abstract class AppLocalizations {
   /// **'Your session ended. Sign in again.'**
   String get authSessionExpired;
 
+  /// No description provided for @welcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Khadra'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse every car on the platform without an account. You need one to book, to save a car for later, and to follow a rental once it starts.'**
+  String get welcomeBody;
+
+  /// No description provided for @welcomeBrowseAsGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse as a guest'**
+  String get welcomeBrowseAsGuest;
+
   /// No description provided for @navHome.
   ///
   /// In en, this message translates to:
@@ -1310,11 +1328,23 @@ abstract class AppLocalizations {
   /// **'Sign in to see your bookings'**
   String get bookingsSignedOutTitle;
 
-  /// No description provided for @bookingsSignedOutBody.
+  /// No description provided for @accountRequiredBody.
   ///
   /// In en, this message translates to:
-  /// **'Your bookings, documents and alerts live in your account.'**
-  String get bookingsSignedOutBody;
+  /// **'Your bookings, saved cars, documents and alerts live in your account.'**
+  String get accountRequiredBody;
+
+  /// No description provided for @notificationsSignedOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to see your alerts'**
+  String get notificationsSignedOutTitle;
+
+  /// No description provided for @profileSignedOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to your account'**
+  String get profileSignedOutTitle;
 
   /// No description provided for @statusRequested.
   ///

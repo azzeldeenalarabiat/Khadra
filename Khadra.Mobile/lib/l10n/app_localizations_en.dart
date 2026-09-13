@@ -273,6 +273,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authSessionExpired => 'Your session ended. Sign in again.';
 
   @override
+  String get welcomeTitle => 'Welcome to Khadra';
+
+  @override
+  String get welcomeBody =>
+      'Browse every car on the platform without an account. You need one to book, to save a car for later, and to follow a rental once it starts.';
+
+  @override
+  String get welcomeBrowseAsGuest => 'Browse as a guest';
+
+  @override
   String get navHome => 'Home';
 
   @override
@@ -769,8 +779,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingsSignedOutTitle => 'Sign in to see your bookings';
 
   @override
-  String get bookingsSignedOutBody =>
-      'Your bookings, documents and alerts live in your account.';
+  String get accountRequiredBody =>
+      'Your bookings, saved cars, documents and alerts live in your account.';
+
+  @override
+  String get notificationsSignedOutTitle => 'Sign in to see your alerts';
+
+  @override
+  String get profileSignedOutTitle => 'Sign in to your account';
 
   @override
   String get statusRequested => 'Waiting for the office';

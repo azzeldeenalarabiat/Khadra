@@ -106,4 +106,31 @@ screens. Latin is Manrope, Arabic is Noto Kufi Arabic, and the fallback ORDER is
 Kufi carries Latin too. The handoff is authoritative for LOOK ONLY: its BOOKING FLOW artboard shows
 pay-before-approval and a simulated declined payment, and this platform has ruled out both.
 
+**The customer app opens on Get Started, and guest browsing is a CHOICE (2026-09-12).**
+A fresh install, cleared app data and a deliberate sign-out all land on `/welcome`,
+which offers exactly three things: browse as a guest, sign in, create an account. The
+gate is a device-local flag in ordinary preferences (`khadra.entry_chosen`, owned by
+`EntryChoice`) and NOT a fourth `SessionStatus` — signed out is signed out whether or
+not a choice was made, and folding a stored preference into the credential state
+machine would put it in front of `restore()` and the router's refresh listener. It is
+consulted at `/` ONLY: public routes render before the session resolves so that
+`/verify-email?token=…` survives a cold start, and a gate across every route would
+land that on a welcome screen with the single-use link unspent. Sign-out clears the
+flag, so the next launch shows the same screen it was left on. An expiry or a
+suspension does not: that customer has an account and chose long ago.
+
+Two things the owner settled on 2026-09-12 when asked. **The three account tabs are
+not redirected.** Bookings, Alerts and Profile each open and show one shared
+`AccountRequired` panel offering both ways in; the data is already behind
+authentication where it counts (the providers never call the API without a session,
+and every one of those endpoints is refused server-side), while a redirect would leave
+the tab shell — the bottom bar disappears — and Profile is where the language switch
+lives, so gating it would strand an Arabic speaker who has not signed in. The hard
+redirect stays for routes that ACT on an account: documents, edit profile, change
+password, sessions, saved cars, `/book`, `/bookings/*`, `/disputes/*`. **And sign-out
+returns to Get Started**, not to the catalogue.
+
+`khadra.session_owned` is what makes "must not restore a stale session" true rather
+than hoped for — see `docs/auth-and-sessions.md`. It replaces `khadra.install_marker`.
+
 **Minimum renter age: settled at 21** by the owner and enforced (`BusinessRules:MinimumRenterAge`, `RenterAgePolicy`). The spec still says "value pending Section 2 decision" in §5.1 and lists it as open in §2.2 — the document has not caught up with the decision. The code is right; the spec needs a revision.

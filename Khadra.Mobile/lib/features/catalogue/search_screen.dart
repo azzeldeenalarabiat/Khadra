@@ -187,29 +187,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       ),
                     ),
                     const SizedBox(height: Space.md),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _ToolbarButton(
-                            icon: Icons.date_range_outlined,
-                            label: filter.hasDates && formats != null
-                                ? formats.dateRange(
-                                    filter.pickupAt!, filter.returnAt!)
-                                : l10n.searchAnyDates,
-                            active: filter.hasDates,
-                            onTap: _openDates,
-                          ),
+                    _Toolbar(
+                      buttons: [
+                        _ToolbarButton(
+                          icon: Icons.date_range_outlined,
+                          label: filter.hasDates && formats != null
+                              ? formats.dateRange(
+                                  filter.pickupAt!, filter.returnAt!)
+                              : l10n.searchAnyDates,
+                          active: filter.hasDates,
+                          onTap: _openDates,
                         ),
-                        const SizedBox(width: Space.sm),
-                        Expanded(
-                          child: _ToolbarButton(
-                            icon: Icons.tune,
-                            label: filter.activeCount > 0
-                                ? l10n.searchFiltersApplied(filter.activeCount)
-                                : l10n.searchFilters,
-                            active: filter.activeCount > 0,
-                            onTap: _openFilters,
-                          ),
+                        _ToolbarButton(
+                          icon: Icons.tune,
+                          label: filter.activeCount > 0
+                              ? l10n.searchFiltersApplied(filter.activeCount)
+                              : l10n.searchFilters,
+                          active: filter.activeCount > 0,
+                          onTap: _openFilters,
                         ),
                       ],
                     ),
@@ -336,6 +331,64 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 }
 
+/// The controls above the results, laid out for the words they actually hold.
+///
+/// They were two `Expanded` halves, which gives each exactly half the width no
+/// matter what is written in it. In English that is fine — "Any dates" and
+/// "1 filter" are short. In Arabic "عامل تصفية واحد" does not fit in half of a
+/// 375-wide phone at all, so the label a customer needed most, the one saying a
+/// filter was hiding results from them, was the one that arrived as "عامل تص…".
+/// Turning the text size up did the same thing to English.
+///
+/// So the width follows the CONTENT. Each button asks for what it needs; if the
+/// two together fit on one line they share the leftover in proportion, and if
+/// they do not they stack full width rather than cropping. Nothing here is
+/// measured against a particular language.
+class _Toolbar extends StatelessWidget {
+  const _Toolbar({required this.buttons});
+
+  final List<_ToolbarButton> buttons;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          final gaps = Space.sm * (buttons.length - 1);
+          final wanted = [
+            for (final button in buttons) button.widthIn(context),
+          ];
+          final total = wanted.fold<double>(0, (sum, w) => sum + w) + gaps;
+
+          if (total > constraints.maxWidth) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < buttons.length; i++) ...[
+                  if (i > 0) const SizedBox(height: Space.sm),
+                  buttons[i],
+                ],
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              for (var i = 0; i < buttons.length; i++) ...[
+                if (i > 0) const SizedBox(width: Space.sm),
+                // Proportional, not equal. `Expanded` divides what is left after
+                // the gaps, so a button asking for more of the line gets more of
+                // it — and because the total fits, every one of them ends up with
+                // at least what it asked for.
+                Expanded(
+                  flex: (wanted[i] * 100).round().clamp(1, 1 << 30),
+                  child: buttons[i],
+                ),
+              ],
+            ],
+          );
+        },
+      );
+}
+
 class _ToolbarButton extends StatelessWidget {
   const _ToolbarButton({
     required this.icon,
@@ -349,6 +402,53 @@ class _ToolbarButton extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
+  static const double _iconSize = 18;
+  static const double _border = 1;
+  static const double _minHeight = 46;
+
+  TextStyle _styleIn(BuildContext context) {
+    final style = DefaultTextStyle.of(context).style.merge(
+          TextStyle(
+            fontSize: 13,
+            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
+            color: active ? KhadraColors.accent : KhadraColors.text,
+          ),
+        );
+
+    // `Text` merges this itself when the reader has turned bold text on at the
+    // system level. The measurement below has to do the same, or every label is
+    // measured light and painted bold — putting an ellipsis on exactly the labels
+    // of the customers who asked for the larger, heavier text.
+    return MediaQuery.boldTextOf(context)
+        ? style.merge(const TextStyle(fontWeight: FontWeight.bold))
+        : style;
+  }
+
+  /// How wide this button has to be for its label to be whole.
+  ///
+  /// Resolved against the ambient default text style and the reader's own text
+  /// size, so the answer is in the app's real faces rather than the platform's.
+  double widthIn(BuildContext context) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: _styleIn(context)),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+
+    final text = painter.width;
+    painter.dispose();
+
+    return text +
+        _iconSize +
+        Space.sm +
+        Space.md * 2 +
+        _border * 2 +
+        // A hair of slack, so a width that rounds down by a fraction of a pixel
+        // does not put an ellipsis on a label that fits.
+        1;
+  }
+
   @override
   Widget build(BuildContext context) => Material(
         color: active ? KhadraColors.accent100 : KhadraColors.surface,
@@ -357,11 +457,17 @@ class _ToolbarButton extends StatelessWidget {
           onTap: onTap,
           borderRadius: Radii.field,
           child: Container(
-            height: 46,
-            padding: const EdgeInsets.symmetric(horizontal: Space.md),
+            // A MINIMUM, not a height. 46 was measured at the default text size
+            // in Latin; Noto Kufi Arabic's line box is deeper, and text scaling
+            // goes to 1.4 here, so a fixed box crops the label from the top and
+            // the bottom instead of growing.
+            constraints: const BoxConstraints(minHeight: _minHeight),
+            padding: const EdgeInsets.symmetric(
+                horizontal: Space.md, vertical: Space.sm),
             decoration: BoxDecoration(
               borderRadius: Radii.field,
               border: Border.all(
+                width: _border,
                 color: active ? KhadraColors.accent300 : KhadraColors.neutral300,
               ),
             ),
@@ -369,7 +475,7 @@ class _ToolbarButton extends StatelessWidget {
               children: [
                 Icon(
                   icon,
-                  size: 18,
+                  size: _iconSize,
                   color: active ? KhadraColors.accent : KhadraColors.neutral600,
                 ),
                 const SizedBox(width: Space.sm),
@@ -377,12 +483,11 @@ class _ToolbarButton extends StatelessWidget {
                   child: Text(
                     label,
                     maxLines: 1,
+                    // The last resort, not the plan. With the width following the
+                    // label this should never fire; it is here so a translation
+                    // nobody anticipated degrades instead of overflowing.
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                      color: active ? KhadraColors.accent : KhadraColors.text,
-                    ),
+                    style: _styleIn(context),
                   ),
                 ),
               ],

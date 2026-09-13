@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -52,6 +54,22 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           .read(sessionProvider.notifier)
           .signIn(_email.text.trim(), _password.text);
 
+      // Somebody who has signed in has said how they want to use the app, even if
+      // they arrived from a link and never saw the Get Started screen. Without this
+      // a customer who signed out, signed back in and relaunched would be asked
+      // again by a screen they had already answered.
+      //
+      // NOT AWAITED, and that is load-bearing. `signIn` has already moved the
+      // session to signedIn, which wakes the router's refresh listener, which
+      // re-runs the redirect for `/sign-in` and bounces it to `/search` — tearing
+      // this screen down. Awaiting a platform-channel write in that gap lets the
+      // rebuild land first, `mounted` goes false, and the `context.go` below never
+      // runs: the customer who tapped a car's booking button and was asked to sign
+      // in arrives on the search screen with the car lost. `choose` sets its state
+      // synchronously and only the disk write is deferred, so nothing here waits
+      // for a preference to be written, and it swallows its own failures.
+      unawaited(ref.read(entryChoiceProvider.notifier).choose());
+
       if (!mounted) return;
 
       // An unverified account signs in perfectly well — it simply cannot book —
@@ -61,7 +79,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         context.go(
           Uri(
             path: Routes.verifyEmail,
-            queryParameters: {'email': user.email},
+            queryParameters: {
+              'email': user.email,
+              // The destination travels THROUGH the detour. Dropping it here is
+              // what sent somebody heading for a car's booking form to the search
+              // screen once they had verified, having lost the car.
+              if (widget.next != null) 'next': widget.next!,
+            },
           ).toString(),
         );
         return;
@@ -90,7 +114,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       subtitle: l10n.authWelcomeSubtitle,
       leading: IconButton(
         icon: const Icon(Icons.close),
-        onPressed: () => context.go(Routes.search),
+        // Back to Get Started when that is where this was opened from, and
+        // otherwise to the app's entry point, which decides between Get Started and
+        // Home the same way a launch does. Closing this used to go straight to the
+        // catalogue, which on a fresh install skipped the screen the customer had
+        // not answered yet.
+        onPressed: () => khadraLeave(context, Routes.splash),
         tooltip: l10n.actionClose,
       ),
       children: [
@@ -164,7 +193,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               style: const TextStyle(color: KhadraColors.neutral600),
             ),
             TextButton(
-              onPressed: _busy ? null : () => context.push(Routes.register),
+              // The destination travels here too. Somebody asked for an account on
+              // the way to a car, who creates one instead of signing in, should
+              // still end up at the car.
+              onPressed: _busy
+                  ? null
+                  : () => context.push(routeWithNext(Routes.register, widget.next)),
               child: Text(l10n.authSignUp),
             ),
           ],
