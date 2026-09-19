@@ -1413,3 +1413,118 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260911000801_AddCustomerShortlist') THEN
+    CREATE TABLE customer_shortlists (
+        id uuid NOT NULL,
+        created_at timestamp with time zone NOT NULL,
+        updated_at timestamp with time zone,
+        CONSTRAINT pk_customer_shortlists PRIMARY KEY (id)
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260911000801_AddCustomerShortlist') THEN
+    CREATE TABLE shortlist_entries (
+        id uuid NOT NULL,
+        shortlist_id uuid NOT NULL,
+        vehicle_id uuid NOT NULL,
+        saved_at timestamp with time zone NOT NULL,
+        CONSTRAINT pk_shortlist_entries PRIMARY KEY (id),
+        CONSTRAINT fk_shortlist_entries_customer_shortlists_shortlist_id FOREIGN KEY (shortlist_id) REFERENCES customer_shortlists (id) ON DELETE RESTRICT
+    );
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260911000801_AddCustomerShortlist') THEN
+    CREATE INDEX ix_shortlist_entries_shortlist_id_saved_at ON shortlist_entries (shortlist_id, saved_at);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260911000801_AddCustomerShortlist') THEN
+    CREATE UNIQUE INDEX ix_shortlist_entries_shortlist_id_vehicle_id ON shortlist_entries (shortlist_id, vehicle_id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260911000801_AddCustomerShortlist') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260911000801_AddCustomerShortlist', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260917002143_DealerPublicProfile') THEN
+    ALTER TABLE dealers ADD customer_notes character varying(2000);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260917002143_DealerPublicProfile') THEN
+    ALTER TABLE dealers ADD delivery_notes character varying(2000);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260917002143_DealerPublicProfile') THEN
+    ALTER TABLE dealers ADD hidden_profile_sections character varying(200) NOT NULL DEFAULT ('');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260917002143_DealerPublicProfile') THEN
+    ALTER TABLE dealers ADD insurance_summary character varying(2000);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260917002143_DealerPublicProfile') THEN
+    ALTER TABLE dealers ADD pickup_instructions character varying(2000);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260917002143_DealerPublicProfile') THEN
+    ALTER TABLE dealers ADD rental_conditions character varying(2000);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260917002143_DealerPublicProfile') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260917002143_DealerPublicProfile', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260918201534_PenaltyReasonCode') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260918201534_PenaltyReasonCode', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

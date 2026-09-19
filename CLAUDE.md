@@ -1,6 +1,8 @@
 # Khadra
 
-Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.1.docx` (v3.1 "Tech Stack Finalized"; v3.0 is kept for history — the two differ only in the header, every numbered section is identical). v3.1 names this stack: ASP.NET Core + PostgreSQL + EF Core. One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens, not in this repo). Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
+Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.1.docx` (v3.1 "Tech Stack Finalized"; v3.0 is kept for history — the two differ only in the header, every numbered section is identical). v3.1 names this stack: ASP.NET Core + PostgreSQL + EF Core. One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens) in `Khadra.Mobile/`. Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
+
+**The customer app lives in THIS repository.** It used to have its own — `khadra-mobile` on GitHub — and that line said so. The app moved here and the sentence did not, which is how a deployment review found a stale instruction pointing at a repository last pushed on 2026-09-07. `Khadra.Mobile/` is the canonical working copy (owner, 2026-09-20); `khadra-mobile` is retired and must not be pushed to. Whether the app eventually splits back out is a separate decision, to be taken when production is stable rather than inside a release.
 
 ## Commands
 

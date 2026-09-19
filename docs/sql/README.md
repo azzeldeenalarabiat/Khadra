@@ -12,9 +12,15 @@ no Render feature and no connection string leaving the browser.
 
 Generated with `dotnet ef migrations script --idempotent`, so it is safe to run
 again — each migration is wrapped in a check against `__EFMigrationsHistory`.
-Creates 25 tables plus that history table, the `btree_gist` extension, and the
+Creates 26 tables plus that history table, the `btree_gist` extension, and the
 `bookings_one_hold_per_vehicle` exclusion constraint that stops two live bookings
 overlapping on one vehicle.
+
+The last regeneration (2026-09-20) added three migrations: `AddCustomerShortlist`,
+which brings `customer_shortlists` and `shortlist_entries` — the two tables that
+make script 2 below mandatory this time — `DealerPublicProfile`, which adds six
+columns to `dealers`, and `PenaltyReasonCode`, which adds no schema at all and only
+records itself.
 
 Regenerate after adding a migration:
 
@@ -77,7 +83,9 @@ The one destructive statement on the page is commented out and explains itself: 
 consumes every live verification link, which is the remedy if messages were written
 to the log while `Email:Provider` selected the Logging transport. Each of those log
 lines carries a working link — an hour for a reset, a day for verification, seven
-days for an invitation.
+days for an invitation. A build from 2026-09-17 on no longer writes them: the Logging
+transport logs the subject and the recipient's domain only. So this is the remedy for
+lines an earlier build wrote.
 
 ## 4. `2026-09-10-dealer-address.sql`
 

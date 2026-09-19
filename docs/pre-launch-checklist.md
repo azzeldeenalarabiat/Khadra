@@ -1067,6 +1067,31 @@ and the exception handler; `AuthApiClient` forwarding `Accept-Language`, since t
 are not proxied; and `PreferredLanguage` on `User`, because emails are composed without a request.
 Doing it server-side also spares the Flutter app a third copy of the same 140 codes.
 
+**Updated 2026-09-18 (Wave Two). CLOSED for the console: the scanner reports 0 findings across every
+screen, against a 12-entry allowlist in which each entry carries its reason.** Measured with a
+STRONGER scanner than the one that reported 75 and later 505: it had two blind spots and could not
+have found what it was missing.
+
+- It never read inside a callback, so everything built in `rows.map((row) => …)` was invisible — a
+  timeline calling `toLocaleString('en-GB')`, a document tile reading "Provided".
+- It never read the words AROUND an interpolation, so `{{ radius() }} km`, `{{ a }} of {{ b }}` and
+  "by", "to" passed unseen.
+- It could not see money built by hand — `${value.amount} ${value.currency}` — which is the shape the
+  "JOD 0−" defect came in by.
+
+Both halves were fixed, plus false-positive rules so machine values are not reported as copy (a
+membership test, a typed value list, the filter a chip sends, a route parameter). Re-measured on the
+UNTOUCHED code, the honest baseline was **525 findings in 57 files**, not the 505 previously reported.
+
+What moved, beyond keying the copy: one shared clock (a chance that runs out ends as "Expired"; a
+promise that can be broken reads "Overdue by 13h"), status and enum names through `statusLabel` /
+`enumLabel` with a spelled-out fallback, refusals held as `ProblemSnapshot` facts and worded at render
+time, every date, number, percentage and amount through `FormatService`, and six API contracts that
+used to send English sentences now sending facts the console words (see items 100–108).
+
+Left open deliberately: the server's own messages (item 100), and the English written INTO records at
+the moment of an action (item 103).
+
 ### 50. `DisputeAuditor` writes an English sentence into an append-only table
 
 `DisputeAuditor.Describe` composes `"Resolved: of {amount} {currency} held, refund …, platform …,
@@ -2242,6 +2267,12 @@ become the platform administrator. Search the retention window for event 1200 or
 Nobody loses anything — they ask again. Do **not** "invalidate by requesting a new one" while the
 Logging transport is still selected, because that writes a fresh live link to the same log.
 
+*2026-09-17:* the transport no longer does this. `LoggingEmailSender` now logs the subject and the
+recipient's domain, never the body, as event 1400 rather than 1200, and `LoggingEmailSenderTests`
+asserts the token is absent. That stops new links reaching the log. It does nothing about lines an
+older build already wrote, so the search above — event 1200 — still stands for any retention window
+that reaches back before the change.
+
 **Related:** item 37 (the enumeration trade-off in reporting a failed send). Worth appending there:
 the no-account path is one database round trip while the account path is three plus an HTTPS call, so
 the response time distinguishes them — a channel that is open always, not only while mail is broken.
@@ -2873,7 +2904,9 @@ device to check it on.
 
 ### 98. Arabic is rendered with Latin letter-spacing
 
-**Status:** open · **Raised:** 2026-09-13 · **Found by the RTL audit; NOT fixed**
+**Status:** closed · **Raised:** 2026-09-13 · **Closed:** 2026-09-18 — `KhadraType` answers the
+tracking, the theme takes `light({bool arabic})`, and the audit forbids the literal that would go
+round either. See the close note at the end of this item.
 
 Fourteen styles in `Khadra.Mobile/lib` set `letterSpacing`, from -0.6 to +0.7: the
 theme's own title styles, `KhadraLargeTitle`, `KhadraBadge`, `KhadraSpecGrid`,
@@ -2895,17 +2928,32 @@ recorded rather than rushed at the end of an unrelated pass.
 `test/rtl_audit_test.dart` deliberately does NOT yet fail on this; the source scan
 cannot tell which styles land on Arabic text and which never can.
 
-**To close:** one helper that returns the tracking for Latin and zero for Arabic,
-resolved from `Localizations.localeOf(context)`; the three styles inside
-`KhadraTheme` take it through a `light({bool arabic})` parameter, since they are
-built before there is a context. Then add `letterSpacing:` outside
-`khadra_theme.dart` to the audit so a new one cannot be added without going through
-it, and check a screenshot of the Profile section headings in Arabic before and
-after.
+**Closed as described, with two additions.** `KhadraType.tracking(latin, arabic)` is the answer and
+`KhadraType.of(context, latin)` reads it from `Localizations.localeOf(context)` — the LANGUAGE, not
+the direction, because they are not the same question even where they agree. `KhadraTheme.light({bool
+arabic})` carries it into the styles built before there is a context, and `main.dart` passes the
+resolved `isArabicProvider` so the scale follows the app's own language switch rather than the
+device's.
+
+First addition: the Arabic scale is untracked WHOLE, not style by style. `_untracked` clears the
+tracking on all fifteen text styles, including the ones this app does not override and inherits from
+Material with figures of their own — so a screen that starts using `displayMedium` tomorrow cannot
+inherit tracking nobody chose. (`TextTheme.apply(letterSpacingFactor: 0)` looks like the one-liner for
+this and is not: it asserts on any style whose tracking is already unset, which is most of them.)
+
+Second addition: three sites keep their literal, each with an `rtl-audit: allow` marker on the line —
+the booking reference in `bookings_screen`, `booking_detail_screen` and `request_booking_screen`. A
+reference is Latin in both languages and is opened out deliberately, because somebody reads it aloud
+over a phone. Zeroing those would have been the rule applied past its reason.
+
+`test/rtl_audit_test.dart` now fails on a `letterSpacing:` literal outside `khadra_theme.dart`, and
+`test/typography_test.dart` asserts the English scale keeps every figure the design asks for while the
+Arabic scale carries none, on the theme and on the three widgets that name their own.
 
 ### 99. The seat filter is a list typed into the screen
 
-**Status:** open · **Raised:** 2026-09-13 · **Found by the RTL audit; NOT fixed**
+**Status:** closed · **Raised:** 2026-09-13 · **Closed:** 2026-09-18 — the chips are now the
+facets of the bookable catalogue. See the close note at the end of this item.
 
 `Khadra.Mobile/lib/features/catalogue/filter_sheet.dart` builds its "minimum seats"
 chips from `const [2, 4, 5, 7]`. Every other group in that sheet is served by the
@@ -2916,6 +2964,460 @@ It is the standing rule broken in miniature: a list a customer sees that no API
 sent. It is not dangerous the way an invented price would be, but it is the same
 class, and the day the platform lists a nine-seat van the filter cannot find it.
 
-**To close:** serve the seat options from `/app-config` vocabularies beside
-transmissions, or get the owner's explicit exception recorded here. It is one
-vocabulary and the app already knows how to render one.
+**Closed differently, and better.** A vocabulary on `/app-config` would have been a second list
+somebody chose — accurate only for as long as nobody changed the fleet. `GET /api/v1/vehicles/facets`
+(anonymous, `no-store`, the catalogue's own rate-limit policy) returns `{ seats, carTypeIds }` taken
+from the bookable-catalogue predicate itself, so the filter offers a seat count exactly when a
+customer could book one, and offers the nine-seat van the day it is listed. The category chips on Home
+are built from the same call, intersected with the active car-type lookups.
+
+Null is a real answer: on an older API, or a dropped request, the app falls back to every active car
+type and offers no seat group at all rather than a list of its own.
+
+`rtl_audit_test.dart` now fails on a literal list of numbers anywhere under `features/catalogue/`,
+which is the shape this came back as.
+
+## Console localization, Wave Two (2026-09-18)
+
+The pass that localized the Dealer, Employee and Admin consoles end to end and fixed the platform
+commission that printed as "JOD 0−". What it left behind, and why.
+
+### 100. The server still writes every refusal and validation message in English
+
+**Status:** open · **Raised:** 2026-09-18 · **Deliberate, scoped out of Wave Two**
+
+ProblemDetails titles, the 28 FluentValidation `WithMessage` texts and roughly 194 `Error` messages
+are English, and always were. The consoles no longer show them in Arabic: a refusal is held as a
+`ProblemSnapshot`, known error CODES are worded from the dictionary, and anything unmapped shows the
+server's English only in English mode — in Arabic the reader gets "the request was refused" plus the
+trace id. So an Arabic screen never shows English prose, but it also cannot say exactly what went
+wrong for a code the console has not mapped.
+
+**To close:** localize the API's own messages (resources keyed by error code, `Accept-Language`
+forwarded by the BFF), or accept the current behaviour and keep mapping codes as they appear. The
+codes are the contract either way; a server-side dictionary would be a third copy to keep in step,
+which is why it was not done here.
+
+### 101. The customer app does not yet read the new "account closed" facts
+
+**Status:** open · **Raised:** 2026-09-18
+
+Wave Two added a fact beside every name a booking or a dispute carries: `dealerRemoved`,
+`customerAccountClosed`, `openedByAccountClosed`, `authorAccountClosed`, `resolvedByAccountClosed`.
+The consoles read those flags and word them. `Khadra.Mobile` still prints the name as it arrives,
+which for a party that no longer resolves is an English stand-in ("Dealer no longer on the platform")
+in the middle of an Arabic screen. Nothing broke — the strings kept their names, types and meanings,
+which is why the change was safe to make additively — but the app is a release behind the fact.
+
+**To close:** read the boolean beside each name in `Khadra.Mobile/lib/api/dtos.dart` and word it from
+the app's own `AppLocalizations`, as the consoles do.
+
+### 102. A penalty's reason has a code now; the customer app has no vocabulary for it
+
+**Status:** open · **Raised:** 2026-09-18
+
+`PenaltyAssessment` carries `reasonCode` (a `PenaltyReason` name) beside the frozen English
+`reason`. The consoles word the code and fall back to the sentence for bookings assessed before
+codes existed. The customer app parses `reason` and never displays it, so it is unaffected — but the
+day it wants to show why a penalty was assessed, it needs the words.
+
+**To close:** serve a `PenaltyReasons` vocabulary on `/app-config`, built from the same enum, beside
+the existing vocabularies. Additive, and the app already knows how to render one.
+
+### 103. Names written into the record in English, at the moment of the action
+
+**Status:** open · **Raised:** 2026-09-18
+
+Some names are not looked up at read time but WRITTEN when something happens, and they were written
+in English: notification actor names ("A colleague", "A customer", "The rental office"), audit
+`actorName` ("Unknown admin", "Unknown"), `DealerDocumentReview.ReviewedByName` ("Unknown"). Those
+records are history and are not rewritten, so they stay English on an Arabic screen.
+
+**To close:** for records written from here on, store a code (or the actor's id) beside the name and
+word it at render time, as the penalty reason now does. Historical rows keep what they were given.
+
+### 104. The vehicle wizard offers nine car makes nobody served it
+
+**Status:** open · **Raised:** 2026-09-18 · **Found during the localization sweep**
+
+`Khadra.Dashboard/src/app/features/fleet/vehicle-wizard.component.ts` builds its make suggestions
+from `['Toyota', 'Hyundai', 'Kia', …]` — a list typed into the screen. Every other list on that form
+is served by the platform: car types and cities from the lookup endpoints, transmissions and fuel
+types from the API's own vocabularies. It is the standing rule broken in miniature, and the day a
+dealer lists a make that is not in those nine, the suggestions are quietly wrong.
+
+They are brand names, so they read the same in both languages; the localization scanner allowlists
+them for that reason, with a pointer to this item. The defect is the list, not the language.
+
+**To close:** serve the makes as a lookup or an `/app-config` vocabulary, or drop the suggestions and
+let the field stand alone.
+
+### 105. The car form still pre-fills figures nobody chose
+
+**Status:** open · **Raised:** 2026-09-18 · **Found during the localization sweep**
+
+`car-form.component.ts` starts a new car at `seats: 5`, `dailyRate: 30`, `securityDeposit: 150`,
+`transmission: 'Automatic'`, `fuelType: 'Petrol'` and the current year. The vehicle WIZARD had the
+same defaults and they were removed, with a comment recording why: a dealer who tabbed past them
+published a real car at figures the console invented. The older form was not fixed at the same time.
+
+**To close:** start those fields empty, as the wizard does, and let the dealer state each one.
+
+### 106. The admin dealer list judges its review SLA by the browser's clock alone
+
+**Status:** open · **Raised:** 2026-09-18
+
+Every other clock in the console consults the server's own flag as well as the local one, so a
+browser whose time is behind cannot show a broken promise as time remaining: the dispute queue reads
+`isOverdue`, the review screen reads `isBreachingSla`. The dealer LIST has no such field on its rows,
+so `dealers-list` compares `reviewDueAt` against `Date.now()` and nothing else.
+
+**To close:** add `IsBreachingSla` to `DealerListItem` (the reader already has `now` for the queue
+counts) and pass it to `formats.sla(...)`, which takes the flag.
+
+### 107. A resubmitted application cannot say which decision it answered
+
+**Status:** open · **Raised:** 2026-09-18 · **Behaviour deliberately changed in Wave Two**
+
+`Dealer.Resubmit` can follow a clarification request OR a rejection, and it clears the note, so
+afterwards the aggregate holds no trace of which one happened. The review timeline used to label
+every such step "Clarification requested" — right for one path, wrong for the other, and it was a
+guess either way. It now says only that a decision was recorded, which is true.
+
+**To close (only if the owner wants the distinction back):** record the decision that was answered on
+the aggregate — a `PreviousDecision` alongside `ReviewedAt` — and word it from that. Until then the
+audit log is where an administrator can see which it was.
+
+### 108. Two console strings still come from the server in English
+
+**Status:** open · **Raised:** 2026-09-18
+
+- The platform settings screen prints the SOURCE of its figures ("Configuration") as the API sends
+  it — a display word rather than a code, so the console cannot translate it.
+- `DisputeAdminReader` sends "—" as a booking reference when a ticket's booking does not resolve,
+  which is practically unreachable (bookings are never deleted) but is the reader inventing a value.
+
+**To close:** send a code for the settings source and word it in the console; drop the "—" and let the
+reference be null, which the console already knows how to word.
+
+### 109. A resubmitted application does not record what it answered
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of Wave Two**
+
+Item 107 says the review timeline can no longer name the decision a dealer answered. The reason is
+that `Dealer.Resubmit` keeps `ReviewedAt` but clears `ReviewNote` and moves the status back to
+`PendingReview`, so nothing on the aggregate says whether the applicant was REJECTED or merely asked
+to clarify — or what they were asked to fix. Those are different review postures, and an admin
+picking up a resubmission cannot tell them apart without opening the audit log.
+
+**To close:** two fields on `Dealer`, set inside `Resubmit`: the status being resubmitted from, and
+the note it answers. Not a history table — a second cycle overwriting the first is fine, because the
+timeline shows only the latest decision anyway. Then the timeline words the step from those.
+
+### 110. Every countdown trusts the browser's clock for "how long"
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of Wave Two**
+
+Whether a deadline has PASSED is the server's answer (`isAwaitingDecision`, `isOverdue`,
+`isBreachingSla`) OR the local clock, whichever says so first, so a slow browser clock cannot show a
+dead deadline as live. How MUCH time is left, though, is always local arithmetic. A browser running
+fast shows "Expired" or "Overdue by 1m" a little early. Nothing is locked: the controls gate on
+status and permissions, not on the countdown.
+
+**To close:** where a response already carries the moment it was generated (`AttentionQueue` has
+`generatedAt`), anchor the clock to that plus elapsed local time instead of `Date.now()`. Cheap where
+the field exists; the rest keep the local clock and the server flag.
+
+## The rental office's customer page (2026-09-18)
+
+Six things this pass left for later, recorded when they were decided rather than when they bite.
+
+### 111. Email acceptance is logged and nothing more
+
+**Status:** open · **Raised:** 2026-09-18
+
+`IEmailSender` now returns an `EmailSendReceipt` — provider, provider message id, accepted-at,
+attempts — and `AuthEmailDispatcher` and `BookingEmailDispatcher` each write one Information line per
+accepted send, carrying the RECIPIENT DOMAIN only. That is enough to find a message in Brevo's own
+transactional log by id, and it is not a record: logs are ephemeral locally and whatever the host keeps
+in production, and nothing is queryable.
+
+It also does not prove delivery, and must never be read as if it did. Acceptance means the provider
+took the request. Delivered, deferred, bounced and blocked all happen afterwards and only the provider
+knows.
+
+**To close:** an append-only `email_delivery_attempts` table written in its own post-commit
+transaction, and provider delivery webhooks updating the row. That is a migration, a retention policy
+for data that is PII-adjacent, and a failure path of its own — none of which the app needs today, which
+is why it is here and not in the last pass.
+
+### 112. Dealer prose is not frozen onto a booking
+
+**Status:** open · **Raised:** 2026-09-18
+
+A booking freezes the rules and the price it was made under (`BookingTerms`, `BookingPricing`), so a
+gallery changing its fee never re-prices an existing rental. The office's own words are NOT frozen:
+rental conditions, insurance and pickup instructions are read live off the dealer, and an office may
+rewrite them the day after a customer books on the strength of them.
+
+For the platform's own terms this does not matter, because those are frozen and are what a dispute is
+judged against. It matters for a dispute where the argument is about something the OFFICE promised —
+"they said a second driver was included".
+
+**To close:** decide first whether dealer prose is ever evidence. If it is, a version row per change
+and the version id frozen onto the booking; if it is not, say so here and close this. Do not build the
+versioning until that question has an answer — a history table nobody reads is worse than no history.
+
+### 113. No Admin can read what an office tells customers
+
+**Status:** open · **Raised:** 2026-09-18
+
+Six free-text fields, up to 2,000 characters each, written by dealers and shown to every customer.
+Nothing moderates them and no Admin screen shows them. That is the same exposure vehicle descriptions
+already have, so it is not new, but it is now six times larger and it is about policy rather than about
+a car.
+
+**To close:** a read-only panel on the admin dealer page showing the six sections and which are
+hidden. Admin console work, which is out of scope for a customer-app pass.
+
+### 114. The design export has no artboard for the customer page
+
+**Status:** open · **Raised:** 2026-09-18
+
+`docs/design/Dealer Console.dc.html` is the source of truth for how the console looks, and it does not
+contain this screen — it did not exist when the project was exported. The screen is built from the
+console's existing components and tokens (`sect`, `field`, `note-box`, `dc-split-155`) so it is
+consistent by construction, but it is not DESIGNED, and the rules file says to diff against the export
+before changing a screen's appearance.
+
+**To close:** add the artboard on the next design export, then diff the Angular against it.
+
+### 115. A platform-rules block on the rental office page, if it is ever wanted
+
+**Status:** open (deliberate omission) · **Raised:** 2026-09-18
+
+The architecture review proposed putting Khadra's own booking rules and the renter's required
+documents on the rental office page, fed from `/app-config`. The owner ruled both out for this pass.
+They are stated on every booking quote (`QuoteTerms`) and on the booking itself, which is where a
+customer meets them at the moment they matter.
+
+Recorded because the reasoning may not survive contact with real customers: somebody comparing three
+offices before choosing one cannot see the cancellation window until they have picked a car.
+
+**To close:** an owner decision, not a fix. If they want it, it is a block on the page fed from
+`/app-config` — never text a dealer writes, which would be a promise nothing enforces.
+
+### 116. The customer app picks "today" from the device clock
+
+**Status:** open · **Raised:** 2026-09-18
+
+The rental office page collapses opening hours to today's line, and which day that is comes from
+`DateTime.now()` converted to Amman. The ZONE is right — it is the office's own day, not the phone's —
+but the instant is the phone's, so a device whose clock is a day out shows the wrong row. The whole
+week is one tap away and nothing is gated on it, which is why this is a note rather than a fix.
+
+Same class as item 110 in the console: whether a deadline has passed is the server's answer; how long
+is left is local arithmetic.
+
+**To close:** carry the server's own "now" on a response the page already makes and anchor the day to
+it plus elapsed local time. Cheap wherever a response already says when it was generated; not worth a
+field of its own just for this.
+
+### 117. Saving the dealer page wipes the dealership's city and address
+
+**Status:** closed · **Raised:** 2026-09-18 · **Closed:** 2026-09-19 — the request carries the
+location and requires it present, the form shows and edits it, and the command can no longer be built
+without it. Approved by the owner as a contract change. See the close note at the end of this item.
+
+`PUT /api/v1/dealers/me/profile` takes `BusinessName`, `Latitude`, `Longitude` and `OperatingHours`
+and nothing else. It builds `UpdateDealerProfileCommand` with five arguments, so `CityId`,
+`AddressArea` and `AddressStreet` fall back to the record's own defaults of null; `ResolveAddress(null,
+null)` returns a successful null rather than refusing; and `Dealer.UpdateProfile` assigns `CityId =
+cityId; Address = address;` **unconditionally**. So an owner who changes one closing time clears both.
+
+The handler's own comment says the city "now travels with the rest of the form, and is checked against
+the lookup exactly as submission checks it". The command grew those parameters; the HTTP request never
+did, and neither did the console form.
+
+Two consequences, and the second is the serious one:
+
+- The address line disappears from the rental office page, which is new — customers only started
+  seeing it in this pass.
+- `CatalogueReader.SearchAsync` filters vehicles by `dealer.CityId`, so the office's **entire fleet
+  drops out of every city-filtered search**. Nothing tells anybody: the cars are still listed, still
+  bookable by direct link, and simply absent from the results customers actually browse.
+
+`DealerProfileTests` passes because it builds the command the same five-argument way the controller
+does. It exercises the wiping path and asserts only that `Description` survived it. A test shaped like
+the bug is why this stood.
+
+**To close:** `cityId`, `addressArea` and `addressStreet` on the API request, on the console's
+`UpdateProfileRequest`, and on the dealer page form — the dashboard's `DealerProfile` already reads
+both back, so the form has the values to seed from. Then a handler test asserting a save keeps them.
+**Not** by having the handler quietly forward the stored values when a field is omitted: that makes
+"omitted" mean two different things on the same endpoint, which is the ambiguity that produced this.
+
+**Close note (2026-09-19).** Closed the way this item asked, with the owner's rulings on the retired
+city and the architecture advisor's review:
+
+- **The request** carries `CityId`, `AddressArea` and `AddressStreet`, named and limited as the
+  application form's (100 and 200). Each is `[JsonRequired]`: it must be present, and may be null.
+  Null is an answer; leaving one out is a 400, so no client — an old console, a stale tab — can erase a
+  location by not knowing about it. The 400 is the framework's model-binding shape, the same as every
+  other malformed body today (see item 121).
+- **The command** lost its `= null` defaults, so the five-argument construction that did this no
+  longer compiles. `DealerProfileTests` had to state a location to build, which is the point.
+- **A retired city.** The city an office is already filed under is not re-checked against the lookup,
+  so an office under a city an administrator retired later can still save its hours, and is never made
+  to move to save anything. A NEW city is checked exactly as submission checks it: a retired or unknown
+  one is refused with `dealer.unknown_city`.
+- **The form** shows the city, area and street, seeded from `GET /dealers/me`, and sends all three on
+  every save. The city is selected per option, not by the select's value, because it is seeded before
+  the list arrives. Until the list loads the select is disabled and the city is sent unchanged. A city
+  retired since it was filed is pinned as "Your current city (no longer offered)" — the dealer cannot
+  fetch its name; see item 124. Once an office has a city the form does not offer "no city", because
+  that takes its fleet out of city search; the API still accepts null.
+- **Tests at the boundary that broke,** not below it: the real controller's request-to-command mapping
+  (`DealerProfileEndpointTests`, which fails if the mapping is removed — checked by re-introducing the
+  bug); the handler over the real repositories on SQLite, read back through `GET /dealers/me`'s own
+  query; the city-filtered catalogue after an unrelated save, with a control proving it can fail; and
+  the retired-city rule, which fails four tests when its guard is removed.
+
+**Deploy ordering.** Ship the API and the console together. An API that requires the location, facing
+a console tab opened before the update, answers that tab's profile saves with a 400 until it is
+reloaded. That is loud on purpose — the quiet version is the one that erased data — but it is a window.
+
+### 118. An unrecognised hidden-section name is dropped rather than kept
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of the customer page**
+
+`HiddenSectionsConverter.Read` drops a stored name this build does not know. Making the read total is
+right — materialising a dealer must never fail over a stored string — but dropping is not the only way
+to be total, and the direction of the failure matters.
+
+Kept, an unknown name hides something the old build cannot render anyway. Dropped, it is gone from the
+set, so the next save from that build narrows the column and, after a roll-forward, a section the owner
+chose to hide is shown. The whole feature exists to stop exactly that.
+
+It is not a launch blocker: the vocabulary has six names and has never changed, so there is nothing
+unrecognised to drop.
+
+**To close, before a seventh section is ever added:** `PublicProfile` carries a private list of
+unrecognised names, set only by the converter's read; `Write` appends them after the known ones;
+`UpdatePublicProfile` copies them from the outgoing profile onto the incoming one; the comparer
+includes them. Test: tamper the column to `About;Prices`, load, hide Insurance, save, assert
+`About;Insurance;Prices`.
+
+### 119. The public-profile endpoints have no Security-layer tests
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of the customer page**
+
+`Khadra.Tests/Security` has nothing touching `me/public-profile` or `galleries/`. The application
+layer covers owner-only writing, and the reader covers what a suspended office returns, but neither
+exercises the wire: an employee's 403 rests on the `DealerOwner` policy attribute being present, and
+"404 with none of the office's prose in the body" is asserted one layer below the serialiser.
+
+**To close:** two `WebApplicationFactory` tests — an employee's `PUT me/public-profile` is 403, and an
+anonymous `GET galleries/{id}` for a suspended office is 404 whose body contains none of the six
+sections.
+
+### 120. Typed text collapses its own line breaks in the console
+
+**Status:** open (deferred by the owner, 2026-09-19) · **Raised:** 2026-09-18 · **From the
+architecture review of the customer page**
+
+`.user-text` marks text somebody typed — an office's customer page, a customer's dispute statement, a
+review note — so bidi does not reorder it. It sets no `white-space`, so the line breaks a person typed
+collapse into one paragraph wherever the console shows them. It is most visible in the customer page
+preview, which says it shows what customers see: an office that lays its rental conditions out as a
+list sees them run together.
+
+The fix proposed was `white-space: pre-line` on `.user-text` in `src/styles/`. The owner deferred it
+rather than take it inside the customer page work, because `.user-text` is console-wide: it would
+change how every typed string on every screen wraps, the night before a walkthrough of every screen,
+under a change labelled for one of them.
+
+**To close:** either the global rule, with a before-and-after of the screens that render `.user-text`,
+or a preview-only rule the customer page panel opts into. Either way, check how the customer app lays
+out the same text, so the preview and the page a customer reads agree.
+
+### 121. A malformed request body is refused without a `code`
+
+**Status:** open · **Raised:** 2026-09-19 · **Pre-existing; from the architecture review of item 117**
+
+Every error this API returns is meant to carry a stable `code` beside its `traceId`. Model-binding
+failures do not: invalid JSON, a missing `[JsonRequired]` property, a `[StringLength]` breach. They
+become MVC's automatic `ValidationProblemDetails` — a title, an `errors` map, a `traceId`, and no
+`code` — because nothing customises `InvalidModelStateResponseFactory`. `ApiSmokeTests` already
+accepts that shape, so it is not new; item 117 made one more request depend on it, since a client
+that leaves the location out of a dealer page save now gets exactly this.
+
+The console copes (`snapshotProblem` records `code: null`, and English mode shows the title), but no
+client can tell "your body was malformed" from any other 400 by code.
+
+**To close:** one `InvalidModelStateResponseFactory` that adds `code: "request.invalid"` for every
+endpoint, keeping the `errors` map as it is. A smoke test pins the code.
+
+### 122. Retiring a city drops its offices out of city search, and nobody is told
+
+**Status:** open · **Raised:** 2026-09-19 · **Pre-existing; from the architecture review of item 117**
+
+`SetLookupActiveCommand` retires a city without looking at who is filed under it. From then on the
+customer app cannot offer that city as a filter, so every office in it is missing from every
+city-filtered search — the same consequence item 117 had, arrived at from the other side. The
+administrator who retired the city sees nothing to suggest it.
+
+Item 117 made sure such an office can still save its page and keep its filing; it did not make it
+findable.
+
+**To close:** an owner decision first — refuse to retire a city that trading offices are filed under,
+or warn with the count and let the administrator proceed. Either way the lookups screen says how many
+offices a city holds before it is retired.
+
+### 123. The dealer page needs a version check the day it gains a second writer
+
+**Status:** open (not needed yet) · **Raised:** 2026-09-19 · **From the architecture review of
+item 117**
+
+`PUT me/profile` replaces the whole page, location included, from whatever the owner's form loaded.
+Today that is safe: after submission the owner is the only writer of the name, pin, hours, city and
+address. `Dealer` has an `xmin` concurrency token, but it only compares against the row the handler
+loaded inside the request, not the one the console loaded minutes earlier.
+
+The day anything else writes these fields — an administrator correcting a city, an import — an owner
+with the page open would silently put back what it had loaded.
+
+**To close, before a second writer exists:** the response carries a version, the console sends it
+back as `If-Match`, and a mismatch is a 409 the form explains.
+
+### 124. Nobody but an administrator can name a retired city
+
+**Status:** open · **Raised:** 2026-09-19 · **From item 117**
+
+A dealer can fetch only the offered cities (`GET /cities`, active only). So the dealer page cannot
+name an office's city once an administrator has retired it, and shows it as "Your current city (no
+longer offered)" instead — honest, and enough to keep it, but the owner cannot see which city it is.
+The administrator's dealer review screen reads the same active-only list and names nothing either.
+
+Deliberately NOT fixed by putting the city's name on `DealerProfileDto`: that would copy a renameable
+value out of the lookup into a Dealers read model, which `dealer-review.component.ts` already argues
+against, and it is built in eight places.
+
+**To close:** a way for a signed-in reader to name a city by id whether or not it is still offered —
+`GET /api/v1/cities/{id}`, or an id-list that includes retired entries — used by both screens.
+
+### 125. A newer console could drop a section it forgot to send
+
+**Status:** open · **Raised:** 2026-09-19 · **From the architecture review of the customer page**
+
+The stale-console protection (item 3 of the owner's 2026-09-19 approvals) covers a console OLDER than
+its server: a section it has no box for disables Save. The opposite case is not covered.
+`customerPageRequest` writes the six text fields out by hand, independently of `SECTIONS`, the map
+that decides which boxes the page renders. A release that adds a seventh box to `SECTIONS` and forgets
+the request would show the box, accept the typing, and send nothing for it — and the save, being a full
+replacement, would clear whatever the section held.
+
+Left out of the approved fix because it is a different case from the one the owner approved.
+
+**To close:** a spec asserting that the fields `SECTIONS` renders are exactly the text keys
+`customerPageRequest` sends (every key but `hiddenSections`), so the two cannot drift silently.
