@@ -11,23 +11,32 @@ using MediatR;
 
 namespace Khadra.Application.Dealers.UpdateProfile;
 
-// Spec 4.1, the dealer page: name, description, map pin, opening hours, logo and cover. Owner-only,
-// and deliberately NOT gated on the business being able to trade: an applicant sent back for
-// clarification fixing their description is the main use of this screen.
+// Spec 4.1, the dealer page: name, map pin, opening hours, logo and cover. Owner-only, and
+// deliberately NOT gated on the business being able to trade: an applicant sent back for
+// clarification fixing their details is the main use of this screen.
+//
+// The About text is not here. It is part of the customer page (PublicProfile), which has one writer,
+// so this form and that one cannot overwrite each other's copy of it.
 
 /// <summary>One day's hours as entered: "HH:mm" local times, or closed.</summary>
 public sealed record DayScheduleInput(string Day, bool IsClosed, string? OpensAt, string? ClosesAt);
 
+/// <summary>The whole dealer page, as the owner states it on save — location included.</summary>
+/// <remarks>
+/// No defaults, on purpose. The location parameters were once optional, and the API built this with
+/// five arguments: every save sent a null city and a null address, and `Dealer.UpdateProfile` stored
+/// them, so changing one closing time erased where the office is and dropped its whole fleet from
+/// city search. A caller now has to say what the location is — the same city, a new one, or none.
+/// </remarks>
 public sealed record UpdateDealerProfileCommand(
     Id OwnerUserId,
     string BusinessName,
-    string? Description,
     double Latitude,
     double Longitude,
     IReadOnlyList<DayScheduleInput> OperatingHours,
-    Id? CityId = null,
-    string? AddressArea = null,
-    string? AddressStreet = null) : ICommand<Result<DealerProfileDto, Error>>;
+    Id? CityId,
+    string? AddressArea,
+    string? AddressStreet) : ICommand<Result<DealerProfileDto, Error>>;
 
 /// <summary>Step one of a logo or cover upload: where to PUT the bytes.</summary>
 public sealed record RequestBrandingUploadCommand(Id OwnerUserId, string Kind, string ContentType)
@@ -54,7 +63,6 @@ public sealed class UpdateDealerProfileCommandValidator : AbstractValidator<Upda
     public UpdateDealerProfileCommandValidator()
     {
         RuleFor(command => command.BusinessName).NotEmpty().MaximumLength(150);
-        RuleFor(command => command.Description).MaximumLength(2000);
         RuleFor(command => command.Latitude).InclusiveBetween(-90, 90);
         RuleFor(command => command.Longitude).InclusiveBetween(-180, 180);
         // Length only. Whether the pair forms a usable address is DealerAddress.Create's decision,
@@ -126,20 +134,25 @@ public sealed class DealerProfileHandlers(
         if (hours.IsFailure)
             return hours.Error;
 
-        // The city was previously frozen at whatever submission set: the command had no CityId at
-        // all, and the handler forwarded dealer.CityId back into itself, so an owner who moved --
-        // or picked wrongly on the application -- could never correct it. It now travels with the
-        // rest of the form, and is checked against the lookup exactly as submission checks it.
-        var city = await ResolveCityAsync(request.CityId, cancellationToken);
-        if (city.IsFailure)
-            return city.Error;
+        // The city travels with the rest of the form, so an owner who moved -- or picked wrongly on
+        // the application -- can correct it. A NEW city is checked against the lookup exactly as
+        // submission checks it. The city the office is ALREADY filed under is not re-checked: an
+        // administrator may have retired it since, and retiring a city must not stop an office
+        // under it from saving its opening hours, nor force it to move to save anything at all.
+        // Keeping your filing is always allowed; moving to a city nobody offers never is.
+        if (request.CityId != dealer.CityId)
+        {
+            var city = await ResolveCityAsync(request.CityId, cancellationToken);
+            if (city.IsFailure)
+                return city.Error;
+        }
 
         var address = ResolveAddress(request.AddressArea, request.AddressStreet);
         if (address.IsFailure)
             return address.Error;
 
         var updated = dealer.UpdateProfile(
-            name.Value, location.Value, hours.Value, request.Description, request.CityId, address.Value);
+            name.Value, location.Value, hours.Value, request.CityId, address.Value);
         if (updated.IsFailure)
             return updated.Error;
 

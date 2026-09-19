@@ -131,6 +131,134 @@ public sealed class CatalogueReaderTests : IDisposable
     }
 
     /// <summary>
+    /// The office's page: what it wrote, where it is, and nothing it chose not to show.
+    /// </summary>
+    [Fact]
+    public async Task A_gallerys_page_carries_its_address_and_the_sections_it_shows()
+    {
+        var dealer = Build.ApprovedDealer();
+        Assert.True(dealer.UpdateProfile(
+            dealer.BusinessName,
+            dealer.Location,
+            dealer.OperatingHours,
+            dealer.CityId,
+            DealerAddress.Create("Abdoun", "Zahran Street").Value).IsSuccess);
+        Assert.True(dealer.EnableDelivery(10m, Money.Jod(5m), Build.Now).IsSuccess);
+        Assert.True(dealer.UpdatePublicProfile(
+            "Family-run since 2014.",
+            PublicProfile.Create(
+                "No smoking.",
+                "Comprehensive, 200 JOD excess.",
+                null,
+                "We deliver to the airport.",
+                null,
+                ["Insurance"]).Value).IsSuccess);
+
+        await using (var context = NewContext())
+        {
+            context.Dealers.Add(dealer);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var page = await new CatalogueReader(reader).GetGalleryAsync(dealer.Id);
+
+        Assert.NotNull(page);
+        Assert.Equal("Abdoun", page.Address!.Area);
+        Assert.Equal("Zahran Street", page.Address.Street);
+        Assert.Equal("Family-run since 2014.", page.Sections.About);
+        Assert.Equal("No smoking.", page.Sections.RentalConditions);
+        Assert.Equal("We deliver to the airport.", page.Sections.DeliveryNotes);
+        // Hidden and never written are both simply absent, and the page says nothing about which.
+        Assert.Null(page.Sections.Insurance);
+        Assert.Null(page.Sections.PickupInstructions);
+        // What a customer needs before booking is not a section and cannot be hidden.
+        Assert.Equal(7, page.OperatingHours.Count);
+        Assert.True(page.Delivery.IsEnabled);
+    }
+
+    /// <summary>
+    /// A car carries enough of its office to recognise it, and none of the office's own writing.
+    /// </summary>
+    /// <remarks>
+    /// The page's sections include ones an office has HIDDEN — it wrote them, after all. This record
+    /// travels inside every car in the catalogue, so a field added to it would put that text in front
+    /// of customers with nothing anywhere to notice.
+    /// </remarks>
+    [Fact]
+    public void A_cars_gallery_carries_none_of_the_offices_own_writing()
+    {
+        var carried = typeof(PublicGallery).GetProperties().Select(property => property.Name).ToHashSet();
+
+        foreach (var section in Enumeration.GetAll<PublicProfileSection>())
+            Assert.DoesNotContain(section.Name, carried);
+        Assert.DoesNotContain("Description", carried);
+        Assert.DoesNotContain("Sections", carried);
+    }
+
+    /// <summary>
+    /// The customer's filters are built from what a customer could actually book. A seat count or a
+    /// category that only a hidden car or a suspended gallery's car has must not become a choice that
+    /// leads to an empty page — or that tells an anonymous caller such a car exists.
+    /// </summary>
+    [Fact]
+    public async Task Facets_offer_only_what_a_customer_could_actually_book()
+    {
+        var sedan = CarType.Create("Sedan", "سيدان", 1, Build.Now).Value;
+        var suv = CarType.Create("SUV", "دفع رباعي", 2, Build.Now).Value;
+        var van = CarType.Create("Van", "فان", 3, Build.Now).Value;
+        var coupe = CarType.Create("Coupe", "كوبيه", 4, Build.Now).Value;
+
+        var approved = Build.ApprovedDealer(commercialRegistration: "200001");
+        var suspended = Build.ApprovedDealer(commercialRegistration: "200002");
+        suspended.Suspend(Id.New(), "Complaints.", Build.Now);
+
+        var fiveSeatSedan = ListedWithSeats(approved.Id, sedan.Id, seats: 5);
+        var sevenSeatSuv = ListedWithSeats(approved.Id, suv.Id, seats: 7);
+        var anotherFiveSeatSedan = ListedWithSeats(approved.Id, sedan.Id, seats: 5);
+        var suspendedGalleriesVan = ListedWithSeats(suspended.Id, van.Id, seats: 9);
+        var hiddenCoupe = ListedWithSeats(approved.Id, coupe.Id, seats: 2);
+        hiddenCoupe.Hide(Build.Now);
+
+        await using (var context = NewContext())
+        {
+            context.CarTypes.AddRange(sedan, suv, van, coupe);
+            context.Dealers.AddRange(approved, suspended);
+            context.Vehicles.AddRange(
+                fiveSeatSedan, sevenSeatSuv, anotherFiveSeatSedan, suspendedGalleriesVan, hiddenCoupe);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var facets = await new CatalogueReader(reader).FacetsAsync();
+
+        // Each value once, seats ascending, and nothing that only an unlistable car has.
+        Assert.Equal(new[] { 5, 7 }, facets.Seats);
+        Assert.Equal(new[] { sedan.Id.Value, suv.Id.Value }.Order(), facets.CarTypeIds);
+    }
+
+    /// <summary>A listed car with a stated number of seats; <c>Build.Vehicle</c> always has five.</summary>
+    private Vehicle ListedWithSeats(Id dealerId, Id carTypeId, int seats)
+    {
+        var vehicle = Vehicle.Add(
+            dealerId,
+            carTypeId,
+            VehicleDetails.Create(
+                "Toyota", "Corolla", 2024, seats, TransmissionType.Automatic, FuelType.Petrol, currentYear: 2026).Value,
+            PlateNumber.Create($"12-{34567 + ++_plate}").Value,
+            Money.Jod(30m),
+            Money.Jod(200m),
+            MileagePolicy.Unlimited(),
+            FuelPolicy.FullToFull,
+            true,
+            Build.Now).Value;
+        vehicle.AddImage("cars/front.jpg", Build.Now);
+        vehicle.Publish(dealerCanTrade: true, Build.Now);
+        vehicle.ClearDomainEvents();
+        return vehicle;
+    }
+
+    /// <summary>
     /// The category name is correlated, not joined, so a car type an administrator has since retired
     /// still names itself on the cars listed under it (pre-launch checklist item 29).
     /// </summary>

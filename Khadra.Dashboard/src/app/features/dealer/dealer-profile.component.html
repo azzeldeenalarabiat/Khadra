@@ -21,10 +21,10 @@
         <button
           type="button"
           class="btn btn-primary btn-md"
-          [disabled]="busy() || !dirty() || coordsInvalid()"
+          [disabled]="busy() || !dirty() || coordsInvalid() || addressIncomplete()"
           (click)="save()"
         >
-          {{ busy() ? 'Saving…' : 'Save changes' }}
+          {{ busy() ? t('common.saving') : t('dealerProfile.saveChanges') }}
         </button>
       </div>
     }
@@ -52,7 +52,7 @@
         </div>
       </div>
     }
-    @if (problem(); as message) {
+    @if (problemText(); as message) {
       <div class="banner s-bad" role="alert">
         <kh-icon name="warning-circle" class="banner-icon" />
         <div class="banner-body">
@@ -80,7 +80,7 @@
               <span class="photo-label">{{ t('dealerProfile.logo') }}</span>
               @if (isOwner()) {
                 <label class="btn btn-secondary btn-xs">
-                  {{ uploading() === 'logo' ? 'Uploading…' : 'Change' }}
+                  {{ uploading() === 'logo' ? t('dealerProfile.uploading') : t('dealerProfile.change') }}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -103,7 +103,9 @@
                 <span class="photo-label">{{ t('dealerProfile.coverImage') }}</span>
                 @if (isOwner()) {
                   <label class="btn btn-secondary btn-xs push">
-                    {{ uploading() === 'cover' ? 'Uploading…' : 'Change' }}
+                    {{
+                      uploading() === 'cover' ? t('dealerProfile.uploading') : t('dealerProfile.change')
+                    }}
                     <input
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
@@ -148,20 +150,22 @@
               />
               <div class="field-hint">{{ t('dealerProfile.fromYourLicenceNot') }}</div>
             </div>
-            <div class="field">
-              <label for="description">{{ t('common.description') }}</label>
-              <textarea
-                id="description"
-                class="input"
-                rows="4"
-                [value]="description()"
-                [disabled]="!isOwner()"
-                (input)="description.set(value($event))"
-                [placeholder]="t('dealerProfile.whatYouRentWhat')"
-              ></textarea>
-              @if (fieldError('description'); as e) {
-                <div class="field-error">{{ e }}</div>
-              }
+            <!--
+              About is NOT edited here any more. It moved to the customer page, which is the one
+              writer the API now has for it: `PUT me/profile` does not accept `description` at all,
+              so a box here would save nothing and toast success while doing it.
+            -->
+            <div class="note-box is-plain">
+              <kh-icon name="info" />
+              <div class="stack stack-9">
+                <div class="k">{{ t('dealerProfile.aboutMovedTitle') }}</div>
+                <div class="page-sub">{{ t('dealerProfile.aboutMovedBody') }}</div>
+                <div class="action-row">
+                  <a class="btn btn-secondary btn-sm" routerLink="/dealer/customer-page">
+                    {{ t('dealerProfile.openCustomerPage') }}
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -182,7 +186,7 @@
                     [disabled]="!isOwner()"
                     (change)="setDay(h.day, { isClosed: h.isClosed })"
                   />
-                  <span>{{ h.isClosed ? 'Closed' : 'Open' }}</span>
+                  <span>{{ h.isClosed ? t('dealerProfile.closed') : t('dealerProfile.open') }}</span>
                 </label>
                 @if (!h.isClosed) {
                   <input
@@ -243,7 +247,7 @@
                 [longitude]="lngNumber()"
                 [editable]="isOwner()"
                 [radiusKm]="deliveryRadiusKm()"
-                [label]="'Your dealership location'"
+                [label]="t('dealerProfile.yourDealershipLocation')"
                 (moved)="moveTo($event)"
               />
             }
@@ -286,6 +290,70 @@
                 {{ t('dealerProfile.dragThePinOr') }}
               </div>
             }
+
+            <!-- The office's filing: sent on every save, so a save never erases it. -->
+            <div class="field">
+              <label for="profile-city">{{ t('dealerApply.city') }}</label>
+              <!-- Selected per option, not by [value] on the select: the city is seeded before the
+                   options arrive, and a value set then selects nothing and is never re-applied. -->
+              <select
+                id="profile-city"
+                class="input"
+                [disabled]="!isOwner() || cityOptions().disabled"
+                [attr.title]="cityOptions().disabled ? t('dealerProfile.cityListNotLoaded') : null"
+                (change)="cityId.set(value($event))"
+              >
+                @for (option of cityOptions().options; track option.id) {
+                  <option [value]="option.id" [selected]="option.selected">{{ option.label }}</option>
+                }
+              </select>
+              @if (fieldError('cityId'); as e) {
+                <div class="field-error">{{ e }}</div>
+              } @else if (keepingRetiredCity()) {
+                <div class="field-hint">{{ t('dealerProfile.cityNotOfferedHint') }}</div>
+              } @else {
+                <div class="field-hint">{{ t('dealerProfile.cityDecidesSearch') }}</div>
+              }
+            </div>
+            <div class="dc-split-even">
+              <div class="field">
+                <label for="profile-area">{{ t('dealerApply.area') }}</label>
+                <input
+                  id="profile-area"
+                  class="input user-text"
+                  type="text"
+                  [value]="area()"
+                  [disabled]="!isOwner()"
+                  (input)="area.set(value($event))"
+                />
+                @if (fieldError('addressArea'); as e) {
+                  <div class="field-error">{{ e }}</div>
+                } @else if (addressIncomplete()) {
+                  <div class="field-error">{{ t('dealerProfile.addTheAreaForThisStreet') }}</div>
+                } @else {
+                  <div class="field-hint">{{ t('dealerApply.theNeighbourhoodACustomer') }}</div>
+                }
+              </div>
+              <div class="field">
+                <label for="profile-street">
+                  {{ t('dealerApply.street') }}
+                  <span class="field-hint">{{ t('dealerApply.optional') }}</span>
+                </label>
+                <input
+                  id="profile-street"
+                  class="input user-text"
+                  type="text"
+                  [value]="street()"
+                  [disabled]="!isOwner()"
+                  (input)="street.set(value($event))"
+                />
+                @if (fieldError('addressStreet'); as e) {
+                  <div class="field-error">{{ e }}</div>
+                } @else {
+                  <div class="field-hint">{{ t('dealerApply.manyStreetsHaveNo') }}</div>
+                }
+              </div>
+            </div>
           </div>
         </section>
       </div>
@@ -313,23 +381,23 @@
               <div>
                 <div class="public-name">{{ businessName() || d.businessName }}</div>
                 <div class="public-meta">
-                  {{ t('dealerProfile.noReviewsYet') }}
                   {{
                     d.delivery.isEnabled
-                      ? 'Delivers up to ' + d.delivery.radiusKm + ' km'
-                      : 'Pickup only'
+                      ? t('dealerProfile.noReviewsDeliversUpTo', {
+                          km: fmt.number(d.delivery.radiusKm),
+                        })
+                      : t('dealerProfile.noReviewsPickupOnly')
                   }}
                 </div>
               </div>
             </div>
-            <div class="page-sub">{{ description() || 'No description yet.' }}</div>
             <div class="history-line">
               <span class="k-label">{{ t('dealerProfile.hours') }}</span><span>{{ hoursSummary() }}</span>
             </div>
             <div class="history-line">
               <span class="k-label">{{ t('common.status') }}</span
               ><span class="pill" [class]="d.canTrade ? 's-ok' : 's-warn'">{{
-                d.canTrade ? 'Listed' : 'Not listed'
+                d.canTrade ? t('dealerProfile.listed') : t('dealerProfile.notListed')
               }}</span>
             </div>
             <div class="note-box is-plain">
@@ -344,15 +412,15 @@
           <div class="history-line">
             <span class="k-label">{{ t('common.status') }}</span
             ><span class="pill" [class]="d.canTrade ? 's-ok' : 's-warn'">{{
-              d.verificationStatus
+              statusLabel(d.verificationStatus)
             }}</span>
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('common.documentsOnFile') }}</span
             ><span class="num">{{ d.submittedDocuments.length }}</span>
           </div>
-          @if (d.reviewNote) {
-            <div class="page-sub">{{ t('dealerProfile.platformNote') }}{{ d.reviewNote }}”</div>
+          @if (d.reviewNote; as note) {
+            <div class="page-sub">{{ t('dealerProfile.platformNoteQuoted', { note }) }}</div>
           }
           <div class="history-line">
             <span class="k-label">{{ t('dealerProfile.staff') }}</span><span class="num">{{ d.employeeCount }}</span>
