@@ -429,7 +429,7 @@ public sealed class Booking : AggregateRoot
         if (PaymentDeadline is not { } deadline || now < deadline)
             return UnitResult.Failure(BookingErrors.PaymentWindowNotElapsed);
 
-        Penalty = PenaltyAssessment.None("The deposit was not paid within the payment window.", Pricing.CurrencyCode, now);
+        Penalty = PenaltyAssessment.None(PenaltyReason.PaymentWindowLapsed, Pricing.CurrencyCode, now);
         FinishedAt = now;
         Transition(BookingStatus.Expired, PartyFor(actorUserId), actorUserId, "Payment window elapsed.", now);
         AddDomainEvent(new BookingExpired(Id, VehicleId, "PaymentWindowElapsed", now));
@@ -449,7 +449,7 @@ public sealed class Booking : AggregateRoot
         if (now < DecisionDeadline)
             return UnitResult.Failure(BookingErrors.DecisionWindowNotElapsed);
 
-        Penalty = PenaltyAssessment.None("The dealer did not answer within the agreed window.", Pricing.CurrencyCode, now);
+        Penalty = PenaltyAssessment.None(PenaltyReason.DealerAnswerWindowLapsed, Pricing.CurrencyCode, now);
         FinishedAt = now;
         Transition(BookingStatus.Expired, PartyFor(actorUserId), actorUserId, "Dealer did not respond.", now);
         AddDomainEvent(new BookingExpired(Id, VehicleId, "DealerDidNotRespond", now));
@@ -509,7 +509,7 @@ public sealed class Booking : AggregateRoot
             return UnitResult.Failure(BookingErrors.ReasonRequired);
 
         ActedByUserId = actedByUserId;
-        Penalty = PenaltyAssessment.None("The dealer rejected the request.", Pricing.CurrencyCode, now);
+        Penalty = PenaltyAssessment.None(PenaltyReason.DealerRejected, Pricing.CurrencyCode, now);
         FinishedAt = now;
         Transition(BookingStatus.Rejected, BookingParty.Dealer, actedByUserId, details, now, reasonCode.Name);
         AddDomainEvent(new BookingRejected(Id, DealerId, actedByUserId, details.Trim(), now));
@@ -601,7 +601,7 @@ public sealed class Booking : AggregateRoot
             Terms.DealerPenaltyMinPercent,
             Terms.DealerPenaltyMaxPercent,
             Pricing.RentalTotal,
-            "The dealer did not hand over the vehicle after approving the booking.",
+            PenaltyReason.DealerDidNotHandOver,
             now);
         FinishedAt = now;
         Transition(BookingStatus.Cancelled, BookingParty.Customer, customerUserId, reason, now);
@@ -636,10 +636,10 @@ public sealed class Booking : AggregateRoot
                 BookingParty.Customer,
                 Percentage.FromValidated(100m),
                 Pricing.DepositAmount,
-                "The customer did not collect the vehicle within the no-show window.",
+                PenaltyReason.CustomerNoShow,
                 now)
             : PenaltyAssessment.None(
-                "The vehicle was never handed over on a delivery booking; responsibility is undetermined.",
+                PenaltyReason.DeliveryNoShowUndetermined,
                 Pricing.CurrencyCode,
                 now);
 
@@ -769,10 +769,10 @@ public sealed class Booking : AggregateRoot
         // which is a late rejection in all but name. Assessing a percentage of a deposit nobody has
         // paid would be an assessment with nothing behind it and no rail to collect it on.
         if (Status != BookingStatus.Confirmed)
-            return PenaltyAssessment.None("Cancelled before the deposit was paid.", Pricing.CurrencyCode, now);
+            return PenaltyAssessment.None(PenaltyReason.CancelledBeforeDeposit, Pricing.CurrencyCode, now);
 
         if (FreeCancellationDeadline is not null && now <= FreeCancellationDeadline.Value)
-            return PenaltyAssessment.None("Cancelled inside the free cancellation window.", Pricing.CurrencyCode, now);
+            return PenaltyAssessment.None(PenaltyReason.CancelledInFreeWindow, Pricing.CurrencyCode, now);
 
         if (cancelledBy == BookingParty.Customer)
         {
@@ -780,7 +780,7 @@ public sealed class Booking : AggregateRoot
                 BookingParty.Customer,
                 Terms.CustomerCancellationPenaltyPercent,
                 Pricing.DepositAmount,
-                "The customer cancelled after the free cancellation window.",
+                PenaltyReason.CustomerCancelledAfterFreeWindow,
                 now);
         }
 
@@ -791,11 +791,11 @@ public sealed class Booking : AggregateRoot
                 Terms.DealerPenaltyMinPercent,
                 Terms.DealerPenaltyMaxPercent,
                 Pricing.RentalTotal,
-                "The dealer cancelled after the free cancellation window.",
+                PenaltyReason.DealerCancelledAfterFreeWindow,
                 now);
         }
 
-        return PenaltyAssessment.None("Cancelled by the platform.", Pricing.CurrencyCode, now);
+        return PenaltyAssessment.None(PenaltyReason.CancelledByPlatform, Pricing.CurrencyCode, now);
     }
 
     private void Transition(

@@ -94,8 +94,18 @@ public sealed record BookingDto(
     /// <summary>The customer's review of it, if they have already left one.</summary>
     Guid? MyReviewId,
     VehicleLabel? Vehicle,
+    /// <summary>The dealership's name, or an English stand-in when <see cref="DealerRemoved"/> is true.</summary>
+    /// <remarks>
+    /// Kept a string, stand-in included, because shipped customer apps print it as it arrives. A client
+    /// that words the case in its reader's language reads the flag instead and never shows the stand-in.
+    /// </remarks>
     string DealerName,
+    /// <summary>True exactly when the dealership no longer resolves: it is no longer on the platform.</summary>
+    bool DealerRemoved,
+    /// <summary>The customer's name, or an English stand-in when <see cref="CustomerAccountClosed"/> is true.</summary>
     string CustomerName,
+    /// <summary>True exactly when the customer's account no longer resolves: it was closed.</summary>
+    bool CustomerAccountClosed,
     IReadOnlyList<HandoverDto> Handovers,
     IReadOnlyList<BookingStatusChangeDto> History)
 {
@@ -148,7 +158,9 @@ public sealed record BookingDto(
             context.MyReviewId,
             context.Vehicle,
             context.DealerName,
+            context.DealerRemoved,
             context.CustomerName,
+            context.CustomerAccountClosed,
             booking.Handovers.OrderBy(handover => handover.RecordedAt).Select(HandoverDto.From).ToList(),
             booking.StatusHistory.OrderBy(change => change.OccurredAt).Select(BookingStatusChangeDto.From).ToList());
     }
@@ -248,7 +260,14 @@ public sealed record PenaltyAssessmentDto(
     /// than from a sentence typed into it. Spec 3.3: with no ticket, nothing is charged at all.
     /// </summary>
     bool RequiresTicketToEnforce,
+    /// <summary>The sentence the platform wrote when it assessed this, frozen on the booking.</summary>
     string Reason,
+    /// <summary>The stable code behind that sentence, so a client can word it in its reader's language.</summary>
+    /// <remarks>
+    /// Null on bookings assessed before codes existed: those keep their sentence, and a client falls
+    /// back to it rather than guessing a code from the text.
+    /// </remarks>
+    string? ReasonCode,
     DateTimeOffset AssessedAt)
 {
     public static PenaltyAssessmentDto? From(PenaltyAssessment? penalty) =>
@@ -264,6 +283,7 @@ public sealed record PenaltyAssessmentDto(
                 penalty.IsNothingOwed,
                 penalty.RequiresTicketToEnforce,
                 penalty.Reason,
+                penalty.ReasonCode?.Name,
                 penalty.AssessedAt);
 }
 

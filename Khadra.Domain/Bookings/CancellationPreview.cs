@@ -37,5 +37,5 @@ public sealed record CancellationPreview(
         new(
             false,
             true,
-            PenaltyAssessment.None("This booking can no longer be cancelled.", currencyCode, now));
+            PenaltyAssessment.None(PenaltyReason.NotCancellable, currencyCode, now));
 }
