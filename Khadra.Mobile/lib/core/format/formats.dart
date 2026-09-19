@@ -152,19 +152,31 @@ class Formats {
   /// An unrecognised name comes back unchanged — a day the platform adds later
   /// should read as itself rather than vanish from an opening-hours table.
   String weekday(String dayOfWeek) {
-    const order = <String>[
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
-    final index = order.indexOf(dayOfWeek);
+    final index = _weekdays.indexOf(dayOfWeek);
     if (index < 0) return dayOfWeek;
     return DateFormat.EEEE(locale).format(DateTime(2024, 1, 1 + index));
   }
+
+  /// The API's own name for the day [instant] falls on IN AMMAN.
+  ///
+  /// Amman, not the phone: an office's opening hours are its own day's, and a
+  /// traveller whose phone is still on another continent's clock must not be told
+  /// it is shut. The name is the wire vocabulary — never shown to anybody, only
+  /// matched against a schedule and then rendered through [weekday].
+  String weekdayInAmman(DateTime instant) =>
+      _weekdays[toAmman(instant).weekday - 1];
+
+  /// The day names this API uses, Monday first, which is the order
+  /// `DateTime.weekday` counts in.
+  static const List<String> _weekdays = <String>[
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
 
   /// A `HH:mm[:ss]` opening time, without a date attached to it.
   String clock(String? isoTime) {

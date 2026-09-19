@@ -95,10 +95,10 @@ class KhadraLargeTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.4,
+          letterSpacing: KhadraType.of(context, -0.4),
           color: KhadraColors.text,
         ),
         maxLines: 1,
@@ -425,7 +425,7 @@ class KhadraBadge extends StatelessWidget {
                   color: colour,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
+                  letterSpacing: KhadraType.of(context, 0.3),
                 ),
               ),
             ),
@@ -665,10 +665,10 @@ class KhadraSpecGrid extends StatelessWidget {
                       children: [
                         Text(
                           spec.label.toUpperCase(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
+                            letterSpacing: KhadraType.of(context, 0.5),
                             color: KhadraColors.neutral500,
                           ),
                           maxLines: 1,
@@ -707,11 +707,11 @@ class KhadraSectionTitle extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: KhadraColors.text,
-                  letterSpacing: -0.2,
+                  letterSpacing: KhadraType.of(context, -0.2),
                 ),
               ),
             ),
@@ -901,11 +901,18 @@ class UserText extends StatelessWidget {
   final TextStyle? style;
   final int? maxLines;
 
+  /// The direction [text] will be laid out in.
+  ///
+  /// Exposed because a caller that has to MEASURE this paragraph — the fold
+  /// behind a "Show more" — must measure it the way it is rendered, and a second
+  /// copy of the detection rule is a second rule.
+  static TextDirection directionOf(String text) =>
+      // rtl-audit: allow — derived from the typed text, not from the interface.
+      Bidi.detectRtlDirectionality(text) ? TextDirection.rtl : TextDirection.ltr;
+
   @override
   Widget build(BuildContext context) {
-    final rtl = Bidi.detectRtlDirectionality(text);
-    // rtl-audit: allow — derived from the typed text, not from the interface.
-    final direction = rtl ? TextDirection.rtl : TextDirection.ltr;
+    final direction = directionOf(text);
 
     return Text(
       text,
