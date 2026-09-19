@@ -46,8 +46,8 @@ public interface ICatalogueReader
         AvailabilityWindow? window,
         CancellationToken cancellationToken = default);
 
-    /// <summary>A gallery's public page, or null if it is not one a customer may see.</summary>
-    Task<PublicGallery?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default);
+    /// <summary>A gallery's own page, or null if it is not one a customer may see.</summary>
+    Task<PublicGalleryPage?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The listings for a named set of cars, through the SAME visibility predicate as the search.
@@ -73,7 +73,26 @@ public interface ICatalogueReader
     Task<IReadOnlyList<CatalogueListing>> ListByIdsAsync(
         IReadOnlyCollection<Id> vehicleIds,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// What the bookable catalogue actually holds, for the controls a customer narrows it with.
+    /// </summary>
+    /// <remarks>
+    /// Through the same visibility predicate as the search, so a draft, a hidden car or a suspended
+    /// gallery's car never adds a choice. And deliberately NOT narrowed by any filter: these build the
+    /// controls themselves, and a control that vanished whenever another one was set would make a
+    /// choice impossible to take back.
+    /// </remarks>
+    Task<CatalogueFacets> FacetsAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>The values the bookable catalogue contains.</summary>
+/// <remarks>
+/// Seat counts ascending, and car type ids without names: the names are the lookup's, in both
+/// languages. An app offers a type only when it appears in both — so a type with no bookable car
+/// offers no chip, and neither does one an administrator has retired.
+/// </remarks>
+public sealed record CatalogueFacets(IReadOnlyList<int> Seats, IReadOnlyList<Guid> CarTypeIds);
 
 /// <summary>
 /// How a customer narrowed the search.
@@ -184,18 +203,21 @@ public sealed record CatalogueVehicle(
 public sealed record MileagePolicyView(bool IsUnlimited, int? DailyLimitKm, MoneyDto? ExcessFeePerKm);
 
 /// <summary>
-/// A gallery's public face.
+/// A gallery's public face, as it appears BESIDE A CAR.
 /// </summary>
 /// <remarks>
 /// What is NOT here matters as much as what is: no commercial registration number, no review note,
 /// no suspension reason, no verification status, no owner. A suspended or unapproved gallery is not
 /// returned at all, so a status field would only ever read "Approved" and invite someone to add the
 /// others beside it.
+///
+/// And none of the office's own writing. This record travels inside every car, and the office's
+/// sections are its page's to show — including the ones it has HIDDEN, which is exactly the kind of
+/// thing that leaks when one record serves two screens. <see cref="PublicGalleryPage"/> is the page.
 /// </remarks>
 public sealed record PublicGallery(
     Guid DealerId,
     string BusinessName,
-    string? Description,
     Guid? CityId,
     double Latitude,
     double Longitude,
@@ -207,6 +229,50 @@ public sealed record PublicGallery(
     // the honest values; omitting the fields would make a client invent its own placeholder.
     decimal? AverageRating,
     int ReviewCount);
+
+/// <summary>
+/// A gallery's OWN page: everything the embed carries, plus where it is in words and what it writes
+/// for customers.
+/// </summary>
+/// <remarks>
+/// A separate record from <see cref="PublicGallery"/> rather than a superset flag, so a section an
+/// office hid cannot reach a customer through a car's embedded gallery by accident. What is mandatory
+/// here — the hours a pickup is held to, whether delivery is offered and at what price, the address,
+/// the pin, the rating — is not part of <see cref="Sections"/> and cannot be hidden.
+/// </remarks>
+public sealed record PublicGalleryPage(
+    Guid DealerId,
+    string BusinessName,
+    Guid? CityId,
+    GalleryAddress? Address,
+    double Latitude,
+    double Longitude,
+    string? LogoUrl,
+    string? CoverUrl,
+    IReadOnlyList<GalleryDaySchedule> OperatingHours,
+    GalleryDelivery Delivery,
+    decimal? AverageRating,
+    int ReviewCount,
+    GallerySections Sections);
+
+/// <summary>Where the office is, in words. Null until an owner records one.</summary>
+public sealed record GalleryAddress(string Area, string? Street);
+
+/// <summary>
+/// What the office wrote for its customers, as a customer sees it.
+/// </summary>
+/// <remarks>
+/// Null means "nothing to show" and deliberately does not say why: hidden, never written, and — for
+/// delivery notes — an office that does not deliver all read the same. There is no flag saying a
+/// section exists but is hidden, because that flag would be the answer the silence is protecting.
+/// </remarks>
+public sealed record GallerySections(
+    string? About,
+    string? RentalConditions,
+    string? Insurance,
+    string? PickupInstructions,
+    string? DeliveryNotes,
+    string? CustomerNotes);
 
 public sealed record GalleryDaySchedule(string Day, bool IsClosed, TimeOnly? Opens, TimeOnly? Closes);
 

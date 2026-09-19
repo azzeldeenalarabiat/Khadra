@@ -40,7 +40,10 @@ public sealed record GetCatalogueVehicleQuery(Id VehicleId, DateTimeOffset? Pick
     : IQuery<Result<CatalogueVehicle, Error>>;
 
 /// <summary>A gallery's public page.</summary>
-public sealed record GetPublicGalleryQuery(Id DealerId) : IQuery<Result<PublicGallery, Error>>;
+public sealed record GetPublicGalleryQuery(Id DealerId) : IQuery<Result<PublicGalleryPage, Error>>;
+
+/// <summary>The seat counts and car types the bookable catalogue holds, for building its filters.</summary>
+public sealed record GetCatalogueFacetsQuery : IQuery<Result<CatalogueFacets, Error>>;
 
 /// <summary>
 /// What a named rental would cost, priced by the server.
@@ -220,9 +223,9 @@ public sealed class GetCatalogueVehicleHandler(
 }
 
 public sealed class GetPublicGalleryHandler(ICatalogueReader catalogue)
-    : IRequestHandler<GetPublicGalleryQuery, Result<PublicGallery, Error>>
+    : IRequestHandler<GetPublicGalleryQuery, Result<PublicGalleryPage, Error>>
 {
-    public async Task<Result<PublicGallery, Error>> Handle(
+    public async Task<Result<PublicGalleryPage, Error>> Handle(
         GetPublicGalleryQuery request,
         CancellationToken cancellationToken)
     {
@@ -230,6 +233,19 @@ public sealed class GetPublicGalleryHandler(ICatalogueReader catalogue)
 
         var gallery = await catalogue.GetGalleryAsync(request.DealerId, cancellationToken);
         return gallery is null ? FleetCatalogueErrors.GalleryNotFound : gallery;
+    }
+}
+
+public sealed class GetCatalogueFacetsHandler(ICatalogueReader catalogue)
+    : IRequestHandler<GetCatalogueFacetsQuery, Result<CatalogueFacets, Error>>
+{
+    public async Task<Result<CatalogueFacets, Error>> Handle(
+        GetCatalogueFacetsQuery request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return await catalogue.FacetsAsync(cancellationToken);
     }
 }
 

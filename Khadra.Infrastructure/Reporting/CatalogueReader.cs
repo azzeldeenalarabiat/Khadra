@@ -145,7 +145,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         if (vehicle is null)
             return null;
 
-        var gallery = await LoadGalleryAsync(vehicle.DealerId, cancellationToken);
+        // The EMBED, not the page: a car carries enough of its office to recognise it, and none of
+        // what the office writes — including the sections it has hidden.
+        var gallery = await LoadGalleryEmbedAsync(vehicle.DealerId, cancellationToken);
         if (gallery is null)
             return null;
 
@@ -260,8 +262,60 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         return await WithRatingsAsync(items, cancellationToken);
     }
 
-    public Task<PublicGallery?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default) =>
-        LoadGalleryAsync(dealerId, cancellationToken);
+    public async Task<PublicGalleryPage?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default)
+    {
+        var dealer = await VisibleDealerAsync(dealerId, cancellationToken);
+        if (dealer is null)
+            return null;
+
+        var rating = await RatingFor(dealer.Id, cancellationToken);
+        // The office's own words, filtered by the aggregate: hidden and never-written are both simply
+        // absent, and nothing here decides that a second time.
+        var shown = dealer.VisiblePublicProfile();
+
+        return new PublicGalleryPage(
+            dealer.Id.Value,
+            dealer.BusinessName.Value,
+            dealer.CityId?.Value,
+            dealer.Address is null ? null : new GalleryAddress(dealer.Address.Area, dealer.Address.Street),
+            dealer.Location.Latitude,
+            dealer.Location.Longitude,
+            Branding(dealer.Id, dealer.LogoStorageKey),
+            Branding(dealer.Id, dealer.CoverStorageKey),
+            Schedule(dealer),
+            DeliveryOf(dealer),
+            rating.Average,
+            rating.Count,
+            new GallerySections(
+                shown.About,
+                shown.RentalConditions,
+                shown.Insurance,
+                shown.PickupInstructions,
+                shown.DeliveryNotes,
+                shown.CustomerNotes));
+    }
+
+    public async Task<CatalogueFacets> FacetsAsync(CancellationToken cancellationToken = default)
+    {
+        // `Bookable()`, exactly as the search uses it: a choice may only be offered for something a
+        // customer could actually be shown.
+        var bookable = Bookable();
+
+        var seats = await bookable
+            .Select(vehicle => vehicle.Details.Seats)
+            .Distinct()
+            .OrderBy(count => count)
+            .ToListAsync(cancellationToken);
+
+        // Distinct over the converted column and unwrapped afterwards: an Id's .Value inside the query
+        // is an expression EF cannot translate.
+        var carTypeIds = await bookable
+            .Select(vehicle => vehicle.CarTypeId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return new CatalogueFacets(seats, [.. carTypeIds.Select(id => id.Value).Order()]);
+    }
 
     /// <summary>
     /// Every car a customer may be shown: listed, not deleted, and belonging to a gallery that may
@@ -303,21 +357,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         return vehicles.Where(vehicle => !holding.Any(booking => booking.VehicleId == vehicle.Id));
     }
 
-    private async Task<PublicGallery?> LoadGalleryAsync(Id dealerId, CancellationToken cancellationToken)
+    private async Task<PublicGallery?> LoadGalleryEmbedAsync(Id dealerId, CancellationToken cancellationToken)
     {
-        var approved = DealerVerificationStatus.Approved;
-
-        // Loaded as an aggregate rather than projected: OperatingHours is a value object behind a
-        // converter and its Days collection is computed, so it cannot be shaped in SQL. One gallery
-        // is one row, and mapping it in memory costs nothing.
-        var dealer = await context.Dealers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(
-                candidate => candidate.Id == dealerId &&
-                    candidate.VerificationStatus == approved &&
-                    !candidate.IsSuspended,
-                cancellationToken);
-
+        var dealer = await VisibleDealerAsync(dealerId, cancellationToken);
         if (dealer is null)
             return null;
 
@@ -327,24 +369,51 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         return new PublicGallery(
             dealer.Id.Value,
             dealer.BusinessName.Value,
-            dealer.Description,
             dealer.CityId?.Value,
             dealer.Location.Latitude,
             dealer.Location.Longitude,
             Branding(dealer.Id, dealer.LogoStorageKey),
             Branding(dealer.Id, dealer.CoverStorageKey),
-            [.. dealer.OperatingHours.Days.Select(day => new GalleryDaySchedule(
-                day.Day.ToString(),
-                day.IsClosed,
-                day.IsClosed ? null : day.OpensAt,
-                day.IsClosed ? null : day.ClosesAt))],
-            new GalleryDelivery(
-                dealer.Delivery.IsEnabled,
-                dealer.Delivery.RadiusKm,
-                MoneyDto.FromOptional(dealer.Delivery.Fee)),
+            Schedule(dealer),
+            DeliveryOf(dealer),
             rating.Average,
             rating.Count);
     }
+
+    /// <summary>
+    /// The gallery a customer may be shown, or null.
+    /// </summary>
+    /// <remarks>
+    /// Loaded as an aggregate rather than projected: OperatingHours is a value object behind a
+    /// converter and its Days collection is computed, and the customer page's sections come from
+    /// `Dealer.VisiblePublicProfile()` — neither can be shaped in SQL. One gallery is one row, and
+    /// mapping it in memory costs nothing.
+    ///
+    /// This is also where "may a customer see this office at all" is decided, once. The aggregate
+    /// decides what of the page is shown; it does not decide whether the office may trade.
+    /// </remarks>
+    private async Task<Dealer?> VisibleDealerAsync(Id dealerId, CancellationToken cancellationToken)
+    {
+        var approved = DealerVerificationStatus.Approved;
+
+        return await context.Dealers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                candidate => candidate.Id == dealerId &&
+                    candidate.VerificationStatus == approved &&
+                    !candidate.IsSuspended,
+                cancellationToken);
+    }
+
+    private static IReadOnlyList<GalleryDaySchedule> Schedule(Dealer dealer) =>
+        [.. dealer.OperatingHours.Days.Select(day => new GalleryDaySchedule(
+            day.Day.ToString(),
+            day.IsClosed,
+            day.IsClosed ? null : day.OpensAt,
+            day.IsClosed ? null : day.ClosesAt))];
+
+    private static GalleryDelivery DeliveryOf(Dealer dealer) =>
+        new(dealer.Delivery.IsEnabled, dealer.Delivery.RadiusKm, MoneyDto.FromOptional(dealer.Delivery.Fee));
 
     /// <summary>
     /// Fills the rating on every card of a page from one grouped query.
