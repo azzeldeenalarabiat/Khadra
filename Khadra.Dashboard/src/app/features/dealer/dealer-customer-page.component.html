@@ -1,0 +1,191 @@
+<div class="stack stack-14 page-mid">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('dealerCustomerPage.title') }}</h1>
+      <div class="page-sub">{{ t('dealerCustomerPage.subtitle') }}</div>
+    </div>
+  </div>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('dealerCustomerPage.couldntLoad') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="resource.reload()">
+            {{ t('common.retry') }}
+          </button>
+        </div>
+      </div>
+    </section>
+  } @else if (page(); as p) {
+    @if (!canEdit()) {
+      <div class="banner s-warn" role="status">
+        <kh-icon name="info" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-text">{{ t('dealerCustomerPage.onlyTheDealerOwner') }}</div>
+        </div>
+      </div>
+    }
+
+    @if (staleConsole()) {
+      <div class="banner s-warn" role="alert">
+        <kh-icon name="warning" class="banner-icon" />
+        <div class="banner-body">
+          <div class="banner-title">{{ t('dealerCustomerPage.staleConsoleTitle') }}</div>
+          <div class="banner-text">{{ t('dealerCustomerPage.staleConsoleBody') }}</div>
+        </div>
+      </div>
+    }
+
+    <div class="dc-split-155">
+      <div class="stack stack-14">
+        @for (row of rows(); track row.name) {
+          <section class="sect" [class.is-muted]="row.muted">
+            <div class="sect-h">
+              <span class="sect-t">{{ row.label }}</span>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                [disabled]="!canEdit()"
+                (click)="toggle(row.name)"
+              >
+                <kh-icon [name]="isHidden(row.name) ? 'eye-slash' : 'check-square'" />
+                {{ isHidden(row.name) ? t('dealerCustomerPage.hidden') : t('dealerCustomerPage.shown') }}
+              </button>
+            </div>
+            <div class="sect-pad stack stack-10">
+              <div class="field">
+                <label [attr.for]="row.field">{{ row.hint }}</label>
+                <textarea
+                  [id]="row.field"
+                  class="input user-text"
+                  rows="4"
+                  [value]="text(row.field)"
+                  [disabled]="!canEdit()"
+                  [placeholder]="row.placeholder"
+                  (input)="setText(row.field, $event)"
+                ></textarea>
+                @if (tooLong(row.field)) {
+                  <div class="field-error">
+                    {{ t('dealerCustomerPage.tooLong', { count: maxLength() }) }}
+                  </div>
+                } @else if (fieldError(row.field); as e) {
+                  <div class="field-error">{{ e }}</div>
+                } @else {
+                  <div class="field-hint">
+                    {{
+                      t('dealerCustomerPage.charactersUsed', {
+                        used: used(row.field),
+                        count: maxLength(),
+                      })
+                    }}
+                  </div>
+                }
+              </div>
+
+              @if (row.muted) {
+                <div class="note-box is-plain">
+                  <kh-icon name="info" />
+                  {{ t('dealerCustomerPage.deliveryIsOff') }}
+                </div>
+              }
+              @if (isHidden(row.name)) {
+                <div class="note-box is-plain">
+                  <kh-icon name="eye-slash" />
+                  {{ t('dealerCustomerPage.hiddenMeans') }}
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        @if (problemText(); as message) {
+          <div class="banner s-bad" role="alert">
+            <kh-icon name="warning-circle" class="banner-icon" />
+            <div class="banner-body">
+              <div class="banner-text">{{ message }}</div>
+            </div>
+          </div>
+        }
+
+        @if (canEdit()) {
+          <div class="action-row">
+            <button
+              type="button"
+              class="btn btn-primary btn-md"
+              [disabled]="busy() || !dirty() || anyTooLong() || staleConsole()"
+              (click)="save()"
+            >
+              {{ busy() ? t('dealerCustomerPage.saving') : t('dealerCustomerPage.savePage') }}
+            </button>
+            @if (dirty()) {
+              <button type="button" class="btn btn-secondary btn-md" (click)="discard()">
+                {{ t('dealerProfile.discard') }}
+              </button>
+              <span class="page-sub">{{ t('dealerDelivery.unsavedChanges') }}</span>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="stack stack-14">
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">{{ t('dealerCustomerPage.asCustomersSeeIt') }}</span>
+          <div class="page-sub">{{ t('dealerCustomerPage.previewIsSaved') }}</div>
+
+          @if (previewEmpty()) {
+            <div class="note-box is-plain">
+              <kh-icon name="info" />
+              {{ t('dealerCustomerPage.nothingShownYet') }}
+            </div>
+          } @else {
+            @for (shown of previewRows(); track shown.label) {
+              <div class="stack stack-9">
+                <span class="k-label">{{ shown.label }}</span>
+                <div class="page-sub user-text">{{ shown.text }}</div>
+              </div>
+            }
+            <div class="note-box is-plain">
+              <kh-icon name="info" />
+              {{ t('dealerCustomerPage.yourWordsNotKhadras') }}
+            </div>
+          }
+        </section>
+
+        <!--
+          Where the rest of a booking's terms come from. No figures: a percentage or a window written
+          here would be a second copy of a number the platform owns, right until the day it moved.
+        -->
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">{{ t('dealerCustomerPage.whatYouDoNotWrite') }}</span>
+          <div class="page-sub">{{ t('dealerCustomerPage.khadrasRules') }}</div>
+          <div class="page-sub">{{ t('dealerCustomerPage.perCarTerms') }}</div>
+          <div class="page-sub">{{ t('dealerCustomerPage.alwaysShown') }}</div>
+        </section>
+
+        <section class="sect sect-pad stack stack-9">
+          <span class="k">{{ t('dealerCustomerPage.whereElse') }}</span>
+          <div class="page-sub">{{ t('dealerCustomerPage.brandingAndHours') }}</div>
+          <div class="action-row">
+            <a class="btn btn-secondary btn-sm" routerLink="/dealer/profile">
+              {{ t('dealerCustomerPage.openDealerPage') }}
+            </a>
+            @if (!p.deliveryEnabled) {
+              <a class="btn btn-secondary btn-sm" routerLink="/dealer/delivery">
+                {{ t('dealerCustomerPage.openDelivery') }}
+              </a>
+            }
+          </div>
+        </section>
+      </div>
+    </div>
+  } @else {
+    <section class="sect sect-pad" aria-busy="true" aria-live="polite">
+      @for (placeholder of [0, 1, 2]; track placeholder) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </section>
+  }
+</div>
