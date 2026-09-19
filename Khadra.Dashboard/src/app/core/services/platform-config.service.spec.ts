@@ -1,3 +1,7 @@
+// Loaded before anything Angular, and only here. `HttpClient` is used below as a DI TOKEN, which
+// pulls in `@angular/common/http` at runtime; its `BrowserXhr` is partially compiled, so without the
+// JIT compiler present the whole file fails to load and this spec silently contributes no tests.
+import '@angular/compiler';
 import { HttpClient } from '@angular/common/http';
 import { Injector, runInInjectionContext } from '@angular/core';
 import { Observable, of, throwError } from 'rxjs';
