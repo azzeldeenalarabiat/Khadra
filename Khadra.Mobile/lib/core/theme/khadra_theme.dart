@@ -71,6 +71,52 @@ abstract final class KhadraColors {
 
   static const Color divider = Color(0xFFECEEEC);
   static const Color dim = Color(0x9E111827);
+
+  /// The Get Started hero, and nowhere else: the badge's green taken a step deeper,
+  /// so the top of the hero, where the status bar sits, holds white type and light
+  /// system icons at a comfortable contrast.
+  static const Color brandDeep = Color(0xFF0B3B20);
+
+  /// Type and marks drawn ON the brand green. Full white for the name, and thinned
+  /// for whatever must not compete with it: the tagline, the disc behind the badge
+  /// and the globe, and the road drawn behind all of it.
+  static const Color onBrand = Color(0xFFFFFFFF);
+  static const Color onBrandMuted = Color(0xD9FFFFFF);
+  static const Color onBrandLine = Color(0x33FFFFFF);
+  static const Color onBrandFaint = Color(0x14FFFFFF);
+
+  /// The two ends of the wash over a rental office's cover photograph: nothing at
+  /// the top, and a sixth of the page's own ink at the foot.
+  static const Color scrimNone = Color(0x00111827);
+  static const Color scrimFoot = Color(0x2B111827);
+}
+
+/// The two gradients in the app.
+///
+/// The handoff draws flat surfaces everywhere, and these stay the exception.
+abstract final class KhadraGradients {
+  /// Get Started. It has nothing of the platform's to show yet, so the brand
+  /// carries it. Directional, so the light end follows the reading direction.
+  static const LinearGradient hero = LinearGradient(
+    begin: AlignmentDirectional.topStart,
+    end: AlignmentDirectional.bottomEnd,
+    colors: <Color>[
+      KhadraColors.brandDeep,
+      KhadraColors.accent900,
+      KhadraColors.accent700,
+    ],
+    stops: <double>[0, 0.55, 1],
+  );
+
+  /// Over a rental office's cover photograph. Clear at the top and barely tinted
+  /// at the foot, only so a pale sky cannot leave the office's mark and name
+  /// below it floating on nothing. Vertical, because a photograph has no reading
+  /// direction.
+  static const LinearGradient coverScrim = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: <Color>[KhadraColors.scrimNone, KhadraColors.scrimFoot],
+  );
 }
 
 /// Spacing, ported from the console's `--space-*` and read at phone scale.
@@ -89,6 +135,10 @@ abstract final class Space {
   /// Enough room under a scrolling page that the last row clears a bottom bar or
   /// a floating action, on the phones that put a gesture handle there too.
   static const double bottomInset = 96;
+
+  /// The widest a form, or Get Started's column of choices, grows. A phone form on
+  /// a tablet or in a desktop browser should not stretch to a metre wide.
+  static const double measure = 440;
 }
 
 /// The handoff's radius system, named by ROLE rather than by size.
@@ -212,7 +262,12 @@ abstract final class KhadraTheme {
         letterSpacing: letterSpacing,
       );
 
-  static ThemeData light() {
+  /// The app's theme.
+  ///
+  /// [arabic] is the RESOLVED language, not the device's: the app has a language
+  /// switch of its own, and the type scale has to follow the same answer the rest
+  /// of the app is rendered with.
+  static ThemeData light({bool arabic = false}) {
     const scheme = ColorScheme.light(
       primary: KhadraColors.accent,
       onPrimary: Colors.white,
@@ -238,8 +293,8 @@ abstract final class KhadraTheme {
     );
 
     return base.copyWith(
-      textTheme: _textTheme(base.textTheme),
-      primaryTextTheme: _textTheme(base.primaryTextTheme),
+      textTheme: _textTheme(base.textTheme, arabic),
+      primaryTextTheme: _textTheme(base.primaryTextTheme, arabic),
       appBarTheme: AppBarTheme(
         backgroundColor: KhadraColors.surface,
         foregroundColor: KhadraColors.text,
@@ -257,7 +312,7 @@ abstract final class KhadraTheme {
           color: KhadraColors.text,
           fontSize: 16,
           fontWeight: FontWeight.w800,
-          letterSpacing: -0.2,
+          letterSpacing: KhadraType.tracking(-0.2, arabic),
         ),
       ),
       cardTheme: CardThemeData(
@@ -434,6 +489,16 @@ abstract final class KhadraTheme {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: Radii.card),
       ),
+      // The language menu. White and bordered like a card, not Material's tinted
+      // surface, which is a colour this palette does not have.
+      popupMenuTheme: const PopupMenuThemeData(
+        color: KhadraColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: Radii.card,
+          side: BorderSide(color: KhadraColors.neutral200),
+        ),
+      ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: KhadraColors.surface,
         surfaceTintColor: Colors.transparent,
@@ -462,7 +527,8 @@ abstract final class KhadraTheme {
   /// Heavier at the top than Material's defaults and tighter at the bottom: the
   /// design leans on weight rather than size to separate a title from the line
   /// under it, which is what keeps a card readable at 375px.
-  static TextTheme _textTheme(TextTheme base) => base
+  static TextTheme _textTheme(TextTheme base, bool arabic) {
+    final scale = base
       .apply(
         bodyColor: KhadraColors.text,
         displayColor: KhadraColors.text,
@@ -470,6 +536,12 @@ abstract final class KhadraTheme {
         fontFamilyFallback: _fontFallback,
       )
       .copyWith(
+        // The title a form leads with. It was written out inside AuthScaffold, which
+        // left the forms and Get Started free to disagree about how big a first
+        // heading is.
+        headlineMedium: _style(
+            fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.6,
+            height: 1.2, color: KhadraColors.text),
         headlineSmall: _style(
             fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.4,
             color: KhadraColors.text),
@@ -497,4 +569,62 @@ abstract final class KhadraTheme {
             fontSize: 11, fontWeight: FontWeight.w600,
             color: KhadraColors.neutral500),
       );
+
+    return arabic ? _untracked(scale) : scale;
+  }
+
+  /// The same scale with the tracking taken out of every style in it.
+  ///
+  /// Every style, not only the ones named above: the scale also carries Material's
+  /// own figures on the styles this app does not override, and a screen that
+  /// starts using `displayMedium` tomorrow would inherit tracking nobody chose.
+  ///
+  /// Written out rather than `apply(letterSpacingFactor: 0)`, which asserts on any
+  /// style whose tracking is already unset — most of this scale.
+  static TextTheme _untracked(TextTheme scale) {
+    TextStyle? flat(TextStyle? style) => style?.copyWith(letterSpacing: 0);
+
+    return scale.copyWith(
+      displayLarge: flat(scale.displayLarge),
+      displayMedium: flat(scale.displayMedium),
+      displaySmall: flat(scale.displaySmall),
+      headlineLarge: flat(scale.headlineLarge),
+      headlineMedium: flat(scale.headlineMedium),
+      headlineSmall: flat(scale.headlineSmall),
+      titleLarge: flat(scale.titleLarge),
+      titleMedium: flat(scale.titleMedium),
+      titleSmall: flat(scale.titleSmall),
+      bodyLarge: flat(scale.bodyLarge),
+      bodyMedium: flat(scale.bodyMedium),
+      bodySmall: flat(scale.bodySmall),
+      labelLarge: flat(scale.labelLarge),
+      labelMedium: flat(scale.labelMedium),
+      labelSmall: flat(scale.labelSmall),
+    );
+  }
+}
+
+/// Type metrics that depend on the script being set.
+///
+/// Every tracking figure in this app is a decision about LATIN letterforms:
+/// Manrope is drawn slightly loose, so headings are pulled in and small
+/// upper-case labels are opened out. Arabic is JOINED. Letter spacing does not
+/// space Arabic letters — it breaks the joins inside a word, so a heading arrives
+/// as a row of disconnected marks with gaps where the strokes should meet. Zero is
+/// not a compromise for Arabic; it is the correct value.
+///
+/// The theme handles the scale every screen inherits. This is for the widgets that
+/// name their own tracking, which cannot read the theme's answer back out.
+abstract final class KhadraType {
+  /// The design's tracking in Latin, and none in Arabic.
+  static double? tracking(double latin, bool arabic) => arabic ? null : latin;
+
+  /// The same answer for platform copy, read from the language [context] is being
+  /// rendered in.
+  ///
+  /// The LANGUAGE, not the direction: they agree in this app today and they are
+  /// not the same question, and a Latin run inside an Arabic screen keeps its own
+  /// tracking by staying out of here entirely.
+  static double? of(BuildContext context, double latin) =>
+      tracking(latin, Localizations.localeOf(context).languageCode == 'ar');
 }

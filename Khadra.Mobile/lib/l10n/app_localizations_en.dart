@@ -273,11 +273,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authSessionExpired => 'Your session ended. Sign in again.';
 
   @override
-  String get welcomeTitle => 'Welcome to Khadra';
+  String get welcomeTitle => 'How would you like to start?';
 
   @override
   String get welcomeBody =>
-      'Browse every car on the platform without an account. You need one to book, to save a car for later, and to follow a rental once it starts.';
+      'Browse freely. Booking and saving cars need an account.';
 
   @override
   String get welcomeBrowseAsGuest => 'Browse as a guest';
@@ -316,16 +316,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get searchCity => 'City';
-
-  @override
   String get searchAnyCity => 'Any city';
 
   @override
   String get searchCarType => 'Car type';
-
-  @override
-  String get searchAnyCarType => 'Any type';
 
   @override
   String get searchTransmission => 'Transmission';
@@ -367,6 +361,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchAnyDates => 'Any dates';
 
   @override
+  String get searchPickupLocation => 'Pickup location';
+
+  @override
+  String get searchRentalPeriod => 'Rental period';
+
+  @override
+  String searchPeriodValue(String pickup, String dropoff) {
+    return '$pickup → $dropoff';
+  }
+
+  @override
+  String get searchAllCarTypes => 'All';
+
+  @override
   String get searchPickup => 'Pick-up';
 
   @override
@@ -400,6 +408,18 @@ class AppLocalizationsEn extends AppLocalizations {
       other: '$count cars',
       one: '1 car',
       zero: 'No cars',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchResultsAvailable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cars available',
+      one: '1 car available',
+      zero: 'No cars available',
     );
     return '$_temp0';
   }
@@ -518,6 +538,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get galleryAbout => 'About';
 
   @override
+  String get galleryPickupInstructions => 'Pickup instructions';
+
+  @override
+  String get galleryRentalConditions => 'Rental conditions';
+
+  @override
+  String get galleryInsurance => 'Insurance';
+
+  @override
+  String get galleryNotes => 'Notes from the office';
+
+  @override
+  String get galleryFromTheOffice => 'From the rental office';
+
+  @override
+  String get galleryOfficeOwnWords => 'Written by this office, not by Khadra.';
+
+  @override
   String get galleryOpeningHours => 'Opening hours';
 
   @override
@@ -530,6 +568,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get galleryClosedToday => 'Closed today';
+
+  @override
+  String get galleryAllWeek => 'All week';
+
+  @override
+  String get galleryTodayOnly => 'Today only';
 
   @override
   String get galleryLocation => 'Where they are';
@@ -1819,12 +1863,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reputationWhoSeesThis =>
       'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.';
-
-  @override
-  String get landingWhereTo => 'Where are you going?';
-
-  @override
-  String get landingWhatKind => 'What kind of car?';
 
   @override
   String get landingDepositDue => 'Your deposit is due';

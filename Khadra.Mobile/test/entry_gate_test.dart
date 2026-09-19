@@ -280,16 +280,43 @@ void main() {
 
   testWidgets('Get Started is readable in Arabic, and switches into it',
       (tester) async {
-    final (_, container, _, _) = await launch(tester);
+    final (_, container, preferences, _) = await launch(tester);
 
     expect(container.read(isArabicProvider), isFalse);
 
-    // Written in its own language, so the way out of the wrong one does not
-    // require reading the wrong one.
+    // The globe is found by what it tells a screen reader, and each language in
+    // its menu is written in its own script, so the way out of the wrong language
+    // does not require reading the wrong language.
+    await tester.tap(find.byTooltip('Language'));
+    await tester.pumpAndSettle();
+    expect(find.text('English'), findsOneWidget);
     await tester.tap(find.text('العربية'));
     await tester.pumpAndSettle();
 
     expect(container.read(isArabicProvider), isTrue);
     expect(find.byType(WelcomeScreen), findsOneWidget);
+    // Remembered, so the next launch opens in it. That the screen then turns right
+    // to left is welcome_screen_test's: this harness pins the app's locale.
+    expect(preferences.getString('khadra.locale'), 'ar');
+  });
+
+  testWidgets('a form opened from Get Started keeps the language switch',
+      (tester) async {
+    // Somebody who tapped Sign in in a language they cannot read must not have
+    // to back out of the form to find the way to one they can.
+    final (_, container, preferences, _) = await launch(tester);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Sign in'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SignInScreen), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Language').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('العربية'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(isArabicProvider), isTrue);
+    expect(find.byType(SignInScreen), findsOneWidget);
+    expect(preferences.getString('khadra.locale'), 'ar');
   });
 }

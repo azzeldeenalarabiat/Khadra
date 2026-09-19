@@ -278,11 +278,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authSessionExpired => 'انتهت جلستك. سجّل الدخول من جديد.';
 
   @override
-  String get welcomeTitle => 'أهلاً بك في خضرا';
+  String get welcomeTitle => 'كيف تودّ أن تبدأ؟';
 
   @override
-  String get welcomeBody =>
-      'تصفّح كل سيارات المنصة دون حساب. أما الحجز، وحفظ سيارة لوقت لاحق، ومتابعة الإيجار بعد بدئه، فتحتاج كلها إلى حساب.';
+  String get welcomeBody => 'تصفّح بحرية. تحتاج إلى حساب للحجز ولحفظ السيارات.';
 
   @override
   String get welcomeBrowseAsGuest => 'تصفّح كزائر';
@@ -324,16 +323,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get searchCity => 'المدينة';
-
-  @override
   String get searchAnyCity => 'كل المدن';
 
   @override
   String get searchCarType => 'نوع السيارة';
-
-  @override
-  String get searchAnyCarType => 'كل الأنواع';
 
   @override
   String get searchTransmission => 'ناقل الحركة';
@@ -375,6 +368,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get searchAnyDates => 'أي تاريخ';
 
   @override
+  String get searchPickupLocation => 'موقع الاستلام';
+
+  @override
+  String get searchRentalPeriod => 'مدة الإيجار';
+
+  @override
+  String searchPeriodValue(String pickup, String dropoff) {
+    return '$pickup ← $dropoff';
+  }
+
+  @override
+  String get searchAllCarTypes => 'الكل';
+
+  @override
   String get searchPickup => 'الاستلام';
 
   @override
@@ -411,6 +418,21 @@ class AppLocalizationsAr extends AppLocalizations {
       two: 'سيارتان',
       one: 'سيارة واحدة',
       zero: 'لا توجد سيارات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchResultsAvailable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سيارة متاحة',
+      many: '$count سيارة متاحة',
+      few: '$count سيارات متاحة',
+      two: 'سيارتان متاحتان',
+      one: 'سيارة واحدة متاحة',
+      zero: 'لا توجد سيارات متاحة',
     );
     return '$_temp0';
   }
@@ -531,6 +553,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get galleryAbout => 'نبذة';
 
   @override
+  String get galleryPickupInstructions => 'تعليمات الاستلام';
+
+  @override
+  String get galleryRentalConditions => 'شروط الإيجار';
+
+  @override
+  String get galleryInsurance => 'التأمين';
+
+  @override
+  String get galleryNotes => 'ملاحظات المكتب';
+
+  @override
+  String get galleryFromTheOffice => 'من مكتب التأجير';
+
+  @override
+  String get galleryOfficeOwnWords => 'كتبها هذا المكتب، وليست من خضرا.';
+
+  @override
   String get galleryOpeningHours => 'ساعات العمل';
 
   @override
@@ -543,6 +583,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get galleryClosedToday => 'مغلق اليوم';
+
+  @override
+  String get galleryAllWeek => 'كل الأسبوع';
+
+  @override
+  String get galleryTodayOnly => 'اليوم فقط';
 
   @override
   String get galleryLocation => 'الموقع';
@@ -1883,12 +1929,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get reputationWhoSeesThis =>
       'لا يمكن للمكتب الاطلاع على هذا إلا أثناء بتّه في حجز معك أو خلال سريانه — لا قبل أن تطلب منه سيارة، ولا بعد انتهاء الحجز.';
-
-  @override
-  String get landingWhereTo => 'إلى أين أنت ذاهب؟';
-
-  @override
-  String get landingWhatKind => 'أي نوع من السيارات؟';
 
   @override
   String get landingDepositDue => 'العربون مستحق';

@@ -563,13 +563,13 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Welcome to Khadra'**
+  /// **'How would you like to start?'**
   String get welcomeTitle;
 
   /// No description provided for @welcomeBody.
   ///
   /// In en, this message translates to:
-  /// **'Browse every car on the platform without an account. You need one to book, to save a car for later, and to follow a rental once it starts.'**
+  /// **'Browse freely. Booking and saving cars need an account.'**
   String get welcomeBody;
 
   /// No description provided for @welcomeBrowseAsGuest.
@@ -626,12 +626,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{No filters} =1{1 filter} other{{count} filters}}'**
   String searchFiltersApplied(int count);
 
-  /// No description provided for @searchCity.
-  ///
-  /// In en, this message translates to:
-  /// **'City'**
-  String get searchCity;
-
   /// No description provided for @searchAnyCity.
   ///
   /// In en, this message translates to:
@@ -643,12 +637,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Car type'**
   String get searchCarType;
-
-  /// No description provided for @searchAnyCarType.
-  ///
-  /// In en, this message translates to:
-  /// **'Any type'**
-  String get searchAnyCarType;
 
   /// No description provided for @searchTransmission.
   ///
@@ -722,6 +710,30 @@ abstract class AppLocalizations {
   /// **'Any dates'**
   String get searchAnyDates;
 
+  /// No description provided for @searchPickupLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup location'**
+  String get searchPickupLocation;
+
+  /// No description provided for @searchRentalPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Rental period'**
+  String get searchRentalPeriod;
+
+  /// The rental period chosen on Home. The arrow points the way the language is read, so the pickup comes first in both languages.
+  ///
+  /// In en, this message translates to:
+  /// **'{pickup} → {dropoff}'**
+  String searchPeriodValue(String pickup, String dropoff);
+
+  /// No description provided for @searchAllCarTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get searchAllCarTypes;
+
   /// No description provided for @searchPickup.
   ///
   /// In en, this message translates to:
@@ -769,6 +781,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =0{No cars} =1{1 car} other{{count} cars}}'**
   String searchResults(int count);
+
+  /// No description provided for @searchResultsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No cars available} =1{1 car available} other{{count} cars available}}'**
+  String searchResultsAvailable(int count);
 
   /// No description provided for @searchEmptyTitle.
   ///
@@ -956,6 +974,42 @@ abstract class AppLocalizations {
   /// **'About'**
   String get galleryAbout;
 
+  /// No description provided for @galleryPickupInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup instructions'**
+  String get galleryPickupInstructions;
+
+  /// No description provided for @galleryRentalConditions.
+  ///
+  /// In en, this message translates to:
+  /// **'Rental conditions'**
+  String get galleryRentalConditions;
+
+  /// No description provided for @galleryInsurance.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance'**
+  String get galleryInsurance;
+
+  /// No description provided for @galleryNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes from the office'**
+  String get galleryNotes;
+
+  /// No description provided for @galleryFromTheOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'From the rental office'**
+  String get galleryFromTheOffice;
+
+  /// No description provided for @galleryOfficeOwnWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Written by this office, not by Khadra.'**
+  String get galleryOfficeOwnWords;
+
   /// No description provided for @galleryOpeningHours.
   ///
   /// In en, this message translates to:
@@ -979,6 +1033,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Closed today'**
   String get galleryClosedToday;
+
+  /// No description provided for @galleryAllWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'All week'**
+  String get galleryAllWeek;
+
+  /// No description provided for @galleryTodayOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Today only'**
+  String get galleryTodayOnly;
 
   /// No description provided for @galleryLocation.
   ///
@@ -2977,18 +3043,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.'**
   String get reputationWhoSeesThis;
-
-  /// No description provided for @landingWhereTo.
-  ///
-  /// In en, this message translates to:
-  /// **'Where are you going?'**
-  String get landingWhereTo;
-
-  /// No description provided for @landingWhatKind.
-  ///
-  /// In en, this message translates to:
-  /// **'What kind of car?'**
-  String get landingWhatKind;
 
   /// No description provided for @landingDepositDue.
   ///

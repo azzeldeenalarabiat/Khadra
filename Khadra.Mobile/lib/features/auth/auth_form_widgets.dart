@@ -4,9 +4,15 @@ import 'package:flutter/services.dart';
 import '../../api/dtos.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
+import '../../core/widgets/language_menu.dart';
 import '../../l10n/app_localizations.dart';
 
-/// The frame every auth screen sits in: the mark, a title, and the form.
+/// The frame every auth screen sits in: the brand, a title, and the form.
+///
+/// The brand is a compact header — the badge, with the name and tagline beside it —
+/// rather than a large centred logo, so the form starts higher on a small phone. The
+/// app bar carries the same language globe as Get Started, so somebody who opened a
+/// form in a language they cannot read is not stranded on it.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
     super.key,
@@ -24,59 +30,80 @@ class AuthScaffold extends StatelessWidget {
   final Widget? leading;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Scaffold(
+      backgroundColor: KhadraColors.surface,
+      appBar: AppBar(
         backgroundColor: KhadraColors.surface,
-        appBar: AppBar(
-          backgroundColor: KhadraColors.surface,
-          leading: leading,
-        ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                  Space.xl, Space.sm, Space.xl, Space.bottomInset),
-              child: ConstrainedBox(
-                // A phone form on a tablet or a desktop browser should not stretch
-                // to a metre wide; the app builds for web too.
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (showLogo) ...[
-                      const Center(child: KhadraLogo(size: 72)),
-                      const SizedBox(height: Space.xl),
-                    ],
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 26,
-                        height: 1.2,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.6,
-                        color: KhadraColors.text,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: Space.sm),
-                      Text(
-                        subtitle!,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.5,
-                          fontWeight: FontWeight.w500,
-                          color: KhadraColors.neutral600,
-                        ),
-                      ),
-                    ],
+        leading: leading,
+        actions: const [KhadraLanguageMenu(), SizedBox(width: Space.xs)],
+      ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+                Space.xl, Space.sm, Space.xl, Space.bottomInset),
+            child: ConstrainedBox(
+              // The app builds for web too.
+              constraints: const BoxConstraints(maxWidth: Space.measure),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showLogo) ...[
+                    const _BrandHeader(),
                     const SizedBox(height: Space.xl),
-                    ...children,
                   ],
-                ),
+                  Text(title, style: text.headlineMedium),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: Space.sm),
+                    Text(
+                      subtitle!,
+                      style: text.bodyMedium?.copyWith(color: KhadraColors.neutral600),
+                    ),
+                  ],
+                  const SizedBox(height: Space.xl),
+                  ...children,
+                ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
+}
+
+/// The badge, with the name and the tagline beside it.
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        // Cut to its circle, as on Get Started, and read out once, from the name.
+        const ExcludeSemantics(child: ClipOval(child: KhadraLogo(size: 44))),
+        const SizedBox(width: Space.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.appName,
+                style: text.titleLarge?.copyWith(color: KhadraColors.price),
+              ),
+              Text(l10n.appTagline, style: text.bodySmall),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// A labelled text field with the app's validation vocabulary.
