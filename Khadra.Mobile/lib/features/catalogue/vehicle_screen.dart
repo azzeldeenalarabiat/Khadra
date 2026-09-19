@@ -165,10 +165,10 @@ class _VehicleBody extends ConsumerWidget {
                     children: [
                       Text(
                         vehicle.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
+                          letterSpacing: KhadraType.of(context, -0.5),
                         ),
                       ),
                       const SizedBox(height: 5),

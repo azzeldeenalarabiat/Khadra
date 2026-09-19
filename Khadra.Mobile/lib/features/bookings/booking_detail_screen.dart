@@ -206,6 +206,7 @@ class _Header extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   color: KhadraColors.neutral500,
+                  // rtl-audit: allow — a reference is Latin in both languages.
                   letterSpacing: 0.4,
                 ),
               ),

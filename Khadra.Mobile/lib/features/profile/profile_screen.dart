@@ -423,11 +423,11 @@ class _Group extends StatelessWidget {
               padding: const EdgeInsetsDirectional.only(start: 2, bottom: 9),
               child: Text(
                 title.toUpperCase(),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: KhadraColors.neutral500,
-                  letterSpacing: 0.7,
+                  letterSpacing: KhadraType.of(context, 0.7),
                 ),
               ),
             ),

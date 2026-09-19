@@ -233,10 +233,10 @@ class _UnavailableState extends ConsumerState<_Unavailable> {
                     ),
                     child: Text(
                       l10n.shortlistUnavailable.toUpperCase(),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4,
+                        letterSpacing: KhadraType.of(context, 0.4),
                         color: KhadraColors.neutral600,
                       ),
                     ),

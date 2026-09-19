@@ -385,6 +385,7 @@ class _BookingRow extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: KhadraColors.neutral500,
+                    // rtl-audit: allow — a reference is Latin in both languages.
                     letterSpacing: 0.4,
                   ),
                 ),

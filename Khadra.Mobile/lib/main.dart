@@ -76,7 +76,9 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
       // context that has the localisations in it.
       onGenerateTitle: (context) => AppLocalizations.of(context).appName,
       debugShowCheckedModeBanner: false,
-      theme: KhadraTheme.light(),
+      // The language decides the type scale as well as the words: Arabic is a
+      // joined script and the design's letter spacing is drawn for Latin.
+      theme: KhadraTheme.light(arabic: ref.watch(isArabicProvider)),
       routerConfig: router,
 
       // Null follows the device, which is the right default on a first run: a

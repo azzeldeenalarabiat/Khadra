@@ -3,7 +3,10 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:khadra_mobile/core/theme/khadra_theme.dart';
+import 'package:khadra_mobile/core/widgets/khadra_widgets.dart';
+import 'package:khadra_mobile/l10n/app_localizations.dart';
 
 /// The two faces the approved design is set in, and the reason there are two.
 ///
@@ -113,6 +116,7 @@ void main() {
       for (final entry in styles.entries) {
         expect(entry.value, isNotNull, reason: '${entry.key} is set by the theme');
 
+
         // A style can depend on the widget's STATE, and a state the theme forgot
         // to give a family to renders Arabic as boxes on that state alone --
         // which is the version nobody screenshots. So every state is checked,
@@ -132,6 +136,116 @@ void main() {
         }
       }
     });
+  });
+
+  /// Arabic is a JOINED script.
+  ///
+  /// Every tracking figure in this design was chosen for Manrope's Latin
+  /// letterforms — headings pulled in, small upper-case labels opened out. Applied
+  /// to Arabic it does not space the letters, because Arabic letters are not
+  /// separate: it breaks the joins inside a word, and a heading arrives as a row of
+  /// disconnected marks. The app was shipping that on every Arabic screen.
+  group('letter spacing follows the script', () {
+    /// Every style in a scale that names a tracking figure.
+    Map<String, double?> trackingIn(TextTheme scale) => <String, double?>{
+          'displayLarge': scale.displayLarge?.letterSpacing,
+          'displayMedium': scale.displayMedium?.letterSpacing,
+          'displaySmall': scale.displaySmall?.letterSpacing,
+          'headlineLarge': scale.headlineLarge?.letterSpacing,
+          'headlineMedium': scale.headlineMedium?.letterSpacing,
+          'headlineSmall': scale.headlineSmall?.letterSpacing,
+          'titleLarge': scale.titleLarge?.letterSpacing,
+          'titleMedium': scale.titleMedium?.letterSpacing,
+          'titleSmall': scale.titleSmall?.letterSpacing,
+          'bodyLarge': scale.bodyLarge?.letterSpacing,
+          'bodyMedium': scale.bodyMedium?.letterSpacing,
+          'bodySmall': scale.bodySmall?.letterSpacing,
+          'labelLarge': scale.labelLarge?.letterSpacing,
+          'labelMedium': scale.labelMedium?.letterSpacing,
+          'labelSmall': scale.labelSmall?.letterSpacing,
+        };
+
+    test('the English scale keeps every figure the design asks for', () {
+      final scale = KhadraTheme.light().textTheme;
+
+      expect(scale.headlineMedium!.letterSpacing, -0.6);
+      expect(scale.headlineSmall!.letterSpacing, -0.4);
+      expect(scale.titleLarge!.letterSpacing, -0.2);
+      expect(KhadraTheme.light().appBarTheme.titleTextStyle!.letterSpacing, -0.2);
+    });
+
+    test('the Arabic scale carries no tracking anywhere in it', () {
+      // Including the styles this app never overrides: Material brings its own
+      // figures, and one factor over the whole scale is what stops a style being
+      // missed the day a screen starts using it.
+      final tracked = <String>[
+        for (final entry in trackingIn(KhadraTheme.light(arabic: true).textTheme).entries)
+          if ((entry.value ?? 0) != 0) '${entry.key}=${entry.value}',
+      ];
+
+      expect(tracked, isEmpty);
+      expect(
+        KhadraTheme.light(arabic: true).appBarTheme.titleTextStyle!.letterSpacing,
+        anyOf(isNull, 0),
+      );
+    });
+
+    Future<TextStyle> styleOf(
+      WidgetTester tester, {
+      required String language,
+      required Widget child,
+      required String text,
+    }) async {
+      await tester.pumpWidget(MaterialApp(
+        locale: Locale(language),
+        theme: KhadraTheme.light(arabic: language == 'ar'),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        home: Scaffold(body: child),
+      ));
+
+      return tester.widget<Text>(find.text(text)).style!;
+    }
+
+    // The widgets that name a figure of their own. They cannot read the theme's
+      // answer back out, so each asks `KhadraType`, and `rtl_audit_test` forbids
+    // the literal that would go round it.
+    final namesItsOwn = <String, ({Widget widget, String text, double latin})>{
+      'a screen title': (
+        widget: const KhadraLargeTitle('Bookings'),
+        text: 'Bookings',
+        latin: -0.4,
+      ),
+      'a section heading': (
+        widget: const KhadraSectionTitle('Delivery'),
+        text: 'Delivery',
+        latin: -0.2,
+      ),
+      'a status badge': (
+        widget: const KhadraBadge(label: 'PENDING', colour: KhadraColors.warn),
+        text: 'PENDING',
+        latin: 0.3,
+      ),
+    };
+
+    for (final entry in namesItsOwn.entries) {
+      testWidgets('${entry.key} is tracked in English', (tester) async {
+        final style = await styleOf(tester,
+            language: 'en', child: entry.value.widget, text: entry.value.text);
+        expect(style.letterSpacing, entry.value.latin);
+      });
+
+      testWidgets('${entry.key} is not tracked in Arabic', (tester) async {
+        final style = await styleOf(tester,
+            language: 'ar', child: entry.value.widget, text: entry.value.text);
+        expect(style.letterSpacing, anyOf(isNull, 0));
+      });
+    }
   });
 }
 

@@ -881,6 +881,7 @@ class _RequestSentDialog extends ConsumerWidget {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
+              // rtl-audit: allow — a reference is Latin in both languages.
               letterSpacing: 0.5,
             ),
           ),

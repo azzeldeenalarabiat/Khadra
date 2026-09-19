@@ -73,10 +73,10 @@ class VehicleRow extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         listing.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: -0.2,
+                          letterSpacing: KhadraType.of(context, -0.2),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

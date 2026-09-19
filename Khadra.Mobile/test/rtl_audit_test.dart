@@ -148,6 +148,47 @@ void main() {
     );
   });
 
+  test('letter spacing is named in the theme, never in a screen', () {
+    // Arabic is a JOINED script. Every tracking figure in this app was chosen for
+    // Manrope's Latin letterforms, and applying it to Arabic does not space the
+    // letters — it breaks the joins inside the word, so a heading arrives as a row
+    // of disconnected marks. `KhadraType` answers null for Arabic and the design's
+    // figure for Latin, and the theme gates its own scale the same way.
+    //
+    // A literal here escapes both, silently, in the one language nobody testing in
+    // English would ever see it in. The exemptions are the Latin runs — a booking
+    // reference is Latin whatever the interface is — and each says so on its line.
+    final literal = RegExp(r'letterSpacing: [-0-9.]');
+    expect(
+      [
+        for (final file in dartFiles)
+          if (!file.path.endsWith('core/theme/khadra_theme.dart') &&
+              literal.hasMatch(file.source))
+            file.path,
+      ],
+      isEmpty,
+      reason: 'use KhadraType.of(context, latinValue)',
+    );
+  });
+
+  test('no list of numbers stands in for a choice the catalogue makes', () {
+    // Not an RTL mistake, and found by the same reading. The seat filter offered
+    // `const [2, 4, 5, 7]`: "at least 2 seats" on a platform with no two-seaters,
+    // and never the nine-seat van an office lists tomorrow. Its choices are now the
+    // facets the server sends, and a literal list of numbers in the catalogue's UI
+    // is exactly how that list would come back.
+    final literal = RegExp(r'const\s*(<int>)?\s*\[\s*\d+(\s*,\s*\d+)+\s*\]');
+    expect(
+      [
+        for (final file in dartFiles)
+          if (file.path.contains('/features/catalogue/') && literal.hasMatch(file.source))
+            file.path,
+      ],
+      isEmpty,
+      reason: 'build the choices from /api/v1/vehicles/facets',
+    );
+  });
+
   test('no sentence is written in Dart instead of in the ARB files', () {
     // A literal here is a string that can only ever appear in one language. The
     // pattern looks for a capitalised phrase in quotes — "Sign in", "No results" —
