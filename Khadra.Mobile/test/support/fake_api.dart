@@ -64,11 +64,29 @@ class FakeApi extends KhadraApi {
   @override
   Future<AppConfig> appConfig() async => fakeConfig();
 
-  @override
-  Future<List<Lookup>> cities() async => const [];
+  /// The lookups, empty unless a test says otherwise.
+  List<Lookup> cityLookups = const [];
+  List<Lookup> carTypeLookups = const [];
 
   @override
-  Future<List<Lookup>> carTypes() async => const [];
+  Future<List<Lookup>> cities() async => cityLookups;
+
+  @override
+  Future<List<Lookup>> carTypes() async => carTypeLookups;
+
+  /// What the catalogue holds. Empty unless a test says otherwise.
+  CatalogueFacets facets = const CatalogueFacets(seats: [], carTypeIds: <String>{});
+
+  /// When set, the facets endpoint fails this way — the way an older server
+  /// without it answers.
+  ApiFailure? facetsFailure;
+
+  @override
+  Future<CatalogueFacets> catalogueFacets() async {
+    final failure = facetsFailure;
+    if (failure != null) throw failure;
+    return facets;
+  }
 
   @override
   Future<AuthUser> me() async => fakeUser();
@@ -163,6 +181,10 @@ class FakeApi extends KhadraApi {
   @override
   Future<int> unreadNotificationCount() async => 0;
 
+  /// What a search answers, whatever it asked. Empty unless a test says otherwise.
+  Paged<CatalogueListing> searchResult =
+      const Paged(items: [], page: 1, pageSize: 20, totalCount: 0);
+
   @override
   Future<Paged<CatalogueListing>> searchVehicles({
     String? cityId,
@@ -180,7 +202,29 @@ class FakeApi extends KhadraApi {
     int pageSize = 20,
     CancelToken? cancelToken,
   }) async =>
+      searchResult;
+
+  // ── A rental office's page ──────────────────────────────────────────────────
+
+  /// The page a dealer id answers with. Set by the test; reaching it unset is a
+  /// test asking for a page it never described.
+  PublicGalleryPage? galleryPage;
+
+  /// That office's reviews. Empty unless a test says otherwise.
+  Paged<GalleryReview> galleryReviewPage =
       const Paged(items: [], page: 1, pageSize: 20, totalCount: 0);
+
+  @override
+  Future<PublicGalleryPage> gallery(String dealerId) async =>
+      galleryPage ?? (throw StateError('no gallery page set for $dealerId'));
+
+  @override
+  Future<Paged<GalleryReview>> galleryReviews(
+    String dealerId, {
+    int page = 1,
+    int pageSize = 20,
+  }) async =>
+      galleryReviewPage;
 
   // ── Saved cars ──────────────────────────────────────────────────────────────
 

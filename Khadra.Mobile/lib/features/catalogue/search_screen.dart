@@ -7,7 +7,6 @@ import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/paging.dart';
-import '../../core/providers.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -16,6 +15,7 @@ import '../shortlist/shortlist_providers.dart';
 import 'date_range_sheet.dart';
 import 'filter_sheet.dart';
 import 'landing.dart';
+import 'search_header.dart';
 import 'search_providers.dart';
 import 'vehicle_row.dart';
 
@@ -24,6 +24,10 @@ import 'vehicle_row.dart';
 /// Anonymous by design, settled with the owner: daily rates, delivery fees and the
 /// deposit percentage are public prices, and a marketplace that demands a sign-up
 /// before it will show a car converts badly. Booking still needs an account.
+///
+/// Laid out the way a rental is thought about: where and when first, then the make
+/// or model, then the kind of car, then how many there are — with every other
+/// filter one button away rather than in the way.
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
@@ -128,7 +132,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final l10n = AppLocalizations.of(context);
     final filter = ref.watch(searchFilterProvider);
     final results = ref.watch(searchResultsProvider);
-    final formats = ref.watch(formatsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -145,8 +148,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         onRefresh: () async {
           // The landing card is on this screen and goes stale for the same
           // reasons the results do -- an approval that landed while the app was
-          // closed is exactly what somebody pulls to find.
+          // closed is exactly what somebody pulls to find. So do the categories:
+          // a car listed since the app opened can bring one with it.
           ref.invalidate(nextBookingProvider);
+          ref.invalidate(catalogueFacetsProvider);
           ref.invalidate(searchResultsProvider);
           await ref.read(searchResultsProvider.future);
         },
@@ -155,58 +160,53 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    Space.lg, Space.md, Space.lg, Space.sm),
+                padding: const EdgeInsets.only(top: Space.md, bottom: Space.sm),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // The landing state. Above the search box rather than below
-                    // it, because the thing it carries — a deposit falling due —
-                    // is more urgent than anything the customer came here to
-                    // look for.
-                    const SearchLanding(),
-                    TextField(
-                      controller: _searchController,
-                      onChanged: _onSearchChanged,
-                      textInputAction: TextInputAction.search,
-                      decoration: InputDecoration(
-                        hintText: l10n.searchHint,
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _searchController.text.isEmpty
-                            ? null
-                            : IconButton(
-                                icon: const Icon(Icons.clear),
-                                tooltip: l10n.actionClearAll,
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _onSearchChanged('');
-                                },
-                              ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: Space.lg, vertical: 0),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Above everything, because what it carries — a deposit
+                          // falling due — is more urgent than anything the customer
+                          // came here to look for.
+                          const SearchLanding(),
+                          SearchWhereWhen(onChooseDates: _openDates),
+                          const SizedBox(height: Space.md),
+                          TextField(
+                            controller: _searchController,
+                            onChanged: _onSearchChanged,
+                            textInputAction: TextInputAction.search,
+                            decoration: InputDecoration(
+                              hintText: l10n.searchHint,
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _searchController.text.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      tooltip: l10n.actionClearAll,
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _onSearchChanged('');
+                                      },
+                                    ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: Space.lg, vertical: 0),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: Space.md),
-                    _Toolbar(
-                      buttons: [
-                        _ToolbarButton(
-                          icon: Icons.date_range_outlined,
-                          label: filter.hasDates && formats != null
-                              ? formats.dateRange(
-                                  filter.pickupAt!, filter.returnAt!)
-                              : l10n.searchAnyDates,
-                          active: filter.hasDates,
-                          onTap: _openDates,
-                        ),
-                        _ToolbarButton(
-                          icon: Icons.tune,
-                          label: filter.activeCount > 0
-                              ? l10n.searchFiltersApplied(filter.activeCount)
-                              : l10n.searchFilters,
-                          active: filter.activeCount > 0,
-                          onTap: _openFilters,
-                        ),
-                      ],
+                    // Edge to edge: the row keeps its own gutter so it scrolls under
+                    // the page's margins.
+                    const SearchCarTypeChips(),
+                    const SizedBox(height: Space.md),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+                      child: SearchResultsBar(onOpenFilters: _openFilters),
                     ),
                   ],
                 ),
@@ -282,20 +282,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     }
 
     return [
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.md),
-          child: Text(
-            // The SERVER's count over the whole catalogue, not the length of the
-            // pages loaded so far.
-            l10n.searchResults(results.total),
-            style: const TextStyle(
-                color: KhadraColors.neutral600, fontSize: 13),
-          ),
-        ),
-      ),
       SliverPadding(
-        padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, Space.lg),
         sliver: SliverList.separated(
           itemCount: results.items.length,
           separatorBuilder: (_, __) => const SizedBox(height: Space.lg),
@@ -329,170 +317,4 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
     ];
   }
-}
-
-/// The controls above the results, laid out for the words they actually hold.
-///
-/// They were two `Expanded` halves, which gives each exactly half the width no
-/// matter what is written in it. In English that is fine — "Any dates" and
-/// "1 filter" are short. In Arabic "عامل تصفية واحد" does not fit in half of a
-/// 375-wide phone at all, so the label a customer needed most, the one saying a
-/// filter was hiding results from them, was the one that arrived as "عامل تص…".
-/// Turning the text size up did the same thing to English.
-///
-/// So the width follows the CONTENT. Each button asks for what it needs; if the
-/// two together fit on one line they share the leftover in proportion, and if
-/// they do not they stack full width rather than cropping. Nothing here is
-/// measured against a particular language.
-class _Toolbar extends StatelessWidget {
-  const _Toolbar({required this.buttons});
-
-  final List<_ToolbarButton> buttons;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final gaps = Space.sm * (buttons.length - 1);
-          final wanted = [
-            for (final button in buttons) button.widthIn(context),
-          ];
-          final total = wanted.fold<double>(0, (sum, w) => sum + w) + gaps;
-
-          if (total > constraints.maxWidth) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < buttons.length; i++) ...[
-                  if (i > 0) const SizedBox(height: Space.sm),
-                  buttons[i],
-                ],
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              for (var i = 0; i < buttons.length; i++) ...[
-                if (i > 0) const SizedBox(width: Space.sm),
-                // Proportional, not equal. `Expanded` divides what is left after
-                // the gaps, so a button asking for more of the line gets more of
-                // it — and because the total fits, every one of them ends up with
-                // at least what it asked for.
-                Expanded(
-                  flex: (wanted[i] * 100).round().clamp(1, 1 << 30),
-                  child: buttons[i],
-                ),
-              ],
-            ],
-          );
-        },
-      );
-}
-
-class _ToolbarButton extends StatelessWidget {
-  const _ToolbarButton({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  static const double _iconSize = 18;
-  static const double _border = 1;
-  static const double _minHeight = 46;
-
-  TextStyle _styleIn(BuildContext context) {
-    final style = DefaultTextStyle.of(context).style.merge(
-          TextStyle(
-            fontSize: 13,
-            fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-            color: active ? KhadraColors.accent : KhadraColors.text,
-          ),
-        );
-
-    // `Text` merges this itself when the reader has turned bold text on at the
-    // system level. The measurement below has to do the same, or every label is
-    // measured light and painted bold — putting an ellipsis on exactly the labels
-    // of the customers who asked for the larger, heavier text.
-    return MediaQuery.boldTextOf(context)
-        ? style.merge(const TextStyle(fontWeight: FontWeight.bold))
-        : style;
-  }
-
-  /// How wide this button has to be for its label to be whole.
-  ///
-  /// Resolved against the ambient default text style and the reader's own text
-  /// size, so the answer is in the app's real faces rather than the platform's.
-  double widthIn(BuildContext context) {
-    final painter = TextPainter(
-      text: TextSpan(text: label, style: _styleIn(context)),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-      maxLines: 1,
-    )..layout();
-
-    final text = painter.width;
-    painter.dispose();
-
-    return text +
-        _iconSize +
-        Space.sm +
-        Space.md * 2 +
-        _border * 2 +
-        // A hair of slack, so a width that rounds down by a fraction of a pixel
-        // does not put an ellipsis on a label that fits.
-        1;
-  }
-
-  @override
-  Widget build(BuildContext context) => Material(
-        color: active ? KhadraColors.accent100 : KhadraColors.surface,
-        borderRadius: Radii.field,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: Radii.field,
-          child: Container(
-            // A MINIMUM, not a height. 46 was measured at the default text size
-            // in Latin; Noto Kufi Arabic's line box is deeper, and text scaling
-            // goes to 1.4 here, so a fixed box crops the label from the top and
-            // the bottom instead of growing.
-            constraints: const BoxConstraints(minHeight: _minHeight),
-            padding: const EdgeInsets.symmetric(
-                horizontal: Space.md, vertical: Space.sm),
-            decoration: BoxDecoration(
-              borderRadius: Radii.field,
-              border: Border.all(
-                width: _border,
-                color: active ? KhadraColors.accent300 : KhadraColors.neutral300,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: _iconSize,
-                  color: active ? KhadraColors.accent : KhadraColors.neutral600,
-                ),
-                const SizedBox(width: Space.sm),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    // The last resort, not the plan. With the width following the
-                    // label this should never fire; it is here so a translation
-                    // nobody anticipated degrades instead of overflowing.
-                    overflow: TextOverflow.ellipsis,
-                    style: _styleIn(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
 }

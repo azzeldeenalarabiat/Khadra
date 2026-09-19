@@ -194,6 +194,15 @@ class KhadraApi {
         CatalogueListing.fromJson,
       );
 
+  /// The seat counts and car types the bookable catalogue holds: what the search's
+  /// choices are built from, rather than from a list typed into the app.
+  Future<CatalogueFacets> catalogueFacets() async => CatalogueFacets.fromJson(
+        _object(await _client.get<dynamic>(
+          '/api/v1/vehicles/facets',
+          options: AuthInterceptor.anonymous(),
+        )),
+      );
+
   Future<CatalogueVehicle> vehicle(
     String vehicleId, {
     DateTime? pickupAt,
@@ -233,8 +242,8 @@ class KhadraApi {
         options: AuthInterceptor.anonymous(),
       )));
 
-  Future<PublicGallery> gallery(String dealerId) async =>
-      PublicGallery.fromJson(_object(await _client.get<dynamic>(
+  Future<PublicGalleryPage> gallery(String dealerId) async =>
+      PublicGalleryPage.fromJson(_object(await _client.get<dynamic>(
         '/api/v1/galleries/$dealerId',
         options: AuthInterceptor.anonymous(),
       )));

@@ -9,12 +9,13 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'search_providers.dart';
 
-/// The filters, all of them fed by the platform.
+/// The filters beyond where, when and what kind — all of them fed by the platform.
 ///
-/// Not one chip's text is a literal. Cities and car types come from the lookup
-/// endpoints in both languages; transmissions come from `/app-config`'s
-/// vocabularies, where the NAME is the contract and the label is what is shown.
-/// A category an administrator adds tomorrow appears here without a release.
+/// Not one chip's text is a literal. Transmissions come from `/app-config`'s
+/// vocabularies, where the NAME is the contract and the label is what is shown;
+/// the seat choices are the counts the bookable catalogue actually has. The city,
+/// the dates and the category are on Home itself, where a customer sees them
+/// without opening anything.
 Future<SearchFilter?> showFilterSheet({
   required BuildContext context,
   required SearchFilter current,
@@ -66,11 +67,11 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final arabic = ref.watch(isArabicProvider);
-    final cities = ref.watch(citiesProvider).valueOrNull ?? const <Lookup>[];
-    final carTypes = ref.watch(carTypesProvider).valueOrNull ?? const <Lookup>[];
     final transmissions =
         ref.watch(appConfigProvider).valueOrNull?.vocabularies.transmissions ??
             const <VocabularyEntry>[];
+    final seats =
+        ref.watch(catalogueFacetsProvider).valueOrNull?.seats ?? const <int>[];
 
     return DraggableScrollableSheet(
       expand: false,
@@ -121,28 +122,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   Space.lg, Space.md, Space.lg, Space.lg),
               children: [
                 _ChipGroup(
-                  title: l10n.searchCity,
-                  anyLabel: l10n.searchAnyCity,
-                  selected: _draft.cityId,
-                  options: [
-                    for (final city in cities)
-                      (value: city.id, label: city.nameFor(arabic)),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _draft = _draft.copyWith(cityId: value)),
-                ),
-                _ChipGroup(
-                  title: l10n.searchCarType,
-                  anyLabel: l10n.searchAnyCarType,
-                  selected: _draft.carTypeId,
-                  options: [
-                    for (final type in carTypes)
-                      (value: type.id, label: type.nameFor(arabic)),
-                  ],
-                  onChanged: (value) =>
-                      setState(() => _draft = _draft.copyWith(carTypeId: value)),
-                ),
-                _ChipGroup(
                   title: l10n.searchTransmission,
                   anyLabel: l10n.searchAnyTransmission,
                   selected: _draft.transmission,
@@ -157,11 +136,15 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                   title: l10n.searchSeats,
                   anyLabel: l10n.searchAnySeats,
                   selected: _draft.minSeats?.toString(),
+                  // The seat counts the bookable catalogue has, from the server. The
+                  // list typed in here offered "at least 2 seats" to a platform with
+                  // no two-seaters, and could never offer the nine-seat van an office
+                  // lists tomorrow. Nothing to offer hides the group.
                   options: [
-                    for (final seats in const [2, 4, 5, 7])
+                    for (final count in seats)
                       (
-                        value: seats.toString(),
-                        label: l10n.searchMinimumSeats(seats)
+                        value: count.toString(),
+                        label: l10n.searchMinimumSeats(count)
                       ),
                   ],
                   onChanged: (value) => setState(() => _draft =

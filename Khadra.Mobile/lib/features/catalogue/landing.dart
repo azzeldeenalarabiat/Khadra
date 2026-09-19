@@ -9,9 +9,8 @@ import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../bookings/booking_providers.dart';
-import 'search_providers.dart';
 
-/// What the first screen shows above the results.
+/// What the first screen shows above the search.
 ///
 /// The owner asked for a home page. This is the honest version of one: a
 /// marketplace's home IS its search, and everything a conventional home page
@@ -19,27 +18,15 @@ import 'search_providers.dart';
 /// behind it on this platform. A "featured" list would be somebody picking cars
 /// by hand, which is the static-data rule broken on the app's front door.
 ///
-/// So what is here is only what is REAL: the two lookups the filter sheet already
-/// loads, and the one booking the server says needs attention.
-class SearchLanding extends ConsumerWidget {
+/// So what is here is only what is REAL: the one booking the server says needs
+/// attention. The city, the dates and the categories below it are the search's own
+/// controls (`search_header.dart`); the "Where are you going?" and "What kind of
+/// car?" prompts they replaced asked the same two questions twice.
+class SearchLanding extends StatelessWidget {
   const SearchLanding({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final filter = ref.watch(searchFilterProvider);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _NextBookingCard(),
-        // Quick entry disappears once the customer has narrowed anything: at that
-        // point they are reading results, and a row of shortcuts above them is
-        // just something between the search and its answer.
-        if (filter.activeCount == 0 && (filter.text ?? '').isEmpty)
-          const _QuickEntry(),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => const _NextBookingCard();
 }
 
 /// The booking that needs the customer's attention, if there is one.
@@ -137,105 +124,4 @@ class _NextBookingCard extends ConsumerWidget {
         NextBookingReasons.awaitingDecision => l10n.landingAwaitingOffice,
         _ => l10n.bookingsTitle,
       };
-}
-
-/// Two rows of chips that fill in the search for you.
-///
-/// The cities and the car types are the platform's own lookups, in both
-/// languages, already loaded and kept alive for the filter sheet — so this adds
-/// no request. Tapping one writes into the SAME filter the sheet writes into,
-/// rather than holding a second idea of what is being searched for.
-///
-/// Nothing here is ranked or "popular": the platform publishes no such figure,
-/// and inventing an order would be a claim the app cannot support.
-class _QuickEntry extends ConsumerWidget {
-  const _QuickEntry();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final arabic = ref.watch(isArabicProvider);
-    final cities = ref.watch(citiesProvider).valueOrNull ?? const <Lookup>[];
-    final carTypes = ref.watch(carTypesProvider).valueOrNull ?? const <Lookup>[];
-
-    // A lookup that has not loaded shows nothing rather than an empty heading.
-    if (cities.isEmpty && carTypes.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (cities.isNotEmpty)
-          _ChipRow(
-            title: l10n.landingWhereTo,
-            options: [
-              for (final city in cities)
-                (value: city.id, label: city.nameFor(arabic)),
-            ],
-            onTap: (value) => ref
-                .read(searchFilterProvider.notifier)
-                .update((filter) => filter.copyWith(cityId: value)),
-          ),
-        if (carTypes.isNotEmpty)
-          _ChipRow(
-            title: l10n.landingWhatKind,
-            options: [
-              for (final type in carTypes)
-                (value: type.id, label: type.nameFor(arabic)),
-            ],
-            onTap: (value) => ref
-                .read(searchFilterProvider.notifier)
-                .update((filter) => filter.copyWith(carTypeId: value)),
-          ),
-        const SizedBox(height: Space.sm),
-      ],
-    );
-  }
-}
-
-class _ChipRow extends StatelessWidget {
-  const _ChipRow({
-    required this.title,
-    required this.options,
-    required this.onTap,
-  });
-
-  final String title;
-  final List<({String value, String label})> options;
-  final ValueChanged<String> onTap;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: Space.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            KhadraFieldLabel(title),
-            SizedBox(
-              // Tall enough for ARABIC: Noto Kufi Arabic's line box is deeper
-              // than Manrope's at the same point size, and a horizontal list has
-              // to be given a height before it knows what is in it.
-              //
-              // ASKED, not written down. It was 42, which is right for Arabic at
-              // the default text size and wrong the moment a customer turns text
-              // up — this app honours scaling to 1.4, and the chips were cropped
-              // top and bottom for anybody who uses it.
-              height: KhadraChoiceChip.heightIn(context),
-              // Scrolls rather than wraps: the number of cities is the platform's
-              // to grow, and a wrapping block would push the results off screen
-              // the day an administrator adds a dozen.
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: options.length,
-                separatorBuilder: (_, __) => const SizedBox(width: Space.sm),
-                itemBuilder: (_, index) => Center(
-                  child: KhadraChoiceChip(
-                    label: options[index].label,
-                    onTap: () => onTap(options[index].value),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
 }

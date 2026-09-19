@@ -323,6 +323,29 @@ class Lookup {
   }
 }
 
+/// What the bookable catalogue holds, which the search's choices are built from.
+///
+/// Seat counts ascending, and car type IDS only: the names are the lookup's, in both
+/// languages. A category is offered when it is in both, so one with no bookable car
+/// offers no chip, and neither does one an administrator has retired.
+class CatalogueFacets {
+  const CatalogueFacets({required this.seats, required this.carTypeIds});
+
+  final List<int> seats;
+  final Set<String> carTypeIds;
+
+  static CatalogueFacets fromJson(Map<String, dynamic> json) => CatalogueFacets(
+        seats: [
+          for (final value in json['seats'] as List<dynamic>? ?? const [])
+            if (value is num) value.toInt(),
+        ],
+        carTypeIds: {
+          for (final value in json['carTypeIds'] as List<dynamic>? ?? const [])
+            if (value is String) value,
+        },
+      );
+}
+
 // ── Identity ───────────────────────────────────────────────────────────────────
 
 class AuthUser {
@@ -706,11 +729,15 @@ class GalleryDelivery {
       );
 }
 
+/// The rental office as it appears BESIDE A CAR.
+///
+/// Carries nothing the office wrote for its own page: those sections include ones
+/// it has HIDDEN, and this travels inside every car in the catalogue.
+/// [PublicGalleryPage] is the page.
 class PublicGallery {
   const PublicGallery({
     required this.dealerId,
     required this.businessName,
-    required this.description,
     required this.cityId,
     required this.latitude,
     required this.longitude,
@@ -724,7 +751,6 @@ class PublicGallery {
 
   final String dealerId;
   final String businessName;
-  final String? description;
   final String? cityId;
   final double latitude;
   final double longitude;
@@ -738,7 +764,6 @@ class PublicGallery {
   static PublicGallery fromJson(Map<String, dynamic> json) => PublicGallery(
         dealerId: json['dealerId'] as String? ?? '',
         businessName: json['businessName'] as String? ?? '',
-        description: json['description'] as String?,
         cityId: json['cityId'] as String?,
         latitude: _num(json['latitude']).toDouble(),
         longitude: _num(json['longitude']).toDouble(),
@@ -754,6 +779,112 @@ class PublicGallery {
             json['averageRating'] == null ? null : _num(json['averageRating']),
         reviewCount: _int(json['reviewCount']),
       );
+}
+
+/// The rental office's OWN page: everything a car carries, plus where the office is
+/// in words and what it writes for customers.
+class PublicGalleryPage {
+  const PublicGalleryPage({
+    required this.dealerId,
+    required this.businessName,
+    required this.cityId,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.logoUrl,
+    required this.coverUrl,
+    required this.operatingHours,
+    required this.delivery,
+    required this.averageRating,
+    required this.reviewCount,
+    required this.sections,
+  });
+
+  final String dealerId;
+  final String businessName;
+  final String? cityId;
+  final GalleryAddress? address;
+  final double latitude;
+  final double longitude;
+  final String? logoUrl;
+  final String? coverUrl;
+  final List<GalleryDaySchedule> operatingHours;
+  final GalleryDelivery delivery;
+  final num? averageRating;
+  final int reviewCount;
+  final GallerySections sections;
+
+  static PublicGalleryPage fromJson(Map<String, dynamic> json) => PublicGalleryPage(
+        dealerId: json['dealerId'] as String? ?? '',
+        businessName: json['businessName'] as String? ?? '',
+        cityId: json['cityId'] as String?,
+        address: GalleryAddress.maybe(json['address']),
+        latitude: _num(json['latitude']).toDouble(),
+        longitude: _num(json['longitude']).toDouble(),
+        logoUrl: _url(json['logoUrl']),
+        coverUrl: _url(json['coverUrl']),
+        operatingHours: (json['operatingHours'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(GalleryDaySchedule.fromJson)
+            .toList(),
+        delivery: GalleryDelivery.fromJson(
+            json['delivery'] as Map<String, dynamic>? ?? const {}),
+        averageRating:
+            json['averageRating'] == null ? null : _num(json['averageRating']),
+        reviewCount: _int(json['reviewCount']),
+        sections: GallerySections.fromJson(
+            json['sections'] as Map<String, dynamic>? ?? const {}),
+      );
+}
+
+/// Where the office is, in words. Null until the office records one.
+class GalleryAddress {
+  const GalleryAddress(this.area, this.street);
+
+  final String area;
+  final String? street;
+
+  static GalleryAddress? maybe(dynamic json) => json is Map<String, dynamic>
+      ? GalleryAddress(json['area'] as String? ?? '', json['street'] as String?)
+      : null;
+}
+
+/// What the office wrote for its customers, as the server decided a customer sees it.
+///
+/// Null is "nothing to show" and says nothing about why: hidden, never written, and
+/// — for delivery notes — an office that does not deliver all arrive the same way.
+/// The app renders no heading for a null section and must never ask why it is null.
+class GallerySections {
+  const GallerySections({
+    required this.about,
+    required this.rentalConditions,
+    required this.insurance,
+    required this.pickupInstructions,
+    required this.deliveryNotes,
+    required this.customerNotes,
+  });
+
+  final String? about;
+  final String? rentalConditions;
+  final String? insurance;
+  final String? pickupInstructions;
+  final String? deliveryNotes;
+  final String? customerNotes;
+
+  static GallerySections fromJson(Map<String, dynamic> json) => GallerySections(
+        about: _text(json['about']),
+        rentalConditions: _text(json['rentalConditions']),
+        insurance: _text(json['insurance']),
+        pickupInstructions: _text(json['pickupInstructions']),
+        deliveryNotes: _text(json['deliveryNotes']),
+        customerNotes: _text(json['customerNotes']),
+      );
+
+  /// Blank is the same as absent: a section with nothing in it is not a section.
+  static String? _text(dynamic value) {
+    final text = value as String?;
+    return text == null || text.trim().isEmpty ? null : text;
+  }
 }
 
 class CatalogueVehicle {

@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -103,46 +102,59 @@ void main() {
     return container;
   }
 
-  /// Whether the label was cropped. `RenderParagraph` knows; a screenshot is the
-  /// only other way to find out.
-  bool truncated(WidgetTester tester, String label) {
-    final paragraph = tester.renderObject<RenderParagraph>(find.text(label));
-    return paragraph.didExceedMaxLines;
+  /// Whether [label] arrived on ONE line: measured against the same words, in the
+  /// style they were set in and at the same text size, laid out with nowhere to
+  /// wrap. A label squeezed into less width than it needs breaks onto a second
+  /// line and is taller than that — or is cut, which is shorter than the words.
+  bool whole(WidgetTester tester, String label) {
+    final text = find.text(label);
+    final context = tester.element(text);
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: DefaultTextStyle.of(context).style.merge(tester.widget<Text>(text).style),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final oneLine = painter.size;
+    painter.dispose();
+
+    final drawn = tester.getSize(text);
+    return drawn.height <= oneLine.height + 0.5 && drawn.width >= oneLine.width - 0.5;
   }
 
   final ar = AppLocalizationsAr();
 
-  testWidgets('the Arabic filter label is not cropped on a 375 phone',
-      (tester) async {
+  testWidgets('the Arabic filter label is whole on a 375 phone', (tester) async {
     // One filter, which is the longest of the Arabic plural forms and the one a
     // customer sees most.
     await pumpSearch(
       tester,
       locale: const Locale('ar'),
-      filter: const SearchFilter(cityId: 'a-city'),
+      filter: const SearchFilter(transmission: 'Automatic'),
     );
 
     final label = ar.searchFiltersApplied(1);
     expect(find.text(label), findsOneWidget,
-        reason: 'the toolbar should be showing "$label"');
-    expect(truncated(tester, label), isFalse,
-        reason: '"$label" is being ellipsised — the toolbar is giving it less '
-            'width than the words need');
+        reason: 'the Filters button should be showing "$label"');
+    expect(whole(tester, label), isTrue,
+        reason: '"$label" is being given less width than the words need');
   });
 
   testWidgets('nor at the largest text size the app honours', (tester) async {
-    // The app clamps scaling to 1.4. At that size neither control fits beside the
-    // other, so they stack — the label still has to arrive whole.
+    // The app clamps scaling to 1.4. At that size the button can no longer sit
+    // beside the count, so it moves under it — the label still arrives whole.
     await pumpSearch(
       tester,
       locale: const Locale('ar'),
       textScale: 1.4,
-      filter: const SearchFilter(cityId: 'a-city'),
+      filter: const SearchFilter(transmission: 'Automatic'),
     );
 
-    final label = ar.searchFiltersApplied(1);
-    expect(truncated(tester, label), isFalse);
-    expect(truncated(tester, ar.searchAnyDates), isFalse);
+    expect(whole(tester, ar.searchFiltersApplied(1)), isTrue);
+    expect(whole(tester, ar.searchAnyDates), isTrue);
   });
 
   testWidgets('and English is not broken by fixing Arabic', (tester) async {
@@ -150,23 +162,23 @@ void main() {
       tester,
       locale: const Locale('en'),
       textScale: 1.4,
-      filter: const SearchFilter(cityId: 'a-city', deliveryOnly: true),
+      filter: const SearchFilter(transmission: 'Automatic', deliveryOnly: true),
     );
 
-    expect(truncated(tester, 'Any dates'), isFalse);
-    expect(truncated(tester, '2 filters'), isFalse);
+    expect(whole(tester, 'Any dates'), isTrue);
+    expect(whole(tester, '2 filters'), isTrue);
   });
 
-  testWidgets('the toolbar stays on one line when the words fit', (tester) async {
-    // The fix must not cost the ordinary case its layout: in English at the
-    // default size these two sit side by side, and stacking them would push the
-    // first result off the screen for no reason.
+  testWidgets('the count and the Filters button share a line when they fit',
+      (tester) async {
+    // In English at the default size these sit side by side, and stacking them
+    // would push the first result further down for no reason.
     await pumpSearch(tester, locale: const Locale('en'));
 
-    final dates = tester.getRect(find.text('Any dates'));
-    final filters = tester.getRect(find.text('Filters'));
-    expect(dates.top, closeTo(filters.top, 0.5),
-        reason: 'the two controls should share a line at the default text size');
+    final count = tester.getCenter(find.text('No cars'));
+    final filters = tester.getCenter(find.text('Filters'));
+    expect(count.dy, closeTo(filters.dy, 1),
+        reason: 'the two should share a line at the default text size');
   });
 
   // An overflow paints a yellow-and-black bar in debug and silently crops in
