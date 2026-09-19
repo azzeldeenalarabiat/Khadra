@@ -31,7 +31,7 @@ worse, because nothing complains:
 | Setting | Ships as | Consequence if left |
 |---|---|---|
 | `App__ClientBaseUrl` | `https://localhost:7243` | Every verification, reset and invitation email links to localhost. The send succeeds. |
-| `Email__Provider` | `Logging` | Mail is written to the log and delivered to nobody. |
+| `Email__Provider` | `Logging` | Mail is delivered to nobody, while every send reports success. |
 
 ## Generating the signing key
 

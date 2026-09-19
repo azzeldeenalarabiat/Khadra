@@ -483,7 +483,10 @@ public static class DependencyInjection
                 client.BaseAddress = new Uri("https://api.resend.com/");
                 // A registration waits on this call, so it fails fast rather than hanging the form.
                 client.Timeout = TimeSpan.FromSeconds(15);
-            });
+            })
+            // Trace-level HttpClient logging — the first thing anybody turns on when mail is not
+            // arriving — prints request headers verbatim, and this one is the API key.
+            .RedactLoggedHeaders(["Authorization"]);
             services.AddSingleton<IEmailSender, ResendEmailSender>();
             services.AddSingleton<IEmailTransportProbe, ResendTransportProbe>();
         }
@@ -497,7 +500,10 @@ public static class DependencyInjection
                 var apiKey = configuration[$"{EmailOptions.SectionName}:ApiKey"];
                 if (!string.IsNullOrWhiteSpace(apiKey))
                     client.DefaultRequestHeaders.Add(BrevoEmailSender.ApiKeyHeader, apiKey);
-            });
+            })
+            // Trace-level HttpClient logging prints request headers verbatim, and Brevo's key travels
+            // in its own header rather than in Authorization.
+            .RedactLoggedHeaders([BrevoEmailSender.ApiKeyHeader]);
             services.AddSingleton<IEmailSender, BrevoEmailSender>();
             services.AddSingleton<IEmailTransportProbe, BrevoTransportProbe>();
         }

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
@@ -25,7 +26,8 @@ namespace Khadra.Infrastructure.Notifications;
 /// </summary>
 internal sealed class BrevoEmailSender(
     IHttpClientFactory httpClientFactory,
-    IOptions<EmailOptions> options) : IEmailSender
+    IOptions<EmailOptions> options,
+    IClock clock) : IEmailSender
 {
     public const string HttpClientName = "brevo";
 
@@ -46,7 +48,7 @@ internal sealed class BrevoEmailSender(
         [property: JsonPropertyName("htmlContent")] string HtmlContent,
         [property: JsonPropertyName("textContent")] string TextContent);
 
-    public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    public async Task<EmailSendReceipt> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -73,16 +75,32 @@ internal sealed class BrevoEmailSender(
             message.HtmlBody,
             message.TextBody);
 
-        var response = await client.PostAsJsonAsync("v3/smtp/email", request, cancellationToken);
+        using var response = await client.PostAsJsonAsync("v3/smtp/email", request, cancellationToken);
         if (response.IsSuccessStatusCode)
-            return;
+        {
+            // Brevo answers `{"messageId":"<…@smtp-relay.mailin.fr>"}`: the id its Transactional log is
+            // searched by, and proof that Brevo QUEUED the message — nothing more. Delivered, deferred,
+            // bounced and blocked are all decided afterwards, and only that log knows which.
+            //
+            // The body is already buffered, and not read with the caller's token: a send Brevo has
+            // accepted cannot be un-sent, so nothing after this point may report it as failed.
+            var body = await response.Content.ReadAsStringAsync(CancellationToken.None);
+            return new EmailSendReceipt(
+                EmailOptions.BrevoProvider,
+                ProviderReply.JsonString(body, "messageId"),
+                clock.UtcNow,
+                Attempts: 1,
+                ProviderResponse: null);
+        }
 
         // Brevo names its refusals in the body, and they are nearly always fixable: an unverified
         // sender, the wrong key kind, the daily allowance spent. Carrying that text out is the
         // difference between one operator-readable line and "email failed". The dispatcher catches
-        // this and reports the send as failed; it never reaches the person on the form.
+        // this and reports the send as failed; it never reaches the person on the form. It is logged
+        // at Error, so every address in it comes out first, and it is cut short.
         var detail = await response.Content.ReadAsStringAsync(cancellationToken);
         throw new InvalidOperationException(
-            $"Brevo refused the message ({(int)response.StatusCode} {response.ReasonPhrase}): {detail}");
+            $"Brevo refused the message ({(int)response.StatusCode} {response.ReasonPhrase}): " +
+            ProviderReply.Refusal(detail));
     }
 }

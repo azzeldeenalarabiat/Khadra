@@ -34,7 +34,7 @@ public sealed class AdminBootstrapTests
     {
         public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
         public IVerificationTokenRepository Tokens { get; } = Substitute.For<IVerificationTokenRepository>();
-        public IEmailSender Email { get; } = Substitute.For<IEmailSender>();
+        public IEmailSender Email { get; } = TestEmail.AcceptingSender();
         public IAuthEmailComposer Composer { get; } = Substitute.For<IAuthEmailComposer>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public IAuditTrail AuditTrail { get; } = Substitute.For<IAuditTrail>();
@@ -307,7 +307,7 @@ public sealed class AdminBootstrapTests
         var context = new Context();
         context.Users.AnyAdminExistsAsync(Arg.Any<CancellationToken>()).Returns(false);
         context.Email.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new InvalidOperationException("The mail server refused the message."));
+            .Returns<Task<EmailSendReceipt>>(_ => throw new InvalidOperationException("The mail server refused the message."));
 
         // Startup does not get an exception...
         await context.Bootstrapper(Settings.Configured).EnsureAsync();
@@ -347,7 +347,7 @@ public sealed class AdminBootstrapRefusalTests
     {
         public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
         public IVerificationTokenRepository Tokens { get; } = Substitute.For<IVerificationTokenRepository>();
-        public IEmailSender Email { get; } = Substitute.For<IEmailSender>();
+        public IEmailSender Email { get; } = TestEmail.AcceptingSender();
         public IAuthEmailComposer Composer { get; } = Substitute.For<IAuthEmailComposer>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public IAuditTrail AuditTrail { get; } = Substitute.For<IAuditTrail>();

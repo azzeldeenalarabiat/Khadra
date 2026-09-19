@@ -1,17 +1,19 @@
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Infrastructure.Configuration;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
+using MimeKit.Utils;
 
 namespace Khadra.Infrastructure.Notifications;
 
-internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSender
+internal sealed class SmtpEmailSender(IOptions<EmailOptions> options, IClock clock) : IEmailSender
 {
     private readonly EmailOptions _options = options.Value;
 
-    public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    public async Task<EmailSendReceipt> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -30,6 +32,12 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
         mime.From.Add(new MailboxAddress(_options.FromName, from));
         mime.To.Add(new MailboxAddress(message.ToName, message.ToAddress));
         mime.Subject = message.Subject;
+        // Set here rather than left to MimeKit, whose default is built from the name of the machine it
+        // runs on and then travels in a header every relay and inbox can read. It is also the only id
+        // this transport can log — a relay names its queue entry only in free text — so the receipt
+        // reports the id the relay was HANDED; a relay may stamp its own on the way out. Set once,
+        // outside the retries, so a copy that a retry sends is recognisably the same message.
+        mime.MessageId = MimeUtils.GenerateMessageId(from[(from.LastIndexOf('@') + 1)..]);
         mime.Body = new BodyBuilder { HtmlBody = message.HtmlBody, TextBody = message.TextBody }.ToMessageBody();
 
         // The attempts SHARE the timeout budget, so more attempts never mean a longer wait for the
@@ -50,8 +58,13 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
         {
             try
             {
-                await SendOnceAsync(mime, perAttemptMs, budget.Token);
-                return;
+                var reply = await SendOnceAsync(mime, perAttemptMs, budget.Token);
+                return new EmailSendReceipt(
+                    EmailOptions.SmtpProvider,
+                    $"<{mime.MessageId}>",
+                    clock.UtcNow,
+                    attempt,
+                    ProviderReply.Text(reply, message.ToAddress));
             }
             catch (Exception exception) when (attempt < attempts && IsTransient(exception)
                                              && !budget.IsCancellationRequested)
@@ -63,18 +76,46 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options) : IEmailSe
                 // cannot finish inside a window that has already closed.
                 await Task.Delay(TimeSpan.FromMilliseconds(250), budget.Token);
             }
+            catch (Exception exception)
+            {
+                // Rethrown as a sentence with every address taken out, and deliberately WITHOUT the
+                // original attached: the dispatcher logs this at Error, a log sink prints an inner
+                // exception in full, and a relay's refusal is where addresses appear — "5.1.1
+                // <ali@example.com>: Recipient address rejected", or the account a server would not
+                // authenticate.
+                throw new InvalidOperationException(
+                    $"The SMTP send failed on attempt {attempt} of {attempts} ({exception.GetType().Name}): " +
+                    ProviderReply.Refusal(exception.Message));
+            }
         }
     }
 
-    private async Task SendOnceAsync(MimeMessage mime, int timeoutMs, CancellationToken cancellationToken)
+    /// <returns>The relay's reply to the message itself, such as <c>2.0.0 Ok: queued as 4F2A1C</c>.</returns>
+    private async Task<string> SendOnceAsync(MimeMessage mime, int timeoutMs, CancellationToken cancellationToken)
     {
         using var client = new SmtpClient { Timeout = timeoutMs };
         var socketOptions = _options.UseStartTls ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
         await client.ConnectAsync(_options.Host, _options.Port, socketOptions, cancellationToken);
         if (!string.IsNullOrEmpty(_options.Username))
             await client.AuthenticateAsync(_options.Username, _options.Password ?? string.Empty, cancellationToken);
-        await client.SendAsync(mime, cancellationToken);
-        await client.DisconnectAsync(quit: true, cancellationToken);
+        var reply = await client.SendAsync(mime, cancellationToken);
+
+        // The relay has the message. QUIT is a courtesy, and nothing that goes wrong saying goodbye
+        // may become a retry — which hands the relay a second copy — or a failure reported for a
+        // message that was accepted. MailKit swallows most QUIT failures itself, but not the timeout
+        // of a relay that queues the message and then stalls.
+        try
+        {
+            await client.DisconnectAsync(quit: true, cancellationToken);
+        }
+#pragma warning disable CA1031 // Past acceptance: see above.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            // Disposing the client closes the socket either way.
+        }
+
+        return reply;
     }
 
     /// <summary>

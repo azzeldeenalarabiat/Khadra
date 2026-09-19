@@ -33,6 +33,11 @@ internal sealed class RecordingLogger<T> : ILogger<T>
         Func<TState, Exception?, string> formatter)
     {
         ArgumentNullException.ThrowIfNull(formatter);
-        Entries.Add((eventId, logLevel, formatter(state, exception)));
+
+        // The exception too, because every real sink prints it beside the message. Recording the
+        // message alone made "the address is not in the log" true of a line whose exception carried
+        // the address in full.
+        var message = formatter(state, exception);
+        Entries.Add((eventId, logLevel, exception is null ? message : $"{message}\n{exception}"));
     }
 }

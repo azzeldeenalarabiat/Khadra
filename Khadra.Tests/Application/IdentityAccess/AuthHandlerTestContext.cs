@@ -24,7 +24,7 @@ internal sealed class AuthHandlerTestContext
     public IVerificationTokenRepository VerificationTokens { get; } = Substitute.For<IVerificationTokenRepository>();
     public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
     public IAuthEmailComposer EmailComposer { get; } = Substitute.For<IAuthEmailComposer>();
-    public IEmailSender EmailSender { get; init; } = Substitute.For<IEmailSender>();
+    public IEmailSender EmailSender { get; init; } = TestEmail.AcceptingSender();
     public ICurrentActor Actor { get; } = Substitute.For<ICurrentActor>();
     // Recording rather than null, so a test can assert what the reason line says AND that the
     // address never reaches it.
@@ -54,6 +54,11 @@ internal sealed class AuthHandlerTestContext
             .Returns(call => Message(call.Arg<User>(), "reset", call.Arg<string>()));
         EmailComposer.PasswordChanged(Arg.Any<User>())
             .Returns(call => Message(call.Arg<User>(), "changed", string.Empty));
+        // All five, so no handler here hands a transport a null message.
+        EmailComposer.EmployeeInvitation(Arg.Any<User>(), Arg.Any<string>(), Arg.Any<string>())
+            .Returns(call => Message(call.Arg<User>(), "invited", call.ArgAt<string>(2)));
+        EmailComposer.AdminInvitation(Arg.Any<User>(), Arg.Any<string>())
+            .Returns(call => Message(call.Arg<User>(), "admin", call.ArgAt<string>(1)));
     }
 
     // Registration is shared by the customer and dealer-owner flows; both handlers delegate here.

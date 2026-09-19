@@ -242,7 +242,7 @@ all refuse at boot rather than at the first request that needs them:
 | Refusal | Why |
 |---|---|
 | `KnownProxies` empty outside Development | Silently means "trust anybody" |
-| `Email:Provider` = `Logging` in Production | Writes every message to the log and delivers nothing |
+| `Email:Provider` = `Logging` in Production | Delivers nothing, while every send reports success |
 | An unrecognised `Email:Provider` | The fallback was the Logging transport, silently |
 | `Documents:Provider` = `Local` in Production | Files deleted on the next deploy |
 | An unrecognised `Documents:Provider` | Same silent-fallback trap |

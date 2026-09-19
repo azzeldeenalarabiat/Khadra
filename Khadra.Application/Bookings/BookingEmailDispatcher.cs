@@ -47,6 +47,8 @@ public sealed partial class BookingEmailDispatcher(
     {
         ArgumentNullException.ThrowIfNull(booking);
 
+        EmailMessage message;
+        EmailSendReceipt receipt;
         try
         {
             var customer = await users.GetByIdAsync(Id.From(booking.CustomerId), cancellationToken);
@@ -68,8 +70,8 @@ public sealed partial class BookingEmailDispatcher(
             // gallery's browser drops the connection, which happens AFTER the commit — and this is
             // the one message on the platform where a send abandoned half-way is probably a booking
             // that expires unread. `Email:TimeoutSeconds` already bounds how long it can take.
-            await sender.SendAsync(composer.BookingApproved(customer, booking, context, note), CancellationToken.None);
-            return true;
+            message = composer.BookingApproved(customer, booking, context, note);
+            receipt = await sender.SendAsync(message, CancellationToken.None);
         }
 #pragma warning disable CA1031 // A delivery failure is reported to the log, never thrown at a gallery.
         catch (Exception exception)
@@ -78,11 +80,56 @@ public sealed partial class BookingEmailDispatcher(
             LogDeliveryFailed(logger, booking.Reference, exception);
             return false;
         }
+
+        // The message is accepted by now, and nothing may turn that into "not sent" — or into a failure
+        // for an approval that is committed. Logging CAN throw: the logging framework rethrows a
+        // failing sink's exception to the caller.
+        try
+        {
+            LogAccepted(
+                logger,
+                booking.Reference,
+                booking.CustomerId.ToString(),
+                receipt.Provider,
+                receipt.ProviderMessageId,
+                receipt.Attempts,
+                receipt.AcceptedAt,
+                message.RecipientDomain,
+                receipt.ProviderResponse);
+        }
+#pragma warning disable CA1031 // Past acceptance: see above.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            // Nothing to report it to: the logger is what failed.
+        }
+
+        return true;
     }
 
     [LoggerMessage(1200, LogLevel.Error,
         "Failed to send the approval email for booking {Reference}. The approval stands.")]
     private static partial void LogDeliveryFailed(ILogger logger, string reference, Exception exception);
+
+    /// <summary>
+    /// Accepted, which is not delivered: see <see cref="IdentityAccess.AuthEmailDispatcher"/> for what
+    /// each half of that proves, and why the recipient appears by domain only.
+    /// </summary>
+    [LoggerMessage(1202, LogLevel.Information,
+        "The approval email for booking {Reference} (customer {CustomerId}) was accepted by {Provider} " +
+        "(message id {ProviderMessageId}, attempt {Attempts}, at {AcceptedAt}, recipient domain " +
+        "{RecipientDomain}, reply {ProviderResponse}). Accepted is not delivered: the provider's log " +
+        "says whether it arrived.")]
+    private static partial void LogAccepted(
+        ILogger logger,
+        string reference,
+        string customerId,
+        string provider,
+        string? providerMessageId,
+        int attempts,
+        DateTimeOffset acceptedAt,
+        string recipientDomain,
+        string? providerResponse);
 
     [LoggerMessage(1201, LogLevel.Warning,
         "No approval email sent for booking {Reference}: {Reason}.")]

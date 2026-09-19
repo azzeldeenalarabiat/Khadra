@@ -57,7 +57,9 @@ public sealed class BookingEmailComposerTests
         var context = new BookingContext(
             new VehicleLabel(Guid.NewGuid(), "Kia", "Sportage", 2024, "White", "12-34567", null),
             "Rami Haddad Rentals",
+            false,
             "Nour Al-Masri",
+            false,
             null,
             null);
 

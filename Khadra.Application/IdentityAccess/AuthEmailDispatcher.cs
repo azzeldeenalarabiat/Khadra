@@ -59,10 +59,12 @@ public sealed partial class AuthEmailDispatcher(
         string kind,
         CancellationToken cancellationToken)
     {
+        EmailMessage message;
+        EmailSendReceipt receipt;
         try
         {
-            await sender.SendAsync(compose(), cancellationToken);
-            return true;
+            message = compose();
+            receipt = await sender.SendAsync(message, cancellationToken);
         }
 #pragma warning disable CA1031 // Delivery failures are reported to the caller, never thrown at it.
         catch (Exception exception)
@@ -71,8 +73,57 @@ public sealed partial class AuthEmailDispatcher(
             LogDeliveryFailed(logger, kind, user.Id.ToString(), exception);
             return false;
         }
+
+        // The message is accepted by now, and nothing may turn that into "not sent" — or into a
+        // failed command whose record is committed and whose email went. Logging CAN throw: the
+        // logging framework rethrows a failing sink's exception to the caller.
+        try
+        {
+            LogAccepted(
+                logger,
+                kind,
+                user.Id.ToString(),
+                receipt.Provider,
+                receipt.ProviderMessageId,
+                receipt.Attempts,
+                receipt.AcceptedAt,
+                message.RecipientDomain,
+                receipt.ProviderResponse);
+        }
+#pragma warning disable CA1031 // Past acceptance: see above.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            // Nothing to report it to: the logger is what failed.
+        }
+
+        return true;
     }
 
     [LoggerMessage(1100, LogLevel.Error, "Failed to send the {Kind} email for user {UserId}")]
     private static partial void LogDeliveryFailed(ILogger logger, string kind, string userId, Exception exception);
+
+    /// <summary>
+    /// The first place to look when somebody says an email never came — and it says ACCEPTED, because
+    /// that is all a transport can vouch for.
+    /// </summary>
+    /// <remarks>
+    /// Whether the message was then delivered is in the provider's own log, found by the message id;
+    /// whether anybody can read it is in the recipient's inbox. The recipient appears by domain only,
+    /// and nothing from the message itself does — above all not its link, which carries the token.
+    /// </remarks>
+    [LoggerMessage(1101, LogLevel.Information,
+        "The {Kind} email for user {UserId} was accepted by {Provider} (message id {ProviderMessageId}, " +
+        "attempt {Attempts}, at {AcceptedAt}, recipient domain {RecipientDomain}, reply {ProviderResponse}). " +
+        "Accepted is not delivered: the provider's log says whether it arrived.")]
+    private static partial void LogAccepted(
+        ILogger logger,
+        string kind,
+        string userId,
+        string provider,
+        string? providerMessageId,
+        int attempts,
+        DateTimeOffset acceptedAt,
+        string recipientDomain,
+        string? providerResponse);
 }
