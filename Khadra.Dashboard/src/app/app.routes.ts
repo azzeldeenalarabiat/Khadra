@@ -7,6 +7,17 @@ import {
   dealerOwnerGuard,
   dealerStaffGuard,
 } from './core/guards/role.guards';
+import { TranslationKey } from './core/i18n/en';
+
+/**
+ * A route's tab title, as a translation KEY.
+ *
+ * `TranslatedTitleStrategy` names the tab in the reader's language: it resolves most routes from
+ * `SCREEN_TITLES`, and a declared title only matters for a route that map does not know — exactly the
+ * case where an English literal used to be frozen into an Arabic tab. Typed, so a misspelt key fails
+ * the build instead of reaching a tab.
+ */
+const title = (key: TranslationKey): TranslationKey => key;
 
 /**
  * Console routes.
@@ -17,11 +28,11 @@ import {
  * and their place in the navigation, but they now say what they will show and what is missing,
  * rather than displaying figures nobody can act on. `notBuilt` names the entry that explains each.
  */
-const notBuilt = (path: string, title: string, missing = path) => ({
+const notBuilt = (path: string, titleKey: TranslationKey, missing = path) => ({
   path,
   // The tab title is what a browser history entry and a bookmark are named by, so every route sets
   // one rather than leaving a dozen tabs all reading "Khadra".
-  title: `${title} · Khadra Admin`,
+  title: title(titleKey),
   data: { missing },
   loadComponent: () =>
     import('./features/not-built/not-built.component').then((m) => m.NotBuiltComponent),
@@ -32,26 +43,26 @@ export const routes: Routes = [
   // reach them. The reset path matches the link AuthEmailComposer builds ({base}/reset-password?token=).
   {
     path: 'sign-in',
-    title: 'Sign in · Khadra Admin',
+    title: title('auth.signIn.title'),
     loadComponent: () => import('./features/auth/sign-in.component').then((m) => m.SignInComponent),
   },
   // Step one of spec 3.1. The only self-service account the console creates: administrators are
   // invited by another administrator, employees by their owner, and customers register in the app.
   {
     path: 'register',
-    title: 'Register your gallery · Khadra',
+    title: title('auth.register.title'),
     loadComponent: () =>
       import('./features/auth/register-dealer.component').then((m) => m.RegisterDealerComponent),
   },
   {
     path: 'forgot-password',
-    title: 'Reset your password · Khadra Admin',
+    title: title('auth.forgot.title'),
     loadComponent: () =>
       import('./features/auth/forgot-password.component').then((m) => m.ForgotPasswordComponent),
   },
   {
     path: 'reset-password',
-    title: 'Choose a new password · Khadra Admin',
+    title: title('auth.reset.title'),
     loadComponent: () =>
       import('./features/auth/reset-password.component').then((m) => m.ResetPasswordComponent),
   },
@@ -60,14 +71,14 @@ export const routes: Routes = [
   // which no self-registered account can pass — CanAuthenticate refuses an unverified address.
   {
     path: 'verify-email',
-    title: 'Verify your email · Khadra',
+    title: title('auth.verify.title'),
     loadComponent: () =>
       import('./features/auth/verify-email.component').then((m) => m.VerifyEmailComponent),
   },
   // The link an invited employee receives (spec 4.2): {base}/accept-invitation?token=
   {
     path: 'accept-invitation',
-    title: 'Accept your invitation · Khadra',
+    title: title('auth.invite.title'),
     loadComponent: () =>
       import('./features/auth/accept-invitation.component').then(
         (m) => m.AcceptInvitationComponent,
@@ -91,14 +102,14 @@ export const routes: Routes = [
         children: [
           {
             path: 'dashboard',
-            title: 'Dashboard · Khadra Admin',
+            title: title('nav.dashboard'),
             loadComponent: () =>
               import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
           },
 
           {
             path: 'dealers',
-            title: 'Dealers · Khadra Admin',
+            title: title('nav.dealers'),
             loadComponent: () =>
               import('./features/dealers/dealers-list.component').then(
                 (m) => m.DealersListComponent,
@@ -109,7 +120,7 @@ export const routes: Routes = [
           { path: 'dealers/profile', pathMatch: 'full', redirectTo: 'dealers' },
           {
             path: 'dealers/:dealerId',
-            title: 'Dealer application · Khadra Admin',
+            title: title('screen.dealerApplication'),
             loadComponent: () =>
               import('./features/dealers/dealer-review.component').then(
                 (m) => m.DealerReviewComponent,
@@ -119,7 +130,7 @@ export const routes: Routes = [
           // Every booking on the platform, and the three interventions an admin can make in one.
           {
             path: 'bookings',
-            title: 'Bookings · Khadra Admin',
+            title: title('nav.bookings'),
             loadComponent: () =>
               import('./features/bookings/bookings-list.component').then(
                 (m) => m.BookingsListComponent,
@@ -127,7 +138,7 @@ export const routes: Routes = [
           },
           {
             path: 'bookings/:bookingId',
-            title: 'Booking details · Khadra Admin',
+            title: title('screen.bookingDetails'),
             loadComponent: () =>
               import('./features/bookings/booking-detail.component').then(
                 (m) => m.AdminBookingDetailComponent,
@@ -136,7 +147,7 @@ export const routes: Routes = [
 
           {
             path: 'customers',
-            title: 'Customers · Khadra Admin',
+            title: title('nav.customers'),
             loadComponent: () =>
               import('./features/customers/customers-list.component').then(
                 (m) => m.CustomersListComponent,
@@ -144,23 +155,23 @@ export const routes: Routes = [
           },
           {
             path: 'customers/:customerId',
-            title: 'Customer profile · Khadra Admin',
+            title: title('screen.customerProfile'),
             loadComponent: () =>
               import('./features/customers/customer-profile.component').then(
                 (m) => m.CustomerProfileComponent,
               ),
           },
 
-          notBuilt('finance', 'Finance'),
-          notBuilt('payments', 'Payments'),
-          notBuilt('payments/detail', 'Payment details', 'payment-detail'),
-          notBuilt('payouts', 'Payouts'),
+          notBuilt('finance', 'nav.finance'),
+          notBuilt('payments', 'nav.payments'),
+          notBuilt('payments/detail', 'screen.paymentDetails', 'payment-detail'),
+          notBuilt('payouts', 'nav.payouts'),
 
           // Disputes are real: the queue, and the workspace where the platform's only decision
           // about money is made.
           {
             path: 'disputes',
-            title: 'Disputes · Khadra Admin',
+            title: title('nav.disputes'),
             loadComponent: () =>
               import('./features/disputes/disputes-list.component').then(
                 (m) => m.DisputesListComponent,
@@ -168,26 +179,26 @@ export const routes: Routes = [
           },
           {
             path: 'disputes/:ticketId',
-            title: 'Dispute resolution · Khadra Admin',
+            title: title('screen.disputeResolution'),
             loadComponent: () =>
               import('./features/disputes/dispute-detail.component').then(
                 (m) => m.DisputeDetailComponent,
               ),
           },
 
-          notBuilt('reviews', 'Reviews'),
+          notBuilt('reviews', 'nav.reviews'),
           // One component serves both: the same aggregate with the same four actions, and the
           // route says which list it is curating.
           {
             path: 'cities',
-            title: 'Cities & Regions · Khadra Admin',
+            title: title('nav.cities'),
             data: { kind: 'cities' },
             loadComponent: () =>
               import('./features/lookups/lookups.component').then((m) => m.LookupsComponent),
           },
           {
             path: 'car-types',
-            title: 'Car Types · Khadra Admin',
+            title: title('nav.carTypes'),
             data: { kind: 'car-types' },
             loadComponent: () =>
               import('./features/lookups/lookups.component').then((m) => m.LookupsComponent),
@@ -196,13 +207,13 @@ export const routes: Routes = [
           // was missing.
           {
             path: 'audit-logs',
-            title: 'Audit logs · Khadra Admin',
+            title: title('screen.auditLogs'),
             loadComponent: () =>
               import('./features/audit/audit-log.component').then((m) => m.AuditLogComponent),
           },
           {
             path: 'admin-users',
-            title: 'Admin users · Khadra Admin',
+            title: title('screen.adminUsers'),
             loadComponent: () =>
               import('./features/admin-users/admin-users.component').then(
                 (m) => m.AdminUsersComponent,
@@ -211,14 +222,14 @@ export const routes: Routes = [
 
           {
             path: 'settings',
-            title: 'Platform settings · Khadra Admin',
+            title: title('screen.platformSettings'),
             loadComponent: () =>
               import('./features/settings/settings.component').then((m) => m.SettingsComponent),
           },
-          notBuilt('notifications', 'Notifications'),
+          notBuilt('notifications', 'nav.notifications'),
           {
             path: 'security',
-            title: 'Security · Khadra Admin',
+            title: title('nav.security'),
             loadComponent: () =>
               import('./features/security/security.component').then((m) => m.SecurityComponent),
           },
@@ -240,7 +251,7 @@ export const routes: Routes = [
           // The gate lets this through while `GET /dealers/me` is answering dealer.not_registered.
           {
             path: 'apply',
-            title: 'Submit your gallery · Khadra',
+            title: title('screen.submitGallery'),
             loadComponent: () =>
               import('./features/dealer/dealer-apply.component').then(
                 (m) => m.DealerApplyComponent,
@@ -248,7 +259,7 @@ export const routes: Routes = [
           },
           {
             path: 'dashboard',
-            title: 'Dashboard · Khadra',
+            title: title('nav.dashboard'),
             loadComponent: () =>
               import('./features/dealer/dealer-dashboard.component').then(
                 (m) => m.DealerDashboardComponent,
@@ -256,7 +267,7 @@ export const routes: Routes = [
           },
           {
             path: 'bookings',
-            title: 'Bookings · Khadra',
+            title: title('nav.bookings'),
             loadComponent: () =>
               import('./features/dealer/dealer-bookings.component').then(
                 (m) => m.DealerBookingsComponent,
@@ -264,7 +275,7 @@ export const routes: Routes = [
           },
           {
             path: 'bookings/:bookingId',
-            title: 'Booking details · Khadra',
+            title: title('screen.bookingDetails'),
             loadComponent: () =>
               import('./features/dealer/booking-detail.component').then(
                 (m) => m.DealerBookingDetailComponent,
@@ -272,7 +283,7 @@ export const routes: Routes = [
           },
           {
             path: 'disputes/:ticketId',
-            title: 'Dispute · Khadra',
+            title: title('screen.dispute'),
             loadComponent: () =>
               import('./features/dealer/dealer-dispute.component').then(
                 (m) => m.DealerDisputeComponent,
@@ -280,7 +291,7 @@ export const routes: Routes = [
           },
           {
             path: 'employees',
-            title: 'Employees · Khadra',
+            title: title('nav.employees'),
             loadComponent: () =>
               import('./features/dealer/dealer-employees.component').then(
                 (m) => m.DealerEmployeesComponent,
@@ -288,7 +299,7 @@ export const routes: Routes = [
           },
           {
             path: 'delivery',
-            title: 'Delivery · Khadra',
+            title: title('nav.delivery'),
             loadComponent: () =>
               import('./features/dealer/dealer-delivery.component').then(
                 (m) => m.DealerDeliveryComponent,
@@ -296,29 +307,40 @@ export const routes: Routes = [
           },
           {
             path: 'reviews',
-            title: 'Reviews · Khadra',
+            title: title('nav.reviews'),
             data: { kind: 'reviews' },
             loadComponent: () =>
               import('./features/dealer/not-live.component').then((m) => m.NotLiveComponent),
           },
           {
             path: 'notifications',
-            title: 'Notifications · Khadra',
+            title: title('nav.notifications'),
             data: { kind: 'notifications' },
             loadComponent: () =>
               import('./features/dealer/not-live.component').then((m) => m.NotLiveComponent),
           },
           {
             path: 'profile',
-            title: 'Dealer profile · Khadra',
+            title: title('screen.dealerProfile'),
             loadComponent: () =>
               import('./features/dealer/dealer-profile.component').then(
                 (m) => m.DealerProfileComponent,
               ),
           },
+          // What the office tells customers in its own words. Staff may read it; the PUT behind it
+          // is owner-only, and the screen renders read-only for everybody else rather than being
+          // guarded away — an employee answering a customer's question needs to see what it says.
+          {
+            path: 'customer-page',
+            title: title('nav.customerPage'),
+            loadComponent: () =>
+              import('./features/dealer/dealer-customer-page.component').then(
+                (m) => m.DealerCustomerPageComponent,
+              ),
+          },
           {
             path: 'reports',
-            title: 'Reports · Khadra',
+            title: title('nav.reports'),
             loadComponent: () =>
               import('./features/dealer/dealer-reports.component').then(
                 (m) => m.DealerReportsComponent,
@@ -326,7 +348,7 @@ export const routes: Routes = [
           },
           {
             path: 'activity',
-            title: 'Activity · Khadra',
+            title: title('nav.activity'),
             loadComponent: () =>
               import('./features/dealer/dealer-activity.component').then(
                 (m) => m.DealerActivityComponent,
@@ -334,7 +356,7 @@ export const routes: Routes = [
           },
           {
             path: 'settings',
-            title: 'Settings · Khadra',
+            title: title('nav.settings'),
             loadComponent: () =>
               import('./features/dealer/dealer-settings.component').then(
                 (m) => m.DealerSettingsComponent,
@@ -342,7 +364,7 @@ export const routes: Routes = [
           },
           {
             path: 'fleet',
-            title: 'Fleet · Khadra',
+            title: title('nav.fleet'),
             loadComponent: () =>
               import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
           },
@@ -351,7 +373,7 @@ export const routes: Routes = [
           // explain. Guarded so the trap is never entered, rather than sprung at the end of it.
           {
             path: 'fleet/new',
-            title: 'Add vehicle · Khadra',
+            title: title('screen.addVehicle'),
             canActivate: [dealerOwnerGuard],
             loadComponent: () =>
               import('./features/fleet/vehicle-wizard.component').then(
@@ -360,7 +382,7 @@ export const routes: Routes = [
           },
           {
             path: 'fleet/:vehicleId',
-            title: 'Vehicle · Khadra',
+            title: title('screen.vehicleDetails'),
             loadComponent: () =>
               import('./features/fleet/vehicle-detail.component').then(
                 (m) => m.VehicleDetailComponent,
@@ -368,7 +390,7 @@ export const routes: Routes = [
           },
           {
             path: 'fleet/:vehicleId/edit',
-            title: 'Edit vehicle · Khadra',
+            title: title('screen.editVehicle'),
             canActivate: [dealerOwnerGuard],
             loadComponent: () =>
               import('./features/fleet/car-form.component').then((m) => m.CarFormComponent),
@@ -391,7 +413,7 @@ export const routes: Routes = [
           { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
           {
             path: 'dashboard',
-            title: 'Dashboard · Khadra',
+            title: title('nav.dashboard'),
             loadComponent: () =>
               import('./features/employee/employee-dashboard.component').then(
                 (m) => m.EmployeeDashboardComponent,
@@ -402,7 +424,7 @@ export const routes: Routes = [
           // all of it (spec 4.2). Forking them would be two copies of the console's hardest screen.
           {
             path: 'bookings',
-            title: 'Bookings · Khadra',
+            title: title('nav.bookings'),
             loadComponent: () =>
               import('./features/dealer/dealer-bookings.component').then(
                 (m) => m.DealerBookingsComponent,
@@ -410,7 +432,7 @@ export const routes: Routes = [
           },
           {
             path: 'bookings/:bookingId',
-            title: 'Booking details · Khadra',
+            title: title('screen.bookingDetails'),
             loadComponent: () =>
               import('./features/dealer/booking-detail.component').then(
                 (m) => m.DealerBookingDetailComponent,
@@ -418,7 +440,7 @@ export const routes: Routes = [
           },
           {
             path: 'disputes/:ticketId',
-            title: 'Dispute · Khadra',
+            title: title('screen.dispute'),
             loadComponent: () =>
               import('./features/dealer/dealer-dispute.component').then(
                 (m) => m.DealerDisputeComponent,
@@ -426,13 +448,13 @@ export const routes: Routes = [
           },
           {
             path: 'fleet',
-            title: 'Fleet · Khadra',
+            title: title('nav.fleet'),
             loadComponent: () =>
               import('./features/fleet/fleet-list.component').then((m) => m.FleetListComponent),
           },
           {
             path: 'fleet/:vehicleId',
-            title: 'Vehicle · Khadra',
+            title: title('screen.vehicleDetails'),
             loadComponent: () =>
               import('./features/fleet/vehicle-detail.component').then(
                 (m) => m.VehicleDetailComponent,
@@ -440,7 +462,7 @@ export const routes: Routes = [
           },
           {
             path: 'business',
-            title: 'My business · Khadra',
+            title: title('screen.myBusiness'),
             loadComponent: () =>
               import('./features/employee/employee-business.component').then(
                 (m) => m.EmployeeBusinessComponent,
@@ -448,7 +470,7 @@ export const routes: Routes = [
           },
           {
             path: 'notifications',
-            title: 'Notifications · Khadra',
+            title: title('nav.notifications'),
             loadComponent: () =>
               import('./features/employee/employee-notifications.component').then(
                 (m) => m.EmployeeNotificationsComponent,
@@ -456,7 +478,7 @@ export const routes: Routes = [
           },
           {
             path: 'settings',
-            title: 'Settings · Khadra',
+            title: title('nav.settings'),
             loadComponent: () =>
               import('./features/employee/employee-settings.component').then(
                 (m) => m.EmployeeSettingsComponent,

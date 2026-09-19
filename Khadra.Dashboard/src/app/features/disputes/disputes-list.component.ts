@@ -5,7 +5,17 @@ import { DisputeListItem } from '../../core/models/disputes.api';
 import { AdminDisputesService, DisputeQueue } from '../../core/services/admin-disputes.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { TranslationKey } from '../../core/i18n/en';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { Language } from '../../core/i18n/language';
+import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
+
+/**
+ * The queues, as the values the service filters on. `live` is the console's own view of everything
+ * still waiting; the rest are the server's status names, so they are worded as statuses.
+ */
+const QUEUES: readonly DisputeQueue[] = ['live', 'Open', 'UnderReview', 'Resolved', 'Withdrawn'];
 
 /**
  * The Admin's dispute queue (spec 3.3).
@@ -22,17 +32,25 @@ import { I18nService } from '../../core/i18n/i18n.service';
   imports: [RouterLink, IconComponent],
 })
 export class DisputesListComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  private readonly statusLabel = this.i18n.statusLabel;
+  /** Server enums that are not statuses: which party raised the ticket. */
+  protected readonly enumLabel = this.i18n.enumLabel;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(AdminDisputesService);
   private readonly router = inject(Router);
 
-  protected readonly queues: readonly { key: DisputeQueue; label: string }[] = [
-    { key: 'live', label: this.t('disputesList.liveQueue') },
-    { key: 'Open', label: 'Open' },
-    { key: 'UnderReview', label: this.t('disputesList.underReview') },
-    { key: 'Resolved', label: 'Resolved' },
-    { key: 'Withdrawn', label: 'Withdrawn' },
-  ];
+  /**
+   * The queue tabs in the reader's language. A `computed`, not a field: this was a field initialiser
+   * once, which worded the tabs a single time and left them in that language after a switch.
+   */
+  protected readonly queues = computed(() =>
+    QUEUES.map((key) => ({
+      key,
+      label: key === 'live' ? this.t('disputesList.liveQueue') : this.statusLabel(key),
+    })),
+  );
 
   protected readonly queue = this.service.queue;
   protected readonly overdueOnly = this.service.overdueOnly;
@@ -52,11 +70,11 @@ export class DisputesListComponent {
   protected readonly overdue = computed(() => this.loadedCounts()?.overdue ?? null);
   protected readonly unassigned = computed(() => this.loadedCounts()?.unassigned ?? null);
 
+  /** A failed load, held as the resource's facts and worded here, so a language switch re-words it. */
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as { status?: number } | undefined;
+    const error = this.resource.error();
     if (!error) return null;
-    if (error.status === 403) return this.t('disputesList.theDisputeQueueIs');
-    return this.t('disputesList.theDisputeQueueCould');
+    return describe(snapshotProblem(error), this.t, this.i18n.lang());
   });
 
   protected select(queue: DisputeQueue): void {
@@ -88,31 +106,66 @@ export class DisputesListComponent {
   }
 
   protected label(row: DisputeListItem): string {
-    return row.status === 'UnderReview' ? this.t('status.underReview') : row.status;
+    return this.statusLabel(row.status);
   }
 
-  /** Time against the ticket's own deadline, as words rather than a raw timestamp. */
+  /**
+   * Time against the ticket's own deadline, as words rather than a raw timestamp: "7h remaining",
+   * then "Overdue by 13h" by the server's flag OR the clock. A closed ticket says when it closed.
+   */
   protected sla(row: DisputeListItem): string {
-    if (row.closedAt) return `Closed ${this.when(row.closedAt)}`;
-    const hours = Math.round((Date.parse(row.slaDeadline) - Date.now()) / 3_600_000);
-    if (hours <= 0) return `${-hours}h over`;
-    return hours >= 48 ? `${Math.round(hours / 24)}d left` : `${hours}h left`;
+    if (row.closedAt) return this.t('disputesList.closedAt', { when: this.when(row.closedAt) });
+    return this.formats.sla(row.slaDeadline, row.isOverdue).text;
   }
 
   protected when(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.formats.dayMonthTime(iso);
   }
 
-  protected initials(name: string): string {
+  /** The dealership's name, or the fact that it has left the platform, in the reader's language. */
+  protected dealerName(row: DisputeListItem): string {
+    return row.dealerName ?? this.t('common.dealerNoLongerOnPlatform');
+  }
+
+  /** The customer's name, or the fact that the account was closed, in the reader's language. */
+  protected customerName(row: DisputeListItem): string {
+    return row.customerName ?? this.t('common.customerAccountClosed');
+  }
+
+  /**
+   * Who holds the ticket. Whether it is held is the ID's answer, not the name's: a holder whose
+   * account has since closed still holds it, and saying "Unassigned" would tell a second admin the
+   * work is free while the queue's own count says otherwise.
+   */
+  protected holder(row: DisputeListItem): string {
+    if (row.assignedAdminId === null) return this.t('common.unassigned');
+    return row.assignedAdminName === null
+      ? this.t('disputesList.heldByClosedAccount')
+      : this.t('disputesList.withHolder', { name: row.assignedAdminName });
+  }
+
+  /**
+   * Two letters for the avatar. A party that no longer resolves has no name to take them from, and
+   * the server sends null rather than a sentence -- so the avatar shows a dash, not the initials of
+   * "Dealer no longer on the platform", and never throws on the missing name.
+   */
+  protected initials(name: string | null): string {
+    if (!name?.trim()) return '—';
     return name
-      .split(' ')
+      .trim()
+      .split(/\s+/)
       .slice(0, 2)
       .map((part) => part[0] ?? '')
       .join('');
   }
+}
+
+/** Why the queue could not load, in the language on screen when it is shown. */
+function describe(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  if (problem.status === 403) return t('disputesList.theDisputeQueueIs');
+  return serverSentence(problem, language, t) ?? t('disputesList.theDisputeQueueCould');
 }

@@ -76,7 +76,6 @@ public sealed class ShortlistUseCaseTests
                 Id.New().Value,
                 "A gallery",
                 null,
-                null,
                 31.95,
                 35.91,
                 null,

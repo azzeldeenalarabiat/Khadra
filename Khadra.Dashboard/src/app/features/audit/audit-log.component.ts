@@ -4,8 +4,59 @@ import { AdminAuditService } from '../../core/services/admin-audit.service';
 import { loaded } from '../../core/services/loaded';
 import { AuditLogEntry } from '../../core/models/audit.api';
 import { Tone } from '../../core/models/console.models';
+import { roleLabel } from '../../core/models/user-display';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { TranslationKey } from '../../core/i18n/en';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
+import { spellEnumName } from '../../core/i18n/status-key';
+
+/**
+ * The server's audit actions (`AuditAction`), each with the key that words it.
+ *
+ * The names stay the server's: they are what the Action filter sends back. Only the label is the
+ * console's. The vocabulary grows without asking this build, so a name missing here is spelled out
+ * from its capitals rather than rendered blank — see `actionLabel`.
+ */
+const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
+  DealerApproved: 'auditLog.actionDealerApproved',
+  DealerRejected: 'auditLog.actionDealerRejected',
+  DealerClarificationRequested: 'auditLog.actionDealerClarificationRequested',
+  DealerSuspended: 'auditLog.actionDealerSuspended',
+  DealerReactivated: 'auditLog.actionDealerReactivated',
+  CustomerSuspended: 'auditLog.actionCustomerSuspended',
+  CustomerReactivated: 'auditLog.actionCustomerReactivated',
+  DisputeOpened: 'auditLog.actionDisputeOpened',
+  DisputeAssigned: 'auditLog.actionDisputeAssigned',
+  DisputeResolved: 'auditLog.actionDisputeResolved',
+  BusinessRuleChanged: 'auditLog.actionBusinessRuleChanged',
+  ReviewHidden: 'auditLog.actionReviewHidden',
+  ReviewRestored: 'auditLog.actionReviewRestored',
+  AdminInvited: 'auditLog.actionAdminInvited',
+  AdminDeactivated: 'auditLog.actionAdminDeactivated',
+  AdminReactivated: 'auditLog.actionAdminReactivated',
+  BookingCancelledByAdmin: 'auditLog.actionBookingCancelledByAdmin',
+  BookingExpired: 'auditLog.actionBookingExpired',
+  BookingMarkedNoShow: 'auditLog.actionBookingMarkedNoShow',
+  LookupCreated: 'auditLog.actionLookupCreated',
+  LookupRenamed: 'auditLog.actionLookupRenamed',
+  LookupRetired: 'auditLog.actionLookupRetired',
+  LookupRestored: 'auditLog.actionLookupRestored',
+};
+
+/** The server's audit record types (`AuditEntityType`), worded the same way as the actions. */
+const ENTITY_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
+  Dealer: 'auditLog.entityDealer',
+  Customer: 'auditLog.entityCustomer',
+  Booking: 'auditLog.entityBooking',
+  Dispute: 'auditLog.entityDispute',
+  Review: 'auditLog.entityReview',
+  Setting: 'auditLog.entitySetting',
+  AdminUser: 'auditLog.entityAdminUser',
+  City: 'auditLog.entityCity',
+  CarType: 'auditLog.entityCarType',
+};
 
 /**
  * The audit log (spec 7): every privileged action, who took it, and on what grounds.
@@ -27,7 +78,9 @@ import { I18nService } from '../../core/i18n/i18n.service';
   imports: [IconComponent],
 })
 export class AuditLogComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(AdminAuditService);
 
   protected readonly resource = this.service.entries;
@@ -84,31 +137,37 @@ export class AuditLogComponent {
       !!this.entityId(),
   );
 
+  /**
+   * "Showing 21–40 of 57 entries", as ONE plural message: the total picks the noun's form, and
+   * Arabic has six of them.
+   */
   protected readonly summary = computed(() => {
     const page = this.loadedPage();
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
-    const noun = page.totalCount === 1 ? 'entry' : 'entries';
-    return `Showing ${from}–${to} of ${page.totalCount} ${noun}`;
+    return this.t('auditLog.pageSummary', { from, to, count: page.totalCount });
   });
 
   /**
    * A refused request and an unusable filter set are not the same thing to the reader. A 400 is
    * something they typed — a "to" date before the "from" — so it offers the filters back rather than
    * a Retry that would fail identically. Only a genuine load failure is worth retrying.
+   *
+   * Held as the resource's facts and worded here, so a language switch re-words it.
    */
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as { status?: number } | undefined;
+    const error = this.resource.error();
     if (!error) return null;
-    if (error.status === 400) {
+    const problem = snapshotProblem(error);
+    if (problem.status === 400) {
       return {
         title: this.t('auditLog.filtersDoNotWork'),
         message: this.t('auditLog.checkTheDates'),
         action: 'clear' as const,
       };
     }
-    if (error.status === 403) {
+    if (problem.status === 403) {
       return {
         title: this.t('auditLog.couldntLoadTheAudit'),
         message: this.t('auditLog.theAuditLogIs'),
@@ -117,7 +176,8 @@ export class AuditLogComponent {
     }
     return {
       title: this.t('auditLog.couldntLoadTheAudit'),
-      message: this.t('auditLog.theAuditLogCould'),
+      message:
+        serverSentence(problem, this.i18n.lang(), this.t) ?? this.t('auditLog.theAuditLogCould'),
       action: 'retry' as const,
     };
   });
@@ -170,14 +230,27 @@ export class AuditLogComponent {
   }
 
   /**
-   * "DealerClarificationRequested" reads as "Dealer clarification requested".
+   * "DealerClarificationRequested" reads as "Dealer clarification requested" — or its Arabic.
    *
-   * Split on the capitals rather than mapped through a dictionary: the vocabulary is the server's and
-   * grows without asking this console, so a lookup table here would render a new action as a blank.
+   * Worded through the dictionary, with the old capitals split kept as the fallback: the vocabulary
+   * is the server's and grows without asking this console, so an action this build has no words for
+   * is spelled out from its name rather than rendered as a blank.
    */
   protected label(name: string): string {
-    const spaced = name.replace(/([a-z])([A-Z])/g, '$1 $2');
-    return spaced.charAt(0) + spaced.slice(1).toLowerCase();
+    const key = ACTION_LABELS[name];
+    return key ? this.t(key) : spellEnumName(name);
+  }
+
+  /** A record type ("AdminUser") in the reader's language, spelled out when this build has no words. */
+  protected entityTypeLabel(name: string): string {
+    const key = ENTITY_TYPE_LABELS[name];
+    return key ? this.t(key) : spellEnumName(name);
+  }
+
+  /** The role the actor held at the time, in words; the raw name only for a role this build lacks. */
+  protected roleText(role: string | null): string {
+    if (!role) return '—';
+    return roleLabel(role, this.t) || spellEnumName(role);
   }
 
   /**
@@ -208,26 +281,20 @@ export class AuditLogComponent {
   }
 
   /**
-   * An instant, stamped in the calendar this screen FILTERS by.
+   * An instant, stamped in the calendar this screen FILTERS by, in the reader's language.
    *
    * Not the browser's. The date pickers resolve against the platform's reporting zone, so rendering
    * in the reader's own zone made an entry near midnight appear to vanish: an admin in London
    * filtering "to 3 September" would see a row labelled "03 Sep 22:00" disappear, correctly — it is
    * the 4th in Amman — and inexplicably, because nothing on the screen said which calendar it meant.
+   * `FormatService` prints in the zone `/app-config` names, which is the same
+   * `AdminDashboard:ReportingTimeZone` setting the vocabulary reports beside the table.
    *
    * Seconds are shown because entries are strictly ordered and two in the same minute are common;
    * without them the log looks simultaneous where it is sequential.
    */
   protected when(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZone: this.timeZone(),
-    });
+    return this.formats.dateTimeSeconds(iso);
   }
 
   /** The zone the server resolves this log in. Undefined until it answers — never assumed. */
@@ -236,7 +303,7 @@ export class AuditLogComponent {
   /** Spelled out beside the table, so nobody has to guess whose midnight a day ends at. */
   protected readonly timeZoneNote = computed(() => {
     const zone = this.timeZone();
-    return zone ? `Times and dates in ${zone.replace('_', ' ')}` : '';
+    return zone ? this.t('auditLog.timesAndDatesIn', { zone: zone.replace('_', ' ') }) : '';
   });
 
   /** True when the entry records a change of value, rather than just that something happened. */

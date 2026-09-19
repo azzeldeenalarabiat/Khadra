@@ -8,8 +8,12 @@ public sealed record DisputeListItem(
     Guid TicketId,
     Guid BookingId,
     string BookingReference,
-    string DealerName,
-    string CustomerName,
+    // Null when the dealership no longer resolves (it is no longer on the platform). This read model
+    // reaches only the Admin console, which words the case in its reader's language; there is no
+    // shipped client to keep an English stand-in for.
+    string? DealerName,
+    // Null when the customer's account no longer resolves (it was closed).
+    string? CustomerName,
     string OpenedByParty,
     string Reason,
     string Status,
@@ -18,7 +22,10 @@ public sealed record DisputeListItem(
     // Judged against the deadline frozen when the ticket was opened, so raising the SLA later never
     // retroactively breaches a promise already made.
     bool IsOverdue,
+    // Null while nobody holds the ticket.
     Guid? AssignedAdminId,
+    // Null when the ticket is unassigned AND when the holder's account no longer resolves: the id tells
+    // the two apart, so an assigned ticket is never shown as unassigned.
     string? AssignedAdminName,
     DateTimeOffset? ClosedAt,
     int StatementCount);

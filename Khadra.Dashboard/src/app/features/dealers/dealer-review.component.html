@@ -30,12 +30,7 @@
           <h1 class="detail-name">{{ application.businessName }}</h1>
           <span class="pill" [class]="'s-' + statusTone()">{{ statusLabel() }}</span>
         </div>
-        <div class="detail-meta">
-          CR {{ application.commercialRegistrationNumber }} ·
-          {{ application.submittedDocuments.length }} of {{ application.requiredDocuments.length }}
-          {{ t('dealerReview.documentsSubmitted') }}
-          {{ application.submittedAt | date: 'dd MMM yyyy, HH:mm' }}
-        </div>
+        <div class="detail-meta">{{ headerMeta() }}</div>
       </div>
       <div class="sla-box" [class]="'s-' + sla().tone">
         <div class="k">{{ t('dealerReview.approvalSla') }}</div>
@@ -105,7 +100,7 @@
                  signature binds the file and the expiry, not the admin who minted it, so within its
                  lifetime the link works for any signed-in session. Pre-launch checklist item 14. -->
             @if (linkExpiry(); as expiry) {
-              <span class="sect-note">{{ t('dealerReview.signedUrls') }} {{ expiry }}</span>
+              <span class="sect-note">{{ expiry }}</span>
             }
           </div>
           @if (documents().length > 0) {
@@ -121,10 +116,7 @@
                 <kh-icon name="warning" class="banner-icon" />
                 <!-- No count in the sentence: the header above already reads "n of m documents",
                      and "all three" was a number this screen had no way to know. -->
-                <span class="banner-body">
-                  {{ t('dealerReview.missing') }} {{ missing().join(', ')
-                  }}{{ t('dealerReview.everyOneOfThese') }}
-                </span>
+                <span class="banner-body">{{ missingSentence() }}</span>
               </div>
             </div>
           }
@@ -142,7 +134,9 @@
         </section>
 
         <section class="sect sect-pad stack stack-9">
-          <span class="k">{{ canDecide() ? 'Decision' : 'Decision on record' }}</span>
+          <span class="k">{{
+            canDecide() ? t('dealerReview.decision') : t('dealerReview.decisionOnRecord')
+          }}</span>
 
           <!-- A settled application still has to SAY what was settled. Without this the screen for a
                rejected dealer was an empty panel headed "Decision", which reads as though the

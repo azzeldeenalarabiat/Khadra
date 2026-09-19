@@ -1,3 +1,4 @@
+using Khadra.Application.Common;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Infrastructure.Persistence;
@@ -187,5 +188,84 @@ public sealed class DealerBookingReaderTests : IDisposable
 
         Assert.Single(held);
         Assert.Equal(vehicleId.Value, held[0]);
+    }
+
+    // ── Names that no longer resolve ─────────────────────────────────────────────────────────────
+    //
+    // The dealer console words these cases in its reader's language, so the reader sends null rather
+    // than an English sentence. An actor's id travels beside the name, which is how the console tells
+    // "the rental office did this" (no id) from "a former member of staff did" (an id, no name).
+
+    [Fact]
+    public async Task A_handover_whose_customer_closed_their_account_names_nobody()
+    {
+        var gone = Build.Customer(email: "gone@example.jo", phone: "0795556677");
+        var here = Build.Customer(email: "here@example.jo", phone: "0795556678");
+        Assert.True(gone.Delete(Build.Now).IsSuccess);
+        var start = Build.Now.AddDays(1);
+        var theirs = BookedBy(gone.Id, start, Reserve);
+        var mine = BookedBy(here.Id, start.AddHours(2), Reserve);
+
+        await SaveAsync([gone, here], theirs, mine);
+
+        await using var read = new KhadraDbContext(_options);
+        var pickups = await new DealerBookingReader(read).UpcomingPickupsAsync(_dealerId, Build.Now, Build.Now.AddDays(2));
+
+        Assert.Null(pickups.Single(pickup => pickup.BookingId == theirs.Id.Value).CustomerName);
+        Assert.Equal(here.Name.Value, pickups.Single(pickup => pickup.BookingId == mine.Id.Value).CustomerName);
+    }
+
+    [Fact]
+    public async Task Activity_names_nobody_for_the_office_or_for_a_former_member_of_staff()
+    {
+        var former = Build.Customer(email: "former@example.jo", phone: "0794443322");
+        var current = Build.Customer(email: "current@example.jo", phone: "0794443323");
+        Assert.True(former.Delete(Build.Now).IsSuccess);
+        var start = Build.Now.AddDays(3);
+        var approvedByFormer = Theirs(start, booking => booking.Approve(former.Id, start.AddDays(-1)));
+        var approvedByCurrent = Theirs(start.AddDays(1), booking => booking.Approve(current.Id, start));
+        // Cancelled by the dealer with nobody signing it: the rental office acting as itself.
+        var cancelledByOffice = Theirs(
+            start.AddDays(2),
+            booking => booking.Cancel(BookingParty.Dealer, null, "Car withdrawn from service.", start.AddDays(1)));
+
+        await SaveAsync([former, current], approvedByFormer, approvedByCurrent, cancelledByOffice);
+
+        await using var read = new KhadraDbContext(_options);
+        var entries = (await new DealerBookingReader(read).ActivityAsync(_dealerId, PageRequest.From(1, 50))).Items;
+
+        var byFormer = Assert.Single(entries, entry => entry.BookingId == approvedByFormer.Id.Value);
+        Assert.Equal(former.Id.Value, byFormer.ActorUserId);
+        Assert.Null(byFormer.ActorName);
+
+        var byCurrent = Assert.Single(entries, entry => entry.BookingId == approvedByCurrent.Id.Value);
+        Assert.Equal(current.Name.Value, byCurrent.ActorName);
+
+        var byOffice = Assert.Single(entries, entry => entry.BookingId == cancelledByOffice.Id.Value);
+        Assert.Null(byOffice.ActorUserId);
+        Assert.Null(byOffice.ActorName);
+    }
+
+    /// <summary>A booking of this dealer's made by one particular customer.</summary>
+    private Booking BookedBy(Id customerId, DateTimeOffset start, Action<Booking>? advance)
+    {
+        var booking = Build.Booking(
+            now: start.AddDays(-1),
+            period: Build.Period(start),
+            dealerId: _dealerId,
+            customerId: customerId);
+        advance?.Invoke(booking);
+        booking.ClearDomainEvents();
+        return booking;
+    }
+
+    private async Task SaveAsync(Khadra.Domain.IdentityAccess.User[] users, params Booking[] bookings)
+    {
+        foreach (var user in users)
+            user.ClearDomainEvents();
+        await using var write = new KhadraDbContext(_options);
+        write.Users.AddRange(users);
+        write.Bookings.AddRange(bookings);
+        await write.SaveChangesAsync();
     }
 }

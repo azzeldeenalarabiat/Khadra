@@ -16,6 +16,12 @@ namespace Khadra.Infrastructure.Reporting;
 // make such a booking vanish from the list, which for a financial record is the wrong kind of quiet.
 internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
 {
+    // English stand-ins for a party that no longer resolves, kept ONLY because shipped customer apps
+    // print the name as it arrives. A client that words the case reads the DealerRemoved /
+    // CustomerAccountClosed flag instead and never shows these.
+    private const string RemovedDealerName = "Dealer no longer on the platform";
+    private const string ClosedCustomerName = "Customer account closed";
+
     public async Task<PagedResult<BookingListItem>> ListAsync(
         BookingListFilter filter,
         PageRequest page,
@@ -53,7 +59,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         if (total == 0)
             return PagedResult.Empty<BookingListItem>(page.Page, page.PageSize);
 
-        var items = await query
+        var rows = await query
             // Newest first: for a customer that is "the one I just made"; for a dealer it is the
             // queue of requests still waiting on them.
             .OrderByDescending(booking => booking.CreatedAt)
@@ -62,10 +68,11 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             .ThenByDescending(booking => booking.Id)
             .Skip(page.Skip)
             .Take(page.PageSize)
-            .Select(ToListItem())
+            .Select(ToListRow())
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<BookingListItem>(items, page.Page, page.PageSize, total);
+        return new PagedResult<BookingListItem>(
+            rows.Select(row => row.ToItem()).ToList(), page.Page, page.PageSize, total);
     }
 
     public async Task<IReadOnlyDictionary<string, int>> TabCountsAsync(
@@ -99,13 +106,18 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
     /// It is a METHOD returning the expression rather than a static field because it closes over the
     /// DbContext, and EF inlines a locally-bound expression into the query the same way it inlines a
     /// literal one.
+    ///
+    /// It projects a <see cref="ListRow"/> rather than the list item itself so that each party's name
+    /// is read ONCE, arriving as null when it no longer resolves, and both the flag and the stand-in
+    /// are taken from that one read after materialisation. Deriving the flag in SQL would ask the
+    /// same question twice, in two subqueries that agree only by construction.
     /// </remarks>
-    private Expression<Func<Booking, BookingListItem>> ToListItem()
+    private Expression<Func<Booking, ListRow>> ToListRow()
     {
         var open = DisputeStatus.Open;
         var underReview = DisputeStatus.UnderReview;
 
-        return booking => new BookingListItem(
+        return booking => new ListRow(
             booking.Id.Value,
             booking.Reference.Value,
             booking.Status.Name,
@@ -133,16 +145,56 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             context.Dealers
                 .Where(dealer => dealer.Id == booking.DealerId)
                 .Select(dealer => dealer.BusinessName.Value)
-                .FirstOrDefault() ?? "Dealer no longer on the platform",
+                .FirstOrDefault(),
             context.Users
                 .Where(user => user.Id == booking.CustomerId)
                 .Select(user => user.Name.Value)
-                .FirstOrDefault() ?? "Customer account closed",
+                .FirstOrDefault(),
             context.DisputeTickets.Any(ticket =>
                 ticket.BookingId == booking.Id &&
                 (ticket.Status == open || ticket.Status == underReview)),
             booking.DealerId.Value,
             booking.CustomerId.Value);
+    }
+
+    /// <summary>A list row as it leaves the database: each party's name is null when it did not resolve.</summary>
+    private sealed record ListRow(
+        Guid BookingId,
+        string Reference,
+        string Status,
+        DateTimeOffset PeriodStart,
+        DateTimeOffset PeriodEnd,
+        int Days,
+        string PickupMethod,
+        decimal TotalPrice,
+        string Currency,
+        DateTimeOffset CreatedAt,
+        VehicleLabel? Vehicle,
+        string? DealerName,
+        string? CustomerName,
+        bool HasLiveDispute,
+        Guid DealerId,
+        Guid CustomerId)
+    {
+        public BookingListItem ToItem() => new(
+            BookingId,
+            Reference,
+            Status,
+            PeriodStart,
+            PeriodEnd,
+            Days,
+            PickupMethod,
+            TotalPrice,
+            Currency,
+            CreatedAt,
+            Vehicle,
+            DealerName ?? RemovedDealerName,
+            DealerRemoved: DealerName is null,
+            CustomerName ?? ClosedCustomerName,
+            CustomerAccountClosed: CustomerName is null,
+            HasLiveDispute,
+            DealerId,
+            CustomerId);
     }
 
     /// <summary>The bookings this caller may see at all: their own, and nothing else filtered out.</summary>
@@ -244,8 +296,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                 ? query.OrderBy(booking => booking.Period.End).ThenBy(booking => booking.Id)
                 : query.OrderBy(booking => booking.Period.Start).ThenBy(booking => booking.Id);
 
-            var found = await query.Take(1).Select(ToListItem()).FirstOrDefaultAsync(cancellationToken);
-            return found is null ? null : new NextBooking(found, reason);
+            var found = await query.Take(1).Select(ToListRow()).FirstOrDefaultAsync(cancellationToken);
+            return found is null ? null : new NextBooking(found.ToItem(), reason);
         }
 
         return await FirstAsync(BookingStatus.Approved, NextBookingReason.AwaitingPayment)
@@ -261,9 +313,11 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         var underReview = DisputeStatus.UnderReview;
         var customerRatesDealer = ReviewDirection.CustomerRatesDealer;
 
+        // Each party's name is read once, as null when it no longer resolves, and the flag and the
+        // stand-in are both taken from that read -- the same shape the list row uses.
         var found = await context.Bookings
             .Where(booking => booking.Id == bookingId)
-            .Select(booking => new BookingContext(
+            .Select(booking => new ContextRow(
                 context.Vehicles
                     .Where(vehicle => vehicle.Id == booking.VehicleId)
                     .Select(vehicle => new VehicleLabel(
@@ -281,11 +335,11 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                 context.Dealers
                     .Where(dealer => dealer.Id == booking.DealerId)
                     .Select(dealer => dealer.BusinessName.Value)
-                    .FirstOrDefault() ?? "Dealer no longer on the platform",
+                    .FirstOrDefault(),
                 context.Users
                     .Where(user => user.Id == booking.CustomerId)
                     .Select(user => user.Name.Value)
-                    .FirstOrDefault() ?? "Customer account closed",
+                    .FirstOrDefault(),
                 context.DisputeTickets
                     .Where(ticket =>
                         ticket.BookingId == booking.Id &&
@@ -301,7 +355,26 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             .SingleOrDefaultAsync(cancellationToken);
 
         // The caller has already loaded the aggregate, so a miss here is a race with a delete that
-        // cannot happen (bookings are never deleted). Empty labels keep the contract total anyway.
-        return found ?? new BookingContext(null, string.Empty, string.Empty, null, null);
+        // cannot happen (bookings are never deleted). Empty labels keep the contract total anyway, and
+        // no flag is raised: nothing was looked up, so nothing failed to resolve.
+        if (found is null)
+            return new BookingContext(null, string.Empty, DealerRemoved: false, string.Empty, CustomerAccountClosed: false, null, null);
+
+        return new BookingContext(
+            found.Vehicle,
+            found.DealerName ?? RemovedDealerName,
+            DealerRemoved: found.DealerName is null,
+            found.CustomerName ?? ClosedCustomerName,
+            CustomerAccountClosed: found.CustomerName is null,
+            found.LiveDisputeId,
+            found.MyReviewId);
     }
+
+    /// <summary>A booking's context as it leaves the database: each party's name is null when it did not resolve.</summary>
+    private sealed record ContextRow(
+        VehicleLabel? Vehicle,
+        string? DealerName,
+        string? CustomerName,
+        Guid? LiveDisputeId,
+        Guid? MyReviewId);
 }

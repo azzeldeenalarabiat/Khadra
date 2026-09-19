@@ -6,8 +6,12 @@
         <div class="state-title">{{ t('vehicleDetail.couldntLoadThisCar') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/fleet">{{ t('common.backToFleet') }}</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            {{ t('common.retry') }}
+          </button>
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/fleet">{{
+            t('common.backToFleet')
+          }}</a>
         </div>
       </div>
     </section>
@@ -70,7 +74,9 @@
           <img khFallback [src]="photo.url" alt="" />
           <kh-icon name="image" />
           <span class="photo-label">{{
-            photo.isPrimary ? 'Cover' : 'Photo ' + (photo.position + 1)
+            photo.isPrimary
+              ? t('vehicleWizard.cover')
+              : t('vehicleDetail.photoNumber', { number: photo.position + 1 })
           }}</span>
         </div>
       } @empty {
@@ -78,14 +84,14 @@
           <kh-icon name="car-simple" />
           <!-- "Add one" is an instruction only the owner can act on. -->
           <span class="photo-label">
-            {{ readOnly() ? 'No photos yet' : 'No photos yet — add one before publishing' }}
+            {{ readOnly() ? t('vehicleDetail.noPhotosYet') : t('vehicleDetail.noPhotosYetAddOne') }}
           </span>
         </div>
       }
     </div>
 
     <div class="tabs" role="tablist">
-      @for (option of tabs; track option.key) {
+      @for (option of tabs(); track option.key) {
         <button
           type="button"
           class="tab"
@@ -103,7 +109,9 @@
       @case ('overview') {
         <div class="dc-split-even">
           <section class="sect">
-            <div class="sect-h"><span class="sect-t">{{ t('vehicleDetail.informationAmpSpecifications') }}</span></div>
+            <div class="sect-h">
+              <span class="sect-t">{{ t('vehicleDetail.informationAmpSpecifications') }}</span>
+            </div>
             <div class="sect-pad kv-narrow">
               @for (row of info(); track row.k) {
                 <div class="kv">
@@ -118,7 +126,9 @@
           </section>
           <div class="stack stack-14">
             <section class="sect">
-              <div class="sect-h"><span class="sect-t">{{ t('vehicleDetail.pricingAmpDelivery') }}</span></div>
+              <div class="sect-h">
+                <span class="sect-t">{{ t('vehicleDetail.pricingAmpDelivery') }}</span>
+              </div>
               <div class="sect-pad kv-narrow">
                 @for (row of pricing(); track row.k) {
                   <div class="kv">
@@ -131,12 +141,14 @@
               </div>
             </section>
             <section class="sect sect-pad stack stack-9">
-              <span class="k">{{ current() ? 'Current rental' : 'Next rental' }}</span>
+              <span class="k">{{
+                current() ? t('vehicleDetail.currentRental') : t('vehicleDetail.nextRental')
+              }}</span>
               @if (current(); as b) {
                 <div class="queue-desc">
-                  {{ t('vehicleDetail.outOnBooking') }} <span class="mono s-accent">{{ b.reference }}</span> —
-                  {{ b.customerName }}, {{ period(b) }},
-                  {{ b.pickupMethod === 'Delivery' ? 'delivered' : 'collected' }}.
+                  {{ t('vehicleDetail.outOnBooking') }}
+                  <span class="mono s-accent ltr">{{ b.reference }}</span> —
+                  {{ currentRentalLine(b) }}
                 </div>
                 <a
                   class="btn btn-secondary btn-sm self-start"
@@ -145,9 +157,9 @@
                 >
               } @else if (next(); as b) {
                 <div class="queue-desc">
-                  {{ t('vehicleDetail.heldForBooking') }} <span class="mono s-accent">{{ b.reference }}</span> —
-                  {{ b.customerName }}, {{ period(b) }},
-                  {{ b.pickupMethod === 'Delivery' ? 'delivery' : 'pickup' }}.
+                  {{ t('vehicleDetail.heldForBooking') }}
+                  <span class="mono s-accent ltr">{{ b.reference }}</span> —
+                  {{ nextRentalLine(b) }}
                 </div>
                 <a
                   class="btn btn-secondary btn-sm self-start"
@@ -172,7 +184,9 @@
             >
               <kh-icon name="caret-left" />
             </button>
-            <span class="sect-t">{{ t('vehicleDetail.availability') }} {{ monthLabel() }}</span>
+            <span class="sect-t">{{
+              t('vehicleDetail.availabilityInMonth', { month: monthLabel() })
+            }}</span>
             <button
               type="button"
               class="btn btn-ghost btn-xs"
@@ -182,7 +196,7 @@
               <kh-icon name="caret-right" />
             </button>
             <div class="legend">
-              @for (l of legend; track l.label) {
+              @for (l of legend(); track l.label) {
                 <span class="legend-item"
                   ><span class="legend-dot" [class]="'s-' + l.tone"></span>{{ l.label }}</span
                 >
@@ -238,10 +252,10 @@
                   @for (b of bookings(); track b.bookingId) {
                     <tr class="rowlink" (click)="openBooking(b.bookingId)">
                       <td class="td mono">{{ b.reference }}</td>
-                      <td class="td">{{ b.customerName }}</td>
+                      <td class="td">{{ customerName(b) }}</td>
                       <td class="td">{{ period(b) }}</td>
                       <td class="td td-num">
-                        <span class="num">{{ b.totalPrice }} {{ b.currency }}</span>
+                        <span class="num">{{ total(b) }}</span>
                       </td>
                       <td class="td">
                         <span class="pill" [class]="'s-' + tone(b)">{{ label(b) }}</span>
@@ -266,10 +280,9 @@
                 <kh-icon name="calendar-plus" />
                 <div>
                   <div>
-                    <span class="mono">{{ e.reference }}</span> · {{ statusLabel(e.toStatus) }} by
-                    {{ e.actorName }}
+                    <span class="mono ltr">{{ e.reference }}</span> · {{ logLine(e) }}
                   </div>
-                  <div class="veh-log-ts">{{ when(e.occurredAt) }}</div>
+                  <div class="veh-log-ts">{{ formats.dayMonthTime(e.occurredAt) }}</div>
                 </div>
               </div>
             }
@@ -277,7 +290,7 @@
               <kh-icon name="plus-circle" />
               <div>
                 <div>{{ t('vehicleDetail.vehicleAdded') }}</div>
-                <div class="veh-log-ts">{{ when(c.createdAt) }}</div>
+                <div class="veh-log-ts">{{ formats.dayMonthTime(c.createdAt) }}</div>
               </div>
             </div>
             <div class="note-box is-plain">

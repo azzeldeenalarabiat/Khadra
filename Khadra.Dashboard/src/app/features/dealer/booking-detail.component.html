@@ -25,7 +25,9 @@
     <div class="dc-head">
       <div class="grow">
         <div class="row row-gap-9">
-          <h1 class="page-title">{{ t('common.booking') }} {{ b.reference }}</h1>
+          <h1 class="page-title">
+            {{ t('dealerBooking.bookingReference', { reference: b.reference }) }}
+          </h1>
           <span class="pill" [class]="'s-' + tone()">{{ label() }}</span>
         </div>
         <div class="page-sub">{{ meta() }}</div>
@@ -79,7 +81,9 @@
             <span class="sect-t">{{ t('dealerBooking.customer') }}</span>
           </div>
           <div class="sect-pad row row-gap-14">
-            <div class="customer-avatar">{{ initials(b.customerName) }}</div>
+            <div class="customer-avatar">
+              {{ b.customerAccountClosed ? '—' : initials(b.customerName) }}
+            </div>
             <div class="grow">
               @for (row of customerRows(); track row.k) {
                 <div class="kv">
@@ -114,7 +118,7 @@
                     @if (rep.dealerRating.average !== null) {
                       {{ rep.dealerRating.average }}
                       <span class="sect-hint">{{
-                        t('dealerBooking.ratingsCount', { count: rep.dealerRating.count })
+                        t('dealerBooking.fromRatings', { count: rep.dealerRating.count })
                       }}</span>
                     } @else {
                       <span class="sect-hint">{{ t('dealerBooking.notRatedYet') }}</span>
@@ -125,10 +129,11 @@
                   <span class="kv-key">{{ t('dealerBooking.completedRentals') }}</span
                   ><span class="kv-val"
                     >{{ rep.completedRentals }}
-                    <span class="sect-hint"
-                      >({{ rep.completedRentalsWithThisDealer }}
-                      {{ t('dealerBooking.withYou') }})</span
-                    ></span
+                    <span class="sect-hint">{{
+                      t('dealerBooking.completedWithYou', {
+                        rentals: rep.completedRentalsWithThisDealer,
+                      })
+                    }}</span></span
                   >
                 </div>
                 <div class="kv">
@@ -299,11 +304,12 @@
                         </div>
                       </div>
                       <div class="renter-doc-meta">
-                        {{ doc.format }} · {{ t('renterDocs.uploaded') }} {{ doc.uploadedAt }}
+                        {{ doc.format }} ·
+                        {{ t('renterDocs.uploadedWhen', { when: doc.uploadedAt }) }}
                       </div>
                       @if (doc.reviewedBy; as reviewer) {
                         <div class="renter-doc-meta">
-                          {{ t('renterDocs.reviewedBy') }} {{ reviewer }}
+                          {{ t('renterDocs.reviewedByReviewer', { reviewer: reviewer }) }}
                         </div>
                       }
                       @if (doc.isImage && isRevealed(doc.documentId)) {
@@ -421,10 +427,9 @@
           <div class="sect-h">
             <kh-icon name="currency-circle-dollar" class="kpi-icon" />
             <span class="sect-t">{{ t('dealerBooking.financial') }}</span>
-            <span class="sect-hint"
-              >{{ t('dealerBooking.allAmountsIn') }} {{ b.pricing.totalPrice.currency }}
-              {{ t('dealerBooking.frozenOnThisBooking') }}</span
-            >
+            <span class="sect-hint">{{
+              t('dealerBooking.allAmountsFrozen', { currency: b.pricing.totalPrice.currency })
+            }}</span>
           </div>
           <div class="sect-pad">
             @for (row of moneyRows(); track row.k) {
@@ -448,7 +453,7 @@
               <span class="sect-hint">{{ t('dealerBooking.thePlatformAnswersWithin') }}</span>
             </div>
             <div class="sect-pad stack stack-10">
-              @if (problem(); as message) {
+              @if (problemText(); as message) {
                 <div class="banner s-bad" role="alert">
                   <kh-icon name="warning-circle" class="banner-icon" />
                   <div class="banner-body">
@@ -478,7 +483,11 @@
                 />
                 @if (evidenceNames().length) {
                   <div class="field-hint">
-                    {{ t('dealerBooking.attached') }} {{ evidenceNames().join(', ') }}
+                    {{
+                      t('dealerDispute.evidenceAttached', {
+                        files: evidenceNames().join(t('common.listSeparator')),
+                      })
+                    }}
                   </div>
                 } @else {
                   <div class="field-hint">
@@ -492,7 +501,7 @@
                 [disabled]="disputeBusy() || !disputeReason().trim()"
                 (click)="openDispute()"
               >
-                {{ disputeBusy() ? 'Working…' : 'Open dispute' }}
+                {{ disputeBusy() ? t('common.working') : t('common.openDispute') }}
               </button>
             </div>
           </section>
@@ -513,18 +522,24 @@
             <span class="k">{{ t('common.handovers') }}</span>
             @for (h of b.handovers; track h.recordedAt) {
               <div class="history-line">
-                <span class="k-label">{{ h.type }} · {{ dateTime(h.recordedAt) }}</span
-                ><span class="num"
-                  >{{ h.odometerKm ?? '—' }} {{ t('dealerBooking.kmFuel') }}
-                  {{ h.fuelLevel ?? '—' }}</span
-                >
+                <span class="k-label"
+                  >{{ enumLabel('handoverType', h.type) }} · {{ dateTime(h.recordedAt) }}</span
+                ><span class="num">{{
+                  t('dealerBooking.odometerAndFuel', {
+                    km: number(h.odometerKm),
+                    fuel: number(h.fuelLevel),
+                  })
+                }}</span>
               </div>
               @if (h.notes) {
-                <div class="page-sub">“{{ h.notes }}”</div>
+                <!-- Typed at the counter: quoted as written, never translated. -->
+                <div class="page-sub">{{ t('disputeDetail.quoted', { text: h.notes }) }}</div>
               }
               @if (h.cashCollected) {
                 <div class="page-sub">
-                  {{ t('dealerBooking.cashCollected') }} {{ h.cashCollected | money }}
+                  {{
+                    t('dealerBooking.cashCollectedAmount', { amount: (h.cashCollected | money) })
+                  }}
                 </div>
               }
             }
@@ -536,20 +551,15 @@
             <span class="k">{{ t('common.penaltyAssessed') }}</span>
             <div class="history-line">
               <span class="k-label">{{ t('dealerBooking.attributedTo') }}</span
-              ><span>{{ b.penalty.attributedTo }}</span>
+              ><span>{{ enumLabel('party', b.penalty.attributedTo) }}</span>
             </div>
             <div class="history-line">
               <span class="k-label">{{ t('dealerBooking.amount') }}</span
-              ><span class="num"
-                >{{
-                  b.penalty.isRange
-                    ? b.penalty.minAmount.amount + '–' + b.penalty.maxAmount.amount
-                    : b.penalty.minAmount.amount
-                }}
-                {{ b.penalty.minAmount.currency }}</span
-              >
+              ><span class="num">{{ penaltyAmount() }}</span>
             </div>
-            <div class="page-sub">{{ b.penalty.reason }}</div>
+            <div class="page-sub" [class.ltr]="penaltyReasonIsFrozen(b.penalty)">
+              {{ penaltyReasonText(b.penalty) }}
+            </div>
             <div class="note-box is-plain">
               {{ t('dealerBooking.assessedNotChargedMoney') }}
             </div>
@@ -560,25 +570,27 @@
           <span class="k">{{ t('dealerBooking.termsFrozenOnThis') }}</span>
           <div class="history-line">
             <span class="k-label">{{ t('common.deposit') }}</span
-            ><span class="num">{{ b.terms.depositPercent }}%</span>
+            ><span class="num">{{ percent(b.terms.depositPercent) }}</span>
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerBooking.commission') }}</span
-            ><span class="num">{{ b.terms.commissionPercent }}%</span>
+            ><span class="num">{{ percent(b.terms.commissionPercent) }}</span>
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerBooking.freeCancellation') }}</span
-            ><span class="num"
-              >{{ b.terms.freeCancellationWindowHours
-              }}{{ t('dealerBooking.hAfterApproval') }}</span
-            >
+            ><span class="num">{{
+              t('dealerBooking.hoursAfterApproval', {
+                count: b.terms.freeCancellationWindowHours,
+              })
+            }}</span>
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerBooking.settlementWindow') }}</span
-            ><span class="num"
-              >{{ b.terms.postReturnSettlementWindowHours
-              }}{{ t('dealerBooking.hAfterReturn') }}</span
-            >
+            ><span class="num">{{
+              t('dealerBooking.hoursAfterReturn', {
+                count: b.terms.postReturnSettlementWindowHours,
+              })
+            }}</span>
           </div>
           <div class="history-line">
             <span class="k-label">{{ t('dealerBooking.rulesVersion') }}</span

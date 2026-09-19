@@ -7,6 +7,19 @@ import { DealerListItem } from '../../core/models/dealers.api';
 import { DataTableComponent } from '../../shared/data-table/data-table.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+
+/**
+ * The verification filters, as the values `GET /admin/dealers?status=` takes; null is every status.
+ * Machine values only: each chip is worded from its value by `statusLabel` when the view reads it.
+ */
+const VERIFICATION_FILTERS: readonly (string | null)[] = [
+  null,
+  'PendingReview',
+  'ClarificationNeeded',
+  'Approved',
+  'Rejected',
+];
 
 /**
  * The Admin's dealer queue, reading `GET /api/v1/admin/dealers`.
@@ -23,6 +36,8 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class DealersListComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  private readonly formats = inject(FormatService);
   private readonly service = inject(AdminDealersService);
 
   protected readonly resource = this.service.dealers;
@@ -34,13 +49,14 @@ export class DealersListComponent {
   protected readonly suspendedOnly = this.service.suspendedOnly;
   protected readonly search = this.service.search;
 
-  protected readonly statuses = [
-    { label: this.t('common.all'), value: null },
-    { label: this.t('kpi.pendingReview'), value: 'PendingReview' },
-    { label: this.t('gate.clarification.badge'), value: 'ClarificationNeeded' },
-    { label: this.t('status.approved'), value: 'Approved' },
-    { label: this.t('status.rejected'), value: 'Rejected' },
-  ];
+  // A computed, not a field initialiser: an initialiser resolves the words once, and the chips would
+  // go on reading the language the screen was opened in.
+  protected readonly statuses = computed(() =>
+    VERIFICATION_FILTERS.map((value) => ({
+      value,
+      label: value === null ? this.t('common.all') : this.i18n.statusLabel(value),
+    })),
+  );
 
   // "Registration" used to have its own column while also sitting under the dealer's name; the
   // duplicate went so that fleet size and rating -- what an admin judges a trading dealer on -- fit
@@ -66,10 +82,9 @@ export class DealersListComponent {
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
-    // One result reads 'Showing 1 of 1 dealer', not '1 dealers'. Every other list on the console
-    // already picks its noun by count; this one is phrased in the translation instead.
-    if (page.totalCount === 1) return this.t('dealersList.showingOne');
-    return this.t('dealersList.showing', { from, to, total: page.totalCount });
+    // One plural message on the total, so the noun agrees with it in both languages: 'Showing 1 of
+    // 1 dealer', and in Arabic مكتبان, 3 مكاتب, 11 مكتبًا, 100 مكتب.
+    return this.t('dealersList.showingRange', { from, to, count: page.totalCount });
   });
 
   protected readonly page = computed(() => this.loadedPage()?.page ?? 1);
@@ -121,12 +136,15 @@ export class DealersListComponent {
       {
         kind: 'entity',
         value: dealer.businessName,
-        sub: `CR ${dealer.commercialRegistrationNumber}`,
+        // The number is a parameter, so it is isolated as one Latin run inside Arabic.
+        sub: this.t('dealersList.commercialRegistration', {
+          number: dealer.commercialRegistrationNumber,
+        }),
       },
       { kind: 'badge', value: this.statusLabel(dealer), tone: this.statusTone(dealer) },
       {
         kind: 'text',
-        value: String(dealer.carCount),
+        value: this.formats.number(dealer.carCount),
         align: 'right',
         // An approved dealer with an empty fleet has finished nothing: they can trade and have
         // nothing to trade. Worth the admin's eye, which a plain "0" would not catch.
@@ -138,7 +156,10 @@ export class DealersListComponent {
       // the console would keep printing "of 3" after a fourth document type was required.
       {
         kind: 'text',
-        value: `${dealer.documentCount} of ${dealer.requiredDocumentCount}`,
+        value: this.t('dealersList.documentsOfRequired', {
+          have: dealer.documentCount,
+          need: dealer.requiredDocumentCount,
+        }),
         align: 'right',
         tone: dealer.documentCount < dealer.requiredDocumentCount ? 'warn' : undefined,
       },
@@ -170,21 +191,21 @@ export class DealersListComponent {
    */
   private ratingCell(dealer: DealerListItem): Cell {
     if (dealer.averageRating === null) {
-      return { kind: 'text', value: 'No reviews yet', variant: 'dim' };
+      return { kind: 'text', value: this.t('dealersList.noReviewsYet'), variant: 'dim' };
     }
 
     return {
       kind: 'text',
-      value: dealer.averageRating.toFixed(1),
-      sub: `${dealer.reviewCount} ${dealer.reviewCount === 1 ? 'review' : 'reviews'}`,
+      value: this.formats.number(dealer.averageRating, 1),
+      sub: this.t('dealersList.reviewCount', { count: dealer.reviewCount }),
       align: 'right',
     };
   }
 
   /** Suspension is reported ahead of verification: it is what actually stops the business trading. */
   private statusLabel(dealer: DealerListItem): string {
-    if (dealer.isSuspended) return 'Suspended';
-    return dealer.verificationStatus.replace(/([a-z])([A-Z])/g, '$1 $2');
+    if (dealer.isSuspended) return this.t('status.suspended');
+    return this.i18n.statusLabel(dealer.verificationStatus);
   }
 
   private statusTone(dealer: DealerListItem): Tone {
@@ -210,11 +231,13 @@ export class DealersListComponent {
     const now = Date.now();
     const started = Date.parse(dealer.submittedAt);
     const due = Date.parse(dealer.reviewDueAt);
-    const overdue = due <= now;
-    const hours = Math.round(Math.abs(due - now) / 3_600_000);
+    // The list row carries no breach flag of its own, so this clock is the only answer here; the
+    // review screen, which has the server's isBreachingSla, consults both.
+    const reading = this.formats.sla(dealer.reviewDueAt, false, now);
+    const overdue = reading.passed;
     return {
       kind: 'text',
-      value: overdue ? `${hours}h over` : `${hours}h left`,
+      value: reading.text,
       // At risk as a fraction of the window this application froze, not a literal 12 hours. The 12
       // was 0.75 of a 48-hour SLA and would have stopped meaning anything the moment the SLA moved.
       tone: overdue ? 'bad' : isAtRisk(started, due, now) ? 'warn' : undefined,
@@ -222,14 +245,12 @@ export class DealersListComponent {
   }
 
   private actionLabel(dealer: DealerListItem): string {
-    return dealer.verificationStatus === 'PendingReview' ? 'Review' : 'Open';
+    return dealer.verificationStatus === 'PendingReview'
+      ? this.t('queue.actionReview')
+      : this.t('queue.actionOpen');
   }
 
   private date(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return this.formats.date(iso);
   }
 }

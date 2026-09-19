@@ -29,7 +29,9 @@
           <h1 class="page-title">{{ c.fullName }}</h1>
           <span class="pill" [class]="'s-' + tone()">{{ accountStatusLabel() }}</span>
         </div>
-        <div class="page-sub">{{ c.email }} · {{ c.phone }}</div>
+        <div class="page-sub">
+          <span class="ltr">{{ c.email }}</span> · <span class="ltr">{{ c.phone }}</span>
+        </div>
       </div>
       <div class="dc-head-actions">
         <a
@@ -53,7 +55,13 @@
             @for (row of accountRows(); track row.k) {
               <div class="kv-split">
                 <div class="kv-key">{{ row.k }}</div>
-                <div class="kv-val">{{ row.v }}</div>
+                <div class="kv-val">
+                  @if (row.ltr) {
+                    <span class="ltr">{{ row.v }}</span>
+                  } @else {
+                    {{ row.v }}
+                  }
+                </div>
               </div>
             }
           </div>
@@ -64,7 +72,11 @@
             <kh-icon name="identification-card" class="kpi-icon" />
             <span class="sect-t">{{ t('common.documentsOnFile') }}</span>
             <span class="sect-hint" [class.s-ok]="c.hasCompleteRenterDocuments">
-              {{ c.hasCompleteRenterDocuments ? 'Complete to rent' : 'Incomplete' }}
+              {{
+                c.hasCompleteRenterDocuments
+                  ? t('customersList.completeToRent')
+                  : t('customersList.incomplete')
+              }}
             </span>
           </div>
           @if (c.documents.length) {

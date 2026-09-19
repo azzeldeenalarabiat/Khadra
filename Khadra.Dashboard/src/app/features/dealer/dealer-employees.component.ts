@@ -7,6 +7,8 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 
 /**
  * Staff (spec 4.2, design `isEmployees`).
@@ -31,6 +33,8 @@ import { I18nService } from '../../core/i18n/i18n.service';
   imports: [IconComponent, RouterLink],
 })
 export class DealerEmployeesComponent {
+  private readonly i18n = inject(I18nService);
+  private readonly formats = inject(FormatService);
   protected readonly t = inject(I18nService).t;
   // Server enum names, in the reader's language. Shared rather than per-component: the same enum
   // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
@@ -87,11 +91,10 @@ export class DealerEmployeesComponent {
   });
 
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as
-      { status?: number; error?: { code?: string } } | undefined;
+    const error = this.resource.error();
     if (!error) return null;
     // Reachable when standing changes under an open screen -- a suspension landing mid-session.
-    if (error.status === 403) return this.t('dealerStaff.yourDealershipCanNo');
+    if (snapshotProblem(error).status === 403) return this.t('dealerStaff.yourDealershipCanNo');
     return this.t('dealerStaff.yourStaffListCould');
   });
 
@@ -108,13 +111,7 @@ export class DealerEmployeesComponent {
   }
 
   protected when(iso: string | null): string {
-    if (!iso) return 'Never';
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return iso ? this.formats.dayMonthTime(iso) : this.t('common.never');
   }
 
   protected invite(): void {
@@ -127,9 +124,11 @@ export class DealerEmployeesComponent {
         confirm: this.t('dealerEmployees.sendInvitation'),
         fields: [
           { name: 'fullName', label: this.t('employeeSettings.fullName'), type: 'text', placeholder: this.t('dealerEmployees.eGAhmadZaid') },
-          { name: this.t('dealerStaff.email'), label: this.t('dealerSettings.email'), type: 'text', placeholder: 'name@example.jo' },
+          // `name` is the key the dialog returns the value under, read back below: a machine value,
+          // never a translated word (a translated one left every Arabic invitation "missing" its email).
+          { name: 'email', label: this.t('dealerSettings.email'), type: 'text', placeholder: 'name@example.jo' },
           {
-            name: this.t('dealerStaff.phone'),
+            name: 'phone',
             label: this.t('customerProfile.phone'),
             type: 'text',
             placeholder: '07XXXXXXXX',
@@ -172,7 +171,7 @@ export class DealerEmployeesComponent {
       e.employeeId,
       () => this.service.resendInvitation(e.employeeId),
       this.t('dealerStaff.invitationResent'),
-      `A fresh link is on its way to ${e.email}.`,
+      this.t('dealerEmployees.freshLinkOnItsWay', { email: e.email }),
     );
   }
 
@@ -183,8 +182,8 @@ export class DealerEmployeesComponent {
       () => this.service.setReportAccess(e.employeeId, grant),
       grant ? this.t('dealerStaff.reportAccessGranted') : this.t('dealerStaff.reportAccessRemoved'),
       grant
-        ? `${e.fullName} can now see revenue and reports.`
-        : `${e.fullName} can still handle bookings; reports are hidden.`,
+        ? this.t('dealerEmployees.canNowSeeReports', { name: e.fullName })
+        : this.t('dealerEmployees.reportsNowHidden', { name: e.fullName }),
     );
   }
 
@@ -194,12 +193,12 @@ export class DealerEmployeesComponent {
         icon: 'user-minus',
         tone: 'bad',
         danger: true,
-        title: `Deactivate ${e.fullName}?`,
+        title: this.t('dealerEmployees.deactivateName', { name: e.fullName }),
         body: this.t('dealerEmployees.theyAreSignedOut'),
-        confirm: 'Deactivate',
+        confirm: this.t('common.deactivate'),
         result: {
           title: this.t('dealerEmployees.staffMemberDeactivated'),
-          body: `${e.fullName} no longer has access.`,
+          body: this.t('dealerEmployees.noLongerHasAccess', { name: e.fullName }),
           tone: 'warn',
         },
       },
@@ -210,7 +209,7 @@ export class DealerEmployeesComponent {
       },
       {
         title: this.t('dealerEmployees.staffMemberDeactivated'),
-        body: `${e.fullName} no longer has access.`,
+        body: this.t('dealerEmployees.noLongerHasAccess', { name: e.fullName }),
         tone: 'warn',
       },
     );
@@ -222,8 +221,8 @@ export class DealerEmployeesComponent {
     // `status` is on the record, so the sentence can say which of the two this is.
     const back =
       e.status === 'Invited'
-        ? `${e.fullName} still needs to accept their invitation and set a password.`
-        : `${e.fullName} can sign in again with their existing password.`;
+        ? this.t('dealerEmployees.stillNeedsToAccept', { name: e.fullName })
+        : this.t('dealerEmployees.canSignInAgain', { name: e.fullName });
     await this.run(
       e.employeeId,
       () => this.service.reactivate(e.employeeId),
@@ -246,10 +245,10 @@ export class DealerEmployeesComponent {
       this.service.refreshMe();
       this.ui.showToast(title, body);
     } catch (error) {
-      const p = error as { error?: { title?: string } };
       this.ui.showToast(
         this.t('vehicleDetail.thatDidNotGo'),
-        p.error?.title ?? this.t('vehicleDetail.theServiceDidNot'),
+        serverSentence(snapshotProblem(error), this.i18n.lang(), this.t) ??
+          this.t('vehicleDetail.theServiceDidNot'),
         'bad',
       );
     } finally {

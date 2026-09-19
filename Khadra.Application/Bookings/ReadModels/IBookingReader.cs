@@ -23,8 +23,14 @@ public sealed record BookingListItem(
     DateTimeOffset CreatedAt,
     // Null when the car has since been removed from the platform: the booking outlives the listing.
     VehicleLabel? Vehicle,
+    // Kept as a string (an English stand-in when the dealership no longer resolves) only for older customer apps.
     string DealerName,
+    // True exactly when the dealership no longer resolves, so DealerName holds the stand-in.
+    bool DealerRemoved,
+    // Kept as a string (an English stand-in when the account no longer resolves) only for older clients.
     string CustomerName,
+    // True exactly when the customer's account no longer resolves, so CustomerName holds the stand-in.
+    bool CustomerAccountClosed,
     bool HasLiveDispute,
     // Both parties by id, so a platform-wide row can open the dealership or the customer behind it.
     // A dealer or customer reading their own list already knows one of them; the Admin knows neither.
@@ -39,8 +45,14 @@ public sealed record BookingListItem(
 /// </remarks>
 public sealed record BookingContext(
     VehicleLabel? Vehicle,
+    // Kept as a string (an English stand-in when the dealership no longer resolves) only for older customer apps.
     string DealerName,
+    // True exactly when the dealership no longer resolves, so DealerName holds the stand-in.
+    bool DealerRemoved,
+    // Kept as a string (an English stand-in when the account no longer resolves) only for older clients.
     string CustomerName,
+    // True exactly when the customer's account no longer resolves, so CustomerName holds the stand-in.
+    bool CustomerAccountClosed,
     Guid? LiveDisputeId,
     /// <summary>
     /// The customer's own review of this booking, if they have left one.

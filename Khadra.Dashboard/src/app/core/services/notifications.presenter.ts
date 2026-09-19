@@ -2,7 +2,8 @@ import { AttentionQueue } from '../models/dashboard.api';
 import { DealerDashboard } from '../models/dealer-console.api';
 import { Tone } from '../models/console.models';
 import { IconName } from '../../shared/icon/icon-paths';
-import { Translate, relativeTime, toQueueItems } from './dashboard.presenter';
+import { relativeTime } from '../i18n/relative-time';
+import { Translate, toQueueItems } from './dashboard.presenter';
 
 /** One line in the notifications panel. Every field is derived from a record the server sent. */
 export interface NotificationRow {
@@ -50,6 +51,7 @@ export function toDealerNotifications(
   dashboard: DealerDashboard | null,
   now: number,
   t: Translate,
+  localeTag: string,
 ): readonly NotificationRow[] {
   if (!dashboard) return [];
   const rows: NotificationRow[] = [];
@@ -62,7 +64,7 @@ export function toDealerNotifications(
       // between two of them in TypeScript picks the wrong one for every count from two upwards.
       title: t('notifications.carsOverdue', { count: n }),
       detail: t('notifications.pastTheEndOf'),
-      when: 'Overdue',
+      when: t('notifications.overdue'),
       tone: 'bad',
       icon: 'warning-circle',
       route: '/dealer/bookings',
@@ -77,22 +79,29 @@ export function toDealerNotifications(
       // The oldest is the one closest to expiring, so it is the fact worth carrying.
       detail: dashboard.bookings.oldestRequestedAt
         ? t('notifications.oldestAndExpiry', {
-            when: relativeTime(dashboard.bookings.oldestRequestedAt, now, t),
+            when: relativeTime(dashboard.bookings.oldestRequestedAt, now, localeTag),
           })
         : t('notifications.aRequestExpiresWhen'),
-      when: 'To answer',
+      when: t('notifications.toAnswer'),
       tone: 'warn',
       icon: 'calendar-check',
       route: '/dealer/bookings',
     });
   }
 
+  // The vehicle and the customer can both be gone by the time a handover is due. The server says so
+  // with a null rather than an English phrase, and the console words it.
+  const vehicle = (label: string | null): string =>
+    label ?? t('dealerBookings.vehicleNoLongerListed');
+  const customer = (name: string | null): string => name ?? t('common.customerAccountClosed');
+
   for (const pickup of dashboard.upcomingPickups) {
     rows.push({
       id: `pickup:${pickup.bookingId}`,
-      title: `Pickup — ${pickup.vehicleLabel}`,
-      detail: `${pickup.customerName} · ${pickup.reference}`,
-      when: relativeTime(pickup.when, now, t),
+      title: t('notifications.pickupRow', { vehicle: vehicle(pickup.vehicleLabel) }),
+      detail: `${customer(pickup.customerName)} · ${pickup.reference}`,
+      // Forwards as well as backwards: an upcoming pickup reads "in 3 hr", not "Just now".
+      when: relativeTime(pickup.when, now, localeTag),
       tone: pickup.isOverdue ? 'bad' : 'accent',
       icon: pickup.pickupMethod === 'Delivery' ? 'moped' : 'map-pin',
       route: `/dealer/bookings/${pickup.bookingId}`,
@@ -102,9 +111,9 @@ export function toDealerNotifications(
   for (const back of dashboard.upcomingReturns) {
     rows.push({
       id: `return:${back.bookingId}`,
-      title: `Return — ${back.vehicleLabel}`,
-      detail: `${back.customerName} · ${back.reference}`,
-      when: relativeTime(back.when, now, t),
+      title: t('notifications.returnRow', { vehicle: vehicle(back.vehicleLabel) }),
+      detail: `${customer(back.customerName)} · ${back.reference}`,
+      when: relativeTime(back.when, now, localeTag),
       tone: back.isOverdue ? 'bad' : 'ok',
       icon: 'arrow-u-down-left',
       route: `/dealer/bookings/${back.bookingId}`,

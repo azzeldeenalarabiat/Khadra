@@ -255,4 +255,97 @@ public sealed class BookingReaderTests : IDisposable
         Assert.Null(await NextAsync());
     }
 
+    // ── Parties that no longer resolve ───────────────────────────────────────
+    //
+    // A booking outlives its dealership and its customer. The name fields stay strings, with an
+    // English stand-in, because shipped customer apps print them as they arrive; the flags are what a
+    // client that words the case in its reader's language reads instead. Both are taken from ONE read
+    // of each name, so a flag and its stand-in can never disagree.
+
+    /// <summary>A dealership and a customer that both still resolve: real names, no flag.</summary>
+    [Fact]
+    public async Task Parties_that_still_resolve_are_named_and_raise_no_flag()
+    {
+        var (dealer, customer, booking) = await SaveWithPartiesAsync(deleteDealer: false, deleteCustomer: false);
+
+        await using var read = NewContext();
+        var reader = new BookingReader(read);
+
+        var context = await reader.ContextAsync(booking.Id);
+        Assert.Equal(dealer.BusinessName.Value, context.DealerName);
+        Assert.False(context.DealerRemoved);
+        Assert.Equal(customer.Name.Value, context.CustomerName);
+        Assert.False(context.CustomerAccountClosed);
+
+        var row = Assert.Single((await reader.ListAsync(new BookingListFilter(null, dealer.Id, null), PageRequest.From(1, 50))).Items);
+        Assert.Equal(dealer.BusinessName.Value, row.DealerName);
+        Assert.False(row.DealerRemoved);
+        Assert.Equal(customer.Name.Value, row.CustomerName);
+        Assert.False(row.CustomerAccountClosed);
+    }
+
+    /// <summary>
+    /// A dealership that left the platform and a customer who closed their account: each says so by
+    /// its flag, and the stand-in older apps print is still there.
+    /// </summary>
+    [Fact]
+    public async Task Parties_that_no_longer_resolve_are_flagged_and_keep_the_stand_in()
+    {
+        var (dealer, _, booking) = await SaveWithPartiesAsync(deleteDealer: true, deleteCustomer: true);
+
+        await using var read = NewContext();
+        var reader = new BookingReader(read);
+
+        var context = await reader.ContextAsync(booking.Id);
+        Assert.True(context.DealerRemoved);
+        Assert.Equal("Dealer no longer on the platform", context.DealerName);
+        Assert.True(context.CustomerAccountClosed);
+        Assert.Equal("Customer account closed", context.CustomerName);
+
+        var row = Assert.Single((await reader.ListAsync(new BookingListFilter(null, dealer.Id, null), PageRequest.From(1, 50))).Items);
+        Assert.True(row.DealerRemoved);
+        Assert.Equal("Dealer no longer on the platform", row.DealerName);
+        Assert.True(row.CustomerAccountClosed);
+        Assert.Equal("Customer account closed", row.CustomerName);
+    }
+
+    /// <summary>One gone and one not: the flags are independent, not one "something is missing" bit.</summary>
+    [Fact]
+    public async Task Each_party_is_flagged_on_its_own()
+    {
+        var (dealer, customer, booking) = await SaveWithPartiesAsync(deleteDealer: false, deleteCustomer: true);
+
+        await using var read = NewContext();
+        var context = await new BookingReader(read).ContextAsync(booking.Id);
+
+        Assert.False(context.DealerRemoved);
+        Assert.Equal(dealer.BusinessName.Value, context.DealerName);
+        Assert.True(context.CustomerAccountClosed);
+        Assert.NotEqual(customer.Name.Value, context.CustomerName);
+    }
+
+    private async Task<(Khadra.Domain.Dealers.Dealer Dealer, Khadra.Domain.IdentityAccess.User Customer, Booking Booking)> SaveWithPartiesAsync(
+        bool deleteDealer,
+        bool deleteCustomer)
+    {
+        var dealer = Build.ApprovedDealer(businessName: "Wadi Rum Rentals", commercialRegistration: "778899");
+        var customer = Build.Customer(email: "parties@example.jo", phone: "0797654321");
+        var booking = Build.Booking(customerId: customer.Id, dealerId: dealer.Id);
+
+        if (deleteDealer)
+            Assert.True(dealer.Delete(Build.Now).IsSuccess);
+        if (deleteCustomer)
+        {
+            Assert.True(customer.Delete(Build.Now).IsSuccess);
+            customer.ClearDomainEvents();
+        }
+
+        await using var write = NewContext();
+        write.Dealers.Add(dealer);
+        write.Users.Add(customer);
+        write.Bookings.Add(booking);
+        await write.SaveChangesAsync();
+
+        return (dealer, customer, booking);
+    }
 }

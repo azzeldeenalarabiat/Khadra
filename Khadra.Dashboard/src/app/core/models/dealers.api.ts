@@ -119,9 +119,26 @@ export interface DealerDocumentLink {
   readonly expiresAt: string;
 }
 
+/**
+ * One step of an application's history, as facts. The server sends no sentence: the console words
+ * every step, in the reader's language.
+ */
 export interface DealerReviewTimelineEntry {
-  readonly label: string;
-  readonly detail: string;
+  readonly step:
+    'Submitted' | 'DocumentsAttached' | 'Decision' | 'Resubmitted' | 'AwaitingDecision';
+  /**
+   * On a `Decision` step, the DealerVerificationStatus name that decision recorded, or null when the
+   * record can no longer say which: once the dealer resubmits, a clarification request and a rejection
+   * leave the same trace. Null on every other step.
+   */
+  readonly decision: string | null;
+  /** On a `Decision` step, the reviewer's note, or null when none is on record. Null on every other step. */
+  readonly note: string | null;
+  /** On `DocumentsAttached`, how many documents are on file. Null on every other step. */
+  readonly documentCount: number | null;
+  /** On `DocumentsAttached`, how many an approval requires, from the server. Null on every other step. */
+  readonly requiredDocumentCount: number | null;
+  /** When it happened; on `AwaitingDecision`, the review deadline frozen on the application. */
   readonly occurredAt: string;
   readonly isComplete: boolean;
 }

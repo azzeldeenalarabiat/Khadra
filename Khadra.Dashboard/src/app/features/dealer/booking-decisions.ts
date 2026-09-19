@@ -10,6 +10,23 @@ const FUEL = 'fuelLevel';
 const CASH = 'cashCollected';
 
 /**
+ * Codes the API accepts (RejectionReasons.Labels), each with the KEY of the words the dealer picks
+ * from, in the order they are offered.
+ *
+ * The code is what travels; the label is only what is read, and it is resolved when the dialog opens
+ * so the list follows the language. They were the same string once, and the dialog matched the
+ * chosen WORDS back to a code — which meant an Arabic label matched nothing and every rejection was
+ * filed as 'Other'.
+ */
+const REJECTION_REASONS: Readonly<Record<string, TranslationKey>> = {
+  VehicleUnavailable: 'dealerDecide.reason.vehicleUnavailable',
+  DatesConflict: 'dealerDecide.reason.datesConflict',
+  OutsideDeliveryRadius: 'dealerDecide.reason.outsideRadius',
+  CustomerVerificationIncomplete: 'dealerDecide.reason.verificationIncomplete',
+  Other: 'dealerDecide.reason.other',
+};
+
+/**
  * The dealer's decisions on a booking, each behind the console's confirmation dialog so the
  * consequence is stated before it happens and the outcome reported back (design: `modals()`).
  *
@@ -20,27 +37,6 @@ export class BookingDecisions {
   private readonly service = inject(DealerBookingsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly t = inject(I18nService).t;
-
-  /**
-   * Codes the API accepts (RejectionReasons.Labels), with the words the dealer picks from.
-   *
-   * The code is what travels; the label is only what is read, and it is resolved fresh so the list
-   * follows the language. They were the same string once, and the dialog matched the chosen WORDS
-   * back to a code — which meant an Arabic label matched nothing and every rejection was filed as
-   * 'Other'.
-   */
-  get rejectionReasons(): readonly { readonly code: string; readonly label: string }[] {
-    return [
-      { code: 'VehicleUnavailable', label: this.t('dealerDecide.reason.vehicleUnavailable') },
-      { code: 'DatesConflict', label: this.t('dealerDecide.reason.datesConflict') },
-      { code: 'OutsideDeliveryRadius', label: this.t('dealerDecide.reason.outsideRadius') },
-      {
-        code: 'CustomerVerificationIncomplete',
-        label: this.t('dealerDecide.reason.verificationIncomplete'),
-      },
-      { code: 'Other', label: this.t('dealerDecide.reason.other') },
-    ];
-  }
 
   approve(bookingId: string, reference: string, customer: string, done: () => void): void {
     this.ui.openAction(
@@ -78,7 +74,11 @@ export class BookingDecisions {
   }
 
   reject(bookingId: string, reference: string, done: () => void): void {
-    const reasons = this.rejectionReasons;
+    // The API code IS the option value, so nothing has to be matched back from the words.
+    const reasons = Object.entries(REJECTION_REASONS).map(([code, key]) => ({
+      value: code,
+      label: this.t(key),
+    }));
     this.ui.openAction(
       {
         icon: 'x-circle',
@@ -91,8 +91,7 @@ export class BookingDecisions {
             name: 'reason',
             label: this.t('dealerDecide.reject.reasonLabel'),
             type: 'select',
-            // The API code IS the option value, so nothing has to be matched back from the words.
-            options: reasons.map((r) => ({ value: r.code, label: r.label })),
+            options: reasons,
           },
           {
             name: 'details',
@@ -109,7 +108,7 @@ export class BookingDecisions {
         },
       },
       async (values) => {
-        const code = values['reason'] ?? reasons[0].code;
+        const code = values['reason'] ?? reasons[0].value;
         const details = values['details']?.trim();
         if (!details) throw { error: { title: this.t('dealerDecide.reject.needDetails') } };
         await this.service.reject(bookingId, code, details);
@@ -123,7 +122,18 @@ export class BookingDecisions {
     );
   }
 
-  recordPickup(bookingId: string, reference: string, vehicle: string, done: () => void): void {
+  /**
+   * `currency` is the booking's own: the server records the cash in the currency the booking was
+   * priced in, so that is the code the field names. It used to say "(JOD)" whatever the booking was.
+   */
+  recordPickup(
+    bookingId: string,
+    reference: string,
+    vehicle: string,
+    currency: string,
+    done: () => void,
+  ): void {
+    const cashLabel = this.t('dealerDecide.cashLabelIn', { currency });
     this.ui.openAction(
       {
         icon: 'key',
@@ -147,7 +157,7 @@ export class BookingDecisions {
           },
           {
             name: CASH,
-            label: this.t('dealerDecide.cashLabel'),
+            label: cashLabel,
             type: 'text',
             optional: true,
             placeholder: this.t('dealerDecide.pickup.cashPlaceholder'),
@@ -168,7 +178,7 @@ export class BookingDecisions {
         },
       },
       async (values) => {
-        await this.service.recordPickup(bookingId, this.handover(values));
+        await this.service.recordPickup(bookingId, this.handover(values, cashLabel));
         done();
       },
       {
@@ -178,7 +188,15 @@ export class BookingDecisions {
     );
   }
 
-  recordReturn(bookingId: string, reference: string, vehicle: string, done: () => void): void {
+  /** `currency` is the booking's own, as for a pickup. */
+  recordReturn(
+    bookingId: string,
+    reference: string,
+    vehicle: string,
+    currency: string,
+    done: () => void,
+  ): void {
+    const cashLabel = this.t('dealerDecide.cashLabelIn', { currency });
     this.ui.openAction(
       {
         icon: 'arrow-square-in',
@@ -202,7 +220,7 @@ export class BookingDecisions {
           },
           {
             name: CASH,
-            label: this.t('dealerDecide.cashLabel'),
+            label: cashLabel,
             type: 'text',
             optional: true,
             placeholder: this.t('dealerDecide.return.cashPlaceholder'),
@@ -223,7 +241,7 @@ export class BookingDecisions {
         },
       },
       async (values) => {
-        await this.service.recordReturn(bookingId, this.handover(values));
+        await this.service.recordReturn(bookingId, this.handover(values, cashLabel));
         done();
       },
       {
@@ -240,21 +258,24 @@ export class BookingDecisions {
    * the caption returned `undefined` for all three, `number()` turned that into `null`, and the
    * handover was recorded with no odometer, no fuel and no cash, silently. The constants above are
    * the same ones the fields are declared with, so the two cannot drift apart again.
+   *
+   * `cashLabel` is the cash field's caption as the dialog showed it, currency and all, so a refusal
+   * names the field the dealer can see.
    */
-  private handover(values: Record<string, string>): HandoverInput {
-    const number = (name: string, labelKey: TranslationKey): number | null => {
+  private handover(values: Record<string, string>, cashLabel: string): HandoverInput {
+    const number = (name: string, label: string): number | null => {
       const raw = values[name]?.trim();
       if (!raw) return null;
       const parsed = Number(raw);
       if (!Number.isFinite(parsed)) {
-        throw { error: { title: this.t('dealerDecide.mustBeANumber', { field: this.t(labelKey) }) } };
+        throw { error: { title: this.t('dealerDecide.mustBeANumber', { field: label }) } };
       }
       return parsed;
     };
     return {
-      odometerKm: number(ODOMETER, 'dealerDecide.odometerLabel'),
-      fuelLevel: number(FUEL, 'dealerDecide.fuelLabel'),
-      cashCollected: number(CASH, 'dealerDecide.cashLabel'),
+      odometerKm: number(ODOMETER, this.t('dealerDecide.odometerLabel')),
+      fuelLevel: number(FUEL, this.t('dealerDecide.fuelLabel')),
+      cashCollected: number(CASH, cashLabel),
       notes: values['notes']?.trim() || null,
     };
   }

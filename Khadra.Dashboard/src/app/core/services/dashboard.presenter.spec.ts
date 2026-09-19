@@ -6,9 +6,7 @@ import { resolveMessage } from '../i18n/resolve';
 import { Translate } from './dashboard.presenter';
 
 /** Resolves real English, so these assertions still read as the words an admin sees. */
-const t: Translate = (key, params) =>
-  resolveMessage(EN[key], params, 'en-GB', false) ?? key;
-
+const t: Translate = (key, params) => resolveMessage(EN[key], params, 'en-GB', false) ?? key;
 
 /**
  * Where a "Requires attention" row leads.
@@ -138,7 +136,7 @@ describe('toTrendBars', () => {
   });
 
   it('draws a bar for every day, including the ones with no bookings', () => {
-    const bars = toTrendBars(trend([5, 0, 3]));
+    const bars = toTrendBars(trend([5, 0, 3]), t, 'en-GB');
 
     expect(bars).toHaveLength(3);
     expect(bars.map((bar) => bar.count)).toEqual([5, 0, 3]);
@@ -148,20 +146,20 @@ describe('toTrendBars', () => {
   });
 
   it('scales every bar against the busiest day', () => {
-    const bars = toTrendBars(trend([10, 5]));
+    const bars = toTrendBars(trend([10, 5]), t, 'en-GB');
 
     expect(bars[0].height).toBe(88);
     expect(bars[1].height).toBe(44);
   });
 
   it('keeps a single booking visible rather than rounding it away', () => {
-    const bars = toTrendBars(trend([100, 1]));
+    const bars = toTrendBars(trend([100, 1]), t, 'en-GB');
 
     expect(bars[1].height).toBeGreaterThanOrEqual(6);
   });
 
   it('says what each bar is, so a figure can be checked against the bookings', () => {
-    const bars = toTrendBars(trend([17, 1]));
+    const bars = toTrendBars(trend([17, 1]), t, 'en-GB');
 
     expect(bars[0].label).toContain('17 bookings');
     expect(bars[1].label).toContain('1 booking');
@@ -170,7 +168,7 @@ describe('toTrendBars', () => {
 
   /** A fortnight of daily ticks would be a smear, so only some bars are labelled. */
   it('labels the ends of the window and thins the rest', () => {
-    const bars = toTrendBars(trend(Array.from({ length: 14 }, () => 1)));
+    const bars = toTrendBars(trend(Array.from({ length: 14 }, () => 1)), t, 'en-GB');
     const labelled = bars.filter((bar) => bar.tick !== '');
 
     expect(bars[0].tick).not.toBe('');
@@ -179,7 +177,7 @@ describe('toTrendBars', () => {
   });
 
   it('draws no bars at all rather than a flat row when nothing was booked', () => {
-    const bars = toTrendBars(trend([0, 0, 0]));
+    const bars = toTrendBars(trend([0, 0, 0]), t, 'en-GB');
 
     expect(bars.every((bar) => bar.height === 0)).toBe(true);
     expect(busiestDay(trend([0, 0, 0]))).toBe(0);

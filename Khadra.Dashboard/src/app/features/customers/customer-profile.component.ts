@@ -9,6 +9,30 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { TranslationKey } from '../../core/i18n/en';
+import { spellEnumName } from '../../core/i18n/status-key';
+
+/** An account row. `ltr` marks a Latin run -- an email, a "+962" number -- the template isolates. */
+interface AccountRow extends KeyValue {
+  readonly ltr?: boolean;
+}
+
+/** What each `CustomerDocumentType` is called; the same words the dealer's renter panel uses. */
+const DOCUMENT_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
+  DrivingLicenceFront: 'renterDocs.type.drivingLicenceFront',
+  DrivingLicenceBack: 'renterDocs.type.drivingLicenceBack',
+  NationalId: 'renterDocs.type.nationalId',
+  Passport: 'renterDocs.type.passport',
+};
+
+/** The formats an upload is stored as, worded. Anything else is shown as the MIME type it is. */
+const FORMAT_LABELS: Readonly<Record<string, TranslationKey>> = {
+  'application/pdf': 'docFormat.pdf',
+  'image/jpeg': 'docFormat.jpeg',
+  'image/png': 'docFormat.png',
+  'image/webp': 'docFormat.webp',
+};
 
 /**
  * One customer: their account, what they have on file, and their history with the platform.
@@ -27,6 +51,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class CustomerProfileComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(AdminCustomersService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -75,18 +100,27 @@ export class CustomerProfileComponent {
   /** A document's status, straight from the server's enum. */
   protected readonly statusLabel = inject(I18nService).statusLabel;
 
-  protected readonly accountRows = computed<readonly KeyValue[]>(() => {
+  protected readonly accountRows = computed<readonly AccountRow[]>(() => {
     const customer = this.customer();
     if (!customer) return [];
-    const rows: KeyValue[] = [
-      { k: this.t('dealerSettings.email'), v: customer.email },
-      { k: this.t('customerProfile.phone'), v: customer.phone },
+    const rows: AccountRow[] = [
+      { k: this.t('dealerSettings.email'), v: customer.email, ltr: true },
+      { k: this.t('customerProfile.phone'), v: customer.phone, ltr: true },
       {
         k: this.t('customerProfile.emailVerified'),
-        v: customer.isEmailVerified ? this.when(customer.emailVerifiedAt) : 'No',
+        v: customer.isEmailVerified ? this.when(customer.emailVerifiedAt) : this.t('common.no'),
       },
-      { k: this.t('customerProfile.dateOfBirth'), v: customer.dateOfBirth ?? this.t('customerProfile.notGiven') },
-      { k: this.t('customerProfile.foreignNational'), v: customer.isForeignNational ? 'Yes' : 'No' },
+      // Printed as the server sends it (YYYY-MM-DD): a calendar date, not an instant, and the
+      // formatter has no calendar-date form that keeps the year.
+      {
+        k: this.t('customerProfile.dateOfBirth'),
+        v: customer.dateOfBirth ?? this.t('customerProfile.notGiven'),
+        ltr: customer.dateOfBirth !== null,
+      },
+      {
+        k: this.t('customerProfile.foreignNational'),
+        v: customer.isForeignNational ? this.t('common.yes') : this.t('common.no'),
+      },
       { k: this.t('customersList.joined'), v: this.when(customer.createdAt) },
       { k: this.t('adminUsers.lastSignedIn'), v: this.when(customer.lastLoginAt) },
     ];
@@ -100,11 +134,11 @@ export class CustomerProfileComponent {
     const totals = this.customer()?.bookings;
     if (!totals) return [];
     return [
-      { k: this.t('bookingsList.total'), v: String(totals.total) },
-      { k: this.t('customerProfile.liveNow'), v: String(totals.live) },
-      { k: this.t('status.completed'), v: String(totals.completed) },
-      { k: this.t('status.cancelled'), v: String(totals.cancelled) },
-      { k: this.t('dealerBooking.noShows'), v: String(totals.noShow) },
+      { k: this.t('bookingsList.total'), v: this.formats.number(totals.total) },
+      { k: this.t('customerProfile.liveNow'), v: this.formats.number(totals.live) },
+      { k: this.t('status.completed'), v: this.formats.number(totals.completed) },
+      { k: this.t('status.cancelled'), v: this.formats.number(totals.cancelled) },
+      { k: this.t('dealerBooking.noShows'), v: this.formats.number(totals.noShow) },
     ];
   });
 
@@ -119,13 +153,20 @@ export class CustomerProfileComponent {
         icon: 'prohibit',
         tone: 'bad',
         danger: true,
-        title: `Suspend ${customer.fullName}?`,
+        title: this.t('customerProfile.suspendNameQuestion', { name: customer.fullName }),
         body: this.t('customerProfile.theyAreSignedOut'),
         // Pre-launch item 18: the audit table is append-only and can never be erased, so an admin
         // must not type identity into a field that outlives every request to remove it.
         note: this.t('customerProfile.theReasonIsRecorded'),
         fields: [
-          { name: this.t('myBooking.reason'), label: this.t('dealerDecide.reject.reasonLabel'), type: 'text', placeholder: this.t('customerProfile.whyIsThisAccount') },
+          {
+            // The key the typed value is stored under, read back as values['reason'] below: a
+            // machine name, never a translation, or an Arabic screen sends an empty reason.
+            name: 'reason',
+            label: this.t('dealerDecide.reject.reasonLabel'),
+            type: 'text',
+            placeholder: this.t('customerProfile.whyIsThisAccount'),
+          },
         ],
         confirm: this.t('customerProfile.suspendAccount'),
         result: { title: this.t('customerProfile.accountSuspended'), body: '', tone: 'bad' },
@@ -145,7 +186,7 @@ export class CustomerProfileComponent {
       {
         icon: 'check-circle',
         tone: 'ok',
-        title: `Reactivate ${customer.fullName}?`,
+        title: this.t('customerProfile.reactivateNameQuestion', { name: customer.fullName }),
         body: this.t('customerProfile.theyCanSignIn'),
         confirm: this.t('customerProfile.reactivateAccount'),
         result: { title: this.t('customerProfile.accountReactivated'), body: '', tone: 'ok' },
@@ -168,15 +209,25 @@ export class CustomerProfileComponent {
     return 'warn';
   }
 
+  /** A document type in the reader's language; one this build does not know is spelled out. */
   protected documentLabel(document: CustomerDocumentSummary): string {
-    return document.type.replace(/([a-z])([A-Z])/g, '$1 $2');
+    const key = DOCUMENT_TYPE_LABELS[document.type];
+    return key ? this.t(key) : spellEnumName(document.type);
   }
 
-  /** The file's real format and size. Never a filename, which the server does not send. */
+  /**
+   * The file's real format and size, and when it arrived: three independent facts, each worded on
+   * its own. Never a filename, which the server does not send.
+   */
   protected documentDetail(document: CustomerDocumentSummary): string {
     const kilobytes = Math.max(1, Math.round(document.sizeBytes / 1024));
-    const format = document.contentType.split('/')[1]?.toUpperCase() ?? document.contentType;
-    return `${format} · ${kilobytes} KB · uploaded ${this.when(document.uploadedAt)}`;
+    const formatKey = FORMAT_LABELS[document.contentType];
+    return [
+      // An unrecognised type is shown as it arrived rather than guessed at.
+      formatKey ? this.t(formatKey) : document.contentType,
+      this.t('customerProfile.sizeInKilobytes', { size: this.formats.number(kilobytes) }),
+      this.t('customerProfile.uploadedOn', { date: this.when(document.uploadedAt) }),
+    ].join(' · ');
   }
 
   protected initials(name: string): string {
@@ -188,14 +239,6 @@ export class CustomerProfileComponent {
   }
 
   protected when(iso: string | null): string {
-    return iso
-      ? new Date(iso).toLocaleString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
-      : 'Never';
+    return iso ? this.formats.dateTime(iso) : this.t('common.never');
   }
 }

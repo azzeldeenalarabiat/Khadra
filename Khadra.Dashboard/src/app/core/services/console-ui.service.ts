@@ -2,6 +2,8 @@ import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { ModalConfig, Toast, Tone } from '../models/console.models';
+import { I18nService } from '../i18n/i18n.service';
+import { serverSentence, snapshotProblem } from '../i18n/problem';
 
 /**
  * Console-wide UI state: the open confirmation dialog and the transient toast.
@@ -20,6 +22,7 @@ import { ModalConfig, Toast, Tone } from '../models/console.models';
 @Injectable({ providedIn: 'root' })
 export class ConsoleUiService {
   private readonly router = inject(Router);
+  private readonly i18n = inject(I18nService);
   private toastTimer?: ReturnType<typeof setTimeout>;
 
   readonly modal = signal<ModalConfig | null>(null);
@@ -91,10 +94,13 @@ export class ConsoleUiService {
       // The dialog stays open on failure: closing it would leave the admin unsure whether the
       // decision landed, which for an approval is the worst thing to be unsure about.
       this.modalBusy.set(false);
-      const problem = error as { error?: { title?: string } };
+      // Worded as it is shown, in the language on screen: a toast is gone in seconds, so there is no
+      // refusal left standing to re-word on a switch. The server's English only ever reads in English.
+      const t = this.i18n.t;
       this.showToast(
-        'That did not go through',
-        problem.error?.title ?? 'The service did not respond.',
+        t('common.thatDidNotGoThrough'),
+        serverSentence(snapshotProblem(error), this.i18n.lang(), t) ??
+          t('common.serviceDidNotRespond'),
         'bad',
       );
     }

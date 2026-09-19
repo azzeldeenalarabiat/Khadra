@@ -118,7 +118,7 @@ public sealed class ReadBookingsTests
     private readonly IDealerRepository _dealers = Substitute.For<IDealerRepository>();
     private readonly TestClock _clock = new(Build.Now);
 
-    private static readonly BookingContext EmptyContext = new(null, "Petra Wheels", "Layla Odeh", null, null);
+    private static readonly BookingContext EmptyContext = new(null, "Petra Wheels", false, "Layla Odeh", false, null, null);
 
     public ReadBookingsTests()
     {

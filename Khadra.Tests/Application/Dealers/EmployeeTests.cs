@@ -36,7 +36,7 @@ public sealed class EmployeeTests
         public FakeOpaqueTokens Opaque { get; } = new();
         public IEmployeeReader Reader { get; } = Substitute.For<IEmployeeReader>();
         public IAuthEmailComposer Composer { get; } = Substitute.For<IAuthEmailComposer>();
-        public IEmailSender Sender { get; } = Substitute.For<IEmailSender>();
+        public IEmailSender Sender { get; } = TestEmail.AcceptingSender();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public TestClock Clock { get; } = new(Build.Now);
         public Dealer Dealer { get; }

@@ -39,7 +39,9 @@
       <label class="field-inline">
         <span class="k">{{ t('auditLog.who') }}</span>
         <select class="input input-sm" (change)="setActor($any($event.target).value)">
-          <option value="" [selected]="!actorUserId() && !systemOnly()">{{ t('auditLog.anyone') }}</option>
+          <option value="" [selected]="!actorUserId() && !systemOnly()">
+            {{ t('auditLog.anyone') }}
+          </option>
           <!-- Tracked by id, not name: two people can share one, and someone renamed between two
                actions appears under both. "System" is a mode rather than an id — it is the absence
                of an actor — so it selects a different filter. -->
@@ -50,7 +52,9 @@
               </option>
             } @else {
               <option value="system" [selected]="systemOnly()">
-                {{ actor.name }} {{ t('auditLog.automated') }}{{ actor.entryCount }})
+                {{
+                  t('auditLog.automatedActorOption', { name: actor.name, count: actor.entryCount })
+                }}
               </option>
             }
           }
@@ -89,7 +93,9 @@
       </label>
 
       @if (anyFilter()) {
-        <button type="button" class="btn btn-secondary btn-sm" (click)="clear()">{{ t('auditLog.clear') }}</button>
+        <button type="button" class="btn btn-secondary btn-sm" (click)="clear()">
+          {{ t('auditLog.clear') }}
+        </button>
       }
     </div>
 
@@ -100,9 +106,13 @@
         <div class="state-text">{{ problem.message }}</div>
         <div class="state-actions">
           @if (problem.action === 'clear') {
-            <button type="button" class="btn btn-primary btn-sm" (click)="clear()">{{ t('auditLog.clearFilters') }}</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="clear()">
+              {{ t('auditLog.clearFilters') }}
+            </button>
           } @else if (problem.action === 'retry') {
-            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+              {{ t('common.retry') }}
+            </button>
           }
         </div>
       </div>
@@ -116,7 +126,11 @@
       <div class="state-block is-empty">
         <div class="state-icon is-outline"><kh-icon name="list-magnifying-glass" /></div>
         <div class="state-title">
-          {{ anyFilter() ? 'Nothing matches those filters' : 'No actions have been recorded yet' }}
+          {{
+            anyFilter()
+              ? t('auditLog.nothingMatchesThoseFilters')
+              : t('auditLog.noActionsRecordedYet')
+          }}
         </div>
         <div class="state-text">
           @if (anyFilter()) {
@@ -173,7 +187,7 @@
                       <!-- The role held AT THE TIME. An admin later demoted still reads as an admin
                            on the line where they acted. -->
                       <div class="entity-sub">
-                        {{ isSystem(row) ? 'Automated' : (row.actorRole ?? '—') }}
+                        {{ isSystem(row) ? t('auditLog.automatedActor') : roleText(row.actorRole) }}
                       </div>
                     </div>
                   </div>
@@ -203,7 +217,7 @@
                 </td>
                 <td class="td td-num">
                   <button type="button" class="btn btn-secondary btn-xs">
-                    {{ expanded() === row.id ? 'Hide' : 'Details' }}
+                    {{ expanded() === row.id ? t('common.hide') : t('common.details') }}
                   </button>
                 </td>
               </tr>
@@ -217,7 +231,9 @@
                       <div class="kv">
                         <div class="kv-key">{{ t('auditLog.reasonGiven') }}</div>
                         <div class="kv-val">
-                          {{ row.reason ?? 'No reason was recorded with this action.' }}
+                          <span class="user-text">{{
+                            row.reason ?? t('auditLog.noReasonRecordedWithAction')
+                          }}</span>
                         </div>
                       </div>
                       @if (hasChange(row)) {
@@ -262,7 +278,9 @@
           >
             {{ t('common.previous') }}
           </button>
-          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
+          <span class="pager-count">{{
+            t('common.pageOf', { page: page(), total: totalPages() })
+          }}</span>
           <button
             type="button"
             class="btn btn-secondary btn-page"

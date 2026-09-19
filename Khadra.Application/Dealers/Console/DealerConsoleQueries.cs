@@ -52,14 +52,16 @@ public sealed record DealerDashboardDto(
 
 public sealed record FleetStatusCountDto(string Status, int Count);
 
+/// <param name="VehicleLabel">Make, model and year; null when the car is no longer in this dealer's fleet.</param>
+/// <param name="CustomerName">Null when the customer's account no longer resolves.</param>
 public sealed record UpcomingHandoverDto(
     Guid BookingId,
     string Reference,
     string Status,
     DateTimeOffset When,
     string PickupMethod,
-    string VehicleLabel,
-    string CustomerName,
+    string? VehicleLabel,
+    string? CustomerName,
     bool IsOverdue);
 
 public sealed record DealerReportDto(
@@ -281,7 +283,8 @@ public sealed class DealerConsoleHandlers(
             handover.Status,
             handover.When,
             handover.PickupMethod,
-            labels.TryGetValue(handover.VehicleId, out var label) ? label : "Vehicle no longer listed",
+            // Null when the vehicle is no longer in this dealer's fleet summary; the console words that case.
+            labels.TryGetValue(handover.VehicleId, out var label) ? label : null,
             handover.CustomerName,
             handover.IsOverdue);
 }

@@ -9,13 +9,26 @@ export interface Dispute {
   readonly isLive: boolean;
   readonly openedByParty: 'Customer' | 'Dealer';
   readonly openedByUserId: string;
+  /**
+   * The opener's name. When `openedByAccountClosed` is true this holds an English stand-in kept only
+   * for older customer apps: never display it then.
+   */
   readonly openedByName: string;
+  /** True exactly when the opener's account no longer resolves (closed). */
+  readonly openedByAccountClosed: boolean;
   readonly reason: string;
   readonly openedAt: string;
   readonly slaDeadline: string;
   readonly isOverdue: boolean;
+  /** Null while nobody holds the ticket. */
   readonly assignedAdminId: string | null;
+  /**
+   * Null exactly while nobody holds the ticket. When `assignedAdminAccountClosed` is true this holds
+   * an English stand-in: never display it then.
+   */
   readonly assignedAdminName: string | null;
+  /** True exactly when the ticket is held by an account that no longer resolves (closed). */
+  readonly assignedAdminAccountClosed: boolean;
   readonly closedAt: string | null;
   readonly statements: readonly DisputeStatement[];
   readonly resolution: DisputeResolution | null;
@@ -28,7 +41,13 @@ export interface DisputeStatement {
   readonly statementId: string;
   readonly party: 'Customer' | 'Dealer';
   readonly authorUserId: string;
+  /**
+   * The author's name. When `authorAccountClosed` is true this holds an English stand-in kept only
+   * for older customer apps: never display it then.
+   */
   readonly authorName: string;
+  /** True exactly when the author's account no longer resolves (closed). */
+  readonly authorAccountClosed: boolean;
   readonly body: string;
   readonly createdAt: string;
   /** Freshly signed per request; never stored. */
@@ -49,7 +68,13 @@ export interface DisputeResolution {
   readonly waivesEverything: boolean;
   readonly note: string;
   readonly resolvedByAdminId: string;
+  /**
+   * The resolving administrator's name. When `resolvedByAccountClosed` is true this holds an English
+   * stand-in: never display it then.
+   */
   readonly resolvedByName: string;
+  /** True exactly when the resolving administrator's account no longer resolves (closed). */
+  readonly resolvedByAccountClosed: boolean;
   readonly resolvedAt: string;
 }
 
@@ -69,15 +94,22 @@ export interface DisputeListItem {
   readonly ticketId: string;
   readonly bookingId: string;
   readonly bookingReference: string;
-  readonly dealerName: string;
-  readonly customerName: string;
+  /** Null when the dealership no longer resolves (no longer on the platform). */
+  readonly dealerName: string | null;
+  /** Null when the customer's account no longer resolves (closed). */
+  readonly customerName: string | null;
   readonly openedByParty: 'Customer' | 'Dealer';
   readonly reason: string;
   readonly status: 'Open' | 'UnderReview' | 'Resolved' | 'Withdrawn';
   readonly openedAt: string;
   readonly slaDeadline: string;
   readonly isOverdue: boolean;
+  /** Null while nobody holds the ticket. */
   readonly assignedAdminId: string | null;
+  /**
+   * Null when the ticket is unassigned (`assignedAdminId` is null) AND when the holder's account no
+   * longer resolves (`assignedAdminId` is set). Branch on the id to tell the two apart.
+   */
   readonly assignedAdminName: string | null;
   readonly closedAt: string | null;
   readonly statementCount: number;

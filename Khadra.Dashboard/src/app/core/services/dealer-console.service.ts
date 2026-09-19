@@ -6,6 +6,7 @@ import { filter, firstValueFrom, map, startWith } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
 import {
   BrandingUpload,
+  CustomerPageView,
   DealerActivityEntry,
   DealerDashboard,
   DealerReport,
@@ -14,6 +15,7 @@ import {
   Employee,
   InviteEmployeeRequest,
   ReportPeriod,
+  UpdateCustomerPageRequest,
   UpdateProfileRequest,
 } from '../models/dealer-console.api';
 import { AddressSuggestion, DealerProfile } from '../models/dealers.api';
@@ -195,6 +197,17 @@ export class DealerConsoleService {
 
   readonly delivery = httpResource<DeliverySettingsView>(() => this.dealerUrl('/delivery'));
 
+  /**
+   * What the office tells customers in its own words.
+   *
+   * Readable by every member of staff, who answer questions about what is on it; owner-only to
+   * write. Not gated on the dealership being able to trade — an applicant prepares the page while
+   * waiting, and nothing on it reaches a customer until the office may trade.
+   */
+  readonly customerPage = httpResource<CustomerPageView>(() =>
+    this.dealerUrl('/public-profile'),
+  );
+
   // ── Staff (spec 4.2) ──
 
   invite(request: InviteEmployeeRequest): Promise<Employee> {
@@ -286,6 +299,13 @@ export class DealerConsoleService {
 
   updateProfile(request: UpdateProfileRequest): Promise<DealerProfile> {
     return firstValueFrom(this.http.put<DealerProfile>(`${this.base}/profile`, request));
+  }
+
+  /** The whole page every time: a section left out is a section cleared. */
+  updateCustomerPage(request: UpdateCustomerPageRequest): Promise<CustomerPageView> {
+    return firstValueFrom(
+      this.http.put<CustomerPageView>(`${this.base}/public-profile`, request),
+    );
   }
 
   /** Request a URL, PUT the bytes, confirm — the same three steps as a car photo. */

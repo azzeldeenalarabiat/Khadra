@@ -24,6 +24,10 @@ public sealed record DealerBookingCounts(
     int OverdueReturns);
 
 /// <summary>A pickup or a return the dealer has coming.</summary>
+/// <param name="CustomerName">
+/// Null when the customer's account no longer resolves. A fact rather than a sentence: the console
+/// words that case in the reader's own language, which an English stand-in written here never was.
+/// </param>
 public sealed record UpcomingHandover(
     Guid BookingId,
     string Reference,
@@ -31,7 +35,7 @@ public sealed record UpcomingHandover(
     DateTimeOffset When,
     string PickupMethod,
     Guid VehicleId,
-    string CustomerName,
+    string? CustomerName,
     bool IsOverdue);
 
 /// <summary>One booking's contribution to revenue, at the rate FROZEN on that booking.</summary>
@@ -47,13 +51,18 @@ public sealed record RevenueFact(
 public sealed record OccupancyFact(Guid VehicleId, DateTimeOffset Start, DateTimeOffset End, string Status);
 
 /// <summary>Something a member of staff did to a booking, from the booking's own history.</summary>
+/// <param name="ActorUserId">Null when no person signed the change: the rental office acted as itself.</param>
+/// <param name="ActorName">
+/// Null in two cases, told apart by <paramref name="ActorUserId"/>: no id at all (the rental office
+/// acted), or an id whose account no longer resolves (a former member of staff). The console words both.
+/// </param>
 public sealed record DealerActivityEntry(
     Guid BookingId,
     string Reference,
     string ToStatus,
     string? FromStatus,
     Guid? ActorUserId,
-    string ActorName,
+    string? ActorName,
     string? Reason,
     DateTimeOffset OccurredAt);
 

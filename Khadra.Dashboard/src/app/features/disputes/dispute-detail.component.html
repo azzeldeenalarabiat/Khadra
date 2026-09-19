@@ -6,8 +6,12 @@
         <div class="state-title">{{ t('common.couldntLoadThisDispute') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/disputes">{{ t('disputeDetail.backToTheQueue') }}</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            {{ t('common.retry') }}
+          </button>
+          <a class="btn btn-secondary btn-sm" routerLink="/disputes">{{
+            t('disputeDetail.backToTheQueue')
+          }}</a>
         </div>
       </div>
     </section>
@@ -30,8 +34,17 @@
           }
         </div>
         <div class="page-sub">
-          {{ t('disputeDetail.opened') }} {{ when(d.openedAt) }} by {{ d.openedByName }} ({{ d.openedByParty }}) ·
-          {{ d.booking.dealerName }} {{ t('disputeDetail.and') }} {{ d.booking.customerName }}
+          {{
+            t('disputeDetail.openedLine', {
+              when: when(d.openedAt),
+              name: openerName(d),
+              party: enumLabel('party', d.openedByParty),
+            })
+          }}
+          ·
+          {{
+            t('disputeDetail.betweenParties', { dealer: dealerName(d), customer: customerName(d) })
+          }}
         </div>
       </div>
       <div class="sla-panel">
@@ -49,7 +62,9 @@
         <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', d.booking.dealerId]">
           {{ t('common.openDealer') }}
         </a>
-        @if (d.isLive && !d.assignedAdminName) {
+        <!-- Whether anyone holds the ticket is the id's answer: a holder whose account has closed
+             still holds it. -->
+        @if (d.isLive && d.assignedAdminId === null) {
           <button
             type="button"
             class="btn btn-secondary btn-md"
@@ -100,23 +115,27 @@
             @for (s of d.statements; track s.statementId; let first = $first) {
               <div class="row row-gap-12">
                 <div class="customer-avatar" [class.s-accent]="s.party === 'Dealer'">
-                  {{ initials(s.authorName) }}
+                  {{ s.authorAccountClosed ? '—' : initials(s.authorName) }}
                 </div>
                 <div class="grow">
                   <div class="row row-gap-8">
-                    <span class="handover-title">{{ s.authorName }}</span>
+                    <span class="handover-title user-text">{{ authorName(s) }}</span>
                     <span class="pill" [class]="s.party === 'Dealer' ? 's-accent' : 's-dim'">
-                      {{ s.party }}{{ first ? ' · opened it' : '' }}
+                      {{
+                        first
+                          ? t('disputeDetail.partyOpenedIt', { party: enumLabel('party', s.party) })
+                          : enumLabel('party', s.party)
+                      }}
                     </span>
                     <span class="page-sub push">{{ when(s.createdAt) }}</span>
                   </div>
-                  <div class="queue-desc">{{ s.body }}</div>
+                  <div class="queue-desc user-text">{{ s.body }}</div>
                 </div>
               </div>
             } @empty {
               <!-- Unreachable while Open() writes the first statement, but a ticket with no
                    statement at all must not render an empty panel with no explanation. -->
-              <div class="page-sub">{{ d.reason }}</div>
+              <div class="page-sub user-text">{{ d.reason }}</div>
             }
           </div>
         </section>
@@ -127,7 +146,7 @@
               <kh-icon name="paperclip" class="kpi-icon" />
               <span class="sect-t">{{ t('disputeDetail.evidence') }}</span>
               <span class="sect-hint">
-                {{ evidence().length }} {{ t('disputeDetail.fileSFromBoth') }}
+                {{ t('disputeDetail.evidenceFromBothParties', { count: evidence().length }) }}
               </span>
             </div>
             <div class="doc-grid-4">
@@ -138,11 +157,11 @@
                   </a>
                   <div class="evidence-by">
                     <span class="pill" [class]="file.party === 'Dealer' ? 's-accent' : 's-dim'">
-                      {{ file.party }}
+                      {{ enumLabel('party', file.party) }}
                     </span>
                     <span class="evidence-ts">{{ file.when }}</span>
                   </div>
-                  <div class="evidence-label">{{ file.author }}</div>
+                  <div class="evidence-label user-text">{{ file.author }}</div>
                 </div>
               }
             </div>
@@ -150,7 +169,9 @@
         }
 
         <section class="sect">
-          <div class="sect-h"><span class="sect-t">{{ t('disputeDetail.caseTimeline') }}</span></div>
+          <div class="sect-h">
+            <span class="sect-t">{{ t('disputeDetail.caseTimeline') }}</span>
+          </div>
           <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
         </section>
       </div>
@@ -162,7 +183,7 @@
               <kh-icon name="scales" class="kpi-icon" />
               <span class="sect-t">{{ t('disputeDetail.decisionRecorded') }}</span>
             </div>
-            <div class="page-sub">{{ when(r.resolvedAt) }} · {{ r.resolvedByName }}</div>
+            <div class="page-sub">{{ when(r.resolvedAt) }} · {{ resolverName(r) }}</div>
             <div class="money-line">
               <span class="k-label">{{ t('common.depositHeld') }}</span>
               <span class="num">{{ r.depositHeld | money }} </span>
@@ -173,21 +194,15 @@
                  screen where the platform decides who gets what. -->
             <div class="money-line">
               <span class="k-label">{{ t('common.refundedToTheCustomer') }}</span>
-              <span class="num"
-                >{{ r.refundToCustomer | money }} </span
-              >
+              <span class="num">{{ r.refundToCustomer | money }} </span>
             </div>
             <div class="money-line">
               <span class="k-label">{{ t('common.keptByThePlatform') }}</span>
-              <span class="num"
-                >{{ r.retainedByPlatform | money }} </span
-              >
+              <span class="num">{{ r.retainedByPlatform | money }} </span>
             </div>
             <div class="money-line">
               <span class="k-label">{{ t('disputeDetail.transferredToTheDealer') }}</span>
-              <span class="num"
-                >{{ r.transferredToDealer | money }} </span
-              >
+              <span class="num">{{ r.transferredToDealer | money }} </span>
             </div>
             @if (r.dealerCharge) {
               <div class="money-line s-bad">
@@ -195,7 +210,7 @@
                 <span class="num">{{ r.dealerCharge | money }} </span>
               </div>
             }
-            <div class="page-sub">“{{ r.note }}”</div>
+            <div class="page-sub">{{ t('disputeDetail.quoted', { text: r.note }) }}</div>
             <div class="note-box is-plain">
               <kh-icon name="info" />
               {{ t('common.decisionRecordedNoFunds') }}
@@ -215,7 +230,7 @@
               <span class="sect-t">{{ t('disputeDetail.adminResolution') }}</span>
             </div>
 
-            @if (problem(); as message) {
+            @if (problemText(); as message) {
               <div class="banner s-bad" role="alert">
                 <kh-icon name="warning-circle" class="banner-icon" />
                 <div class="banner-body">
@@ -243,7 +258,9 @@
             </div>
 
             <div class="field">
-              <label for="leg-refund">{{ t('disputeDetail.refundedToTheCustomer') }}{{ currency() }})</label>
+              <label for="leg-refund">{{
+                t('disputeDetail.refundedToCustomerIn', { currency: currency() })
+              }}</label>
               <input
                 id="leg-refund"
                 class="input input-num"
@@ -255,7 +272,9 @@
               />
             </div>
             <div class="field">
-              <label for="leg-platform">{{ t('disputeDetail.keptByThePlatform') }}{{ currency() }})</label>
+              <label for="leg-platform">{{
+                t('disputeDetail.keptByPlatformIn', { currency: currency() })
+              }}</label>
               <input
                 id="leg-platform"
                 class="input input-num"
@@ -267,7 +286,9 @@
               />
             </div>
             <div class="field">
-              <label for="leg-dealer">{{ t('disputeDetail.transferredToTheDealerOpen') }}{{ currency() }})</label>
+              <label for="leg-dealer">{{
+                t('disputeDetail.transferredToDealerIn', { currency: currency() })
+              }}</label>
               <input
                 id="leg-dealer"
                 class="input input-num"
@@ -281,18 +302,31 @@
 
             <div class="money-line" [class.is-hi]="balanced()" [class.s-bad]="!balanced()">
               <span class="k-label">
-                {{ balanced() ? 'Balances against the deposit held' : 'Left to allocate' }}
+                {{
+                  balanced()
+                    ? t('disputeDetail.balancesAgainstTheDepositHeld')
+                    : t('disputeDetail.leftToAllocate')
+                }}
               </span>
+              <!-- No sign is typed in front of the remainder: the label says what it is, and an
+                   over-allocation keeps the minus the formatter gives it, inside one isolated run. -->
               <span class="num">
-                {{ allocated() }} of {{ held() }} {{ currency() }}
+                {{
+                  t('disputeDetail.allocatedOfHeld', {
+                    allocated: amount(allocated()),
+                    held: heldWithCode(),
+                  })
+                }}
                 @if (!balanced()) {
-                  ({{ remainder() > 0 ? '+' : '' }}{{ remainder() }})
+                  ({{ amount(remainder()) }})
                 }
               </span>
             </div>
 
             <div class="field">
-              <label for="dealer-charge">{{ t('disputeDetail.chargeToTheDealer') }}{{ currency() }}{{ t('disputeDetail.optional') }}</label>
+              <label for="dealer-charge">{{
+                t('disputeDetail.chargeToDealerOptionalIn', { currency: currency() })
+              }}</label>
               <input
                 id="dealer-charge"
                 class="input input-num"
@@ -325,7 +359,7 @@
               [disabled]="!canResolve()"
               (click)="resolve()"
             >
-              {{ busy() ? 'Working…' : 'Resolve dispute' }}
+              {{ busy() ? t('common.working') : t('disputeDetail.resolveDispute') }}
             </button>
             <div class="field-hint">
               {{ t('disputeDetail.theDecisionYourNote') }}

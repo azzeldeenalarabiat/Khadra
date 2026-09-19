@@ -48,13 +48,15 @@
                 }}</a>
                 · {{ describe(e) }}
                 @if (e.fromStatus) {
-                  <span class="page-sub">{{ t('dealerActivity.was') }} {{ statusLabel(e.fromStatus) }})</span>
+                  <span class="page-sub">{{
+                    t('dealerActivity.wasStatus', { status: statusLabel(e.fromStatus, 'dealerBooking') })
+                  }}</span>
                 }
               </div>
               <div class="page-sub">
-                {{ e.actorName }}
+                {{ actor(e) }}
                 @if (e.reason) {
-                  · “{{ e.reason }}”
+                  · “<span class="user-text">{{ e.reason }}</span>”
                 }
               </div>
             </div>

@@ -2,7 +2,7 @@ import { Injectable, effect, inject, untracked } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
 import { SCREEN_TITLES } from '../data/nav.data';
-import { TranslationKey } from './en';
+import { EN, TranslationKey } from './en';
 import { I18nService } from './i18n.service';
 
 /**
@@ -59,8 +59,15 @@ export class TranslatedTitleStrategy extends TitleStrategy {
       return;
     }
 
+    // Routes declare a translation KEY as their title, so even a screen missing from both maps is
+    // named in the reader's language rather than in the English a literal would have frozen.
     const declared = this.buildTitle(snapshot);
-    if (declared) this.title.setTitle(declared);
+    if (!declared) return;
+    this.title.setTitle(
+      declared in EN
+        ? `${this.i18n.t(declared as TranslationKey)} · ${this.i18n.t('app.name')}`
+        : declared,
+    );
   }
 
   /** '/dealers/019a…?x=1' becomes 'dealers/:id', the shape `SCREEN_TITLES` is keyed by. */

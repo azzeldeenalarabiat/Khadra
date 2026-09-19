@@ -22,7 +22,7 @@
 
   <section class="sect sect-clip">
     <div class="tabs" role="tablist">
-      @for (q of queues; track q.key) {
+      @for (q of queues(); track q.key) {
         <button
           type="button"
           class="tab"
@@ -42,7 +42,9 @@
         <div class="state-title">{{ t('disputesList.couldntLoadTheDispute') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            {{ t('common.retry') }}
+          </button>
         </div>
       </div>
     } @else if (resource.isLoading() && rows().length === 0) {
@@ -55,7 +57,11 @@
       <div class="state-block is-empty">
         <div class="state-icon is-outline"><kh-icon name="scales" /></div>
         <div class="state-title">
-          {{ queue() === 'live' ? 'Nothing waiting on you' : 'Nothing in this view' }}
+          {{
+            queue() === 'live'
+              ? t('disputesList.nothingWaitingOnYou')
+              : t('disputesList.nothingInThisView')
+          }}
         </div>
         <div class="state-text">
           @if (queue() === 'live') {
@@ -77,12 +83,12 @@
         <!-- The two figures describe the whole filtered queue, not the page. They are only shown
              once the server has answered: a zero the screen assumed would read as "none overdue". -->
         <span class="page-sub">
-          {{ rows().length }} of {{ total() }} {{ t('disputesList.tickets') }}
-          @if (overdue()) {
-            · <span class="s-bad">{{ overdue() }} {{ t('disputesList.overdue') }}</span>
+          {{ t('disputesList.shownOfTickets', { shown: rows().length, count: total() }) }}
+          @if (overdue(); as count) {
+            · <span class="s-bad">{{ t('disputesList.overdueCount', { count: count }) }}</span>
           }
-          @if (unassigned()) {
-            · {{ unassigned() }} {{ t('disputesList.unassigned') }}
+          @if (unassigned(); as count) {
+            · {{ t('disputesList.unassignedCount', { count: count }) }}
           }
         </span>
       </div>
@@ -110,14 +116,16 @@
                     (click)="$event.stopPropagation()"
                     >{{ row.bookingReference }}</a
                   >
-                  <div class="td-sub">{{ t('disputesList.opened') }} {{ when(row.openedAt) }}</div>
+                  <div class="td-sub">
+                    {{ t('disputesList.openedAt', { when: when(row.openedAt) }) }}
+                  </div>
                 </td>
                 <td class="td">
                   <div class="entity">
                     <div class="entity-avatar">{{ initials(row.dealerName) }}</div>
                     <div>
-                      <div class="entity-name">{{ row.dealerName }}</div>
-                      <div class="entity-sub">{{ row.customerName }}</div>
+                      <div class="entity-name">{{ dealerName(row) }}</div>
+                      <div class="entity-sub">{{ customerName(row) }}</div>
                     </div>
                   </div>
                 </td>
@@ -126,29 +134,22 @@
                     class="pill"
                     [class]="row.openedByParty === 'Dealer' ? 's-accent' : 's-dim'"
                   >
-                    {{ row.openedByParty }}
+                    {{ enumLabel('party', row.openedByParty) }}
                   </span>
                   <div class="td-sub">
-                    {{ row.statementCount }}
-                    {{ row.statementCount === 1 ? 'statement' : 'statements' }}
+                    {{ t('disputesList.statementCount', { count: row.statementCount }) }}
                   </div>
                 </td>
                 <td class="td">
-                  <div class="queue-desc">{{ row.reason }}</div>
+                  <div class="queue-desc user-text">{{ row.reason }}</div>
                 </td>
                 <td class="td">
                   <span [class]="row.isOverdue ? 's-bad' : ''">{{ sla(row) }}</span>
                   <!-- Whether a ticket is taken is the ID's answer, not the name's. Keying this on
                        the name printed "Unassigned" against a ticket whose admin could not be named
                        -- so the queue contradicted its own "N unassigned" count above, which keys on
-                       the id, and told a second admin the work was free. -->
-                  <div class="td-sub">
-                    {{
-                      row.assignedAdminId
-                        ? 'With ' + (row.assignedAdminName ?? 'an admin')
-                        : 'Unassigned'
-                    }}
-                  </div>
+                       the id, and told a second admin the work was free. holder() keys on the id. -->
+                  <div class="td-sub">{{ holder(row) }}</div>
                 </td>
                 <td class="td">
                   <span class="pill" [class]="'s-' + tone(row)">{{ label(row) }}</span>
@@ -159,7 +160,7 @@
                     [routerLink]="['/disputes', row.ticketId]"
                     (click)="$event.stopPropagation()"
                   >
-                    {{ row.closedAt ? 'View' : 'Resolve' }}
+                    {{ row.closedAt ? t('disputesList.view') : t('queue.actionResolve') }}
                   </a>
                 </td>
               </tr>
@@ -169,7 +170,9 @@
       </div>
 
       <div class="pager">
-        <span class="pager-count">{{ rows().length }} of {{ total() }} {{ t('disputesList.tickets') }}</span>
+        <span class="pager-count">{{
+          t('disputesList.shownOfTickets', { shown: rows().length, count: total() })
+        }}</span>
         <div class="pager-nav">
           <button
             type="button"
@@ -179,7 +182,9 @@
           >
             {{ t('common.previous') }}
           </button>
-          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: totalPages() }) }}</span>
+          <span class="pager-count">{{
+            t('common.pageOf', { page: page(), total: totalPages() })
+          }}</span>
           <button
             type="button"
             class="btn btn-secondary btn-page"

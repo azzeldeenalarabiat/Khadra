@@ -9,8 +9,27 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { BookingDecisions } from './booking-decisions';
+import { TranslationKey } from '../../core/i18n/en';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+
+/**
+ * The tabs, as the server's tab names and the keys that word them.
+ *
+ * The name is what travels in `?tab=` and to the API; the words are chosen when the tabs render. They
+ * were English literals in a field initialiser once, which no language switch could reach.
+ */
+const TABS: readonly { readonly key: BookingTab; readonly label: TranslationKey }[] = [
+  { key: 'all', label: 'common.all' },
+  { key: 'pending', label: 'dealerBookings.tabPending' },
+  { key: 'upcoming', label: 'dealerBookings.tabUpcoming' },
+  { key: 'active', label: 'dealerBookings.tabActive' },
+  { key: 'returned', label: 'dealerBookings.tabReturned' },
+  { key: 'completed', label: 'dealerBookings.tabCompleted' },
+  { key: 'closed', label: 'dealerBookings.tabClosed' },
+  // A live dispute is a flag on a booking, and this tab is every booking carrying it.
+  { key: 'disputed', label: 'status.disputed' },
+];
 
 /**
  * The dealer's bookings (design: Dealer Console, `isList` for bookings).
@@ -27,6 +46,8 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class DealerBookingsComponent {
   protected readonly t = inject(I18nService).t;
+  // Server enum names, in the reader's language, with the dealer's own wording for its queue.
+  private readonly statusLabel = inject(I18nService).statusLabel;
   private readonly formats = inject(FormatService);
 
   /**
@@ -52,16 +73,10 @@ export class DealerBookingsComponent {
   private readonly tabCounts = loaded(this.counts);
   protected readonly tab = this.service.tab;
 
-  protected readonly tabs: readonly { readonly key: BookingTab; readonly label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'upcoming', label: 'Upcoming' },
-    { key: 'active', label: 'Active' },
-    { key: 'returned', label: 'Returned' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'closed', label: 'Closed' },
-    { key: 'disputed', label: 'Disputed' },
-  ];
+  /** The tabs in the reader's language. A `computed`, not a field: a field words them only once. */
+  protected readonly tabs = computed(() =>
+    TABS.map((option) => ({ key: option.key, label: this.t(option.label) })),
+  );
 
   // The dashboard links here with ?tab=pending; the URL is the source of truth for the tab.
   private readonly tabFromUrl = toSignal(
@@ -72,7 +87,7 @@ export class DealerBookingsComponent {
   constructor() {
     effect(() => {
       const wanted = this.tabFromUrl();
-      const known = this.tabs.find((t) => t.key === wanted);
+      const known = TABS.find((option) => option.key === wanted);
       this.service.tab.set(known ? known.key : 'all');
       this.service.page.set(1);
     });
@@ -82,11 +97,13 @@ export class DealerBookingsComponent {
   protected readonly total = computed(() => this.listPage()?.totalCount ?? 0);
   protected readonly totalPages = computed(() => this.listPage()?.totalPages ?? 1);
 
-  /** "1 bookings" is the sort of thing that makes a screen look generated. */
-  protected readonly summary = computed(() => {
-    const total = this.total();
-    return `${this.rows().length} of ${total} ${total === 1 ? 'booking' : 'bookings'}`;
-  });
+  /**
+   * "1 bookings" is the sort of thing that makes a screen look generated. The total picks the noun's
+   * form, and Arabic has six of them.
+   */
+  protected readonly summary = computed(() =>
+    this.t('dealerBookings.pageSummary', { shown: this.rows().length, count: this.total() }),
+  );
   protected readonly page = this.service.page;
 
   protected readonly failure = computed(() => {
@@ -124,7 +141,7 @@ export class DealerBookingsComponent {
 
   protected approve(event: Event, booking: BookingListItem): void {
     event.stopPropagation();
-    this.decisions.approve(booking.bookingId, booking.reference, booking.customerName, () =>
+    this.decisions.approve(booking.bookingId, booking.reference, this.customer(booking), () =>
       this.reload(),
     );
   }
@@ -151,27 +168,24 @@ export class DealerBookingsComponent {
     }
   }
 
-  /** The dealer's word for the state, not the domain's identifier. */
+  /**
+   * The dealer's word for the state, not the domain's identifier.
+   *
+   * A live dispute is a flag on the booking rather than a status, so it has its own key. Everything
+   * else is the dealer-scoped label, which is where `Requested` becomes "Pending" and `PickedUp`
+   * becomes "Active".
+   */
   protected label(booking: BookingListItem): string {
-    if (booking.hasLiveDispute) return 'Disputed';
-    switch (booking.status) {
-      case 'Requested':
-        return 'Pending';
-      case 'Approved':
-        return this.t('status.awaitingDeposit');
-      case 'PickedUp':
-        return 'Active';
-      case 'NoShow':
-        return 'No-show';
-      default:
-        return booking.status;
-    }
+    if (booking.hasLiveDispute) return this.t('status.disputed');
+    return this.statusLabel(booking.status, 'dealerBooking');
   }
 
+  /** "06 Sept → 09 Sept", as one message so Arabic can point its own arrow. */
   protected period(booking: BookingListItem): string {
-    const f = (iso: string) =>
-      new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    return `${f(booking.periodStart)} → ${f(booking.periodEnd)}`;
+    return this.t('dealerBookings.periodRange', {
+      start: this.formats.dayMonth(booking.periodStart),
+      end: this.formats.dayMonth(booking.periodEnd),
+    });
   }
 
   /**
@@ -188,12 +202,7 @@ export class DealerBookingsComponent {
   }
 
   protected created(booking: BookingListItem): string {
-    return new Date(booking.createdAt).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.formats.dayMonthTime(booking.createdAt);
   }
 
   protected car(booking: BookingListItem): string {
@@ -202,7 +211,24 @@ export class DealerBookingsComponent {
       : this.t('dealerBookings.vehicleNoLongerListed');
   }
 
-  protected initials(name: string): string {
+  /**
+   * Who booked, as this gallery may name them.
+   *
+   * A closed customer account keeps its bookings. `customerName` then carries an English sentinel for
+   * older clients; the flag is what says so, and the words are the reader's.
+   */
+  protected customer(booking: BookingListItem): string {
+    return booking.customerAccountClosed
+      ? this.t('common.customerAccountClosed')
+      : booking.customerName;
+  }
+
+  /** No initials for a closed account: two letters would stand for a person who is no longer there. */
+  protected customerInitials(booking: BookingListItem): string {
+    return booking.customerAccountClosed ? '' : this.initials(booking.customerName);
+  }
+
+  private initials(name: string): string {
     return name
       .split(' ')
       .slice(0, 2)

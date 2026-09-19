@@ -13,11 +13,39 @@ import { map } from 'rxjs';
 import { FleetService } from '../../core/services/fleet.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fleet.api';
-import { LookupsService } from '../../core/services/lookups.service';
+import { LookupEntry, LookupsService } from '../../core/services/lookups.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslationKey } from '../../core/i18n/en';
+import { Language } from '../../core/i18n/language';
+import {
+  ProblemSnapshot,
+  fieldMessage,
+  serverSentence,
+  snapshotProblem,
+} from '../../core/i18n/problem';
+
+/**
+ * The API's transmission and fuel names, each beside the key that words it — the same two tables the
+ * fleet list and the car page use. The name is what the form sends and the server stores; only the
+ * label is the reader's.
+ */
+const TRANSMISSION_LABELS: Readonly<Record<string, TranslationKey>> = {
+  Automatic: 'fleetList.transmissionAutomatic',
+  Manual: 'fleetList.transmissionManual',
+};
+const FUEL_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
+  Petrol: 'fleetList.fuelPetrol',
+  Diesel: 'fleetList.fuelDiesel',
+  Hybrid: 'fleetList.fuelHybrid',
+  Electric: 'fleetList.fuelElectric',
+};
+/** The two fuel policies the API accepts, worded as the wizard and the car page word them. */
+const FUEL_POLICY_LABELS: Readonly<Record<string, TranslationKey>> = {
+  FullToFull: 'vehicleWizard.fullToFull',
+  SameToSame: 'vehicleWizard.sameToSame',
+};
 
 /**
  * Add or edit one car (spec 4.3).
@@ -33,7 +61,11 @@ import { TranslationKey } from '../../core/i18n/en';
   imports: [FormsModule, RouterLink, IconComponent],
 })
 export class CarFormComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  // The server's own enum names, in the reader's language, from the shared table rather than a map
+  // per screen: a copy each is a copy each to forget a new member in.
+  private readonly statusLabel = this.i18n.statusLabel;
   private readonly service = inject(FleetService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);
@@ -48,11 +80,17 @@ export class CarFormComponent {
   private readonly data = loaded(this.resource);
   protected readonly saving = signal(false);
   protected readonly uploading = signal(false);
-  protected readonly problem = signal<string | null>(null);
+  /** What went wrong, held as facts; `problemText` chooses the words when it is shown. */
+  private readonly problem = signal<FormProblem | null>(null);
+  protected readonly problemText = computed(() => {
+    const problem = this.problem();
+    return problem ? describe(problem, this.t, this.i18n.lang()) : null;
+  });
 
-  protected readonly transmissions = ['Automatic', 'Manual'];
-  protected readonly fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
-  protected readonly fuelPolicies = ['FullToFull', 'SameToSame'];
+  /** The API's names, in the order offered. Worded by the three label helpers below. */
+  protected readonly transmissions = Object.keys(TRANSMISSION_LABELS);
+  protected readonly fuelTypes = Object.keys(FUEL_TYPE_LABELS);
+  protected readonly fuelPolicies = Object.keys(FUEL_POLICY_LABELS);
 
   /**
    * The vehicle types, from the platform's own list.
@@ -113,8 +151,7 @@ export class CarFormComponent {
     const car = this.car();
     if (!car) return null;
     if (car.images.length === 0) return this.t('carForm.addAtLeastOne');
-    if (car.status === 'Draft')
-      return this.t('carForm.thisCarIsA');
+    if (car.status === 'Draft') return this.t('carForm.thisCarIsA');
     return null;
   });
 
@@ -134,10 +171,46 @@ export class CarFormComponent {
     return (event.target as HTMLInputElement).checked;
   }
 
+  /**
+   * What the server said about one field, under the same language rule as the banner: its own English
+   * sentence in English, and a line of the console's own in Arabic.
+   */
+  protected fieldError(name: string): string | null {
+    const problem = this.problem();
+    return problem?.kind === 'request'
+      ? fieldMessage(problem.snapshot, name, this.i18n.lang(), this.t)
+      : null;
+  }
+
+  /** The gearbox as the reader's language says it. */
+  protected transmissionLabel(name: string): string {
+    return wordFor(TRANSMISSION_LABELS, name, this.t);
+  }
+
+  /** The fuel, the same way. */
+  protected fuelTypeLabel(name: string): string {
+    return wordFor(FUEL_TYPE_LABELS, name, this.t);
+  }
+
+  /** And the fuel policy, which is a choice rather than a fact about the car. */
+  protected fuelPolicyLabel(name: string): string {
+    return wordFor(FUEL_POLICY_LABELS, name, this.t);
+  }
+
+  /**
+   * A vehicle type in the reader's language. Both names come from the same curated row and the id is
+   * what is sent either way. Falls back to the other name rather than an empty option: a lookup row
+   * may be half-translated, and an unnamed option cannot be picked.
+   */
+  protected typeName(type: LookupEntry): string {
+    const arabic = this.i18n.lang() === 'ar';
+    return (arabic ? type.nameAr || type.nameEn : type.nameEn || type.nameAr).trim();
+  }
+
   protected async save(): Promise<void> {
     if (this.saving()) return;
     if (!this.form().carTypeId) {
-      this.problem.set(this.t('carForm.chooseAVehicleType'));
+      this.problem.set({ kind: 'noType' });
       return;
     }
     this.saving.set(true);
@@ -149,16 +222,21 @@ export class CarFormComponent {
       const saved = id ? await this.service.update(id, body) : await this.service.add(body);
 
       this.service.refresh();
+      // A toast is worded as it is shown: it is gone before anyone could switch language under it.
+      // Year, make and model are the car's own and are never translated; the status is.
       this.ui.showToast(
         id ? this.t('carForm.carUpdated') : this.t('carForm.carAdded'),
-        `${saved.year} ${saved.make} ${saved.model} is saved as ${saved.status}.`,
+        this.t('carForm.savedAsStatus', {
+          vehicle: `${saved.year} ${saved.make} ${saved.model}`,
+          status: this.statusLabel(saved.status, 'vehicle'),
+        }),
       );
 
       // A new car goes straight to its own page so photos can be attached; there is nowhere to
       // upload them until the car exists.
       if (!id) await this.router.navigate(['/dealer/fleet', saved.vehicleId]);
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set({ kind: 'request', snapshot: snapshotProblem(error) });
     } finally {
       this.saving.set(false);
     }
@@ -176,7 +254,7 @@ export class CarFormComponent {
       await this.service.uploadImage(id, file);
       this.service.refresh();
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set({ kind: 'request', snapshot: snapshotProblem(error) });
     } finally {
       this.uploading.set(false);
       // Clear it so choosing the same file again still fires a change event.
@@ -191,7 +269,7 @@ export class CarFormComponent {
       await this.service.removeImage(id, imageId);
       this.service.refresh();
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set({ kind: 'request', snapshot: snapshotProblem(error) });
     }
   }
 
@@ -202,18 +280,40 @@ export class CarFormComponent {
       await this.service.setPrimaryImage(id, imageId);
       this.service.refresh();
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set({ kind: 'request', snapshot: snapshotProblem(error) });
     }
   }
 }
 
-function describe(error: unknown, t: (key: TranslationKey) => string): string {
-  const problem = error as { status?: number; error?: { code?: string; title?: string } };
-  if (problem.error?.code === 'dealer.not_approved') {
-    return t('carForm.yourDealershipIsNot');
-  }
-  if (problem.error?.code === 'vehicle.plate_taken') {
-    return t('carForm.aCarWithThat');
-  }
-  return problem.error?.title ?? t('carForm.theServiceDidNot');
+/**
+ * What the banner reports, as facts rather than as a sentence, so a language switch re-words a
+ * refusal already on screen.
+ */
+type FormProblem =
+  /** The form stopped before asking: no vehicle type is chosen. */
+  | { readonly kind: 'noType' }
+  /** A refused request, with what it said. */
+  | { readonly kind: 'request'; readonly snapshot: ProblemSnapshot };
+
+/** Words a problem in the reader's language, at render time. The code mappings are this form's own. */
+function describe(
+  problem: FormProblem,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  if (problem.kind === 'noType') return t('carForm.chooseAVehicleType');
+  const p = problem.snapshot;
+  if (p.code === 'dealer.not_approved') return t('carForm.yourDealershipIsNot');
+  if (p.code === 'vehicle.plate_taken') return t('carForm.aCarWithThat');
+  return serverSentence(p, language, t) ?? t('carForm.theServiceDidNot');
+}
+
+/** An API name as the reader's language says it; a name this build has no word for is shown as sent. */
+function wordFor(
+  labels: Readonly<Record<string, TranslationKey>>,
+  name: string,
+  t: (key: TranslationKey) => string,
+): string {
+  const key = labels[name];
+  return key ? t(key) : name;
 }

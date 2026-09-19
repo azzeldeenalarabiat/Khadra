@@ -12,6 +12,8 @@ import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { Language } from '../../core/i18n/language';
+import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 
 /**
  * Delivery (spec 4.4, design `isDelivery`).
@@ -30,12 +32,18 @@ import { I18nService } from '../../core/i18n/i18n.service';
   imports: [IconComponent],
 })
 export class DealerDeliveryComponent {
+  private readonly i18n = inject(I18nService);
   protected readonly t = inject(I18nService).t;
   private readonly formats = inject(FormatService);
 
   /** The fee at the dinar's own three decimals, not "9.5". */
   protected money(value: { amount: number; currency: string }): string {
     return this.formats.money(value.amount, value.currency);
+  }
+
+  /** A distance as the reader's language writes it: "12.5 km", "12.5 كم". */
+  protected km(value: number): string {
+    return this.t('dealerDelivery.distanceKm', { km: this.formats.number(value) });
   }
   private readonly service = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
@@ -52,7 +60,13 @@ export class DealerDeliveryComponent {
   /** Null while unanswered, so “not set yet” and “free delivery” stay different answers. */
   protected readonly fee = signal<number | null>(null);
   protected readonly busy = signal(false);
-  protected readonly problem = signal<string | null>(null);
+  /** What the last failed request said, as facts; `problemText` chooses the words. */
+  protected readonly problem = signal<ProblemSnapshot | null>(null);
+
+  protected readonly problemText = computed(() => {
+    const p = this.problem();
+    return p ? describe(p, this.settings()?.maxRadiusKm, this.t, this.i18n.lang()) : null;
+  });
 
   constructor() {
     // Seed the form from the server each time it answers; the form is a draft of THAT answer.
@@ -137,8 +151,7 @@ export class DealerDeliveryComponent {
         this.t('dealerDelivery.offeredOnListedCars', { count: result.updated }),
       );
     } catch (error) {
-      const p = error as { error?: { title?: string } };
-      this.problem.set(p.error?.title ?? this.t('dealerDelivery.serviceDidNotRespond'));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.offering.set(false);
     }
@@ -174,18 +187,24 @@ export class DealerDeliveryComponent {
           : this.t('dealerDelivery.switchedOffBody'),
       );
     } catch (error) {
-      const p = error as { error?: { code?: string; title?: string } };
-      this.problem.set(
-        p.error?.code === 'dealer.invalid_delivery_radius'
-          ? this.t('dealerDelivery.radiusMustBeBetween', {
-              // The server's own bound, echoed back. Never a literal: the console must not state a
-              // limit the API could have moved.
-              max: this.settings()?.maxRadiusKm ?? 0,
-            })
-          : (p.error?.title ?? this.t('dealerDelivery.serviceDidNotRespond')),
-      );
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.busy.set(false);
     }
   }
+}
+
+/** Words a refusal in the reader's language, at render time. */
+function describe(
+  p: ProblemSnapshot,
+  maxRadiusKm: number | undefined,
+  t: I18nService['t'],
+  language: Language,
+): string {
+  if (p.code === 'dealer.invalid_delivery_radius') {
+    // The server's own bound, echoed back. Never a literal: the console must not state a limit the
+    // API could have moved.
+    return t('dealerDelivery.radiusMustBeBetween', { max: maxRadiusKm ?? 0 });
+  }
+  return serverSentence(p, language, t) ?? t('dealerDelivery.serviceDidNotRespond');
 }

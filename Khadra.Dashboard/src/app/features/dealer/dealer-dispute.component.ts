@@ -16,7 +16,11 @@ import { SessionService } from '../../core/services/session.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
+import { Language } from '../../core/i18n/language';
+import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
+import { Dispute, DisputeResolution, DisputeStatement } from '../../core/models/disputes.api';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 /**
@@ -33,7 +37,10 @@ import { MoneyPipe } from '../../shared/money.pipe';
   imports: [RouterLink, IconComponent, MoneyPipe],
 })
 export class DealerDisputeComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  protected readonly statusLabel = this.i18n.statusLabel;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(DealerDisputesService);
   private readonly ui = inject(ConsoleUiService);
   private readonly session = inject(SessionService);
@@ -54,7 +61,12 @@ export class DealerDisputeComponent {
   protected readonly dispute = computed(() => this.data() ?? null);
   protected readonly body = signal('');
   protected readonly busy = signal(false);
-  protected readonly problem = signal<string | null>(null);
+  /** The last refusal, held as facts: its words are chosen below, so a language switch re-words it. */
+  protected readonly problem = signal<ProblemSnapshot | null>(null);
+  protected readonly problemText = computed(() => {
+    const problem = this.problem();
+    return problem ? describe(problem, this.t, this.i18n.lang()) : null;
+  });
   protected readonly evidenceKeys = signal<readonly string[]>([]);
   protected readonly evidenceNames = signal<readonly string[]>([]);
 
@@ -80,10 +92,10 @@ export class DealerDisputeComponent {
   protected readonly sla = computed(() => {
     const d = this.dispute();
     if (!d || !d.isLive) return null;
-    const hours = Math.round((Date.parse(d.slaDeadline) - Date.now()) / 3_600_000);
-    return hours <= 0
-      ? `${-hours}h over the platform's SLA`
-      : `${hours}h until the platform's deadline`;
+    // The platform's promise on this ticket, by the server's flag OR the clock.
+    return this.t('dealerDispute.platformDeadline', {
+      clock: this.formats.sla(d.slaDeadline, d.isOverdue).text,
+    });
   });
 
   protected async attachEvidence(event: Event): Promise<void> {
@@ -97,7 +109,7 @@ export class DealerDisputeComponent {
       this.evidenceKeys.update((keys) => [...keys, key]);
       this.evidenceNames.update((names) => [...names, file.name]);
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.busy.set(false);
       input.value = '';
@@ -116,9 +128,12 @@ export class DealerDisputeComponent {
       this.evidenceKeys.set([]);
       this.evidenceNames.set([]);
       this.service.refresh();
-      this.ui.showToast(this.t('dealerDispute.statementAdded'), this.t('dealerDispute.thePlatformAndThe'));
+      this.ui.showToast(
+        this.t('dealerDispute.statementAdded'),
+        this.t('dealerDispute.thePlatformAndThe'),
+      );
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.busy.set(false);
     }
@@ -134,13 +149,21 @@ export class DealerDisputeComponent {
         title: this.t('dealerDispute.withdrawThisDispute'),
         body: this.t('dealerDispute.theAmicablePathThe'),
         confirm: this.t('dealerDispute.withdrawDispute'),
-        result: { title: this.t('dealerDispute.disputeWithdrawn'), body: this.t('dealerDispute.nothingIsChargedTo'), tone: 'warn' },
+        result: {
+          title: this.t('dealerDispute.disputeWithdrawn'),
+          body: this.t('dealerDispute.nothingIsChargedTo'),
+          tone: 'warn',
+        },
       },
       async () => {
         await this.service.withdraw(d.ticketId);
         this.service.refresh();
       },
-      { title: this.t('dealerDispute.disputeWithdrawn'), body: this.t('dealerDispute.nothingIsChargedTo'), tone: 'warn' },
+      {
+        title: this.t('dealerDispute.disputeWithdrawn'),
+        body: this.t('dealerDispute.nothingIsChargedTo'),
+        tone: 'warn',
+      },
     );
   }
 
@@ -153,31 +176,58 @@ export class DealerDisputeComponent {
   }
 
   protected dateTime(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.formats.dayMonthTime(iso);
   }
 
   protected initials(name: string): string {
     return name
-      .split(' ')
+      .trim()
+      .split(/\s+/)
       .slice(0, 2)
       .map((part) => part[0] ?? '')
       .join('');
   }
+
+  // Every name here arrives with a fact beside it. When the fact says the account is gone, the name
+  // is an English stand-in kept for older customer apps, and this screen words it instead.
+
+  protected openerName(d: Dispute): string {
+    return d.openedByAccountClosed ? this.t('common.accountClosed') : d.openedByName;
+  }
+
+  protected authorName(s: DisputeStatement): string {
+    return s.authorAccountClosed ? this.t('common.accountClosed') : s.authorName;
+  }
+
+  protected resolverName(r: DisputeResolution): string {
+    return r.resolvedByAccountClosed ? this.t('common.accountClosed') : r.resolvedByName;
+  }
+
+  /** Who holds the ticket, or null while nobody does. A closed account still holds it. */
+  protected holderName(d: Dispute): string | null {
+    if (d.assignedAdminId === null) return null;
+    return d.assignedAdminAccountClosed || d.assignedAdminName === null
+      ? this.t('common.accountClosed')
+      : d.assignedAdminName;
+  }
 }
 
-function describe(error: unknown, t: (key: TranslationKey) => string): string {
-  const problem = error as { error?: { code?: string; title?: string } };
-  switch (problem.error?.code) {
+/**
+ * A server refusal, in the reader's own language, worded when it is shown: the codes this screen
+ * knows by their own sentences, anything else by the server's English title while the console is
+ * English and the console's own "refused" line while it is not.
+ */
+function describe(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  switch (problem.code) {
     case 'dispute.not_open':
       return t('dealerDispute.thisDisputeIsClosed');
     case 'dispute.invalid_evidence_type':
       return t('dealerBooking.evidenceMustBeA');
     default:
-      return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
+      return serverSentence(problem, language, t) ?? t('dealerDelivery.serviceDidNotRespond');
   }
 }

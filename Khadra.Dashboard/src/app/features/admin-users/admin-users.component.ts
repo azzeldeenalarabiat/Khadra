@@ -7,6 +7,7 @@ import { loaded } from '../../core/services/loaded';
 import { SessionService } from '../../core/services/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 
 /**
  * Who may administer the platform.
@@ -27,6 +28,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class AdminUsersComponent {
   protected readonly t = inject(I18nService).t;
+  protected readonly formats = inject(FormatService);
   private readonly service = inject(AdminUsersService);
   private readonly session = inject(SessionService);
   private readonly ui = inject(ConsoleUiService);
@@ -70,8 +72,8 @@ export class AdminUsersComponent {
    * which is exactly what an unaccepted invitation looks like.
    */
   protected statusLabel(admin: AdminUserListItem): string {
-    if (admin.status === 'Suspended') return 'Deactivated';
-    return admin.isEmailVerified ? 'Active' : 'Invited';
+    if (admin.status === 'Suspended') return this.t('status.deactivated');
+    return admin.isEmailVerified ? this.t('status.active') : this.t('status.invited');
   }
 
   protected invite(): void {
@@ -83,9 +85,27 @@ export class AdminUsersComponent {
         body: this.t('adminUsers.theyGetAOne'),
         note: this.t('adminUsers.thereIsOneAdministrator'),
         fields: [
-          { name: 'fullName', label: this.t('adminUsers.fullName'), type: 'text', placeholder: this.t('adminUsers.eGYousefBarakat') },
-          { name: this.t('dealerStaff.email'), label: this.t('dealerSettings.email'), type: 'text', placeholder: 'name@khadra.jo' },
-          { name: this.t('dealerStaff.phone'), label: this.t('customerProfile.phone'), type: 'text', placeholder: '07XXXXXXXX' },
+          // `name` is the key each typed value is stored under and read back by below: a machine
+          // name, never a translation, or an Arabic screen sends an empty email and phone. The two
+          // placeholders are format hints, the same in both languages.
+          {
+            name: 'fullName',
+            label: this.t('adminUsers.fullName'),
+            type: 'text',
+            placeholder: this.t('adminUsers.eGYousefBarakat'),
+          },
+          {
+            name: 'email',
+            label: this.t('dealerSettings.email'),
+            type: 'text',
+            placeholder: 'name@khadra.jo',
+          },
+          {
+            name: 'phone',
+            label: this.t('customerProfile.phone'),
+            type: 'text',
+            placeholder: '07XXXXXXXX',
+          },
         ],
         confirm: this.t('adminUsers.sendInvitation'),
         result: { title: this.t('adminUsers.invitationSent'), body: '', tone: 'ok' },
@@ -100,7 +120,10 @@ export class AdminUsersComponent {
         // The expiry is the token's, not a literal: the lifetime is configuration.
         this.ui.showToast(
           this.t('adminUsers.invitationSent'),
-          `${invited.email} can accept until ${new Date(invited.expiresAt).toLocaleString('en-GB')}.`,
+          this.t('adminUsers.canAcceptUntil', {
+            email: invited.email,
+            date: this.formats.dateTime(invited.expiresAt),
+          }),
         );
       },
       { title: this.t('adminUsers.invitationSent'), body: '' },
@@ -113,13 +136,19 @@ export class AdminUsersComponent {
         icon: 'user-minus',
         tone: 'bad',
         danger: true,
-        title: `Deactivate ${admin.fullName}?`,
+        title: this.t('adminUsers.deactivateNameQuestion', { name: admin.fullName }),
         body: this.t('adminUsers.theyAreSignedOut'),
         note: this.t('adminUsers.reversibleTheAccountIs'),
         fields: [
-          { name: this.t('myBooking.reason'), label: this.t('dealerDecide.reject.reasonLabel'), type: 'text', placeholder: this.t('adminUsers.whyIsThisAccount') },
+          {
+            // Read back as values['reason']: a machine name, never a translation.
+            name: 'reason',
+            label: this.t('dealerDecide.reject.reasonLabel'),
+            type: 'text',
+            placeholder: this.t('adminUsers.whyIsThisAccount'),
+          },
         ],
-        confirm: 'Deactivate',
+        confirm: this.t('common.deactivate'),
         result: { title: this.t('adminUsers.administratorDeactivated'), body: '', tone: 'bad' },
       },
       async (values) => {
@@ -135,9 +164,9 @@ export class AdminUsersComponent {
       {
         icon: 'check-circle',
         tone: 'ok',
-        title: `Reactivate ${admin.fullName}?`,
+        title: this.t('adminUsers.reactivateNameQuestion', { name: admin.fullName }),
         body: this.t('adminUsers.theyCanSignIn'),
-        confirm: 'Reactivate',
+        confirm: this.t('common.reactivate'),
         result: { title: this.t('adminUsers.administratorReactivated'), body: '', tone: 'ok' },
       },
       async () => {
@@ -161,12 +190,6 @@ export class AdminUsersComponent {
   }
 
   protected when(iso: string | null): string {
-    return iso
-      ? new Date(iso).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        })
-      : 'Never';
+    return iso ? this.formats.date(iso) : this.t('common.never');
   }
 }

@@ -6,9 +6,19 @@ import { AdminCustomersService } from '../../core/services/admin-customers.servi
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { TranslationKey } from '../../core/i18n/en';
 
 /** A filter chip and the count behind it, both answered by the server. */
 type Chip = { readonly label: string; readonly key: 'all' | 'active' | 'suspended' | 'unverified' };
+
+/** The chips as keys; worded in `chips` so a language switch re-words them. */
+const CHIPS: readonly { readonly key: Chip['key']; readonly label: TranslationKey }[] = [
+  { key: 'all', label: 'common.all' },
+  { key: 'active', label: 'status.active' },
+  { key: 'suspended', label: 'status.suspended' },
+  { key: 'unverified', label: 'status.unverified' },
+];
 
 /**
  * The people who rent (spec 5).
@@ -25,6 +35,8 @@ type Chip = { readonly label: string; readonly key: 'all' | 'active' | 'suspende
 })
 export class CustomersListComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly formats = inject(FormatService);
   private readonly service = inject(AdminCustomersService);
 
   protected readonly resource = this.service.list;
@@ -34,12 +46,9 @@ export class CustomersListComponent {
   private readonly loadedPage = loaded(this.resource);
   private readonly loadedCounts = loaded(this.countsResource);
 
-  protected readonly chips: readonly Chip[] = [
-    { label: 'All', key: 'all' },
-    { label: 'Active', key: 'active' },
-    { label: 'Suspended', key: 'suspended' },
-    { label: 'Unverified', key: 'unverified' },
-  ];
+  protected readonly chips = computed<readonly Chip[]>(() =>
+    CHIPS.map((chip) => ({ key: chip.key, label: this.t(chip.label) })),
+  );
 
   protected readonly active = computed<Chip['key']>(() => {
     if (this.service.unverifiedOnly()) return 'unverified';
@@ -74,8 +83,8 @@ export class CustomersListComponent {
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
-    const noun = page.totalCount === 1 ? 'customer' : 'customers';
-    return `Showing ${from}–${to} of ${page.totalCount} ${noun}`;
+    // One plural message on the total, so the noun agrees with it in Arabic as well as English.
+    return this.t('customersList.showingRange', { from, to, count: page.totalCount });
   });
 
   protected readonly failure = computed(() => {
@@ -108,9 +117,10 @@ export class CustomersListComponent {
     return row.status === 'Suspended' ? 'bad' : row.isEmailVerified ? 'ok' : 'warn';
   }
 
+  /** A suspension is named first; otherwise whether the email has been verified, which is a flag. */
   protected statusLabel(row: CustomerListItem): string {
-    if (row.status === 'Suspended') return 'Suspended';
-    return row.isEmailVerified ? 'Verified' : 'Unverified';
+    if (row.status === 'Suspended') return this.i18n.statusLabel(row.status);
+    return this.t(row.isEmailVerified ? 'status.verified' : 'status.unverified');
   }
 
   protected initials(name: string): string {
@@ -123,12 +133,6 @@ export class CustomersListComponent {
 
   protected when(iso: string | null): string {
     // Never signed in is a fact worth stating; a date invented for it would not be.
-    return iso
-      ? new Date(iso).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-        })
-      : 'Never';
+    return iso ? this.formats.date(iso) : this.t('common.never');
   }
 }

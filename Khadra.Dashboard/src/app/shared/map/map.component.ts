@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  computed,
   OnDestroy,
   afterNextRender,
   effect,
@@ -14,6 +15,8 @@ import {
 import * as L from 'leaflet';
 import { IconComponent } from '../icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { roundTo } from '../../core/services/money';
 
 /** A point on the map, in the order the API and the domain use. */
 export interface MapPoint {
@@ -48,6 +51,9 @@ export interface MapPoint {
 export class MapComponent implements OnDestroy {
   protected readonly t = inject(I18nService).t;
   private readonly host = inject(ElementRef<HTMLElement>);
+  // The coordinates under the map are a figure a reader checks against the place, so they are
+  // formatted like every other number in the console: Latin digits, one isolated left-to-right run.
+  protected readonly formats = inject(FormatService);
 
   readonly latitude = input.required<number>();
   readonly longitude = input.required<number>();
@@ -71,7 +77,9 @@ export class MapComponent implements OnDestroy {
   readonly zoom = input(14);
   /** Kilometres. Draws the delivery radius around the pin, to scale, when set. */
   readonly radiusKm = input<number | null>(null);
-  readonly label = input('Location');
+  /** The pin's accessible name. Unset, it is "Location" in the reader's language. */
+  readonly label = input<string | null>(null);
+  protected readonly pinLabel = computed(() => this.label() ?? this.t('map.location'));
 
   /**
    * How tall to draw it. An input rather than a class on the host, because the size class has to
@@ -98,6 +106,14 @@ export class MapComponent implements OnDestroy {
 
   constructor() {
     afterNextRender(() => this.build());
+
+    // Leaflet names the pin once, when it is created; the name follows the language switch from here.
+    effect(() => {
+      const label = this.pinLabel();
+      const element = this.marker?.getElement();
+      element?.setAttribute('title', label);
+      element?.setAttribute('aria-label', label);
+    });
 
     // Coordinates typed into the fields beside the map move the pin, and the pin moves them back.
     effect(() => {
@@ -170,8 +186,8 @@ export class MapComponent implements OnDestroy {
     const marker = L.marker(at, {
       draggable: this.editable(),
       keyboard: this.editable(),
-      title: this.label(),
-      alt: this.label(),
+      title: this.pinLabel(),
+      alt: this.pinLabel(),
       icon: L.divIcon({
         className: 'kh-map-pin',
         html: '<span class="kh-map-pin-dot"></span><span class="kh-map-pin-ring"></span>',
@@ -283,8 +299,8 @@ export class MapComponent implements OnDestroy {
   /** Rounded to six decimals — about 11cm, past which the extra digits are noise. */
   private publish(at: L.LatLng): void {
     const point = {
-      latitude: Number(at.lat.toFixed(6)),
-      longitude: Number(at.lng.toFixed(6)),
+      latitude: roundTo(at.lat, 6),
+      longitude: roundTo(at.lng, 6),
     };
     this.selfMove = true;
     this.moved.emit(point);

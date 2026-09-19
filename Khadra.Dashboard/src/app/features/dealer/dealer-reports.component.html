@@ -7,7 +7,7 @@
     <!-- A period to choose is only worth offering when there is a report behind it. -->
     @if (granted() !== false) {
       <div class="tabs" role="tablist" [attr.aria-label]="t('common.period')">
-        @for (p of periods; track p.key) {
+        @for (p of periods(); track p.key) {
           <button
             type="button"
             class="tab"
@@ -34,7 +34,9 @@
           {{ t('dealerReports.revenueCommissionAndOccupancy') }}
         </div>
         <div class="state-actions">
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/dashboard">{{ t('dealerReports.backToDashboard') }}</a>
+          <a class="btn btn-secondary btn-sm" routerLink="/dealer/dashboard">{{
+            t('dealerReports.backToDashboard')
+          }}</a>
         </div>
       </div>
     </section>
@@ -52,26 +54,35 @@
     <div class="stat-grid">
       <div class="stat-card">
         <span class="k">{{ t('dealerReports.bookingsReturned') }}</span>
-        <span class="stat-v num">{{ r.bookings }}</span>
+        <span class="stat-v num">{{ formats.number(r.bookings) }}</span>
         <span class="page-sub">{{ t('dealerReports.returnedOrCompletedIn') }}</span>
       </div>
       <div class="stat-card">
         <span class="k">{{ t('dealerReports.rentalRevenue') }}</span>
         <span class="stat-v num"
-          >{{ r.revenue | money: 'amount' }} <small>{{ r.revenue.currency }}</small></span
+          ><span class="ltr"
+            >{{ r.revenue | money: 'amount' }} <small>{{ r.revenue.currency }}</small></span
+          ></span
         >
         <span class="page-sub">{{ t('dealerReports.rentalTotalsOfThose') }}</span>
       </div>
       <div class="stat-card">
         <span class="k">{{ t('dealerReports.platformCommission') }}</span>
+        <!-- Unsigned, on the owner's ruling of 2026-09-13: this is the amount Khadra charges, and
+             "Revenue after commission" below is the server's own subtraction. A "−" typed here
+             printed "−0" on an empty period, and "JOD 0−" in Arabic, where bidi carried the sign to
+             the far end. docs/design/Dealer Console.dc.html still draws "−82 JOD"; a design sync
+             must not bring the sign back. -->
         <span class="stat-v num"
-          >−{{ r.commission | money: 'amount' }} <small>{{ r.commission.currency }}</small></span
+          ><span class="ltr"
+            >{{ r.commission | money: 'amount' }} <small>{{ r.commission.currency }}</small></span
+          ></span
         >
         <span class="page-sub">{{ t('dealerReports.atEachBookingsFrozen') }}</span>
       </div>
       <div class="stat-card">
         <span class="k">{{ t('dealerReports.occupancy') }}</span>
-        <span class="stat-v num">{{ r.occupancyPercent }}%</span>
+        <span class="stat-v num">{{ formats.percent(r.occupancyPercent) }}</span>
         <span class="page-sub">{{ t('dealerReports.rentedDaysOverListed') }}</span>
       </div>
     </div>
@@ -85,12 +96,12 @@
         <div class="sect-pad stack stack-9">
           @for (v of r.occupancyByVehicle; track v.vehicleId) {
             <div class="occ-row">
-              <span class="occ-name">{{ v.label }}</span>
+              <span class="occ-name user-text">{{ v.label }}</span>
               <div class="occ-bar">
                 <div class="occ-fill" [style.width.%]="v.occupancyPercent"></div>
               </div>
-              <span class="occ-pct num">{{ v.occupancyPercent }}%</span>
-              <span class="occ-days">{{ v.rentedDays }}d</span>
+              <span class="occ-pct num">{{ formats.percent(v.occupancyPercent) }}</span>
+              <span class="occ-days">{{ t('time.daysShort', { count: v.rentedDays }) }}</span>
             </div>
           } @empty {
             <div class="page-sub">{{ t('dealerReports.noListedVehiclesIn') }}</div>
@@ -103,20 +114,19 @@
           <span class="k">{{ t('dealerReports.moneyInThisPeriod') }}</span>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.rentalRevenue') }}</span
-            ><span class="num">{{ r.revenue | money }} </span>
+            ><span class="num">{{ r.revenue | money }}</span>
           </div>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.platformCommission') }}</span
-            ><span class="num">−{{ r.commission | money }} </span>
+            ><span class="num">{{ r.commission | money }}</span>
           </div>
           <div class="money-line is-hi">
             <span class="k-label">{{ t('dealerReports.revenueAfterCommission') }}</span
-            ><span class="num"
-              >{{ r.netAfterCommission | money }} </span
-            >
+            ><span class="num">{{ r.netAfterCommission | money }}</span>
           </div>
           <div class="money-line is-dim">
-            <span class="k-label">{{ t('dealerReports.netPayout') }}</span><span>{{ t('dealerReports.notAvailableYet') }}</span>
+            <span class="k-label">{{ t('dealerReports.netPayout') }}</span
+            ><span>{{ t('dealerReports.notAvailableYet') }}</span>
           </div>
           <div class="note-box is-plain">
             <kh-icon name="info" />
@@ -127,11 +137,11 @@
           <span class="k">{{ t('dealerReports.stillOut') }}</span>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.carsCurrentlyRented') }}</span
-            ><span class="num">{{ r.inProgressCount }}</span>
+            ><span class="num">{{ formats.number(r.inProgressCount) }}</span>
           </div>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.rentalValueInProgress') }}</span
-            ><span class="num">{{ r.inProgress | money }} </span>
+            ><span class="num">{{ r.inProgress | money }}</span>
           </div>
           <div class="page-sub">{{ t('dealerReports.countedAsRevenueOnce') }}</div>
         </section>

@@ -12,10 +12,13 @@ import {
 } from '../models/dashboard.api';
 import { TranslationKey } from '../i18n/en';
 import { MessageParams } from '../i18n/language';
+import { formatCalendarDate } from '../i18n/date-format';
+import { formatNumber } from '../i18n/number-format';
+import { clockDuration, relativeTime, slaReading } from '../i18n/relative-time';
+import { KpiCard, QueueItem } from '../data/dashboard.data';
 
 /** Passed in rather than injected: these are pure functions, and their spec calls them directly. */
 export type Translate = (key: TranslationKey, params?: MessageParams) => string;
-import { KpiCard, QueueItem } from '../data/dashboard.data';
 
 /**
  * Turns the API responses into what the design renders.
@@ -26,12 +29,11 @@ import { KpiCard, QueueItem } from '../data/dashboard.data';
  * refetching, and that all of it is testable without a component.
  *
  * Each panel arrives on its own now, so every function here takes the one response it needs and a
- * card is built the moment its own answer lands.
+ * card is built the moment its own answer lands. The functions that print a figure or a date also
+ * take the locale tag, because a pure function cannot read the language switch for itself.
  */
 
 const UNAVAILABLE = '—';
-
-const formatCount = (value: number): string => value.toLocaleString('en-US');
 
 /**
  * The four count responses, each present only once its own request has answered.
@@ -58,20 +60,25 @@ export interface KpiSources {
  * panel below states that once, in words; a KPI card of dashes said it four times and looked like a
  * figure that had failed to load.
  */
-export function toKpiCards(sources: KpiSources, t: Translate): readonly KpiCard[] {
+export function toKpiCards(
+  sources: KpiSources,
+  t: Translate,
+  localeTag: string,
+): readonly KpiCard[] {
   const { dealers, bookings, customers, disputes } = sources;
+  const count = (value: number): string => formatNumber(value, localeTag, 0);
   const cards: KpiCard[] = [];
 
   if (dealers) {
     cards.push({
       label: t('kpi.totalDealers'),
       icon: 'storefront',
-      main: formatCount(dealers.total),
+      main: count(dealers.total),
       route: '/dealers',
       subs: [
-        { k: t('kpi.trading'), v: formatCount(dealers.trading) },
-        { k: t('kpi.pendingReview'), v: formatCount(dealers.pendingReview), tone: 'warn' as Tone },
-        { k: t('kpi.suspended'), v: formatCount(dealers.suspended), tone: 'bad' as Tone },
+        { k: t('kpi.trading'), v: count(dealers.trading) },
+        { k: t('kpi.pendingReview'), v: count(dealers.pendingReview), tone: 'warn' as Tone },
+        { k: t('kpi.suspended'), v: count(dealers.suspended), tone: 'bad' as Tone },
       ],
     });
   }
@@ -80,12 +87,12 @@ export function toKpiCards(sources: KpiSources, t: Translate): readonly KpiCard[
     cards.push({
       label: t('kpi.bookings'),
       icon: 'calendar-check',
-      main: formatCount(bookings.total),
+      main: count(bookings.total),
       route: '/bookings',
       subs: [
-        { k: t('kpi.today'), v: formatCount(bookings.today) },
-        { k: t('kpi.active'), v: formatCount(bookings.active) },
-        { k: t('kpi.pending'), v: formatCount(bookings.pendingApproval), tone: 'warn' as Tone },
+        { k: t('kpi.today'), v: count(bookings.today) },
+        { k: t('kpi.active'), v: count(bookings.active) },
+        { k: t('kpi.pending'), v: count(bookings.pendingApproval), tone: 'warn' as Tone },
       ],
     });
   }
@@ -94,16 +101,16 @@ export function toKpiCards(sources: KpiSources, t: Translate): readonly KpiCard[
     cards.push({
       label: t('kpi.customers'),
       icon: 'users-three',
-      main: formatCount(customers.total),
+      main: count(customers.total),
       route: '/customers',
       subs: [
-        { k: t('kpi.verified'), v: formatCount(customers.verified) },
+        { k: t('kpi.verified'), v: count(customers.verified) },
         {
           k: t('kpi.pendingVerification'),
-          v: formatCount(customers.pendingVerification),
+          v: count(customers.pendingVerification),
           tone: 'warn' as Tone,
         },
-        { k: t('kpi.suspended'), v: formatCount(customers.suspended) },
+        { k: t('kpi.suspended'), v: count(customers.suspended) },
       ],
     });
   }
@@ -112,16 +119,16 @@ export function toKpiCards(sources: KpiSources, t: Translate): readonly KpiCard[
     cards.push({
       label: t('kpi.disputes'),
       icon: 'scales',
-      main: formatCount(disputes.open + disputes.underReview),
+      main: count(disputes.open + disputes.underReview),
       route: '/disputes',
       subs: [
-        { k: t('kpi.pendingAdmin'), v: formatCount(disputes.open), tone: 'warn' as Tone },
-        { k: t('kpi.overdue'), v: formatCount(disputes.overdue), tone: 'bad' as Tone },
+        { k: t('kpi.pendingAdmin'), v: count(disputes.open), tone: 'warn' as Tone },
+        { k: t('kpi.overdue'), v: count(disputes.overdue), tone: 'bad' as Tone },
         {
           // The window travels with the figure, from the server. "4 resolved" means nothing without
           // "in 30 days", and the console must not be the thing that remembers which 30.
           k: t('kpi.resolvedInDays', { days: disputes.resolvedWindowDays }),
-          v: formatCount(disputes.resolvedRecently),
+          v: count(disputes.resolvedRecently),
         },
       ],
     });
@@ -150,36 +157,41 @@ const severityTone = (severity: string): Tone => {
  * own queue instead of a screen we have not been told about — which is what lets the Payments kinds
  * arrive later without a frontend release.
  */
-const kindTarget = (item: AttentionItem): { route: string; action: string } => {
+const kindTarget = (item: AttentionItem): { route: string; action: TranslationKey } => {
   const only = item.subjectIds?.length === 1 ? item.subjectIds[0] : null;
   switch (item.kind) {
     case 'DisputeOverdue':
     case 'DisputeOpen':
-      return { route: only ? `/disputes/${only}` : '/disputes', action: 'Resolve' };
+      return { route: only ? `/disputes/${only}` : '/disputes', action: 'queue.actionResolve' };
     case 'DealerApplicationsAtRisk':
-      return { route: only ? `/dealers/${only}` : '/dealers', action: 'Review' };
+      return { route: only ? `/dealers/${only}` : '/dealers', action: 'queue.actionReview' };
     default:
-      return { route: '/dashboard', action: 'Open' };
+      return { route: '/dashboard', action: 'queue.actionOpen' };
   }
 };
 
-/** "Overdue" / "SLA 41h" — the short badge the design puts above each row. */
-const severityLabel = (item: AttentionItem, now: number): string => {
-  if (item.isOverdue) return 'Overdue';
-  const hoursLeft = Math.max(0, Math.round((Date.parse(item.slaDeadlineAt) - now) / 3_600_000));
-  return `SLA ${hoursLeft}h`;
+/**
+ * "Overdue" / "SLA 41h" — the short badge the design puts above each row.
+ *
+ * Overdue by the server's word OR this clock, the same rule as the SLA line beside it, so the badge
+ * and the line never disagree about one item. Hours are floored like every other clock: a badge that
+ * rounded up promised time that was not there.
+ */
+const severityLabel = (item: AttentionItem, now: number, t: Translate): string => {
+  if (slaReading(item.slaDeadlineAt, now, t, item.isOverdue).passed) return t('queue.overdue');
+  // The same clock as the line beside it, to the same unit. Computed here in hours, the badge read
+  // "SLA 0h" under an hour while the line read "59m remaining".
+  return t('queue.slaLeft', {
+    duration: clockDuration(Date.parse(item.slaDeadlineAt) - now, t),
+  });
 };
 
-/** "13h over", "7h left", "2d left". */
-export function slaLabel(item: AttentionItem, now: number): string {
-  const deadline = Date.parse(item.slaDeadlineAt);
-  const deltaMinutes = Math.round(Math.abs(deadline - now) / 60_000);
-  const suffix = deadline <= now ? 'over' : 'left';
-
-  if (deltaMinutes < 60) return `${deltaMinutes}m ${suffix}`;
-  const hours = Math.round(deltaMinutes / 60);
-  if (hours < 48) return `${hours}h ${suffix}`;
-  return `${Math.round(hours / 24)}d ${suffix}`;
+/**
+ * "Overdue by 13h", "7h remaining", "2d remaining": an SLA is a promise that can be broken, so a
+ * passed one says by how much. See `slaReading`.
+ */
+export function slaLabel(item: AttentionItem, now: number, t: Translate): string {
+  return slaReading(item.slaDeadlineAt, now, t, item.isOverdue).text;
 }
 
 /** How full the meter is. Overdue pins at 100 rather than running off the end. */
@@ -195,17 +207,14 @@ export function slaPercent(item: AttentionItem, now: number): number {
 const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
   if (item.kind === 'DealerApplicationsAtRisk') {
     // One message per plural category, because Arabic needs six where English needs two.
-    return t(
-      item.isOverdue ? 'queue.applicationsOverdue' : 'queue.applicationsApproaching',
-      { count: item.count },
-    );
+    return t(item.isOverdue ? 'queue.applicationsOverdue' : 'queue.applicationsApproaching', {
+      count: item.count,
+    });
   }
 
   const ageHours = Math.max(0, Math.round((now - Date.parse(item.slaStartedAt)) / 3_600_000));
   if (item.kind === 'DisputeOverdue' || item.kind === 'DisputeOpen') {
-    return ageHours < 1
-      ? t('queue.newDispute')
-      : t('queue.disputeOpenFor', { count: ageHours });
+    return ageHours < 1 ? t('queue.newDispute') : t('queue.disputeOpenFor', { count: ageHours });
   }
   return item.subtitle ?? t('queue.needsAttention');
 };
@@ -219,14 +228,14 @@ export function toQueueItems(
     const target = kindTarget(item);
     return {
       id: item.id,
-      severity: severityLabel(item, now),
+      severity: severityLabel(item, now, t),
       tone: severityTone(item.severity),
       title: queueTitle(item, now, t),
       description: item.description ?? '',
       entity: item.subtitle ?? '',
-      sla: slaLabel(item, now),
+      sla: slaLabel(item, now, t),
       percent: slaPercent(item, now),
-      action: target.action,
+      action: t(target.action),
       route: target.route,
     };
   });
@@ -254,12 +263,15 @@ export interface TrendBar {
   readonly tick: string;
 }
 
-export function toTrendBars(trend: BookingTrend): readonly TrendBar[] {
+export function toTrendBars(
+  trend: BookingTrend,
+  t: Translate,
+  localeTag: string,
+): readonly TrendBar[] {
   const counts = trend.points.map((point) => point.count);
   const busiest = Math.max(0, ...counts);
 
   return trend.points.map((point, index) => {
-    const day = new Date(point.date + 'T00:00:00');
     const height =
       busiest === 0 || point.count === 0
         ? 0
@@ -269,12 +281,21 @@ export function toTrendBars(trend: BookingTrend): readonly TrendBar[] {
       date: point.date,
       count: point.count,
       height,
-      label: `${day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}: ${point.count} ${point.count === 1 ? 'booking' : 'bookings'}`,
+      // A plural message, not an `n === 1` ternary: Arabic has six forms. The day is a calendar date,
+      // so it is formatted without a time zone that could move it.
+      label: t('adminDashboard.bookingsOnDay', {
+        day: formatCalendarDate(point.date, localeTag, {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+        }),
+        count: point.count,
+      }),
       // First, last, and roughly every fourth day between: enough to place a bar in the fortnight
       // without the labels running into each other.
       tick:
         index === 0 || index === trend.points.length - 1 || index % 4 === 0
-          ? day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+          ? formatCalendarDate(point.date, localeTag, { day: 'numeric', month: 'short' })
           : '',
     };
   });
@@ -334,17 +355,6 @@ const ACTIVITY_VERBS: Readonly<Record<string, TranslationKey>> = {
   BookingMarkedNoShow: 'activity.bookingNoShow',
 };
 
-export function relativeTime(iso: string, now: number, t: Translate): string {
-  const minutes = Math.round((now - Date.parse(iso)) / 60_000);
-  if (minutes < 1) return t('time.justNow');
-  if (minutes < 60) return t('time.minutesAgo', { count: minutes });
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return t('time.hoursAgo', { count: hours });
-  const days = Math.round(hours / 24);
-  if (days === 1) return t('time.yesterday');
-  return t('time.daysAgo', { count: days });
-}
-
 export interface ActivityRow {
   readonly icon: IconName;
   readonly text: string;
@@ -355,12 +365,13 @@ export function toActivityRows(
   entries: readonly ActivityEntry[],
   now: number,
   t: Translate,
+  localeTag: string,
 ): readonly ActivityRow[] {
   return entries.map((entry) => ({
     icon: ACTIVITY_ICONS[entry.action] ?? 'info',
     // An unmapped action still reads sensibly: the raw name is better than an empty line.
     text: `${entry.actorName} ${verb(entry.action, t)} ${entry.subjectLabel}`,
-    ts: relativeTime(entry.occurredAt, now, t),
+    ts: relativeTime(entry.occurredAt, now, localeTag),
   }));
 }
 
@@ -370,5 +381,9 @@ const verb = (action: string, t: Translate): string => {
   return key ? t(key) : action;
 };
 
-export const formatChangePercent = (change: number | null): string =>
-  change === null ? UNAVAILABLE : `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
+/**
+ * "+3.2%" against the previous window. Through `formatNumber`, so a change that rounds to nothing
+ * reads "0.0%" rather than the "-0.0%" `toFixed` printed for a tiny decline.
+ */
+export const formatChangePercent = (change: number | null, localeTag: string): string =>
+  change === null ? UNAVAILABLE : `${change > 0 ? '+' : ''}${formatNumber(change, localeTag, 1)}%`;

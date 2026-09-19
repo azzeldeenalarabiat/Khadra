@@ -50,6 +50,7 @@ import { IconComponent } from '../shared/icon/icon.component';
 })
 export class NotificationsMenuComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
   private readonly session = inject(SessionService);
   private readonly adminData = inject(AdminDashboardService);
   private readonly dealerData = inject(DealerConsoleService);
@@ -93,7 +94,8 @@ export class NotificationsMenuComponent {
   protected readonly rows = computed<readonly NotificationRow[]>(() => {
     const now = Date.now();
     if (this.isAdmin()) return toAdminNotifications(this.queue() ?? null, now, this.t);
-    if (this.isDealer()) return toDealerNotifications(this.dashboard() ?? null, now, this.t);
+    if (this.isDealer())
+      return toDealerNotifications(this.dashboard() ?? null, now, this.t, this.i18n.localeTag());
     return [];
   });
 

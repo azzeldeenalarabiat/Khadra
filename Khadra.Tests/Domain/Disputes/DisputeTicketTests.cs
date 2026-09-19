@@ -99,7 +99,7 @@ public sealed class DisputeTicketTests
             Percentage.FromValidated(25m),
             Percentage.FromValidated(50m),
             Money.Jod(100m),
-            "Dealer did not deliver.",
+            PenaltyReason.DealerDidNotHandOver,
             Now);
 
         var resolution = DisputeResolution.Create(
@@ -212,7 +212,7 @@ public sealed class DepositDispositionTests
             Percentage.FromValidated(25m),
             Percentage.FromValidated(50m),
             Money.Jod(100m),
-            "Dealer did not deliver.",
+            PenaltyReason.DealerDidNotHandOver,
             Build.Now);
 
     [Fact]
@@ -233,7 +233,7 @@ public sealed class DepositDispositionTests
                 BookingParty.Customer,
                 Percentage.FromValidated(100m),
                 Money.Jod(40m),
-                "Customer cancelled late.",
+                PenaltyReason.CustomerCancelledAfterFreeWindow,
                 Build.Now),
             "Charged.",
             Id.New(),

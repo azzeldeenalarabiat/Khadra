@@ -1,15 +1,17 @@
 <div class="stack stack-14 page-wide">
   <div class="page-head">
     <div>
-      <h1 class="page-title">{{ isEditing() ? 'Edit car' : 'Add a car' }}</h1>
+      <h1 class="page-title">{{ isEditing() ? t('carForm.editCar') : t('fleetList.addACar') }}</h1>
       <div class="page-sub">
         {{ t('carForm.brandModelPriceAnd') }}
       </div>
     </div>
-    <a class="btn btn-secondary btn-md push" routerLink="/dealer/fleet">{{ t('common.backToFleet') }}</a>
+    <a class="btn btn-secondary btn-md push" routerLink="/dealer/fleet">{{
+      t('common.backToFleet')
+    }}</a>
   </div>
 
-  @if (problem(); as message) {
+  @if (problemText(); as message) {
     <div class="banner s-bad" role="alert">
       <kh-icon name="warning-circle" class="banner-icon" />
       <div class="banner-body">
@@ -41,6 +43,9 @@
             [value]="form().make"
             (input)="set('make', text($event))"
           />
+          @if (fieldError('make'); as message) {
+            <div class="field-error">{{ message }}</div>
+          }
         </div>
         <div class="field">
           <label for="car-model">{{ t('common.model') }}</label>
@@ -51,6 +56,9 @@
             [value]="form().model"
             (input)="set('model', text($event))"
           />
+          @if (fieldError('model'); as message) {
+            <div class="field-error">{{ message }}</div>
+          }
         </div>
       </div>
 
@@ -60,7 +68,7 @@
           <select id="car-type" class="input" (change)="set('carTypeId', text($event))">
             @for (type of carTypes(); track type.id) {
               <option [value]="type.id" [selected]="form().carTypeId === type.id">
-                {{ type.nameEn }}
+                {{ typeName(type) }}
               </option>
             }
           </select>
@@ -83,7 +91,11 @@
             (input)="set('year', numeric($event))"
           />
           @if (yearRange(); as range) {
-            <span class="field-hint">{{ range.earliest }}–{{ range.latest }}</span>
+            <!-- Two years and a dash: one Latin run, isolated so Arabic does not read it backwards. -->
+            <span class="field-hint ltr">{{ range.earliest }}–{{ range.latest }}</span>
+          }
+          @if (fieldError('year'); as message) {
+            <div class="field-error">{{ message }}</div>
           }
         </div>
         <div class="field">
@@ -113,7 +125,7 @@
           <select id="car-transmission" class="input" (change)="set('transmission', text($event))">
             @for (option of transmissions; track option) {
               <option [value]="option" [selected]="form().transmission === option">
-                {{ option }}
+                {{ transmissionLabel(option) }}
               </option>
             }
           </select>
@@ -122,7 +134,9 @@
           <label for="car-fuel">{{ t('common.fuel') }}</label>
           <select id="car-fuel" class="input" (change)="set('fuelType', text($event))">
             @for (option of fuelTypes; track option) {
-              <option [value]="option" [selected]="form().fuelType === option">{{ option }}</option>
+              <option [value]="option" [selected]="form().fuelType === option">
+                {{ fuelTypeLabel(option) }}
+              </option>
             }
           </select>
         </div>
@@ -138,6 +152,9 @@
           <div class="field-hint">
             {{ t('carForm.greenPlateDigitsOne') }}
           </div>
+          @if (fieldError('plateNumber'); as message) {
+            <div class="field-error">{{ message }}</div>
+          }
         </div>
       </div>
 
@@ -165,6 +182,9 @@
             [value]="form().dailyRate"
             (input)="set('dailyRate', numeric($event))"
           />
+          @if (fieldError('dailyRate'); as message) {
+            <div class="field-error">{{ message }}</div>
+          }
         </div>
         <div class="field">
           <label for="car-deposit">{{ t('common.securityDepositJod') }}</label>
@@ -185,7 +205,7 @@
           <select id="car-fuel-policy" class="input" (change)="set('fuelPolicy', text($event))">
             @for (option of fuelPolicies; track option) {
               <option [value]="option" [selected]="form().fuelPolicy === option">
-                {{ option }}
+                {{ fuelPolicyLabel(option) }}
               </option>
             }
           </select>
@@ -245,7 +265,13 @@
       }
 
       <button type="submit" class="btn btn-primary btn-md self-start" [disabled]="saving()">
-        {{ saving() ? 'Saving…' : isEditing() ? 'Save changes' : 'Add car' }}
+        {{
+          saving()
+            ? t('common.saving')
+            : isEditing()
+              ? t('carForm.saveChanges')
+              : t('fleetList.addACar')
+        }}
       </button>
     </form>
 
@@ -302,8 +328,10 @@
             [disabled]="uploading()"
             (change)="upload($event)"
           />
+          <!-- The formats the input accepts. How many photos a car may hold is the domain's own limit
+               and the API does not send it, so this hint does not claim a number. -->
           <div class="field-hint">
-            {{ uploading() ? 'Uploading…' : 'JPEG, PNG or WebP. Up to 12 photos per car.' }}
+            {{ uploading() ? t('vehicleWizard.uploading') : t('carForm.photoFormats') }}
           </div>
         </div>
       }

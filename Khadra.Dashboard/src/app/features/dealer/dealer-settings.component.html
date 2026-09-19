@@ -18,7 +18,7 @@
             <span class="kv-key">{{ t('dealerSettings.name') }}</span><span class="kv-val">{{ user()?.fullName }}</span>
           </div>
           <div class="kv">
-            <span class="kv-key">{{ t('dealerSettings.email') }}</span><span class="kv-val">{{ user()?.email }}</span>
+            <span class="kv-key">{{ t('dealerSettings.email') }}</span><span class="kv-val"><span class="ltr">{{ user()?.email }}</span></span>
           </div>
           <div class="kv">
             <span class="kv-key">{{ t('common.role') }}</span><span class="kv-val">{{ role() }}</span>
@@ -40,7 +40,7 @@
           ><span class="sect-hint">{{ t('common.signsOutEveryOther') }}</span>
         </div>
         <div class="sect-pad stack stack-10">
-          @if (problem(); as message) {
+          @if (problemText(); as message) {
             <div class="banner s-bad" role="alert">
               <kh-icon name="warning-circle" class="banner-icon" />
               <div class="banner-body">
@@ -58,6 +58,9 @@
               [value]="current()"
               (input)="current.set(value($event))"
             />
+            @if (fieldError('currentPassword'); as e) {
+              <div class="field-error">{{ e }}</div>
+            }
           </div>
           <div class="field">
             <label for="pw-new">{{ t('common.newPassword') }}</label>
@@ -69,6 +72,9 @@
               [value]="next()"
               (input)="next.set(value($event))"
             />
+            @if (fieldError('newPassword'); as e) {
+              <div class="field-error">{{ e }}</div>
+            }
             <div class="field-hint">{{ t('common.changingItSignsYou') }}</div>
           </div>
           <div class="field">
@@ -91,7 +97,7 @@
             [disabled]="!canSubmit()"
             (click)="changePassword()"
           >
-            {{ busy() ? 'Changing…' : 'Change password' }}
+            {{ busy() ? t('employeeSettings.changingPassword') : t('common.changePassword') }}
           </button>
         </div>
       </section>
@@ -100,7 +106,7 @@
     <section class="sect">
       <div class="sect-h"><span class="sect-t">{{ t('dealerSettings.notLiveYet') }}</span></div>
       <div class="sect-pad stack stack-10">
-        @for (item of notLive; track item.title) {
+        @for (item of notLive(); track item.title) {
           <div class="toggle-card is-off">
             <div class="grow">
               <div class="toggle-title">{{ item.title }}</div>

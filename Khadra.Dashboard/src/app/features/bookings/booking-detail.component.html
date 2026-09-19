@@ -6,8 +6,12 @@
         <div class="state-title">{{ t('common.couldntLoadThisBooking') }}</div>
         <div class="state-text">{{ message }}</div>
         <div class="state-actions">
-          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
-          <a class="btn btn-secondary btn-sm" routerLink="/bookings">{{ t('common.backToBookings') }}</a>
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+            {{ t('common.retry') }}
+          </button>
+          <a class="btn btn-secondary btn-sm" routerLink="/bookings">{{
+            t('common.backToBookings')
+          }}</a>
         </div>
       </div>
     </section>
@@ -28,15 +32,20 @@
           <h1 class="page-title mono">{{ b.reference }}</h1>
           <span class="pill" [class]="'s-' + tone()">{{ statusLabel() }}</span>
           @if (b.liveDisputeId) {
-            <span class="pill s-bad">{{ t('common.disputed') }}</span>
+            <span class="pill s-bad">{{ t('status.disputed') }}</span>
           }
         </div>
         <div class="page-sub">
-          {{ t('adminBooking.booked') }} {{ when(b.createdAt) }} · {{ when(b.periodStart) }} to {{ when(b.periodEnd) }}
+          {{ t('bookingsList.bookedOn', { date: when(b.createdAt) }) }} ·
+          {{
+            t('adminBooking.periodRange', { start: when(b.periodStart), end: when(b.periodEnd) })
+          }}
         </div>
       </div>
       <div class="dc-head-actions">
-        <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', b.dealerId]">{{ t('common.openDealer') }}</a>
+        <a class="btn btn-secondary btn-md" [routerLink]="['/dealers', b.dealerId]">{{
+          t('common.openDealer')
+        }}</a>
         <a class="btn btn-secondary btn-md" [routerLink]="['/customers', b.customerId]">
           {{ t('adminBooking.openCustomer') }}
         </a>
@@ -94,18 +103,17 @@
                 </div>
               } @else {
                 <div class="money-line">
-                  <span class="k-label">{{ t('adminBooking.against') }} {{ penalty.attributedTo }}</span>
-                  <span class="num">
-                    @if (penalty.isRange) {
-                      {{ penalty.minAmount | money: 'amount' }}–{{ penalty.maxAmount | money }}
-                      
-                    } @else {
-                      {{ penalty.maxAmount | money }} 
-                    }
-                  </span>
+                  <span class="k-label">{{
+                    t('adminBooking.againstParty', {
+                      party: enumLabel('party', penalty.attributedTo),
+                    })
+                  }}</span>
+                  <span class="num">{{ penaltyAmount(penalty) }}</span>
                 </div>
               }
-              <div class="page-sub">{{ penalty.reason }}</div>
+              <div class="page-sub" [class.ltr]="penaltyReasonIsFrozen(penalty)">
+                {{ penaltyReasonText(penalty) }}
+              </div>
               <div class="note-box is-plain">
                 {{ t('adminBooking.assessedNotChargedMoney') }}
               </div>
@@ -123,28 +131,17 @@
               @for (h of b.handovers; track h.recordedAt) {
                 <div class="stack stack-4">
                   <div class="row row-gap-8">
-                    <span class="handover-title">{{ h.type }}</span>
+                    <span class="handover-title">{{ enumLabel('handoverType', h.type) }}</span>
                     <span class="page-sub push">{{ when(h.recordedAt) }}</span>
                   </div>
-                  <div class="page-sub">
-                    {{ t('adminBooking.recordedBy') }} {{ h.recordedBy }}
-                    @if (h.odometerKm !== null) {
-                      · {{ h.odometerKm }} km
-                    }
-                    @if (h.fuelLevel !== null) {
-                      {{ t('adminBooking.fuel') }} {{ h.fuelLevel }}
-                    }
-                    @if (h.photoCount) {
-                      · {{ h.photoCount }} {{ t('adminBooking.photoS') }}
-                    }
-                  </div>
-                  @if (h.cashCollected) {
+                  <div class="page-sub">{{ handoverFacts(h) }}</div>
+                  @if (h.cashCollected; as cash) {
                     <div class="page-sub">
-                      {{ t('adminBooking.cashCollected') }} {{ h.cashCollected | money }} 
+                      {{ t('adminBooking.cashCollectedAmount', { amount: money(cash) }) }}
                     </div>
                   }
                   @if (h.notes) {
-                    <div class="queue-desc">{{ h.notes }}</div>
+                    <div class="queue-desc user-text">{{ h.notes }}</div>
                   }
                 </div>
               }
@@ -153,7 +150,9 @@
         }
 
         <section class="sect">
-          <div class="sect-h"><span class="sect-t">{{ t('adminBooking.history') }}</span></div>
+          <div class="sect-h">
+            <span class="sect-t">{{ t('adminBooking.history') }}</span>
+          </div>
           <div class="sect-pad"><kh-timeline [steps]="timeline()" /></div>
         </section>
       </div>

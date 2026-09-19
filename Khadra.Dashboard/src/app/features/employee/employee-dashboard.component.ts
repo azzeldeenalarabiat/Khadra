@@ -9,6 +9,8 @@ import { loaded } from '../../core/services/loaded';
 import { IconName } from '../../shared/icon/icon-paths';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { TranslationKey } from '../../core/i18n/en';
 
 interface Kpi {
   readonly label: string;
@@ -29,6 +31,25 @@ interface Attention {
   readonly action: string;
   readonly route: string;
   readonly query?: Record<string, string>;
+}
+
+/**
+ * This person's own changes, one whole message per status the booking moved to. Any other status is
+ * still worded, through the office's status label.
+ */
+const ACTIVITY: Readonly<Record<string, TranslationKey>> = {
+  Approved: 'employeeDash.activityApproved',
+  Rejected: 'employeeDash.activityRejected',
+  PickedUp: 'employeeDash.activityHandedOver',
+  Returned: 'employeeDash.activityTookBack',
+  Cancelled: 'employeeDash.activityCancelled',
+};
+
+/** The greeting for the hour, with the name inside the message: Arabic punctuates it differently. */
+function greetingKey(hour: number, named: boolean): TranslationKey {
+  if (hour < 12) return named ? 'employeeDash.goodMorningName' : 'employeeDash.goodMorning';
+  if (hour < 18) return named ? 'employeeDash.goodAfternoonName' : 'employeeDash.goodAfternoon';
+  return named ? 'employeeDash.goodEveningName' : 'employeeDash.goodEvening';
 }
 
 /**
@@ -56,6 +77,8 @@ interface Attention {
 })
 export class EmployeeDashboardComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly statusLabel = inject(I18nService).statusLabel;
+  protected readonly formats = inject(FormatService);
   private readonly console = inject(DealerConsoleService);
   private readonly bookings = inject(DealerBookingsService);
   private readonly session = inject(SessionService);
@@ -70,63 +93,67 @@ export class EmployeeDashboardComponent {
   );
 
   protected readonly greeting = computed(() => {
-    const hour = new Date().getHours();
-    const part = hour < 12 ? this.t('employeeDash.goodMorning') : hour < 18 ? this.t('employeeDash.goodAfternoon') : this.t('employeeDash.goodEvening');
     const name = this.firstName();
-    return name ? `${part}, ${name}` : part;
+    return this.t(greetingKey(new Date().getHours(), name !== ''), { name });
   });
 
   protected readonly kpis = computed<readonly Kpi[]>(() => {
     const d = this.dashboard();
     if (!d) return [];
 
-    const window = `${d.upcomingWindowHours}h`;
+    // The window the server counted over, never a figure written here.
+    const hours = d.upcomingWindowHours;
     const overdue = d.bookings.overdueReturns;
+    const next = (handovers: readonly UpcomingHandover[]): string =>
+      handovers[0]
+        ? this.t('employeeDash.nextWhen', { when: this.formats.dayAndTime(handovers[0].when) })
+        : this.t('employeeDash.noneInNextHours', { count: hours });
 
     return [
       {
         label: this.t('employeeDashboard.pendingRequests'),
-        main: String(d.bookings.requested),
+        main: this.formats.number(d.bookings.requested),
         // The oldest one is a fact on the record. How long they have to answer is not: nothing in
         // the platform expires a request, so no deadline is claimed here.
         note: d.bookings.oldestRequestedAt
-          ? `oldest ${this.ago(d.bookings.oldestRequestedAt)}`
+          ? this.t('employeeDash.oldestWhen', {
+              when: this.formats.relative(d.bookings.oldestRequestedAt),
+            })
           : this.t('employeeDash.nothingWaiting'),
         icon: 'bell-ringing',
         route: '/employee/bookings',
         query: { tab: 'pending' },
       },
       {
-        label: `Pickups · next ${window}`,
-        main: String(d.upcomingPickups.length),
-        note: d.upcomingPickups[0]
-          ? `next ${this.when(d.upcomingPickups[0].when)}`
-          : `none in the next ${window}`,
+        label: this.t('employeeDash.pickupsNextHours', { count: hours }),
+        main: this.formats.number(d.upcomingPickups.length),
+        note: next(d.upcomingPickups),
         icon: 'arrow-square-out',
         route: '/employee/bookings',
         query: { tab: 'upcoming' },
       },
       {
-        label: `Returns · next ${window}`,
-        main: String(d.upcomingReturns.length),
-        note: d.upcomingReturns[0]
-          ? `next ${this.when(d.upcomingReturns[0].when)}`
-          : `none in the next ${window}`,
+        label: this.t('employeeDash.returnsNextHours', { count: hours }),
+        main: this.formats.number(d.upcomingReturns.length),
+        note: next(d.upcomingReturns),
         icon: 'arrow-square-in',
         route: '/employee/bookings',
         query: { tab: 'active' },
       },
       {
         label: this.t('employeeDashboard.activeRentals'),
-        main: String(d.bookings.pickedUp),
-        note: overdue > 0 ? `${overdue} overdue` : this.t('employeeDash.noneOverdue'),
+        main: this.formats.number(d.bookings.pickedUp),
+        note:
+          overdue > 0
+            ? this.t('employeeDash.overdueCount', { count: overdue })
+            : this.t('employeeDash.noneOverdue'),
         icon: 'car-simple',
         route: '/employee/bookings',
         query: { tab: 'active' },
       },
       {
         label: this.t('employeeDashboard.confirmedNotYetCollected'),
-        main: String(d.bookings.confirmed),
+        main: this.formats.number(d.bookings.confirmed),
         note: this.t('employeeDashboard.heldForTheirDates'),
         icon: 'calendar-check',
         route: '/employee/bookings',
@@ -145,19 +172,25 @@ export class EmployeeDashboardComponent {
     const d = this.dashboard();
     if (!d) return [];
     const items: Attention[] = [];
+    // A car or a customer can be gone by the time a handover is due. The server says so with a null
+    // rather than an English phrase, and the console words it.
+    const vehicle = (handover: UpcomingHandover): string =>
+      handover.vehicleLabel ?? this.t('dealerBookings.vehicleNoLongerListed');
+    const customer = (handover: UpcomingHandover): string =>
+      handover.customerName ?? this.t('common.customerAccountClosed');
 
     if (d.bookings.requested > 0) {
-      const plural = d.bookings.requested === 1 ? this.t('employeeDash.requestIs') : this.t('employeeDash.requestsAre');
+      const oldest = d.bookings.oldestRequestedAt;
       items.push({
         type: this.t('employeeDash.bookingRequest'),
-        title: `${d.bookings.requested} ${plural} waiting for an answer`,
-        desc: d.bookings.oldestRequestedAt
-          ? `The oldest arrived ${this.ago(d.bookings.oldestRequestedAt)}.`
+        title: this.t('employeeDash.requestsWaitingForAnswer', { count: d.bookings.requested }),
+        desc: oldest
+          ? this.t('employeeDash.oldestArrived', { when: this.formats.relative(oldest) })
           : '',
-        entity: 'Bookings',
-        when: d.bookings.oldestRequestedAt ? this.ago(d.bookings.oldestRequestedAt) : '',
+        entity: this.t('common.bookings'),
+        when: oldest ? this.formats.relative(oldest) : '',
         tone: 'warn',
-        action: 'Review',
+        action: this.t('queue.actionReview'),
         route: '/employee/bookings',
         query: { tab: 'pending' },
       });
@@ -166,10 +199,13 @@ export class EmployeeDashboardComponent {
     for (const overdue of d.upcomingReturns.filter((r) => r.isOverdue)) {
       items.push({
         type: this.t('employeeDash.returnOverdue'),
-        title: `${overdue.vehicleLabel} was due back ${this.when(overdue.when)}`,
-        desc: `${overdue.customerName} has not brought the car back. Record the return when it arrives.`,
+        title: this.t('employeeDash.wasDueBack', {
+          vehicle: vehicle(overdue),
+          when: this.formats.dayAndTime(overdue.when),
+        }),
+        desc: this.t('employeeDash.overdueDesc', { customer: customer(overdue) }),
         entity: overdue.reference,
-        when: this.ago(overdue.when),
+        when: this.formats.relative(overdue.when),
         tone: 'bad',
         action: this.t('dealerDecide.return.confirm'),
         route: `/employee/bookings/${overdue.bookingId}`,
@@ -178,12 +214,15 @@ export class EmployeeDashboardComponent {
 
     for (const pickup of d.upcomingPickups.slice(0, 3)) {
       const delivery = pickup.pickupMethod === 'Delivery';
+      const at = { vehicle: vehicle(pickup), when: this.formats.dayAndTime(pickup.when) };
       items.push({
-        type: delivery ? 'Delivery' : this.t('employeeDash.pickupApproaching'),
-        title: `${pickup.vehicleLabel} ${delivery ? 'delivery' : 'pickup'} ${this.when(pickup.when)}`,
-        desc: `${pickup.customerName}. Record the handover when the car leaves.`,
+        type: delivery ? this.t('common.delivery') : this.t('employeeDash.pickupApproaching'),
+        title: delivery
+          ? this.t('employeeDash.deliveryAt', at)
+          : this.t('employeeDash.pickupAt', at),
+        desc: this.t('employeeDash.pickupDesc', { customer: customer(pickup) }),
         entity: pickup.reference,
-        when: this.until(pickup.when),
+        when: this.formats.relative(pickup.when),
         tone: 'ok',
         action: this.t('dealerDecide.pickup.confirm'),
         route: `/employee/bookings/${pickup.bookingId}`,
@@ -193,10 +232,13 @@ export class EmployeeDashboardComponent {
     for (const ret of d.upcomingReturns.filter((r) => !r.isOverdue).slice(0, 3)) {
       items.push({
         type: this.t('employeeDash.returnDue'),
-        title: `${ret.vehicleLabel} due back ${this.when(ret.when)}`,
-        desc: `${ret.customerName}'s rental ends. Confirm the return and note any damage.`,
+        title: this.t('employeeDash.dueBackAt', {
+          vehicle: vehicle(ret),
+          when: this.formats.dayAndTime(ret.when),
+        }),
+        desc: this.t('employeeDash.returnDesc', { customer: customer(ret) }),
         entity: ret.reference,
-        when: this.until(ret.when),
+        when: this.formats.relative(ret.when),
         tone: 'ok',
         action: this.t('dealerDecide.return.confirm'),
         route: `/employee/bookings/${ret.bookingId}`,
@@ -241,38 +283,12 @@ export class EmployeeDashboardComponent {
 
   /** Every row is already this person's, so the sentence does not repeat their name back at them. */
   protected describe(entry: DealerActivityEntry): string {
-    const verb: Record<string, string> = {
-      Approved: 'Approved',
-      Rejected: 'Rejected',
-      PickedUp: this.t('employeeDash.handedOver'),
-      Returned: this.t('employeeDash.tookBack'),
-      Cancelled: 'Cancelled',
-    };
-    return `${verb[entry.toStatus] ?? entry.toStatus} ${entry.reference}`;
-  }
-
-  protected when(iso: string): string {
-    const date = new Date(iso);
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    if (date.toDateString() === today.toDateString()) return `today ${time}`;
-    if (date.toDateString() === tomorrow.toDateString()) return `tomorrow ${time}`;
-    return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} ${time}`;
-  }
-
-  protected ago(iso: string): string {
-    const hours = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
-    if (hours < 1) return this.t('employeeDash.justNow');
-    if (hours < 48) return `${hours}h ago`;
-    return `${Math.round(hours / 24)} days ago`;
-  }
-
-  protected until(iso: string): string {
-    const hours = Math.round((Date.parse(iso) - Date.now()) / 3_600_000);
-    if (hours <= 0) return 'now';
-    if (hours < 48) return `in ${hours}h`;
-    return `in ${Math.round(hours / 24)} days`;
+    const key = ACTIVITY[entry.toStatus];
+    return key
+      ? this.t(key, { reference: entry.reference })
+      : this.t('employeeDash.activityOther', {
+          reference: entry.reference,
+          status: this.statusLabel(entry.toStatus, 'dealerBooking'),
+        });
   }
 }

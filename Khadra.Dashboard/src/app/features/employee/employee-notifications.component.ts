@@ -8,6 +8,8 @@ import { loaded } from '../../core/services/loaded';
 import { IconName } from '../../shared/icon/icon-paths';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 
 /**
  * Notifications (design: Employee Console, `isNotifications`).
@@ -32,7 +34,9 @@ import { I18nService } from '../../core/i18n/i18n.service';
   imports: [IconComponent, RouterLink],
 })
 export class EmployeeNotificationsComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  protected readonly formats = inject(FormatService);
   private readonly service = inject(NotificationsService);
   private readonly ui = inject(ConsoleUiService);
 
@@ -68,16 +72,16 @@ export class EmployeeNotificationsComponent {
       case 'BookingRejected':
         return this.t('employeeNotif.bookingDecision');
       case 'BookingPickedUp':
-        return 'Pickup';
+        return this.t('handoverType.pickup');
       case 'BookingReturned':
-        return 'Return';
+        return this.t('handoverType.return');
       case 'ReportAccessGranted':
       case 'ReportAccessRevoked':
         return this.t('employeeNotif.yourAccess');
       case 'StaffReactivated':
-        return 'Team';
+        return this.t('employeeNotif.team');
       default:
-        return 'Dealership';
+        return this.t('employeeNotif.dealership');
     }
   }
 
@@ -125,14 +129,6 @@ export class EmployeeNotificationsComponent {
     }
   }
 
-  protected ago(iso: string): string {
-    const hours = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
-    if (hours < 1) return this.t('employeeDash.justNow');
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.round(hours / 24);
-    return days === 1 ? 'yesterday' : `${days} days ago`;
-  }
-
   protected async open(item: NotificationItem): Promise<void> {
     if (item.isRead) return;
     await this.service.markRead(item.notificationId);
@@ -145,10 +141,18 @@ export class EmployeeNotificationsComponent {
       const changed = await this.service.markAllRead();
       this.ui.showToast(
         this.t('employeeNotif.markedAsRead'),
-        changed === 1 ? this.t('employeeNotif.oneNotificationMarkedRead') : `${changed} notifications marked read.`,
+        // A plural message: one notification is not "1 notifications", in either language.
+        this.t('employeeNotif.notificationsMarkedRead', { count: changed }),
       );
-    } catch {
-      this.ui.showToast(this.t('vehicleDetail.thatDidNotGo'), this.t('vehicleDetail.theServiceDidNot'), 'bad');
+    } catch (error) {
+      // Worded as it is shown, in the language on screen: a toast is gone in seconds, so there is no
+      // refusal left standing to re-word on a switch. The server's English only ever reads in English.
+      this.ui.showToast(
+        this.t('common.thatDidNotGoThrough'),
+        serverSentence(snapshotProblem(error), this.i18n.lang(), this.t) ??
+          this.t('common.serviceDidNotRespond'),
+        'bad',
+      );
     } finally {
       this.busy.set(false);
     }

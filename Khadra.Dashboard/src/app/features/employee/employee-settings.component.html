@@ -5,7 +5,7 @@
       <div class="page-sub">{{ t('employeeSettings.yourOwnAccountPermissions') }}</div>
     </div>
     <div class="tabs" role="tablist" [attr.aria-label]="t('employeeSettings.settingsSection')">
-      @for (option of tabs; track option.key) {
+      @for (option of tabs(); track option.key) {
         <button
           type="button"
           class="tab"
@@ -26,7 +26,9 @@
         <div class="sect-h">
           <span class="sect-t">{{ t('employeeSettings.profile') }}</span>
           @if (dealer(); as d) {
-            <span class="sect-hint">{{ t('employeeSettings.employeeOf') }} {{ d.businessName }}</span>
+            <span class="sect-hint">{{
+              t('employeeSettings.employeeOfBusiness', { business: d.businessName })
+            }}</span>
           }
         </div>
         <div class="sect-pad kv-narrow">
@@ -34,7 +36,7 @@
             <span class="kv-key">{{ t('employeeSettings.fullName') }}</span><span class="kv-val">{{ user()?.fullName }}</span>
           </div>
           <div class="kv">
-            <span class="kv-key">{{ t('employeeSettings.workEmail') }}</span><span class="kv-val">{{ user()?.email }}</span>
+            <span class="kv-key">{{ t('employeeSettings.workEmail') }}</span><span class="kv-val"><span class="ltr">{{ user()?.email }}</span></span>
           </div>
           <div class="kv">
             <span class="kv-key">{{ t('common.role') }}</span><span class="kv-val">{{ t('employeeSettings.dealerEmployee') }}</span>
@@ -65,7 +67,9 @@
                   <div class="toggle-title">{{ row.label }}</div>
                   <div class="toggle-desc">{{ row.detail }}</div>
                 </div>
-                <span class="pill" [class]="'s-' + row.tone">{{ row.held ? 'On' : 'Off' }}</span>
+                <span class="pill" [class]="'s-' + row.tone">{{
+                  row.held ? t('common.on') : t('common.off')
+                }}</span>
               </div>
             }
             <div class="field-hint">
@@ -85,7 +89,7 @@
           <span class="sect-hint">{{ t('common.signsOutEveryOther') }}</span>
         </div>
         <div class="sect-pad stack stack-10">
-          @if (problem(); as message) {
+          @if (problemText(); as message) {
             <div class="banner s-bad" role="alert">
               <kh-icon name="warning-circle" class="banner-icon" />
               <div class="banner-body">
@@ -103,6 +107,9 @@
               [value]="current()"
               (input)="current.set(value($event))"
             />
+            @if (fieldError('currentPassword'); as e) {
+              <div class="field-error">{{ e }}</div>
+            }
           </div>
           <div class="field">
             <label for="pw-new">{{ t('common.newPassword') }}</label>
@@ -114,6 +121,9 @@
               [value]="next()"
               (input)="next.set(value($event))"
             />
+            @if (fieldError('newPassword'); as e) {
+              <div class="field-error">{{ e }}</div>
+            }
             <div class="field-hint">{{ t('common.changingItSignsYou') }}</div>
           </div>
           <div class="field">
@@ -136,7 +146,7 @@
             [disabled]="!canSubmit()"
             (click)="changePassword()"
           >
-            {{ busy() ? 'Changing…' : 'Change password' }}
+            {{ busy() ? t('employeeSettings.changingPassword') : t('common.changePassword') }}
           </button>
         </div>
       </section>

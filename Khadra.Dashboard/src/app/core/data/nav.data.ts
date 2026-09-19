@@ -96,6 +96,7 @@ export const DEALER_NAV: readonly NavGroup[] = [
     groupKey: 'nav.group.business',
     items: [
       { labelKey: 'nav.dealerProfile', icon: 'storefront', route: '/dealer/profile' },
+      { labelKey: 'nav.customerPage', icon: 'chat-circle-dots', route: '/dealer/customer-page' },
       { labelKey: 'nav.delivery', icon: 'moped', route: '/dealer/delivery' },
       { labelKey: 'nav.reviews', icon: 'star', route: '/dealer/reviews' },
     ],

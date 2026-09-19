@@ -28,8 +28,20 @@ export interface BookingListItem {
   readonly createdAt: string;
   /** Null when the car has since been removed from the platform: the booking outlives the listing. */
   readonly vehicle: VehicleLabel | null;
+  /**
+   * The dealership's name. When `dealerRemoved` is true this holds an English stand-in kept only for
+   * older customer apps: never display it then.
+   */
   readonly dealerName: string;
+  /** True exactly when the dealership no longer resolves (no longer on the platform). */
+  readonly dealerRemoved: boolean;
+  /**
+   * The customer's name. When `customerAccountClosed` is true this holds an English stand-in kept
+   * only for older clients: never display it then.
+   */
   readonly customerName: string;
+  /** True exactly when the customer's account no longer resolves (closed). */
+  readonly customerAccountClosed: boolean;
   readonly hasLiveDispute: boolean;
   /**
    * Both parties by id, so a platform-wide row can open the dealership or the customer behind it.
@@ -96,10 +108,30 @@ export interface Booking {
   readonly finishedAt: string | null;
   /** Judged server-side against this booking's own frozen window. */
   readonly canBeDisputed: boolean;
+  /**
+   * Whether the rental office can still answer this request, by the SERVER's clock. A request past
+   * its decision deadline still reads Requested until the settlement job reaches it, so the status
+   * alone cannot say — and a browser clock that is behind must not keep a dead request live.
+   */
+  readonly isAwaitingDecision: boolean;
+  /** Whether the deposit can still be paid, judged the same way. */
+  readonly isAwaitingPayment: boolean;
   readonly liveDisputeId: string | null;
   readonly vehicle: VehicleLabel | null;
+  /**
+   * The dealership's name. When `dealerRemoved` is true this holds an English stand-in kept only for
+   * older customer apps: never display it then.
+   */
   readonly dealerName: string;
+  /** True exactly when the dealership no longer resolves (no longer on the platform). */
+  readonly dealerRemoved: boolean;
+  /**
+   * The customer's name. When `customerAccountClosed` is true this holds an English stand-in kept
+   * only for older clients: never display it then.
+   */
   readonly customerName: string;
+  /** True exactly when the customer's account no longer resolves (closed). */
+  readonly customerAccountClosed: boolean;
   readonly handovers: readonly Handover[];
   readonly history: readonly BookingStatusChange[];
 }
@@ -142,7 +174,16 @@ export interface PenaltyAssessment {
   readonly maxAmount: Money;
   readonly isRange: boolean;
   readonly isNothingOwed: boolean;
+  /**
+   * The sentence the platform wrote when it assessed this, frozen on the booking. English, and shown
+   * only when `reasonCode` is null or unknown to this build — a record from before codes existed.
+   */
   readonly reason: string;
+  /**
+   * The stable code behind that sentence (`PenaltyReason`), for the console to word in the reader's
+   * language. Null on bookings assessed before codes existed; never guessed from the sentence.
+   */
+  readonly reasonCode: string | null;
   readonly assessedAt: string;
 }
 

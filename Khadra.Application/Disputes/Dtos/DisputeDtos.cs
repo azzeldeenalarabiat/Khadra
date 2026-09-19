@@ -11,6 +11,12 @@ namespace Khadra.Application.Disputes.Dtos;
 /// car, the resolution is a split of the booking's own deposit, and the penalty range the Admin picks
 /// inside was fixed by the booking when the event happened.
 /// </summary>
+/// <remarks>
+/// Every person named here is a name AND a fact. The customer app receives this DTO, so each name
+/// stays a string -- an English stand-in when the account no longer resolves -- and each
+/// <c>...AccountClosed</c> flag says when it is one. A client that words the case in its reader's
+/// language reads the flag and never shows the stand-in.
+/// </remarks>
 public sealed record DisputeDto(
     Guid TicketId,
     Guid BookingId,
@@ -19,12 +25,17 @@ public sealed record DisputeDto(
     string OpenedByParty,
     Guid OpenedByUserId,
     string OpenedByName,
+    /// <summary>True exactly when the opener's account no longer resolves, so OpenedByName is the stand-in.</summary>
+    bool OpenedByAccountClosed,
     string Reason,
     DateTimeOffset OpenedAt,
     DateTimeOffset SlaDeadline,
     bool IsOverdue,
     Guid? AssignedAdminId,
+    /// <summary>Null exactly when nobody holds the ticket.</summary>
     string? AssignedAdminName,
+    /// <summary>True exactly when the ticket is held by an account that no longer resolves.</summary>
+    bool AssignedAdminAccountClosed,
     DateTimeOffset? ClosedAt,
     IReadOnlyList<DisputeStatementDto> Statements,
     DisputeResolutionDto? Resolution,
@@ -38,6 +49,8 @@ public sealed record DisputeStatementDto(
     string Party,
     Guid AuthorUserId,
     string AuthorName,
+    /// <summary>True exactly when the author's account no longer resolves, so AuthorName is the stand-in.</summary>
+    bool AuthorAccountClosed,
     string Body,
     DateTimeOffset CreatedAt,
     // Freshly signed per request, never stored: a signed URL is a credential (spec 7).
@@ -59,9 +72,14 @@ public sealed record DisputeResolutionDto(
     string Note,
     Guid ResolvedByAdminId,
     string ResolvedByName,
+    /// <summary>True exactly when the resolving administrator's account no longer resolves.</summary>
+    bool ResolvedByAccountClosed,
     DateTimeOffset ResolvedAt)
 {
-    public static DisputeResolutionDto From(DisputeResolution resolution, string resolvedByName)
+    public static DisputeResolutionDto From(
+        DisputeResolution resolution,
+        string resolvedByName,
+        bool resolvedByAccountClosed)
     {
         ArgumentNullException.ThrowIfNull(resolution);
         return new DisputeResolutionDto(
@@ -74,6 +92,7 @@ public sealed record DisputeResolutionDto(
             resolution.Note,
             resolution.ResolvedByAdminId.Value,
             resolvedByName,
+            resolvedByAccountClosed,
             resolution.ResolvedAt);
     }
 }

@@ -19,7 +19,7 @@
           <kh-icon name="device-mobile" class="kpi-icon" />
           <span class="sect-t">{{ t('security.signedInOn') }}</span>
           <span class="sect-hint">
-            {{ activeCount() }} {{ t('security.active') }} {{ activeCount() === 1 ? 'session' : 'sessions' }}
+            {{ activeSummary() }}
           </span>
         </div>
 
@@ -29,7 +29,9 @@
             <div class="state-title">{{ t('security.couldntLoadYourSessions') }}</div>
             <div class="state-text">{{ message }}</div>
             <div class="state-actions">
-              <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+              <button type="button" class="btn btn-primary btn-sm" (click)="reload()">
+                {{ t('common.retry') }}
+              </button>
             </div>
           </div>
         } @else if (resource.isLoading() && sessions().length === 0) {
@@ -52,7 +54,7 @@
                   <div class="row row-gap-8">
                     <span class="handover-title">{{ device(session) }}</span>
                     <span class="pill" [class]="session.isActive ? 's-ok' : 's-dim'">
-                      {{ session.isActive ? 'Active' : 'Ended' }}
+                      {{ session.isActive ? t('security.sessionActive') : t('security.ended') }}
                     </span>
                   </div>
                   <div class="page-sub">
@@ -61,7 +63,9 @@
                       · {{ session.createdByIp }}
                     }
                   </div>
-                  <div class="page-sub">{{ t('security.lastUsed') }} {{ when(session.lastUsedAt) }}</div>
+                  <div class="page-sub">
+                    {{ t('security.lastUsed') }} {{ when(session.lastUsedAt) }}
+                  </div>
                 </div>
                 @if (session.isActive) {
                   <button type="button" class="btn btn-danger btn-xs" (click)="revoke(session)">
@@ -75,7 +79,8 @@
               <!-- The figure is the server's. Revoking stops the refresh, not a token already in
                    flight, and the design's "signed out immediately" would be untrue for this long. -->
               <div class="note-box is-plain">
-                {{ t('security.endingASessionStops') }} {{ minutes }} {{ t('security.minutesAfterThat') }}
+                {{ t('security.endingASessionStops') }} {{ minutes }}
+                {{ t('security.minutesAfterThat') }}
               </div>
             }
           </div>
@@ -91,10 +96,12 @@
           <!-- Named individually rather than left as blank panels: each is a different missing
                thing, and an admin should know which protections they do not have. -->
           <div class="page-sub">
-            <strong>{{ t('security.signInHistory') }}</strong> {{ t('security.sessionsAreRecordedIndividual') }}
+            <strong>{{ t('security.signInHistory') }}</strong>
+            {{ t('security.sessionsAreRecordedIndividual') }}
           </div>
           <div class="page-sub">
-            <strong>{{ t('security.twoFactorAuthentication') }}</strong> {{ t('security.notBuiltAPassword') }}
+            <strong>{{ t('security.twoFactorAuthentication') }}</strong>
+            {{ t('security.notBuiltAPassword') }}
           </div>
           <div class="page-sub">
             <strong>{{ t('security.blockedSignIns') }}</strong> {{ t('security.thereIsNoLockout') }}

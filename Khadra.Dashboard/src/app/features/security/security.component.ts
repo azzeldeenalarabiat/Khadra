@@ -6,6 +6,13 @@ import { MySecurityService, SessionSummary } from '../../core/services/my-securi
 import { SessionService } from '../../core/services/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { roleLabel } from '../../core/models/user-display';
+
+/** An account row. `ltr` marks a Latin run -- an email address -- the template isolates. */
+interface AccountRow extends KeyValue {
+  readonly ltr?: boolean;
+}
 
 /**
  * Your own account security.
@@ -25,6 +32,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class SecurityComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(MySecurityService);
   private readonly session = inject(SessionService);
   private readonly ui = inject(ConsoleUiService);
@@ -37,17 +45,29 @@ export class SecurityComponent {
     () => this.sessions().filter((session) => session.isActive).length,
   );
 
+  /**
+   * "2 active sessions", once the server has answered. Empty until then: a "0" printed while the
+   * list is still loading would say this account is signed in nowhere.
+   */
+  protected readonly activeSummary = computed(() =>
+    this.view() ? this.t('security.activeSessionsCount', { count: this.activeCount() }) : '',
+  );
+
   /** From the server's own configuration, never a literal. */
   protected readonly accessTokenMinutes = computed(() => this.view()?.accessTokenMinutes ?? null);
 
-  protected readonly accountRows = computed<readonly KeyValue[]>(() => {
+  protected readonly accountRows = computed<readonly AccountRow[]>(() => {
     const user = this.session.user();
     if (!user) return [];
     return [
       { k: this.t('dealerSettings.name'), v: user.fullName },
-      { k: this.t('dealerSettings.email'), v: user.email },
-      { k: this.t('common.role'), v: user.role },
-      { k: this.t('customerProfile.emailVerified'), v: user.isEmailVerified ? 'Yes' : 'No' },
+      { k: this.t('dealerSettings.email'), v: user.email, ltr: true },
+      // The role in words; a role this build does not know is shown as the server named it.
+      { k: this.t('common.role'), v: roleLabel(user.role, this.t) || user.role },
+      {
+        k: this.t('customerProfile.emailVerified'),
+        v: user.isEmailVerified ? this.t('common.yes') : this.t('common.no'),
+      },
     ];
   });
 
@@ -90,11 +110,17 @@ export class SecurityComponent {
         tone: 'bad',
         danger: true,
         title: this.t('security.endThisSession'),
-        body: `Signed in ${this.when(session.signedInAt)}${session.createdByIp ? ` from ${session.createdByIp}` : ''}. It cannot be refreshed after this.`,
+        // One sentence with or without the address, so neither language glues a fragment on.
+        body: session.createdByIp
+          ? this.t('security.signedInFromCannotBeRefreshed', {
+              date: this.when(session.signedInAt),
+              address: session.createdByIp,
+            })
+          : this.t('security.signedInCannotBeRefreshed', { date: this.when(session.signedInAt) }),
         // The honest figure, from the server. "Signed out immediately" would be untrue for as long
         // as the access token it already holds has left to live.
         note: minutes
-          ? `A session already in flight can keep working for up to ${minutes} minutes before it has to refresh. If this is the session you are using now, you will be signed out.`
+          ? this.t('security.inFlightForUpToMinutes', { count: minutes })
           : this.t('security.ifThisIsThe'),
         confirm: this.t('security.endSession'),
         result: { title: this.t('security.sessionEnded'), body: '', tone: 'bad' },
@@ -117,12 +143,6 @@ export class SecurityComponent {
   }
 
   protected when(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.formats.dateTime(iso);
   }
 }
