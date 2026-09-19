@@ -152,4 +152,36 @@ public static class DealerErrors
     // Spec 4.2: financial reports are off for an employee unless the owner grants them.
     public static readonly Error ReportsNotGranted =
         Error.Forbidden("dealer.reports_not_granted", "Only the dealer owner can see financial reports, unless they grant you access.");
+
+    /// <summary>
+    /// A section of the customer page is longer than it may be. Refused rather than cut, and naming
+    /// its field so the console can put the message under the box that caused it.
+    /// </summary>
+    public static Error ProfileTextTooLong(PublicProfileSection section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        var message = $"This section cannot be longer than {ProfileText.MaxLength} characters.";
+        return new Error(
+            "dealer.profile_text_too_long",
+            message,
+            ErrorKind.Validation,
+            new Dictionary<string, string[]> { [section.FieldName] = [message] });
+    }
+
+    /// <summary>A section of the customer page holds characters no screen can show honestly.</summary>
+    public static Error InvalidProfileText(PublicProfileSection section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+        const string message = "This section contains characters that cannot be shown. Remove them and try again.";
+        return new Error(
+            "dealer.invalid_profile_text",
+            message,
+            ErrorKind.Validation,
+            new Dictionary<string, string[]> { [section.FieldName] = [message] });
+    }
+
+    public static readonly Error UnknownProfileSection =
+        Error.Validation(
+            "dealer.unknown_profile_section",
+            "That is not a section of the customer page that can be hidden.");
 }
