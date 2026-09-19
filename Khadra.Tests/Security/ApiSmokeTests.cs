@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Khadra.Tests.Support;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -15,6 +16,7 @@ public sealed class ApiSmokeTests : IDisposable
         .WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            builder.IsolateFromDeveloperDatabase();
             builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=khadra_tests;Username=x;Password=y");
             builder.UseSetting("Authentication:Jwt:SigningKey", new string('k', 48));
             builder.UseSetting("Database:AutoMigrate", "false");
@@ -35,6 +37,34 @@ public sealed class ApiSmokeTests : IDisposable
         using var response = await client.GetAsync(new Uri("/api/v1/auth/me", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>
+    /// The platform's own facts are readable before anyone signs in, and carry what a client needs to
+    /// print an amount.
+    /// </summary>
+    /// <remarks>
+    /// Default-deny is the rule everywhere else, and this is one of the few deliberate exceptions: a
+    /// client has to know the currency's scale and the reporting zone BEFORE it has a session, or it
+    /// prints figures at whatever scale they arrived in. A dinar shown as "110" rather than "110.000"
+    /// is not a tidier price, it is a different-looking one — and the customer app, reading this same
+    /// endpoint anonymously, would be showing the other.
+    ///
+    /// The BFF has to agree, or the console gets a 401 here and quietly keeps its fallbacks; that half
+    /// is pinned in <c>BffProxyRouteTests</c>.
+    /// </remarks>
+    [Fact]
+    public async Task The_platform_configuration_is_readable_without_a_token()
+    {
+        using var client = _factory.CreateClient();
+
+        using var response = await client.GetAsync(new Uri("/api/v1/app-config", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var config = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal("JOD", config.GetProperty("currency").GetProperty("code").GetString());
+        Assert.Equal(3, config.GetProperty("currency").GetProperty("minorUnits").GetInt32());
+        Assert.False(string.IsNullOrWhiteSpace(config.GetProperty("timeZone").GetString()));
     }
 
     /// <summary>

@@ -9,6 +9,49 @@ without saying so.**
 
 ---
 
+## `dotnet test` migrated the developer's own database
+
+**Symptom.** On 2026-09-17 a new migration, `DealerPublicProfile`, appeared in the
+local `khadra_e2e` — head 22, six new columns on `dealers` — although nobody had run
+`ef database update` and the API had not been started for three days. It had been
+applied by a routine `dotnet test Khadra.slnx`, before the owner had approved
+applying it at all.
+
+**Cause.** Every test that starts the API already set a connection string that goes
+nowhere and `Database:AutoMigrate=false`, with `builder.UseSetting`. `Program.cs`
+then re-adds `appsettings.{Environment}.json`, the gitignored `appsettings.Local.json`
+and — in Development — the developer's **user-secrets**, all of which outrank
+`UseSetting`. So in a Development-environment test host the real connection string
+came back, `AutoMigrate` read `true` from `appsettings.Development.json`, and
+startup migrated whatever database the developer was working on. Two tests ran a
+host in Development: `ForwardedHeaderTrustTests.Development_still_starts_without_a_known_proxy`
+and the Development case of `MailTransportConfigurationTests`.
+
+**What made it invisible.** Both tests passed. They assert that the host starts,
+and it started — against a database that was real, reachable and being migrated.
+The startup work they were quietly doing also included `AdminBootstrapper`, which
+asks the database whether an administrator exists whenever `Admin:Bootstrap:Email`
+is set, and a developer's user-secrets set it.
+
+**The trap in the fix.** Neither obvious repair works. `UseSetting` is the thing
+being overridden. A test's `ConfigureAppConfiguration` is appended LAST, so it wins
+for anything read afterwards — which is why the final `IConfiguration` looked
+harmless — but it lands after the services were registered, so the DbContext was
+still built with the developer's connection string. The one source `Program.cs`
+cannot talk over is **environment variables**, which it adds last to its own chain,
+in every environment.
+
+**What changed.** `TestHostConfiguration` sets `ConnectionStrings__DefaultConnection`,
+`Database__AutoMigrate=false` and an empty `Admin__Bootstrap__Email` in a
+`[ModuleInitializer]`, before the first test in the process runs, so a factory that
+forgets everything else is still harmless. `TestHostIsolationTests` asserts, per
+environment, what the **DbContext was actually built with** rather than what the
+configuration reads afterwards. Verified by counting connections:
+`pg_stat_database.sessions` for `khadra_e2e` is unchanged across a full
+`dotnet test`.
+
+---
+
 ## The console loaded and nobody could sign in
 
 **Symptom.** `GET /bff/antiforgery` — the first call the sign-in page makes —

@@ -2,6 +2,7 @@ using System.Net;
 using Khadra.Application.Common.Ports;
 using Khadra.Infrastructure;
 using Khadra.Infrastructure.Notifications;
+using Khadra.Tests.Support;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -91,6 +92,7 @@ public sealed class MailTransportConfigurationTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment(environment);
+                builder.IsolateFromDeveloperDatabase();
                 builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=khadra_tests;Username=x;Password=y");
                 builder.UseSetting("Authentication:Jwt:SigningKey", new string('k', 48));
                 builder.UseSetting("Database:AutoMigrate", "false");

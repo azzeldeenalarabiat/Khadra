@@ -39,6 +39,7 @@ public sealed class CustomerDocumentLinkTests : IDisposable
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
+                builder.IsolateFromDeveloperDatabase();
                 builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=khadra_tests;Username=x;Password=y");
                 builder.UseSetting("Authentication:Jwt:SigningKey", new string('k', 48));
                 builder.UseSetting("Database:AutoMigrate", "false");
