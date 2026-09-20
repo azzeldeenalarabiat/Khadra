@@ -364,6 +364,61 @@ public sealed class PaymentUseCaseTests
     }
 
     /// <summary>
+    /// Money that lands a moment after the deadline, on a booking the sweep has not reached, still
+    /// confirms.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>ConfirmDepositPaid</c> does not read the deadline, and that is deliberate: the alternative
+    /// is refusing money the platform has already taken, which means refunding a customer who did
+    /// everything right. The car is still theirs to take — the hold row was never deleted, so nobody
+    /// else could have booked it in the intervening seconds.
+    /// </para>
+    /// <para>
+    /// Written on 2026-09-11, when the payment window went from 24 hours to 2. Nothing in the code
+    /// changed; what changed is how often this happens. The settlement pass runs once a minute, so
+    /// the gap between a spent deadline and an Expired row is up to a minute either way, and a
+    /// customer paying in the last seconds of a two-hour window is a far more ordinary event than one
+    /// paying in the last seconds of a day.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task A_capture_just_after_the_deadline_still_confirms_while_the_booking_is_approved()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved(paymentWindow: TimeSpan.FromHours(2));
+        context.GivenDealerFor(booking);
+
+        // Approved at Now, so the deposit is owed by Now + 2h — and the capture below lands thirty
+        // seconds past that, on a row the sweep has not reached. That is the whole scenario.
+        Assert.Equal(Now.AddHours(2), booking.PaymentDeadline);
+        Assert.Same(BookingStatus.Approved, booking.Status);
+
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(
+                TestPayments.Captured(
+                    "sess_1",
+                    Money.Jod(booking.Pricing.DepositAmount.Amount),
+                    booking.PaymentDeadline!.Value.AddSeconds(30))));
+
+        var result = await context.Receive().Handle(
+            new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+        Assert.Equal(payment.Id, booking.DepositPaymentId);
+        Assert.Same(PaymentStatus.Applied, payment.Status);
+        Assert.Empty(payment.Refunds);
+
+        // And the booking can no longer be expired out from under the customer who just paid.
+        Assert.Equal(
+            "booking.not_awaiting_payment",
+            booking.ExpireUnpaid(booking.PaymentDeadline!.Value.AddMinutes(1)).Error.Code);
+    }
+
+    /// <summary>
     /// The sharpest case in the feature: money taken for a booking that had already gone. It must not
     /// confirm, and it must not be kept.
     /// </summary>

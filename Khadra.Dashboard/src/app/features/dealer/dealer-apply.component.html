@@ -8,7 +8,7 @@
     </div>
   </div>
 
-  @if (problem(); as message) {
+  @if (problemText(); as message) {
     <div class="banner s-bad" role="alert">
       <kh-icon name="warning-circle" class="banner-icon" />
       <div class="banner-body">
@@ -32,6 +32,9 @@
         [value]="businessName()"
         (input)="businessName.set(fieldValue($event))"
       />
+      @if (fieldProblem('businessName'); as e) {
+        <div class="field-error">{{ e }}</div>
+      }
       <div class="field-hint">
         {{ t('dealerApply.theNameOnThe') }}
       </div>
@@ -48,6 +51,9 @@
         [value]="registrationNumber()"
         (input)="registrationNumber.set(fieldValue($event))"
       />
+      @if (fieldProblem('commercialRegistrationNumber'); as e) {
+        <div class="field-error">{{ e }}</div>
+      }
     </div>
 
     <div class="field">
@@ -64,6 +70,9 @@
         [value]="description()"
         (input)="description.set(fieldValue($event))"
       ></textarea>
+      @if (fieldProblem('description'); as e) {
+        <div class="field-error">{{ e }}</div>
+      }
       <div class="field-hint">{{ t('dealerApply.whatCustomersReadOn') }}</div>
     </div>
   </section>
@@ -154,6 +163,9 @@
           [value]="area()"
           (input)="typeArea(fieldValue($event))"
         />
+        @if (fieldProblem('addressArea'); as e) {
+          <div class="field-error">{{ e }}</div>
+        }
         <div class="field-hint">{{ t('dealerApply.theNeighbourhoodACustomer') }}</div>
       </div>
       <div class="field">
@@ -170,6 +182,9 @@
           [value]="street()"
           (input)="typeStreet(fieldValue($event))"
         />
+        @if (fieldProblem('addressStreet'); as e) {
+          <div class="field-error">{{ e }}</div>
+        }
         <div class="field-hint">{{ t('dealerApply.manyStreetsHaveNo') }}</div>
       </div>
     </div>
@@ -193,6 +208,9 @@
           [value]="latitude()"
           (input)="latitude.set(fieldValue($event))"
         />
+        @if (fieldProblem('latitude'); as e) {
+          <div class="field-error">{{ e }}</div>
+        }
       </div>
       <div class="field">
         <label for="apply-lng">{{ t('common.longitude') }}</label>
@@ -205,6 +223,9 @@
           [value]="longitude()"
           (input)="longitude.set(fieldValue($event))"
         />
+        @if (fieldProblem('longitude'); as e) {
+          <div class="field-error">{{ e }}</div>
+        }
       </div>
     </div>
   </section>
@@ -245,6 +266,9 @@
     <div class="field-hint">
       {{ t('dealerApply.allThreeAreRequired') }}
     </div>
+    @if (fieldProblem('documents'); as e) {
+      <div class="field-error">{{ e }}</div>
+    }
 
     @for (document of documents; track document.key) {
       <div class="field">
@@ -258,7 +282,7 @@
           (change)="attach(document.key, $event)"
         />
         @if (fileName(document.key); as name) {
-          <div class="field-hint">{{ t('dealerApply.attached') }} {{ name }}</div>
+          <div class="field-hint">{{ t('dealerApply.attachedFile', { name: name }) }}</div>
         } @else {
           <div class="field-hint">{{ t(document.hintKey) }}</div>
         }
@@ -272,7 +296,11 @@
         <kh-icon name="warning-circle" class="banner-icon" />
         <div class="banner-body">
           <div class="banner-text">
-            {{ t('dealerApply.stillNeeded') }} {{ missingDocuments().join(', ') }}.
+            {{
+              t('dealerApply.stillNeededDocuments', {
+                documents: missingDocuments().join(t('common.listSeparator')),
+              })
+            }}
           </div>
         </div>
       </div>
@@ -285,7 +313,7 @@
         [disabled]="!canSubmit()"
         (click)="submit()"
       >
-        {{ busy() ? 'Submitting…' : 'Submit for review' }}
+        {{ busy() ? t('dealerApply.submitting') : t('dealerApply.submitForReview') }}
       </button>
       <span class="page-sub">
         {{ t('dealerApply.submittingStartsThePlatforms') }}

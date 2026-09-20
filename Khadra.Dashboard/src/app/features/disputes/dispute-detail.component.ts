@@ -10,14 +10,17 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
-import { Dispute } from '../../core/models/disputes.api';
+import { Dispute, DisputeResolution, DisputeStatement } from '../../core/models/disputes.api';
 import { AdminDisputesService } from '../../core/services/admin-disputes.service';
 import { roundTo, scaleOf } from '../../core/services/money';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
+import { Language } from '../../core/i18n/language';
+import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 /** The four shapes spec 3.3 names, each one a preset split of the deposit the booking holds. */
@@ -40,10 +43,13 @@ type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
   imports: [RouterLink, IconComponent, TimelineComponent, MoneyPipe],
 })
 export class DisputeDetailComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   // Server enum names, in the reader's language. Shared rather than per-component: the same enum
   // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
-  protected readonly statusLabel = inject(I18nService).statusLabel;
+  protected readonly statusLabel = this.i18n.statusLabel;
+  protected readonly enumLabel = this.i18n.enumLabel;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(AdminDisputesService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -94,7 +100,17 @@ export class DisputeDetailComponent {
   protected readonly dealerCharge = signal('');
   protected readonly note = signal('');
   protected readonly busy = signal(false);
-  protected readonly problem = signal<string | null>(null);
+  /** A refused action, held as the facts the server sent; worded in `problemText`. */
+  protected readonly problem = signal<ProblemSnapshot | null>(null);
+
+  /**
+   * The refusal in the language on screen. Chosen here rather than when the request failed, so a
+   * switch while the banner is showing re-words it instead of leaving it in the old language.
+   */
+  protected readonly problemText = computed(() => {
+    const problem = this.problem();
+    return problem ? describeRefusal(problem, this.t, this.i18n.lang()) : null;
+  });
 
   /**
    * The four ways an administrator can dispose of a held deposit.
@@ -130,12 +146,11 @@ export class DisputeDetailComponent {
     ],
   );
 
+  /** A failed load, held as the resource's facts and worded here, so a language switch re-words it. */
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as { status?: number } | undefined;
+    const error = this.resource.error();
     if (!error) return null;
-    if (error.status === 404) return this.t('disputeDetail.thatDisputeWasNot');
-    if (error.status === 403) return this.t('disputeDetail.theDisputeWorkspaceIs');
-    return this.t('dealerDispute.theDisputeCouldNot');
+    return describeLoadFailure(snapshotProblem(error), this.t, this.i18n.lang());
   });
 
   /**
@@ -174,21 +189,19 @@ export class DisputeDetailComponent {
     return d.isOverdue ? 'bad' : 'warn';
   });
 
+  /** The platform's promise on this ticket: "7h remaining", then "Overdue by 13h" — the server's flag OR the clock. */
   protected readonly sla = computed(() => {
     const d = this.dispute();
     if (!d) return { figure: '', over: false };
-    if (!d.isLive) return { figure: 'Closed', over: false };
-    const hours = Math.round((Date.parse(d.slaDeadline) - Date.now()) / 3_600_000);
-    return hours <= 0
-      ? { figure: `${-hours}h over`, over: true }
-      : { figure: `${hours}h left`, over: false };
+    if (!d.isLive) return { figure: this.t('disputeDetail.closed'), over: false };
+    const reading = this.formats.sla(d.slaDeadline, d.isOverdue);
+    return { figure: reading.text, over: reading.passed };
   });
 
   protected readonly age = computed(() => {
     const d = this.dispute();
     if (!d) return '';
-    const hours = Math.round((Date.now() - Date.parse(d.openedAt)) / 3_600_000);
-    return hours >= 48 ? `${Math.round(hours / 24)}d` : `${hours}h`;
+    return this.formats.duration(Date.now() - Date.parse(d.openedAt));
   });
 
   /** The three panels the design puts across the top: the booking, the parties, the money. */
@@ -202,7 +215,10 @@ export class DisputeDetailComponent {
     const d = this.dispute();
     if (!d) return [];
     const b = d.booking;
-    const cur = b.pricing.totalPrice.currency;
+    // Every amount carries the code of its own value, never one borrowed from a neighbouring figure.
+    const money = (value: { readonly amount: number; readonly currency: string }): string =>
+      this.formats.money(value.amount, value.currency);
+    const penalty = b.penalty && !b.penalty.isNothingOwed ? b.penalty : null;
     return [
       {
         title: this.t('common.booking'),
@@ -215,33 +231,58 @@ export class DisputeDetailComponent {
               ? `${b.vehicle.make} ${b.vehicle.model} ${b.vehicle.year}`
               : this.t('dealerBooking.noLongerListed'),
           },
-          { k: this.t('dealerBooking.rental'), v: `${this.date(b.periodStart)} – ${this.date(b.periodEnd)}` },
-          { k: this.t('common.status'), v: b.status },
+          {
+            k: this.t('dealerBooking.rental'),
+            v: this.t('disputeDetail.periodRange', {
+              start: this.date(b.periodStart),
+              end: this.date(b.periodEnd),
+            }),
+          },
+          { k: this.t('common.status'), v: this.statusLabel(b.status, 'booking') },
         ],
       },
       {
         title: this.t('disputesList.parties'),
         icon: 'user',
         rows: [
-          { k: this.t('dealersList.colDealer'), v: b.dealerName },
-          { k: this.t('vehicleDetail.customer'), v: b.customerName },
-          { k: this.t('disputesList.raisedBy'), v: `${d.openedByName} (${d.openedByParty})` },
-          { k: this.t('disputeDetail.handledBy'), v: d.assignedAdminName ?? 'Unassigned' },
+          { k: this.t('dealersList.colDealer'), v: this.dealerName(d) },
+          { k: this.t('vehicleDetail.customer'), v: this.customerName(d) },
+          {
+            k: this.t('disputesList.raisedBy'),
+            v: this.t('disputeDetail.nameWithParty', {
+              name: this.openerName(d),
+              party: this.enumLabel('party', d.openedByParty),
+            }),
+          },
+          {
+            k: this.t('disputeDetail.handledBy'),
+            v: this.holderName(d) ?? this.t('common.unassigned'),
+          },
         ],
       },
       {
         title: this.t('disputeDetail.moneyOnThisBooking'),
         icon: 'currency-circle-dollar',
         rows: [
-          { k: this.t('myBooking.rentalTotal'), v: `${b.pricing.rentalTotal.amount} ${cur}` },
-          { k: this.t('common.depositHeld'), v: `${d.depositHeld.amount} ${d.depositHeld.currency}` },
-          { k: this.t('vehicleDetail.securityDeposit'), v: `${b.pricing.securityDeposit.amount} ${cur}` },
+          { k: this.t('myBooking.rentalTotal'), v: money(b.pricing.rentalTotal) },
+          { k: this.t('common.depositHeld'), v: money(d.depositHeld) },
+          { k: this.t('vehicleDetail.securityDeposit'), v: money(b.pricing.securityDeposit) },
           {
             k: this.t('common.penaltyAssessed'),
-            v:
-              b.penalty && !b.penalty.isNothingOwed
-                ? `${b.penalty.isRange ? b.penalty.minAmount.amount + '–' + b.penalty.maxAmount.amount : b.penalty.minAmount.amount} ${b.penalty.minAmount.currency} · ${b.penalty.attributedTo}`
-                : 'None',
+            // Two facts, each worded on its own: the amount (ONE run for a range, so Arabic cannot
+            // lay the bounds out upper bound first) and the party it is assessed against.
+            v: penalty
+              ? [
+                  penalty.isRange
+                    ? this.formats.moneyRange(
+                        penalty.minAmount.amount,
+                        penalty.maxAmount.amount,
+                        penalty.minAmount.currency,
+                      )
+                    : money(penalty.minAmount),
+                  this.enumLabel('party', penalty.attributedTo),
+                ].join(' · ')
+              : this.t('common.none'),
           },
         ],
       },
@@ -255,35 +296,54 @@ export class DisputeDetailComponent {
     // The opening statement IS statement #1 -- Open() writes it from the reason -- so it is labelled
     // as the opening rather than added a second time above the list. Listing both put the same
     // sentence on the trail twice and made a one-statement ticket read as two.
+    // Meta lines are lists of whole facts, each worded on its own, joined by a separator.
+    const facts = (...parts: string[]) => parts.join(' · ');
     const steps: TimelineStep[] = d.statements.map((s, index) => ({
-      label: index === 0 ? `Opened by ${s.authorName}` : `${s.authorName} answered`,
-      meta: `${this.when(s.createdAt)} · ${s.party}${s.evidence.length ? ` · ${s.evidence.length} file(s)` : ''}`,
+      label:
+        index === 0
+          ? this.t('disputeDetail.openedBy', { name: this.authorName(s) })
+          : this.t('disputeDetail.answeredBy', { name: this.authorName(s) }),
+      meta: facts(
+        this.when(s.createdAt),
+        this.enumLabel('party', s.party),
+        ...(s.evidence.length
+          ? [this.t('disputeDetail.filesAttached', { count: s.evidence.length })]
+          : []),
+      ),
       tone: (index === 0 ? 'warn' : s.party === 'Dealer' ? 'accent' : 'dim') as Tone,
     }));
     if (steps.length === 0) {
       steps.push({
-        label: `Opened by ${d.openedByName}`,
-        meta: `${this.when(d.openedAt)} · ${d.openedByParty} · “${d.reason}”`,
+        label: this.t('disputeDetail.openedBy', { name: this.openerName(d) }),
+        meta: facts(
+          this.when(d.openedAt),
+          this.enumLabel('party', d.openedByParty),
+          this.t('disputeDetail.quoted', { text: d.reason }),
+        ),
         tone: 'warn',
       });
     }
-    if (d.assignedAdminName && !d.resolution) {
+    const holder = this.holderName(d);
+    if (holder !== null && !d.resolution) {
       steps.push({
-        label: `Taken on by ${d.assignedAdminName}`,
+        label: this.t('disputeDetail.takenOnBy', { name: holder }),
         meta: this.t('status.underReview'),
         tone: 'accent',
       });
     }
     if (d.resolution) {
       steps.push({
-        label: `Resolved by ${d.resolution.resolvedByName}`,
-        meta: `${this.when(d.resolution.resolvedAt)} · “${d.resolution.note}”`,
+        label: this.t('disputeDetail.resolvedBy', { name: this.resolverName(d.resolution) }),
+        meta: facts(
+          this.when(d.resolution.resolvedAt),
+          this.t('disputeDetail.quoted', { text: d.resolution.note }),
+        ),
         tone: 'ok',
       });
     } else {
       steps.push({
         label: this.t('disputeDetail.decision'),
-        meta: `Due ${this.when(d.slaDeadline)}`,
+        meta: this.t('disputeDetail.dueAt', { when: this.when(d.slaDeadline) }),
         tone: 'dim',
         future: true,
       });
@@ -300,7 +360,7 @@ export class DisputeDetailComponent {
         fileName: file.fileName,
         url: file.url,
         party: s.party,
-        author: s.authorName,
+        author: this.authorName(s),
         when: this.when(s.createdAt),
       })),
     );
@@ -386,7 +446,7 @@ export class DisputeDetailComponent {
           this.t('disputeDetail.recordedOnTheTicket'),
         );
       })
-      .catch((error: unknown) => this.problem.set(describe(error, this.t)))
+      .catch((error: unknown) => this.problem.set(snapshotProblem(error)))
       .finally(() => this.busy.set(false));
   }
 
@@ -402,10 +462,30 @@ export class DisputeDetailComponent {
         tone: 'warn',
         danger: true,
         title: this.t('disputeDetail.recordThisDecision'),
-        body: `${this.refund()} ${cur} back to ${d.booking.customerName}, ${this.platform()} ${cur} kept by the platform, ${this.dealer()} ${cur} to ${d.booking.dealerName}${charge ? `, and ${charge} ${cur} charged to the dealer` : ''}. Both parties see the decision, your note and your name, and it is written to the audit log.`,
+        // One whole sentence per shape, with every amount formatted in the deposit's own currency and
+        // each party named as the reader's language names them -- never the English stand-in.
+        body: charge
+          ? this.t('disputeDetail.resolveConfirmBodyWithCharge', {
+              refund: this.formats.money(this.refund(), cur),
+              customer: this.customerName(d),
+              platform: this.formats.money(this.platform(), cur),
+              dealerShare: this.formats.money(this.dealer(), cur),
+              dealer: this.dealerName(d),
+              charge: this.formats.money(Number(charge), cur),
+            })
+          : this.t('disputeDetail.resolveConfirmBody', {
+              refund: this.formats.money(this.refund(), cur),
+              customer: this.customerName(d),
+              platform: this.formats.money(this.platform(), cur),
+              dealerShare: this.formats.money(this.dealer(), cur),
+              dealer: this.dealerName(d),
+            }),
         note: this.t('disputeDetail.decisionRecordedNoFunds'),
         confirm: this.t('disputeDetail.resolveDispute'),
-        result: { title: this.t('disputeDetail.disputeResolved'), body: this.t('disputeDetail.decisionRecordedNoFunds2') },
+        result: {
+          title: this.t('disputeDetail.disputeResolved'),
+          body: this.t('disputeDetail.decisionRecordedNoFunds2'),
+        },
       },
       async () => {
         await this.service.resolve(d.ticketId, {
@@ -418,7 +498,10 @@ export class DisputeDetailComponent {
         this.service.refresh();
         this.service.refreshList();
       },
-      { title: this.t('disputeDetail.disputeResolved'), body: this.t('disputeDetail.decisionRecordedNoFunds2') },
+      {
+        title: this.t('disputeDetail.disputeResolved'),
+        body: this.t('disputeDetail.decisionRecordedNoFunds2'),
+      },
     );
   }
 
@@ -426,29 +509,73 @@ export class DisputeDetailComponent {
     this.service.refresh();
   }
 
+  /**
+   * An amount at the deposit's own scale with no code beside it, for the running total where the
+   * code is printed once after the held figure. Never a sign typed in front: a negative remainder
+   * (more allocated than is held) keeps the minus the formatter gives it.
+   */
+  protected amount(value: number): string {
+    return this.formats.money(value, null);
+  }
+
+  /** The held deposit with its own currency code. */
+  protected heldWithCode(): string {
+    return this.formats.money(this.held(), this.currency());
+  }
+
   protected date(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return this.formats.date(iso);
   }
 
   protected when(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.formats.dayMonthTime(iso);
   }
 
   protected initials(name: string): string {
     return name
-      .split(' ')
+      .trim()
+      .split(/\s+/)
       .slice(0, 2)
       .map((part) => part[0] ?? '')
       .join('');
+  }
+
+  // ── People, in the reader's language ─────────────────────────────────────────────────────────
+  //
+  // Every name on this dispute arrives with a fact beside it. When the fact says the account or the
+  // dealership is gone, the name is an English stand-in kept for older customer apps, and this screen
+  // says so in its own words instead.
+
+  protected openerName(d: Dispute): string {
+    return d.openedByAccountClosed ? this.t('common.accountClosed') : d.openedByName;
+  }
+
+  protected authorName(s: DisputeStatement): string {
+    return s.authorAccountClosed ? this.t('common.accountClosed') : s.authorName;
+  }
+
+  protected resolverName(r: DisputeResolution): string {
+    return r.resolvedByAccountClosed ? this.t('common.accountClosed') : r.resolvedByName;
+  }
+
+  /** Who holds the ticket, or null while nobody does. A closed account still holds it. */
+  protected holderName(d: Dispute): string | null {
+    if (d.assignedAdminId === null) return null;
+    return d.assignedAdminAccountClosed || d.assignedAdminName === null
+      ? this.t('common.accountClosed')
+      : d.assignedAdminName;
+  }
+
+  protected dealerName(d: Dispute): string {
+    return d.booking.dealerRemoved
+      ? this.t('common.dealerNoLongerOnPlatform')
+      : d.booking.dealerName;
+  }
+
+  protected customerName(d: Dispute): string {
+    return d.booking.customerAccountClosed
+      ? this.t('common.customerAccountClosed')
+      : d.booking.customerName;
   }
 }
 
@@ -458,11 +585,15 @@ export class DisputeDetailComponent {
  * Takes `t` rather than reaching for one: this is a module function, so it has no `this` and no
  * injector. The mapping is from the server's stable error CODE, which is the only part of a refusal
  * that can be translated at all -- `Error.Message` is English and always will be until the API grows
- * request localisation (pre-launch item 49).
+ * request localisation (pre-launch item 49). An unmapped refusal shows the server's sentence only in
+ * English; Arabic gets the console's own "refused" line.
  */
-function describe(error: unknown, t: (key: TranslationKey) => string): string {
-  const problem = error as { error?: { code?: string; title?: string } };
-  switch (problem.error?.code) {
+function describeRefusal(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  switch (problem.code) {
     case 'dispute.disposition_unbalanced':
       return t('disputeDetail.theThreeAmountsMust');
     case 'dispute.resolution_note_required':
@@ -472,6 +603,17 @@ function describe(error: unknown, t: (key: TranslationKey) => string): string {
     case 'dispute.already_withdrawn':
       return t('disputeDetail.thisTicketWasWithdrawn');
     default:
-      return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
+      return serverSentence(problem, language, t) ?? t('dealerDelivery.serviceDidNotRespond');
   }
+}
+
+/** Why the ticket could not load, in the language on screen when it is shown. */
+function describeLoadFailure(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  if (problem.status === 404) return t('disputeDetail.thatDisputeWasNot');
+  if (problem.status === 403) return t('disputeDetail.theDisputeWorkspaceIs');
+  return serverSentence(problem, language, t) ?? t('dealerDispute.theDisputeCouldNot');
 }

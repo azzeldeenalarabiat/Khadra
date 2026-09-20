@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
+import '../../core/uploads/document_picker.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
@@ -43,45 +43,51 @@ class _OpenDisputeScreenState extends ConsumerState<OpenDisputeScreen> {
     super.dispose();
   }
 
+  /// Evidence: a photograph of the damage, or the paperwork behind the claim.
+  ///
+  /// The same picker the document centre uses, against the same published
+  /// capabilities — `RequestDisputeEvidenceUploadHandler` checks the identical
+  /// `AllowedContentTypes`, which have included `application/pdf` all along. This
+  /// screen could only send a photograph from the library, and declared it JPEG
+  /// whatever it was.
   Future<void> _addEvidence() async {
+    final picker =
+        DocumentPicker(ref.read(appConfigProvider).valueOrNull?.documents);
+
+    final choice = await picker.pick(context);
+    if (choice == null || !mounted) return;
+
+    switch (choice) {
+      case DocumentRefused(:final message):
+        showKhadraMessage(context, message, isError: true);
+      case DocumentChosen(:final document):
+        await _sendEvidence(document);
+    }
+  }
+
+  /// Two steps: ask where to put it, then put it there.
+  Future<void> _sendEvidence(PickedDocument document) async {
     final l10n = AppLocalizations.of(context);
-
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 2000,
-      requestFullMetadata: false,
-    );
-    if (picked == null || !mounted) return;
-
     setState(() => _uploading = true);
 
     try {
-      final bytes = await picked.readAsBytes();
-      final fileName = picked.name.toLowerCase().endsWith('.jpg') ||
-              picked.name.toLowerCase().endsWith('.jpeg')
-          ? picked.name
-          // JPEG explicitly: an iPhone writes HEIC, which the platform does not
-          // accept.
-          : '${picked.name}.jpg';
-
       final upload = await ref.read(apiProvider).requestEvidenceUpload(
             bookingId: widget.bookingId,
-            fileName: fileName,
-            contentType: 'image/jpeg',
+            fileName: document.fileName,
+            contentType: document.contentType,
           );
 
       await ref.read(apiProvider).uploadEvidence(
             uploadUrl: upload.uploadUrl,
-            bytes: bytes,
-            contentType: 'image/jpeg',
+            bytes: document.bytes,
+            contentType: document.contentType,
           );
 
       if (!mounted) return;
       setState(() {
         _uploading = false;
         _evidenceKeys.add(upload.storageKey);
-        _evidenceNames.add(fileName);
+        _evidenceNames.add(document.fileName);
       });
     } on ApiFailure catch (failure) {
       if (!mounted) return;
@@ -113,11 +119,12 @@ class _OpenDisputeScreenState extends ConsumerState<OpenDisputeScreen> {
       invalidateBookings(ref, bookingId: widget.bookingId);
 
       if (!mounted) return;
+      final formats = ref.read(formatsProvider);
       showKhadraMessage(
         context,
-        l10n.disputeOpened(
-          dispute.slaDeadline.difference(dispute.openedAt).inHours.toString(),
-        ),
+        formats == null
+            ? l10n.disputeOpenedNoDate
+            : l10n.disputeOpened(formats.dateTime(dispute.slaDeadline)),
       );
       context.pushReplacement(Routes.dispute(dispute.ticketId));
     } on ApiFailure catch (failure) {
@@ -134,7 +141,10 @@ class _OpenDisputeScreenState extends ConsumerState<OpenDisputeScreen> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.disputeTitle)),
+      appBar: AppBar(
+        leading: KhadraBack(fallback: Routes.booking(widget.bookingId)),
+        title: Text(l10n.disputeTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
             Space.lg, Space.lg, Space.lg, Space.bottomInset),

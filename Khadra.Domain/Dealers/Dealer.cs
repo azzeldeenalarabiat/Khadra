@@ -17,7 +17,15 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
 
     public Id OwnerUserId { get; private set; }
     public BusinessName BusinessName { get; private set; } = null!;
+
+    /// <summary>
+    /// The office's About text, in its own words. Written at registration, and after that only by
+    /// <see cref="UpdatePublicProfile"/> — one writer, so two console forms cannot overwrite each other.
+    /// </summary>
     public string? Description { get; private set; }
+
+    /// <summary>The rest of what the office writes for customers, and which of it is hidden.</summary>
+    public PublicProfile PublicProfile { get; private set; } = null!;
     public CommercialRegistrationNumber CommercialRegistration { get; private set; } = null!;
     public GeoPoint Location { get; private set; } = null!;
     public Id? CityId { get; private set; }
@@ -91,7 +99,10 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
             CommercialRegistration = commercialRegistration,
             Location = location,
             OperatingHours = operatingHours,
-            Description = Trim(description, 2000),
+            // Already held to ProfileText by the handler that takes the application form, so it is
+            // stored as written rather than cut short here.
+            Description = description,
+            PublicProfile = PublicProfile.Empty(),
             CityId = cityId,
             Address = address,
             VerificationStatus = DealerVerificationStatus.PendingReview,
@@ -255,11 +266,14 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     // Spec 5.2: a delivery booking is only offered when the pin falls inside the dealer's radius.
     public bool CoversLocation(GeoPoint destination) => Delivery.Covers(Location, destination);
 
+    /// <remarks>
+    /// The About text is not part of this any more. It moved to <see cref="UpdatePublicProfile"/> with
+    /// the rest of the customer page, and a form that still sends it here changes nothing.
+    /// </remarks>
     public UnitResult<Error> UpdateProfile(
         BusinessName businessName,
         GeoPoint location,
         OperatingHours operatingHours,
-        string? description,
         Id? cityId,
         DealerAddress? address)
     {
@@ -277,11 +291,57 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         BusinessName = businessName;
         Location = location;
         OperatingHours = operatingHours;
-        Description = Trim(description, 2000);
         CityId = cityId;
         Address = address;
         return UnitResult.Success<Error>();
     }
+
+    /// <summary>
+    /// Replaces the customer page: the About text, the office's other sections, and which are hidden.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A full replacement. The console sends the whole page, so a section left out is a section
+    /// cleared — never one quietly kept from an earlier save the owner can no longer see.
+    /// </para>
+    /// <para>
+    /// Allowed whatever the verification status and while suspended: an applicant prepares the page
+    /// before approval, and nothing here can reach a customer until the office may trade.
+    /// </para>
+    /// </remarks>
+    public UnitResult<Error> UpdatePublicProfile(string? about, PublicProfile profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        var text = ProfileText.Normalize(about, PublicProfileSection.About);
+        if (text.IsFailure)
+            return UnitResult.Failure(text.Error);
+
+        Description = text.Value;
+        PublicProfile = profile;
+        return UnitResult.Success<Error>();
+    }
+
+    /// <summary>
+    /// What a customer is shown of this office's own words.
+    /// </summary>
+    /// <remarks>
+    /// THE rule, in one place. A section is shown only when it has text and the office has not hidden
+    /// it — and a customer cannot tell hidden from never written, because both are simply absent.
+    /// Delivery notes are also absent whenever delivery is off: they describe a service the office is
+    /// not offering. The public page and the console's preview both read this, so the two cannot come
+    /// to disagree about what a customer sees.
+    /// </remarks>
+    public PublicProfileView VisiblePublicProfile() => new(
+        Shown(PublicProfileSection.About, Description),
+        Shown(PublicProfileSection.RentalConditions, PublicProfile.RentalConditions),
+        Shown(PublicProfileSection.Insurance, PublicProfile.Insurance),
+        Shown(PublicProfileSection.PickupInstructions, PublicProfile.PickupInstructions),
+        Delivery.IsEnabled ? Shown(PublicProfileSection.DeliveryNotes, PublicProfile.DeliveryNotes) : null,
+        Shown(PublicProfileSection.CustomerNotes, PublicProfile.CustomerNotes));
+
+    private string? Shown(PublicProfileSection section, string? text) =>
+        PublicProfile.IsHidden(section) || string.IsNullOrWhiteSpace(text) ? null : text;
 
     /// <summary>Replaces the logo; returns the key it replaced so the caller can delete the old file after commit.</summary>
     public string? SetLogo(string storageKey)

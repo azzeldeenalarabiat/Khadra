@@ -1067,6 +1067,31 @@ and the exception handler; `AuthApiClient` forwarding `Accept-Language`, since t
 are not proxied; and `PreferredLanguage` on `User`, because emails are composed without a request.
 Doing it server-side also spares the Flutter app a third copy of the same 140 codes.
 
+**Updated 2026-09-18 (Wave Two). CLOSED for the console: the scanner reports 0 findings across every
+screen, against a 12-entry allowlist in which each entry carries its reason.** Measured with a
+STRONGER scanner than the one that reported 75 and later 505: it had two blind spots and could not
+have found what it was missing.
+
+- It never read inside a callback, so everything built in `rows.map((row) => …)` was invisible — a
+  timeline calling `toLocaleString('en-GB')`, a document tile reading "Provided".
+- It never read the words AROUND an interpolation, so `{{ radius() }} km`, `{{ a }} of {{ b }}` and
+  "by", "to" passed unseen.
+- It could not see money built by hand — `${value.amount} ${value.currency}` — which is the shape the
+  "JOD 0−" defect came in by.
+
+Both halves were fixed, plus false-positive rules so machine values are not reported as copy (a
+membership test, a typed value list, the filter a chip sends, a route parameter). Re-measured on the
+UNTOUCHED code, the honest baseline was **525 findings in 57 files**, not the 505 previously reported.
+
+What moved, beyond keying the copy: one shared clock (a chance that runs out ends as "Expired"; a
+promise that can be broken reads "Overdue by 13h"), status and enum names through `statusLabel` /
+`enumLabel` with a spelled-out fallback, refusals held as `ProblemSnapshot` facts and worded at render
+time, every date, number, percentage and amount through `FormatService`, and six API contracts that
+used to send English sentences now sending facts the console words (see items 100–108).
+
+Left open deliberately: the server's own messages (item 100), and the English written INTO records at
+the moment of an action (item 103).
+
 ### 50. `DisputeAuditor` writes an English sentence into an append-only table
 
 `DisputeAuditor.Describe` composes `"Resolved: of {amount} {currency} held, refund …, platform …,
@@ -1386,7 +1411,15 @@ existing "at least one" validation makes a missing key fail at startup.
 
 ### 59. The deposit payment window is 24 hours only because nothing can tell the customer
 
-**Status:** open · **Raised:** 2026-09-07 · **Owner decision recorded**
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-07 · **Superseded by:** item 90
+
+The owner shortened `BusinessRules:PaymentWindowHours` from 24 to 2 on 2026-09-11, taking the other
+side of the trade this item described. Everything below was the reasoning for 24 and is kept as the
+record of it; what the shorter window now costs is item 90, which is open.
+
+It was configuration and not a constant precisely so this could happen without a release, and it did.
+
+The original entry follows.
 
 `BusinessRules:PaymentWindowHours` is 24. The number the flow wants is closer to one hour: a car sits
 held against nothing for the whole window, and a dealership that has said yes deserves an answer
@@ -1396,8 +1429,6 @@ It is 24 because there are no push notifications. A customer learns their bookin
 by opening the app. A one-hour window would auto-expire most bookings approved overnight or during a
 working day before the customer ever saw the approval, wasting the dealer's decision and losing the
 rental — a worse failure than a car held a day too long.
-
-It is configuration, not a constant, precisely so this can be shortened without a release.
 
 **To close:** once approval reaches a customer's phone (item 43's notification producers plus a push
 transport), shorten the window and say so on the screen that counts it down.
@@ -1457,8 +1488,8 @@ start, so all three collapse at once: the dealer gets twenty minutes to answer, 
 whatever is left to pay, and free cancellation is already over.
 
 None of that is wrong — a window that outlived the rental it governs would be worse — but the
-platform is meanwhile telling the customer, on `GET /api/v1/app-config`, that they have 24 hours to
-pay. Two answers to one question is the failure this endpoint exists to prevent.
+platform is meanwhile telling the customer, on `GET /api/v1/app-config`, that they have a full
+payment window. Two answers to one question is the failure this endpoint exists to prevent.
 
 **To close:** two things.
 
@@ -1578,13 +1609,18 @@ the disclosure log written for all of it. Tests: `RenterDocumentAccessTests`,
 `RenterDocumentReviewTests` (application and domain), `DocumentAccessPersistenceTests`,
 `RenterDocumentEndpointTests`, `renter-documents.presenter.spec.ts`.
 
-### 64. A free hold is renewable, so the 72-hour ceiling is per request, not per customer
+### 64. A free hold is renewable, so the ceiling is per request, not per customer
 
-**Status:** open by decision · **Raised:** 2026-09-07 · **Accepted exposure**
+**Status:** open by decision · **Raised:** 2026-09-07 · **Accepted exposure** · **Updated:** 2026-09-11
 
-A request holds a car for up to 48 hours unanswered, and an approval holds it a further 24 unpaid:
-72 hours, none of it paid for. Nothing then stops the same customer requesting the same car again the
+A request holds a car for up to 48 hours unanswered, and an approval holds it for the payment window
+unpaid, none of it paid for. Nothing then stops the same customer requesting the same car again the
 instant it expires, so one account can keep a car off the market indefinitely at no cost.
+
+The ceiling was 72 hours when this was raised. Shortening the payment window to 2 hours on 2026-09-11
+made it 50, which narrows the exposure without removing it: the 48 hours a gallery may take to answer
+is the bulk of it, and that window has not moved. The figure is the sum of two settings and is
+deliberately not written down in the code.
 
 The deposit used to make that expensive. Under "reserve now, pay after approval" nothing does.
 
@@ -1839,8 +1875,12 @@ is no push channel, so a customer learns their booking was approved only by open
 
 That is what forced the deposit payment window to 24 hours rather than the one hour first proposed
 (item 59): a shorter window would auto-expire most bookings approved overnight before the customer
-ever saw them. Shortening it is one configuration value once push exists, which is why it is not a
-constant.
+ever saw them.
+
+**The owner shortened it to 2 hours anyway on 2026-09-11 (item 90), so this is no longer a nicety.**
+The window now assumes a channel that does not exist. An approval email over the transport that
+already sends verification mail would close most of it and is far cheaper than FCM/APNs; it should be
+built before the first real gallery approves anything.
 
 **To close:** a push transport (FCM/APNs), a device-token registration endpoint, and a decision about
 which `NotificationKind`s justify waking a phone.
@@ -1966,6 +2006,32 @@ with the provider. Two details that will bite whoever writes the adapter:
   round-trip test, and it must REFUSE an amount it cannot represent exactly rather than round it.
 - **`ParseEvent` must verify over the exact bytes received.** The controller passes the raw body
   through unparsed for that reason; anything that deserialises and re-serialises breaks every signature.
+
+**Three things a 2-hour payment window (item 90) adds to this, raised 2026-09-11.** None of them can
+happen while `Provider` is `None` — no checkout can open at all — so they are conditions on closing
+this item rather than defects today.
+
+1. **The Pay button and the checkout door disagree for the last five minutes.**
+   `BookingPaymentAvailability.ForAsync` answers `CanPay = true` for the whole of `now <
+   PaymentDeadline`, while `OpenDepositCheckoutHandler` refuses from `PaymentDeadline -
+   CheckoutClosesBeforeDeadlineMinutes` (5). The app shows a Pay button under a countdown reading
+   "4 minutes left" and the tap answers 409. At 24 hours that margin was 0.3% of the window; at two
+   it is 4%, and the countdown is now something customers will be watching. Fix: one helper that both
+   sides call, a distinct `payments.checkout_window_closed` code, and `PayBy` reporting the instant
+   the door actually shuts.
+
+2. **A late approval can produce a booking nobody can pay — AN OWNER DECISION, not a fix to make
+   quietly.** `MinimumBookingLeadTimeMinutes` lets a rental start two hours from the request, and the
+   payment deadline is capped at the rental start. Approve such a booking inside the last five
+   minutes and the gallery has said yes to something that cannot be paid for; it will prepare a car
+   that expires. Worse with a real provider — several refuse a checkout session shorter than about
+   thirty minutes, which would make the un-payable tail 35 minutes, a quarter of a two-hour window.
+   The shape of a fix is `Approve` taking a minimum-payment-window parameter the way
+   `BookingWindowPolicy` takes `minimumLeadTime`, refusing with `booking.too_late_to_approve` and
+   leaving rejection allowed. It changes what a gallery may do, so the owner decides.
+
+3. **The provider's own session floor bounds the door, not our five minutes.** Whatever provider
+   closes this item, its minimum session lifetime has to be read and folded into the same helper.
 
 ### 77. Cancellation does not refund, and that is the owner's decision to make
 
@@ -2201,6 +2267,12 @@ become the platform administrator. Search the retention window for event 1200 or
 Nobody loses anything — they ask again. Do **not** "invalidate by requesting a new one" while the
 Logging transport is still selected, because that writes a fresh live link to the same log.
 
+*2026-09-17:* the transport no longer does this. `LoggingEmailSender` now logs the subject and the
+recipient's domain, never the body, as event 1400 rather than 1200, and `LoggingEmailSenderTests`
+asserts the token is absent. That stops new links reaching the log. It does nothing about lines an
+older build already wrote, so the search above — event 1200 — still stands for any retention window
+that reaches back before the change.
+
 **Related:** item 37 (the enumeration trade-off in reporting a failed send). Worth appending there:
 the no-account path is one database round trip while the account path is three plus an HTTPS call, so
 the response time distinguishes them — a channel that is open always, not only while mail is broken.
@@ -2271,3 +2343,1081 @@ the table most likely to have been emptied by the time anybody asks.
 Tests: `DocumentAccessPersistenceTests` (round trip, and the append-only guard on both tables),
 `RenterDocumentReviewTests` (a row per view, none for a refused view, none for a repeat review, none
 for the listing, and no storage key anywhere on a row).
+
+## Customer app completion (2026-09-11)
+
+### 87. Owner decisions on the shortlist
+
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-11 · **Built:** 2026-09-11, at the owner's request
+
+Favourites were built as a `Shortlist` bounded context — aggregate, migration, four endpoints and the
+app screens — with three questions answered by DEFAULTS rather than by the owner. All three were put
+to the owner on 2026-09-11 and settled the same day. This is the decision record; the wording here is
+the authority, because the design handoff it came from is not in `docs/design/`.
+
+1. **Account-only, no device-local list. CONFIRMED.** The catalogue itself is anonymous and stays so,
+   but saving needs an account: a list kept on the phone would vanish with it, show nothing on a
+   second one, and become a merge problem the day the real one arrived. The heart on an anonymous
+   card goes through the ordinary sign-in redirect.
+2. **The cap is 100** (`BusinessRules:MaxShortlistEntries`), raised from the proposed 50. A guard
+   against a list nobody can read and a table one account can grow without bound, not a judgement
+   about how many cars are worth comparing. Validated at startup like its siblings, inside
+   `[Range(1, 500)]`. The refusal carries the figure and the app repeats what it was told; the app
+   holds no copy of the number.
+
+   The list is one unpaged response. A hundred rows is about five search pages — acceptable, and the
+   point at which paging would be needed if the cap ever rose further, because the heart set is told
+   the whole list at once (`markSaved`).
+3. **A car that stops being bookable keeps its row, is shown as "Currently unavailable / غير متاحة
+   حاليًا", and cannot start a booking.** Entries are NEVER auto-removed: `Maintenance → Hidden →
+   Active` is a normal round trip, and a list that edited itself on the way through would lose a
+   customer's choices without asking.
+
+   The row still NAMES the car and its gallery, as the approved design does. That is safe because
+   nothing reaches a shortlist that the public catalogue did not return first — `SaveVehicleCommand`
+   refuses any id `ICatalogueReader.GetAsync` answers null to — so every name on the list is a car
+   this customer was already shown. What stays private is the REASON, and there is no field on the
+   wire that could carry one: hidden, in maintenance, suspended and soft-deleted must remain
+   indistinguishable.
+
+   The name is read live rather than snapshotted, so a gallery correcting a listing corrects the saved
+   row; and it is read **past the soft-delete filter**, which is a correctness requirement rather than
+   a convenience. With the filter respected, a deleted car would come back unnamed while a hidden one
+   came back named, and deletion would become the single de-listing reason a customer could tell
+   apart. `ShortlistPersistenceTests` asserts all four cases render alike.
+
+**Two consequences the owner should know, accepted as they stand:** a car that is deleted for good
+reads "Currently unavailable" for ever, because the platform will not say "deleted" and will not
+auto-remove; and unavailable entries count toward the cap, so a customer at 100 with thirty gone
+clears them one at a time. A "remove all unavailable" affordance would close the second and is not
+built.
+
+### 88. The shortlist is personal data and goes with the account
+
+**Status:** open · **Raised:** 2026-09-11 · **Depends on:** item 18 (account deletion)
+
+A shortlist is browsing interest about a named person. It is not soft-deletable — a removed entry is
+a customer saying they are no longer interested, and a tombstone of that retains personal data for no
+purpose anyone could name — but the LIST itself has to go when the account does, and account deletion
+does not exist yet.
+
+**To close:** whatever closes item 18 deletes `customer_shortlists` and its entries with the account.
+
+### 89. A shortlist has no dates, so it can say nothing about availability
+
+**Status:** closed by design · **Raised:** 2026-09-11
+
+Recorded so nobody later "improves" it. A saved car carries no rental period, and
+`CatalogueVehicle.IsAvailable` is null without one for exactly that reason — false would be a lie. The
+saved list therefore shows today's daily rate and says nothing about whether the car is free; a
+customer picks dates on the vehicle screen as they would from any other entry point.
+
+Adding a per-entry "available on the dates you last searched" would mean storing a search on a
+shortlist entry, which is a different feature wearing this one's clothes.
+
+### 90. Two hours to pay, and no way to tell the customer their booking was approved
+
+**Status:** open · **Raised:** 2026-09-11 · **Depends on:** item 73 (push notifications)
+
+The owner set the payment window to **two hours** on 2026-09-11, replacing the twenty-four that came
+in with the reserve-now-pay-later reordering (`BusinessRules:PaymentWindowHours`). The trade is
+deliberate and in the platform's favour: a car that a customer never pays for goes back on the market
+in two hours instead of a day, which is the difference between one lost rental and three.
+
+What it costs is the other half of the same fact. **There is no push channel** (item 73), so a
+customer finds out their request was approved by opening the app. Two hours is easy to miss entirely
+— asleep, at work, driving. Every approval missed that way is a gallery's decision wasted, a car held
+for nothing, and a customer who believes they booked a car and did not.
+
+**An approval email was built on 2026-09-11 and closes most of this.** `BookingEmailDispatcher`
+sends the customer a bilingual message over the transport that already sends verification mail,
+naming the car, the reference, the deposit, and the deadline as an ABSOLUTE Amman date and time
+rather than only as a duration. It is sent after the commit and its failure is logged and swallowed:
+a mail server having a bad minute cannot undo a gallery's decision.
+
+What is left:
+
+- **Item 38 (no mail queue, no retry) is now on the critical path.** One failed send is probably one
+  expired booking. The transport retries within a single call (`Email:MaxAttempts`) and nothing
+  retries after it returns.
+- **There is nowhere to link the customer to** (item 91), so the email names the reference and says
+  to open the app.
+- **Push is still the only channel that reaches a phone in a pocket** (item 73). Email complements it
+  and does not replace it: a customer who reads mail once a day is still a customer who misses a
+  two-hour window.
+
+The other two surfaces already built: `GET /bookings/next` puts the deposit on the landing screen the
+moment the app opens, ranked above everything else; and the booking screen re-reads itself when its
+countdown runs out, so a spent clock never sits under "Deposit is due".
+
+**To close:** item 73 ships, or the owner accepts the loss rate with email and the landing surface.
+This is not a reason to lengthen the window — that decision is made — it is a reason the window needs
+channels behind it.
+
+**Do not confuse this with `MinimumBookingLeadTimeMinutes`, also 120.** That one is how far ahead of
+now a rental may start. They are the same length today by coincidence and moving one must never move
+the other; `Khadra.Tests/Application/Bookings/PaymentWindowTests.cs` holds them apart.
+
+### 91. Customer deep linking — Android App Links and iOS Universal Links
+
+**Status:** open · **Raised:** 2026-09-11 · **Owner decision recorded** · **Blocks:** the useful half
+of item 90
+
+**`App:CustomerAppBaseUrl` stays EMPTY for now**, by the owner's decision on 2026-09-11, and the
+approval email names the booking reference and tells the reader to open the app. That is honest and
+it costs one tap on a two-hour clock.
+
+**`App:ClientBaseUrl` must never be used for a customer link.** It is the dealer and admin console; a
+customer following it lands on a sign-in that refuses them, which reads as the platform being broken
+at the exact moment they are trying to pay. Two settings exist so that this cannot happen by
+accident, and `BookingEmailComposerTests` asserts the console URL never appears in a customer email.
+
+**What it should become.** One customer-facing **HTTPS** link per booking —
+`https://<customer host>/bookings/{id}` — that opens the booking in the Khadra app when it is
+installed and, eventually, falls back to the customer website when it is not. Not a custom scheme
+(`khadra://`): a custom scheme cannot fall back, shows an ugly failure when the app is absent, and is
+not clickable in many mail clients. The same URL has to work in both cases, which is exactly what
+App Links and Universal Links are for.
+
+**To close, in order:**
+
+1. **A host.** Decide the customer-facing domain and stand up TLS on it.
+2. **Android App Links.** Serve `/.well-known/assetlinks.json` with the app's package name and the
+   release signing certificate's SHA-256 fingerprint; add an `intent-filter` with
+   `android:autoVerify="true"` for `https://<host>/bookings/*` to `AndroidManifest.xml`. Verify with
+   `adb shell pm get-app-links <package>` — a debug build signed with a different key will NOT verify,
+   which is the usual reason this looks broken in testing.
+3. **iOS Universal Links.** Serve `/.well-known/apple-app-site-association` (JSON, no extension, no
+   redirect, `application/json`) with the Team ID and bundle id; add the Associated Domains
+   entitlement `applinks:<host>`.
+4. **Routing in the app.** `go_router` already routes `/bookings/:id`; wire the incoming link to it
+   and decide what an unauthenticated open does — the session-aware redirect should send them to
+   sign-in and then ON to the booking, not drop them on the catalogue.
+
+   That half is already built, as of 2026-09-12, and the Get Started gate does not get in its way:
+   the gate is consulted at `/` ONLY, so a link opening any other route is untouched, and a guarded
+   route opened before the session resolves parks its destination on `/?next=…`, which carries it
+   through `/welcome` to the sign-in form and back out to the booking. `test/entry_gate_test.dart`
+   covers both. What remains here is the link arriving at the app at all, which is steps 1-3.
+5. **The web fallback**, whenever the customer website exists: the same URL rendering the booking, or
+   at minimum a page that names the reference and links to the store.
+6. **Then set `App:CustomerAppBaseUrl`** to that host. The composer renders the button the moment it
+   is non-empty; `BookingEmailComposerTests` already covers both shapes.
+
+**It is not only this email.** Booking confirmations, dispute updates and any later push notification
+want the same link, so whatever closes this should be one helper rather than a second URL built by
+hand somewhere else.
+
+### 92. The four-hour lead time, and why it is four
+
+**Status:** CLOSED 2026-09-11 · **Raised:** 2026-09-11 · **Owner decision recorded**
+
+Settled: `MinimumBookingLeadTimeMinutes` is **240** and `PaymentWindowHours` is **2**. Both halves of
+the four hours are the owner's, and the reasoning is theirs too — a last-minute request gives the
+gallery roughly two hours to decide while preserving the customer's full two-hour payment window
+before the rental starts.
+
+The two numbers are RELATED, which is the part worth keeping in mind. A gallery may not approve
+unless the customer can still have the whole payment window, so the last approvable instant is
+`rental start − PaymentWindow`, and the DIFFERENCE between these two settings is the entire time a
+gallery has to answer a request made at the earliest a customer may book for. At 120 and 120 that
+difference was zero: every such request would have been born unapprovable and the customer would have
+been told the office never responded.
+
+**The invariant stays.** Startup refuses any configuration where the lead time does not STRICTLY
+exceed the payment window, with a message naming the relationship rather than the numbers
+(`Khadra.Infrastructure/DependencyInjection.cs`). `ShippedConfigurationTests` asserts the inequality
+rather than the values, so moving either number deliberately does not fail a test that was only ever
+about the pair.
+
+**What it costs the customer, accepted:** a car cannot be booked for three hours from now. The
+earliest is four.
+
+**If either number moves,** the other is a decision too. Raising the payment window without raising
+the lead time shrinks the gallery's decision window by the same amount, and the platform refuses to
+boot once it reaches zero.
+
+### 93. The PDF upload path has never been exercised on a real device
+
+**Status:** open · **Raised:** 2026-09-11 · **Held open by the owner, 2026-09-11** · **Not a defect,
+a gap in what has been proved**
+
+The owner's instruction: this stays open until the app is installed on an actual Android device and
+the whole path is walked — **select PDF → upload → persist → reopen/view**.
+
+PDF selection and upload shipped on 2026-09-11: `DocumentPicker` offers a file entry when the server
+advertises a non-image type, reads the content type from the file's leading bytes, and checks it and
+the size against `/app-config` before anything leaves the phone.
+
+**What has been proved:** the sheet, its server-driven labels and the whole accept/refuse decision, by
+unit tests and by driving the running app in a browser in both languages.
+
+**What has NOT been proved, and must not be described as end-to-end until it has:** the native
+ANDROID path, start to finish, on a real handset —
+
+1. the system file picker opening with the right filter,
+2. a PDF chosen from Drive, Downloads and a third-party file manager,
+3. the bytes reaching `POST /customers/me/documents` intact,
+4. the row persisting with `content_type = application/pdf` and the right size,
+5. the document reopening through a signed link and rendering.
+
+The browser harness cannot do it: `file_picker` opens the chooser with `input.click()`, which a
+browser refuses without a trusted user gesture, and the harness cannot produce one against a Flutter
+canvas. Steps 3–5 are equally unproven on iOS.
+
+**To close:** run the five steps on an Android device and an iPhone, and record the result here.
+
+#### Run 2 -- Android emulator (Pixel, API 36), 2026-09-12: CLOSED for Android
+
+All five steps pass on the corrected build.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | System file picker with the right filter | **PASS** |
+| 2 | PDF chosen from Downloads | **PASS** |
+| 3 | Bytes reach `POST /customers/me/documents` | **PASS** -- 201 |
+| 4 | Row persists with the right type and size | **PASS** -- `PDF · 1 KB`, survived a force-stop AND an in-place 9.2.4 to 10.3.2 upgrade |
+| 5 | Reopens through a signed link and RENDERS | **PASS** -- `GET /api/v1/documents/...` answered 200 and the native viewer displayed the file’s own text |
+
+Step 5 was the failure. The fix was on the CLIENT and the backend keeps both protections: the app
+fetches the bytes over its own authenticated connection instead of handing the URL to a browser that
+can never carry a bearer token. Repeated in Arabic, where a freshly minted link also answered 200.
+
+The bytes are written to the app’s private cache under the document’s id, and
+`DocumentViewer.discard()` empties that directory when the session ends -- verified on the device:
+after sign-out `cache/khadra_documents` no longer exists.
+
+**Still open for iOS.** The whole path is unexercised there, and the first Mac build is also where
+the iOS 14 floor gets tested.
+
+#### Run 1 -- Android emulator (Pixel, API 36), 2026-09-11, debug build
+
+Four of the five steps pass. The fifth fails, for a reason that needs an owner decision.
+
+| # | Step | Result |
+|---|------|--------|
+| 1 | System file picker opens with the right filter | **PASS** -- Android's SAF opens; the sheet advertises `JPG · PNG · WEBP · PDF · up to 8 MB`, read from `/app-config`, not written down in the app |
+| 2 | A PDF chosen from Downloads | **PASS** |
+| 3 | Bytes reach `POST /customers/me/documents` | **PASS** -- `201`, 9.3 s on the emulator |
+| 4 | Row persists with the right type and size | **PASS** -- the listing reads back `PDF · 1 KB`, "Waiting to be checked", and survives a force-stop and cold restart |
+| 5 | Document reopens through a signed link and renders | **FAIL** -- the browser receives `401 Unauthorized` (ProblemDetails), never the PDF |
+
+Steps 2-4 were also exercised from a third-party source only in the sense that Downloads is one;
+Drive and a third-party file manager are still untried, and so is the whole path on iOS.
+
+#### Why step 5 fails, and why it is not a bug in either half
+
+`DocumentsController.Download` is deliberately protected twice. Its own XML comment says so: the
+signature proves the link was minted by this platform for this file and has not expired, and the
+inherited authentication requirement proves there is still a live session behind the request. There
+is no `[AllowAnonymous]`, and `Program.cs` sets a `FallbackPolicy` requiring an authenticated JWT
+bearer user, so the endpoint needs BOTH the signature and a bearer token.
+
+The customer app opens the link with `launchUrl(..., mode: LaunchMode.externalApplication)`. An
+external browser has no bearer token. So the link is minted correctly (`GET .../link` returns `200`),
+handed to Chrome, and refused.
+
+Neither side is wrong on its own. The dealer and admin consoles open the same endpoint successfully
+because they are browsers carrying a cookie session through the BFF. Nobody reconciled that with a
+native app whose only credential lives inside the app.
+
+**This is not a regression from the file_picker or secure-storage upgrade.** It has been true since
+the View button was written; it could not be observed until an Android build existed to press it on.
+
+#### The owner's decision
+
+1. **Fetch in-app.** The app already holds the bearer token: download the bytes itself and render or
+   share them. No change to the security model, but it is a real piece of client work -- a PDF
+   viewer or a share sheet -- and it is the only option that keeps both checks.
+2. **Make the signature sufficient.** Add `[AllowAnonymous]` to `Download` and rely on the signed,
+   expiring URL alone. One line, and it deletes the second check the comment argues for: a leaked URL
+   then works for anyone until it expires.
+3. **Mint a single-use token bound to the session** and accept it in place of the bearer. Keeps two
+   factors, costs a new concept and a store for the tokens.
+
+Until this is decided, the View button is dead on Android and the app should not claim otherwise.
+
+**Unblocked 2026-09-11:** item 94's first hop landed and `flutter build apk` produces an artifact
+again, so the five steps are attemptable. They still need a handset; nothing below claims otherwise.
+
+### 94. The Android app does not build, and nothing caught it
+
+**Status:** open, BLOCKING · **Raised:** 2026-09-11 · **Decided by the owner, 2026-09-11** ·
+**First hop landed; held open for the on-device migration test**
+
+`flutter build apk` fails. `file_picker` 11.0.3 applies its own Kotlin Gradle Plugin, and this
+toolchain has moved to Flutter's built-in Kotlin, which no longer links a plugin that does:
+
+    WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): file_picker
+    error: cannot find symbol
+      flutterEngine.getPlugins().add(new com.mr.flutter.plugin.filepicker.FilePickerPlugin());
+    symbol: class FilePickerPlugin
+
+No Android artifact of any kind can be produced. It is not a Dart error: `flutter analyze` is clean
+and all 127 Flutter tests pass, because the failure lives in Gradle and is only reachable by actually
+building for Android. Nothing in the branch ever did, which is how PDF upload came to be described as
+shipped while the app it ships in could not be compiled.
+
+**Why it is not a one-line bump.** Every `file_picker` 12.x needs `win32 ^6.3.0`;
+`flutter_secure_storage` 9.2.4 pulls `flutter_secure_storage_windows`, which pins `win32 ^5.0.0`.
+Version solving fails for every 12.x while secure storage stays on 9.x. So unblocking the build means
+moving `flutter_secure_storage` across a major version -- and that package holds the REFRESH TOKEN
+(`lib/core/session/session_store.dart`, `AndroidOptions(encryptedSharedPreferences: true)`).
+
+Its changelog makes the hop a decision rather than a version number:
+
+- **v10** deprecates `encryptedSharedPreferences` "due to Jetpack Crypto package deprecation" and
+  offers `migrateOnAlgorithmChange: true` to move existing data onto a new cipher backend.
+- **v11** removes the option outright, and says: "If you used a version prior to v10, upgrade to v10
+  first so existing data is migrated."
+
+Going 9 to 11 in one hop is the path its own authors tell you not to take: every refresh token already
+on a device is stranded, and the at-rest protection of an auth credential changes without a migration.
+
+**The owner's decision, and it is an auth decision under this project's own rules:**
+
+1. two hops -- 9.2.4 to 10.x with `migrateOnAlgorithmChange: true`, verified on a device, then 11.x; or
+2. one hop to 11.x, accepting that existing test installs are signed out; or
+3. something that removes the collision without touching the token store.
+
+**The owner chose (1), the two-hop, on 2026-09-11**, with the reason stated: this is authentication
+credential storage, and the package author's own migration path is not to be skipped merely because
+there are no production users yet. The advisor had recommended (2) -- see the dissent below, which is
+recorded because it bears on the SECOND hop, not the first.
+
+#### First hop, landed 2026-09-11
+
+`flutter_secure_storage` 9.2.4 to **10.3.2**, `file_picker` 11.0.3 to **12.3.0**. `flutter build apk`
+produces an artifact again, and the KGP warning is gone.
+
+The root cause was never `file_picker` "applying KGP" as the warning implies. 11.0.3's
+`android/build.gradle` applies the Kotlin plugin only `if (!isAgp9OrAbove)`, and this app is on AGP
+9 -- so the `if` never fires. But Flutter's tooling decides whether to apply `kotlin-android` on a
+plugin's behalf by REGEX over its build file, and the regex matches the line inside the dead branch.
+Nobody applied Kotlin, so nothing compiled the `.kt` sources, so `FilePickerPlugin` did not exist.
+`android_file_picker` 1.1.1 (pulled in by 12.x) reads `android.builtInKotlin` itself and applies the
+plugin when it is false, which is the fix for exactly this configuration.
+
+Three other things changed with it, each recorded because none is a version number:
+
+- `AndroidOptions` now states `migrateOnAlgorithmChange: true`, `migrateWithBackup: true` and
+  `resetOnError: true` rather than leaning on defaults. `migrateWithBackup` keeps a copy while the
+  one-time move runs, which is what protects the credential if the app is killed mid-migration.
+  `resetOnError` is a BEHAVIOUR CHANGE: v9 defaulted it to false.
+- The `file_picker` call site moved to `pickFile` (singular). In 12.x `pickFiles` returns a list and
+  `allowMultiple` defaults to **true**, so the old "take the one file" guard would have silently read
+  a two-file selection as a cancel. `withData` is gone; bytes come from `readAsBytes()`.
+- `FilePicker.clearTemporaryFiles()` is now called after the bytes are read. The picker copies the
+  chosen file into this app's cache to give it a path, and a passport should not outlive its upload.
+
+**iOS minimum rises from 13.0 to 14.0.** `file_picker_darwin` 1.2.0 requires it. Three
+`IPHONEOS_DEPLOYMENT_TARGET` lines in the pbxproj were changed; this drops iOS 13 devices and is a
+product decision the owner should confirm before release. It cannot be verified from Windows -- the
+first Mac build is the test.
+
+**A build setting was wrong independently of any of this.** `android/gradle.properties` asked for
+`-Xmx8G -XX:MaxMetaspaceSize=4G` on a machine with 8 GB of RAM. The daemon died mid-build with
+"Gradle build daemon disappeared unexpectedly" and a JVM crash log saying "insufficient memory".
+That is not a Gradle bug and not a plugin problem; it would have hit any contributor on a 8-16 GB
+machine. Now `-Xmx3G -XX:MaxMetaspaceSize=1G`.
+
+#### The advisor's dissent, which matters for the SECOND hop
+
+The advisor read the plugin sources rather than the changelogs and recommended going straight to v11,
+on the grounds that v9's entries are unreadable to v11 but return `null` rather than throwing -- which
+is the "no session" path the app already handles -- so the whole cost of the direct hop is that each
+existing Android test install signs in once more.
+
+One finding from that review bears directly on the owner's stated reason for choosing the two-hop and
+must not be lost: **v10's migration is best-effort, not a guarantee.** On any failure it falls back to
+EncryptedSharedPreferences silently and never sets its `ENCRYPTED_PREFERENCES_MIGRATED` marker, so a
+device that fails the v10 migration is stranded by v11 anyway. The two-hop reduces the risk; it does
+not remove it. That is the argument for testing the migration on a real device rather than assuming
+it, which is what this item is now held open for.
+
+#### What is still unproved, and blocks closing this item
+
+**The migration itself has NOT been exercised.** Every install used for verification so far was a
+FRESH one, which takes the "no data to migrate" branch -- the branch that cannot fail. The test that
+matters is the one nobody has run:
+
+1. install a build with `flutter_secure_storage` **9.2.4** on a real Android device,
+2. sign in, and confirm a token is stored,
+3. upgrade IN PLACE to this build (10.3.2) -- no uninstall,
+4. cold-start, and confirm the session survives without a sign-in,
+5. confirm `shared_prefs/FlutterSecureStorage.xml` no longer holds the Tink-encrypted entries.
+
+Until step 4 passes on a handset, the two-hop has bought nothing that has been demonstrated.
+
+#### The eight health checks the owner asked for, on the Android emulator, 2026-09-11
+
+All eight pass. The storage assertions are made against the device's own
+`shared_prefs/FlutterSecureStorage.xml` through `run-as`, not inferred from the screen.
+
+| # | Check | Result |
+|---|-------|--------|
+| 1 | Dependency resolution succeeds | **PASS** -- `flutter_secure_storage 10.3.2`, `file_picker 12.3.0` |
+| 2 | `flutter build apk` succeeds | **PASS** -- debug APK produced; the KGP warning is gone |
+| 3 | `flutter analyze` clean | **PASS** |
+| 4 | Full Flutter tests pass | **PASS** -- 127 |
+| 5 | Authentication from a fresh install | **PASS** -- `POST /auth/login 200`; the store goes from an empty `<map />` to exactly two entries, `khadra.refresh_token` and `khadra.refresh_expires_at` |
+| 6 | Refresh-token persistence across restart | **PASS** -- force-stop, cold start, `POST /auth/refresh 200`, profile restored without a sign-in |
+| 7 | Logout removes the credentials | **PASS** -- `POST /auth/logout 204`, store back to zero entries |
+| 8 | Expired/invalid refresh token | **PASS** -- password reset server-side revoked the family; cold start gave `POST /auth/refresh 401`, the app landed signed-out on Home, the store was emptied, and there was ONE 401, not a loop |
+
+A fresh install now writes `FlutterSecureKeyStorage.xml` holding an RSA-wrapped AES key -- v10's own
+cipher backend -- rather than Jetpack Crypto's Tink blobs. That is the new scheme working; it is NOT
+evidence that a migration works, because a fresh install has nothing to migrate.
+
+#### The in-place upgrade, run and PASSED on 2026-09-12
+
+The test that matters, on an Android emulator (Pixel, API 36):
+
+1. install a build with `flutter_secure_storage` **9.2.4** -- **done**, built from this branch with
+   the storage package pinned back and `AndroidOptions(encryptedSharedPreferences: true)` restored;
+2. sign in, and confirm a token is stored -- **done**: four entries appeared, two of them Tink-
+   encrypted key NAMES (`AX3dqTca...`, `AX3dqTdP...`) plus the two
+   `__androidx_security_crypto_*` keysets, which is exactly what Jetpack Crypto writes;
+3. upgrade IN PLACE to 10.3.2 -- **done**, `adb install -r`, no uninstall;
+4. cold-start, session survives without a sign-in -- **PASS**. The plugin logged it itself:
+
+        Found data in EncryptedSharedPreferences (deprecated)
+        Migrating data from EncryptedSharedPreferences to custom cipher storage...
+        Migrated key: khadra.refresh_token
+        Migrated key: khadra.refresh_expires_at
+        Migration complete: 2 items migrated
+        Migration completed successfully. Now using custom cipher storage.
+
+   and the server accepted the migrated credential: `POST /auth/refresh` answered **200** on that
+   cold start, with the account restored and no sign-in prompt;
+5. the store now holds v10’s own prefixed entries beside the now-inert Tink keysets.
+
+**The first attempt FAILED, and the cause is worth keeping.** `migrateWithBackup: true` -- added here
+as the careful choice, to keep a copy while the one-time move ran -- is what stopped the move
+happening at all. `FlutterSecureStorage.java:170` guards the whole EncryptedSharedPreferences
+migration with `if (!isAlreadyMigrated && !config.shouldMigrateWithBackup())` and defers it to "step
+6 of the backup-protected migration path", which is the ALGORITHM-CHANGE path -- and that never runs
+on a v9 store, because there are no v10 algorithm markers to have changed. Nothing was corrupted and
+nothing was lost; v10 simply never looked at the old store, treated the app as a fresh install, and
+the customer was signed out. Both flags are defensible on their names; only one combination works,
+and nothing but a real upgrade on a real install would have said so.
+
+**Also disproved: the `win32` override.** The advisor offered `dependency_overrides: win32: ^6.4.0`
+as an emergency way to keep 9.2.4 while unblocking `file_picker`. It RESOLVES but does not COMPILE:
+the Dart front end still type-checks `flutter_secure_storage_windows` 3.1.2 even for an Android
+target, and that package does not build against win32 6.x (`Too many positional arguments`,
+`WIN32_ERROR` vs `HRESULT`). Recorded so nobody reaches for it under pressure.
+
+#### What remains open
+
+Everything above was run on an EMULATOR, not a handset. The emulator is a real Android and the
+migration is a device-local operation, so this is strong evidence; a phone with a hardware-backed
+Keystore is still the last word, and the second hop (10.x to 11.x) has not been attempted and must
+rerun these same tests when it is.
+
+<!-- superseded plan, kept for the shape of the test -->
+
+**The original plan, for reference:**
+
+1. install a build with `flutter_secure_storage` **9.2.4** on a real Android device,
+2. sign in, and confirm a token is stored,
+3. upgrade IN PLACE to this build (10.3.2) -- no uninstall,
+4. cold-start, and confirm the session survives without a sign-in,
+5. confirm the Tink-encrypted entries are gone from `shared_prefs/FlutterSecureStorage.xml`.
+
+Until step 4 passes on a handset, the two-hop has bought nothing that has been demonstrated.
+
+**To close:** the app builds for Android (done), is installed and runs (done), the eight health checks
+pass (done), AND the 9.2.4 to 10.3.2 upgrade-in-place preserves an authenticated session on a real
+device (open). Only then is the second hop, 10.x to 11.x, worth taking -- and it reruns the same
+authentication and storage tests.
+
+### 95. The cold-start rotation is not single-flight with the interceptor's
+
+**Status:** open · **Raised:** 2026-09-12 · **Pre-existing; found while building the Get Started flow**
+
+`SessionController._restore` calls `refresh()` directly, and `AuthInterceptor._refreshOnce` is the
+thing that serialises rotations. They do not share that gate, so the two CAN present the same refresh
+token at the same moment.
+
+It is reachable, not theoretical: public routes deliberately render before the session resolves (that
+is what keeps `/verify-email?token=…` working from a cold start), so opening the app on a car or a
+gallery starts the catalogue's requests while `restore` is still rotating. Every one of those goes
+through `onRequest`, which reads the stored token and refreshes it when the access token is stale —
+which it always is at launch.
+
+The server's 60-second reuse grace covers most of it, and the `xmin` concurrency check turns the
+loser into a 401 rather than a family revocation. But a 401 on the refresh endpoint IS a verdict to
+this app, so the customer can be signed out on arrival, on a session that was perfectly valid.
+
+**To close:** route `_restore`'s rotation through the same single-flight the interceptor owns — or
+have `onRequest` wait while the session is `unknown`, which is the shorter change and costs the first
+request of a cold start nothing it was not already waiting for.
+
+### 96. Upgrading past the install marker signs every device out once
+
+**Status:** open, one-time · **Raised:** 2026-09-12
+
+`khadra.session_owned` replaced `khadra.install_marker` on 2026-09-12 (see `docs/auth-and-sessions.md`).
+A device upgrading in place from a build that wrote the OLD key has no `session_owned`, so its
+perfectly good refresh token is disowned, discarded, and the app opens on Get Started asking the
+customer to sign in again.
+
+That is the safe direction and it is deliberate — the alternative is trusting a marker that was never
+written — but it is a real one-time sign-out for every installed tester, and it will look like a bug
+to whoever reports it.
+
+**To close:** nothing to fix. Delete this item once the fleet has been through it, or fold the
+migration into the same on-device test as item 94, which already installs an old build and upgrades
+in place.
+
+### 97. The launcher icon has no themed (monochrome) layer
+
+**Status:** open, needs a DESIGN decision · **Raised:** 2026-09-13
+
+The Android launcher icon is real as of 2026-09-13: an adaptive icon built from
+`assets/brand/khadra-logo.png` by `tools/make_launcher_icons.dart` and
+`flutter_launcher_icons`, on brand green, sized to Android's 66/108 safe zone.
+`test/launcher_icon_test.dart` keeps it from rotting.
+
+What it does NOT have is `adaptive_icon_monochrome`. Android 13 and later let a
+customer theme every icon to their wallpaper, and an app with no monochrome layer
+is left in full colour among a screen of tinted ones — visible, and visibly the
+odd one out.
+
+It was left out rather than derived, because a themed icon is a single-colour
+SILHOUETTE and this mark is a filled circular badge: flattening it gives a plain
+disc with no car and no wordmark in it, which is less recognisable than the
+full-colour icon Android falls back to. Deriving one automatically would have
+shipped something worse while looking like the box was ticked.
+
+**To close:** the owner supplies, or approves, a single-colour mark — the car
+alone is the obvious candidate, as a path rather than a photograph of a badge.
+Then add `adaptive_icon_monochrome` to `flutter_launcher_icons.yaml`, re-run the
+two commands, and extend `launcher_icon_test.dart` to require the third layer.
+
+**Also open, and smaller:** the iOS icon set is untouched. `flutter_launcher_icons`
+is configured `ios: false` deliberately — nothing in this environment can look at
+an iOS build, and a generated icon nobody has seen is worse than a placeholder
+somebody knows is a placeholder. The same two commands do iOS the day there is a
+device to check it on.
+
+### 98. Arabic is rendered with Latin letter-spacing
+
+**Status:** closed · **Raised:** 2026-09-13 · **Closed:** 2026-09-18 — `KhadraType` answers the
+tracking, the theme takes `light({bool arabic})`, and the audit forbids the literal that would go
+round either. See the close note at the end of this item.
+
+Fourteen styles in `Khadra.Mobile/lib` set `letterSpacing`, from -0.6 to +0.7: the
+theme's own title styles, `KhadraLargeTitle`, `KhadraBadge`, `KhadraSpecGrid`,
+`KhadraSectionTitle` and several screens. Flutter inserts that tracking between
+every glyph, including between the joined letters of an Arabic word.
+
+The console already ruled on this and says why, in `Khadra.Dashboard/src/styles/_rtl.scss`:
+
+> Arabic is cursive: the letters in a word are joined. `letter-spacing` prises
+> those joins apart, so a tracked caption does not render as wide Arabic, it
+> renders as broken Arabic.
+
+It zeroes tracking under `:lang(ar)` and brings the emphasis back with weight. The
+customer app has no equivalent, so every tracked label on it — the section headings
+on Profile, the badges on a booking, the spec grid on a car — is drawn with its
+Arabic joins opened up. It is cosmetic, not functional, which is why it was
+recorded rather than rushed at the end of an unrelated pass.
+
+`test/rtl_audit_test.dart` deliberately does NOT yet fail on this; the source scan
+cannot tell which styles land on Arabic text and which never can.
+
+**Closed as described, with two additions.** `KhadraType.tracking(latin, arabic)` is the answer and
+`KhadraType.of(context, latin)` reads it from `Localizations.localeOf(context)` — the LANGUAGE, not
+the direction, because they are not the same question even where they agree. `KhadraTheme.light({bool
+arabic})` carries it into the styles built before there is a context, and `main.dart` passes the
+resolved `isArabicProvider` so the scale follows the app's own language switch rather than the
+device's.
+
+First addition: the Arabic scale is untracked WHOLE, not style by style. `_untracked` clears the
+tracking on all fifteen text styles, including the ones this app does not override and inherits from
+Material with figures of their own — so a screen that starts using `displayMedium` tomorrow cannot
+inherit tracking nobody chose. (`TextTheme.apply(letterSpacingFactor: 0)` looks like the one-liner for
+this and is not: it asserts on any style whose tracking is already unset, which is most of them.)
+
+Second addition: three sites keep their literal, each with an `rtl-audit: allow` marker on the line —
+the booking reference in `bookings_screen`, `booking_detail_screen` and `request_booking_screen`. A
+reference is Latin in both languages and is opened out deliberately, because somebody reads it aloud
+over a phone. Zeroing those would have been the rule applied past its reason.
+
+`test/rtl_audit_test.dart` now fails on a `letterSpacing:` literal outside `khadra_theme.dart`, and
+`test/typography_test.dart` asserts the English scale keeps every figure the design asks for while the
+Arabic scale carries none, on the theme and on the three widgets that name their own.
+
+### 99. The seat filter is a list typed into the screen
+
+**Status:** closed · **Raised:** 2026-09-13 · **Closed:** 2026-09-18 — the chips are now the
+facets of the bookable catalogue. See the close note at the end of this item.
+
+`Khadra.Mobile/lib/features/catalogue/filter_sheet.dart` builds its "minimum seats"
+chips from `const [2, 4, 5, 7]`. Every other group in that sheet is served by the
+platform — cities and car types from the lookup endpoints, transmissions from
+`/app-config`'s vocabularies — and this one is four numbers somebody chose.
+
+It is the standing rule broken in miniature: a list a customer sees that no API
+sent. It is not dangerous the way an invented price would be, but it is the same
+class, and the day the platform lists a nine-seat van the filter cannot find it.
+
+**Closed differently, and better.** A vocabulary on `/app-config` would have been a second list
+somebody chose — accurate only for as long as nobody changed the fleet. `GET /api/v1/vehicles/facets`
+(anonymous, `no-store`, the catalogue's own rate-limit policy) returns `{ seats, carTypeIds }` taken
+from the bookable-catalogue predicate itself, so the filter offers a seat count exactly when a
+customer could book one, and offers the nine-seat van the day it is listed. The category chips on Home
+are built from the same call, intersected with the active car-type lookups.
+
+Null is a real answer: on an older API, or a dropped request, the app falls back to every active car
+type and offers no seat group at all rather than a list of its own.
+
+`rtl_audit_test.dart` now fails on a literal list of numbers anywhere under `features/catalogue/`,
+which is the shape this came back as.
+
+## Console localization, Wave Two (2026-09-18)
+
+The pass that localized the Dealer, Employee and Admin consoles end to end and fixed the platform
+commission that printed as "JOD 0−". What it left behind, and why.
+
+### 100. The server still writes every refusal and validation message in English
+
+**Status:** open · **Raised:** 2026-09-18 · **Deliberate, scoped out of Wave Two**
+
+ProblemDetails titles, the 28 FluentValidation `WithMessage` texts and roughly 194 `Error` messages
+are English, and always were. The consoles no longer show them in Arabic: a refusal is held as a
+`ProblemSnapshot`, known error CODES are worded from the dictionary, and anything unmapped shows the
+server's English only in English mode — in Arabic the reader gets "the request was refused" plus the
+trace id. So an Arabic screen never shows English prose, but it also cannot say exactly what went
+wrong for a code the console has not mapped.
+
+**To close:** localize the API's own messages (resources keyed by error code, `Accept-Language`
+forwarded by the BFF), or accept the current behaviour and keep mapping codes as they appear. The
+codes are the contract either way; a server-side dictionary would be a third copy to keep in step,
+which is why it was not done here.
+
+### 101. The customer app does not yet read the new "account closed" facts
+
+**Status:** open · **Raised:** 2026-09-18
+
+Wave Two added a fact beside every name a booking or a dispute carries: `dealerRemoved`,
+`customerAccountClosed`, `openedByAccountClosed`, `authorAccountClosed`, `resolvedByAccountClosed`.
+The consoles read those flags and word them. `Khadra.Mobile` still prints the name as it arrives,
+which for a party that no longer resolves is an English stand-in ("Dealer no longer on the platform")
+in the middle of an Arabic screen. Nothing broke — the strings kept their names, types and meanings,
+which is why the change was safe to make additively — but the app is a release behind the fact.
+
+**To close:** read the boolean beside each name in `Khadra.Mobile/lib/api/dtos.dart` and word it from
+the app's own `AppLocalizations`, as the consoles do.
+
+### 102. A penalty's reason has a code now; the customer app has no vocabulary for it
+
+**Status:** open · **Raised:** 2026-09-18
+
+`PenaltyAssessment` carries `reasonCode` (a `PenaltyReason` name) beside the frozen English
+`reason`. The consoles word the code and fall back to the sentence for bookings assessed before
+codes existed. The customer app parses `reason` and never displays it, so it is unaffected — but the
+day it wants to show why a penalty was assessed, it needs the words.
+
+**To close:** serve a `PenaltyReasons` vocabulary on `/app-config`, built from the same enum, beside
+the existing vocabularies. Additive, and the app already knows how to render one.
+
+### 103. Names written into the record in English, at the moment of the action
+
+**Status:** open · **Raised:** 2026-09-18
+
+Some names are not looked up at read time but WRITTEN when something happens, and they were written
+in English: notification actor names ("A colleague", "A customer", "The rental office"), audit
+`actorName` ("Unknown admin", "Unknown"), `DealerDocumentReview.ReviewedByName` ("Unknown"). Those
+records are history and are not rewritten, so they stay English on an Arabic screen.
+
+**To close:** for records written from here on, store a code (or the actor's id) beside the name and
+word it at render time, as the penalty reason now does. Historical rows keep what they were given.
+
+### 104. The vehicle wizard offers nine car makes nobody served it
+
+**Status:** open · **Raised:** 2026-09-18 · **Found during the localization sweep**
+
+`Khadra.Dashboard/src/app/features/fleet/vehicle-wizard.component.ts` builds its make suggestions
+from `['Toyota', 'Hyundai', 'Kia', …]` — a list typed into the screen. Every other list on that form
+is served by the platform: car types and cities from the lookup endpoints, transmissions and fuel
+types from the API's own vocabularies. It is the standing rule broken in miniature, and the day a
+dealer lists a make that is not in those nine, the suggestions are quietly wrong.
+
+They are brand names, so they read the same in both languages; the localization scanner allowlists
+them for that reason, with a pointer to this item. The defect is the list, not the language.
+
+**To close:** serve the makes as a lookup or an `/app-config` vocabulary, or drop the suggestions and
+let the field stand alone.
+
+### 105. The car form still pre-fills figures nobody chose
+
+**Status:** open · **Raised:** 2026-09-18 · **Found during the localization sweep**
+
+`car-form.component.ts` starts a new car at `seats: 5`, `dailyRate: 30`, `securityDeposit: 150`,
+`transmission: 'Automatic'`, `fuelType: 'Petrol'` and the current year. The vehicle WIZARD had the
+same defaults and they were removed, with a comment recording why: a dealer who tabbed past them
+published a real car at figures the console invented. The older form was not fixed at the same time.
+
+**To close:** start those fields empty, as the wizard does, and let the dealer state each one.
+
+### 106. The admin dealer list judges its review SLA by the browser's clock alone
+
+**Status:** open · **Raised:** 2026-09-18
+
+Every other clock in the console consults the server's own flag as well as the local one, so a
+browser whose time is behind cannot show a broken promise as time remaining: the dispute queue reads
+`isOverdue`, the review screen reads `isBreachingSla`. The dealer LIST has no such field on its rows,
+so `dealers-list` compares `reviewDueAt` against `Date.now()` and nothing else.
+
+**To close:** add `IsBreachingSla` to `DealerListItem` (the reader already has `now` for the queue
+counts) and pass it to `formats.sla(...)`, which takes the flag.
+
+### 107. A resubmitted application cannot say which decision it answered
+
+**Status:** open · **Raised:** 2026-09-18 · **Behaviour deliberately changed in Wave Two**
+
+`Dealer.Resubmit` can follow a clarification request OR a rejection, and it clears the note, so
+afterwards the aggregate holds no trace of which one happened. The review timeline used to label
+every such step "Clarification requested" — right for one path, wrong for the other, and it was a
+guess either way. It now says only that a decision was recorded, which is true.
+
+**To close (only if the owner wants the distinction back):** record the decision that was answered on
+the aggregate — a `PreviousDecision` alongside `ReviewedAt` — and word it from that. Until then the
+audit log is where an administrator can see which it was.
+
+### 108. Two console strings still come from the server in English
+
+**Status:** open · **Raised:** 2026-09-18
+
+- The platform settings screen prints the SOURCE of its figures ("Configuration") as the API sends
+  it — a display word rather than a code, so the console cannot translate it.
+- `DisputeAdminReader` sends "—" as a booking reference when a ticket's booking does not resolve,
+  which is practically unreachable (bookings are never deleted) but is the reader inventing a value.
+
+**To close:** send a code for the settings source and word it in the console; drop the "—" and let the
+reference be null, which the console already knows how to word.
+
+### 109. A resubmitted application does not record what it answered
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of Wave Two**
+
+Item 107 says the review timeline can no longer name the decision a dealer answered. The reason is
+that `Dealer.Resubmit` keeps `ReviewedAt` but clears `ReviewNote` and moves the status back to
+`PendingReview`, so nothing on the aggregate says whether the applicant was REJECTED or merely asked
+to clarify — or what they were asked to fix. Those are different review postures, and an admin
+picking up a resubmission cannot tell them apart without opening the audit log.
+
+**To close:** two fields on `Dealer`, set inside `Resubmit`: the status being resubmitted from, and
+the note it answers. Not a history table — a second cycle overwriting the first is fine, because the
+timeline shows only the latest decision anyway. Then the timeline words the step from those.
+
+### 110. Every countdown trusts the browser's clock for "how long"
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of Wave Two**
+
+Whether a deadline has PASSED is the server's answer (`isAwaitingDecision`, `isOverdue`,
+`isBreachingSla`) OR the local clock, whichever says so first, so a slow browser clock cannot show a
+dead deadline as live. How MUCH time is left, though, is always local arithmetic. A browser running
+fast shows "Expired" or "Overdue by 1m" a little early. Nothing is locked: the controls gate on
+status and permissions, not on the countdown.
+
+**To close:** where a response already carries the moment it was generated (`AttentionQueue` has
+`generatedAt`), anchor the clock to that plus elapsed local time instead of `Date.now()`. Cheap where
+the field exists; the rest keep the local clock and the server flag.
+
+## The rental office's customer page (2026-09-18)
+
+Six things this pass left for later, recorded when they were decided rather than when they bite.
+
+### 111. Email acceptance is logged and nothing more
+
+**Status:** open · **Raised:** 2026-09-18
+
+`IEmailSender` now returns an `EmailSendReceipt` — provider, provider message id, accepted-at,
+attempts — and `AuthEmailDispatcher` and `BookingEmailDispatcher` each write one Information line per
+accepted send, carrying the RECIPIENT DOMAIN only. That is enough to find a message in Brevo's own
+transactional log by id, and it is not a record: logs are ephemeral locally and whatever the host keeps
+in production, and nothing is queryable.
+
+It also does not prove delivery, and must never be read as if it did. Acceptance means the provider
+took the request. Delivered, deferred, bounced and blocked all happen afterwards and only the provider
+knows.
+
+**To close:** an append-only `email_delivery_attempts` table written in its own post-commit
+transaction, and provider delivery webhooks updating the row. That is a migration, a retention policy
+for data that is PII-adjacent, and a failure path of its own — none of which the app needs today, which
+is why it is here and not in the last pass.
+
+### 112. Dealer prose is not frozen onto a booking
+
+**Status:** open · **Raised:** 2026-09-18
+
+A booking freezes the rules and the price it was made under (`BookingTerms`, `BookingPricing`), so a
+gallery changing its fee never re-prices an existing rental. The office's own words are NOT frozen:
+rental conditions, insurance and pickup instructions are read live off the dealer, and an office may
+rewrite them the day after a customer books on the strength of them.
+
+For the platform's own terms this does not matter, because those are frozen and are what a dispute is
+judged against. It matters for a dispute where the argument is about something the OFFICE promised —
+"they said a second driver was included".
+
+**To close:** decide first whether dealer prose is ever evidence. If it is, a version row per change
+and the version id frozen onto the booking; if it is not, say so here and close this. Do not build the
+versioning until that question has an answer — a history table nobody reads is worse than no history.
+
+### 113. No Admin can read what an office tells customers
+
+**Status:** open · **Raised:** 2026-09-18
+
+Six free-text fields, up to 2,000 characters each, written by dealers and shown to every customer.
+Nothing moderates them and no Admin screen shows them. That is the same exposure vehicle descriptions
+already have, so it is not new, but it is now six times larger and it is about policy rather than about
+a car.
+
+**To close:** a read-only panel on the admin dealer page showing the six sections and which are
+hidden. Admin console work, which is out of scope for a customer-app pass.
+
+### 114. The design export has no artboard for the customer page
+
+**Status:** open · **Raised:** 2026-09-18
+
+`docs/design/Dealer Console.dc.html` is the source of truth for how the console looks, and it does not
+contain this screen — it did not exist when the project was exported. The screen is built from the
+console's existing components and tokens (`sect`, `field`, `note-box`, `dc-split-155`) so it is
+consistent by construction, but it is not DESIGNED, and the rules file says to diff against the export
+before changing a screen's appearance.
+
+**To close:** add the artboard on the next design export, then diff the Angular against it.
+
+### 115. A platform-rules block on the rental office page, if it is ever wanted
+
+**Status:** open (deliberate omission) · **Raised:** 2026-09-18
+
+The architecture review proposed putting Khadra's own booking rules and the renter's required
+documents on the rental office page, fed from `/app-config`. The owner ruled both out for this pass.
+They are stated on every booking quote (`QuoteTerms`) and on the booking itself, which is where a
+customer meets them at the moment they matter.
+
+Recorded because the reasoning may not survive contact with real customers: somebody comparing three
+offices before choosing one cannot see the cancellation window until they have picked a car.
+
+**To close:** an owner decision, not a fix. If they want it, it is a block on the page fed from
+`/app-config` — never text a dealer writes, which would be a promise nothing enforces.
+
+### 116. The customer app picks "today" from the device clock
+
+**Status:** open · **Raised:** 2026-09-18
+
+The rental office page collapses opening hours to today's line, and which day that is comes from
+`DateTime.now()` converted to Amman. The ZONE is right — it is the office's own day, not the phone's —
+but the instant is the phone's, so a device whose clock is a day out shows the wrong row. The whole
+week is one tap away and nothing is gated on it, which is why this is a note rather than a fix.
+
+Same class as item 110 in the console: whether a deadline has passed is the server's answer; how long
+is left is local arithmetic.
+
+**To close:** carry the server's own "now" on a response the page already makes and anchor the day to
+it plus elapsed local time. Cheap wherever a response already says when it was generated; not worth a
+field of its own just for this.
+
+### 117. Saving the dealer page wipes the dealership's city and address
+
+**Status:** closed · **Raised:** 2026-09-18 · **Closed:** 2026-09-19 — the request carries the
+location and requires it present, the form shows and edits it, and the command can no longer be built
+without it. Approved by the owner as a contract change. See the close note at the end of this item.
+
+`PUT /api/v1/dealers/me/profile` takes `BusinessName`, `Latitude`, `Longitude` and `OperatingHours`
+and nothing else. It builds `UpdateDealerProfileCommand` with five arguments, so `CityId`,
+`AddressArea` and `AddressStreet` fall back to the record's own defaults of null; `ResolveAddress(null,
+null)` returns a successful null rather than refusing; and `Dealer.UpdateProfile` assigns `CityId =
+cityId; Address = address;` **unconditionally**. So an owner who changes one closing time clears both.
+
+The handler's own comment says the city "now travels with the rest of the form, and is checked against
+the lookup exactly as submission checks it". The command grew those parameters; the HTTP request never
+did, and neither did the console form.
+
+Two consequences, and the second is the serious one:
+
+- The address line disappears from the rental office page, which is new — customers only started
+  seeing it in this pass.
+- `CatalogueReader.SearchAsync` filters vehicles by `dealer.CityId`, so the office's **entire fleet
+  drops out of every city-filtered search**. Nothing tells anybody: the cars are still listed, still
+  bookable by direct link, and simply absent from the results customers actually browse.
+
+`DealerProfileTests` passes because it builds the command the same five-argument way the controller
+does. It exercises the wiping path and asserts only that `Description` survived it. A test shaped like
+the bug is why this stood.
+
+**To close:** `cityId`, `addressArea` and `addressStreet` on the API request, on the console's
+`UpdateProfileRequest`, and on the dealer page form — the dashboard's `DealerProfile` already reads
+both back, so the form has the values to seed from. Then a handler test asserting a save keeps them.
+**Not** by having the handler quietly forward the stored values when a field is omitted: that makes
+"omitted" mean two different things on the same endpoint, which is the ambiguity that produced this.
+
+**Close note (2026-09-19).** Closed the way this item asked, with the owner's rulings on the retired
+city and the architecture advisor's review:
+
+- **The request** carries `CityId`, `AddressArea` and `AddressStreet`, named and limited as the
+  application form's (100 and 200). Each is `[JsonRequired]`: it must be present, and may be null.
+  Null is an answer; leaving one out is a 400, so no client — an old console, a stale tab — can erase a
+  location by not knowing about it. The 400 is the framework's model-binding shape, the same as every
+  other malformed body today (see item 121).
+- **The command** lost its `= null` defaults, so the five-argument construction that did this no
+  longer compiles. `DealerProfileTests` had to state a location to build, which is the point.
+- **A retired city.** The city an office is already filed under is not re-checked against the lookup,
+  so an office under a city an administrator retired later can still save its hours, and is never made
+  to move to save anything. A NEW city is checked exactly as submission checks it: a retired or unknown
+  one is refused with `dealer.unknown_city`.
+- **The form** shows the city, area and street, seeded from `GET /dealers/me`, and sends all three on
+  every save. The city is selected per option, not by the select's value, because it is seeded before
+  the list arrives. Until the list loads the select is disabled and the city is sent unchanged. A city
+  retired since it was filed is pinned as "Your current city (no longer offered)" — the dealer cannot
+  fetch its name; see item 124. Once an office has a city the form does not offer "no city", because
+  that takes its fleet out of city search; the API still accepts null.
+- **Tests at the boundary that broke,** not below it: the real controller's request-to-command mapping
+  (`DealerProfileEndpointTests`, which fails if the mapping is removed — checked by re-introducing the
+  bug); the handler over the real repositories on SQLite, read back through `GET /dealers/me`'s own
+  query; the city-filtered catalogue after an unrelated save, with a control proving it can fail; and
+  the retired-city rule, which fails four tests when its guard is removed.
+
+**Deploy ordering.** Ship the API and the console together. An API that requires the location, facing
+a console tab opened before the update, answers that tab's profile saves with a 400 until it is
+reloaded. That is loud on purpose — the quiet version is the one that erased data — but it is a window.
+
+### 118. An unrecognised hidden-section name is dropped rather than kept
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of the customer page**
+
+`HiddenSectionsConverter.Read` drops a stored name this build does not know. Making the read total is
+right — materialising a dealer must never fail over a stored string — but dropping is not the only way
+to be total, and the direction of the failure matters.
+
+Kept, an unknown name hides something the old build cannot render anyway. Dropped, it is gone from the
+set, so the next save from that build narrows the column and, after a roll-forward, a section the owner
+chose to hide is shown. The whole feature exists to stop exactly that.
+
+It is not a launch blocker: the vocabulary has six names and has never changed, so there is nothing
+unrecognised to drop.
+
+**To close, before a seventh section is ever added:** `PublicProfile` carries a private list of
+unrecognised names, set only by the converter's read; `Write` appends them after the known ones;
+`UpdatePublicProfile` copies them from the outgoing profile onto the incoming one; the comparer
+includes them. Test: tamper the column to `About;Prices`, load, hide Insurance, save, assert
+`About;Insurance;Prices`.
+
+### 119. The public-profile endpoints have no Security-layer tests
+
+**Status:** open · **Raised:** 2026-09-18 · **From the architecture review of the customer page**
+
+`Khadra.Tests/Security` has nothing touching `me/public-profile` or `galleries/`. The application
+layer covers owner-only writing, and the reader covers what a suspended office returns, but neither
+exercises the wire: an employee's 403 rests on the `DealerOwner` policy attribute being present, and
+"404 with none of the office's prose in the body" is asserted one layer below the serialiser.
+
+**To close:** two `WebApplicationFactory` tests — an employee's `PUT me/public-profile` is 403, and an
+anonymous `GET galleries/{id}` for a suspended office is 404 whose body contains none of the six
+sections.
+
+### 120. Typed text collapses its own line breaks in the console
+
+**Status:** open (deferred by the owner, 2026-09-19) · **Raised:** 2026-09-18 · **From the
+architecture review of the customer page**
+
+`.user-text` marks text somebody typed — an office's customer page, a customer's dispute statement, a
+review note — so bidi does not reorder it. It sets no `white-space`, so the line breaks a person typed
+collapse into one paragraph wherever the console shows them. It is most visible in the customer page
+preview, which says it shows what customers see: an office that lays its rental conditions out as a
+list sees them run together.
+
+The fix proposed was `white-space: pre-line` on `.user-text` in `src/styles/`. The owner deferred it
+rather than take it inside the customer page work, because `.user-text` is console-wide: it would
+change how every typed string on every screen wraps, the night before a walkthrough of every screen,
+under a change labelled for one of them.
+
+**To close:** either the global rule, with a before-and-after of the screens that render `.user-text`,
+or a preview-only rule the customer page panel opts into. Either way, check how the customer app lays
+out the same text, so the preview and the page a customer reads agree.
+
+### 121. A malformed request body is refused without a `code`
+
+**Status:** open · **Raised:** 2026-09-19 · **Pre-existing; from the architecture review of item 117**
+
+Every error this API returns is meant to carry a stable `code` beside its `traceId`. Model-binding
+failures do not: invalid JSON, a missing `[JsonRequired]` property, a `[StringLength]` breach. They
+become MVC's automatic `ValidationProblemDetails` — a title, an `errors` map, a `traceId`, and no
+`code` — because nothing customises `InvalidModelStateResponseFactory`. `ApiSmokeTests` already
+accepts that shape, so it is not new; item 117 made one more request depend on it, since a client
+that leaves the location out of a dealer page save now gets exactly this.
+
+The console copes (`snapshotProblem` records `code: null`, and English mode shows the title), but no
+client can tell "your body was malformed" from any other 400 by code.
+
+**To close:** one `InvalidModelStateResponseFactory` that adds `code: "request.invalid"` for every
+endpoint, keeping the `errors` map as it is. A smoke test pins the code.
+
+### 122. Retiring a city drops its offices out of city search, and nobody is told
+
+**Status:** open · **Raised:** 2026-09-19 · **Pre-existing; from the architecture review of item 117**
+
+`SetLookupActiveCommand` retires a city without looking at who is filed under it. From then on the
+customer app cannot offer that city as a filter, so every office in it is missing from every
+city-filtered search — the same consequence item 117 had, arrived at from the other side. The
+administrator who retired the city sees nothing to suggest it.
+
+Item 117 made sure such an office can still save its page and keep its filing; it did not make it
+findable.
+
+**To close:** an owner decision first — refuse to retire a city that trading offices are filed under,
+or warn with the count and let the administrator proceed. Either way the lookups screen says how many
+offices a city holds before it is retired.
+
+### 123. The dealer page needs a version check the day it gains a second writer
+
+**Status:** open (not needed yet) · **Raised:** 2026-09-19 · **From the architecture review of
+item 117**
+
+`PUT me/profile` replaces the whole page, location included, from whatever the owner's form loaded.
+Today that is safe: after submission the owner is the only writer of the name, pin, hours, city and
+address. `Dealer` has an `xmin` concurrency token, but it only compares against the row the handler
+loaded inside the request, not the one the console loaded minutes earlier.
+
+The day anything else writes these fields — an administrator correcting a city, an import — an owner
+with the page open would silently put back what it had loaded.
+
+**To close, before a second writer exists:** the response carries a version, the console sends it
+back as `If-Match`, and a mismatch is a 409 the form explains.
+
+### 124. Nobody but an administrator can name a retired city
+
+**Status:** open · **Raised:** 2026-09-19 · **From item 117**
+
+A dealer can fetch only the offered cities (`GET /cities`, active only). So the dealer page cannot
+name an office's city once an administrator has retired it, and shows it as "Your current city (no
+longer offered)" instead — honest, and enough to keep it, but the owner cannot see which city it is.
+The administrator's dealer review screen reads the same active-only list and names nothing either.
+
+Deliberately NOT fixed by putting the city's name on `DealerProfileDto`: that would copy a renameable
+value out of the lookup into a Dealers read model, which `dealer-review.component.ts` already argues
+against, and it is built in eight places.
+
+**To close:** a way for a signed-in reader to name a city by id whether or not it is still offered —
+`GET /api/v1/cities/{id}`, or an id-list that includes retired entries — used by both screens.
+
+### 125. A newer console could drop a section it forgot to send
+
+**Status:** open · **Raised:** 2026-09-19 · **From the architecture review of the customer page**
+
+The stale-console protection (item 3 of the owner's 2026-09-19 approvals) covers a console OLDER than
+its server: a section it has no box for disables Save. The opposite case is not covered.
+`customerPageRequest` writes the six text fields out by hand, independently of `SECTIONS`, the map
+that decides which boxes the page renders. A release that adds a seventh box to `SECTIONS` and forgets
+the request would show the box, accept the typing, and send nothing for it — and the save, being a full
+replacement, would clear whatever the section held.
+
+Left out of the approved fix because it is a different case from the one the owner approved.
+
+**To close:** a spec asserting that the fields `SECTIONS` renders are exactly the text keys
+`customerPageRequest` sends (every key but `hiddenSections`), so the two cannot drift silently.

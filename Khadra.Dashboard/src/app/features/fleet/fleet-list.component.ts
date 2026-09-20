@@ -10,10 +10,47 @@ import { Vehicle, VehicleStatusAction } from '../../core/models/fleet.api';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
+import { TranslationKey } from '../../core/i18n/en';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
+import { spellEnumName } from '../../core/i18n/status-key';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
+
+/**
+ * The state chips: the car status each one filters on, and the key that words it.
+ *
+ * The value is compared with `car.status`, so it stays the server's name; the words are chosen when
+ * the chips render. They were a field initialiser once, which resolved at construction and left the
+ * chips in the old language after a switch — and only one of the five was keyed at all, which is how
+ * a row reading "All | Listed | Hidden | مسحوبة من الخدمة | Draft" happened.
+ */
+const STATES: readonly { readonly key: StateFilter; readonly label: TranslationKey }[] = [
+  { key: 'all', label: 'fleetList.all' },
+  { key: 'Active', label: 'fleetList.listed' },
+  { key: 'Hidden', label: 'fleetList.hidden' },
+  { key: 'Maintenance', label: 'fleetList.offTheRoad' },
+  { key: 'Draft', label: 'fleetList.draft' },
+];
+
+/**
+ * The server's transmission and fuel names, and the keys that word them.
+ *
+ * The name is what the car carries and what the form sends back; the words are the reader's. The
+ * Arabic is the wording `/api/v1/app-config` publishes for the customer app, so a customer and the
+ * rental office call a gearbox the same thing. `vehicle-detail` words the same two sets.
+ */
+const TRANSMISSIONS: Readonly<Record<string, TranslationKey>> = {
+  Automatic: 'fleetList.transmissionAutomatic',
+  Manual: 'fleetList.transmissionManual',
+};
+const FUEL_TYPES: Readonly<Record<string, TranslationKey>> = {
+  Petrol: 'fleetList.fuelPetrol',
+  Diesel: 'fleetList.fuelDiesel',
+  Hybrid: 'fleetList.fuelHybrid',
+  Electric: 'fleetList.fuelElectric',
+};
 
 /**
  * A dealer's own cars (spec 4.3, design `isList` for fleet).
@@ -33,7 +70,8 @@ type StateFilter = 'all' | 'Active' | 'Hidden' | 'Maintenance' | 'Draft';
   imports: [RouterLink, IconComponent, ImageFallbackDirective, MoneyPipe],
 })
 export class FleetListComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   private readonly service = inject(FleetService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);
@@ -54,16 +92,10 @@ export class FleetListComponent {
   private readonly hires = loaded(this.onHire);
   private readonly dealer = loaded(this.consoleData.me);
 
-  // Computed, not a field: a field initialiser resolves once at construction, so switching language
-  // while the screen is open left the chips in the old one — and only one of the five was keyed at
-  // all, which is how a row reading "All | Listed | Hidden | مسحوبة من الخدمة | Draft" happened.
-  protected readonly states = computed<readonly { key: StateFilter; label: string }[]>(() => [
-    { key: 'all', label: this.t('fleetList.all') },
-    { key: 'Active', label: this.t('fleetList.listed') },
-    { key: 'Hidden', label: this.t('fleetList.hidden') },
-    { key: 'Maintenance', label: this.t('fleetList.offTheRoad') },
-    { key: 'Draft', label: this.t('fleetList.draft') },
-  ]);
+  /** The chips in the reader's language. A `computed`, not a field: a field words them only once. */
+  protected readonly states = computed(() =>
+    STATES.map((option) => ({ key: option.key, label: this.t(option.label) })),
+  );
 
   protected readonly cars = computed(() => this.data() ?? []);
 
@@ -121,14 +153,19 @@ export class FleetListComponent {
     ];
   });
 
+  /** Why the fleet did not load, held as facts and worded in `failure`, so a switch re-words it. */
+  private readonly problem = computed(() => {
+    const error = this.resource.error();
+    return error ? snapshotProblem(error) : null;
+  });
+
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as
-      { status?: number; error?: { code?: string } } | undefined;
-    if (!error) return null;
-    if (error.error?.code === 'dealer.not_registered') {
+    const problem = this.problem();
+    if (!problem) return null;
+    if (problem.code === 'dealer.not_registered') {
       return this.t('fleetList.youHaveNotSubmitted');
     }
-    if (error.status === 403) return this.t('fleetList.onlyDealerStaffCan');
+    if (problem.status === 403) return this.t('fleetList.onlyDealerStaffCan');
     return this.t('fleetList.yourFleetCouldNot');
   });
 
@@ -138,6 +175,33 @@ export class FleetListComponent {
 
   protected cover(car: Vehicle): string | null {
     return car.images.find((image) => image.isPrimary)?.url ?? car.images[0]?.url ?? null;
+  }
+
+  /** The gearbox, in the reader's language. */
+  protected transmissionName(car: Vehicle): string {
+    return this.vocabularyName(TRANSMISSIONS, car.transmission);
+  }
+
+  /** The fuel, in the reader's language. */
+  protected fuelName(car: Vehicle): string {
+    return this.vocabularyName(FUEL_TYPES, car.fuelType);
+  }
+
+  /**
+   * A server name worded through its table. A member this build does not know is spelled out and
+   * isolated (U+2068 … U+2069, under Arabic) rather than left blank — the rule
+   * `I18nService.enumLabel` follows for its families.
+   */
+  private vocabularyName(names: Readonly<Record<string, TranslationKey>>, name: string): string {
+    if (!name) return '';
+    if (Object.hasOwn(names, name)) return this.t(names[name]);
+    const spelled = spellEnumName(name);
+    return this.i18n.isRtl() ? `⁨${spelled}⁩` : spelled;
+  }
+
+  /** A car as a dialog names it. Make, model and year are the car's own, never translated. */
+  private vehicleName(car: Vehicle): string {
+    return `${car.make} ${car.model} ${car.year}`;
   }
 
   protected statusTone(car: Vehicle): Tone {
@@ -193,12 +257,14 @@ export class FleetListComponent {
       await this.service.changeStatus(car.vehicleId, action);
       this.service.refresh();
     } catch (error) {
-      const problem = error as { error?: { code?: string; title?: string } };
+      // Worded as it is shown, from the refusal's facts: the server's sentence only in English.
+      const problem = snapshotProblem(error);
       this.ui.showToast(
         this.t('vehicleDetail.thatDidNotGo'),
-        problem.error?.code === 'vehicle.no_photos'
+        problem.code === 'vehicle.no_photos'
           ? this.t('vehicleDetail.addAtLeastOne')
-          : (problem.error?.title ?? this.t('vehicleDetail.theServiceDidNot')),
+          : (serverSentence(problem, this.i18n.lang(), this.t) ??
+              this.t('vehicleDetail.theServiceDidNot')),
         'bad',
       );
     } finally {
@@ -208,16 +274,17 @@ export class FleetListComponent {
 
   protected takeOffRoad(event: Event, car: Vehicle): void {
     event.stopPropagation();
+    const vehicle = this.vehicleName(car);
     this.ui.openAction(
       {
         icon: 'gear',
         tone: 'warn',
-        title: `Take ${car.make} ${car.model} off the road?`,
+        title: this.t('fleetList.takeVehicleOffTheRoad', { vehicle }),
         body: this.t('fleetList.itStopsBeingOffered'),
         confirm: this.t('fleetList.takeOffTheRoad'),
         result: {
           title: this.t('fleetList.offTheRoad'),
-          body: `${car.make} ${car.model} is not being offered.`,
+          body: this.t('fleetList.vehicleNotBeingOffered', { vehicle }),
           tone: 'warn',
         },
       },
@@ -227,7 +294,7 @@ export class FleetListComponent {
       },
       {
         title: this.t('fleetList.offTheRoad'),
-        body: `${car.make} ${car.model} is not being offered.`,
+        body: this.t('fleetList.vehicleNotBeingOffered', { vehicle }),
         tone: 'warn',
       },
     );
@@ -236,12 +303,13 @@ export class FleetListComponent {
   /** Deleting a listing is destructive from the dealer's side, so it states the consequence first. */
   protected remove(event: Event, car: Vehicle): void {
     event.stopPropagation();
+    const vehicle = this.vehicleName(car);
     this.ui.openAction(
       {
         icon: 'x-circle',
         tone: 'bad',
         danger: true,
-        title: `Remove ${car.make} ${car.model}?`,
+        title: this.t('fleetList.removeVehicle', { vehicle }),
         body: this.t('fleetList.itDisappearsFromYour'),
         confirm: this.t('fleetList.removeCar'),
         result: { title: this.t('fleetList.carRemoved'), body: '', tone: 'bad' },
@@ -250,7 +318,11 @@ export class FleetListComponent {
         await this.service.remove(car.vehicleId);
         this.service.refresh();
       },
-      { title: this.t('fleetList.carRemoved'), body: `${car.make} ${car.model} is no longer listed.`, tone: 'bad' },
+      {
+        title: this.t('fleetList.carRemoved'),
+        body: this.t('fleetList.vehicleNoLongerListed', { vehicle }),
+        tone: 'bad',
+      },
     );
   }
 

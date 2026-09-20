@@ -39,18 +39,21 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
                     .Where(booking => booking.Id == ticket.BookingId)
                     .Select(booking => booking.Reference.Value)
                     .FirstOrDefault() ?? "—",
+                // Each party's name arrives as null when it no longer resolves. The Admin console is
+                // the only reader and words that in the reader's language; the English it used to be
+                // sent here reached an Arabic screen as it was.
                 context.Bookings
                     .Where(booking => booking.Id == ticket.BookingId)
                     .SelectMany(booking => context.Dealers
                         .Where(dealer => dealer.Id == booking.DealerId)
                         .Select(dealer => dealer.BusinessName.Value))
-                    .FirstOrDefault() ?? "Dealer no longer on the platform",
+                    .FirstOrDefault(),
                 context.Bookings
                     .Where(booking => booking.Id == ticket.BookingId)
                     .SelectMany(booking => context.Users
                         .Where(user => user.Id == booking.CustomerId)
                         .Select(user => user.Name.Value))
-                    .FirstOrDefault() ?? "Customer account closed",
+                    .FirstOrDefault(),
                 ticket.OpenedByParty.Name,
                 ticket.Reason,
                 ticket.Status.Name,
@@ -58,16 +61,14 @@ internal sealed class DisputeAdminReader(KhadraDbContext context) : IDisputeAdmi
                 ticket.SlaDeadline,
                 (ticket.Status == open || ticket.Status == underReview) && ticket.SlaDeadline <= now,
                 ticket.AssignedAdminId != null ? ticket.AssignedAdminId.Value.Value : null,
-                // An assigned ticket whose admin cannot be named is still assigned. Falling through
-                // to null let the queue print "Unassigned" against a ticket someone already holds --
-                // contradicting both its own "N unassigned" summary and the workspace, which says
-                // "Account closed" for exactly this case. The dealer and customer above take the
-                // same shape for the same reason.
+                // An assigned ticket whose admin cannot be named is still assigned: the id above says
+                // so, and the console branches on it. Printing "Unassigned" for a null name here is
+                // the mistake this used to make, contradicting the queue's own "N unassigned" count.
                 ticket.AssignedAdminId != null
                     ? context.Users
                         .Where(user => user.Id == ticket.AssignedAdminId.Value)
                         .Select(user => user.Name.Value)
-                        .FirstOrDefault() ?? "Account closed"
+                        .FirstOrDefault()
                     : null,
                 ticket.ClosedAt,
                 ticket.Statements.Count))

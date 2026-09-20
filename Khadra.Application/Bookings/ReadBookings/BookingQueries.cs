@@ -97,6 +97,41 @@ public sealed class ListMyBookingsHandler(IBookingReader reader, DealerMembershi
     }
 }
 
+/// <summary>
+/// The one booking a customer most needs to see when they open the app.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A query rather than something the app derives from a list, because "next" is a judgement about
+/// which state is most urgent — and a client deciding that would be ranking bookings by a rule the
+/// server owns, drifting the moment a state is added.
+/// </para>
+/// <para>
+/// CUSTOMERS ONLY, and deliberately. A dealership's "next" is a queue of other people's requests,
+/// which is what their console's tabs already are; there is no single row that means the same thing
+/// on that side of the counter.
+/// </para>
+/// </remarks>
+public sealed record GetMyNextBookingQuery(Id UserId, UserRole Role)
+    : IQuery<Result<NextBooking?, Error>>;
+
+public sealed class GetMyNextBookingHandler(IBookingReader reader)
+    : IRequestHandler<GetMyNextBookingQuery, Result<NextBooking?, Error>>
+{
+    public async Task<Result<NextBooking?, Error>> Handle(
+        GetMyNextBookingQuery request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.Role != UserRole.Customer)
+            return BookingErrors.NotAParty;
+
+        return Result.Success<NextBooking?, Error>(
+            await reader.NextForCustomerAsync(request.UserId, cancellationToken));
+    }
+}
+
 /// <summary>One booking, for someone who is a party to it.</summary>
 public sealed record GetBookingQuery(Id UserId, Id BookingId) : IQuery<Result<BookingDto, Error>>;
 

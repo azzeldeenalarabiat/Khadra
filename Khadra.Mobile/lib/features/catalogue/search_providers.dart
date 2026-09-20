@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
+import '../../core/paging.dart';
 import '../../core/providers.dart';
 
 /// How a customer has narrowed the search.
@@ -38,9 +39,9 @@ class SearchFilter {
 
   bool get hasDates => pickupAt != null && returnAt != null;
 
-  /// What the chip on the filter button counts. The text search is excluded: it
-  /// has its own visible box, and counting it would say "1 filter" for something
-  /// the customer can already see.
+  /// Everything that narrows the results except the text, which has its own
+  /// visible box. It decides which empty state to show and whether there is
+  /// anything for "Clear all" to clear.
   int get activeCount => [
         cityId,
         carTypeId,
@@ -80,10 +81,27 @@ class SearchFilter {
         returnAt: returnAt == _unset ? this.returnAt : returnAt as DateTime?,
       );
 
-  /// Keeps the dates and the text, drops the rest. "Clear all" on the filter sheet
-  /// should not silently un-choose the dates the customer is shopping for.
+  /// What the Filters button counts: the choices that live in its sheet.
+  ///
+  /// The city, the category and the dates each show themselves on Home, so they
+  /// are not counted again. A button saying "3 filters" about choices already in
+  /// plain view reads as three more somewhere else.
+  int get sheetCount => [
+        transmission,
+        minSeats,
+        minDailyRate,
+        maxDailyRate,
+        deliveryOnly ? true : null,
+      ].where((value) => value != null).length;
+
+  /// "Clear all" on the filter sheet: clears the sheet's own choices and nothing
+  /// it does not show. The city, the category, the dates and the text are chosen
+  /// on Home, and a sheet silently un-choosing them would be clearing something
+  /// the customer cannot see it touch.
   SearchFilter cleared() => SearchFilter(
         text: text,
+        cityId: cityId,
+        carTypeId: carTypeId,
         pickupAt: pickupAt,
         returnAt: returnAt,
       );
@@ -112,73 +130,51 @@ class SearchFilter {
 final searchFilterProvider =
     StateProvider<SearchFilter>((ref) => const SearchFilter());
 
-/// One page of results, plus whatever pages were loaded before it.
-class SearchResults {
-  const SearchResults({
-    required this.listings,
-    required this.totalCount,
-    required this.page,
-    required this.hasMore,
-    this.loadingMore = false,
-  });
-
-  final List<CatalogueListing> listings;
-  final int totalCount;
-  final int page;
-  final bool hasMore;
-  final bool loadingMore;
-
-  static const empty =
-      SearchResults(listings: [], totalCount: 0, page: 1, hasMore: false);
-}
+/// What the bookable catalogue holds: the car types it has cars in, and the seat
+/// counts.
+///
+/// Null when the server cannot say — an older API has no such endpoint, and a
+/// dropped request is no reason to lose the categories. Home then offers every
+/// active car type, as it did before, and the filter sheet offers no seat choice
+/// rather than a list typed into the app.
+final catalogueFacetsProvider = FutureProvider<CatalogueFacets?>((ref) async {
+  try {
+    return await ref.watch(apiProvider).catalogueFacets();
+  } on ApiFailure {
+    return null;
+  }
+});
 
 /// The catalogue, paged.
 ///
 /// `AsyncNotifier` rather than a `FutureProvider` because the list ACCUMULATES:
 /// page two is appended to page one, and only a change of filter starts over.
-class SearchResultsNotifier extends AutoDisposeAsyncNotifier<SearchResults> {
+class SearchResultsNotifier
+    extends AutoDisposeAsyncNotifier<PagedList<CatalogueListing>> {
+  static const _pageSize = 20;
+
   @override
-  Future<SearchResults> build() async {
+  Future<PagedList<CatalogueListing>> build() async {
     // Rebuilds whenever the filter changes, which is what resets paging.
     final filter = ref.watch(searchFilterProvider);
     return _fetch(filter, page: 1, existing: const []);
   }
 
   Future<void> loadMore() async {
-    final current = state.valueOrNull;
-    if (current == null || !current.hasMore || current.loadingMore) return;
-
-    state = AsyncData(SearchResults(
-      listings: current.listings,
-      totalCount: current.totalCount,
-      page: current.page,
-      hasMore: current.hasMore,
-      loadingMore: true,
-    ));
-
     final filter = ref.read(searchFilterProvider);
-    try {
-      state = AsyncData(
-        await _fetch(filter, page: current.page + 1, existing: current.listings),
-      );
-    } on ApiFailure {
-      // The pages already loaded are still good. Replacing them with an error
-      // because page three failed would throw away what the customer is reading.
-      state = AsyncData(SearchResults(
-        listings: current.listings,
-        totalCount: current.totalCount,
-        page: current.page,
-        hasMore: current.hasMore,
-      ));
-      rethrow;
-    }
+    await loadNextPage<CatalogueListing>(
+      current: state.valueOrNull,
+      emit: (next) => state = AsyncData(next),
+      fetch: (page, existing) =>
+          _fetch(filter, page: page, existing: existing),
+    );
   }
 
-  Future<SearchResults> _fetch(
-    SearchFilter filter,
-    { required int page,
-    required List<CatalogueListing> existing }
-  ) async {
+  Future<PagedList<CatalogueListing>> _fetch(
+    SearchFilter filter, {
+    required int page,
+    required List<CatalogueListing> existing,
+  }) async {
     final result = await ref.read(apiProvider).searchVehicles(
           cityId: filter.cityId,
           carTypeId: filter.carTypeId,
@@ -192,20 +188,20 @@ class SearchResultsNotifier extends AutoDisposeAsyncNotifier<SearchResults> {
           pickupAt: filter.hasDates ? filter.pickupAt : null,
           returnAt: filter.hasDates ? filter.returnAt : null,
           page: page,
-          pageSize: 20,
+          pageSize: _pageSize,
         );
 
-    return SearchResults(
-      listings: [...existing, ...result.items],
-      totalCount: result.totalCount,
+    return PagedList<CatalogueListing>(
+      items: [...existing, ...result.items],
       page: result.page,
+      total: result.totalCount,
       hasMore: result.hasNext,
     );
   }
 }
 
-final searchResultsProvider =
-    AutoDisposeAsyncNotifierProvider<SearchResultsNotifier, SearchResults>(
+final searchResultsProvider = AutoDisposeAsyncNotifierProvider<
+    SearchResultsNotifier, PagedList<CatalogueListing>>(
   SearchResultsNotifier.new,
 );
 
@@ -220,7 +216,7 @@ final vehicleProvider = FutureProvider.autoDispose
       ),
 );
 
-final galleryProvider = FutureProvider.autoDispose.family<PublicGallery, String>(
+final galleryProvider = FutureProvider.autoDispose.family<PublicGalleryPage, String>(
   (ref, dealerId) => ref.watch(apiProvider).gallery(dealerId),
 );
 

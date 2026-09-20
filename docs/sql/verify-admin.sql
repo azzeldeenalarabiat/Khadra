@@ -117,8 +117,9 @@ LIMIT 50;
 -- platform administrator, sitting in a log that more people can read than should hold one.
 --
 -- This consumes every live link, so none of them can be used. Nobody loses anything: they ask
--- again and get a fresh one. Do NOT run it while the Logging transport is still selected --
--- the replacement would be written straight back into the same log.
+-- again and get a fresh one. Do NOT run it while the Logging transport is still selected by a
+-- build older than 2026-09-17 -- the replacement would be written straight back into the same
+-- log. A build from that date on logs only the subject and the recipient's domain.
 --
 -- UPDATE verification_tokens
 -- SET consumed_at = now()

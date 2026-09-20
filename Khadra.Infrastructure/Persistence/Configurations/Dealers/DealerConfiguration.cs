@@ -29,7 +29,8 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
             .HasMaxLength(OperatingHoursConverter.MaxLength)
             .IsRequired();
 
-        entity.Property(dealer => dealer.Description).HasMaxLength(2000);
+        // The About text, held to the same length as every other section of the customer page.
+        entity.Property(dealer => dealer.Description).HasMaxLength(ProfileText.MaxLength);
         entity.Property(dealer => dealer.ReviewNote).HasMaxLength(1000);
         entity.Property(dealer => dealer.SuspensionReason).HasMaxLength(1000);
         entity.Property(dealer => dealer.LogoStorageKey).HasMaxLength(500);
@@ -72,6 +73,44 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
                 .HasColumnName("address_street")
                 .HasMaxLength(DealerAddress.StreetMaxLength);
         });
+
+        // What the office writes for its customers, and which of it is hidden. REQUIRED as a whole:
+        // every dealer has a page, even if nothing is written on it yet.
+        //
+        // The five texts are nullable, and `hidden_profile_sections` is NOT NULL with a default of ''
+        // — and that anchor is load-bearing. An owned type whose columns are all nullable cannot be
+        // told apart from an absent one, so EF would materialise every existing dealer's page as NULL
+        // (DealerAddress above is the same trap, taken the other way on purpose). The default is also
+        // what lets the migration add the column to rows that already exist without inventing any
+        // text for them: '' reads as nothing hidden.
+        //
+        // Every property mapped explicitly: they are get-only, and EF drops anything left to
+        // convention without an error.
+        entity.OwnsOne(dealer => dealer.PublicProfile, profile =>
+        {
+            profile.Property(value => value.RentalConditions)
+                .HasColumnName("rental_conditions")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.Insurance)
+                .HasColumnName("insurance_summary")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.PickupInstructions)
+                .HasColumnName("pickup_instructions")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.DeliveryNotes)
+                .HasColumnName("delivery_notes")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.CustomerNotes)
+                .HasColumnName("customer_notes")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.HiddenSections)
+                .HasColumnName("hidden_profile_sections")
+                .HasConversion(HiddenSectionsConverter.Instance, HiddenSectionsConverter.Comparer)
+                .HasMaxLength(HiddenSectionsConverter.MaxLength)
+                .HasDefaultValueSql("''")
+                .IsRequired();
+        });
+        entity.Navigation(dealer => dealer.PublicProfile).IsRequired();
 
         entity.OwnsOne(dealer => dealer.Delivery, delivery =>
         {

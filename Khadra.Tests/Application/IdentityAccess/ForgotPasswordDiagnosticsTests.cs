@@ -138,7 +138,8 @@ public sealed class ForgotPasswordDiagnosticsTests
         context.Actor.CorrelationId.Returns("corr-99");
         context.EmailSender
             .SendAsync(Arg.Any<Khadra.Application.Common.Ports.EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromException(new InvalidOperationException("the relay refused it")));
+            .Returns(_ => Task.FromException<Khadra.Application.Common.Ports.EmailSendReceipt>(
+                new InvalidOperationException("the relay refused it")));
         var user = context.KnownUser(Users.Customer());
 
         var result = await context.ForgotPassword()

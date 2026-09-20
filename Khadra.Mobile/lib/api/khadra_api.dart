@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 
 import '../core/api/api_client.dart';
+import '../core/api/api_failure.dart';
 import '../core/api/auth_interceptor.dart';
 import 'dtos.dart';
 
@@ -193,6 +194,15 @@ class KhadraApi {
         CatalogueListing.fromJson,
       );
 
+  /// The seat counts and car types the bookable catalogue holds: what the search's
+  /// choices are built from, rather than from a list typed into the app.
+  Future<CatalogueFacets> catalogueFacets() async => CatalogueFacets.fromJson(
+        _object(await _client.get<dynamic>(
+          '/api/v1/vehicles/facets',
+          options: AuthInterceptor.anonymous(),
+        )),
+      );
+
   Future<CatalogueVehicle> vehicle(
     String vehicleId, {
     DateTime? pickupAt,
@@ -232,8 +242,8 @@ class KhadraApi {
         options: AuthInterceptor.anonymous(),
       )));
 
-  Future<PublicGallery> gallery(String dealerId) async =>
-      PublicGallery.fromJson(_object(await _client.get<dynamic>(
+  Future<PublicGalleryPage> gallery(String dealerId) async =>
+      PublicGalleryPage.fromJson(_object(await _client.get<dynamic>(
         '/api/v1/galleries/$dealerId',
         options: AuthInterceptor.anonymous(),
       )));
@@ -271,6 +281,13 @@ class KhadraApi {
     final body = _object(await _client.get<dynamic>('/api/v1/bookings/tab-counts'));
     return body.map((key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0));
   }
+
+  /// The one booking the customer most needs to see, or null.
+  ///
+  /// Answers 200 with a null body when there is nothing live, which is the
+  /// ordinary case for most people most of the time.
+  Future<NextBooking?> nextBooking() async =>
+      NextBooking.maybe(await _client.get<dynamic>('/api/v1/bookings/next'));
 
   Future<Booking> booking(String bookingId) async =>
       Booking.fromJson(_object(await _client.get<dynamic>('/api/v1/bookings/$bookingId')));
@@ -328,6 +345,38 @@ class KhadraApi {
         body: {'details': details},
       )));
 
+  // ── Shortlist ───────────────────────────────────────────────────────────────
+
+  Future<List<SavedVehicle>> shortlist() async =>
+      (await _client.get<List<dynamic>>('/api/v1/customers/me/shortlist'))
+          .whereType<Map<String, dynamic>>()
+          .map(SavedVehicle.fromJson)
+          .toList();
+
+  /// Which of these cars are already saved.
+  ///
+  /// Asked per page of results so a heart can be drawn without loading the whole
+  /// list. It answers only about the ids NAMED, which is what keeps it from being
+  /// a way to read a shortlist through a screen that was never shown one.
+  Future<Set<String>> savedAmong(List<String> vehicleIds) async {
+    if (vehicleIds.isEmpty) return <String>{};
+
+    final response = await _client.get<List<dynamic>>(
+      '/api/v1/customers/me/shortlist/membership',
+      query: {'vehicleId': vehicleIds},
+    );
+    return response.map((entry) => '$entry').toSet();
+  }
+
+  /// Safe to repeat: saving what is already saved changes nothing and succeeds.
+  Future<void> saveVehicle(String vehicleId) =>
+      _client.put<dynamic>('/api/v1/customers/me/shortlist/$vehicleId');
+
+  /// Safe to repeat, and works for a car that is no longer listed — which is
+  /// precisely the entry somebody most wants gone.
+  Future<void> forgetVehicle(String vehicleId) =>
+      _client.delete<dynamic>('/api/v1/customers/me/shortlist/$vehicleId');
+
   // ── Documents ───────────────────────────────────────────────────────────────
 
   Future<CustomerDocuments> myDocuments() async => CustomerDocuments.fromJson(
@@ -360,6 +409,44 @@ class KhadraApi {
       SignedDocumentLink.fromJson(_object(
         await _client.get<dynamic>('/api/v1/customers/me/documents/$documentId/link'),
       ));
+
+  /// The document's BYTES, fetched by this app rather than handed to a browser.
+  ///
+  /// The download endpoint is protected twice on purpose -- the signature proves
+  /// the link was minted here for this file and has not expired, and the bearer
+  /// token proves there is still a live session behind the request. An external
+  /// browser carries neither the session nor any way to get one, so handing it
+  /// the URL produced a 401 and nothing else. This call goes through the SAME
+  /// authenticated client every other request uses, so both checks are satisfied
+  /// without loosening either.
+  Future<DocumentBytes> documentBytes(String url) async {
+    // `raw` rather than the wrapper, because this one response is bytes and not
+    // JSON -- so the DioException has to be turned into an ApiFailure here, the
+    // way the wrapper does for everything else. Without it a refused download
+    // would reach the screen as a Dio type nothing there catches.
+    try {
+      final response = await _client.raw.get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          // The body is a PDF or a photograph, not the JSON every other call wants.
+          headers: const {'Accept': '*/*'},
+          receiveTimeout: const Duration(seconds: 60),
+          validateStatus: (status) => status != null && status < 400,
+        ),
+      );
+
+      return DocumentBytes(
+        Uint8List.fromList(response.data ?? const <int>[]),
+        // What the SERVER says it is. The app does not re-derive it from the
+        // name: the storage key's extension is the platform's own record of
+        // the type.
+        response.headers.value('content-type')?.split(';').first.trim(),
+      );
+    } on DioException catch (error) {
+      throw ApiFailure.from(error);
+    }
+  }
 
   // ── Disputes ────────────────────────────────────────────────────────────────
 
@@ -449,6 +536,16 @@ class KhadraApi {
   Future<MyReview?> myReview(String bookingId) async => MyReview.maybe(
         await _client.get<dynamic>('/api/v1/bookings/$bookingId/review'),
       );
+
+  /// What galleries are told about the caller.
+  ///
+  /// Aggregates only — a rating, five counts and an account age. No per-review
+  /// rows and no dates on individual ratings, because a rating dated last Tuesday
+  /// would tell a gallery when this customer rented from a competitor.
+  Future<CustomerReputation> myReputation() async =>
+      CustomerReputation.fromJson(_object(
+        await _client.get<dynamic>('/api/v1/customers/me/reputation'),
+      ));
 
   Future<MyReview> leaveReview({
     required String bookingId,

@@ -10,7 +10,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone, toneClass } from '../../core/models/console.models';
-import { Booking } from '../../core/models/bookings.api';
+import { Booking, PenaltyAssessment } from '../../core/models/bookings.api';
+import { enumKey } from '../../core/i18n/status-key';
 import { DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { DealerDisputesService } from '../../core/services/dealer-disputes.service';
@@ -22,8 +23,23 @@ import { BookingDecisions } from './booking-decisions';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
+import { Language } from '../../core/i18n/language';
+import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { toRenterDocumentsPanel } from './renter-documents.presenter';
+
+/**
+ * The history steps this screen words as more than a status's name: who is waiting on whom, the
+ * same descriptions the activity screen gives them. Every other status goes through `statusLabel` in
+ * the rental office's own wording, so a status the domain adds later still reads as words.
+ */
+const STEP_DESCRIPTIONS: Readonly<Record<string, TranslationKey>> = {
+  Requested: 'dealerBooking.requestedAwaitingYourAnswer',
+  Approved: 'dealerBooking.approvedAwaitingTheDeposit',
+  Confirmed: 'dealerBooking.depositPaidBookingConfirmed',
+  // The handover itself, not the queue's word for the rental it starts ("Active").
+  PickedUp: 'status.pickedUp',
+};
 
 /**
  * One booking, from the dealer's side (design: Dealer Console, `isBooking`).
@@ -40,8 +56,10 @@ import { toRenterDocumentsPanel } from './renter-documents.presenter';
   imports: [RouterLink, IconComponent, TimelineComponent, MoneyPipe],
 })
 export class DealerBookingDetailComponent {
-  protected readonly t = inject(I18nService).t;
-  protected readonly statusLabel = inject(I18nService).statusLabel;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  protected readonly statusLabel = this.i18n.statusLabel;
+  protected readonly enumLabel = this.i18n.enumLabel;
   private readonly format = inject(FormatService);
   private readonly service = inject(DealerBookingsService);
   private readonly console = inject(DealerConsoleService);
@@ -77,7 +95,12 @@ export class DealerBookingDetailComponent {
   protected readonly disputeBusy = signal(false);
   protected readonly evidenceKeys = signal<readonly string[]>([]);
   protected readonly evidenceNames = signal<readonly string[]>([]);
-  protected readonly problem = signal<string | null>(null);
+  /** The last refusal, held as facts: its words are chosen below, so a language switch re-words it. */
+  protected readonly problem = signal<ProblemSnapshot | null>(null);
+  protected readonly problemText = computed(() => {
+    const problem = this.problem();
+    return problem ? describe(problem, this.t, this.i18n.lang()) : null;
+  });
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
@@ -108,31 +131,40 @@ export class DealerBookingDetailComponent {
   /**
    * What this booking's state is called ON THE DEALER'S SCREEN.
    *
-   * Four of them are deliberately not the server's own word, because the server names a state and a
-   * gallery wants to know what is being asked OF THEM: `Approved` means "waiting for their money",
-   * `PickedUp` means "the car is out". Everything else falls through to the shared helper, so a
-   * status this console has never heard of still reads as words rather than as a raw enum name.
+   * Some are deliberately not the server's own word, because the server names a state and a gallery
+   * wants to know what is being asked OF THEM: `Approved` means "waiting for their money", `PickedUp`
+   * means "the car is out". Those live in the dictionary under the `dealerBooking` scope, the same
+   * wording the bookings list uses; everything else falls through to the booking and then the plain
+   * word, so a status this console has never heard of still reads as words.
    */
   protected readonly label = computed(() => {
     const b = this.booking();
     if (!b) return '';
-    if (b.liveDisputeId) return this.statusLabel('Disputed');
-    const labels: Partial<Record<Booking['status'], string>> = {
-      Requested: this.t('status.pendingDealer'),
-      Approved: this.t('status.awaitingDeposit'),
-      PickedUp: this.t('status.activeRental'),
-      NoShow: this.t('status.noShow'),
-    };
-    return labels[b.status] ?? this.statusLabel(b.status, 'booking');
+    // A live dispute is a flag on the booking, not one of its statuses, so it is worded here.
+    if (b.liveDisputeId) return this.t('status.disputed');
+    return this.statusLabel(b.status, 'dealerBooking');
   });
 
   protected readonly meta = computed(() => {
     const b = this.booking();
     if (!b) return '';
     const method =
-      b.pickupMethod === 'Delivery' ? 'delivery' : this.t('dealerBooking.pickupAtYourLocation');
-    return `Requested ${this.dateTime(b.requestedAt ?? b.createdAt)} · ${b.customerName} · ${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'} · ${method}`;
+      b.pickupMethod === 'Delivery'
+        ? this.t('common.delivery')
+        : this.t('dealerBooking.pickupAtYourLocation');
+    // A list of whole facts, each worded on its own; the days are the server's frozen count.
+    return [
+      this.t('dealerBooking.requestedAt', { when: this.dateTime(b.requestedAt ?? b.createdAt) }),
+      this.customerName(b),
+      this.t('booking.days', { count: b.pricing.days }),
+      method,
+    ].join(' · ');
   });
+
+  /** The customer's name, or the fact that the account was closed. Never the English stand-in. */
+  protected customerName(b: Booking): string {
+    return b.customerAccountClosed ? this.t('common.customerAccountClosed') : b.customerName;
+  }
 
   /**
    * Time left to answer, against the deadline THIS booking carries.
@@ -144,12 +176,14 @@ export class DealerBookingDetailComponent {
   protected readonly answerBy = computed(() => {
     const b = this.booking();
     if (!b || b.status !== 'Requested') return null;
-    const hours = Math.round((Date.parse(b.decisionDeadline) - Date.now()) / 3_600_000);
-    if (hours <= 0)
-      return { figure: 'Expired', note: this.t('dealerBooking.theAnswerWindowHasClosed') };
+    // A request the office can still answer is the SERVER's call (isAwaitingDecision); this clock can
+    // only close it early, never keep a dead one open. "2h remaining", then "Expired".
+    const reading = this.format.deadline(b.decisionDeadline, !b.isAwaitingDecision);
+    if (reading.passed)
+      return { figure: reading.text, note: this.t('dealerBooking.theAnswerWindowHasClosed') };
     return {
-      figure: hours >= 48 ? `${Math.round(hours / 24)}d left` : `${hours}h left`,
-      note: `Expires ${this.dateTime(b.decisionDeadline)}.`,
+      figure: reading.text,
+      note: this.t('dealerBooking.expiresAt', { when: this.dateTime(b.decisionDeadline) }),
     };
   });
 
@@ -159,7 +193,7 @@ export class DealerBookingDetailComponent {
     // Only what the API carries. NO CONTACT DETAILS: the platform has not decided whether a dealer
     // ever sees a customer's phone, and the console must not promise it. The history below is a
     // separate, deliberately narrower thing -- aggregates the platform itself counted.
-    return [{ k: this.t('dealerSettings.name'), v: b.customerName }];
+    return [{ k: this.t('dealerSettings.name'), v: this.customerName(b) }];
   });
 
   /**
@@ -325,7 +359,7 @@ export class DealerBookingDetailComponent {
     } catch (error: unknown) {
       // A 409 here means the window closed between the listing and the click. The panel's own state
       // will say so on the next load; this line is for everything else.
-      this.problem.set(describe(error, this.t));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.reviewingDocumentId.set(null);
     }
@@ -358,7 +392,7 @@ export class DealerBookingDetailComponent {
       this.service.refresh();
       this.ui.showToast(this.t('dealerBooking.rateCustomer'), this.t('dealerBooking.rateSaved'));
     } catch (error: unknown) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.ratingBusy.set(false);
     }
@@ -384,7 +418,7 @@ export class DealerBookingDetailComponent {
       { k: this.t('common.colour'), v: b.vehicle.color ?? '—' },
       {
         k: this.t('dealerBooking.dailyPriceOnThis'),
-        v: `${b.pricing.dailyRate.amount} ${b.pricing.dailyRate.currency}`,
+        v: this.format.money(b.pricing.dailyRate.amount, b.pricing.dailyRate.currency),
       },
     ];
   });
@@ -392,18 +426,25 @@ export class DealerBookingDetailComponent {
   protected readonly rentalRows = computed<readonly KeyValue[]>(() => {
     const b = this.booking();
     if (!b) return [];
+    const excessFee = b.pricing.mileageExcessFeePerKm;
     return [
       { k: this.t('dealerBooking.start'), v: this.dateTime(b.periodStart) },
       { k: this.t('dealerBooking.end'), v: this.dateTime(b.periodEnd) },
+      // The server's frozen day count, as a plural message: Arabic has six forms of "day".
       {
         k: this.t('dealerBooking.duration'),
-        v: `${b.pricing.days} ${b.pricing.days === 1 ? 'day' : 'days'}`,
+        v: this.t('booking.days', { count: b.pricing.days }),
       },
       {
         k: this.t('vehicleWizard.mileage'),
         v: b.pricing.mileageUnlimited
-          ? 'Unlimited'
-          : `${b.pricing.mileageDailyLimitKm} km/day, ${b.pricing.mileageExcessFeePerKm?.amount ?? 0} ${b.pricing.dailyRate.currency}/km over`,
+          ? this.t('vehicleWizard.unlimited')
+          : this.t('dealerBooking.mileageAllowance', {
+              limit: this.format.number(b.pricing.mileageDailyLimitKm),
+              fee: excessFee
+                ? this.format.money(excessFee.amount, excessFee.currency)
+                : this.format.money(0, b.pricing.dailyRate.currency),
+            }),
       },
       {
         k: this.t('common.fuel'),
@@ -424,23 +465,33 @@ export class DealerBookingDetailComponent {
       ];
     }
     return [
-      { k: this.t('dealerBooking.method'), v: 'Delivery' },
+      { k: this.t('dealerBooking.method'), v: this.t('common.delivery') },
       {
         k: this.t('dealerProfile.location'),
-        v: `${b.deliveryLocation.latitude.toFixed(4)}, ${b.deliveryLocation.longitude.toFixed(4)}`,
+        v: this.format.coordinates(b.deliveryLocation.latitude, b.deliveryLocation.longitude),
       },
       {
         k: this.t('vehicleWizard.deliveryFee'),
-        v: `${b.pricing.deliveryFee.amount} ${b.pricing.deliveryFee.currency} · frozen on this booking`,
+        v: this.t('dealerBooking.amountFrozen', {
+          amount: this.format.money(b.pricing.deliveryFee.amount, b.pricing.deliveryFee.currency),
+        }),
       },
     ];
   });
 
-  /** The money on THIS booking, as frozen when it was made. */
+  /**
+   * The money on THIS booking, as frozen when it was made.
+   *
+   * Every amount carries its own currency code and goes through `FormatService`, so it prints at the
+   * currency's scale and never as "−0". The commission is the amount Khadra charges, unsigned: a sign
+   * typed in front of it printed "−0" when the frozen rate was zero, and Arabic bidi then carried that
+   * sign to the far end of the figure.
+   */
   protected readonly moneyRows = computed(() => {
     const b = this.booking();
     if (!b) return [];
-    const cur = b.pricing.totalPrice.currency;
+    const money = (value: { readonly amount: number; readonly currency: string }): string =>
+      this.format.money(value.amount, value.currency);
     // What the customer has paid and what is still due only mean something while a handover can
     // still happen. A rejected or expired request refunds its deposit (Payments will do that);
     // a cancelled or no-show booking is settled through the penalty panel, not this one.
@@ -455,24 +506,32 @@ export class DealerBookingDetailComponent {
     const paidDeposit = b.depositPaid;
     return [
       {
-        k: `Rental · ${b.pricing.days} × ${b.pricing.dailyRate.amount} ${cur}`,
-        v: `${b.pricing.rentalTotal.amount}`,
+        k: this.t('dealerBooking.rentalLine', {
+          count: b.pricing.days,
+          rate: money(b.pricing.dailyRate),
+        }),
+        v: money(b.pricing.rentalTotal),
       },
-      { k: this.t('dealerBooking.deliveryFeeYours'), v: `${b.pricing.deliveryFee.amount}` },
+      { k: this.t('dealerBooking.deliveryFeeYours'), v: money(b.pricing.deliveryFee) },
       {
         k: this.t('dealerBooking.securityDepositHeldPer'),
-        v: `${b.pricing.securityDeposit.amount}`,
+        v: money(b.pricing.securityDeposit),
       },
       {
-        k: `Deposit paid by card (${b.pricing.depositPercent}%)`,
-        v: paidDeposit ? `${b.pricing.depositAmount.amount}` : '0',
+        k: this.t('dealerBooking.depositPaidByCard', {
+          percent: this.format.percent(b.pricing.depositPercent),
+        }),
+        // Nothing is paid until the server says the deposit cleared: zero, in the deposit's currency.
+        v: paidDeposit
+          ? money(b.pricing.depositAmount)
+          : this.format.money(0, b.pricing.depositAmount.currency),
         hi: live,
       },
       ...(live
         ? [
             {
               k: this.t('dealerBooking.balanceToCollectIn'),
-              v: `${b.pricing.balanceDue.amount}`,
+              v: money(b.pricing.balanceDue),
               hi: true,
             },
           ]
@@ -480,7 +539,7 @@ export class DealerBookingDetailComponent {
           ? [
               {
                 k: this.t('dealerBooking.balanceCollectedInCash'),
-                v: `${b.pricing.balanceDue.amount}`,
+                v: money(b.pricing.balanceDue),
               },
             ]
           : [
@@ -491,9 +550,11 @@ export class DealerBookingDetailComponent {
               },
             ]),
       {
-        k: `Platform commission · ${b.terms.commissionPercent}% (frozen on this booking)`,
-        // Computed by the API at the frozen rate; the console never multiplies money.
-        v: `−${b.commissionAmount.amount}`,
+        k: this.t('dealerBooking.platformCommissionFrozen', {
+          percent: this.format.percent(b.terms.commissionPercent),
+        }),
+        // Unsigned, and computed by the API at the frozen rate; the console never multiplies money.
+        v: money(b.commissionAmount),
       },
       {
         k: this.t('dealerReports.netPayout'),
@@ -508,7 +569,13 @@ export class DealerBookingDetailComponent {
     if (!b) return [];
     const done = b.history.map((change) => ({
       label: this.stepLabel(change.toStatus),
-      meta: `${this.dateTime(change.occurredAt)} · ${this.actor(change.actorParty, change.actorUserId)}${change.reason ? ` · “${change.reason}”` : ''}`,
+      // Independent facts, each whole: when, who, and the reason exactly as somebody typed it —
+      // quoted, never translated.
+      meta: [
+        this.dateTime(change.occurredAt),
+        this.actor(change.actorParty, change.actorUserId),
+        ...(change.reason ? [this.t('disputeDetail.quoted', { text: change.reason })] : []),
+      ].join(' · '),
       tone: (change.toStatus === 'Rejected' ||
       change.toStatus === 'Cancelled' ||
       change.toStatus === 'NoShow'
@@ -520,8 +587,8 @@ export class DealerBookingDetailComponent {
     const future: TimelineStep[] = [];
     if (b.status === 'Requested')
       future.push({
-        label: 'Approved / rejected',
-        meta: `Your answer, before ${this.dateTime(b.decisionDeadline)}`,
+        label: this.t('dealerBooking.approvedOrRejected'),
+        meta: this.t('dealerBooking.yourAnswerBefore', { when: this.dateTime(b.decisionDeadline) }),
         tone: 'dim',
         future: true,
       });
@@ -530,30 +597,33 @@ export class DealerBookingDetailComponent {
     if (b.status === 'Approved' && b.paymentDeadline)
       future.push({
         label: this.t('dealerBooking.depositPaid'),
-        meta: `The customer pays by ${this.dateTime(b.paymentDeadline)}`,
+        meta: this.t('dealerBooking.customerPaysBy', { when: this.dateTime(b.paymentDeadline) }),
         tone: 'dim',
         future: true,
       });
     if (b.status === 'Requested' || b.status === 'Approved' || b.status === 'Confirmed')
       future.push({
         label: this.t('dealerBooking.pickup'),
-        meta: `Scheduled ${this.dateTime(b.periodStart)}`,
+        meta: this.t('dealerBooking.scheduledFor', { when: this.dateTime(b.periodStart) }),
         tone: 'dim',
         future: true,
       });
     if (['Requested', 'Approved', 'Confirmed', 'PickedUp'].includes(b.status))
       future.push({
         label: this.t('dealerBooking.return'),
-        meta: `Scheduled ${this.dateTime(b.periodEnd)}`,
+        meta: this.t('dealerBooking.scheduledFor', { when: this.dateTime(b.periodEnd) }),
         tone: 'dim',
         future: true,
       });
     if (!b.isTerminal)
       future.push({
         label: this.t('status.completed'),
+        // The window frozen on this booking, as a plural message: Arabic words "hours" six ways.
         meta:
           b.status === 'Returned'
-            ? `After the ${b.terms.postReturnSettlementWindowHours}h settlement window`
+            ? this.t('dealerBooking.afterSettlementWindow', {
+                count: b.terms.postReturnSettlementWindowHours,
+              })
             : '—',
         tone: 'dim',
         future: true,
@@ -579,7 +649,7 @@ export class DealerBookingDetailComponent {
   protected approve(): void {
     const b = this.booking();
     if (b)
-      this.decisions.approve(b.bookingId, b.reference, b.customerName, () =>
+      this.decisions.approve(b.bookingId, b.reference, this.customerName(b), () =>
         this.service.refresh(),
       );
   }
@@ -589,19 +659,29 @@ export class DealerBookingDetailComponent {
     if (b) this.decisions.reject(b.bookingId, b.reference, () => this.service.refresh());
   }
 
+  // The cash taken at a handover is recorded in the booking's own currency, so that is the code the
+  // dialog names beside the figure.
   protected pickUp(): void {
     const b = this.booking();
     if (b)
-      this.decisions.recordPickup(b.bookingId, b.reference, this.carName(b), () =>
-        this.service.refresh(),
+      this.decisions.recordPickup(
+        b.bookingId,
+        b.reference,
+        this.carName(b),
+        b.pricing.totalPrice.currency,
+        () => this.service.refresh(),
       );
   }
 
   protected takeBack(): void {
     const b = this.booking();
     if (b)
-      this.decisions.recordReturn(b.bookingId, b.reference, this.carName(b), () =>
-        this.service.refresh(),
+      this.decisions.recordReturn(
+        b.bookingId,
+        b.reference,
+        this.carName(b),
+        b.pricing.totalPrice.currency,
+        () => this.service.refresh(),
       );
   }
 
@@ -616,7 +696,7 @@ export class DealerBookingDetailComponent {
       this.evidenceKeys.update((keys) => [...keys, key]);
       this.evidenceNames.update((names) => [...names, file.name]);
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.disputeBusy.set(false);
       input.value = '';
@@ -633,11 +713,15 @@ export class DealerBookingDetailComponent {
       const ticket = await this.disputes.open(b.bookingId, reason, this.evidenceKeys());
       this.ui.showToast(
         this.t('dealerBooking.disputeOpened'),
-        `The platform will answer within ${this.slaHours(ticket.openedAt, ticket.slaDeadline)} hours.`,
+        // The window the platform promised on THIS ticket, from the deadline the server froze on it
+        // when it was opened. The booking carries no such figure, so nothing earlier can name it.
+        this.t('dealerBooking.platformWillAnswerWithin', {
+          count: this.slaHours(ticket.openedAt, ticket.slaDeadline),
+        }),
       );
       await this.router.navigate(['/dealer/disputes', ticket.ticketId]);
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.disputeBusy.set(false);
     }
@@ -645,6 +729,23 @@ export class DealerBookingDetailComponent {
 
   protected fieldValue(event: Event): string {
     return (event.target as HTMLTextAreaElement).value;
+  }
+
+  /**
+   * Why the platform assessed this penalty, in the reader's language.
+   *
+   * The stable code is what gets worded. A booking assessed before codes existed carries only the
+   * frozen English sentence: that is shown exactly as it was written, never guessed at from the text,
+   * and marked as a Latin run so Arabic does not reorder it.
+   */
+  protected penaltyReasonText(penalty: PenaltyAssessment): string {
+    const key = penalty.reasonCode ? enumKey('penaltyReason', penalty.reasonCode) : null;
+    return key ? this.t(key) : penalty.reason;
+  }
+
+  /** True when the sentence on screen is the frozen English one rather than a worded code. */
+  protected penaltyReasonIsFrozen(penalty: PenaltyAssessment): boolean {
+    return !(penalty.reasonCode && enumKey('penaltyReason', penalty.reasonCode));
   }
 
   protected reload(): void {
@@ -665,58 +766,80 @@ export class DealerBookingDetailComponent {
       : this.t('dealerBooking.theVehicle');
   }
 
+  /** "06 Sept 2026, 14:32", in the reader's language. */
   protected dateTime(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.format.dateTime(iso);
   }
+
+  /** A plain figure (an odometer reading, a fuel level), or "—" when none was recorded. */
+  protected number(value: number | null): string {
+    return this.format.number(value);
+  }
+
+  /** "20%", in the reader's language. */
+  protected percent(value: number): string {
+    return this.format.percent(value);
+  }
+
+  /**
+   * What the penalty would come to: its range, or its single amount, as one isolated run in the
+   * assessment's own currency. Two amounts around a dash would be laid out upper bound first under
+   * Arabic.
+   */
+  protected readonly penaltyAmount = computed(() => {
+    const penalty = this.booking()?.penalty;
+    if (!penalty) return '';
+    return penalty.isRange
+      ? this.format.moneyRange(
+          penalty.minAmount.amount,
+          penalty.maxAmount.amount,
+          penalty.minAmount.currency,
+        )
+      : this.format.money(penalty.minAmount.amount, penalty.minAmount.currency);
+  });
 
   private slaHours(from: string, to: string): number {
     return Math.round((Date.parse(to) - Date.parse(from)) / 3_600_000);
   }
 
   private stepLabel(status: string): string {
-    return (
-      {
-        Requested: this.t('dealerBooking.requestedAwaitingYourAnswer'),
-        Approved: this.t('dealerBooking.approvedAwaitingTheDeposit'),
-        Confirmed: this.t('dealerBooking.depositPaidBookingConfirmed'),
-        Rejected: 'Rejected',
-        PickedUp: this.t('status.pickedUp'),
-        Returned: 'Returned',
-        Completed: 'Completed',
-        Cancelled: 'Cancelled',
-        NoShow: 'No-show',
-        Expired: 'Expired',
-      }[status] ?? status
-    );
+    const key = STEP_DESCRIPTIONS[status];
+    // The office's own wording for everything else, the same the bookings list uses.
+    return key ? this.t(key) : this.statusLabel(status, 'dealerBooking');
   }
 
   private actor(party: string, userId: string | null): string {
-    if (party === 'Dealer')
-      return userId
-        ? this.t('dealerBooking.byYourStaff')
-        : this.t('dealerBooking.byYourDealership');
-    if (party === 'Customer') return this.t('dealerBooking.byTheCustomer');
-    return this.t('dealerBooking.byThePlatform');
+    switch (party) {
+      case 'Dealer':
+        return userId
+          ? this.t('dealerBooking.byYourStaff')
+          : this.t('dealerBooking.byYourDealership');
+      case 'Customer':
+        return this.t('dealerBooking.byTheCustomer');
+      case 'System':
+      case 'Admin':
+        return this.t('dealerBooking.byThePlatform');
+      default:
+        // A party this screen has no sentence for is named, never passed off as the platform.
+        return this.enumLabel('party', party);
+    }
   }
 }
 
 /**
- * A server refusal, in the reader's own language.
+ * A server refusal, in the reader's own language, worded when it is shown.
  *
- * Takes `t` rather than reaching for one: this is a module function, outside the class, so it has no
- * `this` and no injector. Passing it in also keeps the mapping honest about what it is -- a lookup
- * from the server's stable error CODE to a sentence, which is the only shape that can be translated
- * at all. The server's own `title` is English and is the last resort.
+ * Takes `t` and the language rather than reaching for them: this is a module function, outside the
+ * class, so it has no `this` and no injector. The mapping is from the server's stable error CODE to
+ * a sentence, which is the only shape that can be translated at all. The server's own `title` is
+ * English: the last resort, and only while the console is English.
  */
-function describe(error: unknown, t: (key: TranslationKey) => string): string {
-  const problem = error as { status?: number; error?: { code?: string; title?: string } };
-  switch (problem.error?.code) {
+function describe(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  switch (problem.code) {
     case 'dispute.booking_not_disputable':
       return t('dealerBooking.thisBookingCannotBe');
     case 'dispute.already_open':
@@ -731,6 +854,6 @@ function describe(error: unknown, t: (key: TranslationKey) => string): string {
     case 'booking.not_found':
       return t('renterDocs.reviewFailed');
     default:
-      return problem.error?.title ?? t('dealerDelivery.serviceDidNotRespond');
+      return serverSentence(problem, language, t) ?? t('dealerDelivery.serviceDidNotRespond');
   }
 }

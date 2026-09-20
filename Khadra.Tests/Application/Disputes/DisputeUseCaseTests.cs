@@ -58,7 +58,7 @@ public sealed class DisputeUseCaseTests
             AuditTrail.When(trail => trail.Record(Arg.Any<AuditEntry>()))
                 .Do(call => Audited.Add(call.Arg<AuditEntry>()));
             BookingReader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Petra Wheels", "Layla Odeh", null, null));
+                .Returns(new BookingContext(null, "Petra Wheels", false, "Layla Odeh", false, null, null));
             Names.NamesAsync(Arg.Any<IReadOnlyCollection<Id>>(), Arg.Any<CancellationToken>())
                 .Returns(new Dictionary<Guid, string>());
             Signer.Sign(Arg.Any<string>(), Arg.Any<DateTimeOffset>())
@@ -449,5 +449,121 @@ public sealed class DisputeUseCaseTests
             new ResolveDisputeCommand(ticket.Id, result.Value.DepositHeld.Amount, 0m, 0m, null, "Refunded in full."),
             CancellationToken.None);
         Assert.True(resolved.IsSuccess);
+    }
+
+    // ── People whose accounts no longer resolve ──────────────────────────────────────────────────
+    //
+    // The customer app receives this view, and prints each name as it arrives, so a name stays a
+    // string -- an English stand-in when the account is gone. Beside it travels the fact, which is
+    // what a console wording the case in its reader's language reads instead.
+
+    private static readonly System.Text.Json.JsonSerializerOptions WireOptions =
+        new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    [Fact]
+    public async Task Each_person_on_a_dispute_carries_whether_their_account_still_resolves()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var formerStaff = Id.New();
+        Assert.True(ticket.AddStatement(BookingParty.Dealer, formerStaff, "We waited an hour.", Build.Now.AddHours(5)).IsSuccess);
+        Assert.True(ticket.AssignToAdmin(AdminId).IsSuccess);
+        context.Names.NamesAsync(Arg.Any<IReadOnlyCollection<Id>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, string>
+            {
+                [CustomerId.Value] = "Layla Odeh",
+                [AdminId.Value] = "Rania Haddad",
+            });
+
+        var view = await context.Composer().ComposeAsync(ticket, booking, CancellationToken.None);
+
+        Assert.Equal("Layla Odeh", view.OpenedByName);
+        Assert.False(view.OpenedByAccountClosed);
+        Assert.Equal("Rania Haddad", view.AssignedAdminName);
+        Assert.False(view.AssignedAdminAccountClosed);
+        var opener = Assert.Single(view.Statements, statement => statement.AuthorUserId == CustomerId.Value);
+        Assert.False(opener.AuthorAccountClosed);
+        Assert.Equal("Layla Odeh", opener.AuthorName);
+        var leaver = Assert.Single(view.Statements, statement => statement.AuthorUserId == formerStaff.Value);
+        Assert.True(leaver.AuthorAccountClosed);
+        Assert.Equal("Account closed", leaver.AuthorName);
+    }
+
+    /// <summary>
+    /// Nobody holding a ticket and somebody holding it from a closed account are different facts. The
+    /// name is null for the first only, and the flag is raised for the second only.
+    /// </summary>
+    [Fact]
+    public async Task An_unassigned_ticket_is_not_mistaken_for_one_held_by_a_closed_account()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var unassigned = OpenTicket(booking, Build.Now.AddHours(4));
+        var heldByLeaver = OpenTicket(booking, Build.Now.AddHours(4));
+        Assert.True(heldByLeaver.AssignToAdmin(Id.New()).IsSuccess);
+
+        var nobody = await context.Composer().ComposeAsync(unassigned, booking, CancellationToken.None);
+        var leaver = await context.Composer().ComposeAsync(heldByLeaver, booking, CancellationToken.None);
+
+        Assert.Null(nobody.AssignedAdminId);
+        Assert.Null(nobody.AssignedAdminName);
+        Assert.False(nobody.AssignedAdminAccountClosed);
+
+        Assert.NotNull(leaver.AssignedAdminId);
+        Assert.True(leaver.AssignedAdminAccountClosed);
+        Assert.Equal("Account closed", leaver.AssignedAdminName);
+    }
+
+    [Fact]
+    public async Task A_resolution_says_when_the_administrator_who_made_it_has_since_left()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, null, "Refunded in full."),
+            CancellationToken.None);
+        Assert.True(resolved.IsSuccess);
+
+        // The context resolves no names at all, so the admin who decided is gone by the time it is read.
+        var view = await context.Composer().ComposeAsync(ticket, booking, CancellationToken.None);
+
+        Assert.True(view.Resolution!.ResolvedByAccountClosed);
+        Assert.Equal("Account closed", view.Resolution.ResolvedByName);
+    }
+
+    /// <summary>
+    /// The names the customer app reads keep their JSON names and types; the flags sit beside them.
+    /// </summary>
+    [Fact]
+    public async Task The_wire_keeps_every_name_a_string_and_adds_the_flags_beside_them()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        Assert.True(ticket.AddStatement(BookingParty.Customer, CustomerId, "Still waiting.", Build.Now.AddHours(5)).IsSuccess);
+        var held = booking.Pricing.DepositAmount.Amount;
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, null, "Refunded in full."),
+            CancellationToken.None)).IsSuccess);
+
+        var view = await context.Composer().ComposeAsync(ticket, booking, CancellationToken.None);
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(view, WireOptions));
+        var root = json.RootElement;
+
+        Assert.Equal(System.Text.Json.JsonValueKind.String, root.GetProperty("openedByName").ValueKind);
+        Assert.True(root.GetProperty("openedByAccountClosed").GetBoolean());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, root.GetProperty("assignedAdminName").ValueKind);
+        Assert.False(root.GetProperty("assignedAdminAccountClosed").GetBoolean());
+
+        var statement = root.GetProperty("statements")[0];
+        Assert.Equal(System.Text.Json.JsonValueKind.String, statement.GetProperty("authorName").ValueKind);
+        Assert.True(statement.GetProperty("authorAccountClosed").GetBoolean());
+
+        var resolution = root.GetProperty("resolution");
+        Assert.Equal(System.Text.Json.JsonValueKind.String, resolution.GetProperty("resolvedByName").ValueKind);
+        Assert.True(resolution.GetProperty("resolvedByAccountClosed").GetBoolean());
     }
 }

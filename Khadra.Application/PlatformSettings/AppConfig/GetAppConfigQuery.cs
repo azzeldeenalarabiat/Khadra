@@ -4,6 +4,7 @@ using Khadra.Application.Common.Ports;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Fleet;
+using Khadra.Domain.IdentityAccess;
 using MediatR;
 
 namespace Khadra.Application.PlatformSettings.AppConfig;
@@ -45,7 +46,43 @@ public sealed record AppConfigDto(
     /// so it must come from the platform rather than from a sentence typed into a screen.
     int PaymentWindowHours,
     DocumentLimitsDto Documents,
+    PasswordPolicyDto Password,
     VocabulariesDto Vocabularies);
+
+/// <summary>
+/// What makes a password acceptable here.
+/// </summary>
+/// <remarks>
+/// Published for the same reason as the date picker's three bounds: without it a client either
+/// hard-codes the rule — and the app did, at "8 characters, with a letter and a number" — or finds
+/// out by being refused. The minimum is configurable (`Authentication:Password:PasswordMinimumLength`,
+/// 8..64), so the moment the owner raises it every installed phone is stating a number the server no
+/// longer enforces, and accepting passwords it will refuse.
+///
+/// **This is not a disclosure.** A composition rule is not a secret; one failed registration already
+/// returns it in the ProblemDetails title, the endpoint is anonymous and rate limited, and what this
+/// platform does keep secret is whether an ACCOUNT EXISTS — about which this says nothing. What
+/// protects an account is bcrypt at work factor 12 and the sign-in throttling of item 51.
+///
+/// <see cref="MinimumLength"/> is the EFFECTIVE minimum, through
+/// <see cref="Domain.IdentityAccess.PasswordPolicy.EffectiveMinimum"/> — never the raw configured
+/// figure, which can be below the absolute floor and would then promise a password the server
+/// refuses.
+///
+/// The three flags are constants in the domain today. They are sent anyway, because the point of
+/// this endpoint is that a rule can change without an app release, and a client reading a flag it
+/// does not understand simply lets the server judge.
+///
+/// **Sign-in must never apply any of this.** `LoginCommand` deliberately checks only that a password
+/// is present: raising the minimum must not lock out customers whose password predates it.
+/// </remarks>
+public sealed record PasswordPolicyDto(
+    int MinimumLength,
+    /// bcrypt's input cap, not a policy choice.
+    int MaximumLength,
+    bool RequiresLetter,
+    bool RequiresDigit,
+    bool AllowsWhitespace);
 
 /// <summary>
 /// The platform's currency, and how many decimals it is written with.
@@ -87,7 +124,8 @@ public sealed record VocabularyEntryDto(string Name, string LabelEn, string Labe
 public sealed class GetAppConfigHandler(
     IReportingCalendar calendar,
     IBusinessRulesProvider businessRules,
-    IDocumentPolicySettings documents)
+    IDocumentPolicySettings documents,
+    IAuthPolicySettings authPolicy)
     : IRequestHandler<GetAppConfigQuery, Result<AppConfigDto, Error>>
 {
     public async Task<Result<AppConfigDto, Error>> Handle(
@@ -105,6 +143,14 @@ public sealed class GetAppConfigHandler(
             rules.MaxRentalDays,
             rules.PaymentWindowHours,
             new DocumentLimitsDto(documents.MaximumSizeBytes, [.. documents.AllowedContentTypes]),
+            new PasswordPolicyDto(
+                // The EFFECTIVE minimum, through the same expression the validator uses, so the
+                // figure published can never be below the figure enforced.
+                PasswordPolicy.EffectiveMinimum(authPolicy.PasswordMinimumLength),
+                PasswordPolicy.MaximumLength,
+                RequiresLetter: true,
+                RequiresDigit: true,
+                AllowsWhitespace: false),
             new VocabulariesDto(
                 [.. Enumeration.GetAll<TransmissionType>().Select(Vocabulary.Describe)],
                 [.. Enumeration.GetAll<FuelType>().Select(Vocabulary.Describe)],

@@ -1,6 +1,7 @@
 using Khadra.Application.Common.Ports;
 using Khadra.Infrastructure;
 using Khadra.Infrastructure.Documents;
+using Khadra.Tests.Support;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -144,6 +145,7 @@ public sealed class DocumentStorageConfigurationTests
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Production");
+                builder.IsolateFromDeveloperDatabase();
                 builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=khadra_tests;Username=x;Password=y");
                 builder.UseSetting("Authentication:Jwt:SigningKey", new string('k', 48));
                 builder.UseSetting("Database:AutoMigrate", "false");

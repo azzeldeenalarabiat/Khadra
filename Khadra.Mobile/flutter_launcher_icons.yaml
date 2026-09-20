@@ -1,0 +1,30 @@
+# How the launcher icons are cut. Run after `tools/make_launcher_icons.dart`:
+#
+#     dart run tools/make_launcher_icons.dart
+#     dart run flutter_launcher_icons
+#
+# ANDROID ONLY, deliberately. The iOS icon set is untouched because nothing here
+# can be checked on an iOS device today, and a generated icon nobody has looked at
+# is worse than the placeholder somebody knows is a placeholder.
+flutter_launcher_icons:
+  android: true
+  ios: false
+
+  # Pre-Android-8 phones get one flat image with no mask and no layers, so this one
+  # already has the background painted into it.
+  image_path: "tools/launcher/legacy.png"
+
+  # Android 8 and later compose two layers and crop them to a shape the LAUNCHER
+  # chooses. The foreground is the badge alone on transparency, sized to the safe
+  # circle; the background is flat brand green — `KhadraColors.price`, the same
+  # green the profile monogram is drawn on.
+  adaptive_icon_background: "#14532D"
+  adaptive_icon_foreground: "tools/launcher/foreground.png"
+
+  # No `adaptive_icon_monochrome`. Android 13's themed icons want a single-colour
+  # SILHOUETTE, and this mark is a filled circle: flattening it gives a green disc
+  # with no car and no word in it, which is less recognisable than the full-colour
+  # icon Android falls back to when no monochrome layer is supplied. Drawing a real
+  # one — the car alone, as a path — is a design job for the owner, not something
+  # to derive from a photograph of a badge.
+  min_sdk_android: 21

@@ -64,14 +64,66 @@ class FakeApi extends KhadraApi {
   @override
   Future<AppConfig> appConfig() async => fakeConfig();
 
-  @override
-  Future<List<Lookup>> cities() async => const [];
+  /// The lookups, empty unless a test says otherwise.
+  List<Lookup> cityLookups = const [];
+  List<Lookup> carTypeLookups = const [];
 
   @override
-  Future<List<Lookup>> carTypes() async => const [];
+  Future<List<Lookup>> cities() async => cityLookups;
+
+  @override
+  Future<List<Lookup>> carTypes() async => carTypeLookups;
+
+  /// What the catalogue holds. Empty unless a test says otherwise.
+  CatalogueFacets facets = const CatalogueFacets(seats: [], carTypeIds: <String>{});
+
+  /// When set, the facets endpoint fails this way — the way an older server
+  /// without it answers.
+  ApiFailure? facetsFailure;
+
+  @override
+  Future<CatalogueFacets> catalogueFacets() async {
+    final failure = facetsFailure;
+    if (failure != null) throw failure;
+    return facets;
+  }
 
   @override
   Future<AuthUser> me() async => fakeUser();
+
+  /// The account the next `signIn` hands back. Settable because an UNVERIFIED one
+  /// takes a different path off the form — it can sign in and still not book.
+  AuthUser signInAs = fakeUser();
+  int signInCalls = 0;
+  ApiFailure? signInFailure;
+
+  @override
+  Future<AuthTokens> signIn(String email, String password) async {
+    signInCalls++;
+    final failure = signInFailure;
+    if (failure != null) throw failure;
+
+    final tokens = fakeTokens();
+    return AuthTokens(
+      accessToken: tokens.accessToken,
+      accessTokenExpiresAt: tokens.accessTokenExpiresAt,
+      refreshToken: tokens.refreshToken,
+      refreshTokenExpiresAt: tokens.refreshTokenExpiresAt,
+      user: signInAs,
+    );
+  }
+
+  final List<String> verifiedTokens = <String>[];
+
+  @override
+  Future<void> verifyEmail(String token) async => verifiedTokens.add(token);
+
+  /// Nothing needs the customer's attention unless a test says so. Null is the
+  /// ordinary answer and the landing card renders nothing for it.
+  NextBooking? next;
+
+  @override
+  Future<NextBooking?> nextBooking() async => next;
 
   @override
   Future<void> signOut(String refreshToken, {bool allDevices = false}) async {
@@ -129,6 +181,10 @@ class FakeApi extends KhadraApi {
   @override
   Future<int> unreadNotificationCount() async => 0;
 
+  /// What a search answers, whatever it asked. Empty unless a test says otherwise.
+  Paged<CatalogueListing> searchResult =
+      const Paged(items: [], page: 1, pageSize: 20, totalCount: 0);
+
   @override
   Future<Paged<CatalogueListing>> searchVehicles({
     String? cityId,
@@ -146,36 +202,121 @@ class FakeApi extends KhadraApi {
     int pageSize = 20,
     CancelToken? cancelToken,
   }) async =>
+      searchResult;
+
+  // ── A rental office's page ──────────────────────────────────────────────────
+
+  /// The page a dealer id answers with. Set by the test; reaching it unset is a
+  /// test asking for a page it never described.
+  PublicGalleryPage? galleryPage;
+
+  /// That office's reviews. Empty unless a test says otherwise.
+  Paged<GalleryReview> galleryReviewPage =
       const Paged(items: [], page: 1, pageSize: 20, totalCount: 0);
+
+  @override
+  Future<PublicGalleryPage> gallery(String dealerId) async =>
+      galleryPage ?? (throw StateError('no gallery page set for $dealerId'));
+
+  @override
+  Future<Paged<GalleryReview>> galleryReviews(
+    String dealerId, {
+    int page = 1,
+    int pageSize = 20,
+  }) async =>
+      galleryReviewPage;
+
+  // ── Saved cars ──────────────────────────────────────────────────────────────
+
+  /// The saved LIST, which is a different question from the membership set a
+  /// heart asks — hence the name. `shortlist_test.dart` subclasses this with its
+  /// own `saved` set for the heart.
+  List<SavedVehicle> savedCars = const [];
+
+  final List<String> forgotten = <String>[];
+
+  @override
+  Future<List<SavedVehicle>> shortlist() async => savedCars;
+
+  @override
+  Future<Set<String>> savedAmong(List<String> vehicleIds) async => savedCars
+      .map((entry) => entry.vehicleId)
+      .toSet()
+      .intersection(vehicleIds.toSet());
+
+  @override
+  Future<void> forgetVehicle(String vehicleId) async {
+    forgotten.add(vehicleId);
+    savedCars = [
+      for (final entry in savedCars)
+        if (entry.vehicleId != vehicleId) entry,
+    ];
+  }
 }
 
-/// A [SessionStore] backed by two fields, so no test touches a real keystore.
+/// The token store, in memory.
+///
+/// It keeps the real one's OWNERSHIP rule rather than only its storage: a token is
+/// readable when this install claims it and invisible when it does not. That is
+/// what makes a sign-out stick even when a delete fails, so a fake that ignored it
+/// would let a test pass on a session the app could not actually end.
 class FakeSessionStore extends SessionStore {
-  FakeSessionStore({this.refreshToken});
+  FakeSessionStore({this.refreshToken, this.owned = true});
 
   String? refreshToken;
   DateTime? refreshExpiry;
   int clearCalls = 0;
 
-  @override
-  Future<void> clearIfReinstalled() async {}
+  /// Whether this install claims the token below. See `SessionStore.sessionIsOwned`.
+  bool owned;
+
+  /// Set behind the store's back, the way a Keychain entry survives an app being
+  /// deleted or a failed delete leaves one behind.
+  void plantDisownedToken(String token, DateTime expiresAt) {
+    refreshToken = token;
+    refreshExpiry = expiresAt.toUtc();
+    owned = false;
+  }
 
   @override
-  Future<String?> readRefreshToken() async => refreshToken;
+  bool get sessionIsOwned => owned;
 
   @override
-  Future<DateTime?> readRefreshExpiry() async => refreshExpiry;
+  Future<void> discardDisownedTokens() async {
+    if (owned) return;
+    await clear();
+  }
+
+  @override
+  Future<void> disownSession() async => owned = false;
+
+  /// When true the store stops ANSWERING, the way a locked keystore does: reads
+  /// come back null without that meaning the token is gone.
+  bool unreadable = false;
+
+  // `readRefreshToken` is deliberately NOT overridden -- the real one delegates to
+  // this, so a test that fakes only the outcome cannot have the two disagree.
+  @override
+  Future<({String? token, bool answered})> readRefreshTokenOutcome() async =>
+      unreadable
+          ? (token: null, answered: false)
+          : (token: owned ? refreshToken : null, answered: true);
+
+  @override
+  Future<DateTime?> readRefreshExpiry() async => owned ? refreshExpiry : null;
 
   @override
   Future<void> saveRefreshToken(String token, DateTime expiresAt) async {
     refreshToken = token;
     refreshExpiry = expiresAt.toUtc();
+    owned = true;
   }
 
   @override
   Future<void> clear() async {
     clearCalls++;
     clearAccessToken();
+    owned = false;
     refreshToken = null;
     refreshExpiry = null;
   }

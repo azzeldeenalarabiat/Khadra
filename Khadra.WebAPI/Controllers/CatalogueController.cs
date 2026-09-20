@@ -68,6 +68,21 @@ public sealed class CatalogueController : ApiControllerBase
         return FromResult(result);
     }
 
+    /// <summary>The seat counts and car types the bookable catalogue holds.</summary>
+    /// <remarks>
+    /// The customer's filters are built from this rather than from a list typed into the app: a seat
+    /// choice no car has matches nothing, and a category with no car in it is a chip that leads to an
+    /// empty page. Not narrowed by any filter, so choosing one never takes the others away.
+    /// </remarks>
+    [HttpGet("vehicles/facets")]
+    [ProducesResponseType<CatalogueFacets>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> Facets(CancellationToken cancellationToken)
+    {
+        NoStore();
+        var result = await Mediator.Send(new GetCatalogueFacetsQuery(), cancellationToken);
+        return FromResult(result);
+    }
+
     /// <summary>One car in full.</summary>
     /// <remarks>
     /// Answers 404 for a car that is not listed, whose gallery cannot trade, or that does not exist,
@@ -119,7 +134,7 @@ public sealed class CatalogueController : ApiControllerBase
 
     /// <summary>A gallery's public page.</summary>
     [HttpGet("galleries/{dealerId:guid}")]
-    [ProducesResponseType<PublicGallery>(StatusCodes.Status200OK)]
+    [ProducesResponseType<PublicGalleryPage>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Gallery(Guid dealerId, CancellationToken cancellationToken)
     {

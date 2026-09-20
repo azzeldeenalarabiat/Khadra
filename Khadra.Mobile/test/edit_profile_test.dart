@@ -6,6 +6,7 @@ import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/router.dart';
+import 'package:khadra_mobile/features/auth/auth_form_widgets.dart';
 import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/features/profile/edit_profile_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
@@ -68,9 +69,11 @@ void main() {
     return (api, container);
   }
 
+  // The label is a sibling ABOVE the box, not a floating label inside it, so the
+  // question "which field is labelled X" is asked of the widget that owns both.
   Finder fieldLabelled(String label) => find.ancestor(
         of: find.text(label),
-        matching: find.byType(TextFormField),
+        matching: find.byType(KhadraField),
       );
 
   testWidgets('opens holding what the account already says', (tester) async {

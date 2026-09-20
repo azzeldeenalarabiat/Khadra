@@ -70,9 +70,40 @@ reverting the whole console.
     -- in `.ltr`, and text somebody typed in `.user-text`, or bidi reorders them.
   - `letter-spacing` breaks Arabic's cursive joins; `_rtl.scss` zeroes it under `:lang(ar)`.
   - Mirror only direction-carrying icons, with `class="icon-mirrored"`. Not clocks, cars or charts.
+  - **Status names go through `I18nService.statusLabel(name, scope)`**, never a local map to English
+    words. Where a reader words a status differently (the dealer's queue calls `Requested` "Pending"),
+    that wording is a scoped dictionary entry (`status.requestedDealerBooking`), resolved most specific
+    first. A flag that is not a status (a live dispute) is worded with its own key.
+  - **Refusals are held as facts.** A failed request goes into a `ProblemSnapshot`
+    (`core/i18n/problem.ts`) and its words are chosen in a `computed`, so switching language re-words
+    a refusal already on screen. The server writes ProblemDetails and validation messages in English:
+    show them only through `serverSentence` / `fieldMessage`, which use them in English and a localized
+    line in Arabic — never `error.title` or `errors[field][0]` directly.
+  - **Time is worded by `FormatService`:** `relative` ("3 hr ago", "in 2 days"), `dayAndTime`
+    ("tomorrow 09:00"), `duration` ("13h"). A server `YYYY-MM-DD` is a calendar date, not an instant:
+    `calendarDayMonth`, never `new Date(iso + 'T00:00:00')`.
+  - **A clock against a deadline is one of two things, and they read differently** (owner, 2026-09-17):
+    a chance that runs out — a request to answer, a deposit to pay, a signed link — is
+    `formats.deadline(iso, closed)`: "2h remaining", then a terminal "Expired"; a promise that can be
+    broken — a dispute SLA, an application review — is `formats.sla(iso, breached)`: "2h remaining",
+    then "Overdue by 13h". Both floor the figure and never show less than a minute, and both take the
+    SERVER's flag as well as the clock, so a browser whose time is behind cannot keep a dead deadline
+    alive. Never hand-write "13h over" or "7h left".
+  - **Enums that are not statuses** — a booking party, a handover type, a penalty reason — go through
+    `I18nService.enumLabel(family, name)`, with the same spelled-out fallback as `statusLabel`.
+  - A penalty's reason is worded from its `reasonCode`; a booking assessed before codes existed shows
+    its frozen English sentence in a `.ltr` run, never a guess made from the text.
+  - **Arabic vocabulary matches the Customer App** (owner, 2026-09-13): a dealership is "مكتب" /
+    "مكتب التأجير", a vehicle "سيارة", the brand "خضرا". `dictionaries.spec.ts` fails on "معرض" or
+    "مركبة".
 - Every money value shows its currency code, taken from the value's own `currency` — never a literal
   `'JOD'` default. The platform's own figures carry theirs; a hard-coded code is a claim about a
   number that came from somewhere else.
+- **A template never types a sign in front of an amount.** A literal "−" before `{{ x | money }}`
+  printed "−0" on a zero commission, and in Arabic, outside the formatter's bidi isolate, "JOD 0−".
+  The platform commission is shown as the positive amount Khadra charges (owner, 2026-09-13); the
+  labels carry the subtraction, and the server computes the net. `FormatService` also refuses to print
+  negative zero.
 - Restricted actions depend on WHY they are restricted, and the two are not the same restriction:
   - **A state you are waiting out** — a dealership not yet approved, a suspension, a booking in the
     wrong status — keeps its control, disabled, with a `title` naming what unlocks it. The action is
@@ -122,3 +153,7 @@ to the person acting on it.
 
 - No `any` unless an external library forces it.
 - `npm run build -- --configuration production` passes.
+- `npm run i18n:check` passes. It parses every template and component and fails on user-facing copy
+  outside the translation system, on `toLocale*`/`Intl` outside `core/i18n`, and on `toFixed` in a
+  component. A string that is genuinely correct in Latin script on an Arabic screen goes in its
+  `ALLOW` list with the reason — never an exclusion by file.

@@ -72,4 +72,20 @@ describe('translation dictionaries', () => {
       expect(missing, `"${key}" is missing Arabic plural forms`).toEqual([]);
     }
   });
+
+  it('use the Customer App words for a rental office and a car', () => {
+    // The owner decided on 2026-09-13 that the console speaks the Customer App's Arabic
+    // (Khadra.Mobile/lib/l10n/app_ar.arb): a dealership is "مكتب" / "مكتب التأجير" and a vehicle is
+    // "سيارة", so a customer and the office they rent from use the same words. The console used to
+    // say "معرض" and "مركبة"; this stops a later batch bringing either back, in any form (المعارض,
+    // معرضك, مركبات, مركبتك). "معارضة", an objection, is a different word and stays allowed.
+    const retired = /معرض|معارض(?!ة)|مركب[ةتا]/;
+    const offending = (Object.keys(AR) as (keyof typeof AR)[]).filter((key) => {
+      const message: Message = AR[key];
+      const forms = typeof message === 'string' ? [message] : Object.values(message);
+      return forms.some((form) => retired.test(form ?? ''));
+    });
+
+    expect(offending).toEqual([]);
+  });
 });

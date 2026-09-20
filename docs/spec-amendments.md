@@ -89,7 +89,8 @@ do. The order is now:
 
 1. The customer submits a request. **No payment.**
 2. The dealer or their employee approves or rejects it.
-3. On approval the customer has **24 hours** to pay the deposit.
+3. On approval the customer has **2 hours** to pay the deposit. (24 when this was written; the owner
+   shortened it on 2026-09-11 — see below.)
 4. Unpaid within that window, the booking expires and the car returns to the market.
 
 **The deposit requirement is unchanged.** Everything §5.3 says about the money itself still holds:
@@ -173,17 +174,34 @@ would mean the owner could not move one without moving the other.
 
 | Setting | Value | Where |
 |---|---|---|
-| `BusinessRules:PaymentWindowHours` | 24 | Frozen onto each booking as `BookingTerms.PaymentWindow`; published on `GET /api/v1/app-config` |
+| `BusinessRules:PaymentWindowHours` | 2 | Frozen onto each booking as `BookingTerms.PaymentWindow`; published on `GET /api/v1/app-config` |
 | `BusinessRules:BookingAnswerWindowHours` | 48 | Frozen onto each booking as `BookingTerms.AnswerWindow`; expires an unanswered request |
 
-**24 hours, not the one hour first proposed.** There are no push notifications yet, so a customer
-learns of an approval only by opening the app. A one-hour window would auto-cancel most bookings
-approved overnight or during working hours before the customer ever saw them, and waste the dealer's
-decision. Shorten it once push exists — it is one configuration value, which is why it is not a
-constant. Tracked on the pre-launch checklist.
+**24 hours on 2026-09-07, not the one hour first proposed.** There are no push notifications yet, so
+a customer learns of an approval only by opening the app. A one-hour window would auto-cancel most
+bookings approved overnight or during working hours before the customer ever saw them, and waste the
+dealer's decision. Shorten it once push exists — it is one configuration value, which is why it is
+not a constant.
 
-The window is capped at the rental start: a booking approved twenty minutes before pickup cannot have
-a 24-hour window.
+**Amended to 2 hours on 2026-09-11.** The owner took the other side of that trade: a day is a day a
+car sits held for a customer who has stopped thinking about it, and at two hours it is back on the
+market the same morning. Push still does not exist, so the cost stands and is now larger — an
+approval missed is an approval expired. `GET /bookings/next` puts the deposit on the landing screen
+the moment the app opens, and the booking screen re-reads itself when its countdown runs out, but
+neither reaches a phone in a pocket. Pre-launch item 90 records it, and names an approval email as
+the cheapest thing that would close it.
+
+**The window is never shortened to fit the rental. The approval is refused instead (2026-09-11).**
+A gallery may answer a request only up to `rental start − payment window`; past that the car is back
+on the market and the request expires unanswered. It used to be capped instead, so a booking approved
+twenty minutes before pickup got twenty minutes while the platform called it a two-hour window.
+
+That made the two settings dependent on each other, and forced the minimum lead time up from 120
+minutes to **240**: the gap between the lead time and the payment window is the whole of the time a
+gallery has to answer a request made at the earliest a customer may book for, and at 120/120 it was
+zero. Startup now refuses a configuration where the lead time does not strictly exceed the window.
+Both halves were settled by the owner on 2026-09-11: a last-minute request gives the gallery roughly
+two hours to decide while the customer keeps their full two hours to pay.
 
 ### Free cancellation
 
@@ -194,17 +212,21 @@ at approval nothing has been paid and there is nothing to be penalised on. The d
 
 Three consequences were put to the owner and accepted as they stand.
 
-**A car can be held free for 72 hours, and the hold is renewable.** The two windows compose: 48 hours
-for the dealer to answer, then 24 for the customer to pay. Nothing has been paid for any of it. And
-nothing stops the same customer requesting the same car again the moment their request expires, so
-the ceiling is 72 hours per request, not per customer. Accepted as the exposure of launching without
-Payments; the deposit was what used to make hoarding expensive, and the two windows are what replace
-it. Tracked as a checklist item so it is reconsidered rather than forgotten.
+**A car can be held free for the two windows together, and the hold is renewable.** They compose: 48
+hours for the dealer to answer, then the customer's payment window. Nothing has been paid for any of
+it. And nothing stops the same customer requesting the same car again the moment their request
+expires, so the ceiling is per request, not per customer. Accepted as the exposure of launching
+without Payments; the deposit was what used to make hoarding expensive, and the two windows are what
+replace it. Tracked as a checklist item so it is reconsidered rather than forgotten.
+
+The ceiling was 72 hours when this was accepted and is 50 since 2026-09-11, because shortening the
+payment window shortened it. The figure is not written down anywhere in the code — it is the sum of
+two settings, and the reason this paragraph now says "the two windows" rather than a number.
 
 **Cancelling before the deposit clears costs nothing, whoever cancels.** No money has moved, so there
 is nothing a penalty could be assessed against — this is the domain's existing rule and it now covers
 an approved-but-unpaid booking as well as an unanswered request. A dealer can therefore approve and
-the customer walk away at no cost, and a customer can hold a car for 72 hours and drop it. Accepted
+the customer walk away at no cost, and a customer can hold a car for both windows and drop it. Accepted
 for now; to be revisited once Payments exists and there is something to charge against.
 
 **Identity documents are a checkbox, not a check.** A customer must have UPLOADED a licence and an
@@ -225,7 +247,7 @@ Two rules were added with it, both configured:
 
 | Setting | Value | Why |
 |---|---|---|
-| `BusinessRules:MinimumBookingLeadTimeMinutes` | 120 | Every window on a booking is capped at the rental start, so without a floor they all collapse together on a last-minute request while the platform advertises a 24-hour payment window. Published on `/app-config` for the date picker. |
+| `BusinessRules:MinimumBookingLeadTimeMinutes` | 120 | Every window on a booking is capped at the rental start, so without a floor they all collapse together on a last-minute request while the platform is promising the customer a payment window and the gallery an answer window. Published on `/app-config` for the date picker. **Not `PaymentWindowHours`**, which is also 120 minutes since 2026-09-11 and is a different rule entirely. |
 | `BusinessRules:MaxAdvanceBookingDays` | 180 | Already existed and was published but never enforced. Now refused at creation. |
 | `BusinessRules:MaxRentalDays` | 90 | Nothing bounded the far end: a five-year request was accepted and held a car for the whole answer window. Judged on the BILLED day count, so the figure a customer is refused on is the one they were quoted. |
 

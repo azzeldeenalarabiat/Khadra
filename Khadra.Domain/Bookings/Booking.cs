@@ -79,9 +79,20 @@ public sealed class Booking : AggregateRoot
 
     /// <summary>When the dealer must have answered by, or the request expires.</summary>
     /// <remarks>
+    /// <para>
     /// A real column rather than something derived on read, because both the availability query and
-    /// the expiry job filter on it and an index has to exist. Capped at the rental start: a request
-    /// for a car due out in an hour cannot sit unanswered for two days.
+    /// the expiry job filter on it and an index has to exist.
+    /// </para>
+    /// <para>
+    /// Capped at <c>LastDecisionInstant</c> — the rental start LESS the payment window, not the
+    /// rental start itself. Since 2026-09-11 a gallery may not approve unless the customer can still
+    /// have the whole window to pay, and putting that rule in this one column is what makes every
+    /// consumer of it right without being touched: the availability predicate releases the car at the
+    /// last approvable instant, the settlement sweep closes the row there, the customer's screen
+    /// stops saying the office is still deciding there, and the console's countdown reaches zero
+    /// there. A guard in <c>Approve</c> alone would have left the car held, and the gallery counting
+    /// down, on a request nobody could accept.
+    /// </para>
     /// </remarks>
     public DateTimeOffset DecisionDeadline { get; private set; }
 
@@ -142,6 +153,16 @@ public sealed class Booking : AggregateRoot
 
         if (period.Start <= now)
             return BookingErrors.PeriodInThePast;
+        // A request nobody could ever accept must not be created. BookingWindowPolicy keeps the
+        // rental start far enough out that this cannot happen — the lead time is validated at
+        // startup to exceed the payment window — but the aggregate does not take that on trust, and
+        // the day business rules become admin-editable (pre-launch item 25) that validation stops
+        // being the only way a pair of numbers can arrive.
+        //
+        // A Result rather than a throw, unlike the pricing-date check below: this one is reachable
+        // from a configuration change, and a customer deserves a sentence rather than a 500.
+        if (LastDecisionInstant(period, terms) <= now)
+            return BookingErrors.NoTimeToDecide;
         // The pricing must belong to the period being booked. The exact check — that the frozen dates
         // are the period's instants seen through the platform's calendar — needs a time zone, which
         // the domain deliberately does not have. What it can assert without one is that no real zone
@@ -186,15 +207,29 @@ public sealed class Booking : AggregateRoot
             ExtendedFromBookingId = extendedFromBookingId,
             CreatedAt = now,
             RequestedAt = now,
-            // The dealer's clock starts now, capped at the rental start: a request for a car due
-            // out in an hour cannot sit unanswered for two days.
-            DecisionDeadline = Cap(now.Add(terms.AnswerWindow), period.Start)
+            // The dealer's clock starts now, capped at the last instant an approval could still give
+            // the customer their whole payment window.
+            DecisionDeadline = Cap(now.Add(terms.AnswerWindow), LastDecisionInstant(period, terms))
         };
         booking.RecordTransition(null, BookingStatus.Requested, BookingParty.Customer, customerId, null, now);
         booking.AddDomainEvent(new BookingCreated(booking.Id, customerId, dealerId, vehicleId, now));
         booking.AddDomainEvent(new BookingRequested(booking.Id, dealerId, now));
         return booking;
     }
+
+    /// <summary>
+    /// The last instant an approval can still give the customer their whole payment window.
+    /// </summary>
+    /// <remarks>
+    /// One expression, used by <c>Create</c> to trim the stored deadline and by <c>Approve</c> to
+    /// state the invariant, so what is stored and what is enforced cannot drift apart.
+    ///
+    /// EXCLUSIVE, like every other deadline on this aggregate: the availability predicate releases
+    /// the car at <c>DecisionDeadline</c>, so an approval landing exactly on it would be racing
+    /// whoever took the car a microsecond later.
+    /// </remarks>
+    private static DateTimeOffset LastDecisionInstant(DateRange period, BookingTerms terms) =>
+        period.Start.Subtract(terms.PaymentWindow);
 
     /// <summary>No window may outlive the rental it governs.</summary>
     /// <remarks>
@@ -371,8 +406,10 @@ public sealed class Booking : AggregateRoot
         DepositPaymentId = depositPaymentId;
         // The free-cancellation window starts at PAYMENT, not at approval. Spec 5.5 measures it
         // from approval because under the old order payment came first, so approval was the moment
-        // of commitment. It is not any more: a customer who pays at hour 23 of a 24-hour window
-        // would otherwise have a free window that closed 22 hours before they committed anything.
+        // of commitment. It is not any more: a customer who pays near the end of the payment window
+        // would otherwise have a free window that closed before they committed anything. That gap
+        // was a whole day while the window was twenty-four hours; at two it is minutes, and the
+        // reasoning is the same either way, which is why this does not read the window's length.
         FreeCancellationDeadline = Cap(now.Add(Terms.FreeCancellationWindow), Period.Start);
         Transition(BookingStatus.Confirmed, BookingParty.Customer, CustomerId, null, now);
         AddDomainEvent(new BookingConfirmed(Id, DealerId, VehicleId, now));
@@ -392,7 +429,7 @@ public sealed class Booking : AggregateRoot
         if (PaymentDeadline is not { } deadline || now < deadline)
             return UnitResult.Failure(BookingErrors.PaymentWindowNotElapsed);
 
-        Penalty = PenaltyAssessment.None("The deposit was not paid within the payment window.", Pricing.CurrencyCode, now);
+        Penalty = PenaltyAssessment.None(PenaltyReason.PaymentWindowLapsed, Pricing.CurrencyCode, now);
         FinishedAt = now;
         Transition(BookingStatus.Expired, PartyFor(actorUserId), actorUserId, "Payment window elapsed.", now);
         AddDomainEvent(new BookingExpired(Id, VehicleId, "PaymentWindowElapsed", now));
@@ -412,7 +449,7 @@ public sealed class Booking : AggregateRoot
         if (now < DecisionDeadline)
             return UnitResult.Failure(BookingErrors.DecisionWindowNotElapsed);
 
-        Penalty = PenaltyAssessment.None("The dealer did not answer within the agreed window.", Pricing.CurrencyCode, now);
+        Penalty = PenaltyAssessment.None(PenaltyReason.DealerAnswerWindowLapsed, Pricing.CurrencyCode, now);
         FinishedAt = now;
         Transition(BookingStatus.Expired, PartyFor(actorUserId), actorUserId, "Dealer did not respond.", now);
         AddDomainEvent(new BookingExpired(Id, VehicleId, "DealerDidNotRespond", now));
@@ -435,12 +472,21 @@ public sealed class Booking : AggregateRoot
         // anything and closes the record honestly.
         if (now >= DecisionDeadline)
             return UnitResult.Failure(BookingErrors.DecisionWindowElapsed);
+        // The same rule the stored deadline already encodes, stated again — and it is NOT redundant.
+        // A booking requested BEFORE 2026-09-11 carries a deadline capped at the rental start, so
+        // approving one of those in its last two hours would hand the customer a payment deadline
+        // past the moment they were due to collect the car. Same error code, because from the
+        // gallery's side it is the same fact: the time to answer this request has gone.
+        if (now.Add(Terms.PaymentWindow) > Period.Start)
+            return UnitResult.Failure(BookingErrors.DecisionWindowElapsed);
 
         ActedByUserId = actedByUserId;
         ApprovedAt = now;
-        // The customer now owes a deposit, and this is their window to pay it. Capped at the rental
-        // start, so an approval twenty minutes before pickup gives twenty minutes, not a day.
-        PaymentDeadline = Cap(now.Add(Terms.PaymentWindow), Period.Start);
+        // The customer now owes a deposit, and this is their window to pay it. NOT capped: the two
+        // guards above are what guarantee the whole window fits before the rental starts, and a cap
+        // here would tell the next reader that the window can still be shortened — which is exactly
+        // the behaviour the owner removed on 2026-09-11.
+        PaymentDeadline = now.Add(Terms.PaymentWindow);
         var trimmed = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
         Transition(BookingStatus.Approved, BookingParty.Dealer, actedByUserId, trimmed, now);
         AddDomainEvent(new BookingApproved(Id, DealerId, actedByUserId, now, trimmed));
@@ -463,7 +509,7 @@ public sealed class Booking : AggregateRoot
             return UnitResult.Failure(BookingErrors.ReasonRequired);
 
         ActedByUserId = actedByUserId;
-        Penalty = PenaltyAssessment.None("The dealer rejected the request.", Pricing.CurrencyCode, now);
+        Penalty = PenaltyAssessment.None(PenaltyReason.DealerRejected, Pricing.CurrencyCode, now);
         FinishedAt = now;
         Transition(BookingStatus.Rejected, BookingParty.Dealer, actedByUserId, details, now, reasonCode.Name);
         AddDomainEvent(new BookingRejected(Id, DealerId, actedByUserId, details.Trim(), now));
@@ -555,7 +601,7 @@ public sealed class Booking : AggregateRoot
             Terms.DealerPenaltyMinPercent,
             Terms.DealerPenaltyMaxPercent,
             Pricing.RentalTotal,
-            "The dealer did not hand over the vehicle after approving the booking.",
+            PenaltyReason.DealerDidNotHandOver,
             now);
         FinishedAt = now;
         Transition(BookingStatus.Cancelled, BookingParty.Customer, customerUserId, reason, now);
@@ -590,10 +636,10 @@ public sealed class Booking : AggregateRoot
                 BookingParty.Customer,
                 Percentage.FromValidated(100m),
                 Pricing.DepositAmount,
-                "The customer did not collect the vehicle within the no-show window.",
+                PenaltyReason.CustomerNoShow,
                 now)
             : PenaltyAssessment.None(
-                "The vehicle was never handed over on a delivery booking; responsibility is undetermined.",
+                PenaltyReason.DeliveryNoShowUndetermined,
                 Pricing.CurrencyCode,
                 now);
 
@@ -723,10 +769,10 @@ public sealed class Booking : AggregateRoot
         // which is a late rejection in all but name. Assessing a percentage of a deposit nobody has
         // paid would be an assessment with nothing behind it and no rail to collect it on.
         if (Status != BookingStatus.Confirmed)
-            return PenaltyAssessment.None("Cancelled before the deposit was paid.", Pricing.CurrencyCode, now);
+            return PenaltyAssessment.None(PenaltyReason.CancelledBeforeDeposit, Pricing.CurrencyCode, now);
 
         if (FreeCancellationDeadline is not null && now <= FreeCancellationDeadline.Value)
-            return PenaltyAssessment.None("Cancelled inside the free cancellation window.", Pricing.CurrencyCode, now);
+            return PenaltyAssessment.None(PenaltyReason.CancelledInFreeWindow, Pricing.CurrencyCode, now);
 
         if (cancelledBy == BookingParty.Customer)
         {
@@ -734,7 +780,7 @@ public sealed class Booking : AggregateRoot
                 BookingParty.Customer,
                 Terms.CustomerCancellationPenaltyPercent,
                 Pricing.DepositAmount,
-                "The customer cancelled after the free cancellation window.",
+                PenaltyReason.CustomerCancelledAfterFreeWindow,
                 now);
         }
 
@@ -745,11 +791,11 @@ public sealed class Booking : AggregateRoot
                 Terms.DealerPenaltyMinPercent,
                 Terms.DealerPenaltyMaxPercent,
                 Pricing.RentalTotal,
-                "The dealer cancelled after the free cancellation window.",
+                PenaltyReason.DealerCancelledAfterFreeWindow,
                 now);
         }
 
-        return PenaltyAssessment.None("Cancelled by the platform.", Pricing.CurrencyCode, now);
+        return PenaltyAssessment.None(PenaltyReason.CancelledByPlatform, Pricing.CurrencyCode, now);
     }
 
     private void Transition(

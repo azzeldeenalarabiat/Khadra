@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/dtos.dart';
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/format/formats.dart';
 import '../../core/providers.dart';
+import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
+import '../../core/uploads/document_picker.dart';
+import '../../core/uploads/document_viewer.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import 'document_providers.dart';
@@ -30,6 +31,10 @@ class DocumentsScreen extends ConsumerStatefulWidget {
 class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   String? _uploading;
 
+  /// Which document is being fetched and handed to a viewer, so the row can say
+  /// so: the bytes travel over the network and the wait is not instant.
+  String? _opening;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -37,7 +42,10 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.documentsTitle)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.profile),
+        title: Text(l10n.documentsTitle),
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(myDocumentsProvider.future),
         child: switch (documents) {
@@ -69,10 +77,17 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     // renter must file is the platform's rule (and differs for a foreign national,
     // who files a passport rather than a national ID); the app's job is to render
     // the answer, not to hold a copy of the question.
+    //
+    // ORDERED, and that is the point. The set is `missing ∪ uploaded`, so with
+    // insertion order the tiles RESHUFFLED under the customer's finger: uploading
+    // the licence front moved it out of `missing` and down the list, and the next
+    // tile slid up under the tap. The app does not decide WHICH documents appear;
+    // it does decide that they stop moving.
     final wanted = <String>{
       ...documents.missing,
       ...documents.documents.map((document) => document.type),
-    };
+    }.toList()
+      ..sort(_byFilingOrder);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(
@@ -80,7 +95,12 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
       children: [
         Text(
           l10n.documentsIntro,
-          style: const TextStyle(fontSize: 14, height: 1.55),
+          style: const TextStyle(
+            fontSize: 13,
+            height: 1.5,
+            fontWeight: FontWeight.w500,
+            color: KhadraColors.neutral700,
+          ),
         ),
         const SizedBox(height: Space.lg),
 
@@ -97,11 +117,12 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
             type: type,
             document: documents.ofType(type),
             uploading: _uploading == type,
+            opening: _opening == documents.ofType(type)?.documentId,
             formats: formats,
             onUpload: () => _upload(type),
             onView: () => _view(documents.ofType(type)!),
           ),
-          const SizedBox(height: Space.md),
+          const SizedBox(height: Space.sm),
         ],
 
         const SizedBox(height: Space.lg),
@@ -114,76 +135,39 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
     );
   }
 
+  /// Photograph it, choose a photo, or file the PDF somebody sent you.
+  ///
+  /// Which of those are offered, and what is accepted once one is chosen, are the
+  /// SERVER's answers — `/app-config` publishes the content types and the size
+  /// cap, and [DocumentPicker] does nothing but render them and check against
+  /// them. Checked here as well as on the server because the failure is
+  /// expensive: a customer on a Jordanian mobile network should not upload eight
+  /// megabytes to be told it was one too many.
   Future<void> _upload(String type) async {
-    final l10n = AppLocalizations.of(context);
-    final limits = ref.read(appConfigProvider).valueOrNull?.documents;
+    final picker =
+        DocumentPicker(ref.read(appConfigProvider).valueOrNull?.documents);
 
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: Text(l10n.documentsTakePhoto),
-              subtitle: Text(
-                l10n.documentsCameraNote,
-                style: const TextStyle(fontSize: 12),
-              ),
-              onTap: () => Navigator.of(context).pop(ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: Text(l10n.documentsChooseFile),
-              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
+    final choice = await picker.pick(context);
+    if (choice == null || !mounted) return;
 
-    if (source == null) return;
-
-    // JPEG is requested explicitly. An iPhone's camera writes HEIC by default,
-    // and the platform's accepted types are JPEG, PNG, WebP and PDF -- so without
-    // this every licence photo taken on an iPhone would be refused as an invalid
-    // content type.
-    final picked = await ImagePicker().pickImage(
-      source: source,
-      imageQuality: 88,
-      maxWidth: 2400,
-      requestFullMetadata: false,
-    );
-
-    if (picked == null || !mounted) return;
-
-    final bytes = await picked.readAsBytes();
-
-    // Checked here as well as on the server, because the failure is expensive: a
-    // customer on a Jordanian mobile network should not upload eight megabytes to
-    // be told it was one too many.
-    if (limits != null && bytes.length > limits.maximumSizeBytes) {
-      if (!mounted) return;
-      showKhadraMessage(
-        context,
-        l10n.documentsTooLarge(_megabytes(limits.maximumSizeBytes)),
-        isError: true,
-      );
-      return;
+    switch (choice) {
+      case DocumentRefused(:final message):
+        showKhadraMessage(context, message, isError: true);
+      case DocumentChosen(:final document):
+        await _send(type, document);
     }
+  }
 
+  Future<void> _send(String type, PickedDocument document) async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _uploading = type);
 
     try {
       await ref.read(apiProvider).uploadDocument(
             type: type,
-            bytes: bytes,
-            fileName: picked.name.toLowerCase().endsWith('.jpg') ||
-                    picked.name.toLowerCase().endsWith('.jpeg')
-                ? picked.name
-                : '${picked.name}.jpg',
-            contentType: 'image/jpeg',
+            bytes: document.bytes,
+            fileName: document.fileName,
+            contentType: document.contentType,
           );
 
       ref.invalidate(myDocumentsProvider);
@@ -203,18 +187,65 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen> {
   /// wearing a disguise. The link is minted per view and expires.
   Future<void> _view(CustomerDocument document) async {
     final l10n = AppLocalizations.of(context);
+    setState(() => _opening = document.documentId);
+
     try {
+      // THIS APP fetches the bytes, not a browser.
+      //
+      // The download endpoint is protected twice and stays that way: the signed
+      // link proves the URL was minted here for this file and has not expired,
+      // and the bearer token proves there is still a live session behind the
+      // request. Handing the URL to an external browser satisfied only the
+      // first, so the server answered 401 and the customer saw a page of JSON.
+      // Fetching it here satisfies both without loosening either.
       final link = await ref.read(apiProvider).documentLink(document.documentId);
-      await launchUrl(Uri.parse(link.url), mode: LaunchMode.externalApplication);
-    } on ApiFailure catch (failure) {
-      if (mounted) {
-        showKhadraMessage(context, failure.messageFor(l10n), isError: true);
+      final fetched = await ref.read(apiProvider).documentBytes(link.url);
+
+      final opened = await DocumentViewer.open(
+        bytes: fetched.bytes,
+        contentType: fetched.contentType ?? document.contentType,
+        documentId: document.documentId,
+      );
+
+      if (!mounted) return;
+      setState(() => _opening = null);
+      if (!opened) {
+        showKhadraMessage(context, l10n.documentsOpenFailed, isError: true);
       }
+    } on ApiFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _opening = null);
+      showKhadraMessage(context, failure.messageFor(l10n), isError: true);
+    } on Exception {
+      // Writing the cache file, or the platform refusing to open it. Neither is
+      // something to crash on, and neither is an API failure with words of its
+      // own.
+      if (!mounted) return;
+      setState(() => _opening = null);
+      showKhadraMessage(context, l10n.documentsOpenFailed, isError: true);
     }
   }
 
-  static String _megabytes(int bytes) =>
-      '${(bytes / (1024 * 1024)).toStringAsFixed(0)} MB';
+  /// The order somebody would fill these in: licence front, licence back, then
+  /// whichever identity document their account calls for.
+  ///
+  /// A type this build has never heard of sorts last, in its own alphabetical
+  /// order, rather than being dropped — the platform can add one at any time.
+  static int _byFilingOrder(String a, String b) {
+    const order = <String>[
+      DocumentTypes.drivingLicenceFront,
+      DocumentTypes.drivingLicenceBack,
+      DocumentTypes.nationalId,
+      DocumentTypes.passport,
+    ];
+    int rank(String type) {
+      final index = order.indexOf(type);
+      return index < 0 ? order.length : index;
+    }
+
+    final byRank = rank(a).compareTo(rank(b));
+    return byRank != 0 ? byRank : a.compareTo(b);
+  }
 }
 
 class _DocumentTile extends StatelessWidget {
@@ -222,6 +253,7 @@ class _DocumentTile extends StatelessWidget {
     required this.type,
     required this.document,
     required this.uploading,
+    required this.opening,
     required this.formats,
     required this.onUpload,
     required this.onView,
@@ -230,6 +262,10 @@ class _DocumentTile extends StatelessWidget {
   final String type;
   final CustomerDocument? document;
   final bool uploading;
+
+  /// The bytes are being fetched and written before a viewer can be handed them.
+  /// It is a network round trip, so the button has to say it is doing something.
+  final bool opening;
   final Formats formats;
   final VoidCallback onUpload;
   final VoidCallback onView;
@@ -240,14 +276,33 @@ class _DocumentTile extends StatelessWidget {
     final present = document != null;
 
     return KhadraCard(
+      // A document ROW, not a card: the design gives a list of papers a slightly
+      // tighter corner than the cards around it, which is what keeps a column of
+      // them reading as one list.
+      borderRadius: Radii.row,
+      padding: const EdgeInsets.all(13),
+      borderColor: document?.status == 'Rejected' ? KhadraColors.badBorder : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
-                _icon(type),
-                color: present ? KhadraColors.accent : KhadraColors.neutral400,
+              // The proportions of the thing itself — a licence or an identity
+              // card stood on its end, not a square icon.
+              Container(
+                width: 40,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: document?.status == 'Rejected'
+                      ? KhadraColors.badTint
+                      : KhadraColors.imagePlaceholder,
+                  borderRadius: Radii.pill,
+                ),
+                child: Icon(
+                  _icon(type, document),
+                  size: 20,
+                  color: present ? KhadraColors.accent : KhadraColors.neutral500,
+                ),
               ),
               const SizedBox(width: Space.md),
               Expanded(
@@ -257,29 +312,59 @@ class _DocumentTile extends StatelessWidget {
                     Text(
                       _label(l10n, type),
                       style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600),
+                          fontSize: 13, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
+                    // The STATE as a coloured line, not a badge at the end of the
+                    // row. "Waiting to be checked" is a sentence, and a lozenge
+                    // holding a sentence takes half a 375 screen -- which pushed
+                    // the paper's own name onto two lines to make room for it.
                     Text(
                       present
-                          ? l10n.documentsUploaded(
-                              formats.longDate(document!.uploadedAt))
+                          ? _statusLabel(l10n, document!.status)
                           : l10n.documentsMissing,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                         color: present
-                            ? KhadraColors.neutral600
+                            ? _statusColour(document!.status)
                             : KhadraColors.warn,
                       ),
                     ),
+                    if (present) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.documentsUploaded(
+                            formats.longDate(document!.uploadedAt)),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: KhadraColors.neutral500,
+                        ),
+                      ),
+                    ],
+                    // WHAT is on file, from the record rather than from the tile's
+                    // own guess: the platform takes photographs and PDFs, and a
+                    // customer replacing a document a year later deserves to know
+                    // which of the two they filed. Isolated because it is a Latin
+                    // run inside an Arabic paragraph.
+                    if (present && document!.contentType.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        Formats.isolate(l10n.documentsFileSummary(
+                          DocumentPicker.kindOf(document!.contentType),
+                          DocumentPicker.formatBytes(document!.sizeBytes),
+                        )),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: KhadraColors.neutral500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (present)
-                KhadraBadge(
-                  label: _statusLabel(l10n, document!.status),
-                  colour: _statusColour(document!.status),
-                ),
             ],
           ),
           if (document?.reviewNote != null &&
@@ -315,8 +400,16 @@ class _DocumentTile extends StatelessWidget {
                 const SizedBox(width: Space.sm),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: onView,
-                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                    // Disabled WHILE fetching, so a second tap cannot start a
+                    // second download of the same licence.
+                    onPressed: opening ? null : onView,
+                    icon: opening
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.visibility_outlined, size: 18),
                     label: Text(l10n.documentsView),
                   ),
                 ),
@@ -328,13 +421,23 @@ class _DocumentTile extends StatelessWidget {
     );
   }
 
-  static IconData _icon(String type) => switch (type) {
-        DocumentTypes.drivingLicenceFront ||
-        DocumentTypes.drivingLicenceBack =>
-          Icons.credit_card_outlined,
-        DocumentTypes.passport => Icons.book_outlined,
-        _ => Icons.badge_outlined,
-      };
+  /// The document's own icon, unless what is on file says otherwise.
+  ///
+  /// A licence filed as a PDF shows as a PDF. The type icon describes the paper
+  /// the platform asked for; once something is filed, the more useful fact is
+  /// what the customer actually sent.
+  static IconData _icon(String type, CustomerDocument? document) {
+    if (document != null && document.contentType.toLowerCase() == 'application/pdf') {
+      return Icons.picture_as_pdf_outlined;
+    }
+    return switch (type) {
+      DocumentTypes.drivingLicenceFront ||
+      DocumentTypes.drivingLicenceBack =>
+        Icons.credit_card_outlined,
+      DocumentTypes.passport => Icons.book_outlined,
+      _ => Icons.badge_outlined,
+    };
+  }
 
   static String _label(AppLocalizations l10n, String type) => switch (type) {
         DocumentTypes.drivingLicenceFront => l10n.documentsDrivingLicenceFront,

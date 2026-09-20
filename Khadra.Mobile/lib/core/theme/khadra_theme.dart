@@ -1,54 +1,122 @@
 import 'package:flutter/material.dart';
 
-/// The Khadra palette, ported value-for-value from
-/// `Khadra.Dashboard/src/styles/_tokens.scss`.
+/// The Khadra palette, taken from the approved customer-app design handoff
+/// (`KHADRA Customer App.dc.html`), which the owner made the visual source of
+/// truth for this app on 2026-09-11.
 ///
-/// Ported rather than re-picked. The console, the dealer console and this app are
-/// three faces of one platform, and a green chosen by eye on a phone would be a
-/// fourth brand nobody decided on. `_tokens.scss` says of itself that it is the
-/// source of truth for the look; this file is that file's shadow, and any change
-/// to the brand starts there.
+/// Before that it was a port of `Khadra.Dashboard/src/styles/_tokens.scss`, on the
+/// reasoning that one platform should not have two greens. That reasoning still
+/// holds and the answer simply moved: the handoff is now the one the app follows,
+/// and the console keeps its own until somebody decides otherwise. Anything that
+/// changes here changes there too, or the two drift apart again.
 ///
-/// The GEOMETRY is ported too — the same radii, the same 2.8px spacing step — and
-/// then read at phone sizes: the console's step is small because it packs dense
-/// tables, so the app uses multiples of it rather than the step itself.
+/// **Nothing in this app names a colour outside this file.** Not one
+/// `Color(0x…)`, not one screen-specific green. That is what made adopting the
+/// handoff a change to a token list rather than a sweep through thirty screens,
+/// and it is worth keeping true.
 abstract final class KhadraColors {
-  static const Color background = Color(0xFFF6F7F7);
+  static const Color background = Color(0xFFF6F7F6);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color text = Color(0xFF14181C);
+  static const Color text = Color(0xFF111827);
 
-  /// The logo's green. Everything that carries the brand uses this one.
-  static const Color accent = Color(0xFF146C34);
+  /// The brand green. Every button, every heart, every active tab.
+  static const Color accent = Color(0xFF15803D);
   static const Color accentBright = Color(0xFF16A34A);
 
-  static const Color neutral100 = Color(0xFFF5F6F6);
-  static const Color neutral200 = Color(0xFFE6E8E8);
-  static const Color neutral300 = Color(0xFFD2D5D6);
-  static const Color neutral400 = Color(0xFFB0B5B7);
-  static const Color neutral500 = Color(0xFF8B9194);
-  static const Color neutral600 = Color(0xFF6B7174);
-  static const Color neutral700 = Color(0xFF4D5356);
-  static const Color neutral800 = Color(0xFF32383B);
-  static const Color neutral900 = Color(0xFF1C2124);
+  /// The DARKER green the handoff reserves for money. A price is the thing on a
+  /// card a reader looks for first, and it is not an action.
+  static const Color price = Color(0xFF14532D);
 
-  static const Color accent100 = Color(0xFFEEF8F1);
-  static const Color accent200 = Color(0xFFD6EFDF);
-  static const Color accent300 = Color(0xFFAADFBF);
-  static const Color accent400 = Color(0xFF6EC894);
-  static const Color accent500 = Color(0xFF35AB6C);
-  static const Color accent600 = Color(0xFF1F8B52);
-  static const Color accent700 = Color(0xFF146C34);
-  static const Color accent900 = Color(0xFF0B3F1F);
+  /// Greys, in the handoff's own steps. `neutral600` is the one that matters most:
+  /// it is the muted line under a title on nearly every card in the design.
+  static const Color neutral100 = Color(0xFFF4F6F4);
+  static const Color neutral200 = Color(0xFFE8EAE9);
+  static const Color neutral300 = Color(0xFFE2E5E3);
+  static const Color neutral400 = Color(0xFFD1D5DB);
+  static const Color neutral500 = Color(0xFF9CA3AF);
+  static const Color neutral600 = Color(0xFF6B7280);
+  static const Color neutral700 = Color(0xFF4B5563);
+  static const Color neutral800 = Color(0xFF374151);
+  static const Color neutral900 = Color(0xFF111827);
 
-  /// Semantic status colours, darkened from pastels so they carry their meaning
-  /// against white — the same reasoning `_tokens.scss` gives.
-  static const Color ok = Color(0xFF146C34);
+  /// The fill behind a photograph that has not arrived, and behind one that never
+  /// will. Distinct from `neutral100` in the handoff by a hair, and the hair is
+  /// deliberate: a missing image should read as an empty frame, not as a chip.
+  static const Color imagePlaceholder = Color(0xFFEEF0EF);
+
+  static const Color accent100 = Color(0xFFF0FDF4);
+  static const Color accent200 = Color(0xFFDCFCE7);
+  static const Color accent300 = Color(0xFFBBF7D0);
+  static const Color accent400 = Color(0xFF86EFAC);
+  static const Color accent500 = Color(0xFF22C55E);
+  static const Color accent600 = Color(0xFF16A34A);
+  static const Color accent700 = Color(0xFF15803D);
+  static const Color accent900 = Color(0xFF14532D);
+
+  /// Semantic status colours. Each carries its meaning against white, which is the
+  /// only background this app has.
+  static const Color ok = Color(0xFF15803D);
   static const Color warn = Color(0xFFB45309);
-  static const Color bad = Color(0xFFB42318);
-  static const Color badStrong = Color(0xFFD32F2F);
+  static const Color bad = Color(0xFFDC2626);
+  static const Color badStrong = Color(0xFF991B1B);
 
-  static const Color divider = Color(0x2414181C);
-  static const Color dim = Color(0x9E14181C);
+  /// The border and the fill the design gives a REJECTED document — the one row
+  /// on a screen that has to be findable without reading it.
+  static const Color badBorder = Color(0xFFFECACA);
+  static const Color badTint = Color(0xFFFEE2E2);
+
+  /// A rating star. Amber rather than the brand green, so a score never reads as
+  /// an action or as approval by the platform.
+  static const Color star = Color(0xFFF59E0B);
+
+  static const Color divider = Color(0xFFECEEEC);
+  static const Color dim = Color(0x9E111827);
+
+  /// The Get Started hero, and nowhere else: the badge's green taken a step deeper,
+  /// so the top of the hero, where the status bar sits, holds white type and light
+  /// system icons at a comfortable contrast.
+  static const Color brandDeep = Color(0xFF0B3B20);
+
+  /// Type and marks drawn ON the brand green. Full white for the name, and thinned
+  /// for whatever must not compete with it: the tagline, the disc behind the badge
+  /// and the globe, and the road drawn behind all of it.
+  static const Color onBrand = Color(0xFFFFFFFF);
+  static const Color onBrandMuted = Color(0xD9FFFFFF);
+  static const Color onBrandLine = Color(0x33FFFFFF);
+  static const Color onBrandFaint = Color(0x14FFFFFF);
+
+  /// The two ends of the wash over a rental office's cover photograph: nothing at
+  /// the top, and a sixth of the page's own ink at the foot.
+  static const Color scrimNone = Color(0x00111827);
+  static const Color scrimFoot = Color(0x2B111827);
+}
+
+/// The two gradients in the app.
+///
+/// The handoff draws flat surfaces everywhere, and these stay the exception.
+abstract final class KhadraGradients {
+  /// Get Started. It has nothing of the platform's to show yet, so the brand
+  /// carries it. Directional, so the light end follows the reading direction.
+  static const LinearGradient hero = LinearGradient(
+    begin: AlignmentDirectional.topStart,
+    end: AlignmentDirectional.bottomEnd,
+    colors: <Color>[
+      KhadraColors.brandDeep,
+      KhadraColors.accent900,
+      KhadraColors.accent700,
+    ],
+    stops: <double>[0, 0.55, 1],
+  );
+
+  /// Over a rental office's cover photograph. Clear at the top and barely tinted
+  /// at the foot, only so a pale sky cannot leave the office's mark and name
+  /// below it floating on nothing. Vertical, because a photograph has no reading
+  /// direction.
+  static const LinearGradient coverScrim = LinearGradient(
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+    colors: <Color>[KhadraColors.scrimNone, KhadraColors.scrimFoot],
+  );
 }
 
 /// Spacing, ported from the console's `--space-*` and read at phone scale.
@@ -60,29 +128,113 @@ abstract final class Space {
   static const double xl = 24;
   static const double xxl = 32;
 
+  /// The padding INSIDE a content card, which the design sets a step below the
+  /// page gutter so a card does not read as a second, narrower page.
+  static const double card = 14;
+
   /// Enough room under a scrolling page that the last row clears a bottom bar or
   /// a floating action, on the phones that put a gesture handle there too.
   static const double bottomInset = 96;
+
+  /// The widest a form, or Get Started's column of choices, grows. A phone form on
+  /// a tablet or in a desktop browser should not stretch to a metre wide.
+  static const double measure = 440;
 }
 
+/// The handoff's radius system, named by ROLE rather than by size.
+///
+/// The design really does use different radii for different things — 7–8 on a
+/// badge, 12 on an input, 13 on a button, 14 on a list row, 16 on a card, 18 on
+/// the one card a screen leads with — and collapsing them to one value flattens a
+/// distinction a reader can feel. Naming them by size instead (`sm`, `md`, `lg`)
+/// just moves the problem: the call site then has to remember which size a
+/// document row is, and it drifts the first time somebody guesses.
+///
+/// So the raw steps are private to this file and every call site asks for a shape.
 abstract final class Radii {
-  static const Radius sm = Radius.circular(6);
-  static const Radius md = Radius.circular(10);
-  static const Radius lg = Radius.circular(16);
+  static const Radius _s8 = Radius.circular(8);
+  static const Radius _s10 = Radius.circular(10);
+  static const Radius _s12 = Radius.circular(12);
+  static const Radius _s13 = Radius.circular(13);
+  static const Radius _s14 = Radius.circular(14);
+  static const Radius _s16 = Radius.circular(16);
+  static const Radius _s18 = Radius.circular(18);
 
-  static const BorderRadius card = BorderRadius.all(lg);
-  static const BorderRadius field = BorderRadius.all(md);
-  static const BorderRadius chip = BorderRadius.all(Radius.circular(999));
+  /// A status badge, a spec chip, a thumbnail small enough to sit in a row.
+  static const BorderRadius pill = BorderRadius.all(_s8);
+
+  /// An input, and the image inside a list row.
+  static const BorderRadius field = BorderRadius.all(_s12);
+
+  /// A button. The design's own thirteen — between its fields and its rows,
+  /// which is what makes a button read as raised against the form around it.
+  static const BorderRadius button = BorderRadius.all(_s13);
+
+  /// A row in a list: a document, a vehicle on a gallery's page.
+  static const BorderRadius row = BorderRadius.all(_s14);
+
+  /// The standard card, and the top of a bottom sheet.
+  static const BorderRadius card = BorderRadius.all(_s16);
+
+  /// The one card a screen leads with, where the design goes a step softer.
+  static const BorderRadius feature = BorderRadius.all(_s18);
+
+  /// A choice chip in a filter or a quick-pick row.
+  ///
+  /// NOT a lozenge. There is not one fully rounded shape anywhere in the handoff
+  /// -- the softest corner it draws is the 22 on a sheet -- so a pill chip is the
+  /// one control that would announce it came from somewhere else.
+  static const BorderRadius chip = BorderRadius.all(_s10);
+
+  /// The top corners only, for a sheet that rises from the bottom edge. The
+  /// design goes softer here than anywhere else — a sheet is a different surface
+  /// arriving, not a card that grew.
+  static const BorderRadius sheetTop =
+      BorderRadius.vertical(top: Radius.circular(22));
+
+  /// The top corners of a card whose image runs to its edges.
+  static const BorderRadius cardTop = BorderRadius.vertical(top: _s18);
+}
+
+/// The one shadow in the design: `0 1px 2px rgba(17,24,39,.04)`.
+///
+/// Barely visible on purpose. The handoff separates surfaces with a BORDER and
+/// uses this only to lift a card a hair off the page behind it; anything heavier
+/// would turn a flat, paper-like interface into a stack of floating panels.
+abstract final class Shadows {
+  static const List<BoxShadow> card = <BoxShadow>[
+    BoxShadow(
+      color: Color(0x0A111827),
+      blurRadius: 2,
+      offset: Offset(0, 1),
+    ),
+  ];
 }
 
 abstract final class KhadraTheme {
-  /// Arabic faces are APPENDED, not substituted — the console's decision, and the
-  /// reason is that font fallback is per GLYPH: Latin keeps the platform's UI face
-  /// while Arabic, which that face may not cover at all, picks the first fallback
-  /// that does. Without naming them, Arabic lands on whatever the platform has
-  /// last, which is usually a serif Naskh that does not sit level with the Latin
-  /// beside it.
+  /// The handoff's Latin face, bundled at 400–800.
+  ///
+  /// Named rather than left to the platform because the design is set in it and a
+  /// system UI face is a different typeface on every phone the app runs on.
+  static const String _font = 'Manrope';
+
+  /// **Manrope contains no Arabic at all.** Not one letter, not the Arabic comma.
+  /// Every Arabic glyph in this app is rendered by the first fallback that has it,
+  /// and that is the whole Arabic typography strategy: the handoff itself declares
+  /// `'Noto Kufi Arabic', Manrope` for Arabic, and this is the same decision
+  /// expressed the way Flutter resolves fonts.
+  ///
+  /// Fallback is per GLYPH, not per string, which is what makes this work: a price
+  /// or a booking reference inside an Arabic sentence keeps Manrope's figures while
+  /// the words around it are set in Kufi. Ordering is therefore load-bearing —
+  /// Noto Kufi Arabic carries Latin and digits too, so putting it first would
+  /// silently re-set the entire English interface in it.
+  ///
+  /// The platform faces after it are not decoration. A bundled font can fail to
+  /// load, and an Arabic interface falling through to a serif Naskh is survivable
+  /// where falling through to nothing is not.
   static const List<String> _fontFallback = <String>[
+    'Noto Kufi Arabic',
     'SF Arabic',
     'Geeza Pro',
     'Segoe UI',
@@ -91,7 +243,31 @@ abstract final class KhadraTheme {
     'Tahoma',
   ];
 
-  static ThemeData light() {
+  /// A style in the app's own faces. Every explicit style below goes through it,
+  /// so none of them can quietly drop the Arabic fallback.
+  static TextStyle _style({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) =>
+      TextStyle(
+        fontFamily: _font,
+        fontFamilyFallback: _fontFallback,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color,
+        height: height,
+        letterSpacing: letterSpacing,
+      );
+
+  /// The app's theme.
+  ///
+  /// [arabic] is the RESOLVED language, not the device's: the app has a language
+  /// switch of its own, and the type scale has to follow the same answer the rest
+  /// of the app is rendered with.
+  static ThemeData light({bool arabic = false}) {
     const scheme = ColorScheme.light(
       primary: KhadraColors.accent,
       onPrimary: Colors.white,
@@ -112,23 +288,31 @@ abstract final class KhadraTheme {
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: KhadraColors.background,
+      fontFamily: _font,
+      fontFamilyFallback: _fontFallback,
     );
 
     return base.copyWith(
-      textTheme: _textTheme(base.textTheme),
-      primaryTextTheme: _textTheme(base.primaryTextTheme),
-      appBarTheme: const AppBarTheme(
+      textTheme: _textTheme(base.textTheme, arabic),
+      primaryTextTheme: _textTheme(base.primaryTextTheme, arabic),
+      appBarTheme: AppBarTheme(
         backgroundColor: KhadraColors.surface,
         foregroundColor: KhadraColors.text,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        titleTextStyle: TextStyle(
+        iconTheme: const IconThemeData(color: KhadraColors.text, size: 22),
+        // SIXTEEN, which is the design's size for a screen you can go back from —
+        // and most screens in this app are. A tab's own root asks for
+        // `KhadraLargeTitle` instead. 800 either way: Manrope at 800 is a different
+        // voice from Manrope at 600, and it is what makes the design read as
+        // confident rather than administrative.
+        titleTextStyle: _style(
           color: KhadraColors.text,
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          fontFamilyFallback: _fontFallback,
+          fontSize: 16,
+          fontWeight: FontWeight.w800,
+          letterSpacing: KhadraType.tracking(-0.2, arabic),
         ),
       ),
       cardTheme: CardThemeData(
@@ -146,6 +330,26 @@ abstract final class KhadraTheme {
         thickness: 1,
         space: 1,
       ),
+      // Material draws an UNSELECTED radio or checkbox in near-black, which in
+      // this palette is the colour of a heading -- so an unmade choice ends up
+      // the heaviest mark on the screen.
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? KhadraColors.accent
+              : KhadraColors.neutral400,
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        side: const BorderSide(color: KhadraColors.neutral400, width: 1.5),
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? KhadraColors.accent
+              : Colors.transparent,
+        ),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(6))),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
@@ -153,44 +357,35 @@ abstract final class KhadraTheme {
           foregroundColor: Colors.white,
           disabledBackgroundColor: KhadraColors.neutral200,
           disabledForegroundColor: KhadraColors.neutral500,
-          shape: const RoundedRectangleBorder(borderRadius: Radii.field),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamilyFallback: _fontFallback,
-          ),
+          shape: const RoundedRectangleBorder(borderRadius: Radii.button),
+          textStyle: _style(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size.fromHeight(52),
+          // The handoff's secondary button is green ON a green tint, not green on
+          // white: a pale wash plus a pale border, which reads as an action without
+          // competing with the filled one beside it.
           foregroundColor: KhadraColors.accent,
+          backgroundColor: KhadraColors.accent100,
           side: const BorderSide(color: KhadraColors.accent300),
-          shape: const RoundedRectangleBorder(borderRadius: Radii.field),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            fontFamilyFallback: _fontFallback,
-          ),
+          shape: const RoundedRectangleBorder(borderRadius: Radii.button),
+          textStyle: _style(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: KhadraColors.accent,
-          textStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            fontFamilyFallback: _fontFallback,
-          ),
+          // An inline link, not a third button: the design sets these two steps
+          // under the filled button they sit beside.
+          textStyle: _style(fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: KhadraColors.surface,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: Space.lg,
-          vertical: Space.lg,
-        ),
+        contentPadding: const EdgeInsets.all(Space.card),
         border: const OutlineInputBorder(
           borderRadius: Radii.field,
           borderSide: BorderSide(color: KhadraColors.neutral300),
@@ -211,26 +406,42 @@ abstract final class KhadraTheme {
           borderRadius: Radii.field,
           borderSide: BorderSide(color: KhadraColors.bad, width: 2),
         ),
-        labelStyle: const TextStyle(
-          color: KhadraColors.neutral600,
-          fontFamilyFallback: _fontFallback,
-        ),
-        hintStyle: const TextStyle(
-          color: KhadraColors.neutral500,
-          fontFamilyFallback: _fontFallback,
-        ),
+        labelStyle: _style(color: KhadraColors.neutral600, fontWeight: FontWeight.w600),
+        hintStyle: _style(color: KhadraColors.neutral500, fontWeight: FontWeight.w500),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: KhadraColors.surface,
         selectedColor: KhadraColors.accent100,
-        side: const BorderSide(color: KhadraColors.neutral300),
-        shape: const RoundedRectangleBorder(borderRadius: Radii.chip),
-        labelStyle: const TextStyle(
-          fontSize: 14,
-          color: KhadraColors.text,
-          fontFamilyFallback: _fontFallback,
+        // A CHOSEN chip is tinted and outlined in the accent, not filled with it.
+        // A solid green lozenge in a row of white ones reads as a button somebody
+        // has not pressed yet; the tint reads as a choice already made.
+        side: WidgetStateBorderSide.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(WidgetState.selected)
+                ? KhadraColors.accent
+                : KhadraColors.neutral300,
+          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: Space.md, vertical: Space.sm),
+        shape: const RoundedRectangleBorder(borderRadius: Radii.chip),
+        // `height` is not decoration. Material sizes a chip's label box from
+        // these metrics and clips what does not fit, and Noto Kufi Arabic's line
+        // box is deeper than Manrope's at the same point size -- so without room
+        // reserved here an Arabic chip loses the top and bottom of every word
+        // while the English one beside it looks correct.
+        labelStyle: WidgetStateTextStyle.resolveWith(
+          (states) => _style(
+            fontSize: 12,
+            height: 1.5,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w600,
+            color: states.contains(WidgetState.selected)
+                ? KhadraColors.price
+                : KhadraColors.neutral800,
+          ),
+        ),
+        showCheckmark: false,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: KhadraColors.surface,
@@ -242,41 +453,63 @@ abstract final class KhadraTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: KhadraColors.surface,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: KhadraColors.accent100,
+        // NO indicator pill. The design marks the active tab by colouring the icon
+        // and its label green, and a filled lozenge behind one of five icons reads
+        // as a sixth control rather than as a state.
+        indicatorColor: Colors.transparent,
+        indicatorShape: const RoundedRectangleBorder(borderRadius: Radii.chip),
         elevation: 0,
-        height: 68,
+        height: 64,
         labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => TextStyle(
-            fontSize: 12,
-            fontWeight: states.contains(WidgetState.selected)
-                ? FontWeight.w600
-                : FontWeight.w500,
+          (states) => _style(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
             color: states.contains(WidgetState.selected)
                 ? KhadraColors.accent
                 : KhadraColors.neutral600,
-            fontFamilyFallback: _fontFallback,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            size: 22,
+            color: states.contains(WidgetState.selected)
+                ? KhadraColors.accent
+                : KhadraColors.neutral600,
           ),
         ),
       ),
-      snackBarTheme: const SnackBarThemeData(
+      snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: KhadraColors.neutral900,
-        contentTextStyle: TextStyle(
-          color: Colors.white,
-          fontFamilyFallback: _fontFallback,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: Radii.field),
+        contentTextStyle: _style(color: Colors.white, fontWeight: FontWeight.w600),
+        shape: const RoundedRectangleBorder(borderRadius: Radii.field),
       ),
       dialogTheme: const DialogThemeData(
         backgroundColor: KhadraColors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: Radii.card),
       ),
+      // The language menu. White and bordered like a card, not Material's tinted
+      // surface, which is a colour this palette does not have.
+      popupMenuTheme: const PopupMenuThemeData(
+        color: KhadraColors.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: Radii.card,
+          side: BorderSide(color: KhadraColors.neutral200),
+        ),
+      ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: KhadraColors.surface,
         surfaceTintColor: Colors.transparent,
+        // The design's scrim: near-black at 45%, so the page behind is still
+        // legible as context rather than blacked out.
+        modalBarrierColor: Color(0x73111827),
+        showDragHandle: true,
+        dragHandleColor: KhadraColors.neutral300,
+        dragHandleSize: Size(38, 4),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radii.lg),
+          borderRadius: Radii.sheetTop,
         ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
@@ -289,9 +522,109 @@ abstract final class KhadraTheme {
     );
   }
 
-  static TextTheme _textTheme(TextTheme base) => base.apply(
+  /// The handoff's hierarchy, as the scale every screen inherits from.
+  ///
+  /// Heavier at the top than Material's defaults and tighter at the bottom: the
+  /// design leans on weight rather than size to separate a title from the line
+  /// under it, which is what keeps a card readable at 375px.
+  static TextTheme _textTheme(TextTheme base, bool arabic) {
+    final scale = base
+      .apply(
         bodyColor: KhadraColors.text,
         displayColor: KhadraColors.text,
+        fontFamily: _font,
         fontFamilyFallback: _fontFallback,
+      )
+      .copyWith(
+        // The title a form leads with. It was written out inside AuthScaffold, which
+        // left the forms and Get Started free to disagree about how big a first
+        // heading is.
+        headlineMedium: _style(
+            fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.6,
+            height: 1.2, color: KhadraColors.text),
+        headlineSmall: _style(
+            fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.4,
+            color: KhadraColors.text),
+        titleLarge: _style(
+            fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.2,
+            color: KhadraColors.text),
+        titleMedium: _style(
+            fontSize: 15, fontWeight: FontWeight.w700, color: KhadraColors.text),
+        titleSmall: _style(
+            fontSize: 13, fontWeight: FontWeight.w700, color: KhadraColors.text),
+        bodyLarge: _style(
+            fontSize: 15, fontWeight: FontWeight.w500, height: 1.5,
+            color: KhadraColors.text),
+        bodyMedium: _style(
+            fontSize: 14, fontWeight: FontWeight.w500, height: 1.5,
+            color: KhadraColors.text),
+        bodySmall: _style(
+            fontSize: 12, fontWeight: FontWeight.w600,
+            color: KhadraColors.neutral600),
+        labelLarge: _style(fontSize: 15, fontWeight: FontWeight.w700),
+        labelMedium: _style(
+            fontSize: 12, fontWeight: FontWeight.w600,
+            color: KhadraColors.neutral600),
+        labelSmall: _style(
+            fontSize: 11, fontWeight: FontWeight.w600,
+            color: KhadraColors.neutral500),
       );
+
+    return arabic ? _untracked(scale) : scale;
+  }
+
+  /// The same scale with the tracking taken out of every style in it.
+  ///
+  /// Every style, not only the ones named above: the scale also carries Material's
+  /// own figures on the styles this app does not override, and a screen that
+  /// starts using `displayMedium` tomorrow would inherit tracking nobody chose.
+  ///
+  /// Written out rather than `apply(letterSpacingFactor: 0)`, which asserts on any
+  /// style whose tracking is already unset — most of this scale.
+  static TextTheme _untracked(TextTheme scale) {
+    TextStyle? flat(TextStyle? style) => style?.copyWith(letterSpacing: 0);
+
+    return scale.copyWith(
+      displayLarge: flat(scale.displayLarge),
+      displayMedium: flat(scale.displayMedium),
+      displaySmall: flat(scale.displaySmall),
+      headlineLarge: flat(scale.headlineLarge),
+      headlineMedium: flat(scale.headlineMedium),
+      headlineSmall: flat(scale.headlineSmall),
+      titleLarge: flat(scale.titleLarge),
+      titleMedium: flat(scale.titleMedium),
+      titleSmall: flat(scale.titleSmall),
+      bodyLarge: flat(scale.bodyLarge),
+      bodyMedium: flat(scale.bodyMedium),
+      bodySmall: flat(scale.bodySmall),
+      labelLarge: flat(scale.labelLarge),
+      labelMedium: flat(scale.labelMedium),
+      labelSmall: flat(scale.labelSmall),
+    );
+  }
+}
+
+/// Type metrics that depend on the script being set.
+///
+/// Every tracking figure in this app is a decision about LATIN letterforms:
+/// Manrope is drawn slightly loose, so headings are pulled in and small
+/// upper-case labels are opened out. Arabic is JOINED. Letter spacing does not
+/// space Arabic letters — it breaks the joins inside a word, so a heading arrives
+/// as a row of disconnected marks with gaps where the strokes should meet. Zero is
+/// not a compromise for Arabic; it is the correct value.
+///
+/// The theme handles the scale every screen inherits. This is for the widgets that
+/// name their own tracking, which cannot read the theme's answer back out.
+abstract final class KhadraType {
+  /// The design's tracking in Latin, and none in Arabic.
+  static double? tracking(double latin, bool arabic) => arabic ? null : latin;
+
+  /// The same answer for platform copy, read from the language [context] is being
+  /// rendered in.
+  ///
+  /// The LANGUAGE, not the direction: they agree in this app today and they are
+  /// not the same question, and a Latin run inside an Arabic screen keeps its own
+  /// tracking by staying out of here entirely.
+  static double? of(BuildContext context, double latin) =>
+      tracking(latin, Localizations.localeOf(context).languageCode == 'ar');
 }

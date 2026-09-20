@@ -50,6 +50,34 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
   bool _submitting = false;
   String? _error;
 
+  /// So a refusal can be scrolled INTO VIEW.
+  ///
+  /// The submit button lives in a pinned bottom bar and the refusal renders at the
+  /// foot of a long list, which on a phone is well below the fold: a customer
+  /// pressed "request this car", the server answered "upload your licence first",
+  /// and nothing appeared to happen. The message was there; it was just somewhere
+  /// they had no reason to look.
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _revealError() {
+    // After the frame that renders the notice, so its height is part of the
+    // extent being scrolled to.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -61,7 +89,10 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
       // can be priced without them, so the screen says so rather than showing an
       // empty summary.
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.bookTitle)),
+        appBar: AppBar(
+          leading: KhadraBack(fallback: Routes.vehicle(widget.vehicleId)),
+          title: Text(l10n.bookTitle),
+        ),
         body: KhadraEmpty(
           icon: Icons.date_range_outlined,
           title: l10n.searchChooseDates,
@@ -90,11 +121,14 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
     )));
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.bookTitle)),
+      appBar: AppBar(
+        leading: KhadraBack(fallback: Routes.vehicle(widget.vehicleId)),
+        title: Text(l10n.bookTitle),
+      ),
       body: switch (vehicle) {
         AsyncData(:final value) => _body(l10n, formats, value, quote),
         AsyncError(:final error) => KhadraError(
-            message: ApiFailure.from(error).messageFor(l10n),
+            message: ApiFailure.from(error).messageFor(l10n, config: _config),
           ),
         _ => const KhadraLoading(),
       },
@@ -114,6 +148,11 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
   bool get _needsDeliveryPoint =>
       _pickupMethod == _delivery && _deliveryPoint == null;
 
+  /// The platform's own published bounds, for the failures whose sentence needs
+  /// one. Null until `/app-config` answers, and every message that reads it has a
+  /// figure-less version for that case.
+  AppConfig? get _config => ref.read(appConfigProvider).valueOrNull;
+
   Widget _body(
     AppLocalizations l10n,
     Formats formats,
@@ -125,6 +164,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
     final session = ref.watch(sessionProvider);
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(
           Space.lg, Space.lg, Space.lg, Space.bottomInset),
       children: [
@@ -276,7 +316,7 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
 
   Widget _quoteProblem(AppLocalizations l10n, ApiFailure failure) =>
       KhadraNotice(
-        title: failure.messageFor(l10n),
+        title: failure.messageFor(l10n, config: _config),
         tone: NoticeTone.bad,
       );
 
@@ -333,8 +373,9 @@ class _RequestBookingScreenState extends ConsumerState<RequestBookingScreen> {
 
       setState(() {
         _submitting = false;
-        _error = failure.messageFor(l10n);
+        _error = failure.messageFor(l10n, config: _config);
       });
+      _revealError();
     }
   }
 }
@@ -355,7 +396,7 @@ class _VehicleStrip extends StatelessWidget {
               height: 64,
               child: KhadraImage(
                 url: vehicle.imageUrls.isEmpty ? null : vehicle.imageUrls.first,
-                borderRadius: const BorderRadius.all(Radii.md),
+                borderRadius: Radii.field,
               ),
             ),
             const SizedBox(width: Space.md),
@@ -644,8 +685,8 @@ class _PriceBreakdown extends StatelessWidget {
             value: Text(formats.money(pricing.depositAmount)),
             valueStyle: const TextStyle(
               fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: KhadraColors.accent,
+              fontWeight: FontWeight.w800,
+              color: KhadraColors.price,
             ),
           ),
           KhadraDetailRow(
@@ -671,6 +712,19 @@ class _PriceBreakdown extends StatelessWidget {
   }
 }
 
+/// Windows arrive as fractional hours (0.5, 1, 24). Rendering "1.0 hours" reads
+/// like a computed value where a human chose a round number, so a whole one is
+/// narrowed to an int.
+///
+/// It stays a NUMBER rather than becoming a string, because the sentences these
+/// feed are ICU plurals: the count picks the wording. English needs "1 hour"
+/// against "2 hours", and Arabic needs a different word again at two — the
+/// payment window went to two hours on 2026-09-11 and read "2 \u0633\u0627\u0639\u0629",
+/// which is not how the language counts. A genuinely fractional window falls to
+/// the plural's `other` branch in both.
+num _hours(num value) =>
+    value == value.roundToDouble() ? value.round() : value;
+
 /// The rules this booking would freeze, in the server's own numbers.
 class _Terms extends StatelessWidget {
   const _Terms({required this.quote, required this.formats});
@@ -687,10 +741,11 @@ class _Terms extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Bullet(l10n.bookTermsPayAfterApproval(
-              _hours(terms.paymentWindowHours))),
-          _Bullet(l10n.bookTermsPaymentWindow(
-              _hours(terms.paymentWindowHours))),
+          // The gallery's own clock comes first: it is the wait the customer is
+          // agreeing to, and it starts the moment they press the button.
+          _Bullet(l10n.bookTermsAnswerWindow(_hours(terms.answerWindowHours))),
+          _Bullet(l10n.bookTermsPayAfterApproval),
+          _Bullet(l10n.bookTermsPaymentWindow(_hours(terms.paymentWindowHours))),
           _Bullet(l10n.bookTermsFreeCancellation(
               _hours(terms.freeCancellationWindowHours))),
           _Bullet(l10n.bookTermsCancellationPenalty(
@@ -699,12 +754,6 @@ class _Terms extends StatelessWidget {
       ),
     );
   }
-
-  /// Windows arrive as fractional hours (0.5, 1, 24). Rendering "1.0 hours" reads
-  /// like a computed value where a human chose a round number.
-  static String _hours(num value) => value == value.roundToDouble()
-      ? value.round().toString()
-      : value.toString();
 }
 
 class _Bullet extends StatelessWidget {
@@ -796,6 +845,11 @@ class _SubmitBar extends StatelessWidget {
 /// The window is the BOOKING's, not `/app-config`'s: the booking froze its own
 /// terms, and quoting today's setting against a booking made under another would
 /// be the exact mistake the freezing exists to prevent.
+///
+/// It is also READ, not derived. This used to subtract `createdAt` from
+/// `decisionDeadline` — a second source for a figure the server already froze,
+/// which `.inHours` truncates: a 47.5-hour window read "47". `answerWindowHours`
+/// now travels on the terms.
 class _RequestSentDialog extends ConsumerWidget {
   const _RequestSentDialog({required this.booking, required this.galleryName});
 
@@ -805,10 +859,7 @@ class _RequestSentDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final answerHours = booking.decisionDeadline
-        .difference(booking.createdAt)
-        .inHours
-        .toString();
+    final answerHours = _hours(booking.terms.answerWindowHours);
 
     return AlertDialog(
       icon: const Icon(Icons.check_circle_outline,
@@ -830,6 +881,7 @@ class _RequestSentDialog extends ConsumerWidget {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
+              // rtl-audit: allow — a reference is Latin in both languages.
               letterSpacing: 0.5,
             ),
           ),

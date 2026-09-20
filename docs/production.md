@@ -91,7 +91,7 @@ the examples below are shell syntax; a dashboard field keeps them, and
 | `Documents__Provider` | `Supabase` |
 
 Both default to something safe-for-development and disastrous-for-production
-(`Logging` writes mail to the log; `Local` puts documents on a disk that is deleted
+(`Logging` delivers mail to nobody; `Local` puts documents on a disk that is deleted
 every deploy), so **Production refuses to boot on either default**.
 
 ### Required for correct behaviour

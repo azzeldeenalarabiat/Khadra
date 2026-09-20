@@ -9,6 +9,8 @@ import { IconName } from '../../shared/icon/icon-paths';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { TranslationKey } from '../../core/i18n/en';
 
 interface Kpi {
   readonly label: string;
@@ -31,11 +33,43 @@ interface Attention {
   readonly desc: string;
   readonly entity: string;
   readonly when: string;
-  readonly status: string;
+  /** The pill: the booking's status in the office's own words, or "Overdue", which is no status. */
+  readonly pill: string;
   readonly tone: Tone;
   readonly action: string;
   readonly route: string;
   readonly query?: Record<string, string>;
+}
+
+/**
+ * The fleet mix, in the order it is drawn, and the tone of each. Machine data only: the words come
+ * from `statusLabel(status, 'vehicle')`, which is what calls an `Active` car "Published".
+ */
+const FLEET_TONES: Readonly<Record<string, Tone>> = {
+  Active: 'ok',
+  Hidden: 'dim',
+  Maintenance: 'bad',
+  Draft: 'accent',
+};
+
+/**
+ * The activity sentence for each status a booking moved to, one whole message per verb: Arabic puts
+ * the actor and the booking where English does not. Any other status is still worded, through the
+ * office's status label.
+ */
+const ACTIVITY: Readonly<Record<string, TranslationKey>> = {
+  Approved: 'dealerDash.activityApproved',
+  Rejected: 'dealerDash.activityRejected',
+  PickedUp: 'dealerDash.activityHandedOver',
+  Returned: 'dealerDash.activityTookBack',
+  Cancelled: 'dealerDash.activityCancelled',
+};
+
+/** The greeting for the hour, with the name inside the message: Arabic punctuates it differently. */
+function greetingKey(hour: number, named: boolean): TranslationKey {
+  if (hour < 12) return named ? 'employeeDash.goodMorningName' : 'employeeDash.goodMorning';
+  if (hour < 18) return named ? 'employeeDash.goodAfternoonName' : 'employeeDash.goodAfternoon';
+  return named ? 'employeeDash.goodEveningName' : 'employeeDash.goodEvening';
 }
 
 /**
@@ -59,6 +93,7 @@ export class DealerDashboardComponent {
   private readonly console = inject(DealerConsoleService);
   private readonly bookings = inject(DealerBookingsService);
   private readonly session = inject(SessionService);
+  protected readonly formats = inject(FormatService);
 
   protected readonly resource = this.console.dashboard;
   /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
@@ -71,41 +106,51 @@ export class DealerDashboardComponent {
   );
 
   protected readonly greeting = computed(() => {
-    const hour = new Date().getHours();
-    const part = hour < 12 ? this.t('employeeDash.goodMorning') : hour < 18 ? this.t('employeeDash.goodAfternoon') : this.t('employeeDash.goodEvening');
-    return `${part}, ${this.dashboard()?.businessName ?? this.session.user()?.fullName ?? ''}`;
+    const name = this.dashboard()?.businessName ?? this.session.user()?.fullName ?? '';
+    return this.t(greetingKey(new Date().getHours(), name !== ''), { name });
   });
 
   protected readonly statusLine = computed(() => {
     const d = this.dashboard();
     if (!d) return '';
-    const parts = [
-      `${d.bookings.requested} booking ${d.bookings.requested === 1 ? 'request' : 'requests'} waiting`,
-      `${d.upcomingPickups.length} pickups and ${d.upcomingReturns.length} returns in the next ${d.upcomingWindowHours} hours`,
-    ];
-    return parts.join(', ') + '.';
+    // Three counts and a window in one sentence. Each count picks its own noun form and the window
+    // picks the sentence's: Arabic agrees every noun with its own number, so no single count can
+    // choose the grammar for the other three.
+    return this.t('dealerDash.statusLine', {
+      count: d.upcomingWindowHours,
+      requests: this.t('dealerDash.bookingRequestsCount', { count: d.bookings.requested }),
+      pickups: this.t('dealerDash.pickupsCount', { count: d.upcomingPickups.length }),
+      returns: this.t('dealerDash.returnsCount', { count: d.upcomingReturns.length }),
+    });
   });
 
   protected readonly kpis = computed<readonly Kpi[]>(() => {
     const d = this.dashboard();
     if (!d) return [];
     const oldest = d.bookings.oldestRequestedAt
-      ? `oldest ${this.ago(d.bookings.oldestRequestedAt)}`
+      ? this.t('employeeDash.oldestWhen', {
+          when: this.formats.relative(d.bookings.oldestRequestedAt),
+        })
       : this.t('employeeDash.nothingWaiting');
+    // The window is the server's (`upcomingWindowHours`), so the tile says the span it counted over.
+    const next = (handovers: readonly UpcomingHandover[]): string =>
+      handovers[0]
+        ? this.t('employeeDash.nextWhen', { when: this.formats.dayAndTime(handovers[0].when) })
+        : this.t('employeeDash.noneInNextHours', { count: d.upcomingWindowHours });
     return [
       {
         label: this.t('dealerDashboard.pendingRequests'),
-        main: String(d.bookings.requested),
-        note: `${oldest} · answer before pickup`,
+        main: this.formats.number(d.bookings.requested),
+        note: `${oldest} · ${this.t('dealerDash.answerBeforePickup')}`,
         icon: 'bell-ringing',
         route: '/dealer/bookings',
         query: { tab: 'pending' },
       },
       {
         label: this.t('dealerDashboard.activeRentals'),
-        main: String(d.bookings.pickedUp),
+        main: this.formats.number(d.bookings.pickedUp),
         note: d.bookings.overdueReturns
-          ? `${d.bookings.overdueReturns} overdue`
+          ? this.t('employeeDash.overdueCount', { count: d.bookings.overdueReturns })
           : this.t('dealerDash.allWithinTheirDates'),
         icon: 'car-profile',
         route: '/dealer/bookings',
@@ -113,34 +158,30 @@ export class DealerDashboardComponent {
       },
       {
         label: this.t('dealerDashboard.availableVehicles'),
-        main: String(d.availableVehicles),
-        note: `of ${d.publishedVehicles} published · ${d.totalVehicles} in your fleet`,
+        main: this.formats.number(d.availableVehicles),
+        note: `${this.t('dealerDash.ofPublished', { count: d.publishedVehicles })} · ${this.t('dealerDash.inYourFleet', { count: d.totalVehicles })}`,
         icon: 'check-square',
         route: '/dealer/fleet',
       },
       {
         label: this.t('dealerDashboard.upcomingPickups'),
-        main: String(d.upcomingPickups.length),
-        note: d.upcomingPickups[0]
-          ? `next: ${this.when(d.upcomingPickups[0].when)}`
-          : `none in ${d.upcomingWindowHours}h`,
+        main: this.formats.number(d.upcomingPickups.length),
+        note: next(d.upcomingPickups),
         icon: 'arrow-square-out',
         route: '/dealer/bookings',
         query: { tab: 'upcoming' },
       },
       {
         label: this.t('dealerDashboard.upcomingReturns'),
-        main: String(d.upcomingReturns.length),
-        note: d.upcomingReturns[0]
-          ? `next: ${this.when(d.upcomingReturns[0].when)}`
-          : `none in ${d.upcomingWindowHours}h`,
+        main: this.formats.number(d.upcomingReturns.length),
+        note: next(d.upcomingReturns),
         icon: 'arrow-square-in',
         route: '/dealer/bookings',
         query: { tab: 'active' },
       },
       {
         label: this.t('dealerDashboard.confirmedNotYetCollected'),
-        main: String(d.bookings.confirmed),
+        main: this.formats.number(d.bookings.confirmed),
         note: this.t('dealerDashboard.heldForTheirDates'),
         icon: 'calendar-check',
         route: '/dealer/bookings',
@@ -148,7 +189,7 @@ export class DealerDashboardComponent {
       },
       {
         label: this.t('dealerDashboard.awaitingDeposit'),
-        main: String(d.bookings.awaitingDeposit),
+        main: this.formats.number(d.bookings.awaitingDeposit),
         note: this.t('dealerDashboard.approvedAndUnpaid'),
         icon: 'clock',
         route: '/dealer/bookings',
@@ -158,8 +199,9 @@ export class DealerDashboardComponent {
       // Reports is the screen the same grant closes.
       {
         label: this.t('dealerDashboard.revenueThisMonth'),
+        // At the currency's own scale and in the reader's locale, like every other amount.
         main: d.revenueThisMonth
-          ? `${d.revenueThisMonth.amount.toLocaleString('en-GB')} ${d.revenueThisMonth.currency}`
+          ? this.formats.money(d.revenueThisMonth.amount, d.revenueThisMonth.currency)
           : '—',
         note: d.revenueThisMonth
           ? this.t('dealerDash.rentalsReturnedThisMonth')
@@ -169,7 +211,8 @@ export class DealerDashboardComponent {
       },
       {
         label: this.t('dealerDashboard.occupancyRate'),
-        main: d.occupancyPercentLast30Days === null ? '—' : `${d.occupancyPercentLast30Days}%`,
+        // A withheld figure (null) prints as "—".
+        main: this.formats.percent(d.occupancyPercentLast30Days),
         note:
           d.occupancyPercentLast30Days === null
             ? this.t('dealerDash.notPartOfYour')
@@ -189,19 +232,26 @@ export class DealerDashboardComponent {
     const d = this.dashboard();
     if (!d) return [];
     const items: Attention[] = [];
+    // A car or a customer can be gone by the time a handover is due. The server says so with a null
+    // rather than an English phrase, and the console words it.
+    const vehicle = (handover: UpcomingHandover): string =>
+      handover.vehicleLabel ?? this.t('dealerBookings.vehicleNoLongerListed');
+    const customer = (handover: UpcomingHandover): string =>
+      handover.customerName ?? this.t('common.customerAccountClosed');
 
     if (d.bookings.requested > 0) {
+      const oldest = d.bookings.oldestRequestedAt;
       items.push({
         type: this.t('employeeDash.bookingRequest'),
-        title: `${d.bookings.requested} booking ${d.bookings.requested === 1 ? this.t('employeeDash.requestIs') : this.t('employeeDash.requestsAre')} waiting for an answer`,
-        desc: d.bookings.oldestRequestedAt
-          ? `The oldest was made ${this.ago(d.bookings.oldestRequestedAt)}. A request expires when its rental date arrives unanswered.`
+        title: this.t('employeeDash.requestsWaitingForAnswer', { count: d.bookings.requested }),
+        desc: oldest
+          ? this.t('dealerDash.oldestMadeExpiry', { when: this.formats.relative(oldest) })
           : '',
-        entity: 'Bookings',
-        when: d.bookings.oldestRequestedAt ? this.ago(d.bookings.oldestRequestedAt) : '',
-        status: 'Pending',
+        entity: this.t('common.bookings'),
+        when: oldest ? this.formats.relative(oldest) : '',
+        pill: this.statusLabel('Requested', 'dealerBooking'),
         tone: 'warn',
-        action: 'Review',
+        action: this.t('queue.actionReview'),
         route: '/dealer/bookings',
         query: { tab: 'pending' },
       });
@@ -210,11 +260,14 @@ export class DealerDashboardComponent {
     for (const overdue of d.upcomingReturns.filter((r) => r.isOverdue)) {
       items.push({
         type: this.t('dealerDash.overdueReturn'),
-        title: `${overdue.vehicleLabel} was due back ${this.when(overdue.when)}`,
-        desc: `${overdue.customerName} has not returned the car. Record the return when it comes back, and note any damage within the settlement window.`,
+        title: this.t('employeeDash.wasDueBack', {
+          vehicle: vehicle(overdue),
+          when: this.formats.dayAndTime(overdue.when),
+        }),
+        desc: this.t('dealerDash.overdueDesc', { customer: customer(overdue) }),
         entity: overdue.reference,
-        when: this.ago(overdue.when),
-        status: 'Overdue',
+        when: this.formats.relative(overdue.when),
+        pill: this.t('time.overdue'),
         tone: 'bad',
         action: this.t('dealerDash.viewBooking'),
         route: `/dealer/bookings/${overdue.bookingId}`,
@@ -222,13 +275,17 @@ export class DealerDashboardComponent {
     }
 
     for (const pickup of d.upcomingPickups.slice(0, 2)) {
+      const delivery = pickup.pickupMethod === 'Delivery';
+      const at = { vehicle: vehicle(pickup), when: this.formats.dayAndTime(pickup.when) };
       items.push({
-        type: pickup.pickupMethod === 'Delivery' ? 'Delivery' : 'Pickup',
-        title: `${pickup.vehicleLabel} ${pickup.pickupMethod === 'Delivery' ? 'delivery' : 'pickup'} ${this.when(pickup.when)}`,
-        desc: `${pickup.customerName}. Record the handover with the odometer and fuel level when the keys change hands.`,
+        type: delivery ? this.t('common.delivery') : this.t('handoverType.pickup'),
+        title: delivery
+          ? this.t('employeeDash.deliveryAt', at)
+          : this.t('employeeDash.pickupAt', at),
+        desc: this.t('dealerDash.pickupDesc', { customer: customer(pickup) }),
         entity: pickup.reference,
-        when: this.until(pickup.when),
-        status: pickup.status,
+        when: this.formats.relative(pickup.when),
+        pill: this.statusLabel(pickup.status, 'dealerBooking'),
         tone: 'ok',
         action: this.t('dealerDash.viewBooking'),
         route: `/dealer/bookings/${pickup.bookingId}`,
@@ -237,12 +294,15 @@ export class DealerDashboardComponent {
 
     for (const ret of d.upcomingReturns.filter((r) => !r.isOverdue).slice(0, 2)) {
       items.push({
-        type: 'Return',
-        title: `${ret.vehicleLabel} return ${this.when(ret.when)}`,
-        desc: `${ret.customerName}'s rental ends. Confirm the return and note any damage within the settlement window.`,
+        type: this.t('handoverType.return'),
+        title: this.t('dealerDash.returnAt', {
+          vehicle: vehicle(ret),
+          when: this.formats.dayAndTime(ret.when),
+        }),
+        desc: this.t('dealerDash.returnDesc', { customer: customer(ret) }),
         entity: ret.reference,
-        when: this.until(ret.when),
-        status: 'Active',
+        when: this.formats.relative(ret.when),
+        pill: this.statusLabel(ret.status, 'dealerBooking'),
         tone: 'ok',
         action: this.t('dealerDash.viewBooking'),
         route: `/dealer/bookings/${ret.bookingId}`,
@@ -255,29 +315,18 @@ export class DealerDashboardComponent {
   protected readonly fleetStatus = computed(() => {
     const d = this.dashboard();
     if (!d) return [];
-    const order = ['Active', 'Hidden', 'Maintenance', 'Draft'];
-    const tones: Record<string, Tone> = {
-      Active: 'ok',
-      Hidden: 'dim',
-      Maintenance: 'bad',
-      Draft: 'accent',
-    };
-    const labels: Record<string, string> = {
-      Active: 'Published',
-      Hidden: 'Hidden',
-      Maintenance: this.t('status.offTheRoad'),
-      Draft: 'Draft',
-    };
-    return order
-      .map((status) => ({
+    return Object.entries(FLEET_TONES)
+      .map(([status, tone]) => ({
         status,
+        tone,
         count: d.fleetStatus.find((f) => f.status === status)?.count ?? 0,
       }))
       .filter((row) => row.count > 0)
       .map((row) => ({
-        label: labels[row.status] ?? row.status,
-        n: row.count,
-        tone: tones[row.status] ?? 'dim',
+        status: row.status,
+        label: this.statusLabel(row.status, 'vehicle'),
+        n: this.formats.number(row.count),
+        tone: row.tone,
         width: d.totalVehicles ? Math.round((row.count / d.totalVehicles) * 100) : 0,
       }));
   });
@@ -304,40 +353,22 @@ export class DealerDashboardComponent {
     this.bookings.counts.reload();
   }
 
-  protected when(iso: string): string {
-    const date = new Date(iso);
-    const today = new Date();
-    const sameDay = date.toDateString() === today.toDateString();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-    if (sameDay) return `today ${time}`;
-    if (date.toDateString() === tomorrow.toDateString()) return `tomorrow ${time}`;
-    return `${date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} ${time}`;
-  }
-
-  protected ago(iso: string): string {
-    const hours = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 3_600_000));
-    if (hours < 1) return this.t('employeeDash.justNow');
-    if (hours < 48) return `${hours}h ago`;
-    return `${Math.round(hours / 24)} days ago`;
-  }
-
-  protected until(iso: string): string {
-    const hours = Math.round((Date.parse(iso) - Date.now()) / 3_600_000);
-    if (hours <= 0) return 'now';
-    if (hours < 48) return `in ${hours}h`;
-    return `in ${Math.round(hours / 24)} days`;
-  }
-
+  /**
+   * One line of the activity feed. Who acted is sent as facts: no user id is the rental office
+   * itself, and an id without a name is somebody whose account has since closed.
+   */
   protected describe(entry: DealerDashboard['recentActivity'][number]): string {
-    const verb: Record<string, string> = {
-      Approved: 'approved',
-      Rejected: 'rejected',
-      PickedUp: this.t('dealerDash.handedOver'),
-      Returned: this.t('dealerDash.tookBack'),
-      Cancelled: 'cancelled',
-    };
-    return `${entry.actorName} ${verb[entry.toStatus] ?? entry.toStatus.toLowerCase()} booking ${entry.reference}`;
+    const actor =
+      entry.actorUserId === null
+        ? this.t('common.theRentalOffice')
+        : (entry.actorName ?? this.t('common.formerStaffMember'));
+    const key = ACTIVITY[entry.toStatus];
+    return key
+      ? this.t(key, { actor, reference: entry.reference })
+      : this.t('dealerDash.activityOther', {
+          actor,
+          reference: entry.reference,
+          status: this.statusLabel(entry.toStatus, 'dealerBooking'),
+        });
   }
 }

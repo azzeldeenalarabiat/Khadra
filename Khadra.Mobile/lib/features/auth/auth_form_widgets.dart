@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../api/dtos.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
+import '../../core/widgets/language_menu.dart';
 import '../../l10n/app_localizations.dart';
 
-/// The frame every auth screen sits in: the mark, a title, and the form.
+/// The frame every auth screen sits in: the brand, a title, and the form.
+///
+/// The brand is a compact header — the badge, with the name and tagline beside it —
+/// rather than a large centred logo, so the form starts higher on a small phone. The
+/// app bar carries the same language globe as Get Started, so somebody who opened a
+/// form in a language they cannot read is not stranded on it.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
     super.key,
@@ -23,56 +30,80 @@ class AuthScaffold extends StatelessWidget {
   final Widget? leading;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Scaffold(
+      backgroundColor: KhadraColors.surface,
+      appBar: AppBar(
         backgroundColor: KhadraColors.surface,
-        appBar: AppBar(
-          backgroundColor: KhadraColors.surface,
-          leading: leading,
-        ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                  Space.xl, Space.sm, Space.xl, Space.bottomInset),
-              child: ConstrainedBox(
-                // A phone form on a tablet or a desktop browser should not stretch
-                // to a metre wide; the app builds for web too.
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (showLogo) ...[
-                      const Center(child: KhadraLogo(size: 72)),
-                      const SizedBox(height: Space.xl),
-                    ],
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: KhadraColors.text,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: Space.sm),
-                      Text(
-                        subtitle!,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.5,
-                          color: KhadraColors.neutral600,
-                        ),
-                      ),
-                    ],
+        leading: leading,
+        actions: const [KhadraLanguageMenu(), SizedBox(width: Space.xs)],
+      ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+                Space.xl, Space.sm, Space.xl, Space.bottomInset),
+            child: ConstrainedBox(
+              // The app builds for web too.
+              constraints: const BoxConstraints(maxWidth: Space.measure),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showLogo) ...[
+                    const _BrandHeader(),
                     const SizedBox(height: Space.xl),
-                    ...children,
                   ],
-                ),
+                  Text(title, style: text.headlineMedium),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: Space.sm),
+                    Text(
+                      subtitle!,
+                      style: text.bodyMedium?.copyWith(color: KhadraColors.neutral600),
+                    ),
+                  ],
+                  const SizedBox(height: Space.xl),
+                  ...children,
+                ],
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
+}
+
+/// The badge, with the name and the tagline beside it.
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final text = Theme.of(context).textTheme;
+
+    return Row(
+      children: [
+        // Cut to its circle, as on Get Started, and read out once, from the name.
+        const ExcludeSemantics(child: ClipOval(child: KhadraLogo(size: 44))),
+        const SizedBox(width: Space.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.appName,
+                style: text.titleLarge?.copyWith(color: KhadraColors.price),
+              ),
+              Text(l10n.appTagline, style: text.bodySmall),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// A labelled text field with the app's validation vocabulary.
@@ -88,6 +119,7 @@ class KhadraField extends StatelessWidget {
     this.validator,
     this.textInputAction,
     this.onSubmitted,
+    this.onChanged,
     this.maxLength,
     this.maxLines = 1,
     this.enabled = true,
@@ -96,6 +128,7 @@ class KhadraField extends StatelessWidget {
     this.suffix,
     this.errorText,
     this.forceLtr = false,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -107,6 +140,7 @@ class KhadraField extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
   final VoidCallback? onSubmitted;
+  final ValueChanged<String>? onChanged;
   final int? maxLength;
   final int maxLines;
   final bool enabled;
@@ -120,6 +154,9 @@ class KhadraField extends StatelessWidget {
   /// and reorders what has been typed so far.
   final bool forceLtr;
 
+  /// For a field that IS the dialog it sits in. Never on a form with several.
+  final bool autofocus;
+
   @override
   Widget build(BuildContext context) {
     final field = TextFormField(
@@ -129,14 +166,15 @@ class KhadraField extends StatelessWidget {
       validator: validator,
       textInputAction: textInputAction,
       onFieldSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+      onChanged: onChanged,
       maxLength: maxLength,
       maxLines: obscure ? 1 : maxLines,
       enabled: enabled,
+      autofocus: autofocus,
       autofillHints: autofillHints,
       inputFormatters: inputFormatters,
       textDirection: forceLtr ? TextDirection.ltr : null,
       decoration: InputDecoration(
-        labelText: label,
         hintText: hint,
         helperText: helper,
         helperMaxLines: 3,
@@ -144,13 +182,32 @@ class KhadraField extends StatelessWidget {
         errorMaxLines: 3,
         suffixIcon: suffix,
         counterText: '',
-        alignLabelWithHint: maxLines > 1,
       ),
     );
 
+    // The label sits ABOVE the box, not inside it. The design draws it that way
+    // on every form it has, and it is the shape that survives Arabic: a floating
+    // label animating over a right-to-left field lands on the wrong end of it,
+    // and a long Arabic label shrinks to nothing on focus.
     return Padding(
       padding: const EdgeInsets.only(bottom: Space.lg),
-      child: field,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 2, bottom: 7),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: KhadraColors.neutral700,
+              ),
+            ),
+          ),
+          field,
+        ],
+      ),
     );
   }
 }
@@ -167,6 +224,7 @@ class KhadraPasswordField extends StatefulWidget {
     this.onSubmitted,
     this.autofillHints,
     this.errorText,
+    this.maxLength,
   });
 
   final TextEditingController controller;
@@ -177,6 +235,11 @@ class KhadraPasswordField extends StatefulWidget {
   final VoidCallback? onSubmitted;
   final Iterable<String>? autofillHints;
   final String? errorText;
+
+  /// The platform's own cap, from `/app-config`. Null leaves the field
+  /// unbounded and lets the server refuse — better than a 72 typed in here,
+  /// which is bcrypt's limit today and this app's guess tomorrow.
+  final int? maxLength;
 
   @override
   State<KhadraPasswordField> createState() => _KhadraPasswordFieldState();
@@ -197,7 +260,7 @@ class _KhadraPasswordFieldState extends State<KhadraPasswordField> {
         autofillHints: widget.autofillHints,
         errorText: widget.errorText,
         forceLtr: true,
-        maxLength: 72,
+        maxLength: widget.maxLength,
         suffix: IconButton(
           onPressed: () => setState(() => _hidden = !_hidden),
           icon: Icon(_hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
@@ -271,10 +334,58 @@ abstract final class Validate {
     return ok ? null : l10n.validationPhone;
   }
 
-  static String? password(AppLocalizations l10n, String? value) {
+  /// A password, judged against the PLATFORM's rule.
+  ///
+  /// [policy] comes from `/app-config`. Null means the config has not arrived —
+  /// a reset-password deep link can render before it does — and the only honest
+  /// answer then is to check that something was typed and let the server judge
+  /// the rest. It must never fall back to a number, because a number here is a
+  /// second copy of a configurable rule and the whole reason this takes a
+  /// parameter.
+  ///
+  /// **Never call this on the sign-in screen.** The server deliberately checks
+  /// only that a sign-in password is present: raising the minimum must not lock
+  /// out somebody whose password predates it.
+  static String? password(
+    AppLocalizations l10n,
+    String? value, {
+    PasswordPolicy? policy,
+  }) {
     final text = value ?? '';
     if (text.isEmpty) return l10n.validationRequired;
-    return text.length < 8 ? l10n.validationPasswordShort : null;
+    if (policy == null) return null;
+
+    if (text.length < policy.minimumLength) {
+      return l10n.validationPasswordShort(policy.minimumLength);
+    }
+    if (text.length > policy.maximumLength) {
+      return l10n.validationPasswordLong(policy.maximumLength);
+    }
+    if (policy.requiresLetter && !text.contains(RegExp('[A-Za-z]'))) {
+      return l10n.validationPasswordLetter;
+    }
+    if (policy.requiresDigit && !text.contains(RegExp(r'\d'))) {
+      return l10n.validationPasswordDigit;
+    }
+    if (!policy.allowsWhitespace && text.contains(RegExp(r'\s'))) {
+      return l10n.validationPasswordSpaces;
+    }
+    return null;
+  }
+
+  /// The rule, as a sentence under the field.
+  ///
+  /// Composed from the flags rather than sent by the server: the field-level
+  /// messages above have to be the app's anyway, and "{n} characters" in Arabic
+  /// needs plural forms that a server-side interpolation cannot produce. Null
+  /// when there is no policy to describe — better a field with no helper than a
+  /// helper describing a rule nobody is applying.
+  static String? passwordRules(AppLocalizations l10n, PasswordPolicy? policy) {
+    if (policy == null) return null;
+    if (policy.requiresLetter && policy.requiresDigit) {
+      return l10n.authPasswordRules(policy.minimumLength);
+    }
+    return l10n.authPasswordRulesLengthOnly(policy.minimumLength);
   }
 
   static String? maxLength(AppLocalizations l10n, String? value, int max) =>

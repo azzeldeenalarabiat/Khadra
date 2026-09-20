@@ -228,7 +228,7 @@ public sealed class PenaltyAssessmentTests
     [Fact]
     public void Nothing_owed_is_attributed_to_nobody()
     {
-        var assessment = PenaltyAssessment.None("free cancellation", "JOD", Now);
+        var assessment = PenaltyAssessment.None(PenaltyReason.CancelledInFreeWindow, "JOD", Now);
 
         Assert.True(assessment.IsNothingOwed);
         Assert.Same(BookingParty.Unattributed, assessment.AttributedTo);
@@ -239,7 +239,7 @@ public sealed class PenaltyAssessmentTests
     public void A_fixed_assessment_reports_one_figure()
     {
         var assessment = PenaltyAssessment.Fixed(
-            BookingParty.Customer, Build.Percent(100m), Money.Jod(18m), "late cancellation", Now);
+            BookingParty.Customer, Build.Percent(100m), Money.Jod(18m), PenaltyReason.CustomerCancelledAfterFreeWindow, Now);
 
         Assert.Equal(Money.Jod(18m), assessment.MinAmount);
         Assert.Equal(Money.Jod(18m), assessment.MaxAmount);
@@ -250,7 +250,7 @@ public sealed class PenaltyAssessmentTests
     public void A_range_assessment_leaves_the_exact_figure_to_an_admin()
     {
         var assessment = PenaltyAssessment.Range(
-            BookingParty.Dealer, Build.Percent(25m), Build.Percent(50m), Money.Jod(90m), "non-delivery", Now);
+            BookingParty.Dealer, Build.Percent(25m), Build.Percent(50m), Money.Jod(90m), PenaltyReason.DealerDidNotHandOver, Now);
 
         Assert.True(assessment.IsRange);
         Assert.Equal(Money.Jod(22.5m), assessment.MinAmount);
@@ -261,15 +261,15 @@ public sealed class PenaltyAssessmentTests
     public void An_inverted_range_is_a_programming_error()
     {
         Assert.Throws<DomainException>(() => PenaltyAssessment.Range(
-            BookingParty.Dealer, Build.Percent(50m), Build.Percent(25m), Money.Jod(90m), "bad", Now));
+            BookingParty.Dealer, Build.Percent(50m), Build.Percent(25m), Money.Jod(90m), PenaltyReason.DealerDidNotHandOver, Now));
     }
 
     [Fact]
     public void Every_assessment_says_out_loud_that_it_needs_a_ticket()
     {
-        Assert.True(PenaltyAssessment.None("x", "JOD", Now).RequiresTicketToEnforce);
+        Assert.True(PenaltyAssessment.None(PenaltyReason.CancelledByPlatform, "JOD", Now).RequiresTicketToEnforce);
         Assert.True(PenaltyAssessment
-            .Fixed(BookingParty.Customer, Build.Percent(10m), Money.Jod(90m), "x", Now)
+            .Fixed(BookingParty.Customer, Build.Percent(10m), Money.Jod(90m), PenaltyReason.CustomerNoShow, Now)
             .RequiresTicketToEnforce);
     }
 }

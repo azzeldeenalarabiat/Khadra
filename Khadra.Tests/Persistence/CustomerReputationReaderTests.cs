@@ -1,6 +1,7 @@
 using Khadra.Application.Reviews.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
+using Khadra.Domain.Disputes;
 using Khadra.Domain.Reviews;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Reporting;
@@ -258,5 +259,103 @@ public sealed class CustomerReputationReaderTests : IDisposable
 
         Assert.Equal(3, reputation.DealerRating.Count);
         Assert.Equal(4.3m, reputation.DealerRating.Average);
+    }
+
+    private async Task ResolveDisputeAsync(Id bookingId, DepositDisposition disposition)
+    {
+        var ticket = DisputeTicket
+            .Open(bookingId, _customerId, BookingParty.Customer, "I was there.", TimeSpan.FromHours(48), Now)
+            .Value;
+        ticket.Resolve(
+            DisputeResolution.Create(disposition, null, null, "Settled.", Id.New(), Now.AddHours(2)).Value);
+
+        await using var context = NewContext();
+        context.DisputeTickets.Add(ticket);
+        await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// A no-show the customer DISPUTED AND WON does not stay on their record.
+    /// </summary>
+    /// <remarks>
+    /// It did until 2026-09-11, and this is the case that makes it matter. The assessment is what the
+    /// booking closed with; a resolution returning the whole deposit is the platform saying that
+    /// assessment was wrong. Leaving the count standing punished a customer for having been right, in
+    /// the one place they could not see, in front of the one audience deciding whether to rent to
+    /// them — and made winning the dispute pointless, since it moved the money and left the mark.
+    ///
+    /// The reader already had this reasoning written on <c>WentAgainstCustomer</c>, for the disputes
+    /// counter. It simply was not applied to the other two.
+    /// </remarks>
+    [Fact]
+    public async Task A_no_show_the_customer_disputed_and_won_stops_counting_against_them()
+    {
+        var booking = Build.ConfirmedBooking(Now, customerId: _customerId, dealerId: _dealerId);
+        booking.MarkNoShow(booking.Period.Start.Add(booking.Terms.NoShowTimeout));
+        await SaveAsync(booking);
+
+        // Before the ticket: the assessment stands and the count is honest.
+        Assert.Equal(1, (await ReadAsync()).NoShows);
+
+        await ResolveDisputeAsync(
+            booking.Id,
+            DepositDisposition.RefundEverything(booking.Pricing.DepositAmount).Value);
+
+        var reputation = await ReadAsync();
+
+        Assert.Same(BookingParty.Customer, booking.Penalty!.AttributedTo);
+        Assert.Equal(0, reputation.NoShows);
+        // And it is not silently moved into the other column either: a ticket the customer WON is
+        // not a dispute that went against them.
+        Assert.Equal(0, reputation.DisputesResolvedAgainstCustomer);
+    }
+
+    /// <summary>A ticket the customer LOST leaves the record exactly as it was.</summary>
+    [Fact]
+    public async Task A_dispute_that_went_against_the_customer_leaves_the_no_show_standing()
+    {
+        var booking = Build.ConfirmedBooking(Now, customerId: _customerId, dealerId: _dealerId);
+        booking.MarkNoShow(booking.Period.Start.Add(booking.Terms.NoShowTimeout));
+        await SaveAsync(booking);
+
+        var held = booking.Pricing.DepositAmount;
+        await ResolveDisputeAsync(
+            booking.Id,
+            DepositDisposition.Create(
+                Money.Create(held.Amount, held.CurrencyCode),
+                Money.ZeroIn(held.CurrencyCode),
+                Money.ZeroIn(held.CurrencyCode),
+                Money.Create(held.Amount, held.CurrencyCode)).Value);
+
+        var reputation = await ReadAsync();
+
+        Assert.Equal(1, reputation.NoShows);
+        Assert.Equal(1, reputation.DisputesResolvedAgainstCustomer);
+    }
+
+    /// <summary>
+    /// An OPEN ticket clears nothing. A record must not go quiet merely because it is being argued.
+    /// </summary>
+    [Fact]
+    public async Task An_unresolved_dispute_does_not_clear_a_no_show()
+    {
+        var booking = Build.ConfirmedBooking(Now, customerId: _customerId, dealerId: _dealerId);
+        booking.MarkNoShow(booking.Period.Start.Add(booking.Terms.NoShowTimeout));
+        await SaveAsync(booking);
+
+        var ticket = DisputeTicket
+            .Open(booking.Id, _customerId, BookingParty.Customer, "I was there.", TimeSpan.FromHours(48), Now)
+            .Value;
+
+        await using (var context = NewContext())
+        {
+            context.DisputeTickets.Add(ticket);
+            await context.SaveChangesAsync();
+        }
+
+        var reputation = await ReadAsync();
+
+        Assert.Equal(1, reputation.NoShows);
+        Assert.Equal(0, reputation.DisputesResolvedAgainstCustomer);
     }
 }

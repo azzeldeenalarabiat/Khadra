@@ -56,13 +56,15 @@
                           <span class="pill s-dim">{{ t('adminUsers.you') }}</span>
                         }
                       </div>
-                      <div class="entity-sub">{{ t('adminUsers.added') }} {{ when(admin.createdAt) }}</div>
+                      <div class="entity-sub">
+                        {{ t('adminUsers.addedOn', { date: when(admin.createdAt) }) }}
+                      </div>
                     </div>
                   </div>
                 </td>
                 <td class="td">
-                  {{ admin.email }}
-                  <div class="td-sub mono">{{ admin.phone }}</div>
+                  <span class="ltr">{{ admin.email }}</span>
+                  <div class="td-sub mono"><span class="ltr">{{ admin.phone }}</span></div>
                 </td>
                 <td class="td">
                   <span class="pill" [class]="'s-' + tone(admin)">{{ statusLabel(admin) }}</span>
@@ -78,7 +80,7 @@
                     routerLink="/audit-logs"
                     [queryParams]="{ actorUserId: admin.userId }"
                   >
-                    {{ admin.auditedActions }}
+                    {{ formats.number(admin.auditedActions) }}
                   </a>
                 </td>
                 <td class="td">{{ when(admin.lastLoginAt) }}</td>

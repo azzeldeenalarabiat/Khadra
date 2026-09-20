@@ -12,20 +12,59 @@ import { Vehicle, VehicleRequest, toVehicleRequest } from '../../core/models/fle
 import { FleetService } from '../../core/services/fleet.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
-import { LookupsService } from '../../core/services/lookups.service';
+import { LookupEntry, LookupsService } from '../../core/services/lookups.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { MapComponent } from '../../shared/map/map.component';
 import { ImageFallbackDirective } from '../../shared/image-fallback.directive';
 import { IconName } from '../../shared/icon/icon-paths';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
+import { TranslationKey } from '../../core/i18n/en';
+import { Language } from '../../core/i18n/language';
+import {
+  ProblemSnapshot,
+  fieldMessage,
+  serverSentence,
+  snapshotProblem,
+} from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 interface Step {
   readonly n: number;
-  readonly title: string;
+  /** A key, worded where the step is shown, so the list follows a language switch. */
+  readonly title: TranslationKey;
   readonly icon: IconName;
 }
+
+const STEPS: readonly Step[] = [
+  { n: 1, title: 'vehicleWizard.basicInformation', icon: 'info' },
+  { n: 2, title: 'vehicleWizard.specifications', icon: 'gear' },
+  { n: 3, title: 'vehicleWizard.pricing', icon: 'currency-circle-dollar' },
+  { n: 4, title: 'dealerProfile.location', icon: 'map-pin' },
+  { n: 5, title: 'carForm.photos', icon: 'image' },
+  { n: 6, title: 'vehicleWizard.availability', icon: 'toggle-right' },
+  { n: 7, title: 'common.delivery', icon: 'moped' },
+  { n: 8, title: 'vehicleWizard.review', icon: 'check-square' },
+];
+
+/**
+ * The API's transmission names, each with the words a reader sees. The name is what the form sends
+ * and the server stores; only the label is translated, in the platform's own vocabulary (the one
+ * `/api/v1/app-config` gives the customer app for the same car).
+ */
+const TRANSMISSION_LABELS: Readonly<Record<string, TranslationKey>> = {
+  Automatic: 'fleetList.transmissionAutomatic',
+  Manual: 'fleetList.transmissionManual',
+};
+
+/** The API's fuel type names, arranged the same way. */
+const FUEL_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
+  Petrol: 'fleetList.fuelPetrol',
+  Diesel: 'fleetList.fuelDiesel',
+  Hybrid: 'fleetList.fuelHybrid',
+  Electric: 'fleetList.fuelElectric',
+};
 
 /**
  * The wizard's working copy of a vehicle.
@@ -85,33 +124,33 @@ function toRequest(form: WizardForm): VehicleRequest {
   imports: [RouterLink, IconComponent, ImageFallbackDirective, MapComponent, MoneyPipe],
 })
 export class VehicleWizardComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  protected readonly formats = inject(FormatService);
   private readonly service = inject(FleetService);
   private readonly consoleData = inject(DealerConsoleService);
   private readonly ui = inject(ConsoleUiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  protected readonly steps: readonly Step[] = [
-    { n: 1, title: this.t('vehicleWizard.basicInformation'), icon: 'info' },
-    { n: 2, title: 'Specifications', icon: 'gear' },
-    { n: 3, title: 'Pricing', icon: 'currency-circle-dollar' },
-    { n: 4, title: 'Location', icon: 'map-pin' },
-    { n: 5, title: 'Photos', icon: 'image' },
-    { n: 6, title: 'Availability', icon: 'toggle-right' },
-    { n: 7, title: 'Delivery', icon: 'moped' },
-    { n: 8, title: 'Review', icon: 'check-square' },
-  ];
+  protected readonly steps = STEPS;
 
   protected readonly step = signal(1);
   protected readonly busy = signal(false);
   protected readonly uploading = signal(false);
-  protected readonly problem = signal<string | null>(null);
-  protected readonly fieldErrors = signal<Readonly<Record<string, readonly string[]>>>({});
+  /** What the banner reports, held as facts; `problemText` chooses the words. */
+  private readonly problem = signal<WizardProblem | null>(null);
+  /** The refused save whose per-field messages sit under the fields, until the next save. */
+  private readonly fieldProblem = signal<ProblemSnapshot | null>(null);
   protected readonly draft = signal<Vehicle | null>(null);
   protected readonly publishOnSave = signal(true);
   /** A draft of the dealer's own that owns the plate they just typed; offered as "continue that". */
   protected readonly resumable = signal<Vehicle | null>(null);
+
+  protected readonly problemText = computed(() => {
+    const problem = this.problem();
+    return problem ? describe(problem, this.t, this.i18n.lang()) : null;
+  });
 
   constructor() {
     // `?draft=<id>` means this wizard is continuing a draft created earlier (a refresh, or a return
@@ -142,8 +181,9 @@ export class VehicleWizardComponent {
     'Mercedes-Benz',
     'BMW',
   ];
-  protected readonly transmissions = ['Automatic', 'Manual'];
-  protected readonly fuelTypes = ['Petrol', 'Diesel', 'Hybrid', 'Electric'];
+  /** The API's names, in the order offered. Shown through `transmissionLabel` / `fuelTypeLabel`. */
+  protected readonly transmissions = Object.keys(TRANSMISSION_LABELS);
+  protected readonly fuelTypes = Object.keys(FUEL_TYPE_LABELS);
   protected readonly seatOptions = [2, 4, 5, 7, 8];
 
   /**
@@ -211,8 +251,25 @@ export class VehicleWizardComponent {
     return year !== null && !!range && year >= range.earliest && year <= range.latest;
   }
 
-  protected readonly current = computed(() => this.steps[this.step() - 1]);
+  protected readonly current = computed(() => STEPS[this.step() - 1]);
   protected readonly photos = computed(() => this.draft()?.images ?? []);
+
+  /** "Step 3 of 8" as one message, so each language places the two numbers its own way. */
+  protected readonly stepOfTotal = computed(() =>
+    this.t('vehicleWizard.stepOfTotal', { current: this.step(), total: STEPS.length }),
+  );
+
+  /**
+   * The pickup note around its link to the dealer profile.
+   *
+   * The dictionary writes `{profile}` where each language's grammar puts the link, and the sentence
+   * is cut there, so it is never glued together from fragments in English order. The placeholder is
+   * left unfilled on purpose: `t` returns a placeholder it was given no value for as written.
+   */
+  protected readonly pickupNote = computed(() => {
+    const [before, after = ''] = this.t('vehicleWizard.pickupFromYourLocation').split('{profile}');
+    return { before, after };
+  });
 
   protected readonly stepValid = computed(() => {
     const f = this.form();
@@ -244,6 +301,34 @@ export class VehicleWizardComponent {
     }
   });
 
+  /**
+   * The review step's money, in the currency the platform holds THIS car's figures in.
+   *
+   * The amounts are the form's, which is what saving sends. The codes are the draft's own: the draft
+   * exists by the review step (reaching Photos creates it, and every price edit passes Photos again
+   * on the way back), so no code is assumed.
+   */
+  protected readonly reviewPrice = computed(() =>
+    this.formats.money(this.form().dailyRate, this.draft()?.dailyRate.currency),
+  );
+
+  protected readonly reviewPriceNote = computed(() =>
+    this.t('vehicleWizard.perDayAndDeposit', {
+      deposit: this.formats.money(
+        this.form().securityDeposit,
+        this.draft()?.securityDeposit.currency,
+      ),
+    }),
+  );
+
+  /** "Automatic · Petrol · 5 seats" under the car's name on the review step. */
+  protected readonly reviewSpecs = computed(() => {
+    const f = this.form();
+    const facts = [this.transmissionLabel(f.transmission), this.fuelTypeLabel(f.fuelType)];
+    if (f.seats !== null) facts.push(this.t('fleetList.seatCount', { count: f.seats }));
+    return facts.join(' · ');
+  });
+
   protected readonly review = computed<readonly KeyValue[]>(() => {
     const f = this.form();
     const me = this.dealer();
@@ -253,24 +338,52 @@ export class VehicleWizardComponent {
       { k: this.t('common.colour'), v: f.color || '—' },
       {
         k: this.t('dealerProfile.location'),
-        v: me ? `${me.businessName} · ${me.latitude.toFixed(4)}, ${me.longitude.toFixed(4)}` : '—',
+        v: me ? `${me.businessName} · ${this.formats.coordinates(me.latitude, me.longitude)}` : '—',
       },
-      { k: this.t('vehicleWizard.listing'), v: this.publishOnSave() ? this.t('vehicleWizard.publishedOnSave') : this.t('vehicleWizard.keptAsADraft') },
+      {
+        k: this.t('vehicleWizard.listing'),
+        v: this.publishOnSave()
+          ? this.t('vehicleWizard.publishedOnSave')
+          : this.t('vehicleWizard.keptAsADraft'),
+      },
       {
         k: this.t('vehicleWizard.mileage'),
         v: f.mileageUnlimited
-          ? 'Unlimited'
-          : `${f.mileageDailyLimitKm} km/day · ${f.mileageExcessFeePerKm} JOD/km over`,
+          ? this.t('vehicleWizard.unlimited')
+          : this.t('dealerBooking.mileageAllowance', {
+              limit: this.formats.number(f.mileageDailyLimitKm),
+              fee: this.formats.money(
+                f.mileageExcessFeePerKm,
+                this.draft()?.mileage.excessFeePerKm?.currency,
+              ),
+            }),
       },
-      { k: this.t('common.fuelPolicy'), v: f.fuelPolicy === 'FullToFull' ? this.t('vehicleWizard.fullToFull') : this.t('vehicleWizard.sameToSame') },
+      {
+        k: this.t('common.fuelPolicy'),
+        v:
+          f.fuelPolicy === 'FullToFull'
+            ? this.t('vehicleWizard.fullToFull')
+            : this.t('vehicleWizard.sameToSame'),
+      },
       {
         k: this.t('common.delivery'),
         v: f.isDeliveryEligible
-          ? `Eligible${fee ? ` · your fee ${fee.amount} ${fee.currency}` : ''}`
+          ? fee
+            ? this.t('vehicleWizard.eligibleYourFee', {
+                fee: this.formats.money(fee.amount, fee.currency),
+              })
+            : this.t('vehicleWizard.eligible')
           : this.t('vehicleDetail.pickupOnly'),
       },
-      { k: this.t('carForm.photos'), v: `${this.photos().length} uploaded` },
-      { k: this.t('vehicleDetail.insurance'), v: this.t('vehicleDetail.pendingPlatformConfiguration'), tone: 'dim' },
+      {
+        k: this.t('carForm.photos'),
+        v: this.t('vehicleWizard.photosUploaded', { count: this.photos().length }),
+      },
+      {
+        k: this.t('vehicleDetail.insurance'),
+        v: this.t('vehicleDetail.pendingPlatformConfiguration'),
+        tone: 'dim',
+      },
     ];
   });
 
@@ -296,9 +409,27 @@ export class VehicleWizardComponent {
   }
 
   protected fieldError(name: string): string | null {
-    const errors = this.fieldErrors();
-    const key = Object.keys(errors).find((k) => k.toLowerCase() === name.toLowerCase());
-    return key ? (errors[key][0] ?? null) : null;
+    return fieldMessage(this.fieldProblem(), name, this.i18n.lang(), this.t);
+  }
+
+  /** A transmission as the reader's language says it. A name this build has no word for is shown as sent. */
+  protected transmissionLabel(name: string): string {
+    return wordFor(TRANSMISSION_LABELS, name, this.t);
+  }
+
+  /** A fuel type as the reader's language says it, the same way. */
+  protected fuelTypeLabel(name: string): string {
+    return wordFor(FUEL_TYPE_LABELS, name, this.t);
+  }
+
+  /**
+   * A vehicle type in the reader's language. Both names come from the same curated row and the id is
+   * what is sent either way. Falls back to the other name rather than an empty option: a lookup row
+   * may be half-translated, and an unnamed option cannot be picked.
+   */
+  protected typeName(type: LookupEntry): string {
+    const arabic = this.i18n.lang() === 'ar';
+    return (arabic ? type.nameAr || type.nameEn : type.nameEn || type.nameAr).trim();
   }
 
   protected goTo(n: number): void {
@@ -334,7 +465,7 @@ export class VehicleWizardComponent {
   private async persist(): Promise<boolean> {
     this.busy.set(true);
     this.problem.set(null);
-    this.fieldErrors.set({});
+    this.fieldProblem.set(null);
     try {
       const draft = this.draft();
       const saved = draft
@@ -352,18 +483,13 @@ export class VehicleWizardComponent {
       }
       return true;
     } catch (error) {
-      const p = error as {
-        error?: { code?: string; title?: string; errors?: Record<string, string[]> };
-      };
-      if (p.error?.errors) this.fieldErrors.set(p.error.errors);
-      this.problem.set(
-        p.error?.code === 'vehicle.plate_taken'
-          ? this.plateTakenMessage()
-          : (p.error?.title ?? this.t('dealerDelivery.serviceDidNotRespond')),
-      );
+      const snapshot = snapshotProblem(error);
+      const plateTaken = snapshot.code === 'vehicle.plate_taken';
+      this.fieldProblem.set(snapshot);
+      this.problem.set(plateTaken ? this.plateTaken() : { kind: 'save', snapshot });
       // Field errors belong to the early steps; go back to the first one that can show them.
-      if (p.error?.errors) this.step.set(1);
-      if (p.error?.code === 'vehicle.plate_taken') this.step.set(2);
+      if (snapshot.errors) this.step.set(1);
+      if (plateTaken) this.step.set(2);
       return false;
     } finally {
       this.busy.set(false);
@@ -382,12 +508,7 @@ export class VehicleWizardComponent {
         this.draft.set(await this.service.uploadImage(draft.vehicleId, file));
       }
     } catch (error) {
-      const p = error as { error?: { code?: string; title?: string } };
-      this.problem.set(
-        p.error?.code === 'vehicle.invalid_image_type'
-          ? this.t('vehicleWizard.useAJpegPng')
-          : (p.error?.title ?? this.t('vehicleWizard.theUploadDidNot')),
-      );
+      this.problem.set({ kind: 'upload', snapshot: snapshotProblem(error) });
     } finally {
       this.uploading.set(false);
       input.value = '';
@@ -422,7 +543,7 @@ export class VehicleWizardComponent {
     if (!draft) return;
     if (this.publishOnSave()) {
       if (this.photos().length === 0) {
-        this.problem.set(this.t('vehicleWizard.addAtLeastOne'));
+        this.problem.set({ kind: 'noPhoto' });
         this.step.set(5);
         return;
       }
@@ -431,12 +552,7 @@ export class VehicleWizardComponent {
         await this.service.changeStatus(draft.vehicleId, 'Publish');
         this.service.refresh();
       } catch (error) {
-        const p = error as { error?: { code?: string; title?: string } };
-        this.problem.set(
-          p.error?.code === 'dealer.not_approved'
-            ? this.t('vehicleWizard.yourDealershipCannotTrade')
-            : (p.error?.title ?? this.t('vehicleWizard.theCarWasSaved')),
-        );
+        this.problem.set({ kind: 'publish', snapshot: snapshotProblem(error) });
         this.busy.set(false);
         return;
       } finally {
@@ -444,11 +560,14 @@ export class VehicleWizardComponent {
       }
     }
     const f = this.form();
+    const vehicle = `${f.make} ${f.model} ${f.year}`;
     this.ui.showToast(
-      this.publishOnSave() ? this.t('vehicleWizard.vehiclePublished') : this.t('vehicleWizard.draftSaved'),
       this.publishOnSave()
-        ? `${f.make} ${f.model} ${f.year} is live in your fleet.`
-        : `${f.make} ${f.model} ${f.year} is in your fleet as a draft.`,
+        ? this.t('vehicleWizard.vehiclePublished')
+        : this.t('vehicleWizard.draftSaved'),
+      this.publishOnSave()
+        ? this.t('vehicleWizard.vehicleIsLive', { vehicle })
+        : this.t('vehicleWizard.vehicleIsADraft', { vehicle }),
     );
     await this.router.navigate(['/dealer/fleet', draft.vehicleId]);
   }
@@ -460,7 +579,7 @@ export class VehicleWizardComponent {
       await this.persist();
       this.ui.showToast(
         this.t('vehicleWizard.draftKept'),
-        `${draft.make} ${draft.model} stays in your fleet as a draft. Open it from the fleet to finish.`,
+        this.t('vehicleWizard.vehicleStaysADraft', { vehicle: `${draft.make} ${draft.model}` }),
         'warn',
       );
     }
@@ -468,16 +587,11 @@ export class VehicleWizardComponent {
   }
 
   /** A "taken" plate is very often the dealer's own abandoned draft; say so and point at it. */
-  private plateTakenMessage(): string {
+  private plateTaken(): WizardProblem {
     const plate = this.form().plateNumber.trim();
-    const own = (this.ownFleet() ?? []).find((car) => car.plateNumber === plate);
-    if (own?.status === 'Draft') {
-      this.resumable.set(own);
-      return `${plate} is on a draft you already started (${own.make} ${own.model} ${own.year}). Continue that draft instead of creating another.`;
-    }
-    return own
-      ? `${plate} is already on ${own.make} ${own.model} ${own.year} in your fleet.`
-      : this.t('vehicleWizard.thatPlateIsAlready');
+    const own = (this.ownFleet() ?? []).find((car) => car.plateNumber === plate) ?? null;
+    if (own?.status === 'Draft') this.resumable.set(own);
+    return { kind: 'plateTaken', plate, own };
   }
 
   /** Switch this wizard onto an existing draft: same URL state as a refresh would produce. */
@@ -494,7 +608,58 @@ export class VehicleWizardComponent {
     this.draft.set(existing);
     this.form.set(toVehicleRequest(existing));
     this.problem.set(null);
-    this.fieldErrors.set({});
+    this.fieldProblem.set(null);
     this.step.set(5);
   }
+}
+
+/**
+ * What the banner reports, held as facts and worded by `describe` when it is shown, so a language
+ * switch re-words a message already on screen.
+ */
+type WizardProblem =
+  /** Publishing was chosen with no photo: the wizard stops before asking the server. */
+  | { readonly kind: 'noPhoto' }
+  /** A refused request, and which one: each says something different when the server gives no reason. */
+  | { readonly kind: 'save' | 'upload' | 'publish'; readonly snapshot: ProblemSnapshot }
+  /** The plate as it was sent, and the dealer's own car already carrying it when there is one. */
+  | { readonly kind: 'plateTaken'; readonly plate: string; readonly own: Vehicle | null };
+
+/** Words a problem in the reader's language, at render time. The code mappings are the screen's own. */
+function describe(problem: WizardProblem, t: I18nService['t'], language: Language): string {
+  if (problem.kind === 'noPhoto') return t('vehicleWizard.addAtLeastOne');
+  if (problem.kind === 'plateTaken') {
+    const { plate, own } = problem;
+    if (!own) return t('vehicleWizard.thatPlateIsAlready');
+    const vehicle = `${own.make} ${own.model} ${own.year}`;
+    return own.status === 'Draft'
+      ? t('vehicleWizard.plateIsOnYourDraft', { plate, vehicle })
+      : t('vehicleWizard.plateIsOnYourCar', { plate, vehicle });
+  }
+  const p = problem.snapshot;
+  if (problem.kind === 'upload') {
+    return p.code === 'vehicle.invalid_image_type'
+      ? t('vehicleWizard.useAJpegPng')
+      : (serverSentence(p, language, t) ?? t('vehicleWizard.theUploadDidNot'));
+  }
+  if (problem.kind === 'publish') {
+    if (p.code === 'dealer.not_approved') return t('vehicleWizard.yourDealershipCannotTrade');
+    // The draft WAS saved a moment earlier, so the general refusal line ("nothing has been changed")
+    // would be untrue here. English keeps the server's own sentence; Arabic says what happened.
+    return (
+      (language === 'en' ? serverSentence(p, language, t) : null) ??
+      t('vehicleWizard.theCarWasSaved')
+    );
+  }
+  return serverSentence(p, language, t) ?? t('dealerDelivery.serviceDidNotRespond');
+}
+
+/** An API name as the reader's language says it; a name this build has no word for is shown as sent. */
+function wordFor(
+  labels: Readonly<Record<string, TranslationKey>>,
+  name: string,
+  t: I18nService['t'],
+): string {
+  const key = labels[name];
+  return key ? t(key) : name;
 }

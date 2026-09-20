@@ -8,6 +8,8 @@
 // instinct is two, and where guessing renders 12.75 against a contract that says
 // 12.750.
 
+import 'dart:typed_data';
+
 import '../core/config/app_environment.dart';
 
 int _int(dynamic value, [int fallback = 0]) => switch (value) {
@@ -113,8 +115,8 @@ class AppConfig {
     required this.maxAdvanceBookingDays,
     required this.minimumBookingLeadTimeMinutes,
     required this.maxRentalDays,
-    required this.paymentWindowHours,
     required this.documents,
+    required this.password,
     required this.vocabularies,
   });
 
@@ -131,8 +133,14 @@ class AppConfig {
   final int maxAdvanceBookingDays;
   final int minimumBookingLeadTimeMinutes;
   final int maxRentalDays;
-  final int paymentWindowHours;
   final DocumentLimits documents;
+
+  /// What makes a password acceptable, so the app states the platform's rule
+  /// rather than a copy of it. Null when this server is older than the field, or
+  /// when the config has not arrived — in which case the app describes no rule at
+  /// all and lets the server judge, which is the only honest fallback.
+  final PasswordPolicy? password;
+
   final Vocabularies vocabularies;
 
   static AppConfig fromJson(Map<String, dynamic> json) => AppConfig(
@@ -144,12 +152,60 @@ class AppConfig {
         minimumBookingLeadTimeMinutes:
             _int(json['minimumBookingLeadTimeMinutes'], 120),
         maxRentalDays: _int(json['maxRentalDays'], 90),
-        paymentWindowHours: _int(json['paymentWindowHours'], 24),
         documents: DocumentLimits.fromJson(
             json['documents'] as Map<String, dynamic>? ?? const {}),
+        // NO default. Every other field here falls back to the shipped figure,
+        // which is right for a bound the picker cannot open without — but a
+        // password rule invented on the phone is the exact drift this field
+        // exists to end, and `?? 8` would reintroduce it wearing a different hat.
+        password: PasswordPolicy.maybe(json['password']),
         vocabularies: Vocabularies.fromJson(
             json['vocabularies'] as Map<String, dynamic>? ?? const {}),
       );
+}
+
+/// What the platform will accept as a password.
+///
+/// The app used to hold this itself — a minimum of 8 and the sentence "with a
+/// letter and a number" — while the server's minimum is configurable from 8 to
+/// 64. The day the owner raised it, every installed phone would have gone on
+/// promising 8, accepting a 9-character password locally, and showing the
+/// server's English refusal on the registration screen.
+///
+/// The SENTENCE is still the app's, composed from these flags, because "at least
+/// {n} characters" in Arabic needs plural forms that a C# interpolation cannot
+/// produce. The RULE is the server's.
+class PasswordPolicy {
+  const PasswordPolicy({
+    required this.minimumLength,
+    required this.maximumLength,
+    required this.requiresLetter,
+    required this.requiresDigit,
+    required this.allowsWhitespace,
+  });
+
+  final int minimumLength;
+
+  /// bcrypt's input cap, not a policy choice.
+  final int maximumLength;
+
+  final bool requiresLetter;
+  final bool requiresDigit;
+  final bool allowsWhitespace;
+
+  static PasswordPolicy? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final minimum = json['minimumLength'];
+    if (minimum is! num) return null;
+
+    return PasswordPolicy(
+      minimumLength: minimum.toInt(),
+      maximumLength: _int(json['maximumLength'], 72),
+      requiresLetter: json['requiresLetter'] as bool? ?? false,
+      requiresDigit: json['requiresDigit'] as bool? ?? false,
+      allowsWhitespace: json['allowsWhitespace'] as bool? ?? true,
+    );
+  }
 }
 
 /// Sent rather than assumed because the dinar has THREE decimals.
@@ -265,6 +321,29 @@ class Lookup {
     final name = arabic ? nameAr : nameEn;
     return name.isEmpty ? (arabic ? nameEn : nameAr) : name;
   }
+}
+
+/// What the bookable catalogue holds, which the search's choices are built from.
+///
+/// Seat counts ascending, and car type IDS only: the names are the lookup's, in both
+/// languages. A category is offered when it is in both, so one with no bookable car
+/// offers no chip, and neither does one an administrator has retired.
+class CatalogueFacets {
+  const CatalogueFacets({required this.seats, required this.carTypeIds});
+
+  final List<int> seats;
+  final Set<String> carTypeIds;
+
+  static CatalogueFacets fromJson(Map<String, dynamic> json) => CatalogueFacets(
+        seats: [
+          for (final value in json['seats'] as List<dynamic>? ?? const [])
+            if (value is num) value.toInt(),
+        ],
+        carTypeIds: {
+          for (final value in json['carTypeIds'] as List<dynamic>? ?? const [])
+            if (value is String) value,
+        },
+      );
 }
 
 // ── Identity ───────────────────────────────────────────────────────────────────
@@ -404,6 +483,7 @@ class CustomerDocument {
     required this.documentId,
     required this.type,
     required this.status,
+    required this.contentType,
     required this.sizeBytes,
     required this.uploadedAt,
     required this.reviewNote,
@@ -412,6 +492,10 @@ class CustomerDocument {
   final String documentId;
   final String type;
   final String status;
+
+  /// What the server actually stored. Empty on a server that predates the field,
+  /// which the tile renders as nothing rather than as a guess.
+  final String contentType;
   final int sizeBytes;
   final DateTime uploadedAt;
   final String? reviewNote;
@@ -420,6 +504,7 @@ class CustomerDocument {
         documentId: json['documentId'] as String? ?? '',
         type: json['type'] as String? ?? '',
         status: json['status'] as String? ?? '',
+        contentType: json['contentType'] as String? ?? '',
         sizeBytes: _int(json['sizeBytes']),
         uploadedAt: _requiredDateTime(json['uploadedAt']),
         reviewNote: json['reviewNote'] as String?,
@@ -457,6 +542,17 @@ class CustomerDocuments {
     }
     return null;
   }
+}
+
+/// A document's bytes, and what the server said they are.
+class DocumentBytes {
+  const DocumentBytes(this.bytes, this.contentType);
+
+  final Uint8List bytes;
+
+  /// From the response header. Null when the server did not say, which is the
+  /// case the caller has to name a file for anyway.
+  final String? contentType;
 }
 
 class SignedDocumentLink {
@@ -633,11 +729,15 @@ class GalleryDelivery {
       );
 }
 
+/// The rental office as it appears BESIDE A CAR.
+///
+/// Carries nothing the office wrote for its own page: those sections include ones
+/// it has HIDDEN, and this travels inside every car in the catalogue.
+/// [PublicGalleryPage] is the page.
 class PublicGallery {
   const PublicGallery({
     required this.dealerId,
     required this.businessName,
-    required this.description,
     required this.cityId,
     required this.latitude,
     required this.longitude,
@@ -651,7 +751,6 @@ class PublicGallery {
 
   final String dealerId;
   final String businessName;
-  final String? description;
   final String? cityId;
   final double latitude;
   final double longitude;
@@ -665,7 +764,6 @@ class PublicGallery {
   static PublicGallery fromJson(Map<String, dynamic> json) => PublicGallery(
         dealerId: json['dealerId'] as String? ?? '',
         businessName: json['businessName'] as String? ?? '',
-        description: json['description'] as String?,
         cityId: json['cityId'] as String?,
         latitude: _num(json['latitude']).toDouble(),
         longitude: _num(json['longitude']).toDouble(),
@@ -681,6 +779,112 @@ class PublicGallery {
             json['averageRating'] == null ? null : _num(json['averageRating']),
         reviewCount: _int(json['reviewCount']),
       );
+}
+
+/// The rental office's OWN page: everything a car carries, plus where the office is
+/// in words and what it writes for customers.
+class PublicGalleryPage {
+  const PublicGalleryPage({
+    required this.dealerId,
+    required this.businessName,
+    required this.cityId,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.logoUrl,
+    required this.coverUrl,
+    required this.operatingHours,
+    required this.delivery,
+    required this.averageRating,
+    required this.reviewCount,
+    required this.sections,
+  });
+
+  final String dealerId;
+  final String businessName;
+  final String? cityId;
+  final GalleryAddress? address;
+  final double latitude;
+  final double longitude;
+  final String? logoUrl;
+  final String? coverUrl;
+  final List<GalleryDaySchedule> operatingHours;
+  final GalleryDelivery delivery;
+  final num? averageRating;
+  final int reviewCount;
+  final GallerySections sections;
+
+  static PublicGalleryPage fromJson(Map<String, dynamic> json) => PublicGalleryPage(
+        dealerId: json['dealerId'] as String? ?? '',
+        businessName: json['businessName'] as String? ?? '',
+        cityId: json['cityId'] as String?,
+        address: GalleryAddress.maybe(json['address']),
+        latitude: _num(json['latitude']).toDouble(),
+        longitude: _num(json['longitude']).toDouble(),
+        logoUrl: _url(json['logoUrl']),
+        coverUrl: _url(json['coverUrl']),
+        operatingHours: (json['operatingHours'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(GalleryDaySchedule.fromJson)
+            .toList(),
+        delivery: GalleryDelivery.fromJson(
+            json['delivery'] as Map<String, dynamic>? ?? const {}),
+        averageRating:
+            json['averageRating'] == null ? null : _num(json['averageRating']),
+        reviewCount: _int(json['reviewCount']),
+        sections: GallerySections.fromJson(
+            json['sections'] as Map<String, dynamic>? ?? const {}),
+      );
+}
+
+/// Where the office is, in words. Null until the office records one.
+class GalleryAddress {
+  const GalleryAddress(this.area, this.street);
+
+  final String area;
+  final String? street;
+
+  static GalleryAddress? maybe(dynamic json) => json is Map<String, dynamic>
+      ? GalleryAddress(json['area'] as String? ?? '', json['street'] as String?)
+      : null;
+}
+
+/// What the office wrote for its customers, as the server decided a customer sees it.
+///
+/// Null is "nothing to show" and says nothing about why: hidden, never written, and
+/// — for delivery notes — an office that does not deliver all arrive the same way.
+/// The app renders no heading for a null section and must never ask why it is null.
+class GallerySections {
+  const GallerySections({
+    required this.about,
+    required this.rentalConditions,
+    required this.insurance,
+    required this.pickupInstructions,
+    required this.deliveryNotes,
+    required this.customerNotes,
+  });
+
+  final String? about;
+  final String? rentalConditions;
+  final String? insurance;
+  final String? pickupInstructions;
+  final String? deliveryNotes;
+  final String? customerNotes;
+
+  static GallerySections fromJson(Map<String, dynamic> json) => GallerySections(
+        about: _text(json['about']),
+        rentalConditions: _text(json['rentalConditions']),
+        insurance: _text(json['insurance']),
+        pickupInstructions: _text(json['pickupInstructions']),
+        deliveryNotes: _text(json['deliveryNotes']),
+        customerNotes: _text(json['customerNotes']),
+      );
+
+  /// Blank is the same as absent: a section with nothing in it is not a section.
+  static String? _text(dynamic value) {
+    final text = value as String?;
+    return text == null || text.trim().isEmpty ? null : text;
+  }
 }
 
 class CatalogueVehicle {
@@ -805,6 +1009,7 @@ class QuoteTerms {
     required this.paymentWindowHours,
     required this.customerCancellationPenaltyPercent,
     required this.noShowTimeoutHours,
+    required this.answerWindowHours,
   });
 
   final num depositPercent;
@@ -813,6 +1018,9 @@ class QuoteTerms {
   final num customerCancellationPenaltyPercent;
   final num noShowTimeoutHours;
 
+  /// How long the gallery has to answer, from the server rather than derived.
+  final num answerWindowHours;
+
   static QuoteTerms fromJson(Map<String, dynamic> json) => QuoteTerms(
         depositPercent: _num(json['depositPercent']),
         freeCancellationWindowHours: _num(json['freeCancellationWindowHours']),
@@ -820,6 +1028,7 @@ class QuoteTerms {
         customerCancellationPenaltyPercent:
             _num(json['customerCancellationPenaltyPercent']),
         noShowTimeoutHours: _num(json['noShowTimeoutHours']),
+        answerWindowHours: _num(json['answerWindowHours']),
       );
 }
 
@@ -904,6 +1113,7 @@ class BookingTerms {
     required this.freeCancellationWindowHours,
     required this.noShowTimeoutHours,
     required this.paymentWindowHours,
+    required this.answerWindowHours,
     required this.postReturnSettlementWindowHours,
     required this.customerCancellationPenaltyPercent,
     required this.rulesVersion,
@@ -914,6 +1124,11 @@ class BookingTerms {
   final num freeCancellationWindowHours;
   final num noShowTimeoutHours;
   final num paymentWindowHours;
+
+  /// How long the gallery had to answer THIS request — the figure the booking
+  /// froze, not today's setting and not `decisionDeadline − createdAt`.
+  final num answerWindowHours;
+
   final num postReturnSettlementWindowHours;
   final num customerCancellationPenaltyPercent;
   final int rulesVersion;
@@ -924,6 +1139,7 @@ class BookingTerms {
         freeCancellationWindowHours: _num(json['freeCancellationWindowHours']),
         noShowTimeoutHours: _num(json['noShowTimeoutHours']),
         paymentWindowHours: _num(json['paymentWindowHours']),
+        answerWindowHours: _num(json['answerWindowHours']),
         postReturnSettlementWindowHours:
             _num(json['postReturnSettlementWindowHours']),
         customerCancellationPenaltyPercent:
@@ -1369,6 +1585,41 @@ class BookingListItem {
       );
 }
 
+/// The one booking the landing surface shows, and WHY it was chosen.
+///
+/// The reason is a stable code, not a sentence: the wording is the app's, in the
+/// reader's own language. The app does not decide which booking this is — a
+/// deposit due within hours outranking a rental starting tomorrow is a judgement
+/// the platform owns, and a screen sorting a list by pickup date would have shown
+/// the rental and let the deposit expire unread.
+class NextBooking {
+  const NextBooking({required this.booking, required this.reason});
+
+  final BookingListItem booking;
+  final String reason;
+
+  /// Null when the customer has nothing live, which is the ordinary answer. The
+  /// screen renders nothing at all for it, never a placeholder card.
+  static NextBooking? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final booking = json['booking'];
+    if (booking is! Map<String, dynamic>) return null;
+
+    return NextBooking(
+      booking: BookingListItem.fromJson(booking),
+      reason: json['reason'] as String? ?? '',
+    );
+  }
+}
+
+/// Why one booking outranked the others, as the server names them.
+abstract final class NextBookingReasons {
+  static const awaitingPayment = 'AwaitingPayment';
+  static const inProgress = 'InProgress';
+  static const upcoming = 'Upcoming';
+  static const awaitingDecision = 'AwaitingDecision';
+}
+
 // ── Disputes ───────────────────────────────────────────────────────────────────
 
 class EvidenceLink {
@@ -1603,6 +1854,139 @@ class NotificationFeed {
         totalCount: 0,
         unreadCount: 0,
       );
+}
+
+// ── Shortlist ──────────────────────────────────────────────────────────────────
+
+/// One car the customer saved.
+///
+/// [listing] is null when the car is no longer one they can see — hidden, in
+/// maintenance, its gallery suspended, withdrawn. The server returns no name and
+/// no reason for those, deliberately: naming the reason would distinguish cases
+/// the catalogue answers identically on purpose. The screen says "no longer
+/// listed" and offers to remove it.
+/// Enough to recognise a saved car that can no longer be booked.
+///
+/// Four fields, and the server sends no fifth: no reason, no status, no image and
+/// no gallery id. A hidden car, one in maintenance, a suspended gallery's and a
+/// deleted one are all answered identically on this platform, and a reason here
+/// would be the one place a customer could tell them apart.
+class SavedVehicleIdentity {
+  const SavedVehicleIdentity({
+    required this.make,
+    required this.model,
+    required this.year,
+    required this.galleryName,
+  });
+
+  final String make;
+  final String model;
+  final int year;
+  final String galleryName;
+
+  String get title => '$make $model';
+
+  static SavedVehicleIdentity fromJson(Map<String, dynamic> json) =>
+      SavedVehicleIdentity(
+        make: json['make'] as String? ?? '',
+        model: json['model'] as String? ?? '',
+        year: _int(json['year']),
+        galleryName: json['galleryName'] as String? ?? '',
+      );
+}
+
+class SavedVehicle {
+  const SavedVehicle({
+    required this.vehicleId,
+    required this.savedAt,
+    required this.identity,
+    required this.listing,
+  });
+
+  final String vehicleId;
+  final DateTime savedAt;
+
+  /// What the car is called, sent for every entry whose car still exists at all.
+  final SavedVehicleIdentity? identity;
+
+  /// The live listing — present only while the car can actually be booked.
+  final CatalogueListing? listing;
+
+  bool get isStillListed => listing != null;
+
+  static SavedVehicle fromJson(Map<String, dynamic> json) => SavedVehicle(
+        vehicleId: json['vehicleId'] as String? ?? '',
+        savedAt: _requiredDateTime(json['savedAt']),
+        identity: json['identity'] is Map<String, dynamic>
+            ? SavedVehicleIdentity.fromJson(
+                json['identity'] as Map<String, dynamic>)
+            : null,
+        listing: json['listing'] is Map<String, dynamic>
+            ? CatalogueListing.fromJson(json['listing'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
+// ── Reputation ─────────────────────────────────────────────────────────────────
+
+/// What the platform tells a GALLERY about this customer — shown to the customer.
+///
+/// A semi-private score somebody cannot see is what privacy law objects to, and
+/// it is the only way a customer learns of a wrong no-show while the window to
+/// dispute it is still open.
+///
+/// Every figure is the server's, and the app derives nothing from them: no grade,
+/// no colour band, no "trust level". `hasHistory` in particular is the server's
+/// own answer, so "no history yet" and "a clean record" cannot be confused by a
+/// screen adding up zeros.
+///
+/// `completedRentalsWithThisDealer` is deliberately ABSENT. It is always zero in
+/// the self view — there is no gallery asking — and "0 rentals with this office"
+/// on a customer's own screen is nonsense rather than a fact.
+class CustomerReputation {
+  const CustomerReputation({
+    required this.averageRating,
+    required this.ratingCount,
+    required this.completedRentals,
+    required this.noShows,
+    required this.lateCancellations,
+    required this.disputesResolvedAgainstCustomer,
+    required this.customerSince,
+    required this.hasHistory,
+  });
+
+  /// Null when nobody has rated this customer. Never zero: zero is a real score
+  /// on a one-to-five scale and would read as the worst on the platform.
+  final num? averageRating;
+  final int ratingCount;
+
+  final int completedRentals;
+  final int noShows;
+  final int lateCancellations;
+  final int disputesResolvedAgainstCustomer;
+  final DateTime customerSince;
+  final bool hasHistory;
+
+  /// Whether anything here is worth explaining rather than just reporting.
+  bool get hasMarks =>
+      noShows > 0 || lateCancellations > 0 || disputesResolvedAgainstCustomer > 0;
+
+  static CustomerReputation fromJson(Map<String, dynamic> json) {
+    final rating = json['dealerRating'] as Map<String, dynamic>? ?? const {};
+    return CustomerReputation(
+      averageRating: rating['average'] as num?,
+      ratingCount: _int(rating['count']),
+      completedRentals: _int(json['completedRentals']),
+      noShows: _int(json['noShows']),
+      lateCancellations: _int(json['lateCancellations']),
+      disputesResolvedAgainstCustomer:
+          _int(json['disputesResolvedAgainstCustomer']),
+      customerSince: _requiredDateTime(json['customerSince']),
+      // The SERVER's verdict, not a sum of the fields above. Recomputing it here
+      // would be a screen deciding what counts as a history.
+      hasHistory: json['hasHistory'] as bool? ?? false,
+    );
+  }
 }
 
 // ── Reviews ────────────────────────────────────────────────────────────────────

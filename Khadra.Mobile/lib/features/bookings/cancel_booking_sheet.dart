@@ -116,7 +116,7 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
 
     return SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(Space.xl),
+        padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,7 +127,7 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
                   child: Text(
                     l10n.cancelTitle,
                     style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                        fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(
@@ -176,12 +176,12 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
               runSpacing: Space.sm,
               children: [
                 for (final reason in reasons)
-                  ChoiceChip(
-                    label: Text(reason.labelFor(arabic)),
+                  KhadraChoiceChip(
+                    label: reason.labelFor(arabic),
                     selected: _reasonCode == reason.name,
-                    onSelected: _busy
-                        ? null
-                        : (_) => setState(() {
+                    onTap: _busy
+                        ? () {}
+                        : () => setState(() {
                               _reasonCode = reason.name;
                               _error = null;
                             }),

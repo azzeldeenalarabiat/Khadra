@@ -4,6 +4,7 @@ import { EN, TranslationKey } from './en';
 import { AR } from './ar';
 import { Language, LANGUAGES, Message, MessageParams } from './language';
 import { resolveMessage } from './resolve';
+import { EnumFamily, StatusScope, enumKey, spellEnumName, statusKey } from './status-key';
 
 const STORAGE_KEY = 'khadra.language';
 
@@ -67,7 +68,12 @@ export class I18nService {
 
   readonly t = (key: TranslationKey, params?: MessageParams): string => {
     const dictionary = this.dictionary();
-    const resolved = resolveMessage(dictionary[key] ?? EN[key], params, this.localeTag(), this.isRtl());
+    const resolved = resolveMessage(
+      dictionary[key] ?? EN[key],
+      params,
+      this.localeTag(),
+      this.isRtl(),
+    );
     // Never blank. A missing key shows itself, so it is found in a walkthrough rather than leaving
     // a hole nobody can describe.
     return resolved ?? key;
@@ -90,23 +96,35 @@ export class I18nService {
    * refunded", which is wrong in Arabic but readable in both -- and far better than nothing, which
    * is what a blank pill tells somebody deciding whether to approve a booking.
    *
-   * <paramref name="scope"/> disambiguates the handful of names that mean different things in
-   * different contexts: `Approved` on a DEALER is a licence check that passed, and on a BOOKING it
-   * is a gallery saying yes, and Arabic does not use the same word for both.
+   * <paramref name="scope"/> names the reader when the plain word is wrong for them — see
+   * `StatusScope`. Resolution runs most specific first, so a scope only has to word the statuses it
+   * words differently.
    */
-  readonly statusLabel = (name: string | null | undefined, scope?: 'booking'): string => {
+  readonly statusLabel = (name: string | null | undefined, scope?: StatusScope): string => {
     if (!name) return '';
 
-    const camel = name.charAt(0).toLowerCase() + name.slice(1);
-    const scoped = scope === 'booking' ? `status.${camel}Booking` : null;
-    const key = (scoped && scoped in EN ? scoped : `status.${camel}`) as TranslationKey;
+    const key = statusKey(name, scope);
+    if (key) return this.t(key);
 
-    if (key in EN) return this.t(key);
+    // Unknown to this build: spelled out from its name, and isolated so an English run does not
+    // reorder the Arabic sentence it lands in.
+    const spelled = spellEnumName(name);
+    return this.isRtl() ? `⁨${spelled}⁩` : spelled;
+  };
 
-    // Unknown to this build. Split the humps and lower everything after the first letter, the way
-    // the audit screen has always rendered an action it does not know.
-    const spaced = name.replace(/([a-z])([A-Z])/g, '$1 $2');
-    return spaced.charAt(0) + spaced.slice(1).toLowerCase();
+  /**
+   * A server enum that is not a status — a booking party, a handover type — as the reader's language
+   * says it, with the same fallback as `statusLabel`: a member this build does not know is spelled
+   * out from its name and isolated, never blank.
+   */
+  readonly enumLabel = (family: EnumFamily, name: string | null | undefined): string => {
+    if (!name) return '';
+
+    const key = enumKey(family, name);
+    if (key) return this.t(key);
+
+    const spelled = spellEnumName(name);
+    return this.isRtl() ? `⁨${spelled}⁩` : spelled;
   };
 
   /** BCP 47 tag for `Intl`. Western digits are pinned; see FormatService. */

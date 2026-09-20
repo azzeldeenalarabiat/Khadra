@@ -2,10 +2,12 @@
   <div class="dc-head">
     <div>
       <h1 class="page-title">{{ t('common.addVehicle') }}</h1>
-      <div class="page-sub">{{ t('vehicleWizard.step') }} {{ step() }} {{ t('vehicleWizard.of8') }} {{ footer() }}</div>
+      <div class="page-sub">{{ stepOfTotal() }} · {{ footer() }}</div>
     </div>
     <div class="dc-head-actions">
-      <button type="button" class="btn btn-ghost btn-md" (click)="cancel()">{{ t('vehicleWizard.cancel') }}</button>
+      <button type="button" class="btn btn-ghost btn-md" (click)="cancel()">
+        {{ t('vehicleWizard.cancel') }}
+      </button>
     </div>
   </div>
 
@@ -20,7 +22,7 @@
           (click)="goTo(s.n)"
         >
           <span class="wiz-dot">{{ s.n < step() ? '✓' : s.n }}</span>
-          <span class="grow">{{ s.title }}</span>
+          <span class="grow">{{ t(s.title) }}</span>
         </button>
       }
     </nav>
@@ -28,12 +30,12 @@
     <section class="sect">
       <div class="sect-h">
         <kh-icon [name]="current().icon" class="kpi-icon" />
-        <span class="sect-t">{{ current().title }}</span>
-        <span class="sect-hint">{{ t('vehicleWizard.step') }} {{ step() }} {{ t('vehicleWizard.of82') }}</span>
+        <span class="sect-t">{{ t(current().title) }}</span>
+        <span class="sect-hint">{{ stepOfTotal() }}</span>
       </div>
 
       <div class="sect-pad stack stack-12">
-        @if (problem(); as message) {
+        @if (problemText(); as message) {
           <div class="banner s-bad" role="alert">
             <kh-icon name="warning-circle" class="banner-icon" />
             <div class="banner-body">
@@ -89,7 +91,9 @@
                   [value]="form().year"
                   (change)="patch({ year: number($event) })"
                 >
-                  <option value="" [selected]="form().year === null">{{ t('vehicleWizard.chooseAYear') }}</option>
+                  <option value="" [selected]="form().year === null">
+                    {{ t('vehicleWizard.chooseAYear') }}
+                  </option>
                   @for (y of years(); track y) {
                     <option [value]="y" [selected]="y === form().year">{{ y }}</option>
                   }
@@ -113,7 +117,7 @@
                 <select id="w-type" class="input" (change)="patch({ carTypeId: text($event) })">
                   @for (type of carTypes(); track type.id) {
                     <option [value]="type.id" [selected]="type.id === form().carTypeId">
-                      {{ type.nameEn }}
+                      {{ typeName(type) }}
                     </option>
                   }
                 </select>
@@ -130,25 +134,35 @@
               <div class="field">
                 <label for="w-trans">{{ t('common.transmission') }}</label>
                 <select id="w-trans" class="input" (change)="patch({ transmission: text($event) })">
-                  <option value="" [selected]="!form().transmission">{{ t('vehicleWizard.choose') }}</option>
+                  <option value="" [selected]="!form().transmission">
+                    {{ t('vehicleWizard.choose') }}
+                  </option>
                   @for (option of transmissions; track option) {
-                    <option [value]="option" [selected]="option === form().transmission">{{ option }}</option>
+                    <option [value]="option" [selected]="option === form().transmission">
+                      {{ transmissionLabel(option) }}
+                    </option>
                   }
                 </select>
               </div>
               <div class="field">
                 <label for="w-fuel">{{ t('common.fuel') }}</label>
                 <select id="w-fuel" class="input" (change)="patch({ fuelType: text($event) })">
-                  <option value="" [selected]="!form().fuelType">{{ t('vehicleWizard.choose') }}</option>
+                  <option value="" [selected]="!form().fuelType">
+                    {{ t('vehicleWizard.choose') }}
+                  </option>
                   @for (f of fuelTypes; track f) {
-                    <option [value]="f" [selected]="f === form().fuelType">{{ f }}</option>
+                    <option [value]="f" [selected]="f === form().fuelType">
+                      {{ fuelTypeLabel(f) }}
+                    </option>
                   }
                 </select>
               </div>
               <div class="field">
                 <label for="w-seats">{{ t('common.seats') }}</label>
                 <select id="w-seats" class="input" (change)="patch({ seats: number($event) })">
-                  <option value="" [selected]="form().seats === null">{{ t('vehicleWizard.choose') }}</option>
+                  <option value="" [selected]="form().seats === null">
+                    {{ t('vehicleWizard.choose') }}
+                  </option>
                   @for (s of seatOptions; track s) {
                     <option [value]="s" [selected]="s === form().seats">{{ s }}</option>
                   }
@@ -221,8 +235,12 @@
                     })
                   "
                 >
-                  <option value="unlimited" [selected]="form().mileageUnlimited">{{ t('vehicleWizard.unlimited') }}</option>
-                  <option value="limited" [selected]="!form().mileageUnlimited">{{ t('vehicleWizard.dailyLimit') }}</option>
+                  <option value="unlimited" [selected]="form().mileageUnlimited">
+                    {{ t('vehicleWizard.unlimited') }}
+                  </option>
+                  <option value="limited" [selected]="!form().mileageUnlimited">
+                    {{ t('vehicleWizard.dailyLimit') }}
+                  </option>
                 </select>
               </div>
               <div class="field">
@@ -286,22 +304,27 @@
                 [latitude]="d.latitude"
                 [longitude]="d.longitude"
                 [radiusKm]="d.delivery.isEnabled ? d.delivery.radiusKm : null"
-                [label]="d.businessName + ' — pickup location'"
+                [label]="t('vehicleWizard.pickupLocationOf', { business: d.businessName })"
               />
               <div class="kv-narrow">
                 <div class="kv">
                   <span class="kv-key">{{ t('vehicleWizard.pickupLocation') }}</span
-                  ><span class="kv-val">{{ d.businessName }}</span>
+                  ><span class="kv-val user-text">{{ d.businessName }}</span>
                 </div>
                 <div class="kv">
                   <span class="kv-key">{{ t('common.coordinates') }}</span
-                  ><span class="kv-val mono">{{ d.latitude }}, {{ d.longitude }}</span>
+                  ><span class="kv-val mono">{{
+                    formats.coordinates(d.latitude, d.longitude)
+                  }}</span>
                 </div>
               </div>
               <div class="note-box is-plain">
                 <kh-icon name="info" />
-                {{ t('vehicleWizard.everyCarIsCollected') }}
-                <a class="auth-link" routerLink="/dealer/profile">{{ t('vehicleWizard.dealerProfile') }}</a>{{ t('vehicleWizard.aPerCarPickup') }}
+                {{ pickupNote().before
+                }}<a class="auth-link" routerLink="/dealer/profile">{{
+                  t('vehicleWizard.dealerProfile')
+                }}</a
+                >{{ pickupNote().after }}
               </div>
             } @else {
               <div class="page-sub">{{ t('vehicleWizard.loadingYourDealership') }}</div>
@@ -339,7 +362,9 @@
               }
               <label class="thumb thumb-add">
                 <kh-icon name="plus" />
-                <span class="photo-label">{{ uploading() ? 'Uploading…' : 'Add photo' }}</span>
+                <span class="photo-label">{{
+                  uploading() ? t('vehicleWizard.uploading') : t('vehicleWizard.addPhoto')
+                }}</span>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
@@ -369,7 +394,7 @@
                 </div>
               </div>
               <span class="pill" [class]="publishOnSave() ? 's-ok' : 's-dim'">{{
-                publishOnSave() ? 'On' : 'Off'
+                publishOnSave() ? t('common.on') : t('common.off')
               }}</span>
             </label>
             <div class="toggle-card is-off">
@@ -403,7 +428,11 @@
                 <div class="toggle-desc">
                   @if (deliverySettings(); as ds) {
                     @if (ds.isEnabled) {
-                      {{ t('vehicleWizard.customersWithinYour') }} {{ ds.radiusKm }} {{ t('vehicleWizard.kmRadiusCanAsk') }}
+                      {{
+                        t('vehicleWizard.customersWithinRadius', {
+                          radius: formats.number(ds.radiusKm),
+                        })
+                      }}
                     } @else {
                       {{ t('vehicleWizard.deliveryIsSwitchedOff') }}
                     }
@@ -413,7 +442,7 @@
                 </div>
               </div>
               <span class="pill" [class]="form().isDeliveryEligible ? 's-ok' : 's-dim'">{{
-                form().isDeliveryEligible ? 'On' : 'Off'
+                form().isDeliveryEligible ? t('common.on') : t('common.off')
               }}</span>
             </label>
             <div class="toggle-card is-off">
@@ -425,7 +454,7 @@
               </div>
               <span class="pill s-dim num">
                 @if (deliverySettings()?.fee; as fee) {
-                  {{ fee | money }} 
+                  {{ fee | money }}
                 } @else {
                   {{ t('vehicleWizard.notSet') }}
                 }
@@ -445,11 +474,11 @@
                   {{ form().make }} {{ form().model }} {{ form().year }}
                 </div>
                 <div class="page-sub">
-                  {{ form().transmission }} · {{ form().fuelType }} · {{ form().seats }} {{ t('vehicleWizard.seats') }}
+                  {{ reviewSpecs() }}
                 </div>
                 <div class="num">
-                  {{ form().dailyRate }} {{ t('vehicleWizard.jod') }}
-                  <span class="page-sub">{{ t('vehicleWizard.perDay') }} {{ form().securityDeposit }} {{ t('vehicleWizard.jodDeposit') }}</span>
+                  {{ reviewPrice() }}
+                  <span class="page-sub">{{ reviewPriceNote() }}</span>
                 </div>
               </div>
             </div>
@@ -465,8 +494,8 @@
               <kh-icon [name]="publishOnSave() ? 'check-circle' : 'info'" />
               {{
                 publishOnSave()
-                  ? 'Saving publishes the vehicle to customer search and makes it bookable straight away.'
-                  : 'Saving keeps the vehicle as a draft. Publish it from its page when it is ready.'
+                  ? t('vehicleWizard.savingPublishes')
+                  : t('vehicleWizard.savingKeepsADraft')
               }}
             </div>
           }
@@ -492,12 +521,12 @@
           >
             {{
               busy()
-                ? 'Saving…'
+                ? t('common.saving')
                 : step() === 8
                   ? publishOnSave()
-                    ? 'Save & publish'
-                    : 'Save draft'
-                  : 'Continue'
+                    ? t('vehicleWizard.saveAndPublish')
+                    : t('vehicleWizard.saveDraft')
+                  : t('vehicleWizard.continue')
             }}
           </button>
         </div>

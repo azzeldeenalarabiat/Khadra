@@ -57,11 +57,36 @@ class Formats {
       decimalDigits: currency.minorUnits,
     ).format(amount);
 
-    // The code trails in both languages. Leading it in Arabic reads as an
-    // instruction rather than a price, and mixing a Latin code into an RTL run
-    // without an isolate makes the digits jump.
-    return isArabic ? '$digits $currencyCode' : '$currencyCode $digits';
+    // The code trails in Arabic. Leading it there reads as an instruction rather
+    // than a price.
+    final text = isArabic ? '$digits $currencyCode' : '$currencyCode $digits';
+
+    // ISOLATED, which this method said was necessary and did not do.
+    //
+    // A price is Latin digits beside a Latin currency code, and the bidi
+    // algorithm resolves that run against whatever sits next to it. Alone in an
+    // Arabic paragraph it came out right by luck; the moment anything joined it
+    // — "30.000 JOD × 4 أيام" on the price breakdown — the code detached from its
+    // amount and landed against the multiplication sign instead. One line read
+    // "30.000 JOD" and the line under it read "JOD 120.000", on the same card.
+    //
+    // FSI rather than LRI: it takes its direction from the first strong
+    // character, so the same wrapper is correct whichever way round the code and
+    // the digits are, and it stays correct if a currency is ever written in
+    // Arabic script.
+    return isolate(text);
   }
+
+  /// Wraps a run so the bidi algorithm cannot reorder it against its neighbours.
+  ///
+  /// U+2068 FIRST STRONG ISOLATE and U+2069 POP DIRECTIONAL ISOLATE, written as
+  /// ESCAPES rather than as themselves: an invisible character in source reads as
+  /// nothing at all, and the analyzer refuses it for that reason.
+  ///
+  /// The isolate measures zero width and travels inside the string — which is
+  /// what makes it work in an interpolated sentence, where a widget-level
+  /// `Directionality` cannot reach.
+  static String isolate(String text) => '\u2068$text\u2069';
 
   /// A percentage as the server stated it: 20 renders "20%", 12.5 renders "12.5%".
   ///
@@ -116,6 +141,42 @@ class Formats {
     if (year == null || month == null || day == null) return isoDate;
     return DateFormat.yMMMd(locale).format(DateTime(year, month, day));
   }
+
+  /// The platform's own `DayOfWeek` name, as a weekday in the reader's language.
+  ///
+  /// `DateFormat.EEEE` on an anchor date, never a full date with its separator
+  /// sliced off: Arabic's date separator is U+060C (`،`) rather than a Latin
+  /// comma, so splitting on `,` returned the entire date string as the day name.
+  /// 1 January 2024 was a Monday, which is what the index counts from.
+  ///
+  /// An unrecognised name comes back unchanged — a day the platform adds later
+  /// should read as itself rather than vanish from an opening-hours table.
+  String weekday(String dayOfWeek) {
+    final index = _weekdays.indexOf(dayOfWeek);
+    if (index < 0) return dayOfWeek;
+    return DateFormat.EEEE(locale).format(DateTime(2024, 1, 1 + index));
+  }
+
+  /// The API's own name for the day [instant] falls on IN AMMAN.
+  ///
+  /// Amman, not the phone: an office's opening hours are its own day's, and a
+  /// traveller whose phone is still on another continent's clock must not be told
+  /// it is shut. The name is the wire vocabulary — never shown to anybody, only
+  /// matched against a schedule and then rendered through [weekday].
+  String weekdayInAmman(DateTime instant) =>
+      _weekdays[toAmman(instant).weekday - 1];
+
+  /// The day names this API uses, Monday first, which is the order
+  /// `DateTime.weekday` counts in.
+  static const List<String> _weekdays = <String>[
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
 
   /// A `HH:mm[:ss]` opening time, without a date attached to it.
   String clock(String? isoTime) {

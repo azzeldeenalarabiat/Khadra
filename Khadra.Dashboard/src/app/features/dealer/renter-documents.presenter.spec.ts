@@ -284,7 +284,8 @@ describe('the renter-documents panel', () => {
       );
       const [tile] = result.kind === 'ready' ? result.tiles : [];
 
-      expect(tile.status).toBe('تمت مراجعتها من المعرض');
+      // "المكتب", the rental office: the console speaks the Customer App's vocabulary (owner, 2026-09-13).
+      expect(tile.status).toBe('تمت مراجعتها من المكتب');
       // The word the owner ruled out. Arabic for "verified" is تحقق / موثّقة — neither belongs on a
       // badge about what a GALLERY did.
       expect(tile.status).not.toContain('موثّق');

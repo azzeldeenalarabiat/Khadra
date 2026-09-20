@@ -1,6 +1,9 @@
+using Khadra.Application.Bookings;
 using Khadra.Application.Bookings.DecideBooking;
+using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers;
 using Khadra.Application.Notifications;
 using Khadra.Domain.Bookings;
@@ -8,9 +11,11 @@ using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
 using Khadra.Tests.Support;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace Khadra.Tests.Application.Bookings;
@@ -31,16 +36,50 @@ public sealed class BookingDecisionTests
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public INotifier Notifier { get; } = Substitute.For<INotifier>();
         public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
+        public IBookingEmailComposer Composer { get; } = Substitute.For<IBookingEmailComposer>();
+        public IEmailSender Sender { get; } = Substitute.For<IEmailSender>();
+        public RecordingLogger<BookingEmailDispatcher> EmailLog { get; } = new();
         public TestClock Clock { get; } = new(Build.Now);
         public Dealer Dealer { get; }
+
+        /// <summary>Every message the platform handed the transport, in order.</summary>
+        public List<EmailMessage> Sent { get; } = [];
+
+        /// <summary>The token each of those sends was given.</summary>
+        public List<CancellationToken> SendTokens { get; } = [];
 
         public Context()
         {
             UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
             Reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Al-Nadeem Rentals", "Layla Odeh", null, null));
+                .Returns(new BookingContext(null, "Al-Nadeem Rentals", false, "Layla Odeh", false, null, null));
             Dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
             Dealers.GetByOwnerUserIdAsync(OwnerId, Arg.Any<CancellationToken>()).Returns(Dealer);
+
+            Composer.BookingApproved(
+                    Arg.Any<User>(), Arg.Any<BookingDto>(), Arg.Any<BookingContext>(), Arg.Any<string?>())
+                .Returns(call => new EmailMessage(
+                    call.Arg<User>().Email.Value,
+                    call.Arg<User>().Name.Value,
+                    $"approved {call.Arg<BookingDto>().Reference}",
+                    "<p>html</p>",
+                    "text"));
+            Sender.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+                .Returns(TestEmail.Accepted())
+                .AndDoes(call =>
+                {
+                    Sent.Add(call.Arg<EmailMessage>());
+                    SendTokens.Add(call.Arg<CancellationToken>());
+                });
+        }
+
+        /// <summary>The customer the booking belongs to, with an address somebody has proved.</summary>
+        public User GivenCustomerFor(Booking booking)
+        {
+            var customer = Build.Customer();
+            typeof(Entity).GetProperty(nameof(Entity.Id))!.SetValue(customer, booking.CustomerId);
+            Users.GetByIdAsync(booking.CustomerId, Arg.Any<CancellationToken>()).Returns(customer);
+            return customer;
         }
 
         public Booking GivenRequested()
@@ -60,7 +99,14 @@ public sealed class BookingDecisionTests
         }
 
         public BookingDecisionHandlers Handlers() =>
-            new(Bookings, new DealerMembershipResolver(Dealers), Reader, new DealerTeamNotifier(Notifier, Users), Clock, UnitOfWork);
+            new(
+                Bookings,
+                new DealerMembershipResolver(Dealers),
+                Reader,
+                new DealerTeamNotifier(Notifier, Users),
+                new BookingEmailDispatcher(Users, Composer, Sender, EmailLog),
+                Clock,
+                UnitOfWork);
     }
 
     [Fact]
@@ -226,5 +272,135 @@ public sealed class BookingDecisionTests
         Assert.Same(BookingStatus.PickedUp, booking.Status);
         Assert.Equal(EmployeeId, booking.Handovers.Single().RecordedByUserId);
         Assert.Single(result.Value.Handovers);
+    }
+
+    // ── The approval email ────────────────────────────────────────────────────────────────────
+    //
+    // The one channel that reaches a customer who is not holding their phone. There is no push
+    // (item 73) and the deposit is owed within the frozen payment window, so an approval nobody
+    // reads is a lost rental and a car held for nothing (item 90).
+
+    [Fact]
+    public async Task An_approval_emails_the_customer_once()
+    {
+        var context = new Context();
+        var booking = context.GivenRequested();
+        var customer = context.GivenCustomerFor(booking);
+
+        var result = await context.Handlers().Handle(
+            new ApproveBookingCommand(OwnerId, booking.Id, null), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var sent = Assert.Single(context.Sent);
+        Assert.Equal(customer.Email.Value, sent.ToAddress);
+        Assert.Contains(booking.Reference.Value, sent.Subject, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A mail server having a bad minute does not undo a decision a gallery has made.
+    /// </summary>
+    /// <remarks>
+    /// The approval is committed before the message is composed. Returning a failure here would send
+    /// the gallery back to retry, where they would be told the booking is not awaiting a decision —
+    /// a confusing lie about something that worked. The dispatcher logs it and the approval stands.
+    /// </remarks>
+    [Fact]
+    public async Task A_failed_email_does_not_undo_the_approval()
+    {
+        var context = new Context();
+        var booking = context.GivenRequested();
+        context.GivenCustomerFor(booking);
+        context.Sender.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+            .Returns<Task<EmailSendReceipt>>(_ => throw new InvalidOperationException("the relay hung up"));
+
+        var result = await context.Handlers().Handle(
+            new ApproveBookingCommand(OwnerId, booking.Id, null), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Same(BookingStatus.Approved, booking.Status);
+        Assert.Equal(Build.Now.AddMinutes(20), booking.PaymentDeadline);
+        // And the work was committed exactly once, before the send was ever attempted.
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        // A send that failed is never logged as one the transport accepted.
+        Assert.False(context.EmailLog.Logged(1202));
+    }
+
+    /// <summary>
+    /// An approval email the transport took leaves a line to trace it by: the provider's message id,
+    /// worded as ACCEPTED rather than delivered, and with the customer's address left out.
+    /// </summary>
+    [Fact]
+    public async Task An_accepted_approval_email_is_logged_with_its_receipt_and_without_the_address()
+    {
+        var context = new Context();
+        var booking = context.GivenRequested();
+        var customer = context.GivenCustomerFor(booking);
+        // A request token that CAN be cancelled, as a real one can, so the send below is seen to be
+        // handed a different one.
+        using var request = new CancellationTokenSource();
+
+        var result = await context.Handlers().Handle(
+            new ApproveBookingCommand(OwnerId, booking.Id, null), request.Token);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        // The gallery's browser dropping the connection must not abandon this send half-way: it is the
+        // one message whose loss is probably a booking that expires unread.
+        Assert.False(Assert.Single(context.SendTokens).CanBeCanceled);
+        var accepted = Assert.Single(context.EmailLog.Entries, entry => entry.Id.Id == 1202);
+        Assert.Equal(LogLevel.Information, accepted.Level);
+        Assert.Contains(TestEmail.Accepted().ProviderMessageId!, accepted.Message, StringComparison.Ordinal);
+        Assert.Contains("Accepted is not delivered", accepted.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(customer.Email.Value, context.EmailLog.AllText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>An address nobody has proved they can read is not written to.</summary>
+    [Fact]
+    public async Task An_unverified_address_is_not_emailed()
+    {
+        var context = new Context();
+        var booking = context.GivenRequested();
+        var customer = Build.Customer(emailVerified: false);
+        typeof(Entity).GetProperty(nameof(Entity.Id))!.SetValue(customer, booking.CustomerId);
+        context.Users.GetByIdAsync(booking.CustomerId, Arg.Any<CancellationToken>()).Returns(customer);
+
+        var result = await context.Handlers().Handle(
+            new ApproveBookingCommand(OwnerId, booking.Id, null), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Empty(context.Sent);
+    }
+
+    /// <summary>A refused approval sends nothing. There is nothing to tell the customer about.</summary>
+    [Fact]
+    public async Task A_refused_approval_emails_nobody()
+    {
+        var context = new Context();
+        var booking = context.GivenRequested();
+        context.GivenCustomerFor(booking);
+        // Answered inside the payment window, which is now a refusal rather than a short window.
+        context.Clock.UtcNow = booking.Period.Start.AddMinutes(-5);
+
+        var result = await context.Handlers().Handle(
+            new ApproveBookingCommand(OwnerId, booking.Id, null), CancellationToken.None);
+
+        Assert.Equal("booking.decision_window_elapsed", result.Error.Code);
+        Assert.Empty(context.Sent);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>Rejection is the customer's business too, but not by email. It costs them nothing.</summary>
+    [Fact]
+    public async Task A_rejection_sends_no_email()
+    {
+        var context = new Context();
+        var booking = context.GivenRequested();
+        context.GivenCustomerFor(booking);
+
+        var result = await context.Handlers().Handle(
+            new RejectBookingCommand(OwnerId, booking.Id, "VehicleUnavailable", "Sold last week."),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Empty(context.Sent);
     }
 }

@@ -208,7 +208,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authNoAccount => 'جديد على خضرا؟';
 
   @override
-  String get authPasswordRules => 'ثمانية أحرف على الأقل، تتضمن حرفاً ورقماً.';
+  String authPasswordRules(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count حرف على الأقل، تتضمن حرفاً ورقماً.',
+      many: '$count حرفاً على الأقل، تتضمن حرفاً ورقماً.',
+      few: '$count أحرف على الأقل، تتضمن حرفاً ورقماً.',
+      two: 'حرفان على الأقل، يتضمنان حرفاً ورقماً.',
+      one: 'حرف واحد على الأقل، يتضمن حرفاً ورقماً.',
+      zero: 'حرف واحد على الأقل، يتضمن حرفاً ورقماً.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String authPasswordRulesLengthOnly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count حرف على الأقل.',
+      many: '$count حرفاً على الأقل.',
+      few: '$count أحرف على الأقل.',
+      two: 'حرفان على الأقل.',
+      one: 'حرف واحد على الأقل.',
+      zero: 'حرف واحد على الأقل.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get authVerifyEmailTitle => 'فعّل بريدك الإلكتروني';
@@ -251,7 +278,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get authSessionExpired => 'انتهت جلستك. سجّل الدخول من جديد.';
 
   @override
-  String get navBrowse => 'تصفّح';
+  String get welcomeTitle => 'كيف تودّ أن تبدأ؟';
+
+  @override
+  String get welcomeBody => 'تصفّح بحرية. تحتاج إلى حساب للحجز ولحفظ السيارات.';
+
+  @override
+  String get welcomeBrowseAsGuest => 'تصفّح كزائر';
+
+  @override
+  String get navHome => 'الرئيسية';
 
   @override
   String get navBookings => 'حجوزاتي';
@@ -287,16 +323,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get searchCity => 'المدينة';
-
-  @override
   String get searchAnyCity => 'كل المدن';
 
   @override
   String get searchCarType => 'نوع السيارة';
-
-  @override
-  String get searchAnyCarType => 'كل الأنواع';
 
   @override
   String get searchTransmission => 'ناقل الحركة';
@@ -319,6 +349,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get searchPriceRange => 'السعر اليومي';
 
   @override
+  String get searchPriceFrom => 'من';
+
+  @override
+  String get searchPriceTo => 'إلى';
+
+  @override
+  String get searchPriceRangeInverted =>
+      'أعلى السعر أقل من أدناه، فلن تطابقه أي سيارة.';
+
+  @override
   String get searchDeliveryOnly => 'التوصيل إليّ فقط';
 
   @override
@@ -326,6 +366,20 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get searchAnyDates => 'أي تاريخ';
+
+  @override
+  String get searchPickupLocation => 'موقع الاستلام';
+
+  @override
+  String get searchRentalPeriod => 'مدة الإيجار';
+
+  @override
+  String searchPeriodValue(String pickup, String dropoff) {
+    return '$pickup ← $dropoff';
+  }
+
+  @override
+  String get searchAllCarTypes => 'الكل';
 
   @override
   String get searchPickup => 'الاستلام';
@@ -341,6 +395,16 @@ class AppLocalizationsAr extends AppLocalizations {
       'اختيار التواريخ يعرض السيارات المتاحة فقط، ويتيح لنا تسعير الإيجار.';
 
   @override
+  String searchMaxRentalDays(int days) {
+    return 'لا يمكن أن تتجاوز مدة الإيجار $days يوماً.';
+  }
+
+  @override
+  String searchPickupTooSoon(String when) {
+    return 'أقرب موعد يمكن أن يبدأ فيه الإيجار هو $when.';
+  }
+
+  @override
   String get searchClearDates => 'امسح التواريخ';
 
   @override
@@ -354,6 +418,21 @@ class AppLocalizationsAr extends AppLocalizations {
       two: 'سيارتان',
       one: 'سيارة واحدة',
       zero: 'لا توجد سيارات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchResultsAvailable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count سيارة متاحة',
+      many: '$count سيارة متاحة',
+      few: '$count سيارات متاحة',
+      two: 'سيارتان متاحتان',
+      one: 'سيارة واحدة متاحة',
+      zero: 'لا توجد سيارات متاحة',
     );
     return '$_temp0';
   }
@@ -474,6 +553,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get galleryAbout => 'نبذة';
 
   @override
+  String get galleryPickupInstructions => 'تعليمات الاستلام';
+
+  @override
+  String get galleryRentalConditions => 'شروط الإيجار';
+
+  @override
+  String get galleryInsurance => 'التأمين';
+
+  @override
+  String get galleryNotes => 'ملاحظات المكتب';
+
+  @override
+  String get galleryFromTheOffice => 'من مكتب التأجير';
+
+  @override
+  String get galleryOfficeOwnWords => 'كتبها هذا المكتب، وليست من خضرا.';
+
+  @override
   String get galleryOpeningHours => 'ساعات العمل';
 
   @override
@@ -486,6 +583,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get galleryClosedToday => 'مغلق اليوم';
+
+  @override
+  String get galleryAllWeek => 'كل الأسبوع';
+
+  @override
+  String get galleryTodayOnly => 'اليوم فقط';
 
   @override
   String get galleryLocation => 'الموقع';
@@ -601,18 +704,57 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookTermsTitle => 'ما توافق عليه';
 
   @override
-  String bookTermsPayAfterApproval(String hours) {
-    return 'لا يُخصم شيء الآن. يردّ المكتب خلال $hours ساعة، وعندها فقط يُستحق العربون.';
+  String get bookTermsPayAfterApproval =>
+      'لا يُخصم شيء الآن. لا يُستحق العربون إلا إذا وافقوا.';
+
+  @override
+  String bookTermsAnswerWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'أمام المكتب $hours ساعة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      many:
+          'أمام المكتب $hours ساعة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      few:
+          'أمام المكتب $hours ساعات للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      two: 'أمام المكتب ساعتان للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+      one: 'أمام المكتب ساعة واحدة للرد. تبقى السيارة محجوزة لك حتى ذلك الحين.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsPaymentWindow(String hours) {
-    return 'بعد الموافقة، أمامك $hours ساعة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.';
+  String bookTermsPaymentWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'بعد الموافقة، أمامك $hours ساعة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      many:
+          'بعد الموافقة، أمامك $hours ساعة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      few:
+          'بعد الموافقة، أمامك $hours ساعات لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      two:
+          'بعد الموافقة، أمامك ساعتان لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+      one:
+          'بعد الموافقة، أمامك ساعة واحدة لدفع العربون وإلا انتهى الحجز وعادت السيارة إلى السوق.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsFreeCancellation(String hours) {
-    return 'الإلغاء مجاني خلال $hours ساعة من دفع العربون.';
+  String bookTermsFreeCancellation(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'الإلغاء مجاني خلال $hours ساعة من دفع العربون.',
+      many: 'الإلغاء مجاني خلال $hours ساعة من دفع العربون.',
+      few: 'الإلغاء مجاني خلال $hours ساعات من دفع العربون.',
+      two: 'الإلغاء مجاني خلال ساعتين من دفع العربون.',
+      one: 'الإلغاء مجاني خلال ساعة واحدة من دفع العربون.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -630,8 +772,20 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookDoneTitle => 'أُرسل الطلب';
 
   @override
-  String bookDoneBody(String gallery, String hours) {
-    return 'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعة. سنخبرك فور ردّهم.';
+  String bookDoneBody(String gallery, num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعة. سنخبرك فور ردّهم.',
+      many:
+          'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعة. سنخبرك فور ردّهم.',
+      few:
+          'وصل طلبك إلى $gallery وسيردّون خلال $hours ساعات. سنخبرك فور ردّهم.',
+      two: 'وصل طلبك إلى $gallery وسيردّون خلال ساعتين. سنخبرك فور ردّهم.',
+      one: 'وصل طلبك إلى $gallery وسيردّون خلال ساعة واحدة. سنخبرك فور ردّهم.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -655,6 +809,9 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get bookVerifyEmailFirst =>
       'فعّل بريدك الإلكتروني قبل الحجز. تحديثات حجزك تصل إليه.';
+
+  @override
+  String get bookingsViewBooking => 'عرض الحجز';
 
   @override
   String get bookingsTitle => 'حجوزاتي';
@@ -693,10 +850,24 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingsEmptyAction => 'ابحث عن سيارة';
 
   @override
+  String get bookingsEmptyTabTitle => 'لا شيء في هذه القائمة';
+
+  @override
+  String get bookingsEmptyTabBody =>
+      'لديك حجوزات، لكن لا شيء منها في هذه القائمة. جرّب تبويباً آخر.';
+
+  @override
   String get bookingsSignedOutTitle => 'سجّل الدخول لعرض حجوزاتك';
 
   @override
-  String get bookingsSignedOutBody => 'حجوزاتك ومستنداتك وتنبيهاتك في حسابك.';
+  String get accountRequiredBody =>
+      'حجوزاتك وسياراتك المحفوظة ومستنداتك وتنبيهاتك في حسابك.';
+
+  @override
+  String get notificationsSignedOutTitle => 'سجّل الدخول لعرض تنبيهاتك';
+
+  @override
+  String get profileSignedOutTitle => 'سجّل الدخول إلى حسابك';
 
   @override
   String get statusRequested => 'بانتظار ردّ المكتب';
@@ -735,7 +906,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingWhen => 'المدة';
 
   @override
-  String get bookingWhere => 'الاستلام';
+  String get bookingWhere => 'طريقة الاستلام';
 
   @override
   String get bookingWhereDelivery => 'يُوصَّل إليك';
@@ -754,6 +925,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookingHistory => 'ما جرى';
+
+  @override
+  String get bookingHandoversTitle => 'الاستلام والإرجاع';
 
   @override
   String get bookingPrice => 'السعر';
@@ -874,18 +1048,55 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String bookingCountdownDays(int days, int hours) {
-    return 'بقي $days يوم و$hours ساعة';
+  String countdownDays(int days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days يوم',
+      many: '$days يوماً',
+      few: '$days أيام',
+      two: 'يومان',
+      one: 'يوم واحد',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookingCountdownHours(int hours, int minutes) {
-    return 'بقي $hours ساعة و$minutes دقيقة';
+  String countdownHours(int hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: '$hours ساعة',
+      many: '$hours ساعة',
+      few: '$hours ساعات',
+      two: 'ساعتان',
+      one: 'ساعة واحدة',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookingCountdownMinutes(int minutes) {
-    return 'بقي $minutes دقيقة';
+  String countdownMinutes(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes دقيقة',
+      many: '$minutes دقيقة',
+      few: '$minutes دقائق',
+      two: 'دقيقتان',
+      one: 'دقيقة واحدة',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String countdownPair(String first, String second) {
+    return '$first و$second';
+  }
+
+  @override
+  String bookingCountdownLeft(String time) {
+    return 'المتبقي $time';
   }
 
   @override
@@ -977,9 +1188,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get disputeOpen => 'افتح النزاع';
 
   @override
-  String disputeOpened(String hours) {
-    return 'نزاعك مفتوح. ستنظر فيه خضرا خلال $hours ساعة.';
+  String disputeOpened(String deadline) {
+    return 'نزاعك مفتوح. سترد عليه خضرا قبل $deadline.';
   }
+
+  @override
+  String get disputeOpenedNoDate => 'نزاعك مفتوح. ستردّ عليه خضرا.';
 
   @override
   String get disputeViewTitle => 'النزاع';
@@ -1124,7 +1338,28 @@ class AppLocalizationsAr extends AppLocalizations {
   String get documentsTakePhoto => 'التقط صورة';
 
   @override
+  String get documentsChoosePhoto => 'اختر صورة';
+
+  @override
   String get documentsChooseFile => 'اختر ملفاً';
+
+  @override
+  String documentsFileLimits(String kinds, String size) {
+    return '$kinds · حتى $size';
+  }
+
+  @override
+  String get documentsOpenFailed =>
+      'تعذّر فتح هذا المستند على هذا الهاتف. ثبّت تطبيقاً لقراءة PDF أو حاول مرة أخرى.';
+
+  @override
+  String get documentsFileUnreadable =>
+      'تعذّرت قراءة هذا الملف. اختره مرة أخرى أو التقط صورة للمستند بدلاً من ذلك.';
+
+  @override
+  String documentsFileSummary(String kind, String size) {
+    return '$kind · $size';
+  }
 
   @override
   String get documentsUploading => 'جارٍ الرفع…';
@@ -1226,6 +1461,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get profileLanguage => 'اللغة';
+
+  @override
+  String get profileLanguageSystem => 'اتبع لغة جهازي';
 
   @override
   String get profileLanguageEnglish => 'English';
@@ -1398,7 +1636,44 @@ class AppLocalizationsAr extends AppLocalizations {
   String get validationPhone => 'أدخل رقم هاتف أردني، مثل 0791234567.';
 
   @override
-  String get validationPasswordShort => 'استخدم ثمانية أحرف على الأقل.';
+  String validationPasswordShort(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'استخدم $count حرف على الأقل.',
+      many: 'استخدم $count حرفاً على الأقل.',
+      few: 'استخدم $count أحرف على الأقل.',
+      two: 'استخدم حرفين على الأقل.',
+      one: 'استخدم حرفاً واحداً على الأقل.',
+      zero: 'استخدم حرفاً واحداً على الأقل.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String validationPasswordLong(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'استخدم $count حرف كحد أقصى.',
+      many: 'استخدم $count حرفاً كحد أقصى.',
+      few: 'استخدم $count أحرف كحد أقصى.',
+      two: 'استخدم حرفين كحد أقصى.',
+      one: 'استخدم حرفاً واحداً كحد أقصى.',
+      zero: 'لا يمكن استخدام أي حرف.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get validationPasswordLetter => 'أضف حرفاً.';
+
+  @override
+  String get validationPasswordDigit => 'أضف رقماً.';
+
+  @override
+  String get validationPasswordSpaces =>
+      'لا يمكن أن تحتوي كلمة المرور على مسافات.';
 
   @override
   String get validationPasswordMatch => 'كلمتا المرور غير متطابقتين.';
@@ -1475,4 +1750,227 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errorRateLimited => 'طلبات كثيرة. انتظر لحظة وحاول مجدداً.';
+
+  @override
+  String get errorAuthInvalidName =>
+      'يجب أن يتراوح الاسم بين حرفين و150 حرفاً.';
+
+  @override
+  String get errorAuthPasswordUnchanged =>
+      'هذه هي كلمة المرور الحالية. اختر واحدة مختلفة.';
+
+  @override
+  String get errorAuthInvalidDateOfBirth => 'تاريخ الميلاد هذا غير صالح.';
+
+  @override
+  String errorAuthUnderageBy(int age) {
+    return 'يجب ألا يقل عمر المستأجر على خضرا عن $age عاماً.';
+  }
+
+  @override
+  String get errorBookingAccountCannotBook =>
+      'لا يمكن لهذا الحساب إجراء حجوزات.';
+
+  @override
+  String get errorBookingNotYours => 'هذا الحجز يعود لشخص آخر.';
+
+  @override
+  String get errorBookingAlreadyFinished => 'انتهى هذا الحجز بالفعل.';
+
+  @override
+  String get errorBookingNotAwaitingPayment => 'هذا الحجز لا ينتظر أي دفعة.';
+
+  @override
+  String get errorBookingDisputeOpen =>
+      'لا يمكن تسوية هذا الحجز ما دام هناك نزاع مفتوح عليه.';
+
+  @override
+  String get errorBookingTooSoon =>
+      'موعد الاستلام قريب أكثر من اللازم. اختر موعداً لاحقاً.';
+
+  @override
+  String errorBookingTooSoonBy(int minutes) {
+    return 'يجب أن يبدأ الإيجار بعد $minutes دقيقة على الأقل من الآن.';
+  }
+
+  @override
+  String get errorBookingRentalTooLong =>
+      'مدة هذا الإيجار أطول مما يمكن حجزه. اختر مدة أقصر.';
+
+  @override
+  String get errorBookingBeyondHorizon =>
+      'هذا التاريخ أبعد مما يمكن حجزه. اختر تاريخاً أقرب.';
+
+  @override
+  String errorBookingBeyondHorizonBy(int days) {
+    return 'لا يمكن الحجز قبل أكثر من $days يوماً من موعد الإيجار.';
+  }
+
+  @override
+  String get errorBookingOutsideOpeningHours =>
+      'المكتب مغلق في هذا الوقت. اختر وقتاً ضمن ساعات العمل، أو اطلب توصيل السيارة.';
+
+  @override
+  String get errorBookingDeliveryOutOfRange =>
+      'هذا الموقع خارج نطاق التوصيل لهذا المكتب. اختر موقعاً أقرب إليه.';
+
+  @override
+  String get errorBookingDeliveryLocationRequired =>
+      'حدّد المكان الذي تريد إحضار السيارة إليه.';
+
+  @override
+  String get errorDocumentTooLarge => 'حجم هذا الملف أكبر من الحد المسموح به.';
+
+  @override
+  String get errorDocumentUnsupportedType =>
+      'نوع هذا الملف غير مقبول. ارفع صورة JPEG أو PNG أو ملف PDF.';
+
+  @override
+  String get errorDocumentNotFound => 'لم يعد هذا المستند موجوداً.';
+
+  @override
+  String get errorReviewWindowClosed => 'انتهت مهلة تقييم هذا الحجز.';
+
+  @override
+  String get errorReviewInvalidRating =>
+      'اختر تقييماً من نجمة واحدة إلى خمس نجوم.';
+
+  @override
+  String get errorReviewCommentTooLong => 'هذا التعليق أطول مما يمكن قبوله.';
+
+  @override
+  String get errorDisputeNotFound => 'لم يُعثر على هذا النزاع.';
+
+  @override
+  String get errorDisputeNotOpen => 'لم يعد هذا النزاع مفتوحاً.';
+
+  @override
+  String get errorDisputeNotYoursToWithdraw =>
+      'لا يمكن سحب النزاع إلا من الطرف الذي فتحه.';
+
+  @override
+  String get errorDisputeReasonRequired => 'اذكر ما الذي حدث قبل فتح النزاع.';
+
+  @override
+  String get errorDisputeStatementRequired =>
+      'اكتب شيئاً قبل إضافته إلى النزاع.';
+
+  @override
+  String get errorDisputeEvidenceFailed =>
+      'تعذّر رفع أحد الملفات. حاول إرفاقه مجدداً.';
+
+  @override
+  String get errorPaymentRefused => 'رُفضت هذه الدفعة. جرّب بطاقة أخرى.';
+
+  @override
+  String get reputationGroupTitle => 'سجلك لدى المكاتب';
+
+  @override
+  String get reputationTitle => 'كيف تراك المكاتب';
+
+  @override
+  String get reputationIntro =>
+      'عندما تطلب سيارة من مكتب، هذا ما تخبره به خضرا عنك. لا شيء غير ذلك — لا بيانات تواصل، ولا مستندات، ولا أي شيء عن المكتب الذي استأجرت منه.';
+
+  @override
+  String get reputationNoHistoryTitle => 'لا شيء في سجلك بعد';
+
+  @override
+  String get reputationNoHistoryBody =>
+      'لم تُنهِ أي إيجار على خضرا، ولم يُسجَّل عليك شيء. لا ترى المكاتب سوى منذ متى وأنت صاحب حساب.';
+
+  @override
+  String get reputationRatingLabel => 'تقييم المكاتب لك';
+
+  @override
+  String reputationRatingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'من $count مكتب',
+      many: 'من $count مكتباً',
+      few: 'من $count مكاتب',
+      two: 'من مكتبين',
+      one: 'من مكتب واحد',
+      zero: 'من لا مكتب',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reputationNotRatedYet =>
+      'لم يقيّمك أي مكتب بعد. لا يمكن للمكتب تقييمك إلا بعد انتهاء الإيجار، ويبقى تقييمه مخفياً حتى يُنشر تقييمك له أيضاً.';
+
+  @override
+  String get reputationRecordTitle => 'سجلك';
+
+  @override
+  String get reputationCompletedRentals => 'إيجارات منتهية';
+
+  @override
+  String get reputationNoShows => 'مرات لم تُستلم فيها السيارة';
+
+  @override
+  String get reputationLateCancellations => 'إلغاءات قُدِّرت عليها غرامة';
+
+  @override
+  String get reputationDisputesLost => 'نزاعات حُسمت ضدك';
+
+  @override
+  String get reputationDisagreeTitle => 'هل هناك خطأ هنا؟';
+
+  @override
+  String get reputationDisagreeBody =>
+      'كل رقم هنا جاء من حجز واحد. افتح الحجز الذي يخصه، وإذا كانت مهلة التسوية ما زالت مفتوحة يمكنك الاعتراض عليه من هناك.';
+
+  @override
+  String get reputationSeeBookings => 'عرض الحجوزات المنتهية';
+
+  @override
+  String get reputationWhoSeesThis =>
+      'لا يمكن للمكتب الاطلاع على هذا إلا أثناء بتّه في حجز معك أو خلال سريانه — لا قبل أن تطلب منه سيارة، ولا بعد انتهاء الحجز.';
+
+  @override
+  String get landingDepositDue => 'العربون مستحق';
+
+  @override
+  String get landingRentalInProgress => 'إيجارك جارٍ الآن';
+
+  @override
+  String get landingUpcomingRental => 'إيجارك القادم';
+
+  @override
+  String get landingAwaitingOffice => 'بانتظار ردّ مكتب التأجير';
+
+  @override
+  String get shortlistTitle => 'السيارات المحفوظة';
+
+  @override
+  String get shortlistSave => 'احفظ هذه السيارة';
+
+  @override
+  String get shortlistRemove => 'إزالة من المحفوظات';
+
+  @override
+  String get shortlistEmptyTitle => 'لم تحفظ شيئاً بعد';
+
+  @override
+  String get shortlistEmptyBody =>
+      'اضغط على القلب في أي سيارة لتبقى هنا بينما تقارن.';
+
+  @override
+  String get shortlistUnavailable => 'غير متاحة حاليًا';
+
+  @override
+  String shortlistSavedOn(String date) {
+    return 'حُفظت في $date';
+  }
+
+  @override
+  String get errorShortlistFull =>
+      'قائمة المحفوظات ممتلئة. أزل سيارة قبل حفظ أخرى.';
+
+  @override
+  String get errorShortlistVehicleNotFound =>
+      'لم تعد هذه السيارة معروضة، فلا يمكن حفظها.';
 }

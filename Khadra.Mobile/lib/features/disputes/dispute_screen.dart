@@ -160,7 +160,7 @@ class _BodyState extends ConsumerState<_Body> {
                 ],
               ),
               const SizedBox(height: Space.md),
-              Text(
+              UserText(
                 dispute.reason,
                 style: const TextStyle(fontSize: 14, height: 1.55),
               ),
@@ -261,7 +261,7 @@ class _Statement extends StatelessWidget {
             ],
           ),
           const SizedBox(height: Space.sm),
-          Text(
+          UserText(
             statement.body,
             style: const TextStyle(fontSize: 14, height: 1.5),
           ),

@@ -14,9 +14,29 @@ internal static class TestBusinessRules
     // that cares about the bound passes its own.
     public const int EarliestVehicleModelYear = 1970;
 
+    // The shipped cap, settled by the owner at 100 on 2026-09-11. A test about the cap itself passes
+    // a small one; everything else needs a figure high enough that saving a few cars never trips it.
+    public const int MaxShortlistEntries = 100;
+
+    // How long a customer has to pay the deposit after a gallery APPROVES. Two hours, settled by
+    // the owner on 2026-09-11.
+    public const int PaymentWindowHours = 2;
+
+    // How far ahead of NOW a rental may start. Four hours since 2026-09-11: the two below it are
+    // now RELATED, not merely both configured. A gallery may not approve unless the customer can
+    // still have the whole payment window, so the gap between these two numbers is the time a
+    // gallery has to answer a last-minute request — two hours here, and zero if they were equal.
+    //
+    // They stay separate parameters because a test that asserts one of them has to be able to move
+    // the other, or code wired to the wrong clock passes.
+    public const int MinimumBookingLeadTimeMinutes = 240;
+
     public static BusinessRules Values(
         int? minimumRenterAge = MinimumRenterAge,
-        int earliestVehicleModelYear = EarliestVehicleModelYear) => new(
+        int earliestVehicleModelYear = EarliestVehicleModelYear,
+        int maxShortlistEntries = MaxShortlistEntries,
+        int paymentWindowHours = PaymentWindowHours,
+        int minimumBookingLeadTimeMinutes = MinimumBookingLeadTimeMinutes) => new(
         CommissionPercent: 20m,
         DepositPercent: 20m,
         NoShowTimeoutHours: 8,
@@ -25,25 +45,34 @@ internal static class TestBusinessRules
         FreeCancellationWindowMinutes: 60,
         AdminSlaHours: 48,
         CustomerCancellationPenaltyPercent: 100m,
-        PaymentWindowHours: 24,
+        PaymentWindowHours: paymentWindowHours,
         BookingAnswerWindowHours: 48,
         PostReturnSettlementHours: 48,
         MinimumRenterAge: minimumRenterAge,
         TurnaroundMinutes: 120,
         MaxAdvanceBookingDays: 180,
-        MinimumBookingLeadTimeMinutes: 120,
+        MinimumBookingLeadTimeMinutes: minimumBookingLeadTimeMinutes,
         MaxRentalDays: 90,
         NonDeliveryGraceMinutes: 15,
         ReviewWindowDays: 14,
-        EarliestVehicleModelYear: earliestVehicleModelYear);
+        EarliestVehicleModelYear: earliestVehicleModelYear,
+        MaxShortlistEntries: maxShortlistEntries);
 
     public static IBusinessRulesProvider Provider(
         int? minimumRenterAge = MinimumRenterAge,
-        int earliestVehicleModelYear = EarliestVehicleModelYear)
+        int earliestVehicleModelYear = EarliestVehicleModelYear,
+        int maxShortlistEntries = MaxShortlistEntries,
+        int paymentWindowHours = PaymentWindowHours,
+        int minimumBookingLeadTimeMinutes = MinimumBookingLeadTimeMinutes)
     {
         var provider = Substitute.For<IBusinessRulesProvider>();
         provider.GetAsync(Arg.Any<CancellationToken>())
-            .Returns(Values(minimumRenterAge, earliestVehicleModelYear));
+            .Returns(Values(
+                minimumRenterAge,
+                earliestVehicleModelYear,
+                maxShortlistEntries,
+                paymentWindowHours,
+                minimumBookingLeadTimeMinutes));
         return provider;
     }
 
@@ -51,6 +80,10 @@ internal static class TestBusinessRules
     public static IReportingCalendar Calendar()
     {
         var calendar = Substitute.For<IReportingCalendar>();
+        // The zone it claims to convert to. A substitute answers null for a string, and the approval
+        // email prints this beside the deadline — so without it the email would name no zone at all
+        // and the test asserting it does would be the only thing that noticed.
+        calendar.TimeZoneId.Returns("Asia/Amman");
         calendar.Today(Arg.Any<DateTimeOffset>())
             .Returns(call => DateOnly.FromDateTime(call.Arg<DateTimeOffset>().ToOffset(TimeSpan.FromHours(3)).DateTime));
         calendar.DayOf(Arg.Any<DateTimeOffset>())

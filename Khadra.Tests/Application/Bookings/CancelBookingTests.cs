@@ -44,7 +44,7 @@ public sealed class CancelBookingTests
         {
             UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
             Reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Al-Nadeem Rentals", "Layla Odeh", null, null));
+                .Returns(new BookingContext(null, "Al-Nadeem Rentals", false, "Layla Odeh", false, null, null));
             Dealer = Build.ApprovedDealer();
             Dealers.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(Dealer);
         }

@@ -10,7 +10,7 @@
 
   <section class="sect stack sect-clip">
     <div class="tabs" role="tablist">
-      @for (option of tabs; track option.key) {
+      @for (option of tabs(); track option.key) {
         <button
           type="button"
           class="tab"
@@ -57,7 +57,7 @@
       <div class="state-block is-empty">
         <div class="state-icon is-outline"><kh-icon name="calendar-blank" /></div>
         <div class="state-title">
-          {{ tab() === 'all' ? 'No bookings yet' : 'Nothing in this tab' }}
+          {{ tab() === 'all' ? t('dealerBookings.noBookingsYet') : t('dealerBookings.nothingInThisTab') }}
         </div>
         <div class="state-text">
           @if (tab() === 'all') {
@@ -104,8 +104,8 @@
                 </td>
                 <td class="td">
                   <div class="entity">
-                    <div class="entity-avatar">{{ initials(b.customerName) }}</div>
-                    <div class="entity-name">{{ b.customerName }}</div>
+                    <div class="entity-avatar">{{ customerInitials(b) }}</div>
+                    <div class="entity-name">{{ customer(b) }}</div>
                   </div>
                 </td>
                 <td class="td">
@@ -120,7 +120,7 @@
                     <div class="grow">
                       <div class="entity-name">{{ car(b) }}</div>
                       <div class="entity-sub">
-                        {{ b.pickupMethod === 'Delivery' ? 'Delivery' : 'Dealer location' }}
+                        {{ b.pickupMethod === 'Delivery' ? t('common.delivery') : t('dealerBookings.dealerLocation') }}
                       </div>
                     </div>
                   </div>

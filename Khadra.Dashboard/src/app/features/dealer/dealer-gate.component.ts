@@ -11,6 +11,7 @@ import { loaded } from '../../core/services/loaded';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { lockedOut } from './gate-access';
 
 interface LockedCopy {
   readonly icon: IconName;
@@ -63,26 +64,6 @@ export class DealerGateComponent {
     ),
     { initialValue: this.router.url },
   );
-
-  /**
-   * Reachable while locked: the page an applicant is fixing, and their own account.
-   *
-   * The employee console has its own paths for the same two ideas — they have no application to fix,
-   * so only their account is here.
-   */
-  private readonly openWhileLocked = ['/dealer/profile', '/dealer/settings', '/employee/settings'];
-
-  /**
-   * A SUSPENDED dealer still has customers holding its cars. Returns must be recordable, so the
-   * bookings screens stay open; approving and rejecting are hidden there by the booking screen
-   * itself, and the API refuses them regardless.
-   */
-  private readonly openWhileSuspended = [
-    '/dealer/bookings',
-    '/dealer/disputes',
-    '/employee/bookings',
-    '/employee/disputes',
-  ];
 
   /**
    * Whether the dealership's standing is known yet.
@@ -142,14 +123,8 @@ export class DealerGateComponent {
     this.console.me.reload();
   }
 
-  protected readonly locked = computed(() => {
-    const dealer = this.dealer();
-    if (!dealer || dealer.canTrade) return false;
-    const open = dealer.isSuspended
-      ? [...this.openWhileLocked, ...this.openWhileSuspended]
-      : this.openWhileLocked;
-    return !open.some((path) => this.url().startsWith(path));
-  });
+  /** Which screens stay open while the dealership cannot trade: see `gate-access.ts`. */
+  protected readonly locked = computed(() => lockedOut(this.url(), this.dealer() ?? null));
 
   /** A suspension is the one locked state where an employee still has work to do. */
   protected readonly suspended = computed(() => !!this.dealer()?.isSuspended);

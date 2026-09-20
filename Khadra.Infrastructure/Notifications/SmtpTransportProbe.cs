@@ -80,7 +80,7 @@ internal sealed class SmtpTransportProbe(IOptions<EmailOptions> options) : IEmai
 }
 
 /// <summary>
-/// The counterpart for the Logging provider, which writes mail to the log and delivers nothing.
+/// The counterpart for the Logging provider, which delivers nothing.
 /// </summary>
 /// <remarks>
 /// This used to report READY, and the line it produced at startup was
@@ -115,7 +115,7 @@ internal sealed class LoggingTransportProbe(string? configuredProvider = null) :
 
         return chosenBecause +
             " — so NOTHING IS DELIVERED. Every verification, invitation and password-reset message " +
-            "is written to this log and sent to nobody. Set Email__Provider to 'Brevo' (with " +
+            "is sent to nobody; this log notes each one, without its link. Set Email__Provider to 'Brevo' (with " +
             "Email__ApiKey beginning 'xkeysib-' and Email__FromAddress set to a confirmed sender), " +
             "'Resend', or 'Smtp'.";
     }

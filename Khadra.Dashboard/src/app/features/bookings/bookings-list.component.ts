@@ -8,10 +8,34 @@ import { AdminBookingsService } from '../../core/services/admin-bookings.service
 import { BookingTab } from '../../core/services/dealer-bookings.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { TranslationKey } from '../../core/i18n/en';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { Language } from '../../core/i18n/language';
+import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 
 /** The dealer's tabs, plus the one status the platform needs that they cannot express. */
 type AdminBookingTab = BookingTab | 'unpaid';
+
+/**
+ * The tabs, as the names that travel in `?tab=` and the keys that word them.
+ *
+ * The words are chosen when the tabs render. They were English literals in a field initialiser once,
+ * which no language switch could reach. The shared tab names read the same here as on the dealer's
+ * own list because they are the same server vocabulary.
+ */
+const TABS: readonly { readonly key: AdminBookingTab; readonly label: TranslationKey }[] = [
+  { key: 'all', label: 'common.all' },
+  { key: 'unpaid', label: 'bookingsList.tabUnpaid' },
+  { key: 'pending', label: 'dealerBookings.tabPending' },
+  { key: 'upcoming', label: 'dealerBookings.tabUpcoming' },
+  { key: 'active', label: 'dealerBookings.tabActive' },
+  { key: 'returned', label: 'dealerBookings.tabReturned' },
+  { key: 'completed', label: 'dealerBookings.tabCompleted' },
+  { key: 'closed', label: 'dealerBookings.tabClosed' },
+  // A live dispute is a flag on a booking, and this tab is every booking carrying it.
+  { key: 'disputed', label: 'status.disputed' },
+];
 
 /**
  * Every booking on the platform (spec 3.3).
@@ -28,7 +52,9 @@ type AdminBookingTab = BookingTab | 'unpaid';
   imports: [RouterLink, IconComponent],
 })
 export class BookingsListComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(AdminBookingsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -45,18 +71,12 @@ export class BookingsListComponent {
    * 'unpaid' is not one of the server's tabs: it is the Approved status, asked for directly. Since
    * 2026-09-07 that is exactly the booking a dealer has agreed to and nobody has paid for, which is
    * the platform's own concern rather than a queue the dealer console needs.
+   *
+   * A `computed`, not a field: a field words the tabs once, in whichever language was on screen then.
    */
-  protected readonly tabs: readonly { readonly key: AdminBookingTab; readonly label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'unpaid', label: 'Unpaid' },
-    { key: 'pending', label: 'Pending' },
-    { key: 'upcoming', label: 'Upcoming' },
-    { key: 'active', label: 'Active' },
-    { key: 'returned', label: 'Returned' },
-    { key: 'completed', label: 'Completed' },
-    { key: 'closed', label: 'Closed' },
-    { key: 'disputed', label: 'Disputed' },
-  ];
+  protected readonly tabs = computed(() =>
+    TABS.map((option) => ({ key: option.key, label: this.t(option.label) })),
+  );
 
   /**
    * Filters that arrived in the URL.
@@ -85,7 +105,7 @@ export class BookingsListComponent {
   constructor() {
     effect(() => {
       const wanted = this.params();
-      const known = this.tabs.find((candidate) => candidate.key === wanted.tab);
+      const known = TABS.find((candidate) => candidate.key === wanted.tab);
       const key: AdminBookingTab = known ? known.key : 'all';
       this.service.tab.set(key === 'unpaid' ? 'all' : key);
       this.service.status.set(key === 'unpaid' ? 'Approved' : null);
@@ -109,29 +129,45 @@ export class BookingsListComponent {
     return counts ? (counts[tab] ?? null) : null;
   }
 
+  /**
+   * "Showing 21–40 of 57 bookings", as ONE plural message: the total picks the noun's form, and
+   * Arabic has six of them.
+   */
   protected readonly summary = computed(() => {
     const page = this.loadedPage();
     if (!page) return '';
     const from = page.totalCount === 0 ? 0 : (page.page - 1) * page.pageSize + 1;
     const to = Math.min(page.page * page.pageSize, page.totalCount);
-    const noun = page.totalCount === 1 ? 'booking' : 'bookings';
-    return `Showing ${from}–${to} of ${page.totalCount} ${noun}`;
+    return this.t('bookingsList.pageSummary', { from, to, count: page.totalCount });
   });
 
   /** Whether the list is narrowed to one party, so the screen can say so and offer a way out. */
   protected readonly scopedTo = computed(() => {
     const rows = this.rows();
-    if (this.service.dealerId() && rows.length) return `dealer: ${rows[0].dealerName}`;
-    if (this.service.customerId() && rows.length) return `customer: ${rows[0].customerName}`;
-    if (this.service.dealerId() || this.service.customerId()) return this.t('bookingsList.oneParty');
+    if (this.service.dealerId() && rows.length)
+      return this.t('bookingsList.scopedToDealer', { name: this.dealerName(rows[0]) });
+    if (this.service.customerId() && rows.length)
+      return this.t('bookingsList.scopedToCustomer', { name: this.customerName(rows[0]) });
+    if (this.service.dealerId() || this.service.customerId())
+      return this.t('bookingsList.scopedToOneParty');
     return null;
   });
 
+  /** The dealership's name, or the fact that it has left the platform. Never the English stand-in. */
+  protected dealerName(row: BookingListItem): string {
+    return row.dealerRemoved ? this.t('common.dealerNoLongerOnPlatform') : row.dealerName;
+  }
+
+  /** The customer's name, or the fact that the account was closed. Never the English stand-in. */
+  protected customerName(row: BookingListItem): string {
+    return row.customerAccountClosed ? this.t('common.customerAccountClosed') : row.customerName;
+  }
+
+  /** A failed load, held as the resource's facts and worded here, so a language switch re-words it. */
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as { status?: number } | undefined;
+    const error = this.resource.error();
     if (!error) return null;
-    if (error.status === 403) return this.t('bookingsList.thePlatformBookingList');
-    return this.t('bookingsList.theBookingsCouldNot');
+    return describe(snapshotProblem(error), this.t, this.i18n.lang());
   });
 
   protected select(tab: AdminBookingTab): void {
@@ -172,23 +208,27 @@ export class BookingsListComponent {
     return STATUS_TONES[row.status] ?? 'dim';
   }
 
+  /** The server's status name, in the reader's language and in the booking sense of the word. */
   protected label(status: BookingStatus): string {
-    return status.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return this.i18n.statusLabel(status, 'booking');
   }
 
   protected when(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return this.formats.date(iso);
+  }
+
+  /** The row's total at the currency's own scale, with the code the value carries. */
+  protected rowTotal(row: BookingListItem): string {
+    return this.formats.money(row.totalPrice, row.currency);
   }
 
   protected vehicleLabel(row: BookingListItem): string {
     const vehicle = row.vehicle;
     // The booking outlives the listing, so a delisted car has no label to show — and inventing one
     // would put a car on the screen that is no longer on the platform.
-    return vehicle ? `${vehicle.make} ${vehicle.model} ${vehicle.year}` : this.t('bookingsList.vehicleDelisted');
+    return vehicle
+      ? `${vehicle.make} ${vehicle.model} ${vehicle.year}`
+      : this.t('bookingsList.vehicleDelisted');
   }
 }
 
@@ -206,3 +246,13 @@ const STATUS_TONES: Readonly<Partial<Record<BookingStatus, Tone>>> = {
   Expired: 'dim',
   NoShow: 'bad',
 };
+
+/** Why the list could not load, in the language on screen when it is shown. */
+function describe(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  if (problem.status === 403) return t('bookingsList.thePlatformBookingList');
+  return serverSentence(problem, language, t) ?? t('bookingsList.theBookingsCouldNot');
+}

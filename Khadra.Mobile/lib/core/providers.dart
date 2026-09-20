@@ -19,7 +19,14 @@ import 'session/session_store.dart';
 /// those. A "current everything" provider would quietly make every screen depend
 /// on every fetch.
 
-final sessionStoreProvider = Provider<SessionStore>((ref) => SessionStore());
+/// The token store, holding the preferences it needs to disown a session.
+///
+/// The marker that says "these tokens are ours" lives in ordinary preferences
+/// rather than in the secure store, because it has to be readable when the secure
+/// store is not. See [SessionStore.sessionIsOwned].
+final sessionStoreProvider = Provider<SessionStore>(
+  (ref) => SessionStore(preferences: ref.watch(sharedPreferencesProvider)),
+);
 
 /// The Dio instance, wired to the session before anything can use it.
 ///
@@ -87,12 +94,117 @@ class LocaleController extends StateNotifier<Locale?> {
   }
 }
 
+/// The language the app will actually be READ in.
+///
+/// One answer, used by the framework and by every provider that has to agree with
+/// it. They did not agree, and the gap was invisible in both supported languages:
+///
+/// `MaterialApp` with no `locale` resolves through `basicLocaleListResolution`,
+/// which falls back to `supportedLocales.first` when the device matches nothing —
+/// and that list is generated from the ARB file names, so it is `[ar, en]` by
+/// alphabet. A phone set to Turkish, French or Russian therefore got an ARABIC,
+/// right-to-left interface. Meanwhile these providers looked at
+/// `platformDispatcher.locale.languageCode`, saw `tr`, and handed that same screen
+/// English city names, English car types and English dates.
+///
+/// So the fallback is stated rather than inherited from an alphabet: Arabic for a
+/// device asking for Arabic, English for everything else. English is the right
+/// default for the third language — this is a marketplace serving visitors to
+/// Jordan, and an interface nobody can read is worse in Arabic than in English.
+Locale resolveKhadraLocale(Locale? chosen, List<Locale> deviceLocales) {
+  // A language the customer picked in Profile beats anything the device says.
+  if (chosen != null) return chosen;
+
+  for (final locale in deviceLocales) {
+    if (locale.languageCode == 'ar') return const Locale('ar');
+    if (locale.languageCode == 'en') return const Locale('en');
+  }
+
+  return const Locale('en');
+}
+
 final sharedPreferencesProvider = Provider<SharedPreferences?>(
   (ref) => throw UnimplementedError('Overridden in main() once loaded.'),
 );
 
 final localeProvider = StateNotifierProvider<LocaleController, Locale?>(
   (ref) => LocaleController(ref.watch(sharedPreferencesProvider)),
+);
+
+// ── How this device is being used ──────────────────────────────────────────────
+
+/// Whether the person holding this device has SAID how they want to use the app.
+///
+/// True once they have chosen at the Get Started screen — browse as a guest, sign
+/// in, or create an account. False on a fresh install, after the app's data has
+/// been cleared, and after a deliberate sign-out.
+///
+/// **It is not a session state, and deliberately not a fourth [SessionStatus].**
+/// Signed out is signed out whether or not a choice was made; the two answer
+/// different questions, and folding this into the credential state machine would
+/// put a stored preference in front of `restore()` and the router's refresh
+/// listener, neither of which has any business with one.
+///
+/// **In ordinary preferences, not the secure store**, because "the app's data was
+/// cleared" is exactly what has to bring the Get Started screen back — and because
+/// iOS keeps Keychain items when an app is deleted, so a flag kept there would
+/// make a reinstall skip it.
+///
+/// An expiry or a suspension does NOT clear it. Somebody whose session ran out has
+/// an account and has long since made their choice; asking them to make it again
+/// would be the app forgetting who it is talking to.
+class EntryChoice extends StateNotifier<bool> {
+  EntryChoice(this._preferences)
+      : super(_preferences?.getBool(_key) ?? false);
+
+  static const _key = 'khadra.entry_chosen';
+
+  final SharedPreferences? _preferences;
+
+  /// Remembers that a choice has been made, so the next launch opens where they
+  /// left off rather than asking again.
+  ///
+  /// The state moves SYNCHRONOUSLY and the write follows, which is what lets a
+  /// caller carry on without waiting: everything in this run reads the new answer
+  /// immediately, and only the next launch depends on the write.
+  Future<void> choose() => _remember(true);
+
+  /// Forgets it, which returns the app to the unauthenticated flow. Called on a
+  /// deliberate sign-out and nowhere else.
+  Future<void> forget() => _remember(false);
+
+  /// Neither of these may THROW.
+  ///
+  /// Both are called immediately after something the server has already done — an
+  /// account created, a session started, a family revoked — and both are followed
+  /// by the navigation that tells the customer it worked. An exception here (a
+  /// platform channel, a browser refusing storage, a full disk) would escape into
+  /// a `catch (ApiFailure)` that does not catch it, and the screen would sit on
+  /// its spinner for ever over a registration that actually succeeded.
+  ///
+  /// Failing to remember costs one extra tap at the next launch. Failing to
+  /// navigate costs the account.
+  Future<void> _remember(bool chosen) async {
+    if (state != chosen) state = chosen;
+
+    try {
+      if (chosen) {
+        await _preferences?.setBool(_key, true);
+      } else {
+        await _preferences?.remove(_key);
+      }
+    } on Object {
+      // See above. The in-memory answer is already correct for this run.
+    }
+  }
+}
+
+/// A device whose preferences could not be read is treated as a fresh install.
+///
+/// That is the recoverable way round: Get Started is one tap from browsing, while
+/// the other default would mean a genuine first run never sees it at all.
+final entryChoiceProvider = StateNotifierProvider<EntryChoice, bool>(
+  (ref) => EntryChoice(ref.watch(sharedPreferencesProvider)),
 );
 
 // ── Platform configuration ─────────────────────────────────────────────────────
@@ -107,6 +219,16 @@ final appConfigProvider = FutureProvider<AppConfig>((ref) async {
   ref.keepAlive();
   return ref.watch(apiProvider).appConfig();
 });
+
+/// What the platform will accept as a password, or null until it has said.
+///
+/// Its own provider because three screens ask the same question — register,
+/// reset and change — and each of them would otherwise reach into the config the
+/// same way. Null while the config is in flight, and the validator's contract is
+/// that null means "let the server judge", never "assume the old default".
+final passwordPolicyProvider = Provider<PasswordPolicy?>(
+  (ref) => ref.watch(appConfigProvider).valueOrNull?.password,
+);
 
 final citiesProvider = FutureProvider<List<Lookup>>((ref) async {
   ref.keepAlive();
@@ -126,11 +248,16 @@ final formatsProvider = Provider<Formats?>((ref) {
   final config = ref.watch(appConfigProvider).valueOrNull;
   if (config == null) return null;
 
-  final locale = ref.watch(localeProvider)?.languageCode ??
-      WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+  // The SAME answer the framework lays the screen out with. Reading
+  // `platformDispatcher.locale` here instead is what put English dates on an
+  // Arabic screen for a device asking for neither.
+  final locale = resolveKhadraLocale(
+    ref.watch(localeProvider),
+    WidgetsBinding.instance.platformDispatcher.locales,
+  );
 
   return Formats(
-    locale: locale == 'ar' ? 'ar' : 'en',
+    locale: locale.languageCode,
     currency: config.currency,
     // Falls back to UTC rather than throwing if the server names a zone this
     // build's database does not carry. A wrong-by-hours date is bad; a screen
@@ -150,7 +277,33 @@ tz.Location _location(String name) {
 /// Whether the app is currently showing Arabic. Used where a DTO carries both
 /// languages and the widget has to pick one.
 final isArabicProvider = Provider<bool>((ref) {
-  final locale = ref.watch(localeProvider)?.languageCode ??
-      WidgetsBinding.instance.platformDispatcher.locale.languageCode;
-  return locale == 'ar';
+  final locale = resolveKhadraLocale(
+    ref.watch(localeProvider),
+    WidgetsBinding.instance.platformDispatcher.locales,
+  );
+  return locale.languageCode == 'ar';
+});
+
+/// The name of one city, in the reader's language, or null.
+///
+/// The catalogue carries a city as an ID — a listing row and a gallery page both
+/// do — and the NAME lives on the lookup, in both languages. Null covers three
+/// different things and all three mean the same to a screen: no city on the
+/// record, a city the lookup has not loaded yet, and an id the lookup does not
+/// know. Rendering the raw GUID for any of them would be worse than rendering
+/// nothing, so the caller omits the line.
+final cityNameProvider = Provider.family<String?, String?>((ref, cityId) {
+  if (cityId == null || cityId.isEmpty) return null;
+
+  final cities = ref.watch(citiesProvider).valueOrNull;
+  if (cities == null) return null;
+
+  final arabic = ref.watch(isArabicProvider);
+  for (final city in cities) {
+    if (city.id == cityId) {
+      final name = city.nameFor(arabic);
+      return name.isEmpty ? null : name;
+    }
+  }
+  return null;
 });

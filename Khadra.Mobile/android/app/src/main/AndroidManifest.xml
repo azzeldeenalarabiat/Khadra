@@ -7,10 +7,15 @@
          camera must still be able to install the app. -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
 
+    <!-- `supportsRtl` changes nothing Flutter paints: it draws its own interface
+         and takes the direction from the app's locale. It is stated because the
+         parts Android paints ITSELF still read it — the app-info screen, the
+         notification shade, and any system dialog raised over the app. -->
     <application
-        android:label="Khadra"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"

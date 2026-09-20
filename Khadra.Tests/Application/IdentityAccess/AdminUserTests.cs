@@ -31,7 +31,7 @@ public sealed class AdminUserTests
     {
         public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
         public IVerificationTokenRepository Tokens { get; } = Substitute.For<IVerificationTokenRepository>();
-        public IEmailSender Email { get; } = Substitute.For<IEmailSender>();
+        public IEmailSender Email { get; } = TestEmail.AcceptingSender();
         public IAuthEmailComposer Composer { get; } = Substitute.For<IAuthEmailComposer>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public IAuditTrail AuditTrail { get; } = Substitute.For<IAuditTrail>();
@@ -54,6 +54,11 @@ public sealed class AdminUserTests
             Actor.CorrelationId.Returns("test-correlation");
             // One other administrator standing, unless a test says otherwise.
             Users.CountActiveAdminsExceptAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(1);
+            // An invitation as the transport sees it. Left unconfigured, the composer hands over a null
+            // message, and the dispatcher reads the message it sent to log where it was accepted.
+            Composer.AdminInvitation(Arg.Any<User>(), Arg.Any<string>())
+                .Returns(call => new EmailMessage(
+                    call.Arg<User>().Email.Value, call.Arg<User>().Name.Value, "Invitation", "<p>link</p>", "link"));
         }
 
         public User Given(User user)

@@ -165,6 +165,119 @@ public sealed class DealerConsoleTests
         Assert.Equal(report.Value.Revenue.Currency, report.Value.NetAfterCommission.Currency);
     }
 
+    // ── Commission at the edges ──────────────────────────────────────────────────────────────────
+    //
+    // The report screen once printed "JOD 0−" for a commission of nothing: a sign typed in front of
+    // the amount, in a month with no revenue. These pin the numbers the screen formats at the edges
+    // where that happened -- an empty period, a 0% rate and a 100% rate -- and that a commission is
+    // never negative and never more than the revenue it was taken from.
+
+    private static readonly System.Text.Json.JsonSerializerOptions WireOptions =
+        new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    /// <summary>Every money amount in the report, as written into the JSON, carries no sign.</summary>
+    private static void AssertUnsignedOnTheWire(DealerReportDto report)
+    {
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(report, WireOptions));
+        foreach (var name in new[] { "revenue", "commission", "netAfterCommission", "inProgress" })
+        {
+            var amount = json.RootElement.GetProperty(name).GetProperty("amount").GetRawText();
+            Assert.False(amount.StartsWith('-'), $"{name} was written as {amount}");
+        }
+    }
+
+    private static Context WithRevenue(params RevenueFact[] facts)
+    {
+        var context = new Context();
+        context.Bookings.RevenueAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(facts);
+        return context;
+    }
+
+    [Fact]
+    public async Task An_empty_period_reports_zero_everywhere_in_the_platform_currency()
+    {
+        var context = WithRevenue();
+
+        var report = (await context.Handlers().Handle(new GetDealerReportQuery(OwnerId, "monthly"), CancellationToken.None)).Value;
+
+        Assert.Equal(0, report.Bookings);
+        foreach (var money in new[] { report.Revenue, report.Commission, report.NetAfterCommission, report.InProgress })
+        {
+            Assert.Equal(0m, money.Amount);
+            Assert.Equal(Khadra.Domain.Common.Money.JordanianDinar, money.Currency);
+        }
+
+        // No sign reaches the wire for nothing earned: every amount is written 0, never -0.
+        AssertUnsignedOnTheWire(report);
+    }
+
+    [Fact]
+    public async Task A_zero_percent_rate_takes_no_commission_and_the_net_is_the_revenue()
+    {
+        var context = WithRevenue(new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-1), 120m, "JOD", 0m));
+
+        var report = (await context.Handlers().Handle(new GetDealerReportQuery(OwnerId, "monthly"), CancellationToken.None)).Value;
+
+        Assert.Equal(120m, report.Revenue.Amount);
+        Assert.Equal(0m, report.Commission.Amount);
+        Assert.Equal(120m, report.NetAfterCommission.Amount);
+        AssertUnsignedOnTheWire(report);
+    }
+
+    [Fact]
+    public async Task A_hundred_percent_rate_takes_everything_and_the_net_is_exactly_zero()
+    {
+        var context = WithRevenue(new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-1), 87.125m, "JOD", 100m));
+
+        var report = (await context.Handlers().Handle(new GetDealerReportQuery(OwnerId, "monthly"), CancellationToken.None)).Value;
+
+        Assert.Equal(87.125m, report.Commission.Amount);
+        Assert.Equal(0m, report.NetAfterCommission.Amount);
+        AssertUnsignedOnTheWire(report);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(7.5)]
+    [InlineData(12.3456)]
+    [InlineData(33.3333)]
+    [InlineData(99.9999)]
+    [InlineData(100)]
+    public async Task Commission_is_never_negative_and_never_more_than_the_revenue(double rate)
+    {
+        var percent = (decimal)rate;
+        var context = WithRevenue(
+            new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-1), 0.001m, "JOD", percent),
+            new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-2), 19.999m, "JOD", percent),
+            new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-3), 333.333m, "JOD", percent));
+
+        var report = (await context.Handlers().Handle(new GetDealerReportQuery(OwnerId, "monthly"), CancellationToken.None)).Value;
+
+        Assert.True(report.Commission.Amount >= 0m, $"commission {report.Commission.Amount} at {percent}%");
+        Assert.True(report.Commission.Amount <= report.Revenue.Amount, $"commission {report.Commission.Amount} over revenue {report.Revenue.Amount}");
+        Assert.True(report.NetAfterCommission.Amount >= 0m);
+        Assert.Equal(report.Revenue.Amount - report.Commission.Amount, report.NetAfterCommission.Amount);
+    }
+
+    /// <summary>
+    /// A handover whose car has left the fleet carries no label, and no English one either: the
+    /// console says "no longer listed" in its reader's language.
+    /// </summary>
+    [Fact]
+    public async Task A_handover_for_a_car_no_longer_in_the_fleet_has_no_label()
+    {
+        var context = new Context();
+        context.Bookings.UpcomingPickupsAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([new UpcomingHandover(Guid.NewGuid(), "KH-2", "Confirmed", Build.Now.AddHours(4), "SelfPickup", Guid.NewGuid(), null, false)]);
+
+        var dashboard = (await context.Handlers().Handle(new GetDealerDashboardQuery(OwnerId), CancellationToken.None)).Value;
+
+        var pickup = Assert.Single(dashboard.UpcomingPickups);
+        Assert.Null(pickup.VehicleLabel);
+        Assert.Null(pickup.CustomerName);
+    }
+
     [Fact]
     public async Task The_week_starts_on_Sunday_and_the_month_on_the_first_in_the_Amman_calendar()
     {

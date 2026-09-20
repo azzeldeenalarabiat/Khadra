@@ -16,6 +16,9 @@ namespace Khadra.Tests.Application.Dealers;
 // answer -- so each is pinned here.
 public sealed class DealerReviewScreenTests
 {
+    private static readonly System.Text.Json.JsonSerializerOptions WireOptions =
+        new(System.Text.Json.JsonSerializerDefaults.Web);
+
     private sealed class Context
     {
         public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
@@ -158,9 +161,9 @@ public sealed class DealerReviewScreenTests
 
     // The timeline carries instants; the console renders them in the reader's own zone. This entry
     // used to spell the same moment out again as a UTC string in its detail, so one row showed one
-    // deadline twice, in two zones, three words apart.
+    // deadline twice, in two zones, three words apart. It now carries no words at all.
     [Fact]
-    public async Task The_pending_timeline_entry_states_no_date_of_its_own()
+    public async Task The_pending_timeline_entry_is_the_frozen_deadline_and_nothing_else()
     {
         var context = new Context();
         var dealer = context.Given(PendingWithDocuments());
@@ -169,10 +172,51 @@ public sealed class DealerReviewScreenTests
 
         var awaiting = Assert.Single(
             result.Value.Timeline,
-            entry => entry.Label == "Awaiting admin decision");
+            entry => entry.Step == DealerReviewTimelineSteps.AwaitingDecision);
         Assert.Equal(dealer.ReviewDueAt, awaiting.OccurredAt);
-        Assert.DoesNotContain("UTC", awaiting.Detail, StringComparison.Ordinal);
         Assert.False(awaiting.IsComplete);
+        Assert.Null(awaiting.Decision);
+        Assert.Null(awaiting.Note);
+        Assert.Null(awaiting.DocumentCount);
+    }
+
+    /// <summary>
+    /// The timeline is facts for the console to word, never English for it to print.
+    ///
+    /// Every step used to arrive as a label and a detail written here in English, which an Arabic
+    /// screen showed as it came. The document count is the server's, beside the number an approval
+    /// needs, so the console never writes "of 3".
+    /// </summary>
+    [Fact]
+    public async Task The_timeline_sends_facts_rather_than_sentences()
+    {
+        var context = new Context();
+        var dealer = Build.Dealer();
+        dealer.AttachDocument(DealerDocumentType.CommercialRegistration, "dealers/a/one.pdf", Build.Now.AddMinutes(5));
+        context.Given(dealer);
+
+        var result = await context.Load(dealer);
+
+        Assert.Equal(
+            [DealerReviewTimelineSteps.Submitted, DealerReviewTimelineSteps.DocumentsAttached, DealerReviewTimelineSteps.AwaitingDecision],
+            result.Value.Timeline.Select(entry => entry.Step));
+
+        var submitted = result.Value.Timeline[0];
+        Assert.Equal(dealer.SubmittedAt, submitted.OccurredAt);
+        Assert.True(submitted.IsComplete);
+
+        var documents = result.Value.Timeline[1];
+        Assert.Equal(1, documents.DocumentCount);
+        Assert.Equal(DealerDocumentType.Required.Count, documents.RequiredDocumentCount);
+        Assert.Equal(Build.Now.AddMinutes(5), documents.OccurredAt);
+        Assert.False(documents.IsComplete);
+
+        using var json = System.Text.Json.JsonDocument.Parse(
+            System.Text.Json.JsonSerializer.Serialize(result.Value.Timeline[1], WireOptions));
+        var names = json.RootElement.EnumerateObject().Select(property => property.Name).ToArray();
+        Assert.Equal(
+            ["step", "decision", "note", "documentCount", "requiredDocumentCount", "occurredAt", "isComplete"],
+            names);
     }
 
     /// <summary>
@@ -198,14 +242,46 @@ public sealed class DealerReviewScreenTests
         Assert.True(result.IsSuccess);
         var awaiting = Assert.Single(
             result.Value.Timeline,
-            entry => entry.Label == "Awaiting admin decision");
+            entry => entry.Step == DealerReviewTimelineSteps.AwaitingDecision);
         Assert.Equal(dealer.ReviewDueAt, awaiting.OccurredAt);
         Assert.False(awaiting.IsComplete);
 
-        // The earlier decision stays on the record -- it happened -- but it is not the last word,
-        // and it is not labelled with an enumeration name.
-        Assert.DoesNotContain(result.Value.Timeline, entry => entry.Label == "PendingReview");
-        Assert.Contains(result.Value.Timeline, entry => entry.Label == "Clarification requested");
+        // The earlier decision stays on the record -- it happened -- followed by the resubmission that
+        // answered it. It is never named after the CURRENT status, which would read as though the
+        // decision were still pending.
+        var decision = Assert.Single(result.Value.Timeline, entry => entry.Step == DealerReviewTimelineSteps.Decision);
+        Assert.NotEqual(nameof(DealerVerificationStatus.PendingReview), decision.Decision);
+        Assert.Contains(result.Value.Timeline, entry => entry.Step == DealerReviewTimelineSteps.Resubmitted);
+    }
+
+    /// <summary>
+    /// Once the dealer has resubmitted, nothing on the aggregate says which decision came before.
+    ///
+    /// A clarification request and a rejection can both be answered by resubmitting, and both leave
+    /// the application PendingReview with the note cleared. The timeline used to call either one
+    /// "Clarification requested" -- wrong for a rejection that came back. It now says it cannot tell.
+    /// </summary>
+    [Fact]
+    public async Task A_decision_the_dealer_has_answered_is_not_guessed_at()
+    {
+        foreach (var decide in new Action<Dealer>[]
+                 {
+                     dealer => dealer.RequestClarification(Id.New(), "The registration photo is unreadable.", Build.Now),
+                     dealer => dealer.Reject(Id.New(), "The commercial registration does not match.", Build.Now),
+                 })
+        {
+            var context = new Context();
+            var dealer = PendingWithDocuments();
+            decide(dealer);
+            Assert.True(dealer.Resubmit(Build.Now.AddHours(3), Build.ReviewSla).IsSuccess);
+            context.Given(dealer);
+
+            var result = await context.Load(dealer);
+
+            var decision = Assert.Single(result.Value.Timeline, entry => entry.Step == DealerReviewTimelineSteps.Decision);
+            Assert.Null(decision.Decision);
+            Assert.Equal(Build.Now, decision.OccurredAt);
+        }
     }
 
     [Fact]
@@ -221,8 +297,33 @@ public sealed class DealerReviewScreenTests
         Assert.True(result.IsSuccess);
         Assert.DoesNotContain(
             result.Value.Timeline,
-            entry => entry.Label == "Awaiting admin decision");
-        Assert.Contains(result.Value.Timeline, entry => entry.Label == "Rejected");
+            entry => entry.Step == DealerReviewTimelineSteps.AwaitingDecision);
+        var decision = Assert.Single(result.Value.Timeline, entry => entry.Step == DealerReviewTimelineSteps.Decision);
+        Assert.Equal(nameof(DealerVerificationStatus.Rejected), decision.Decision);
+        // The reviewer's own words, exactly as they typed them.
+        Assert.Equal("The commercial registration does not match the applicant.", decision.Note);
+    }
+
+    /// <summary>A decision nobody has answered yet is named; an approval carries no note, and none is invented.</summary>
+    [Fact]
+    public async Task A_decision_still_standing_is_named_and_carries_only_the_note_on_record()
+    {
+        var clarifying = PendingWithDocuments();
+        clarifying.RequestClarification(Id.New(), "The registration photo is unreadable.", Build.Now);
+        var approved = PendingWithDocuments();
+        approved.Approve(Id.New(), Build.Now);
+
+        var context = new Context();
+        context.Given(clarifying);
+        context.Given(approved);
+
+        var asked = Assert.Single((await context.Load(clarifying)).Value.Timeline, entry => entry.Step == DealerReviewTimelineSteps.Decision);
+        Assert.Equal(nameof(DealerVerificationStatus.ClarificationNeeded), asked.Decision);
+        Assert.Equal("The registration photo is unreadable.", asked.Note);
+
+        var yes = Assert.Single((await context.Load(approved)).Value.Timeline, entry => entry.Step == DealerReviewTimelineSteps.Decision);
+        Assert.Equal(nameof(DealerVerificationStatus.Approved), yes.Decision);
+        Assert.Null(yes.Note);
     }
 
     [Fact]

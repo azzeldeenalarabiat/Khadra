@@ -20,29 +20,51 @@ void main() {
         zone: tz.getLocation('Asia/Amman'),
       );
 
+  /// The isolate marks a price is wrapped in. Invisible, zero width, and part of
+  /// the string — see `Formats.isolate`. Stripped here so a test can state the
+  /// figure a customer reads.
+  String plain(String money) => money.replaceAll('\u2068', '').replaceAll('\u2069', '');
+
   group('money', () {
     test('is padded to the platform minor units, not to two', () {
       // The fils is a THOUSANDTH. Rendering 12.75 against a contract that says
       // 12.750 is a different number on an invoice.
-      expect(formatsFor('en').money(const Money(12.75, 'JOD')), 'JOD 12.750');
-      expect(formatsFor('en').money(const Money(40, 'JOD')), 'JOD 40.000');
+      expect(plain(formatsFor('en').money(const Money(12.75, 'JOD'))), 'JOD 12.750');
+      expect(plain(formatsFor('en').money(const Money(40, 'JOD'))), 'JOD 40.000');
     });
 
     test('carries the currency code the VALUE named, not a literal', () {
-      expect(formatsFor('en').money(const Money(5, 'USD')), 'USD 5.000');
+      expect(plain(formatsFor('en').money(const Money(5, 'USD'))), 'USD 5.000');
     });
 
-    test('keeps Latin digits under Arabic', () {
+    test('keeps Latin digits under Arabic, with the code trailing', () {
       // A price is compared far more often than it is read aloud, and Latin
       // digits are what a Jordanian price list and a bank statement both use.
-      final arabic = formatsFor('ar').money(const Money(28, 'JOD'));
-      expect(arabic, contains('28.000'));
-      expect(arabic, contains('JOD'));
+      final arabic = plain(formatsFor('ar').money(const Money(28, 'JOD')));
+      expect(arabic, '28.000 JOD');
+    });
+
+    /// The bug this guards against was VISIBLE on the price breakdown.
+    ///
+    /// A price is Latin digits beside a Latin code, and the bidi algorithm
+    /// resolves that run against whatever sits next to it. Alone in an Arabic
+    /// paragraph it came out right by luck; interpolated into a sentence — the
+    /// breakdown's "30.000 JOD × 4 أيام" — the code detached from its amount and
+    /// landed against the multiplication sign. One line read "30.000 JOD" and the
+    /// line under it read "JOD 120.000", on the same card.
+    test('is isolated, so a neighbouring word cannot reorder it', () {
+      for (final locale in ['en', 'ar']) {
+        final price = formatsFor(locale).money(const Money(30, 'JOD'));
+        expect(price.codeUnitAt(0), 0x2068,
+            reason: '$locale should open with FIRST STRONG ISOLATE');
+        expect(price.codeUnitAt(price.length - 1), 0x2069,
+            reason: '$locale should close with POP DIRECTIONAL ISOLATE');
+      }
     });
 
     test('follows the minor units the server names rather than assuming three', () {
       expect(
-        formatsFor('en', minorUnits: 2).money(const Money(12.5, 'USD')),
+        plain(formatsFor('en', minorUnits: 2).money(const Money(12.5, 'USD'))),
         'USD 12.50',
       );
     });

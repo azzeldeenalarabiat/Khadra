@@ -4,8 +4,17 @@ import { ReportPeriod } from '../../core/models/dealer-console.api';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { TranslationKey } from '../../core/i18n/en';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MoneyPipe } from '../../shared/money.pipe';
+
+/** The windows a report can cover, as keys: the tabs are worded when they render. */
+const PERIODS: readonly { readonly key: ReportPeriod; readonly label: TranslationKey }[] = [
+  { key: 'daily', label: 'dealerReports.today' },
+  { key: 'weekly', label: 'dealerReports.thisWeek' },
+  { key: 'monthly', label: 'dealerReports.thisMonth' },
+];
 
 /**
  * Reports (spec 4.5, design `isReports`).
@@ -14,6 +23,10 @@ import { MoneyPipe } from '../../shared/money.pipe';
  * recalculated from a current setting. Revenue counts cars that came back in the period; what is
  * still out is shown separately as "in progress". Net payout is not shown because payouts are not
  * built -- the card says so instead of showing a number that nothing will ever pay.
+ *
+ * Platform commission is the amount Khadra charges, shown unsigned. The server sends it as a
+ * non-negative amount and computes "revenue after commission" itself, so the labels carry the
+ * subtraction and the screen never performs it.
  */
 @Component({
   selector: 'kh-dealer-reports',
@@ -23,13 +36,18 @@ import { MoneyPipe } from '../../shared/money.pipe';
 })
 export class DealerReportsComponent {
   protected readonly t = inject(I18nService).t;
+  protected readonly formats = inject(FormatService);
   private readonly service = inject(DealerConsoleService);
 
-  protected readonly periods: readonly { key: ReportPeriod; label: string }[] = [
-    { key: 'daily', label: 'Today' },
-    { key: 'weekly', label: this.t('dealerReports.thisWeek') },
-    { key: 'monthly', label: this.t('dealerReports.thisMonth') },
-  ];
+  /**
+   * The period tabs, worded in the reader's language.
+   *
+   * A `computed` rather than a field: a field initialiser resolves `t()` once, at construction, so the
+   * tabs stayed in whichever language the screen opened in — and "Today" had never been keyed at all.
+   */
+  protected readonly periods = computed(() =>
+    PERIODS.map((period) => ({ key: period.key, label: this.t(period.label) })),
+  );
 
   protected readonly period = this.service.period;
   protected readonly resource = this.service.report;
@@ -59,13 +77,17 @@ export class DealerReportsComponent {
     return this.t('dealerReports.reportsCouldNotBe');
   });
 
+  /**
+   * "01 Sept – 30 Sept", from the report's own calendar dates.
+   *
+   * `from` and `to` are dates in the reporting calendar, not instants, so they are formatted without
+   * passing through the browser's zone — which could have moved either one to a neighbouring day.
+   */
   protected readonly range = computed(() => {
     const r = this.report();
     if (!r) return '';
-    const from = new Date(r.from + 'T00:00:00');
-    const to = new Date(r.to + 'T00:00:00');
-    const fmt = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    return r.from === r.to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`;
+    const from = this.formats.calendarDayMonth(r.from);
+    return r.from === r.to ? from : `${from} – ${this.formats.calendarDayMonth(r.to)}`;
   });
 
   protected select(period: ReportPeriod): void {

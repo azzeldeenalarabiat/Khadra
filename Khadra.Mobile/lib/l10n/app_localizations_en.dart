@@ -210,8 +210,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authNoAccount => 'New to Khadra?';
 
   @override
-  String get authPasswordRules =>
-      'At least 8 characters, with a letter and a number.';
+  String authPasswordRules(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'At least $count characters, with a letter and a number.',
+      one: 'At least 1 character, with a letter and a number.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String authPasswordRulesLengthOnly(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'At least $count characters.',
+      one: 'At least 1 character.',
+    );
+    return '$_temp0';
+  }
 
   @override
   String get authVerifyEmailTitle => 'Verify your email';
@@ -255,7 +273,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authSessionExpired => 'Your session ended. Sign in again.';
 
   @override
-  String get navBrowse => 'Browse';
+  String get welcomeTitle => 'How would you like to start?';
+
+  @override
+  String get welcomeBody =>
+      'Browse freely. Booking and saving cars need an account.';
+
+  @override
+  String get welcomeBrowseAsGuest => 'Browse as a guest';
+
+  @override
+  String get navHome => 'Home';
 
   @override
   String get navBookings => 'Bookings';
@@ -288,16 +316,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get searchCity => 'City';
-
-  @override
   String get searchAnyCity => 'Any city';
 
   @override
   String get searchCarType => 'Car type';
-
-  @override
-  String get searchAnyCarType => 'Any type';
 
   @override
   String get searchTransmission => 'Transmission';
@@ -320,6 +342,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchPriceRange => 'Price per day';
 
   @override
+  String get searchPriceFrom => 'From';
+
+  @override
+  String get searchPriceTo => 'To';
+
+  @override
+  String get searchPriceRangeInverted =>
+      'The top of the range is below the bottom, so nothing can match it.';
+
+  @override
   String get searchDeliveryOnly => 'Delivered to me only';
 
   @override
@@ -327,6 +359,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchAnyDates => 'Any dates';
+
+  @override
+  String get searchPickupLocation => 'Pickup location';
+
+  @override
+  String get searchRentalPeriod => 'Rental period';
+
+  @override
+  String searchPeriodValue(String pickup, String dropoff) {
+    return '$pickup → $dropoff';
+  }
+
+  @override
+  String get searchAllCarTypes => 'All';
 
   @override
   String get searchPickup => 'Pick-up';
@@ -342,6 +388,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choosing dates shows only the cars that are free, and lets us price the rental.';
 
   @override
+  String searchMaxRentalDays(int days) {
+    return 'A rental cannot run longer than $days days.';
+  }
+
+  @override
+  String searchPickupTooSoon(String when) {
+    return 'The earliest a rental can start is $when.';
+  }
+
+  @override
   String get searchClearDates => 'Clear the dates';
 
   @override
@@ -352,6 +408,18 @@ class AppLocalizationsEn extends AppLocalizations {
       other: '$count cars',
       one: '1 car',
       zero: 'No cars',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String searchResultsAvailable(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count cars available',
+      one: '1 car available',
+      zero: 'No cars available',
     );
     return '$_temp0';
   }
@@ -470,6 +538,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get galleryAbout => 'About';
 
   @override
+  String get galleryPickupInstructions => 'Pickup instructions';
+
+  @override
+  String get galleryRentalConditions => 'Rental conditions';
+
+  @override
+  String get galleryInsurance => 'Insurance';
+
+  @override
+  String get galleryNotes => 'Notes from the office';
+
+  @override
+  String get galleryFromTheOffice => 'From the rental office';
+
+  @override
+  String get galleryOfficeOwnWords => 'Written by this office, not by Khadra.';
+
+  @override
   String get galleryOpeningHours => 'Opening hours';
 
   @override
@@ -482,6 +568,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get galleryClosedToday => 'Closed today';
+
+  @override
+  String get galleryAllWeek => 'All week';
+
+  @override
+  String get galleryTodayOnly => 'Today only';
 
   @override
   String get galleryLocation => 'Where they are';
@@ -592,18 +684,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookTermsTitle => 'What you are agreeing to';
 
   @override
-  String bookTermsPayAfterApproval(String hours) {
-    return 'Nothing is charged now. The office answers within $hours hours, and only then does the deposit fall due.';
+  String get bookTermsPayAfterApproval =>
+      'Nothing is charged now. The deposit falls due only if they approve.';
+
+  @override
+  String bookTermsAnswerWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'The office has $hours hours to answer. The car is held for you until then.',
+      one:
+          'The office has 1 hour to answer. The car is held for you until then.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsPaymentWindow(String hours) {
-    return 'Once they approve, you have $hours hours to pay the deposit or the booking ends and the car goes back on the market.';
+  String bookTermsPaymentWindow(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          'Once they approve, you have $hours hours to pay the deposit or the booking ends and the car goes back on the market.',
+      one:
+          'Once they approve, you have 1 hour to pay the deposit or the booking ends and the car goes back on the market.',
+    );
+    return '$_temp0';
   }
 
   @override
-  String bookTermsFreeCancellation(String hours) {
-    return 'Free cancellation for $hours hours after the deposit clears.';
+  String bookTermsFreeCancellation(num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: 'Free cancellation for $hours hours after the deposit clears.',
+      one: 'Free cancellation for 1 hour after the deposit clears.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -621,8 +739,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookDoneTitle => 'Request sent';
 
   @override
-  String bookDoneBody(String gallery, String hours) {
-    return '$gallery has your request and will answer within $hours hours. We will tell you as soon as they do.';
+  String bookDoneBody(String gallery, num hours) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other:
+          '$gallery has your request and will answer within $hours hours. We will tell you as soon as they do.',
+      one:
+          '$gallery has your request and will answer within 1 hour. We will tell you as soon as they do.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -646,6 +772,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get bookVerifyEmailFirst =>
       'Verify your email address before booking. Your booking updates go there.';
+
+  @override
+  String get bookingsViewBooking => 'View booking';
 
   @override
   String get bookingsTitle => 'My bookings';
@@ -684,11 +813,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingsEmptyAction => 'Find a car';
 
   @override
+  String get bookingsEmptyTabTitle => 'Nothing in this list';
+
+  @override
+  String get bookingsEmptyTabBody =>
+      'You have bookings, but none of them are in this one. Try another tab.';
+
+  @override
   String get bookingsSignedOutTitle => 'Sign in to see your bookings';
 
   @override
-  String get bookingsSignedOutBody =>
-      'Your bookings, documents and alerts live in your account.';
+  String get accountRequiredBody =>
+      'Your bookings, saved cars, documents and alerts live in your account.';
+
+  @override
+  String get notificationsSignedOutTitle => 'Sign in to see your alerts';
+
+  @override
+  String get profileSignedOutTitle => 'Sign in to your account';
 
   @override
   String get statusRequested => 'Waiting for the office';
@@ -727,7 +869,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingWhen => 'When';
 
   @override
-  String get bookingWhere => 'Pick-up';
+  String get bookingWhere => 'How you get it';
 
   @override
   String get bookingWhereDelivery => 'Delivered to you';
@@ -746,6 +888,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookingHistory => 'What has happened';
+
+  @override
+  String get bookingHandoversTitle => 'Collection and return';
 
   @override
   String get bookingPrice => 'Price';
@@ -867,18 +1012,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String bookingCountdownDays(int days, int hours) {
-    return '${days}d ${hours}h left';
+  String countdownDays(int days) {
+    return '${days}d';
   }
 
   @override
-  String bookingCountdownHours(int hours, int minutes) {
-    return '${hours}h ${minutes}m left';
+  String countdownHours(int hours) {
+    return '${hours}h';
   }
 
   @override
-  String bookingCountdownMinutes(int minutes) {
-    return '${minutes}m left';
+  String countdownMinutes(int minutes) {
+    return '${minutes}m';
+  }
+
+  @override
+  String countdownPair(String first, String second) {
+    return '$first $second';
+  }
+
+  @override
+  String bookingCountdownLeft(String time) {
+    return '$time left';
   }
 
   @override
@@ -971,9 +1126,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get disputeOpen => 'Open the dispute';
 
   @override
-  String disputeOpened(String hours) {
-    return 'Your dispute is open. Khadra will look at it within $hours hours.';
+  String disputeOpened(String deadline) {
+    return 'Your dispute is open. Khadra will answer by $deadline.';
   }
+
+  @override
+  String get disputeOpenedNoDate =>
+      'Your dispute is open. Khadra will answer it.';
 
   @override
   String get disputeViewTitle => 'Dispute';
@@ -1119,7 +1278,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get documentsTakePhoto => 'Take a photo';
 
   @override
+  String get documentsChoosePhoto => 'Choose a photo';
+
+  @override
   String get documentsChooseFile => 'Choose a file';
+
+  @override
+  String documentsFileLimits(String kinds, String size) {
+    return '$kinds · up to $size';
+  }
+
+  @override
+  String get documentsOpenFailed =>
+      'That document could not be opened on this phone. Install a PDF reader, or try again.';
+
+  @override
+  String get documentsFileUnreadable =>
+      'That file could not be read. Choose it again, or take a photo of the document instead.';
+
+  @override
+  String documentsFileSummary(String kind, String size) {
+    return '$kind · $size';
+  }
 
   @override
   String get documentsUploading => 'Uploading…';
@@ -1221,6 +1401,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileLanguage => 'Language';
+
+  @override
+  String get profileLanguageSystem => 'Follow my device';
 
   @override
   String get profileLanguageEnglish => 'English';
@@ -1382,7 +1565,35 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter a Jordanian mobile number, like 0791234567.';
 
   @override
-  String get validationPasswordShort => 'Use at least 8 characters.';
+  String validationPasswordShort(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Use at least $count characters.',
+      one: 'Use at least 1 character.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String validationPasswordLong(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Use at most $count characters.',
+      one: 'Use at most 1 character.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get validationPasswordLetter => 'Add a letter.';
+
+  @override
+  String get validationPasswordDigit => 'Add a number.';
+
+  @override
+  String get validationPasswordSpaces => 'A password cannot contain spaces.';
 
   @override
   String get validationPasswordMatch => 'The two passwords do not match.';
@@ -1470,4 +1681,230 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorRateLimited =>
       'Too many requests. Wait a moment and try again.';
+
+  @override
+  String get errorAuthInvalidName =>
+      'A name must be between 2 and 150 characters.';
+
+  @override
+  String get errorAuthPasswordUnchanged =>
+      'That is the password you already have. Choose a different one.';
+
+  @override
+  String get errorAuthInvalidDateOfBirth => 'That date of birth is not valid.';
+
+  @override
+  String errorAuthUnderageBy(int age) {
+    return 'Renters on Khadra must be at least $age years old.';
+  }
+
+  @override
+  String get errorBookingAccountCannotBook =>
+      'This account cannot make bookings.';
+
+  @override
+  String get errorBookingNotYours => 'That booking belongs to somebody else.';
+
+  @override
+  String get errorBookingAlreadyFinished => 'This booking has already ended.';
+
+  @override
+  String get errorBookingNotAwaitingPayment =>
+      'This booking is not waiting on a payment.';
+
+  @override
+  String get errorBookingDisputeOpen =>
+      'This booking cannot settle while a dispute on it is open.';
+
+  @override
+  String get errorBookingTooSoon =>
+      'That pickup time is too soon. Choose a later one.';
+
+  @override
+  String errorBookingTooSoonBy(int minutes) {
+    return 'A rental must start at least $minutes minutes from now.';
+  }
+
+  @override
+  String get errorBookingRentalTooLong =>
+      'That rental is longer than we can book. Choose a shorter one.';
+
+  @override
+  String get errorBookingBeyondHorizon =>
+      'That is further ahead than we can book. Choose an earlier date.';
+
+  @override
+  String errorBookingBeyondHorizonBy(int days) {
+    return 'A rental cannot be booked more than $days days ahead.';
+  }
+
+  @override
+  String get errorBookingOutsideOpeningHours =>
+      'This office is closed at that time. Choose a time while they are open, or have the car delivered.';
+
+  @override
+  String get errorBookingDeliveryOutOfRange =>
+      'That spot is outside this office’s delivery area. Choose one closer to them.';
+
+  @override
+  String get errorBookingDeliveryLocationRequired =>
+      'Choose where the car should be brought.';
+
+  @override
+  String get errorDocumentTooLarge =>
+      'That file is larger than the upload limit.';
+
+  @override
+  String get errorDocumentUnsupportedType =>
+      'That file type is not accepted. Upload a JPEG, PNG or PDF.';
+
+  @override
+  String get errorDocumentNotFound => 'That document is no longer there.';
+
+  @override
+  String get errorReviewWindowClosed =>
+      'The time to review this booking has passed.';
+
+  @override
+  String get errorReviewInvalidRating =>
+      'Choose a rating between one and five stars.';
+
+  @override
+  String get errorReviewCommentTooLong =>
+      'That comment is longer than we can take.';
+
+  @override
+  String get errorDisputeNotFound => 'That dispute was not found.';
+
+  @override
+  String get errorDisputeNotOpen => 'This dispute is no longer open.';
+
+  @override
+  String get errorDisputeNotYoursToWithdraw =>
+      'Only the party who opened a dispute can withdraw it.';
+
+  @override
+  String get errorDisputeReasonRequired =>
+      'Say what went wrong before opening a dispute.';
+
+  @override
+  String get errorDisputeStatementRequired =>
+      'Write something before adding it to the dispute.';
+
+  @override
+  String get errorDisputeEvidenceFailed =>
+      'One of the files did not upload. Try attaching it again.';
+
+  @override
+  String get errorPaymentRefused =>
+      'That payment was refused. Try a different card.';
+
+  @override
+  String get reputationGroupTitle => 'Your standing';
+
+  @override
+  String get reputationTitle => 'How offices see you';
+
+  @override
+  String get reputationIntro =>
+      'When you ask an office for a car, this is what Khadra tells them about you. Nothing else — no contact details, no documents, and nothing about which office you rented from.';
+
+  @override
+  String get reputationNoHistoryTitle => 'Nothing on your record yet';
+
+  @override
+  String get reputationNoHistoryBody =>
+      'You have not finished a rental on Khadra, and nothing has been recorded against you. Offices see only how long you have had an account.';
+
+  @override
+  String get reputationRatingLabel => 'Your rating from offices';
+
+  @override
+  String reputationRatingCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'From $count offices',
+      one: 'From 1 office',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reputationNotRatedYet =>
+      'No office has rated you yet. An office can only rate you after a rental is finished, and their rating stays hidden until yours of them is published too.';
+
+  @override
+  String get reputationRecordTitle => 'Your record';
+
+  @override
+  String get reputationCompletedRentals => 'Rentals finished';
+
+  @override
+  String get reputationNoShows => 'Times a car was not collected';
+
+  @override
+  String get reputationLateCancellations =>
+      'Cancellations with a penalty assessed';
+
+  @override
+  String get reputationDisputesLost => 'Disputes settled against you';
+
+  @override
+  String get reputationDisagreeTitle => 'Something here is wrong?';
+
+  @override
+  String get reputationDisagreeBody =>
+      'Each of these came from one booking. Open the booking it belongs to, and if the settlement window is still open you can dispute it there.';
+
+  @override
+  String get reputationSeeBookings => 'See finished bookings';
+
+  @override
+  String get reputationWhoSeesThis =>
+      'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.';
+
+  @override
+  String get landingDepositDue => 'Your deposit is due';
+
+  @override
+  String get landingRentalInProgress => 'Your rental is under way';
+
+  @override
+  String get landingUpcomingRental => 'Your next rental';
+
+  @override
+  String get landingAwaitingOffice => 'Waiting on the rental office';
+
+  @override
+  String get shortlistTitle => 'Saved cars';
+
+  @override
+  String get shortlistSave => 'Save this car';
+
+  @override
+  String get shortlistRemove => 'Remove from saved';
+
+  @override
+  String get shortlistEmptyTitle => 'Nothing saved yet';
+
+  @override
+  String get shortlistEmptyBody =>
+      'Tap the heart on a car to keep it here while you compare.';
+
+  @override
+  String get shortlistUnavailable => 'Currently unavailable';
+
+  @override
+  String shortlistSavedOn(String date) {
+    return 'Saved on $date';
+  }
+
+  @override
+  String get errorShortlistFull =>
+      'Your saved list is full. Remove a car before saving another.';
+
+  @override
+  String get errorShortlistVehicleNotFound =>
+      'That car is no longer listed, so it cannot be saved.';
 }

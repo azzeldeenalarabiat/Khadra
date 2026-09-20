@@ -4,6 +4,7 @@ using Khadra.Application.Dealers;
 using Khadra.Application.Dealers.UpdateProfile;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
+using Khadra.Domain.PlatformSettings;
 using Khadra.Domain.PlatformSettings.Repositories;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Tests.Support;
@@ -61,17 +62,51 @@ public sealed class DealerProfileTests
         new("Saturday", saturdayClosed, null, null),
     ];
 
+    /// <summary>
+    /// A save that states the location the office already has — what the form sends when the owner
+    /// changed something else. Every save states one: see <see cref="UpdateDealerProfileCommand"/>.
+    /// </summary>
+    private static UpdateDealerProfileCommand KeepingLocation(
+        Dealer dealer, Id asUser, string businessName, IReadOnlyList<DayScheduleInput> hours) =>
+        new(asUser, businessName, 31.95, 35.91, hours, dealer.CityId, dealer.Address?.Area, dealer.Address?.Street);
+
+    /// <summary>The same office, filed under a city and an address, as submission would have left it.</summary>
+    private static Dealer FiledUnder(Dealer dealer, Id cityId)
+    {
+        Assert.True(dealer.UpdateProfile(
+            dealer.BusinessName,
+            dealer.Location,
+            dealer.OperatingHours,
+            cityId,
+            DealerAddress.Create("Abdoun", "Zahran Street").Value).IsSuccess);
+        return dealer;
+    }
+
+    private static City OfferedCity(string name = "Amman") =>
+        City.Create(name, "عمّان", 1, Build.Now).Value;
+
+    private static City RetiredCity(string name = "Zarqa")
+    {
+        var city = City.Create(name, "الزرقاء", 2, Build.Now).Value;
+        Assert.True(city.Deactivate().IsSuccess);
+        return city;
+    }
+
     [Fact]
-    public async Task The_owner_updates_description_pin_and_seven_day_hours()
+    public async Task The_owner_updates_pin_and_seven_day_hours_and_the_location_and_About_text_are_left_alone()
     {
         var context = new Context();
-        var dealer = context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
+        var cityId = Id.New();
+        var dealer = context.Given(FiledUnder(Build.ApprovedDealer(ownerUserId: OwnerId), cityId));
+        // Written on the customer page, which is its one writer now.
+        Assert.True(dealer.UpdatePublicProfile("Family-run since 2014.", PublicProfile.Empty()).IsSuccess);
 
         var result = await context.Handlers().Handle(
-            new UpdateDealerProfileCommand(OwnerId, dealer.BusinessName.Value, "Family-run since 2014.", 31.95, 35.91, Week()),
+            KeepingLocation(dealer, OwnerId, dealer.BusinessName.Value, Week()),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        // This form no longer carries it, so saving the form cannot overwrite it.
         Assert.Equal("Family-run since 2014.", dealer.Description);
         Assert.Equal(31.95, dealer.Location.Latitude, 4);
         Assert.True(dealer.OperatingHours.For(DayOfWeek.Saturday).IsClosed);
@@ -79,6 +114,127 @@ public sealed class DealerProfileTests
         Assert.Equal(7, result.Value.OperatingHours.Count);
         Assert.Equal("14:00", result.Value.OperatingHours.Single(day => day.Day == "Friday").OpensAt);
         Assert.True(result.Value.IsOwner);
+        // What this test used to leave unasserted, and what every save used to erase.
+        Assert.Equal(cityId, dealer.CityId);
+        Assert.Equal("Abdoun", dealer.Address?.Area);
+        Assert.Equal("Zahran Street", dealer.Address?.Street);
+        Assert.Equal(cityId.Value, result.Value.CityId);
+        Assert.Equal("Abdoun", result.Value.Address?.Area);
+        Assert.Equal("Zahran Street", result.Value.Address?.Street);
+    }
+
+    [Fact]
+    public async Task An_office_keeps_a_city_that_has_since_been_retired_without_the_lookup_being_asked()
+    {
+        // Retiring a city must not stop an office filed under it from saving its hours, nor force it
+        // to move to save anything at all. The id is unchanged, so the lookup is not consulted.
+        var context = new Context();
+        var retired = RetiredCity();
+        context.Cities.GetByIdAsync(retired.Id, Arg.Any<CancellationToken>()).Returns(retired);
+        var dealer = context.Given(FiledUnder(Build.ApprovedDealer(ownerUserId: OwnerId), retired.Id));
+
+        var result = await context.Handlers().Handle(
+            KeepingLocation(dealer, OwnerId, dealer.BusinessName.Value, Week(fridayOpens: "15:00")),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Equal(retired.Id, dealer.CityId);
+        Assert.Equal(new TimeOnly(15, 0), dealer.OperatingHours.For(DayOfWeek.Friday).OpensAt);
+        await context.Cities.DidNotReceive().GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Moving_to_an_offered_city_is_accepted_and_checked_against_the_lookup()
+    {
+        var context = new Context();
+        var offered = OfferedCity();
+        context.Cities.GetByIdAsync(offered.Id, Arg.Any<CancellationToken>()).Returns(offered);
+        var dealer = context.Given(FiledUnder(Build.ApprovedDealer(ownerUserId: OwnerId), Id.New()));
+
+        var result = await context.Handlers().Handle(
+            new UpdateDealerProfileCommand(
+                OwnerId, dealer.BusinessName.Value, 31.95, 35.91, Week(), offered.Id, "Sweifieh", null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Equal(offered.Id, dealer.CityId);
+        Assert.Equal("Sweifieh", dealer.Address?.Area);
+        Assert.Null(dealer.Address?.Street);
+        await context.Cities.Received(1).GetByIdAsync(offered.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Moving_to_a_retired_city_or_one_that_does_not_exist_is_refused_and_nothing_moves()
+    {
+        var context = new Context();
+        var retired = RetiredCity();
+        var nowhere = Id.New();
+        context.Cities.GetByIdAsync(retired.Id, Arg.Any<CancellationToken>()).Returns(retired);
+        context.Cities.GetByIdAsync(nowhere, Arg.Any<CancellationToken>()).Returns((City?)null);
+        var home = Id.New();
+        var dealer = context.Given(FiledUnder(Build.ApprovedDealer(ownerUserId: OwnerId), home));
+
+        var toRetired = await context.Handlers().Handle(
+            new UpdateDealerProfileCommand(
+                OwnerId, dealer.BusinessName.Value, 31.95, 35.91, Week(), retired.Id, "Abdoun", "Zahran Street"),
+            CancellationToken.None);
+        var toNowhere = await context.Handlers().Handle(
+            new UpdateDealerProfileCommand(
+                OwnerId, dealer.BusinessName.Value, 31.95, 35.91, Week(), nowhere, "Abdoun", "Zahran Street"),
+            CancellationToken.None);
+
+        Assert.Equal("dealer.unknown_city", toRetired.Error.Code);
+        Assert.Equal("dealer.unknown_city", toNowhere.Error.Code);
+        Assert.Equal(home, dealer.CityId);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_address_is_refused_rather_than_cut_when_it_runs_past_its_limits()
+    {
+        var context = new Context();
+        var dealer = context.Given(FiledUnder(Build.ApprovedDealer(ownerUserId: OwnerId), Id.New()));
+
+        async Task<string?> Saving(string? area, string? street) =>
+            (await context.Handlers().Handle(
+                new UpdateDealerProfileCommand(
+                    OwnerId, dealer.BusinessName.Value, 31.95, 35.91, Week(), dealer.CityId, area, street),
+                CancellationToken.None)) is { IsFailure: true } failed ? failed.Error.Code : null;
+
+        Assert.Equal("dealer.address_area_too_long", await Saving(new string('a', DealerAddress.AreaMaxLength + 1), null));
+        Assert.Equal("dealer.address_street_too_long", await Saving("Abdoun", new string('s', DealerAddress.StreetMaxLength + 1)));
+        // A street is somewhere only inside an area; many have no name, so the reverse is fine.
+        Assert.Equal("dealer.invalid_address_area", await Saving(null, "Zahran Street"));
+        Assert.Null(await Saving(new string('a', DealerAddress.AreaMaxLength), new string('s', DealerAddress.StreetMaxLength)));
+    }
+
+    [Fact]
+    public async Task Stating_no_address_and_no_city_clears_them()
+    {
+        // The API's rule, unchanged from submission: null is an answer. The console does not offer
+        // "no city" once an office has one, but the contract still means what it says.
+        var context = new Context();
+        var dealer = context.Given(FiledUnder(Build.ApprovedDealer(ownerUserId: OwnerId), Id.New()));
+
+        var result = await context.Handlers().Handle(
+            new UpdateDealerProfileCommand(OwnerId, dealer.BusinessName.Value, 31.95, 35.91, Week(), null, null, null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Null(dealer.CityId);
+        Assert.Null(dealer.Address);
+    }
+
+    [Fact]
+    public void The_validator_holds_the_address_to_the_same_limits_as_the_domain()
+    {
+        var validator = new UpdateDealerProfileCommandValidator();
+        UpdateDealerProfileCommand With(string? area, string? street) =>
+            new(OwnerId, "Petra Rentals", 31.95, 35.91, Week(), Id.New(), area, street);
+
+        Assert.False(validator.Validate(With(new string('a', DealerAddress.AreaMaxLength + 1), null)).IsValid);
+        Assert.False(validator.Validate(With("Abdoun", new string('s', DealerAddress.StreetMaxLength + 1))).IsValid);
+        Assert.True(validator.Validate(With(new string('a', DealerAddress.AreaMaxLength), new string('s', DealerAddress.StreetMaxLength))).IsValid);
     }
 
     [Fact]
@@ -88,13 +244,13 @@ public sealed class DealerProfileTests
         var approved = context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
 
         var renamed = await context.Handlers().Handle(
-            new UpdateDealerProfileCommand(OwnerId, "Al-Nadeem Premium Rentals", null, 31.95, 35.91, Week()),
+            KeepingLocation(approved, OwnerId, "Al-Nadeem Premium Rentals", Week()),
             CancellationToken.None);
         Assert.Equal("dealer.business_name_locked", renamed.Error.Code);
 
         var applicant = context.Given(Build.Dealer(ownerUserId: OwnerId));
         var fixedUp = await context.Handlers().Handle(
-            new UpdateDealerProfileCommand(OwnerId, "Al-Nadeem Rentals (corrected)", null, 31.95, 35.91, Week()),
+            KeepingLocation(applicant, OwnerId, "Al-Nadeem Rentals (corrected)", Week()),
             CancellationToken.None);
         Assert.True(fixedUp.IsSuccess, fixedUp.IsFailure ? fixedUp.Error.Code : null);
         Assert.Equal("Al-Nadeem Rentals (corrected)", applicant.BusinessName.Value);
@@ -107,7 +263,7 @@ public sealed class DealerProfileTests
         var dealer = context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
 
         var result = await context.Handlers().Handle(
-            new UpdateDealerProfileCommand(OwnerId, dealer.BusinessName.Value, null, 31.95, 35.91, Week(fridayOpens: "22:00")),
+            KeepingLocation(dealer, OwnerId, dealer.BusinessName.Value, Week(fridayOpens: "22:00")),
             CancellationToken.None);
 
         Assert.Equal("dealer.invalid_operating_hours", result.Error.Code);
@@ -180,10 +336,9 @@ public sealed class DealerProfileTests
         context.Dealers.GetByStaffUserIdAsync(staffId, Arg.Any<CancellationToken>()).Returns(dealer);
 
         var result = await context.Handlers().Handle(
-            new UpdateDealerProfileCommand(staffId, dealer.BusinessName.Value, "Mine now.", 31.95, 35.91, Week()),
+            KeepingLocation(dealer, staffId, dealer.BusinessName.Value, Week()),
             CancellationToken.None);
 
         Assert.Equal("dealer.owner_only", result.Error.Code);
-        Assert.NotEqual("Mine now.", dealer.Description);
     }
 }

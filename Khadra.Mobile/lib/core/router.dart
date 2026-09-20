@@ -20,17 +20,21 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/profile/edit_profile_screen.dart';
 import '../features/profile/change_password_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/profile/reputation_screen.dart';
 import '../features/profile/sessions_screen.dart';
 import '../features/reviews/leave_review_screen.dart';
 import '../features/reviews/reviews_screen.dart';
 import '../features/shell/app_shell.dart';
+import '../features/shortlist/shortlist_screen.dart';
 import '../features/shell/splash_screen.dart';
+import '../features/shell/welcome_screen.dart';
 import 'providers.dart';
 import 'session/session_controller.dart';
 
 /// Route paths, named once so nothing types a URL twice.
 abstract final class Routes {
   static const splash = '/';
+  static const welcome = '/welcome';
   static const search = '/search';
   static const bookings = '/bookings';
   static const notifications = '/notifications';
@@ -46,6 +50,8 @@ abstract final class Routes {
   static const editProfile = '/profile/edit';
   static const changePassword = '/profile/password';
   static const sessions = '/profile/sessions';
+  static const reputation = '/profile/reputation';
+  static const shortlist = '/profile/saved';
 
   static String vehicle(String id) => '/vehicle/$id';
   static String gallery(String id) => '/gallery/$id';
@@ -56,6 +62,18 @@ abstract final class Routes {
   static String openDispute(String bookingId) => '/bookings/$bookingId/dispute/new';
   static String dispute(String ticketId) => '/disputes/$ticketId';
 }
+
+/// [path] with the destination the customer was heading for attached, or the bare
+/// path when there is none.
+///
+/// Five screens hand a destination on to a sixth — Get Started to both forms, the
+/// account panel and sign-in to registration, sign-in and registration through
+/// verification — and each of them wrote the same `Uri(...)` by hand. One of them
+/// wrote it slightly differently, which is how `next` came to be dropped between
+/// the panel and the form.
+String routeWithNext(String path, String? next) => next == null
+    ? path
+    : Uri(path: path, queryParameters: {'next': next}).toString();
 
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = _SessionRefreshNotifier(ref);
@@ -83,6 +101,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         Routes.editProfile,
         Routes.changePassword,
         Routes.sessions,
+        Routes.reputation,
+        Routes.shortlist,
       };
 
       final needsAccount = guarded.contains(location) ||
@@ -106,8 +126,33 @@ final routerProvider = Provider<GoRouter>((ref) {
                 .toString();
       }
 
+      // The one place the Get Started gate is consulted: the app's own entry
+      // point, at the moment of launch.
+      //
+      // NOT a global redirect, and that is the whole design. Public routes above
+      // render before the session resolves precisely so a deep link survives a
+      // cold start; a gate across every route would take that back, and opening
+      // `/verify-email?token=…` from an email would land on a welcome screen with
+      // the verification unconsumed. A launch decision is not a wall.
+      //
+      // One bypass, stated rather than discovered: on the WEB the browser's URL is
+      // the initial location, so a typed or bookmarked `/search` never passes
+      // through here. That is the browser's flow, and it is allowed to be.
       if (location == Routes.splash) {
-        return state.uri.queryParameters['next'] ?? Routes.search;
+        final next = state.uri.queryParameters['next'];
+
+        // Signed in, or having already said how they want to use the app: straight
+        // on. This is what makes a returning customer's launch land on Home.
+        if (session.isSignedIn || ref.read(entryChoiceProvider)) {
+          return next ?? Routes.search;
+        }
+
+        // A fresh install, app data cleared, or a sign-out. The destination travels
+        // so a first launch from a link does not lose where it was going.
+        return next == null
+            ? Routes.welcome
+            : Uri(path: Routes.welcome, queryParameters: {'next': next})
+                .toString();
       }
 
       if (needsAccount && !session.isSignedIn) {
@@ -117,10 +162,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             .toString();
       }
 
-      // Somebody already signed in has no business on the sign-in screen; deep
-      // links and the back button both reach it otherwise.
+      // Somebody already signed in has no business on the sign-in screen, or on the
+      // one that offers to browse as a guest; deep links and the back button both
+      // reach all three otherwise.
       if (session.isSignedIn &&
-          (location == Routes.signIn || location == Routes.register)) {
+          (location == Routes.signIn ||
+              location == Routes.register ||
+              location == Routes.welcome)) {
         return Routes.search;
       }
 
@@ -128,13 +176,22 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: Routes.splash, builder: (_, __) => const SplashScreen()),
+      GoRoute(
+        path: Routes.welcome,
+        builder: (_, state) =>
+            WelcomeScreen(next: state.uri.queryParameters['next']),
+      ),
 
       GoRoute(
         path: Routes.signIn,
         builder: (_, state) =>
             SignInScreen(next: state.uri.queryParameters['next']),
       ),
-      GoRoute(path: Routes.register, builder: (_, __) => const RegisterScreen()),
+      GoRoute(
+        path: Routes.register,
+        builder: (_, state) =>
+            RegisterScreen(next: state.uri.queryParameters['next']),
+      ),
       GoRoute(
         path: Routes.forgotPassword,
         builder: (_, __) => const ForgotPasswordScreen(),
@@ -149,6 +206,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => VerifyEmailScreen(
           token: state.uri.queryParameters['token'],
           email: state.uri.queryParameters['email'],
+          // Registration sets this when the server accepted the account but
+          // could NOT send the verification email. Dropping it here left the
+          // screen telling somebody to watch an inbox nothing was sent to.
+          undelivered: state.uri.queryParameters['undelivered'] == '1',
+          next: state.uri.queryParameters['next'],
         ),
       ),
 
@@ -228,6 +290,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const ChangePasswordScreen(),
       ),
       GoRoute(path: Routes.sessions, builder: (_, __) => const SessionsScreen()),
+      GoRoute(
+        path: Routes.reputation,
+        builder: (_, __) => const ReputationScreen(),
+      ),
+      GoRoute(
+        path: Routes.shortlist,
+        builder: (_, __) => const ShortlistScreen(),
+      ),
     ],
   );
 });

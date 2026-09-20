@@ -32,7 +32,7 @@ public sealed class EmailDeliveryReportingTests
     {
         var sender = Substitute.For<IEmailSender>();
         sender.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new InvalidOperationException("The mail server refused the message."));
+            .Returns<Task<EmailSendReceipt>>(_ => throw new InvalidOperationException("The mail server refused the message."));
         return sender;
     }
 
@@ -46,6 +46,49 @@ public sealed class EmailDeliveryReportingTests
 
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.VerificationEmailSent);
+    }
+
+    /// <summary>
+    /// The registration-timeout fix, pinned. Nothing pinned it before.
+    /// </summary>
+    /// <remarks>
+    /// A phone gave up on a slow registration: its receive timeout fired, the connection closed, ASP.NET
+    /// cancelled the request, and that token reached the mail transport mid-send. The account was
+    /// committed, the customer was told registration failed, and the verification email never went.
+    /// <c>AccountRegistrar</c> now sends with a token nothing can cancel — but every other registration
+    /// test passes <c>CancellationToken.None</c>, so none of them would notice the request's token being
+    /// put back.
+    /// </remarks>
+    [Fact]
+    public async Task A_phone_giving_up_after_the_account_is_committed_does_not_cancel_its_verification_email()
+    {
+        using var request = new CancellationTokenSource();
+        var context = new AuthHandlerTestContext();
+        // The worst moment for the phone to give up: the account has just been committed.
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                request.Cancel();
+                return Task.FromResult(1);
+            });
+        var sendTokenCouldBeCancelled = true;
+        context.EmailSender.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var token = call.Arg<CancellationToken>();
+                sendTokenCouldBeCancelled = token.CanBeCanceled;
+                // What MailKit and HttpClient do with a cancelled token: abandon the send.
+                token.ThrowIfCancellationRequested();
+                return Task.FromResult(TestEmail.Accepted());
+            });
+
+        var result = await new RegisterDealerOwnerHandler(context.Registrar).Handle(Command(), request.Token);
+
+        Assert.True(request.IsCancellationRequested);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.VerificationEmailSent);
+        await context.EmailSender.Received(1).SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>());
+        Assert.False(sendTokenCouldBeCancelled);
     }
 
     [Fact]

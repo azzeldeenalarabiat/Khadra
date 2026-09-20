@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../api/dtos.dart';
 import '../../api/khadra_api.dart';
 import '../api/api_failure.dart';
+import '../uploads/document_viewer.dart';
 import 'session_store.dart';
 
 /// Who is using the app, if anyone.
@@ -94,10 +95,21 @@ class SessionController extends StateNotifier<SessionState> {
   }
 
   Future<void> _restore() async {
-    await _store.clearIfReinstalled();
+    await _store.discardDisownedTokens();
 
-    final token = await _store.readRefreshToken();
-    if (token == null) {
+    final stored = await _store.readRefreshTokenOutcome();
+    if (stored.token == null) {
+      // The claim can outlive the token -- see `SessionStore.disownSession`. Drop
+      // it so the marker and the store agree, rather than promising a session on
+      // every launch that nothing can deliver.
+      //
+      // Only on a DEFINITE absence. A store that timed out or threw has said
+      // nothing about whether a token is there, and treating that as "gone" would
+      // discard a valid session over one slow answer -- permanently, because the
+      // next launch deletes what it no longer owns. A locked keystore is exactly
+      // this, and it unlocks a moment later. Same rule as `refresh` below: only a
+      // verdict ends a session.
+      if (stored.answered) await _store.disownSession();
       state = const SessionState(status: SessionStatus.signedOut);
       return;
     }
@@ -182,6 +194,8 @@ class SessionController extends StateNotifier<SessionState> {
     }
 
     await _store.clear();
+    // Best-effort and deliberately not awaited; see _end below.
+    DocumentViewer.discard();
     state = const SessionState(status: SessionStatus.signedOut);
   }
 
@@ -214,6 +228,32 @@ class SessionController extends StateNotifier<SessionState> {
 
   Future<void> _end(SessionEndReason reason) async {
     await _store.clear();
+    // A licence fetched while signed in must not still be in the cache for
+    // whoever signs in next on the same phone. Clearing the token without
+    // clearing what the token was used to fetch would leave the document behind.
+    //
+    // NOT awaited. The session has to end whether or not the cache can be
+    // reached: getTemporaryDirectory goes through a platform channel, and a
+    // channel that never answers would leave somebody pressing Sign out on a
+    // screen that stays signed in. The call swallows its own failures.
+    DocumentViewer.discard();
+
+    // A session that has already ended cannot end again, and must not acquire a
+    // REASON for it on the way past. The clearing above still runs — arriving here
+    // twice is not a reason to leave a token behind — but the state does not move.
+    //
+    // Signing out clears the tokens, and every authenticated request already in
+    // flight then comes back 401: the alerts badge polls on a one-minute loop and
+    // the bookings list is usually mid-fetch. `AuthInterceptor.onError` finds no
+    // refresh token, calls `endSession`, and this line used to overwrite a clean
+    // sign-out with `expired` — so the customer who had just tapped Sign out was
+    // told on the next screen that their session had run out. A guest who touched
+    // an authenticated endpoint was accused of the same thing, having never had a
+    // session at all.
+    //
+    // `unknown` still ends, so the cold-start path is untouched.
+    if (state.status == SessionStatus.signedOut) return;
+
     state = SessionState(status: SessionStatus.signedOut, endedReason: reason);
   }
 }

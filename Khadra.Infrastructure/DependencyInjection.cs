@@ -8,6 +8,7 @@ using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.Reviews.ReadModels;
+using Khadra.Application.Shortlist.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Auditing.Repositories;
@@ -19,6 +20,7 @@ using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
 using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Reviews.Repositories;
+using Khadra.Domain.Shortlist.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Geocoding;
@@ -134,9 +136,19 @@ public static class DependencyInjection
             // Not merely present but positive. Zero would mean a car could be booked for one minute
             // from now, and every window on that booking -- the dealer's answer, the customer's
             // payment, free cancellation -- is capped at the rental start, so all three would
-            // collapse while /app-config still advertised a 24-hour payment window.
+            // collapse while the platform was still promising each of them in full.
             .Validate(options => options.MinimumBookingLeadTimeMinutes is > 0,
                 "BusinessRules: MinimumBookingLeadTimeMinutes must be set to a positive number of minutes.")
+            // And STRICTLY longer than the payment window. Since 2026-09-11 a gallery may not
+            // approve unless the customer can still have the whole window to pay, so the gap between
+            // the request and the rental start is what a gallery gets to answer in. Equal values
+            // give it zero: every request made at the minimum lead time would be born unapprovable,
+            // and the customer would be told the office never responded. The difference between
+            // these two numbers IS the decision window, and the owner sets it by moving them.
+            .Validate(
+                options => options.MinimumBookingLeadTimeMinutes > options.PaymentWindowHours * 60,
+                "BusinessRules: MinimumBookingLeadTimeMinutes must be greater than PaymentWindowHours "
+                + "expressed in minutes, or a booking made at the minimum lead time can never be approved.")
             .Validate(options => options.MaxRentalDays is > 0,
                 "BusinessRules: MaxRentalDays must be set to a positive number of days.")
             // Present, not positive: 0 is the owner's to choose and says a gallery is late at the
@@ -150,6 +162,10 @@ public static class DependencyInjection
             // switched off by a typo rather than by a decision.
             .Validate(options => options.ReviewWindowDays is > 0,
                 "BusinessRules: ReviewWindowDays must be set to a positive number of days.")
+            // Positive: the provider dereferences it with `!`, and a zero would be a shortlist
+            // that refuses every save while naming its own limit as nought.
+            .Validate(options => options.MaxShortlistEntries is > 0,
+                "BusinessRules: MaxShortlistEntries must be set to a positive number of cars.")
             .ValidateOnStart();
         services.AddOptions<PaymentOptions>()
             .Bind(configuration.GetSection(PaymentOptions.SectionName))
@@ -201,6 +217,7 @@ public static class DependencyInjection
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();
+        services.AddScoped<IShortlistRepository, ShortlistRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IProviderEventReceiptRepository, ProviderEventReceiptRepository>();
         services.AddScoped<INotifier, Notifier>();
@@ -231,6 +248,7 @@ public static class DependencyInjection
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddScoped<IGalleryReviewReader, GalleryReviewReader>();
+        services.AddScoped<IShortlistReader, ShortlistReader>();
         services.AddScoped<ICustomerReputationReader, CustomerReputationReader>();
         // The dashboard glance and the audit screen read one table with different questions: a fixed
         // seven-row feed, and a filtered, paged log. Two readers, deliberately.
@@ -465,7 +483,10 @@ public static class DependencyInjection
                 client.BaseAddress = new Uri("https://api.resend.com/");
                 // A registration waits on this call, so it fails fast rather than hanging the form.
                 client.Timeout = TimeSpan.FromSeconds(15);
-            });
+            })
+            // Trace-level HttpClient logging — the first thing anybody turns on when mail is not
+            // arriving — prints request headers verbatim, and this one is the API key.
+            .RedactLoggedHeaders(["Authorization"]);
             services.AddSingleton<IEmailSender, ResendEmailSender>();
             services.AddSingleton<IEmailTransportProbe, ResendTransportProbe>();
         }
@@ -479,7 +500,10 @@ public static class DependencyInjection
                 var apiKey = configuration[$"{EmailOptions.SectionName}:ApiKey"];
                 if (!string.IsNullOrWhiteSpace(apiKey))
                     client.DefaultRequestHeaders.Add(BrevoEmailSender.ApiKeyHeader, apiKey);
-            });
+            })
+            // Trace-level HttpClient logging prints request headers verbatim, and Brevo's key travels
+            // in its own header rather than in Authorization.
+            .RedactLoggedHeaders([BrevoEmailSender.ApiKeyHeader]);
             services.AddSingleton<IEmailSender, BrevoEmailSender>();
             services.AddSingleton<IEmailTransportProbe, BrevoTransportProbe>();
         }
@@ -514,5 +538,6 @@ public static class DependencyInjection
         }
 
         services.AddSingleton<IAuthEmailComposer, AuthEmailComposer>();
+        services.AddSingleton<IBookingEmailComposer, BookingEmailComposer>();
     }
 }

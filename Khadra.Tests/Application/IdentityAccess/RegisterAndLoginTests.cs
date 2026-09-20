@@ -86,7 +86,7 @@ public sealed class RegisterCustomerHandlerTests
     {
         var context = new AuthHandlerTestContext();
         context.EmailSender.SendAsync(Arg.Any<Khadra.Application.Common.Ports.EmailMessage>(), Arg.Any<CancellationToken>())
-            .Returns(_ => throw new InvalidOperationException("smtp down"));
+            .Returns<Task<Khadra.Application.Common.Ports.EmailSendReceipt>>(_ => throw new InvalidOperationException("smtp down"));
 
         var result = await Handler(context).Handle(ValidCommand(), CancellationToken.None);
 

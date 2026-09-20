@@ -39,6 +39,73 @@ JWT claims: `sub`, `email`, `name`, `role`, `email_verified`, `khadra:security_s
 
 **Change password** (authenticated) → verifies the current password, revokes all sessions, returns a fresh token pair.
 
+## The customer app's entry flow
+
+Three states decide what a launch shows, and they are deliberately kept apart.
+
+**Is there a session?** `SessionStatus` — `unknown` while the cold-start rotation is
+in flight, then `signedOut` or `signedIn`. About credentials and nothing else.
+
+**Has this device said how it wants to be used?** A device-local flag in ordinary
+preferences, `khadra.entry_chosen`, owned by `EntryChoice` in `lib/core/providers.dart`.
+Set by Get Started's *Browse as a guest*, and by a successful sign-in or
+registration. Cleared by a deliberate sign-out and by nothing else — an expiry or a
+suspension is not a choice, and that customer has long since made theirs. It is in
+preferences rather than the secure store because "the app's data was cleared" is
+exactly what must bring Get Started back, and because iOS keeps Keychain items when
+an app is deleted.
+
+**Are these tokens ours?** `khadra.session_owned`, in preferences, read by
+`SessionStore.sessionIsOwned`. See below.
+
+The flag is consulted at ONE place: `/`, the app's entry point, inside the router's
+redirect. Never globally — public routes render before the session resolves precisely
+so that `/verify-email?token=…` survives a cold start, and a gate across every route
+would land that on a welcome screen with the link unspent. A destination parked on
+`/?next=…` travels onto `/welcome` and from there onto the sign-in form. One known
+bypass, accepted: on the web the browser's URL is the initial location, so a typed
+`/search` never passes through `/`.
+
+Signing out goes to `/welcome`, not to the catalogue: somebody signing out is leaving
+the device or switching accounts, and Get Started's *Sign in* is the switch-account
+path.
+
+### Ownership: why a sign-out sticks
+
+Every secure-store call in `SessionStore` is bounded at five seconds and swallows its
+own failure, because a store that never answers must not leave a customer on a splash
+screen for ever. The cost is that `clear()` can report success having deleted nothing
+— and a cold start would then rotate a live refresh token and sign somebody back into
+the account they had just left. Requirement: *after logout the app must not restore a
+stale session.*
+
+`khadra.session_owned` closes it, written where failures are visible and ordered so
+every crash window fails safe:
+
+- `saveRefreshToken` sets it **after** the token is written. A crash between the two
+  leaves a valid token nobody will read — one extra sign-in.
+- `clear()` removes it **before** deleting anything. A crash, failure or timeout
+  leaves an orphan nobody will read — no cost at all.
+- `readRefreshToken` / `readRefreshExpiry` return null when it is absent, without
+  touching the store.
+- `discardDisownedTokens()` at startup deletes what the app does not own, because on
+  an iOS reinstall that entry is somebody else's credential on a device that may have
+  changed hands.
+- `disownSession()` covers the opposite drift: Android Auto Backup restores
+  preferences to a new device while the Keystore key does not travel, so the marker
+  can outlive the token it claims. It fires **only on a definite absence** —
+  `readRefreshTokenOutcome()` reports whether the store answered at all, because a
+  timeout or a locked keystore reads as null everywhere else and giving up the claim
+  on one of those would be permanent: the next launch deletes what this install no
+  longer owns. Same rule as `refresh()`: only a verdict ends a session.
+
+A device with **no preferences at all** is a different answer from one whose marker is
+absent: it cannot tell, so it trusts the secure store. Answering "not ours" there
+would mean no session ever survived a cold start.
+
+This replaced `khadra.install_marker`, which answered only the reinstall half. One
+marker, one meaning. Covered by `test/session_store_test.dart`.
+
 ## BFF session
 
 1. `GET /bff/antiforgery` → antiforgery cookie + `XSRF-TOKEN` cookie; Angular sends the value in `X-XSRF-TOKEN` on every mutation.

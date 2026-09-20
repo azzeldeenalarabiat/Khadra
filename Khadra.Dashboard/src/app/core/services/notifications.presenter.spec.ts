@@ -7,9 +7,7 @@ import { resolveMessage } from '../i18n/resolve';
 import { Translate } from './dashboard.presenter';
 
 /** Resolves real English, so these assertions still read as the words an admin sees. */
-const t: Translate = (key, params) =>
-  resolveMessage(EN[key], params, 'en-GB', false) ?? key;
-
+const t: Translate = (key, params) => resolveMessage(EN[key], params, 'en-GB', false) ?? key;
 
 const NOW = Date.parse('2026-09-05T12:00:00Z');
 
@@ -62,7 +60,11 @@ describe('toAdminNotifications', () => {
 
   /** An overdue row has to look different from one merely approaching its deadline. */
   it('carries the severity through as the row tone', () => {
-    const [late] = toAdminNotifications(queue(item({ isOverdue: true, severity: 'Overdue' })), NOW, t);
+    const [late] = toAdminNotifications(
+      queue(item({ isOverdue: true, severity: 'Overdue' })),
+      NOW,
+      t,
+    );
     const [soon] = toAdminNotifications(
       queue(item({ isOverdue: false, severity: 'Warning', slaDeadlineAt: '2026-09-06T12:00:00Z' })),
       NOW,
@@ -124,12 +126,12 @@ describe('toDealerNotifications', () => {
     }) as DealerDashboard;
 
   it('shows nothing at all before the dashboard has answered', () => {
-    expect(toDealerNotifications(null, NOW, t)).toEqual([]);
+    expect(toDealerNotifications(null, NOW, t, 'en-GB')).toEqual([]);
   });
 
   /** "0 requests waiting" is not news, and a badge of 0 is worse than no badge. */
   it('says nothing when there is nothing waiting', () => {
-    expect(toDealerNotifications(dashboard(), NOW, t)).toEqual([]);
+    expect(toDealerNotifications(dashboard(), NOW, t, 'en-GB')).toEqual([]);
   });
 
   it('puts what is already late above what is merely due', () => {
@@ -147,6 +149,7 @@ describe('toDealerNotifications', () => {
       }),
       NOW,
       t,
+      'en-GB',
     );
 
     expect(rows[0].id).toBe('overdue-returns');
@@ -168,6 +171,7 @@ describe('toDealerNotifications', () => {
       }),
       NOW,
       t,
+      'en-GB',
     );
 
     expect(one[0].title).toBe('1 car is overdue back');
@@ -188,9 +192,10 @@ describe('toDealerNotifications', () => {
       }),
       NOW,
       t,
+      'en-GB',
     );
 
-    expect(row.detail).toContain('4d');
+    expect(row.detail).toContain('4 days ago');
   });
 
   it('opens the booking a handover is about', () => {
@@ -198,10 +203,36 @@ describe('toDealerNotifications', () => {
       dashboard({ upcomingReturns: [handover({ bookingId: 'b9', reference: 'KH-ZZZ999' })] }),
       NOW,
       t,
+      'en-GB',
     );
 
     expect(rows[0].route).toBe('/dealer/bookings/b9');
     expect(rows[0].detail).toContain('KH-ZZZ999');
+  });
+
+  /** The bug this pins: an upcoming handover read "Just now", because only the past was counted. */
+  it('says when an upcoming handover is, counting forwards', () => {
+    const [row] = toDealerNotifications(
+      dashboard({ upcomingPickups: [handover({ when: '2026-09-05T15:00:00Z' })] }),
+      NOW,
+      t,
+      'en-GB',
+    );
+
+    expect(row.when).toBe('in 3 hr');
+  });
+
+  /** A car or an account that is gone arrives as null, and the row still names what it can. */
+  it('words a vehicle and a customer that no longer resolve', () => {
+    const [row] = toDealerNotifications(
+      dashboard({ upcomingReturns: [handover({ vehicleLabel: null, customerName: null })] }),
+      NOW,
+      t,
+      'en-GB',
+    );
+
+    expect(row.title).toBe('Return — Vehicle no longer listed');
+    expect(row.detail).toBe('Customer account closed · KH-AAA111');
   });
 
   /** A delivery and a self-pickup are different jobs, and the row should not imply otherwise. */
@@ -210,11 +241,13 @@ describe('toDealerNotifications', () => {
       dashboard({ upcomingPickups: [handover({ pickupMethod: 'Delivery' })] }),
       NOW,
       t,
+      'en-GB',
     );
     const [collect] = toDealerNotifications(
       dashboard({ upcomingPickups: [handover({ pickupMethod: 'SelfPickup' })] }),
       NOW,
       t,
+      'en-GB',
     );
 
     expect(delivery.icon).toBe('moped');
@@ -226,6 +259,7 @@ describe('toDealerNotifications', () => {
       dashboard({ upcomingReturns: [handover({ isOverdue: true })] }),
       NOW,
       t,
+      'en-GB',
     );
 
     expect(row.tone).toBe('bad');
@@ -248,6 +282,7 @@ describe('toDealerNotifications', () => {
       }),
       NOW,
       t,
+      'en-GB',
     );
 
     // Two counts collapse to one row each; the five handovers-in-window are listed individually.

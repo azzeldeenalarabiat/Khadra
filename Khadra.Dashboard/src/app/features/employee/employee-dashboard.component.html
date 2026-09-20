@@ -52,7 +52,7 @@
             <kh-icon name="warning-diamond" class="s-bad" />
             <span class="sect-t">{{ t('employeeDashboard.requiresAttention') }}</span>
             @if (attention().length > 0) {
-              <span class="queue-count">{{ attention().length }}</span>
+              <span class="queue-count">{{ formats.number(attention().length) }}</span>
             }
           </div>
           @if (attention().length === 0) {
@@ -114,7 +114,7 @@
               />
               <div class="grow">
                 <div class="act-text">{{ describe(entry) }}</div>
-                <div class="act-ts">{{ ago(entry.occurredAt) }}</div>
+                <div class="act-ts">{{ formats.relative(entry.occurredAt) }}</div>
               </div>
             </div>
           } @empty {

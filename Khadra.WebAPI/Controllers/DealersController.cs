@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using Khadra.Application.Common;
+using Khadra.Application.Dealers.CustomerPage;
 using Khadra.Application.Dealers.Dtos;
 using Khadra.Application.Dealers.GetMyDealer;
 using Khadra.Application.Dealers.ReviewDealer;
@@ -161,7 +163,70 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
         return FromResult(result);
     }
 
+    // ── The customer page (spec 4.1): what the office tells customers in its own words. ──
+
+    public sealed record CustomerPageRequest(
+        [MaxLength(ProfileText.MaxLength)] string? About,
+        [MaxLength(ProfileText.MaxLength)] string? RentalConditions,
+        [MaxLength(ProfileText.MaxLength)] string? Insurance,
+        [MaxLength(ProfileText.MaxLength)] string? PickupInstructions,
+        [MaxLength(ProfileText.MaxLength)] string? DeliveryNotes,
+        [MaxLength(ProfileText.MaxLength)] string? CustomerNotes,
+        IReadOnlyList<string>? HiddenSections);
+
     /// <summary>
+    /// The customer page as the console edits it, with the vocabulary its toggles are built from and
+    /// the server's own preview of what a customer would see.
+    /// </summary>
+    /// <remarks>
+    /// Readable by every member of staff — they answer customers' questions about what is on it —
+    /// while writing it stays owner-only through the PUT below.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.DealerStaff)]
+    [HttpGet("me/public-profile")]
+    [ProducesResponseType<DealerCustomerPageDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> CustomerPage(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new GetDealerCustomerPageQuery(actor.UserId!.Value), cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// Replaces the customer page.
+    /// </summary>
+    /// <remarks>
+    /// The WHOLE page: a section left out of the body is a section cleared, so a console cannot leave
+    /// text on a customer's screen that its owner can no longer see. Not gated on the business being
+    /// able to trade — an applicant prepares the page while waiting, and the public endpoint returns
+    /// nothing for an office that may not trade.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.DealerOwner)]
+    [HttpPut("me/public-profile")]
+    [ProducesResponseType<DealerCustomerPageDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> UpdateCustomerPage(
+        [FromBody] CustomerPageRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(
+            new UpdateDealerCustomerPageCommand(
+                actor.UserId!.Value,
+                request.About,
+                request.RentalConditions,
+                request.Insurance,
+                request.PickupInstructions,
+                request.DeliveryNotes,
+                request.CustomerNotes,
+                request.HiddenSections),
+            cancellationToken);
+        return FromResult(result);
+    }
+
     /// <summary>
     /// The delivery page. Readable by every member of staff (they answer customers' questions about
     /// it); changing it stays owner-only through the PUT below.
@@ -229,7 +294,7 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     }
 
     // ── The dealer page (spec 4.1). Owner-only, but not gated on trading: an applicant sent back
-    // for clarification fixing their description is exactly who needs these. ──
+    // for clarification fixing their details is exactly who needs these. ──
 
     public sealed record DayScheduleRequest(
         [Required, MaxLength(9)] string Day,
@@ -237,12 +302,25 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
         [MaxLength(5)] string? OpensAt,
         [MaxLength(5)] string? ClosesAt);
 
+    // No Description: the About text belongs to the customer page and has one writer. A console that
+    // still sends it here has it ignored rather than saved over the page's copy.
+    //
+    // The location is a full statement on every save, named as the application form names it. Each
+    // of the three must be PRESENT — null is an answer ("no city", "no address"), absence is not.
+    // Without that, a client that did not know about them sent nothing, the command got nulls, and
+    // the save erased the office's city and address: this endpoint did exactly that until the form
+    // and this request learned the fields. `JsonRequired` makes leaving one out a 400 instead.
     public sealed record UpdateProfileRequest(
         [Required, MaxLength(150)] string BusinessName,
-        [MaxLength(2000)] string? Description,
         [Range(-90, 90)] double Latitude,
         [Range(-180, 180)] double Longitude,
-        [Required] IReadOnlyList<DayScheduleRequest> OperatingHours);
+        [Required] IReadOnlyList<DayScheduleRequest> OperatingHours,
+        // Two attribute lists each, deliberately: `JsonRequired` exists only for properties, while
+        // MVC reads a record's validation attributes from its constructor parameter and refuses them
+        // on the property.
+        [property: JsonRequired] Guid? CityId,
+        [property: JsonRequired][StringLength(DealerAddress.AreaMaxLength)] string? AddressArea,
+        [property: JsonRequired][StringLength(DealerAddress.StreetMaxLength)] string? AddressStreet);
 
     public sealed record BrandingUploadRequest([Required, MaxLength(100)] string ContentType);
 
@@ -251,6 +329,7 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
     [Authorize(Policy = SecurityPolicies.DealerOwner)]
     [HttpPut("me/profile")]
     [ProducesResponseType<DealerProfileDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult> UpdateProfile([FromBody] UpdateProfileRequest request, CancellationToken cancellationToken)
     {
@@ -259,10 +338,12 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
             new UpdateDealerProfileCommand(
                 actor.UserId!.Value,
                 request.BusinessName,
-                request.Description,
                 request.Latitude,
                 request.Longitude,
-                [.. request.OperatingHours.Select(day => new DayScheduleInput(day.Day, day.IsClosed, day.OpensAt, day.ClosesAt))]),
+                [.. request.OperatingHours.Select(day => new DayScheduleInput(day.Day, day.IsClosed, day.OpensAt, day.ClosesAt))],
+                request.CityId is null ? null : Id.From(request.CityId.Value),
+                request.AddressArea,
+                request.AddressStreet),
             cancellationToken);
         return FromResult(result);
     }

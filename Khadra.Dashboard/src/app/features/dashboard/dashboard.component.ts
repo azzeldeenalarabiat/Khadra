@@ -20,6 +20,7 @@ import { Tone, toneClass } from '../../core/models/console.models';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { FormatService } from '../../core/i18n/format.service';
 
 /**
  * Landing screen: platform figures, the work queue that drives the admin SLA, and a short activity
@@ -37,6 +38,8 @@ import { I18nService } from '../../core/i18n/i18n.service';
 })
 export class DashboardComponent {
   protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  private readonly formats = inject(FormatService);
   private readonly service = inject(AdminDashboardService);
   private readonly now = signal(Date.now());
 
@@ -90,6 +93,7 @@ export class DashboardComponent {
         disputes: this.disputeCounts(),
       },
       this.t,
+      this.i18n.localeTag(),
     ),
   );
 
@@ -108,16 +112,16 @@ export class DashboardComponent {
 
   protected readonly trend = computed(() => {
     const data = this.trendData();
-    return data ? toTrendBars(data) : [];
+    return data ? toTrendBars(data, this.t, this.i18n.localeTag()) : [];
   });
 
   protected readonly activity = computed(() => {
     const data = this.activityData();
-    return data ? toActivityRows(data.entries, this.now(), this.t) : [];
+    return data ? toActivityRows(data.entries, this.now(), this.t, this.i18n.localeTag()) : [];
   });
 
   protected readonly trendChange = computed(() =>
-    formatChangePercent(this.trendData()?.changePercent ?? null),
+    formatChangePercent(this.trendData()?.changePercent ?? null, this.i18n.localeTag()),
   );
 
   /**
@@ -135,7 +139,17 @@ export class DashboardComponent {
     return null;
   });
 
-  protected readonly trendDays = computed(() => this.trendData()?.points.length ?? 0);
+  /**
+   * The panel's heading, with the window's length once the response has said it. Before then it is
+   * just "Bookings": "last 0 days" would be a figure nobody sent. The length is the server's
+   * (`AdminDashboard:TrendDays`), counted from the points it returned, so the plural follows it.
+   */
+  protected readonly trendHeading = computed(() => {
+    const days = this.trendData()?.points.length ?? 0;
+    return days > 0
+      ? this.t('adminDashboard.bookingsInTheLastDays', { count: days })
+      : this.t('adminDashboard.bookingsTrendHeading');
+  });
 
   /**
    * The number every bar is drawn as a proportion of, so the scale is stated rather than implied.
@@ -146,29 +160,33 @@ export class DashboardComponent {
     return data ? busiestDay(data) : null;
   });
 
-  /** The window the chart covers, taken from the response rather than worked out locally. */
+  /**
+   * The window the chart covers, taken from the response rather than worked out locally. `from` and
+   * `to` are calendar dates (`YYYY-MM-DD`), not instants, so they never pass through a time zone.
+   */
   protected readonly trendRange = computed(() => {
     const data = this.trendData();
     if (!data) return '';
-    return `${this.day(data.from)} – ${this.day(data.to)}`;
+    return this.t('adminDashboard.trendRange', {
+      from: this.formats.calendarDayMonth(data.from),
+      to: this.formats.calendarDayMonth(data.to),
+    });
   });
 
-  private day(iso: string): string {
-    return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-    });
-  }
-
+  /** Two independent counts, each a whole message so each noun agrees with its own number. */
   protected readonly queueSummary = computed(() => {
     const queue = this.queueData();
-    return queue ? `${queue.openCount} open · ${queue.overdueCount} overdue` : '';
+    if (!queue) return '';
+    return [
+      this.t('adminDashboard.queueOpenCount', { count: queue.openCount }),
+      this.t('adminDashboard.queueOverdueCount', { count: queue.overdueCount }),
+    ].join(' · ');
   });
 
   /** The SLA in force today, labelled as such — each row is judged against its own frozen window. */
   protected readonly slaNote = computed(() => {
     const hours = this.queueData()?.slaHours;
-    return hours ? `Current SLA ${hours}h` : '';
+    return hours ? this.t('adminDashboard.currentSlaHours', { count: hours }) : '';
   });
 
   /**
@@ -181,7 +199,10 @@ export class DashboardComponent {
   protected readonly failure = computed(() => {
     const status = (this.dealers.error() as { status?: number } | undefined)?.status ?? 0;
     if (status === 401) {
-      return { title: this.t('adminDashboard.yourSessionHasExpired'), body: this.t('adminDashboard.signInAgainTo') };
+      return {
+        title: this.t('adminDashboard.yourSessionHasExpired'),
+        body: this.t('adminDashboard.signInAgainTo'),
+      };
     }
     if (status === 403) {
       return {

@@ -4,6 +4,7 @@ import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { FormatService } from '../../core/i18n/format.service';
+import { snapshotProblem } from '../../core/i18n/problem';
 
 interface OwnerOnlyRow {
   readonly label: string;
@@ -34,6 +35,7 @@ interface OwnerOnlyRow {
 })
 export class EmployeeBusinessComponent {
   protected readonly t = inject(I18nService).t;
+  protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly service = inject(DealerConsoleService);
   protected readonly fmt = inject(FormatService);
 
@@ -43,12 +45,11 @@ export class EmployeeBusinessComponent {
   protected readonly dealer = computed(() => this.data() ?? null);
 
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as
-      { status?: number; error?: { code?: string } } | undefined;
+    const error = this.resource.error();
     if (!error) return null;
-    if (error.error?.code === 'dealer.not_registered')
+    if (snapshotProblem(error).code === 'dealer.not_registered')
       return this.t('employeeDash.thisAccountIsNot');
-    return "Your dealership's details could not be loaded. Nothing has been changed.";
+    return this.t('employeeBusiness.detailsCouldNotBeLoaded');
   });
 
   /** The days, in the week's order, as the server sent them. */
@@ -65,18 +66,31 @@ export class EmployeeBusinessComponent {
     const d = this.dealer();
     if (!d) return [];
 
+    const km = this.fmt.number(d.delivery.radiusKm);
     const delivery = d.delivery.isEnabled
       ? d.delivery.fee
-        ? `${d.delivery.radiusKm} km · ${d.delivery.fee.amount} ${d.delivery.fee.currency}`
-        : `${d.delivery.radiusKm} km`
+        ? this.t('employeeBusiness.radiusAndFee', {
+            km,
+            fee: this.fmt.money(d.delivery.fee.amount, d.delivery.fee.currency),
+          })
+        : this.t('dealerDelivery.distanceKm', { km })
       : this.t('vehicleWizard.notOffered');
 
     return [
       { label: this.t('dealerProfile.commercialRegistration'), value: d.commercialRegistrationNumber },
-      { label: this.t('employeeBusiness.verificationStatus'), value: d.verificationStatus },
+      {
+        label: this.t('employeeBusiness.verificationStatus'),
+        value: this.statusLabel(d.verificationStatus),
+      },
       { label: this.t('common.delivery'), value: delivery },
-      { label: this.t('employeeBusiness.businessNameAndLocation'), value: 'Owner-maintained' },
-      { label: this.t('employeeBusiness.staffAndPermissions'), value: 'Owner-maintained' },
+      {
+        label: this.t('employeeBusiness.businessNameAndLocation'),
+        value: this.t('employeeBusiness.ownerMaintained'),
+      },
+      {
+        label: this.t('employeeBusiness.staffAndPermissions'),
+        value: this.t('employeeBusiness.ownerMaintained'),
+      },
       { label: this.t('employeeBusiness.financialSettings'), value: this.t('employeeBusiness.notShownToStaff') },
     ];
   });
@@ -87,18 +101,17 @@ export class EmployeeBusinessComponent {
     opensAt: string | null;
     closesAt: string | null;
   }): string {
-    if (day.isClosed || !day.opensAt || !day.closesAt) return 'Closed';
-    return `${day.opensAt.slice(0, 5)} – ${day.closesAt.slice(0, 5)}`;
+    if (day.isClosed || !day.opensAt || !day.closesAt) return this.t('dealerProfile.closed');
+    return this.t('employeeBusiness.opensToCloses', {
+      opens: day.opensAt.slice(0, 5),
+      closes: day.closesAt.slice(0, 5),
+    });
   }
 
   protected readonly since = computed(() => {
     const d = this.dealer();
     if (!d) return '';
-    return new Date(d.createdAt).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
+    return this.fmt.date(d.createdAt);
   });
 
   protected reload(): void {

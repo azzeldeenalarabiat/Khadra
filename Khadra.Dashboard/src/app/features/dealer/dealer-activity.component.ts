@@ -5,7 +5,23 @@ import { Tone } from '../../core/models/console.models';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { TranslationKey } from '../../core/i18n/en';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+
+/**
+ * The changes this screen words as more than a status's name: who is waiting on whom, or what
+ * happened. Every other status goes through `statusLabel`, so a status the domain adds later still
+ * reads as something rather than as its identifier.
+ */
+const DESCRIPTIONS: Readonly<Record<string, TranslationKey>> = {
+  Requested: 'dealerActivity.requestedAwaitingYourAnswer',
+  Approved: 'dealerActivity.approvedAwaitingTheDeposit',
+  Confirmed: 'dealerActivity.depositPaidBookingConfirmed',
+  PickedUp: 'status.pickedUp',
+  NoShow: 'dealerActivity.markedNoShow',
+  Expired: 'dealerActivity.expiredUnanswered',
+};
 
 /**
  * Activity (design `isActivity`): every status change on the dealership's bookings, newest first,
@@ -23,6 +39,7 @@ export class DealerActivityComponent {
   // Server enum names, in the reader's language. Shared rather than per-component: the same enum
   // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
   protected readonly statusLabel = inject(I18nService).statusLabel;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(DealerConsoleService);
 
   protected readonly page = this.service.activityPage;
@@ -32,11 +49,10 @@ export class DealerActivityComponent {
   protected readonly entries = computed(() => this.data()?.items ?? []);
   protected readonly total = computed(() => this.data()?.totalCount ?? 0);
 
-  /** One change is a change, not "1 changes". */
-  protected readonly summary = computed(() => {
-    const total = this.total();
-    return `${this.entries().length} of ${total} ${total === 1 ? 'change' : 'changes'}`;
-  });
+  /** One change is a change, not "1 changes": the total picks the noun's form, in either language. */
+  protected readonly summary = computed(() =>
+    this.t('dealerActivity.pageSummary', { shown: this.entries().length, count: this.total() }),
+  );
   protected readonly totalPages = computed(() => this.data()?.totalPages ?? 1);
 
   protected readonly failure = computed(() =>
@@ -68,27 +84,22 @@ export class DealerActivityComponent {
   }
 
   protected describe(e: DealerActivityEntry): string {
-    const labels: Record<string, string> = {
-      Requested: this.t('dealerActivity.requestedAwaitingYourAnswer'),
-      Approved: this.t('dealerActivity.approvedAwaitingTheDeposit'),
-      Confirmed: this.t('dealerActivity.depositPaidBookingConfirmed'),
-      Rejected: 'Rejected',
-      PickedUp: this.t('status.pickedUp'),
-      Returned: 'Returned',
-      Completed: 'Completed',
-      Cancelled: 'Cancelled',
-      NoShow: this.t('dealerActivity.markedNoShow'),
-      Expired: this.t('dealerActivity.expiredUnanswered'),
-    };
-    return labels[e.toStatus] ?? e.toStatus;
+    const key = DESCRIPTIONS[e.toStatus];
+    // The dealer's own wording for everything else, the same the bookings list uses.
+    return key ? this.t(key) : this.statusLabel(e.toStatus, 'dealerBooking');
   }
 
+  /**
+   * Who made the change, as the API names them: a change recorded against no user is the rental
+   * office's own, and a user with no name is somebody whose account has since been closed.
+   */
+  protected actor(e: DealerActivityEntry): string {
+    if (e.actorUserId === null) return this.t('common.theRentalOffice');
+    return e.actorName ?? this.t('common.formerStaffMember');
+  }
+
+  /** "06 Sept, 14:32", in the reader's language. */
   protected when(iso: string): string {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.formats.dayMonthTime(iso);
   }
 }

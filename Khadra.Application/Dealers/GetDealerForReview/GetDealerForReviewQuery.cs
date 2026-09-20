@@ -38,8 +38,42 @@ public sealed record DealerReviewDto(
 // and the dealer's own profile showed two different staff numbers for one dealership. One field, one
 // meaning: read Dealer.EmployeeCount.
 
-/// <summary>The application's own history, so an Admin can see what has already happened to it.</summary>
-public sealed record DealerReviewTimelineEntry(string Label, string Detail, DateTimeOffset OccurredAt, bool IsComplete);
+/// <summary>One step of the application's own history, so an Admin can see what has already happened to it.</summary>
+/// <remarks>
+/// Facts, never a sentence. The console words every step in the reader's language; English written
+/// here used to reach an Arabic screen as it was. Each field is set only on the step it describes and
+/// is null on every other, so a client never has to guess which of them apply.
+/// </remarks>
+/// <param name="Step">One of <see cref="DealerReviewTimelineSteps"/>.</param>
+/// <param name="Decision">
+/// On a <see cref="DealerReviewTimelineSteps.Decision"/> step, the <see cref="DealerVerificationStatus"/>
+/// name that decision recorded, or null when the record can no longer say which: once the dealer has
+/// resubmitted, the application is PendingReview again, and a clarification request and a rejection
+/// both leave the same trace behind.
+/// </param>
+/// <param name="Note">On a decision, the reviewer's note, or null when none is on record.</param>
+/// <param name="DocumentCount">On <see cref="DealerReviewTimelineSteps.DocumentsAttached"/>, how many are on file.</param>
+/// <param name="RequiredDocumentCount">On the same step, how many an approval requires.</param>
+/// <param name="OccurredAt">When it happened; on <see cref="DealerReviewTimelineSteps.AwaitingDecision"/>, the frozen review deadline.</param>
+/// <param name="IsComplete">False only for the step still owed.</param>
+public sealed record DealerReviewTimelineEntry(
+    string Step,
+    string? Decision,
+    string? Note,
+    int? DocumentCount,
+    int? RequiredDocumentCount,
+    DateTimeOffset OccurredAt,
+    bool IsComplete);
+
+/// <summary>The steps an application's timeline is made of. Their names are the wire contract.</summary>
+public static class DealerReviewTimelineSteps
+{
+    public const string Submitted = "Submitted";
+    public const string DocumentsAttached = "DocumentsAttached";
+    public const string Decision = "Decision";
+    public const string Resubmitted = "Resubmitted";
+    public const string AwaitingDecision = "AwaitingDecision";
+}
 
 /// <summary>
 /// Admin-only. Mints a fresh signed link per document on every load rather than storing one, so a
@@ -102,10 +136,13 @@ public sealed class GetDealerForReviewHandler(
     {
         var timeline = new List<DealerReviewTimelineEntry>
         {
-            new("Application submitted", dealer.BusinessName.Value, dealer.SubmittedAt, true),
+            new(DealerReviewTimelineSteps.Submitted, null, null, null, null, dealer.SubmittedAt, true),
             new(
-                "Documents attached",
-                $"{dealer.Documents.Count} of {DealerDocumentType.Required.Count} required",
+                DealerReviewTimelineSteps.DocumentsAttached,
+                null,
+                null,
+                dealer.Documents.Count,
+                DealerDocumentType.Required.Count,
                 dealer.Documents.Count > 0
                     ? dealer.Documents.Max(document => document.UploadedAt)
                     : dealer.SubmittedAt,
@@ -113,62 +150,52 @@ public sealed class GetDealerForReviewHandler(
         };
 
         // A decision that was made stays on the record even after the dealer answers it: Resubmit
-        // restarts the clock but keeps ReviewedAt, because the clarification really did happen.
+        // restarts the clock but keeps ReviewedAt, because the decision really did happen.
         if (dealer.ReviewedAt is { } reviewedAt)
         {
             timeline.Add(new DealerReviewTimelineEntry(
-                DecisionLabel(dealer, reviewedAt),
-                dealer.ReviewNote ?? "No note recorded.",
+                DealerReviewTimelineSteps.Decision,
+                DecisionName(dealer, reviewedAt),
+                dealer.ReviewNote,
+                null,
+                null,
                 reviewedAt,
                 true));
         }
 
         // Then the resubmission that answered it, when there was one -- otherwise the trail jumps
-        // from "clarification requested" straight to a deadline nothing explains.
+        // from the decision straight to a deadline nothing explains.
         if (dealer.ReviewedAt is { } previous && dealer.SubmittedAt > previous)
         {
             timeline.Add(new DealerReviewTimelineEntry(
-                "Resubmitted by the dealer",
-                "The application was corrected and sent back for review.",
-                dealer.SubmittedAt,
-                true));
+                DealerReviewTimelineSteps.Resubmitted, null, null, null, null, dealer.SubmittedAt, true));
         }
 
         // Whether an Admin still owes a decision is the STATUS's answer, not "has this ever been
         // reviewed". Branching on ReviewedAt alone meant a resubmitted application -- the one whose
         // deadline had just been reset -- showed a completed decision and no pending step at all.
         //
-        // No rendered date in the detail: OccurredAt IS the deadline, and the console prints it in
-        // the reader's own zone. Spelling it again here as UTC put one moment on the screen twice,
-        // in two zones, three words apart.
+        // OccurredAt IS the deadline, and the console prints it in the reader's own zone.
         if (dealer.VerificationStatus.IsAwaitingAdmin)
         {
             timeline.Add(new DealerReviewTimelineEntry(
-                "Awaiting admin decision",
-                "No decision has been recorded yet.",
-                dealer.ReviewDueAt,
-                false));
+                DealerReviewTimelineSteps.AwaitingDecision, null, null, null, null, dealer.ReviewDueAt, false));
         }
 
         return timeline;
     }
 
     /// <summary>
-    /// What the Admin actually did, in words.
+    /// Which decision the Admin recorded, or null when the aggregate can no longer say.
     ///
-    /// The status is the CURRENT one, so it cannot name a past decision once the dealer has answered
-    /// it: a resubmitted application is PendingReview again, and labelling the old step with that
-    /// read as though the decision were still pending. When the status can no longer describe the
-    /// step, the step says only that a decision was recorded, and its note says which.
+    /// The status is the CURRENT one, so it names the decision only while nobody has answered it. A
+    /// resubmitted application is PendingReview again, and both a clarification request and a
+    /// rejection can be resubmitted (<see cref="Dealer.Resubmit"/>) with nothing left behind to tell
+    /// them apart. This used to call every such decision "Clarification requested", which was a guess,
+    /// and a wrong one for a rejected application that came back.
     /// </summary>
-    private static string DecisionLabel(Dealer dealer, DateTimeOffset reviewedAt) =>
-        dealer.SubmittedAt > reviewedAt
-            ? "Clarification requested"
-            : dealer.VerificationStatus.Name switch
-            {
-                nameof(DealerVerificationStatus.Approved) => "Approved",
-                nameof(DealerVerificationStatus.Rejected) => "Rejected",
-                nameof(DealerVerificationStatus.ClarificationNeeded) => "Clarification requested",
-                _ => "Decision recorded"
-            };
+    private static string? DecisionName(Dealer dealer, DateTimeOffset reviewedAt) =>
+        dealer.SubmittedAt > reviewedAt || dealer.VerificationStatus.IsAwaitingAdmin
+            ? null
+            : dealer.VerificationStatus.Name;
 }

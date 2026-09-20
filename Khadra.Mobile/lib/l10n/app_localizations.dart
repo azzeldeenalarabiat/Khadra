@@ -479,8 +479,14 @@ abstract class AppLocalizations {
   /// No description provided for @authPasswordRules.
   ///
   /// In en, this message translates to:
-  /// **'At least 8 characters, with a letter and a number.'**
-  String get authPasswordRules;
+  /// **'{count, plural, =1{At least 1 character, with a letter and a number.} other{At least {count} characters, with a letter and a number.}}'**
+  String authPasswordRules(int count);
+
+  /// No description provided for @authPasswordRulesLengthOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{At least 1 character.} other{At least {count} characters.}}'**
+  String authPasswordRulesLengthOnly(int count);
 
   /// No description provided for @authVerifyEmailTitle.
   ///
@@ -554,11 +560,29 @@ abstract class AppLocalizations {
   /// **'Your session ended. Sign in again.'**
   String get authSessionExpired;
 
-  /// No description provided for @navBrowse.
+  /// No description provided for @welcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Browse'**
-  String get navBrowse;
+  /// **'How would you like to start?'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse freely. Booking and saving cars need an account.'**
+  String get welcomeBody;
+
+  /// No description provided for @welcomeBrowseAsGuest.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse as a guest'**
+  String get welcomeBrowseAsGuest;
+
+  /// No description provided for @navHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Home'**
+  String get navHome;
 
   /// No description provided for @navBookings.
   ///
@@ -602,12 +626,6 @@ abstract class AppLocalizations {
   /// **'{count, plural, =0{No filters} =1{1 filter} other{{count} filters}}'**
   String searchFiltersApplied(int count);
 
-  /// No description provided for @searchCity.
-  ///
-  /// In en, this message translates to:
-  /// **'City'**
-  String get searchCity;
-
   /// No description provided for @searchAnyCity.
   ///
   /// In en, this message translates to:
@@ -619,12 +637,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Car type'**
   String get searchCarType;
-
-  /// No description provided for @searchAnyCarType.
-  ///
-  /// In en, this message translates to:
-  /// **'Any type'**
-  String get searchAnyCarType;
 
   /// No description provided for @searchTransmission.
   ///
@@ -662,6 +674,24 @@ abstract class AppLocalizations {
   /// **'Price per day'**
   String get searchPriceRange;
 
+  /// No description provided for @searchPriceFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get searchPriceFrom;
+
+  /// No description provided for @searchPriceTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get searchPriceTo;
+
+  /// No description provided for @searchPriceRangeInverted.
+  ///
+  /// In en, this message translates to:
+  /// **'The top of the range is below the bottom, so nothing can match it.'**
+  String get searchPriceRangeInverted;
+
   /// No description provided for @searchDeliveryOnly.
   ///
   /// In en, this message translates to:
@@ -679,6 +709,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Any dates'**
   String get searchAnyDates;
+
+  /// No description provided for @searchPickupLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup location'**
+  String get searchPickupLocation;
+
+  /// No description provided for @searchRentalPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Rental period'**
+  String get searchRentalPeriod;
+
+  /// The rental period chosen on Home. The arrow points the way the language is read, so the pickup comes first in both languages.
+  ///
+  /// In en, this message translates to:
+  /// **'{pickup} → {dropoff}'**
+  String searchPeriodValue(String pickup, String dropoff);
+
+  /// No description provided for @searchAllCarTypes.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get searchAllCarTypes;
 
   /// No description provided for @searchPickup.
   ///
@@ -704,6 +758,18 @@ abstract class AppLocalizations {
   /// **'Choosing dates shows only the cars that are free, and lets us price the rental.'**
   String get searchDatesHelp;
 
+  /// No description provided for @searchMaxRentalDays.
+  ///
+  /// In en, this message translates to:
+  /// **'A rental cannot run longer than {days} days.'**
+  String searchMaxRentalDays(int days);
+
+  /// No description provided for @searchPickupTooSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'The earliest a rental can start is {when}.'**
+  String searchPickupTooSoon(String when);
+
   /// No description provided for @searchClearDates.
   ///
   /// In en, this message translates to:
@@ -715,6 +781,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count, plural, =0{No cars} =1{1 car} other{{count} cars}}'**
   String searchResults(int count);
+
+  /// No description provided for @searchResultsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No cars available} =1{1 car available} other{{count} cars available}}'**
+  String searchResultsAvailable(int count);
 
   /// No description provided for @searchEmptyTitle.
   ///
@@ -902,6 +974,42 @@ abstract class AppLocalizations {
   /// **'About'**
   String get galleryAbout;
 
+  /// No description provided for @galleryPickupInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup instructions'**
+  String get galleryPickupInstructions;
+
+  /// No description provided for @galleryRentalConditions.
+  ///
+  /// In en, this message translates to:
+  /// **'Rental conditions'**
+  String get galleryRentalConditions;
+
+  /// No description provided for @galleryInsurance.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance'**
+  String get galleryInsurance;
+
+  /// No description provided for @galleryNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes from the office'**
+  String get galleryNotes;
+
+  /// No description provided for @galleryFromTheOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'From the rental office'**
+  String get galleryFromTheOffice;
+
+  /// No description provided for @galleryOfficeOwnWords.
+  ///
+  /// In en, this message translates to:
+  /// **'Written by this office, not by Khadra.'**
+  String get galleryOfficeOwnWords;
+
   /// No description provided for @galleryOpeningHours.
   ///
   /// In en, this message translates to:
@@ -925,6 +1033,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Closed today'**
   String get galleryClosedToday;
+
+  /// No description provided for @galleryAllWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'All week'**
+  String get galleryAllWeek;
+
+  /// No description provided for @galleryTodayOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Today only'**
+  String get galleryTodayOnly;
 
   /// No description provided for @galleryLocation.
   ///
@@ -1091,20 +1211,26 @@ abstract class AppLocalizations {
   /// No description provided for @bookTermsPayAfterApproval.
   ///
   /// In en, this message translates to:
-  /// **'Nothing is charged now. The office answers within {hours} hours, and only then does the deposit fall due.'**
-  String bookTermsPayAfterApproval(String hours);
+  /// **'Nothing is charged now. The deposit falls due only if they approve.'**
+  String get bookTermsPayAfterApproval;
 
-  /// No description provided for @bookTermsPaymentWindow.
+  /// The gallery's own clock, frozen on the booking. A plural because the owner may move it: at 1 the sentence has to say hour, and Arabic needs a different word again at 2.
   ///
   /// In en, this message translates to:
-  /// **'Once they approve, you have {hours} hours to pay the deposit or the booking ends and the car goes back on the market.'**
-  String bookTermsPaymentWindow(String hours);
+  /// **'{hours, plural, =1{The office has 1 hour to answer. The car is held for you until then.} other{The office has {hours} hours to answer. The car is held for you until then.}}'**
+  String bookTermsAnswerWindow(num hours);
 
-  /// No description provided for @bookTermsFreeCancellation.
+  /// Two hours since 2026-09-11, which is exactly why this is a plural: Arabic says the two-hour form with its own word, not the number.
   ///
   /// In en, this message translates to:
-  /// **'Free cancellation for {hours} hours after the deposit clears.'**
-  String bookTermsFreeCancellation(String hours);
+  /// **'{hours, plural, =1{Once they approve, you have 1 hour to pay the deposit or the booking ends and the car goes back on the market.} other{Once they approve, you have {hours} hours to pay the deposit or the booking ends and the car goes back on the market.}}'**
+  String bookTermsPaymentWindow(num hours);
+
+  /// One hour today, which read as 'for 1 hours' until this became a plural.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{Free cancellation for 1 hour after the deposit clears.} other{Free cancellation for {hours} hours after the deposit clears.}}'**
+  String bookTermsFreeCancellation(num hours);
 
   /// No description provided for @bookTermsCancellationPenalty.
   ///
@@ -1130,11 +1256,11 @@ abstract class AppLocalizations {
   /// **'Request sent'**
   String get bookDoneTitle;
 
-  /// No description provided for @bookDoneBody.
+  /// The hours are the ANSWER window frozen on the booking just made, never the payment window: the two are different rules and were 48 and 2 on the day this was written.
   ///
   /// In en, this message translates to:
-  /// **'{gallery} has your request and will answer within {hours} hours. We will tell you as soon as they do.'**
-  String bookDoneBody(String gallery, String hours);
+  /// **'{hours, plural, =1{{gallery} has your request and will answer within 1 hour. We will tell you as soon as they do.} other{{gallery} has your request and will answer within {hours} hours. We will tell you as soon as they do.}}'**
+  String bookDoneBody(String gallery, num hours);
 
   /// No description provided for @bookDoneReference.
   ///
@@ -1171,6 +1297,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Verify your email address before booking. Your booking updates go there.'**
   String get bookVerifyEmailFirst;
+
+  /// No description provided for @bookingsViewBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'View booking'**
+  String get bookingsViewBooking;
 
   /// No description provided for @bookingsTitle.
   ///
@@ -1244,17 +1376,41 @@ abstract class AppLocalizations {
   /// **'Find a car'**
   String get bookingsEmptyAction;
 
+  /// No description provided for @bookingsEmptyTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in this list'**
+  String get bookingsEmptyTabTitle;
+
+  /// No description provided for @bookingsEmptyTabBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You have bookings, but none of them are in this one. Try another tab.'**
+  String get bookingsEmptyTabBody;
+
   /// No description provided for @bookingsSignedOutTitle.
   ///
   /// In en, this message translates to:
   /// **'Sign in to see your bookings'**
   String get bookingsSignedOutTitle;
 
-  /// No description provided for @bookingsSignedOutBody.
+  /// No description provided for @accountRequiredBody.
   ///
   /// In en, this message translates to:
-  /// **'Your bookings, documents and alerts live in your account.'**
-  String get bookingsSignedOutBody;
+  /// **'Your bookings, saved cars, documents and alerts live in your account.'**
+  String get accountRequiredBody;
+
+  /// No description provided for @notificationsSignedOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to see your alerts'**
+  String get notificationsSignedOutTitle;
+
+  /// No description provided for @profileSignedOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to your account'**
+  String get profileSignedOutTitle;
 
   /// No description provided for @statusRequested.
   ///
@@ -1331,7 +1487,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookingWhere.
   ///
   /// In en, this message translates to:
-  /// **'Pick-up'**
+  /// **'How you get it'**
   String get bookingWhere;
 
   /// No description provided for @bookingWhereDelivery.
@@ -1369,6 +1525,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What has happened'**
   String get bookingHistory;
+
+  /// No description provided for @bookingHandoversTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Collection and return'**
+  String get bookingHandoversTitle;
 
   /// No description provided for @bookingPrice.
   ///
@@ -1556,23 +1718,35 @@ abstract class AppLocalizations {
   /// **'Cash taken: {amount}'**
   String bookingCashCollected(String amount);
 
-  /// No description provided for @bookingCountdownDays.
+  /// A countdown is built from parts so Arabic can inflect each unit. English abbreviates and needs no plural; Arabic spells the unit out and needs all six categories.
   ///
   /// In en, this message translates to:
-  /// **'{days}d {hours}h left'**
-  String bookingCountdownDays(int days, int hours);
+  /// **'{days}d'**
+  String countdownDays(int days);
 
-  /// No description provided for @bookingCountdownHours.
+  /// No description provided for @countdownHours.
   ///
   /// In en, this message translates to:
-  /// **'{hours}h {minutes}m left'**
-  String bookingCountdownHours(int hours, int minutes);
+  /// **'{hours}h'**
+  String countdownHours(int hours);
 
-  /// No description provided for @bookingCountdownMinutes.
+  /// No description provided for @countdownMinutes.
   ///
   /// In en, this message translates to:
-  /// **'{minutes}m left'**
-  String bookingCountdownMinutes(int minutes);
+  /// **'{minutes}m'**
+  String countdownMinutes(int minutes);
+
+  /// Joins the two largest units. Arabic joins with و; English with a space.
+  ///
+  /// In en, this message translates to:
+  /// **'{first} {second}'**
+  String countdownPair(String first, String second);
+
+  /// Wraps the assembled parts. A NOUN phrase in Arabic rather than a verb, because an Arabic verb would have to agree in gender with whichever unit came first.
+  ///
+  /// In en, this message translates to:
+  /// **'{time} left'**
+  String bookingCountdownLeft(String time);
 
   /// No description provided for @bookingCountdownOver.
   ///
@@ -1733,8 +1907,14 @@ abstract class AppLocalizations {
   /// No description provided for @disputeOpened.
   ///
   /// In en, this message translates to:
-  /// **'Your dispute is open. Khadra will look at it within {hours} hours.'**
-  String disputeOpened(String hours);
+  /// **'Your dispute is open. Khadra will answer by {deadline}.'**
+  String disputeOpened(String deadline);
+
+  /// No description provided for @disputeOpenedNoDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Your dispute is open. Khadra will answer it.'**
+  String get disputeOpenedNoDate;
 
   /// No description provided for @disputeViewTitle.
   ///
@@ -1988,11 +2168,41 @@ abstract class AppLocalizations {
   /// **'Take a photo'**
   String get documentsTakePhoto;
 
+  /// No description provided for @documentsChoosePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a photo'**
+  String get documentsChoosePhoto;
+
   /// No description provided for @documentsChooseFile.
   ///
   /// In en, this message translates to:
   /// **'Choose a file'**
   String get documentsChooseFile;
+
+  /// Both values are read off /app-config's documents section. The app holds no list of accepted types and no size of its own.
+  ///
+  /// In en, this message translates to:
+  /// **'{kinds} · up to {size}'**
+  String documentsFileLimits(String kinds, String size);
+
+  /// No description provided for @documentsOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'That document could not be opened on this phone. Install a PDF reader, or try again.'**
+  String get documentsOpenFailed;
+
+  /// No description provided for @documentsFileUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'That file could not be read. Choose it again, or take a photo of the document instead.'**
+  String get documentsFileUnreadable;
+
+  /// What is actually on file, from the record: the server's stored content type and byte count, never guessed from the tile.
+  ///
+  /// In en, this message translates to:
+  /// **'{kind} · {size}'**
+  String documentsFileSummary(String kind, String size);
 
   /// No description provided for @documentsUploading.
   ///
@@ -2167,6 +2377,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Language'**
   String get profileLanguage;
+
+  /// No description provided for @profileLanguageSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow my device'**
+  String get profileLanguageSystem;
 
   /// No description provided for @profileLanguageEnglish.
   ///
@@ -2381,8 +2597,32 @@ abstract class AppLocalizations {
   /// No description provided for @validationPasswordShort.
   ///
   /// In en, this message translates to:
-  /// **'Use at least 8 characters.'**
-  String get validationPasswordShort;
+  /// **'{count, plural, =1{Use at least 1 character.} other{Use at least {count} characters.}}'**
+  String validationPasswordShort(int count);
+
+  /// No description provided for @validationPasswordLong.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Use at most 1 character.} other{Use at most {count} characters.}}'**
+  String validationPasswordLong(int count);
+
+  /// No description provided for @validationPasswordLetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a letter.'**
+  String get validationPasswordLetter;
+
+  /// No description provided for @validationPasswordDigit.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a number.'**
+  String get validationPasswordDigit;
+
+  /// No description provided for @validationPasswordSpaces.
+  ///
+  /// In en, this message translates to:
+  /// **'A password cannot contain spaces.'**
+  String get validationPasswordSpaces;
 
   /// No description provided for @validationPasswordMatch.
   ///
@@ -2521,6 +2761,366 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Too many requests. Wait a moment and try again.'**
   String get errorRateLimited;
+
+  /// No description provided for @errorAuthInvalidName.
+  ///
+  /// In en, this message translates to:
+  /// **'A name must be between 2 and 150 characters.'**
+  String get errorAuthInvalidName;
+
+  /// No description provided for @errorAuthPasswordUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'That is the password you already have. Choose a different one.'**
+  String get errorAuthPasswordUnchanged;
+
+  /// No description provided for @errorAuthInvalidDateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'That date of birth is not valid.'**
+  String get errorAuthInvalidDateOfBirth;
+
+  /// No description provided for @errorAuthUnderageBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Renters on Khadra must be at least {age} years old.'**
+  String errorAuthUnderageBy(int age);
+
+  /// No description provided for @errorBookingAccountCannotBook.
+  ///
+  /// In en, this message translates to:
+  /// **'This account cannot make bookings.'**
+  String get errorBookingAccountCannotBook;
+
+  /// No description provided for @errorBookingNotYours.
+  ///
+  /// In en, this message translates to:
+  /// **'That booking belongs to somebody else.'**
+  String get errorBookingNotYours;
+
+  /// No description provided for @errorBookingAlreadyFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking has already ended.'**
+  String get errorBookingAlreadyFinished;
+
+  /// No description provided for @errorBookingNotAwaitingPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking is not waiting on a payment.'**
+  String get errorBookingNotAwaitingPayment;
+
+  /// No description provided for @errorBookingDisputeOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking cannot settle while a dispute on it is open.'**
+  String get errorBookingDisputeOpen;
+
+  /// No description provided for @errorBookingTooSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'That pickup time is too soon. Choose a later one.'**
+  String get errorBookingTooSoon;
+
+  /// No description provided for @errorBookingTooSoonBy.
+  ///
+  /// In en, this message translates to:
+  /// **'A rental must start at least {minutes} minutes from now.'**
+  String errorBookingTooSoonBy(int minutes);
+
+  /// No description provided for @errorBookingRentalTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'That rental is longer than we can book. Choose a shorter one.'**
+  String get errorBookingRentalTooLong;
+
+  /// No description provided for @errorBookingBeyondHorizon.
+  ///
+  /// In en, this message translates to:
+  /// **'That is further ahead than we can book. Choose an earlier date.'**
+  String get errorBookingBeyondHorizon;
+
+  /// No description provided for @errorBookingBeyondHorizonBy.
+  ///
+  /// In en, this message translates to:
+  /// **'A rental cannot be booked more than {days} days ahead.'**
+  String errorBookingBeyondHorizonBy(int days);
+
+  /// No description provided for @errorBookingOutsideOpeningHours.
+  ///
+  /// In en, this message translates to:
+  /// **'This office is closed at that time. Choose a time while they are open, or have the car delivered.'**
+  String get errorBookingOutsideOpeningHours;
+
+  /// No description provided for @errorBookingDeliveryOutOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'That spot is outside this office’s delivery area. Choose one closer to them.'**
+  String get errorBookingDeliveryOutOfRange;
+
+  /// No description provided for @errorBookingDeliveryLocationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose where the car should be brought.'**
+  String get errorBookingDeliveryLocationRequired;
+
+  /// No description provided for @errorDocumentTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'That file is larger than the upload limit.'**
+  String get errorDocumentTooLarge;
+
+  /// No description provided for @errorDocumentUnsupportedType.
+  ///
+  /// In en, this message translates to:
+  /// **'That file type is not accepted. Upload a JPEG, PNG or PDF.'**
+  String get errorDocumentUnsupportedType;
+
+  /// No description provided for @errorDocumentNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'That document is no longer there.'**
+  String get errorDocumentNotFound;
+
+  /// No description provided for @errorReviewWindowClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'The time to review this booking has passed.'**
+  String get errorReviewWindowClosed;
+
+  /// No description provided for @errorReviewInvalidRating.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a rating between one and five stars.'**
+  String get errorReviewInvalidRating;
+
+  /// No description provided for @errorReviewCommentTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'That comment is longer than we can take.'**
+  String get errorReviewCommentTooLong;
+
+  /// No description provided for @errorDisputeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'That dispute was not found.'**
+  String get errorDisputeNotFound;
+
+  /// No description provided for @errorDisputeNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'This dispute is no longer open.'**
+  String get errorDisputeNotOpen;
+
+  /// No description provided for @errorDisputeNotYoursToWithdraw.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the party who opened a dispute can withdraw it.'**
+  String get errorDisputeNotYoursToWithdraw;
+
+  /// No description provided for @errorDisputeReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Say what went wrong before opening a dispute.'**
+  String get errorDisputeReasonRequired;
+
+  /// No description provided for @errorDisputeStatementRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Write something before adding it to the dispute.'**
+  String get errorDisputeStatementRequired;
+
+  /// No description provided for @errorDisputeEvidenceFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'One of the files did not upload. Try attaching it again.'**
+  String get errorDisputeEvidenceFailed;
+
+  /// No description provided for @errorPaymentRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'That payment was refused. Try a different card.'**
+  String get errorPaymentRefused;
+
+  /// No description provided for @reputationGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your standing'**
+  String get reputationGroupTitle;
+
+  /// No description provided for @reputationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How offices see you'**
+  String get reputationTitle;
+
+  /// No description provided for @reputationIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'When you ask an office for a car, this is what Khadra tells them about you. Nothing else — no contact details, no documents, and nothing about which office you rented from.'**
+  String get reputationIntro;
+
+  /// No description provided for @reputationNoHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing on your record yet'**
+  String get reputationNoHistoryTitle;
+
+  /// No description provided for @reputationNoHistoryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not finished a rental on Khadra, and nothing has been recorded against you. Offices see only how long you have had an account.'**
+  String get reputationNoHistoryBody;
+
+  /// No description provided for @reputationRatingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rating from offices'**
+  String get reputationRatingLabel;
+
+  /// No description provided for @reputationRatingCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{From 1 office} other{From {count} offices}}'**
+  String reputationRatingCount(int count);
+
+  /// No description provided for @reputationNotRatedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No office has rated you yet. An office can only rate you after a rental is finished, and their rating stays hidden until yours of them is published too.'**
+  String get reputationNotRatedYet;
+
+  /// No description provided for @reputationRecordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your record'**
+  String get reputationRecordTitle;
+
+  /// No description provided for @reputationCompletedRentals.
+  ///
+  /// In en, this message translates to:
+  /// **'Rentals finished'**
+  String get reputationCompletedRentals;
+
+  /// No description provided for @reputationNoShows.
+  ///
+  /// In en, this message translates to:
+  /// **'Times a car was not collected'**
+  String get reputationNoShows;
+
+  /// No description provided for @reputationLateCancellations.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancellations with a penalty assessed'**
+  String get reputationLateCancellations;
+
+  /// No description provided for @reputationDisputesLost.
+  ///
+  /// In en, this message translates to:
+  /// **'Disputes settled against you'**
+  String get reputationDisputesLost;
+
+  /// No description provided for @reputationDisagreeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Something here is wrong?'**
+  String get reputationDisagreeTitle;
+
+  /// No description provided for @reputationDisagreeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Each of these came from one booking. Open the booking it belongs to, and if the settlement window is still open you can dispute it there.'**
+  String get reputationDisagreeBody;
+
+  /// No description provided for @reputationSeeBookings.
+  ///
+  /// In en, this message translates to:
+  /// **'See finished bookings'**
+  String get reputationSeeBookings;
+
+  /// No description provided for @reputationWhoSeesThis.
+  ///
+  /// In en, this message translates to:
+  /// **'An office can read this only while they are deciding on, or holding, a booking with you — never before you ask them for a car, and never afterwards.'**
+  String get reputationWhoSeesThis;
+
+  /// No description provided for @landingDepositDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit is due'**
+  String get landingDepositDue;
+
+  /// No description provided for @landingRentalInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Your rental is under way'**
+  String get landingRentalInProgress;
+
+  /// No description provided for @landingUpcomingRental.
+  ///
+  /// In en, this message translates to:
+  /// **'Your next rental'**
+  String get landingUpcomingRental;
+
+  /// No description provided for @landingAwaitingOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting on the rental office'**
+  String get landingAwaitingOffice;
+
+  /// No description provided for @shortlistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved cars'**
+  String get shortlistTitle;
+
+  /// No description provided for @shortlistSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save this car'**
+  String get shortlistSave;
+
+  /// No description provided for @shortlistRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from saved'**
+  String get shortlistRemove;
+
+  /// No description provided for @shortlistEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing saved yet'**
+  String get shortlistEmptyTitle;
+
+  /// No description provided for @shortlistEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the heart on a car to keep it here while you compare.'**
+  String get shortlistEmptyBody;
+
+  /// The owner's wording, settled 2026-09-11. CURRENTLY, because a gallery moving a car through Maintenance and back is routine and the entry is never removed for it. No reason is given: the catalogue answers hidden, in maintenance, suspended and deleted identically on purpose.
+  ///
+  /// In en, this message translates to:
+  /// **'Currently unavailable'**
+  String get shortlistUnavailable;
+
+  /// No description provided for @shortlistSavedOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved on {date}'**
+  String shortlistSavedOn(String date);
+
+  /// No description provided for @errorShortlistFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Your saved list is full. Remove a car before saving another.'**
+  String get errorShortlistFull;
+
+  /// No description provided for @errorShortlistVehicleNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'That car is no longer listed, so it cannot be saved.'**
+  String get errorShortlistVehicleNotFound;
 }
 
 class _AppLocalizationsDelegate

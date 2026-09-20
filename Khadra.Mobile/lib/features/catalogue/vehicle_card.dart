@@ -3,19 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/dtos.dart';
-import '../../core/format/formats.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../shortlist/save_button.dart';
 
-/// One car, as a search result.
+/// One car as a FEATURE: a full-width photograph with the details beneath it.
 ///
-/// The rating on it is the GALLERY's, not the car's, and the note under the list
-/// says so. This platform rates rental offices — a renter comparing two Corollas
-/// is really choosing between two offices, which is what the spec models and what
-/// this shows.
+/// **Nothing mounts this today.** It is the design's HOME treatment, for the short
+/// "Recommended" strip where three cars are the whole screen — and this app has no
+/// such strip: its first tab is the search itself. Every list that does exist uses
+/// `VehicleRow`, which is the shape the design gives RESULTS, a gallery's own page
+/// and saved cars.
+///
+/// Kept rather than deleted because the strip is a screen the design specifies and
+/// this app may yet grow, and because a card that took a week to get right is
+/// cheaper to keep than to rebuild. If the owner decides against the strip, this
+/// file goes with it.
+///
+/// The rating on it is the GALLERY's, not the car's. This platform rates rental
+/// offices — a renter comparing two Corollas is really choosing between two
+/// offices, which is what the spec models and what this shows.
 class VehicleCard extends ConsumerWidget {
   const VehicleCard({super.key, required this.listing});
 
@@ -39,7 +49,7 @@ class VehicleCard extends ConsumerWidget {
                 aspectRatio: 16 / 10,
                 child: KhadraImage(
                   url: listing.coverImageUrl,
-                  borderRadius: const BorderRadius.vertical(top: Radii.lg),
+                  borderRadius: Radii.sheetTop,
                 ),
               ),
               if (listing.isDeliveryAvailable)
@@ -52,6 +62,13 @@ class VehicleCard extends ConsumerWidget {
                     icon: Icons.local_shipping_outlined,
                   ),
                 ),
+              // Opposite corner from the delivery badge, so neither hides the
+              // other on a car that is both.
+              PositionedDirectional(
+                top: Space.xs,
+                end: Space.xs,
+                child: SaveButton(vehicleId: listing.vehicleId, onSurface: true),
+              ),
             ],
           ),
           Padding(
@@ -95,10 +112,13 @@ class VehicleCard extends ConsumerWidget {
                         children: [
                           Text(
                             formats.money(listing.dailyRate),
+                            // The DARK green the design keeps for money. A price is
+                            // the first thing a reader looks for on a card and it is
+                            // not something to press.
                             style: const TextStyle(
                               fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: KhadraColors.accent,
+                              fontWeight: FontWeight.w800,
+                              color: KhadraColors.price,
                             ),
                           ),
                           Text(
@@ -118,15 +138,47 @@ class VehicleCard extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        listing.gallery.businessName,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: KhadraColors.neutral700,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            listing.gallery.businessName,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: KhadraColors.neutral700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          // WHERE the car is. The API has sent a `cityId` on
+                          // every listing row since the catalogue shipped and no
+                          // screen rendered it, which left a marketplace whose
+                          // cards named a price and an office but not a town —
+                          // the first thing anyone comparing two cars needs.
+                          if (ref.watch(cityNameProvider(listing.gallery.cityId))
+                              case final city?)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 1),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.place_outlined,
+                                      size: 12, color: KhadraColors.neutral500),
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(
+                                      city,
+                                      style: const TextStyle(
+                                          color: KhadraColors.neutral500,
+                                          fontSize: 12),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: Space.sm),
@@ -179,7 +231,7 @@ class _Rating extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.star_rounded, size: 15, color: KhadraColors.warn),
+        const Icon(Icons.star_rounded, size: 15, color: KhadraColors.star),
         const SizedBox(width: 3),
         LatinRun(
           gallery.averageRating!.toStringAsFixed(1),
@@ -199,37 +251,3 @@ class _Rating extends StatelessWidget {
   }
 }
 
-/// The price line used on the vehicle screen's sticky bar.
-class DailyRateLabel extends StatelessWidget {
-  const DailyRateLabel({
-    super.key,
-    required this.formats,
-    required this.rate,
-  });
-
-  final Formats formats;
-  final Money rate;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          formats.money(rate),
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: KhadraColors.text,
-          ),
-        ),
-        Text(
-          l10n.vehiclePerDay(''),
-          style: const TextStyle(color: KhadraColors.neutral500, fontSize: 12),
-        ),
-      ],
-    );
-  }
-}

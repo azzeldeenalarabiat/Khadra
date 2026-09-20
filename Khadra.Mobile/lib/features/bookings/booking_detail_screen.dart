@@ -47,13 +47,50 @@ class BookingDetailScreen extends ConsumerStatefulWidget {
 class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
   Timer? _tick;
 
+  /// How many times a spent deadline has been re-read. See [_askTheServerWhenTheClockRunsOut].
+  int _expiryReads = 0;
+
   @override
   void initState() {
     super.initState();
     // The countdown is rendered from the server's deadline; this only repaints it.
     _tick = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      _askTheServerWhenTheClockRunsOut();
+      setState(() {});
     });
+  }
+
+  /// Re-reads the booking once its own countdown has run out.
+  ///
+  /// The countdown is display only — the SERVER decides whether a booking is
+  /// over, and its settlement pass runs on a minute of its own. Without this the
+  /// screen sits on "Deposit of 24.000 JOD is due" above a clock reading zero
+  /// until the customer thinks to pull down, which is the app contradicting
+  /// itself on the one screen where the answer matters.
+  ///
+  /// It mattered less while the payment window was a day: nobody was watching
+  /// when it ran out. At two hours they very well might be.
+  ///
+  /// Capped at three reads — ninety seconds, comfortably past the sweep's own
+  /// minute — so a server that has not settled yet is asked a few times and then
+  /// left alone. This is a detail screen, not a poller.
+  void _askTheServerWhenTheClockRunsOut() {
+    if (_expiryReads >= 3) return;
+    final booking = ref.read(bookingProvider(widget.bookingId)).valueOrNull;
+    if (booking == null) return;
+
+    final deadline = booking.isAwaitingPayment
+        ? booking.paymentDeadline
+        : booking.isAwaitingDecision
+            ? booking.decisionDeadline
+            : null;
+    if (deadline == null || DateTime.now().toUtc().isBefore(deadline.toUtc())) {
+      return;
+    }
+
+    _expiryReads++;
+    invalidateBookings(ref, bookingId: widget.bookingId);
   }
 
   @override
@@ -130,7 +167,7 @@ class _Body extends ConsumerWidget {
 
         if (booking.handovers.isNotEmpty) ...[
           const SizedBox(height: Space.xl),
-          KhadraSectionTitle(l10n.bookingHistory),
+          KhadraSectionTitle(l10n.bookingHandoversTitle),
           _Handovers(handovers: booking.handovers, formats: formats),
         ],
 
@@ -169,6 +206,7 @@ class _Header extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 12,
                   color: KhadraColors.neutral500,
+                  // rtl-audit: allow — a reference is Latin in both languages.
                   letterSpacing: 0.4,
                 ),
               ),
@@ -576,7 +614,20 @@ class _NonDeliveryDialogState extends State<_NonDeliveryDialog> {
   final _details = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // The Report button is gated on there being something typed, so the dialog
+    // has to rebuild as it IS typed. Without this listener the gate reads an
+    // empty controller for ever and the button never enables -- which made the
+    // whole non-delivery report unreachable.
+    _details.addListener(_onChanged);
+  }
+
+  void _onChanged() => setState(() {});
+
+  @override
   void dispose() {
+    _details.removeListener(_onChanged);
     _details.dispose();
     super.dispose();
   }
@@ -584,24 +635,29 @@ class _NonDeliveryDialogState extends State<_NonDeliveryDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final details = _details.text.trim();
 
     return AlertDialog(
       title: Text(l10n.nonDeliveryTitle),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            l10n.nonDeliveryBody,
-            style: const TextStyle(fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: Space.lg),
-          KhadraField(
-            controller: _details,
-            label: l10n.nonDeliveryDetails,
-            maxLines: 4,
-            maxLength: 1000,
-          ),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.nonDeliveryBody,
+              style: const TextStyle(fontSize: 14, height: 1.5),
+            ),
+            const SizedBox(height: Space.lg),
+            KhadraField(
+              controller: _details,
+              label: l10n.nonDeliveryDetails,
+              maxLines: 4,
+              maxLength: 1000,
+              autofocus: true,
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -609,9 +665,9 @@ class _NonDeliveryDialogState extends State<_NonDeliveryDialog> {
           child: Text(l10n.actionCancel),
         ),
         FilledButton(
-          onPressed: _details.text.trim().isEmpty
+          onPressed: details.isEmpty
               ? null
-              : () => Navigator.of(context).pop(_details.text.trim()),
+              : () => Navigator.of(context).pop(details),
           child: Text(l10n.nonDeliveryReport),
         ),
       ],
@@ -640,7 +696,7 @@ class _VehicleCard extends StatelessWidget {
             height: 60,
             child: KhadraImage(
               url: vehicle?.coverImageUrl,
-              borderRadius: const BorderRadius.all(Radii.md),
+              borderRadius: Radii.field,
             ),
           ),
           const SizedBox(width: Space.md),
@@ -850,7 +906,7 @@ class _Handovers extends StatelessWidget {
             if (handover.notes != null && handover.notes!.isNotEmpty)
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: Text(
+                child: UserText(
                   handover.notes!,
                   style: const TextStyle(fontSize: 13, height: 1.45),
                 ),
@@ -918,7 +974,7 @@ class _Timeline extends ConsumerWidget {
                       if (_reasonLine(l10n, change, rejectionReasons, arabic)
                           case final line?) ...[
                         const SizedBox(height: Space.xs),
-                        Text(
+                        UserText(
                           line,
                           style: const TextStyle(
                             fontSize: 13,

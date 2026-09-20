@@ -4,7 +4,7 @@
       <h1 class="page-title">{{ t('employeeNotifications.notifications') }}</h1>
       <div class="page-sub">
         @if (unread() > 0) {
-          {{ unread() }} {{ t('employeeNotifications.unreadWhatHappenedAt') }}
+          {{ t('employeeNotifications.unreadSummary', { count: unread() }) }}
         } @else {
           {{ t('employeeNotifications.whatHappenedAtYour') }}
         }
@@ -15,10 +15,10 @@
         type="button"
         class="btn btn-secondary btn-md"
         [disabled]="busy() || unread() === 0"
-        [title]="unread() === 0 ? 'Nothing unread' : ''"
+        [title]="unread() === 0 ? t('employeeNotifications.nothingUnread') : ''"
         (click)="markAllRead()"
       >
-        {{ busy() ? 'Marking…' : 'Mark all read' }}
+        {{ busy() ? t('employeeNotifications.marking') : t('employeeNotifications.markAllRead') }}
       </button>
     </div>
   </div>
@@ -73,7 +73,7 @@
               @if (item.subjectReference) {
                 <span class="queue-entity">{{ item.subjectReference }}</span>
               }
-              <span class="queue-entity push">{{ ago(item.occurredAt) }}</span>
+              <span class="queue-entity push">{{ formats.relative(item.occurredAt) }}</span>
               @if (!item.isRead) {
                 <span class="unread-dot" [attr.aria-label]="t('employeeNotifications.unread')"></span>
               }
@@ -97,6 +97,8 @@
         </div>
       }
     </section>
-    <div class="page-sub">{{ t('employeeNotifications.showing') }} {{ items().length }} of {{ total() }}.</div>
+    <div class="page-sub">
+      {{ t('employeeNotifications.showingOf', { shown: items().length, count: total() }) }}
+    </div>
   }
 </div>

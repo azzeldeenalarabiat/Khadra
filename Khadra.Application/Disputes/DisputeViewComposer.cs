@@ -28,6 +28,8 @@ public sealed class DisputeViewComposer(
     IDocumentLinkSigner signer,
     IClock clock)
 {
+    private const string ClosedAccountName = "Account closed";
+
     public async Task<Result<DisputeDto, Error>> ComposeAsync(DisputeTicket ticket, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ticket);
@@ -54,7 +56,10 @@ public sealed class DisputeViewComposer(
             .Distinct()
             .ToList();
         var lookup = await names.NamesAsync(userIds, cancellationToken);
-        string NameOf(Id id) => lookup.TryGetValue(id.Value, out var name) ? name : "Account closed";
+        // The stand-in is kept ONLY for shipped customer apps, which print a name as it arrives. Each
+        // name travels with its flag, and a client that words the case reads the flag instead.
+        string NameOf(Id id) => lookup.TryGetValue(id.Value, out var name) ? name : ClosedAccountName;
+        bool Closed(Id id) => !lookup.ContainsKey(id.Value);
 
         var statements = ticket.Statements
             .OrderBy(statement => statement.CreatedAt)
@@ -63,6 +68,7 @@ public sealed class DisputeViewComposer(
                 statement.Party.Name,
                 statement.AuthorUserId.Value,
                 NameOf(statement.AuthorUserId),
+                Closed(statement.AuthorUserId),
                 statement.Body,
                 statement.CreatedAt,
                 statement.EvidenceStorageKeys
@@ -82,16 +88,21 @@ public sealed class DisputeViewComposer(
             ticket.OpenedByParty.Name,
             ticket.OpenedByUserId.Value,
             NameOf(ticket.OpenedByUserId),
+            Closed(ticket.OpenedByUserId),
             ticket.Reason,
             ticket.OpenedAt,
             ticket.SlaDeadline,
             ticket.IsBreachingSla(now),
             ticket.AssignedAdminId?.Value,
             ticket.AssignedAdminId is { } admin ? NameOf(admin) : null,
+            ticket.AssignedAdminId is { } holder && Closed(holder),
             ticket.ClosedAt,
             statements,
             ticket.Resolution is { } resolved
-                ? DisputeResolutionDto.From(resolved, NameOf(resolved.ResolvedByAdminId))
+                ? DisputeResolutionDto.From(
+                    resolved,
+                    NameOf(resolved.ResolvedByAdminId),
+                    Closed(resolved.ResolvedByAdminId))
                 : null,
             MoneyDto.From(BookingDisputeSettlement.DepositHeldFor(booking)),
             BookingDto.From(booking, context, now));

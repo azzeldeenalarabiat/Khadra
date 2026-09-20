@@ -1,6 +1,8 @@
 # Khadra
 
-Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.1.docx` (v3.1 "Tech Stack Finalized"; v3.0 is kept for history — the two differ only in the header, every numbered section is identical). v3.1 names this stack: ASP.NET Core + PostgreSQL + EF Core. One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens, not in this repo). Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
+Car rental marketplace for Jordan: customers rent from licensed (green-plate) rental offices. Roles: Admin (platform owner), Dealer Owner, Dealer Employee, Customer. Spec: `docs/Car_Rental_System_v3.1.docx` (v3.1 "Tech Stack Finalized"; v3.0 is kept for history — the two differ only in the header, every numbered section is identical). v3.1 names this stack: ASP.NET Core + PostgreSQL + EF Core. One .NET 10 backend serves an Angular 22 business dashboard (through a BFF) and a Flutter customer app (bearer tokens) in `Khadra.Mobile/`. Modular monolith with DDD bounded contexts; see `docs/architecture-bounded-contexts.md`.
+
+**The customer app lives in THIS repository.** It used to have its own — `khadra-mobile` on GitHub — and that line said so. The app moved here and the sentence did not, which is how a deployment review found a stale instruction pointing at a repository last pushed on 2026-09-07. `Khadra.Mobile/` is the canonical working copy (owner, 2026-09-20); `khadra-mobile` is retired and must not be pushed to. Whether the app eventually splits back out is a separate decision, to be taken when production is stable rather than inside a release.
 
 ## Commands
 
@@ -23,7 +25,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 
 ## Architecture map (dependency direction: Domain <- Application <- Infrastructure <- WebAPI)
 
-- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `Percentage`, `GeoPoint`, `DateRange`) and one folder per bounded context: `IdentityAccess/`, `Auditing/`, `Dealers/`, `Fleet/`, `Bookings/`, `Disputes/`, `Reviews/`, `PlatformSettings/`. `Payments/` was built on 2026-09-08 with the owner's explicit approval: `Payment` (one checkout attempt) with `Refund` children, plus `ProviderEventReceipt` outside the aggregate. **No provider is configured**, so every checkout is refused with `payments.provider_unavailable` and the startup log says `PAYMENTS ARE NOT ACCEPTED` on every boot — see pre-launch item 76 for what closing that needs. Repository interfaces live next to their aggregate. See `docs/architecture-bounded-contexts.md` for the status table and the open owner decisions.
+- `Khadra.Domain` — shared kernel (`Common/`: `Id`, `Entity`, `AggregateRoot`, `ValueObject`, `Enumeration`, `Error`, `Money`, `Percentage`, `GeoPoint`, `DateRange`) and one folder per bounded context: `IdentityAccess/`, `Auditing/`, `Dealers/`, `Fleet/`, `Bookings/`, `Disputes/`, `Reviews/`, `PlatformSettings/`, `Shortlist/`. `Payments/` was built on 2026-09-08 with the owner's explicit approval: `Payment` (one checkout attempt) with `Refund` children, plus `ProviderEventReceipt` outside the aggregate. **No provider is configured**, so every checkout is refused with `payments.provider_unavailable` and the startup log says `PAYMENTS ARE NOT ACCEPTED` on every boot — see pre-launch item 76 for what closing that needs. Repository interfaces live next to their aggregate. See `docs/architecture-bounded-contexts.md` for the status table and the open owner decisions.
 - `Khadra.Application` — CQRS: `<Context>/<UseCase>/<UseCase>Command.cs` (+ validator) and `<UseCase>Handler.cs` using `ICommand<T>`/`IQuery<T>` (MediatR). Ports in `Common/Ports/`. Behaviors: logging, FluentValidation.
 - `Khadra.Infrastructure` — `KhadraDbContext`, `Persistence/Configurations/<Context>/`, migrations, repositories, `UnitOfWork` (dispatches domain events after commit), BCrypt/JWT/opaque tokens, MailKit email, strongly-typed options.
 - `Khadra.WebAPI` — controllers under `/api/v1`, JWT bearer with security-stamp check, policies, rate limiting, ProblemDetails, OpenAPI.
@@ -40,7 +42,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 - Cross-context references by `Id` only. No navigation properties or EF relationships across contexts.
 - Soft delete via `ISoftDeletable`; `DeleteBehavior.Restrict` on every FK; never hard-delete.
 - Handlers return `Result<T, Error>` / `UnitResult<Error>`; `Error.Kind` maps to HTTP status in `ApiControllerBase.Failure`. Do not throw for business outcomes. Handlers call `IUnitOfWork.SaveChangesAsync` explicitly and never touch `HttpContext` (use `ClientInfo` / `ICurrentActor`).
-- Business numbers (commission %, deposit %, no-show hours, penalties, cancellation window, SLA, turnaround minutes) come ONLY from `IBusinessRulesProvider` (configuration section `BusinessRules` today, admin-editable aggregate later). Never a constant.
+- Business numbers (commission %, deposit %, no-show hours, penalties, cancellation window, SLA, turnaround minutes, shortlist cap) come ONLY from `IBusinessRulesProvider` (configuration section `BusinessRules` today, admin-editable aggregate later). Never a constant.
 - **The delivery fee is NOT one of them.** It was, and the owner moved it (2026-09-06) onto the dealership that performs the delivery: it lives on `DeliverySettings` beside the radius, each gallery sets its own from `/dealer/delivery`, and there is no platform-wide figure any more. That matches where the money already went — `BookingPricing` leaves the fee out of the deposit base, so the platform takes no commission on it, and puts it in `BalanceDue` for the driver to collect in cash. A booking still freezes the fee it was made under, so a gallery raising its price never re-prices an existing booking.
 - A booking FREEZES the rules and the price it was made under (`BookingTerms`, `BookingPricing`). Never judge a past booking against current settings.
 - **Rentals are billed in CALENDAR days** (owner, 2026-09-07): the Amman date difference, minimum one, so Mon 09:00 to Thu 11:00 is three days. `RentalDays.Between(DateOnly, DateOnly)` is the only place that counts, and `BookingPricing` freezes the count with the two dates it came from. `DateRange` has no day count and must not grow one — it is the shared kernel's instant interval and has no time zone. Convert through `IReportingCalendar` before pricing. A screen NEVER recomputes days from the two instants; it renders the server's figure.
@@ -76,5 +78,61 @@ something for later; an item comes off only by being fixed.
 Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
 
 **Dealer console defaults awaiting a decision (2026-09-03):** a suspended dealer may still record a pickup on an already-approved booking (default: allowed; returns are always allowed); the business name is locked after approval (default: locked) while location and operating hours stay editable; the customer's contact details are never shown to the dealer (the console makes no promise about it); staff management (`/dealers/me/employees`) requires an approved, trading dealer, so the owner of a suspended dealer cannot deactivate an employee (default kept). Ask the owner before changing any of these.
+
+**Shortlist, settled by the owner (2026-09-11):** favourites are a `Shortlist` context. Account-only,
+with no device-local list. The cap is **100** (`BusinessRules:MaxShortlistEntries`). A car that stops
+being bookable **keeps its row** and is shown as "Currently unavailable / غير متاحة حاليًا" — still
+named, with its gallery, and with no way to start a booking from it — **never auto-removed**, and
+**never with a reason**: hidden, in maintenance, suspended and deleted are answered identically
+everywhere else and this screen is not the exception. The name is read live and past the soft-delete
+filter, deliberately, so that deletion does not become the one reason a customer can tell apart. See
+pre-launch items 87-89 and `IShortlistReader`.
+
+**A gallery may not approve a booking late (2026-09-11).** An approval must leave the customer the
+WHOLE frozen `BookingTerms.PaymentWindow` before the rental starts, so `DecisionDeadline` is capped at
+`Period.Start - PaymentWindow` rather than at the rental start. Putting the rule in that one column is
+what keeps the availability predicate, the settlement sweep, the DTO flags and the console countdown
+correct without any of them being touched. `Approve` restates the invariant, which is NOT redundant
+for rows created before the change. Two consequences: `MinimumBookingLeadTimeMinutes` must STRICTLY
+exceed `PaymentWindowHours` (validated at startup; 240 against 120 today, and the extra two hours are
+both halves settled by the owner on 2026-09-11), and an approval now emails the customer, after the
+commit, with failures logged and swallowed, because a mail server cannot be allowed to undo a
+decision a gallery has made.
+
+**The customer app's visual source of truth is the design handoff (2026-09-11)**, not
+`Khadra.Dashboard/src/styles/_tokens.scss`. `KhadraColors`, `Radii`, `Shadows` and `KhadraTheme` in
+`Khadra.Mobile/lib/core/theme/khadra_theme.dart` carry it, and NOTHING in that app names a colour or
+a radius outside that file — no `Color(0x...)`, no `BorderRadius.circular` in a screen. Keep it that
+way: it is what made adopting the handoff a change to a token list rather than a sweep through thirty
+screens. Latin is Manrope, Arabic is Noto Kufi Arabic, and the fallback ORDER is load-bearing because
+Kufi carries Latin too. The handoff is authoritative for LOOK ONLY: its BOOKING FLOW artboard shows
+pay-before-approval and a simulated declined payment, and this platform has ruled out both.
+
+**The customer app opens on Get Started, and guest browsing is a CHOICE (2026-09-12).**
+A fresh install, cleared app data and a deliberate sign-out all land on `/welcome`,
+which offers exactly three things: browse as a guest, sign in, create an account. The
+gate is a device-local flag in ordinary preferences (`khadra.entry_chosen`, owned by
+`EntryChoice`) and NOT a fourth `SessionStatus` — signed out is signed out whether or
+not a choice was made, and folding a stored preference into the credential state
+machine would put it in front of `restore()` and the router's refresh listener. It is
+consulted at `/` ONLY: public routes render before the session resolves so that
+`/verify-email?token=…` survives a cold start, and a gate across every route would
+land that on a welcome screen with the single-use link unspent. Sign-out clears the
+flag, so the next launch shows the same screen it was left on. An expiry or a
+suspension does not: that customer has an account and chose long ago.
+
+Two things the owner settled on 2026-09-12 when asked. **The three account tabs are
+not redirected.** Bookings, Alerts and Profile each open and show one shared
+`AccountRequired` panel offering both ways in; the data is already behind
+authentication where it counts (the providers never call the API without a session,
+and every one of those endpoints is refused server-side), while a redirect would leave
+the tab shell — the bottom bar disappears — and Profile is where the language switch
+lives, so gating it would strand an Arabic speaker who has not signed in. The hard
+redirect stays for routes that ACT on an account: documents, edit profile, change
+password, sessions, saved cars, `/book`, `/bookings/*`, `/disputes/*`. **And sign-out
+returns to Get Started**, not to the catalogue.
+
+`khadra.session_owned` is what makes "must not restore a stale session" true rather
+than hoped for — see `docs/auth-and-sessions.md`. It replaces `khadra.install_marker`.
 
 **Minimum renter age: settled at 21** by the owner and enforced (`BusinessRules:MinimumRenterAge`, `RenterAgePolicy`). The spec still says "value pending Section 2 decision" in §5.1 and lists it as open in §2.2 — the document has not caught up with the decision. The code is right; the spec needs a revision.

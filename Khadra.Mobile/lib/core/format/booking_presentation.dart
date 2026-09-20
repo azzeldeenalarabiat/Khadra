@@ -69,17 +69,41 @@ abstract final class BookingPresentation {
   /// `isAwaitingDecision` / `isAwaitingPayment` — the server's answer against its
   /// own clock. This is what makes a phone with a skewed clock show a slightly
   /// wrong number of hours instead of showing a live booking as dead.
+  /// Built from PARTS, one per unit, rather than from a sentence per shape.
+  ///
+  /// English abbreviates — "1h 30m left" — and needs no plural at all. Arabic
+  /// spells the unit out, and spelling it out means inflecting it: one hour is
+  /// ساعة واحدة, two is ساعتان, three to ten takes ساعات, and eleven upwards
+  /// takes ساعة again. The old strings interpolated a digit in front of a fixed
+  /// noun, which was right for the eleven-and-up case and wrong everywhere else.
+  ///
+  /// It stopped being a corner in 2026-09-11, when the payment window went from
+  /// twenty-four hours to two: this countdown now spends its whole life in the
+  /// one-and-two range, and "2 ساعة" would have been the first thing a customer
+  /// read on the screen that decides whether they keep the car.
+  ///
+  /// The wrapper is a NOUN phrase in Arabic (المتبقي) rather than a verb, because
+  /// an Arabic verb would have to agree in gender with whichever unit happened to
+  /// come first — masculine for يوم, feminine for ساعة.
   static String countdown(AppLocalizations l10n, DateTime deadline) {
     final left = deadline.toUtc().difference(DateTime.now().toUtc());
     if (left.isNegative) return l10n.bookingCountdownOver;
 
+    final String time;
     if (left.inDays >= 1) {
-      return l10n.bookingCountdownDays(left.inDays, left.inHours % 24);
+      time = l10n.countdownPair(
+        l10n.countdownDays(left.inDays),
+        l10n.countdownHours(left.inHours % 24),
+      );
+    } else if (left.inHours >= 1) {
+      time = l10n.countdownPair(
+        l10n.countdownHours(left.inHours),
+        l10n.countdownMinutes(left.inMinutes % 60),
+      );
+    } else {
+      time = l10n.countdownMinutes(left.inMinutes.clamp(0, 59));
     }
-    if (left.inHours >= 1) {
-      return l10n.bookingCountdownHours(left.inHours, left.inMinutes % 60);
-    }
-    return l10n.bookingCountdownMinutes(left.inMinutes.clamp(0, 59));
+    return l10n.bookingCountdownLeft(time);
   }
 
   /// A "3 hours ago" for a notification feed.

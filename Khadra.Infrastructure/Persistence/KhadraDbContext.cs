@@ -9,6 +9,7 @@ using Khadra.Domain.Notifications;
 using Khadra.Domain.Payments;
 using Khadra.Domain.PlatformSettings;
 using Khadra.Domain.Reviews;
+using Khadra.Domain.Shortlist;
 using Microsoft.EntityFrameworkCore;
 
 namespace Khadra.Infrastructure.Persistence;
@@ -30,6 +31,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<City> Cities => Set<City>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<CustomerShortlist> Shortlists => Set<CustomerShortlist>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<ProviderEventReceipt> ProviderEventReceipts => Set<ProviderEventReceipt>();
 

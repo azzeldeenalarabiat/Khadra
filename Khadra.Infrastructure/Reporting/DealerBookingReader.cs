@@ -163,9 +163,12 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
                 row.change.To.Name,
                 row.change.From != null ? row.change.From.Name : null,
                 row.change.ActorUserId != null ? row.change.ActorUserId.Value.Value : null,
+                // Null for a change no person signed AND for an account that no longer resolves; the
+                // id beside it tells the console which, and the console words both. The English
+                // stand-ins that used to be written here reached Arabic screens untranslated.
                 row.change.ActorUserId != null
-                    ? context.Users.Where(user => user.Id == row.change.ActorUserId.Value).Select(user => user.Name.Value).FirstOrDefault() ?? "Former staff member"
-                    : "The rental office",
+                    ? context.Users.Where(user => user.Id == row.change.ActorUserId.Value).Select(user => user.Name.Value).FirstOrDefault()
+                    : null,
                 row.change.Reason,
                 row.change.OccurredAt))
             .ToListAsync(cancellationToken);
@@ -181,6 +184,7 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
             pickup ? booking.Period.Start : booking.Period.End,
             booking.PickupMethod.Name,
             booking.VehicleId.Value,
-            context.Users.Where(user => user.Id == booking.CustomerId).Select(user => user.Name.Value).FirstOrDefault() ?? "Customer account closed",
+            // Null when the customer's account no longer resolves; the console words that case.
+            context.Users.Where(user => user.Id == booking.CustomerId).Select(user => user.Name.Value).FirstOrDefault(),
             !pickup && booking.Period.End < now));
 }

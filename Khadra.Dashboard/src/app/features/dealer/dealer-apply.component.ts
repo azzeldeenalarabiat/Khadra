@@ -1,4 +1,3 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
@@ -9,6 +8,13 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { MapComponent } from '../../shared/map/map.component';
 import { TranslationKey } from '../../core/i18n/en';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { Language } from '../../core/i18n/language';
+import {
+  ProblemSnapshot,
+  fieldMessage,
+  serverSentence,
+  snapshotProblem,
+} from '../../core/i18n/problem';
 
 /** The three papers spec 3.1 requires. The keys are the form field names the API binds. */
 const REQUIRED_DOCUMENTS = [
@@ -90,7 +96,20 @@ export class DealerApplyComponent {
   protected readonly files = signal<Readonly<Partial<Record<DocumentKey, File>>>>({});
 
   protected readonly busy = signal(false);
-  protected readonly problem = signal<string | null>(null);
+  /** Why the last submission was refused, held as facts: the words are chosen when it is shown. */
+  protected readonly problem = signal<ProblemSnapshot | null>(null);
+  protected readonly problemText = computed(() => {
+    const problem = this.problem();
+    return problem ? describe(problem, this.t, this.i18n.lang()) : null;
+  });
+
+  /**
+   * The server's word on one field of a refused submission, or null: its own sentence while the
+   * console is English, "Check this field." beneath the field while it is Arabic.
+   */
+  protected fieldProblem(field: string): string | null {
+    return fieldMessage(this.problem(), field, this.i18n.lang(), this.t);
+  }
 
   protected readonly cities = computed(() => loaded(this.lookups.cities)() ?? []);
 
@@ -324,24 +343,34 @@ export class DealerApplyComponent {
       const dealer = await this.console.submitApplication(form);
       this.ui.showToast(
         this.t('dealerApply.applicationSubmitted'),
-        `${dealer.businessName} is with the platform for its licence check.`,
+        this.t('dealerApply.withThePlatformForLicenceCheck', { name: dealer.businessName }),
       );
       await this.router.navigateByUrl('/dealer/dashboard');
     } catch (error) {
-      this.problem.set(describe(error, this.t));
+      this.problem.set(snapshotProblem(error));
     } finally {
       this.busy.set(false);
     }
   }
 }
 
-function describe(error: unknown, t: (key: TranslationKey) => string): string {
-  if (!(error instanceof HttpErrorResponse)) {
+/**
+ * Why a submission was refused, in the reader's own language, worded when it is shown.
+ *
+ * The codes this screen knows by their own sentences; anything else by the server's English title
+ * while the console is English, and the console's own lines while it is not.
+ */
+function describe(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  // No answer at all — the request never reached the platform, or something failed before it could.
+  if (problem.status === 0) {
     return t('dealerApply.theServiceDidNot');
   }
 
-  const code: string | undefined = error.error?.code;
-  switch (code) {
+  switch (problem.code) {
     case 'dealer.already_registered':
     // The database's own answer to the same question, from the unique index on the owner. The
     // handler's check and the index can only disagree in a race — two tabs, or a double click on a
@@ -364,8 +393,8 @@ function describe(error: unknown, t: (key: TranslationKey) => string): string {
       break;
   }
 
-  if (error.status === 413) {
+  if (problem.status === 413) {
     return t('dealerApply.theDocumentsTogetherAre');
   }
-  return error.error?.title ?? t('dealerApply.theApplicationWasRejected');
+  return serverSentence(problem, language, t) ?? t('dealerApply.theApplicationWasRejected');
 }

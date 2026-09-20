@@ -74,9 +74,13 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final passwordPolicy = ref.watch(passwordPolicyProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.authChangePassword)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.profile),
+        title: Text(l10n.authChangePassword),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
             Space.lg, Space.lg, Space.lg, Space.bottomInset),
@@ -86,6 +90,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
             const SizedBox(height: Space.lg),
           ],
           Form(
+            // Re-validates as a field is corrected, so a message does not outlive the
+            // mistake it described. Without it the error stays until the next submit:
+            // "This is needed." sat under an email box that had just been filled in,
+            // which reads as the form refusing what was typed.
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             key: _formKey,
             child: Column(
               children: [
@@ -97,8 +106,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 KhadraPasswordField(
                   controller: _next,
                   label: l10n.authNewPassword,
-                  helper: l10n.authPasswordRules,
-                  validator: (value) => Validate.password(l10n, value),
+                  helper: Validate.passwordRules(l10n, passwordPolicy),
+                  maxLength: passwordPolicy?.maximumLength,
+                  validator: (value) =>
+                      Validate.password(l10n, value, policy: passwordPolicy),
                 ),
                 KhadraPasswordField(
                   controller: _confirm,

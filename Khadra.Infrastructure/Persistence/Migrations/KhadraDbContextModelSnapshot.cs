@@ -1681,6 +1681,57 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.ToTable("reviews", (string)null);
                 });
 
+            modelBuilder.Entity("Khadra.Domain.Shortlist.CustomerShortlist", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_shortlists");
+
+                    b.ToTable("customer_shortlists", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Shortlist.ShortlistEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("SavedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("saved_at");
+
+                    b.Property<Guid>("ShortlistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shortlist_id");
+
+                    b.Property<Guid>("VehicleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("vehicle_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shortlist_entries");
+
+                    b.HasIndex("ShortlistId", "SavedAt")
+                        .HasDatabaseName("ix_shortlist_entries_shortlist_id_saved_at");
+
+                    b.HasIndex("ShortlistId", "VehicleId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shortlist_entries_shortlist_id_vehicle_id");
+
+                    b.ToTable("shortlist_entries", (string)null);
+                });
+
             modelBuilder.Entity("Khadra.Domain.Bookings.Booking", b =>
                 {
                     b.OwnsOne("Khadra.Domain.Common.GeoPoint", "DeliveryLocation", b1 =>
@@ -2110,6 +2161,9 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                                 .IsRequired()
                                 .HasMaxLength(500);
 
+                            b1.Property<string>("ReasonCode")
+                                .HasMaxLength(60);
+
                             b1.HasKey("BookingId");
 
                             b1.ToTable("bookings");
@@ -2409,12 +2463,63 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                             b1.Navigation("Fee");
                         });
 
+                    b.OwnsOne("Khadra.Domain.Dealers.PublicProfile", "PublicProfile", b1 =>
+                        {
+                            b1.Property<Guid>("DealerId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<string>("CustomerNotes")
+                                .HasMaxLength(2000)
+                                .HasColumnType("character varying(2000)")
+                                .HasColumnName("customer_notes");
+
+                            b1.Property<string>("DeliveryNotes")
+                                .HasMaxLength(2000)
+                                .HasColumnType("character varying(2000)")
+                                .HasColumnName("delivery_notes");
+
+                            b1.Property<string>("HiddenSections")
+                                .IsRequired()
+                                .ValueGeneratedOnAdd()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("hidden_profile_sections")
+                                .HasDefaultValueSql("''");
+
+                            b1.Property<string>("Insurance")
+                                .HasMaxLength(2000)
+                                .HasColumnType("character varying(2000)")
+                                .HasColumnName("insurance_summary");
+
+                            b1.Property<string>("PickupInstructions")
+                                .HasMaxLength(2000)
+                                .HasColumnType("character varying(2000)")
+                                .HasColumnName("pickup_instructions");
+
+                            b1.Property<string>("RentalConditions")
+                                .HasMaxLength(2000)
+                                .HasColumnType("character varying(2000)")
+                                .HasColumnName("rental_conditions");
+
+                            b1.HasKey("DealerId");
+
+                            b1.ToTable("dealers");
+
+                            b1.WithOwner()
+                                .HasForeignKey("DealerId")
+                                .HasConstraintName("fk_dealers_dealers_id");
+                        });
+
                     b.Navigation("Address");
 
                     b.Navigation("Delivery")
                         .IsRequired();
 
                     b.Navigation("Location")
+                        .IsRequired();
+
+                    b.Navigation("PublicProfile")
                         .IsRequired();
                 });
 
@@ -2981,6 +3086,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Khadra.Domain.Shortlist.ShortlistEntry", b =>
+                {
+                    b.HasOne("Khadra.Domain.Shortlist.CustomerShortlist", null)
+                        .WithMany("_entries")
+                        .HasForeignKey("ShortlistId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_shortlist_entries_customer_shortlists_shortlist_id");
+                });
+
             modelBuilder.Entity("Khadra.Domain.Bookings.Booking", b =>
                 {
                     b.Navigation("Handovers");
@@ -3015,6 +3130,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Khadra.Domain.Payments.Payment", b =>
                 {
                     b.Navigation("Refunds");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Shortlist.CustomerShortlist", b =>
+                {
+                    b.Navigation("_entries");
                 });
 #pragma warning restore 612, 618
         }

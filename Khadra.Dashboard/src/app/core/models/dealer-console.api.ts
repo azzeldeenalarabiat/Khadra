@@ -23,8 +23,10 @@ export interface UpcomingHandover {
   readonly status: string;
   readonly when: string;
   readonly pickupMethod: 'SelfPickup' | 'Delivery';
-  readonly vehicleLabel: string;
-  readonly customerName: string;
+  /** Make, model and year. Null when the car is no longer in this dealer's fleet. */
+  readonly vehicleLabel: string | null;
+  /** Null when the customer's account no longer resolves (closed). */
+  readonly customerName: string | null;
   readonly isOverdue: boolean;
 }
 
@@ -38,8 +40,13 @@ export interface DealerActivityEntry {
   readonly reference: string;
   readonly toStatus: string;
   readonly fromStatus: string | null;
+  /** Null when nobody signed the change: the rental office (or the system) acted. */
   readonly actorUserId: string | null;
-  readonly actorName: string;
+  /**
+   * Null in two cases, told apart by `actorUserId`: a null id means the rental office acted; an id
+   * with a null name means that person's account no longer resolves (a former member of staff).
+   */
+  readonly actorName: string | null;
   readonly reason: string | null;
   readonly occurredAt: string;
 }
@@ -115,10 +122,20 @@ export interface DayScheduleInput {
 
 export interface UpdateProfileRequest {
   readonly businessName: string;
-  readonly description: string | null;
+  // No `description`. The API stopped accepting one when About moved to the customer page, and a
+  // field here would have been sent, ignored, and reported as saved.
   readonly latitude: number;
   readonly longitude: number;
   readonly operatingHours: readonly DayScheduleInput[];
+  /**
+   * The location, stated on every save, named as the application form names it. Required and
+   * nullable — never optional: `JSON.stringify` drops an `undefined` property, and the API refuses a
+   * save that leaves one out, because a save that left them out used to erase the office's city and
+   * address. `null` is an answer ("none"); absence is not.
+   */
+  readonly cityId: string | null;
+  readonly addressArea: string | null;
+  readonly addressStreet: string | null;
 }
 
 export interface BrandingUpload {
@@ -151,4 +168,45 @@ export interface DeliverySettingsView {
 /** What the bulk action changed, so a screen says a number rather than "done". */
 export interface FleetDeliveryResult {
   readonly updated: number;
+}
+
+/**
+ * The customer page as its owner edits it: what is written, what is hidden, what MAY be hidden, and
+ * what a customer would actually see.
+ *
+ * `sections` is the server's own vocabulary and the toggles are built from it, so a section the
+ * platform adds appears in the editor without a console release — and the console cannot offer one
+ * the platform does not have. `visible` is the server's answer to "what does a customer see", from
+ * the same code the public page runs, so the preview cannot drift from the page; a console working
+ * out "hidden or empty" for itself certainly would.
+ */
+export interface CustomerPageView extends CustomerPageText {
+  /** Section names that are hidden. PascalCase, as they are stored and sent. */
+  readonly hiddenSections: readonly string[];
+  /** Every section that MAY be hidden. Nothing else on the page can be. */
+  readonly sections: readonly string[];
+  readonly maxTextLength: number;
+  /** Delivery notes are not shown while delivery is off, and the editor says so. */
+  readonly deliveryEnabled: boolean;
+  readonly visible: CustomerPageText;
+}
+
+/** The six texts, by their wire names. Null is "nothing written". */
+export interface CustomerPageText {
+  readonly about: string | null;
+  readonly rentalConditions: string | null;
+  readonly insurance: string | null;
+  readonly pickupInstructions: string | null;
+  readonly deliveryNotes: string | null;
+  readonly customerNotes: string | null;
+}
+
+/**
+ * A full replacement, never a patch.
+ *
+ * A section left out is a section cleared. That is the server's rule and it is the right one: a patch
+ * would let the console leave text on a customer's screen that its owner can no longer see.
+ */
+export interface UpdateCustomerPageRequest extends CustomerPageText {
+  readonly hiddenSections: readonly string[];
 }

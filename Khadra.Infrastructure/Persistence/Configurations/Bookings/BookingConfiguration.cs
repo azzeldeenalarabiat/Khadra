@@ -126,6 +126,16 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             ConfigureMoney(penalty.OwnsOne(value => value.MinAmount));
             ConfigureMoney(penalty.OwnsOne(value => value.MaxAmount));
             penalty.Property(value => value.Reason).HasMaxLength(500);
+            // The code beside the sentence. Nullable, and null is the WHOLE history before codes
+            // existed: EF never runs a converter on null, so an older document simply reads as null.
+            //
+            // Read through Find rather than FromName, which throws: a name this build does not know
+            // — a reason added by a newer build, read by an older one — must not make the BOOKING
+            // unloadable. It reads as no code, and a client then shows the frozen sentence, which is
+            // the same fallback every pre-code booking already uses.
+            penalty.Property(value => value.ReasonCode)
+                .HasMaxLength(60)
+                .HasConversion(code => code!.Name, name => PenaltyReason.Find(name)!);
             penalty.Property(value => value.AssessedAt);
             penalty.Property(value => value.AttributedTo)
                 .HasConversion(party => party.Name, name => Enumeration.FromName<BookingParty>(name));

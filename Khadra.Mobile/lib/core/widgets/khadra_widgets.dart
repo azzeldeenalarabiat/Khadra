@@ -1,6 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+// `show Bidi`: intl exports a TextDirection of its own, which shadows the
+// framework's and makes `TextDirection.rtl` stop resolving.
+import 'package:intl/intl.dart' show Bidi;
 
 import '../../l10n/app_localizations.dart';
 import '../theme/khadra_theme.dart';
@@ -74,14 +77,75 @@ void khadraLeave(BuildContext context, String fallback) {
 /// renders nothing at all in that case, which leaves a customer on a pushed screen
 /// with no navigation and no tabs: on the web there is no way out but the browser's
 /// own back, and on a phone the gesture quits the app.
+/// The title of a screen that is somewhere you ARRIVE, not somewhere you opened.
+///
+/// The design has two title sizes and one rule for choosing: a screen you can go
+/// back from wears 16, and a screen that is the root of a tab wears 20. The rule
+/// is about the back arrow, not about which screen it is — so Saved cars, which
+/// the handoff draws as a tab at 20, is 16 here because this app reaches it from
+/// Profile and it has an arrow.
+///
+/// 20 fits at 375 with room to spare; the app bar has no leading control on these
+/// screens, which is the whole reason the design can afford the larger size.
+class KhadraLargeTitle extends StatelessWidget {
+  const KhadraLargeTitle(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          letterSpacing: KhadraType.of(context, -0.4),
+          color: KhadraColors.text,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+}
+
 class KhadraBack extends StatelessWidget {
-  const KhadraBack({super.key, required this.fallback});
+  const KhadraBack({super.key, required this.fallback, this.onSurface = false});
 
   final String fallback;
 
+  /// Sitting over a PHOTOGRAPH rather than on a bar, so it needs its own white
+  /// disc: a bare dark chevron disappears into the first car photographed at
+  /// night, and the save button beside it already has one.
+  final bool onSurface;
+
   @override
-  Widget build(BuildContext context) => IconButton(
-        icon: const BackButtonIcon(),
+  Widget build(BuildContext context) {
+    final button = _button(context);
+    if (!onSurface) return button;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: KhadraColors.surface.withValues(alpha: 0.92),
+        shape: BoxShape.circle,
+      ),
+      child: button,
+    );
+  }
+
+  Widget _button(BuildContext context) => IconButton(
+        // A plain CHEVRON, which is what the design draws, rather than Material's
+        // arrow-with-a-shaft. It is on fifteen screens, it is the single most
+        // repeated glyph in the app, and it is one icon to change.
+        //
+        // NAMED ONCE, and not chosen by direction. `Icons.chevron_left` carries
+        // `matchTextDirection: true`, and the `Icon` widget mirrors any such glyph
+        // under an RTL `Directionality` itself — so this already points right in
+        // Arabic. Picking `chevron_right` for Arabic by hand, as this did, mirrors
+        // a glyph that was about to be mirrored anyway and lands back where it
+        // started: a back button pointing LEFT on every Arabic screen.
+        //
+        // `KhadraDisclosure` below is the same rule for the trailing chevron, and
+        // `rtl_audit_test` forbids the hand-written version so this cannot come
+        // back.
+        icon: Icon(Icons.chevron_left, size: 26),
         tooltip: MaterialLocalizations.of(context).backButtonTooltip,
         onPressed: () => khadraLeave(context, fallback),
       );
@@ -132,7 +196,9 @@ class _ImagePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ColoredBox(
-        color: KhadraColors.neutral100,
+        // The design's own empty-frame grey, a hair off the chip fill beside it so a
+        // missing photograph reads as a gap rather than as a surface.
+        color: KhadraColors.imagePlaceholder,
         child: Center(
           child: spinning
               ? const SizedBox(
@@ -215,32 +281,48 @@ class KhadraEmpty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(Space.xl),
+        padding: const EdgeInsets.symmetric(
+            horizontal: Space.xl, vertical: Space.xxl + Space.lg),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 52, color: KhadraColors.neutral300),
+            // The icon sits IN something. A bare 52px glyph floating above the
+            // text reads as a failure; the design's rounded grey tile reads as a
+            // place where something will be.
+            Container(
+              width: 54,
+              height: 54,
+              decoration: const BoxDecoration(
+                color: KhadraColors.neutral100,
+                borderRadius: Radii.card,
+              ),
+              child: Icon(icon, size: 24, color: KhadraColors.neutral500),
+            ),
             const SizedBox(height: Space.lg),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
                 color: KhadraColors.text,
               ),
             ),
             if (body != null) ...[
-              const SizedBox(height: Space.sm),
+              const SizedBox(height: 7),
               Text(
                 body!,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    color: KhadraColors.neutral600, fontSize: 15, height: 1.45),
+                  color: KhadraColors.neutral600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  height: 1.5,
+                ),
               ),
             ],
             if (action != null) ...[
-              const SizedBox(height: Space.xl),
+              const SizedBox(height: 18),
               action!,
             ],
           ],
@@ -253,10 +335,11 @@ class KhadraCard extends StatelessWidget {
   const KhadraCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(Space.lg),
+    this.padding = const EdgeInsets.all(Space.card),
     this.onTap,
     this.borderColor,
     this.background,
+    this.borderRadius = Radii.card,
   });
 
   final Widget child;
@@ -265,13 +348,20 @@ class KhadraCard extends StatelessWidget {
   final Color? borderColor;
   final Color? background;
 
+  /// `Radii.card` by default; `Radii.row` for a list of papers or of a gallery's
+  /// cars, which the design draws a step tighter.
+  final BorderRadius borderRadius;
+
   @override
   Widget build(BuildContext context) {
     final body = Container(
       decoration: BoxDecoration(
         color: background ?? KhadraColors.surface,
-        borderRadius: Radii.card,
+        borderRadius: borderRadius,
         border: Border.all(color: borderColor ?? KhadraColors.neutral200),
+        // The design's single shadow, and it is almost nothing: surfaces are
+        // separated by the border, and this only lifts the card a hair off the page.
+        boxShadow: Shadows.card,
       ),
       padding: padding,
       child: child,
@@ -283,7 +373,7 @@ class KhadraCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: Radii.card,
+        borderRadius: borderRadius,
         child: body,
       ),
     );
@@ -309,19 +399,21 @@ class KhadraBadge extends StatelessWidget {
         padding: const EdgeInsetsDirectional.only(
           start: Space.sm,
           end: Space.sm,
-          top: 5,
-          bottom: 5,
+          top: 4,
+          bottom: 4,
         ),
+        // A SOFT-cornered rectangle filled with a wash of its own colour, and no
+        // border. The design carries state on the fill alone; an outline as well
+        // turns a label into a second button on a card that already has one.
         decoration: BoxDecoration(
-          color: colour.withValues(alpha: 0.10),
-          borderRadius: Radii.chip,
-          border: Border.all(color: colour.withValues(alpha: 0.28)),
+          color: colour.withValues(alpha: 0.12),
+          borderRadius: Radii.pill,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 13, color: colour),
+              Icon(icon, size: 11, color: colour),
               const SizedBox(width: 4),
             ],
             Flexible(
@@ -331,8 +423,9 @@ class KhadraBadge extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: colour,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: KhadraType.of(context, 0.3),
                 ),
               ),
             ),
@@ -367,7 +460,10 @@ class KhadraDetailRow extends StatelessWidget {
               child: Text(
                 label,
                 style: const TextStyle(
-                    color: KhadraColors.neutral600, fontSize: 14),
+                  color: KhadraColors.neutral600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             const SizedBox(width: Space.md),
@@ -375,14 +471,224 @@ class KhadraDetailRow extends StatelessWidget {
               style: valueStyle ??
                   const TextStyle(
                     color: KhadraColors.text,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
               textAlign: TextAlign.end,
               child: value,
             ),
           ],
         ),
+      );
+}
+
+/// The design's choice chip: a bordered rounded rectangle that tints and takes
+/// an accent outline when it is the one chosen.
+///
+/// Drawn rather than themed from Material's `Chip`. Material sizes a chip's label
+/// box from the style's own metrics and clips what does not fit, and Noto Kufi
+/// Arabic's line box is deeper than Manrope's at the same point size -- so the
+/// city chips came out with the top and bottom sliced off every Arabic word
+/// while the English ones looked fine. A Container has no opinion about the
+/// script inside it.
+class KhadraChoiceChip extends StatelessWidget {
+  const KhadraChoiceChip({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool selected;
+
+  static const double _fontSize = 12;
+  static const double _padding = 9;
+  static const double _border = 1;
+
+  /// The height one of these takes at the reader's chosen text size.
+  ///
+  /// Exposed because one caller has to know BEFORE it builds one: a horizontal
+  /// list must be given a height, and the number that was written down there —
+  /// 42 — was measured in English at the default size. Arabic's line box is
+  /// deeper and a customer who has turned text up gets more of both, so a
+  /// constant is clipped in exactly the cases nobody takes a screenshot of.
+  ///
+  /// It reads the SAME constants the chip builds with, so the two cannot drift
+  /// the day the padding or the point size changes.
+  static double heightIn(BuildContext context) {
+    final ambient = DefaultTextStyle.of(context);
+
+    final painter = TextPainter(
+      // BOTH scripts in one line, and that is the point. A run of Latin is set in
+      // Manrope and a run of Arabic falls through to Noto Kufi Arabic, the two
+      // faces do not have the same metrics, and a line takes the taller of the
+      // runs it contains. Measuring either alphabet alone under-reports the other
+      // by a pixel or two — which is all it takes to shave the top off a word.
+      text: TextSpan(text: 'Aع', style: _styleIn(context, selected: true)),
+      // rtl-audit: allow — measuring a sample, not laying out a screen.
+      textDirection: TextDirection.ltr,
+      textScaler: MediaQuery.textScalerOf(context),
+      // The same height behaviour `Text` will be laid out with. Left to the
+      // default the painter and the widget can disagree, and the painter is the
+      // one that says the row is big enough. (No strut: the chip's `Text` sets
+      // none either, so the line height comes from the runs in both.)
+      textHeightBehavior: ambient.textHeightBehavior,
+    )..layout();
+
+    final height = painter.height;
+    painter.dispose();
+
+    // Ceiled: a paragraph is laid out in whole pixels and a row reserving 36.4 for
+    // a chip that takes 37 clips it by the rounding alone.
+    return height.ceilToDouble() + (_padding + _border) * 2;
+  }
+
+  /// Resolved against the ambient default so the measurement runs in the app's
+  /// own faces. A bare `TextStyle` names no family and would be measured in the
+  /// platform's, which is not what any of this renders in.
+  static TextStyle _styleIn(BuildContext context, {required bool selected}) =>
+      DefaultTextStyle.of(context).style.merge(
+            TextStyle(
+              fontSize: _fontSize,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+              color: selected ? KhadraColors.price : KhadraColors.neutral800,
+            ),
+          );
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: selected ? KhadraColors.accent100 : KhadraColors.surface,
+        borderRadius: Radii.chip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: Radii.chip,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 13, vertical: _padding),
+            decoration: BoxDecoration(
+              borderRadius: Radii.chip,
+              border: Border.all(
+                width: _border,
+                color:
+                    selected ? KhadraColors.accent : KhadraColors.neutral300,
+              ),
+            ),
+            child: Text(label, style: _styleIn(context, selected: selected)),
+          ),
+        ),
+      );
+}
+
+/// The chevron at the end of a row you can open.
+///
+/// It points the way the language runs — right in English, left in Arabic — and
+/// FLUTTER does that, not this widget. `Icons.chevron_right` is declared with
+/// `matchTextDirection: true`, and `Icon` flips any such glyph horizontally under
+/// an RTL `Directionality`. So the four screens that named it directly were
+/// right; what was wrong was the correction, which chose `chevron_left` for
+/// Arabic and had it mirrored straight back into pointing right.
+///
+/// This exists for the colour and for one place to look, not to pick the glyph.
+/// `rtl_audit_test` forbids picking one by hand anywhere.
+class KhadraDisclosure extends StatelessWidget {
+  const KhadraDisclosure({super.key, this.color});
+
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => Icon(
+        Icons.chevron_right,
+        color: color ?? KhadraColors.neutral400,
+      );
+}
+
+/// The small label above ONE control -- a group of chips, a slider, a field.
+///
+/// Deliberately not a section title: inside a sheet the design drops to a quiet
+/// 12, because the sheet's own heading is already doing the shouting and a column
+/// of full-weight headings makes six controls look like six screens.
+class KhadraFieldLabel extends StatelessWidget {
+  const KhadraFieldLabel(this.label, {super.key});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: KhadraColors.neutral700,
+          ),
+        ),
+      );
+}
+
+/// The design's SPECIFICATIONS block: a two-column grid of small bordered
+/// tiles, each an uppercase label over its value.
+///
+/// A list of label/value rows says the same words, but a car's specification is
+/// six unrelated facts of the same weight, and a column makes the first one look
+/// like the heading for the rest.
+class KhadraSpecGrid extends StatelessWidget {
+  const KhadraSpecGrid({super.key, required this.specs});
+
+  final List<({String label, String value})> specs;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, constraints) {
+          const gap = 10.0;
+          final width = (constraints.maxWidth - gap) / 2;
+
+          return Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: [
+              for (final spec in specs)
+                SizedBox(
+                  width: width,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: Space.md, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: KhadraColors.surface,
+                      borderRadius: Radii.field,
+                      border: Border.all(color: KhadraColors.neutral200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          spec.label.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: KhadraType.of(context, 0.5),
+                            color: KhadraColors.neutral500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          spec.value,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       );
 }
 
@@ -401,10 +707,11 @@ class KhadraSectionTitle extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
                   color: KhadraColors.text,
+                  letterSpacing: KhadraType.of(context, -0.2),
                 ),
               ),
             ),
@@ -532,7 +839,7 @@ class KhadraStars extends StatelessWidget {
                   ? Icons.star_half_rounded
                   : Icons.star_outline_rounded,
           size: size,
-          color: rating == null ? KhadraColors.neutral300 : KhadraColors.warn,
+          color: rating == null ? KhadraColors.neutral300 : KhadraColors.star,
         );
 
         if (onChanged == null) return star;
@@ -564,9 +871,62 @@ class LatinRun extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Directionality(
+        // rtl-audit: allow — an isolate is exactly what this widget is for.
         textDirection: TextDirection.ltr,
         child: Text(text, style: style),
       );
+}
+
+/// Text somebody TYPED, laid out in the direction they typed it in.
+///
+/// A gallery writes its description in Arabic or in English, a customer writes a
+/// dispute statement in either, and the interface language says nothing about
+/// which. Rendering an English paragraph inside an Arabic layout puts its full
+/// stop at the wrong end — the gallery page showed ".open seven days a week",
+/// with the period orphaned at the start of the line — and an Arabic paragraph in
+/// an English layout has the mirror-image problem.
+///
+/// The direction comes from the TEXT, through the bidi algorithm's own
+/// first-strong rule, and the alignment follows it so the paragraph does not sit
+/// ragged against the wrong margin. Text with no strong character either way — a
+/// number, a plate — keeps the interface direction, which is the right default
+/// for something that reads the same both ways.
+///
+/// This is NOT for platform copy. Every string from the ARB files is written in
+/// the language it will be read in, and belongs in an ordinary [Text].
+class UserText extends StatelessWidget {
+  const UserText(this.text, {super.key, this.style, this.maxLines});
+
+  final String text;
+  final TextStyle? style;
+  final int? maxLines;
+
+  /// The direction [text] will be laid out in.
+  ///
+  /// Exposed because a caller that has to MEASURE this paragraph — the fold
+  /// behind a "Show more" — must measure it the way it is rendered, and a second
+  /// copy of the detection rule is a second rule.
+  static TextDirection directionOf(String text) =>
+      // rtl-audit: allow — derived from the typed text, not from the interface.
+      Bidi.detectRtlDirectionality(text) ? TextDirection.rtl : TextDirection.ltr;
+
+  @override
+  Widget build(BuildContext context) {
+    final direction = directionOf(text);
+
+    return Text(
+      text,
+      style: style,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
+      // rtl-audit: allow — the direction comes from the TEXT, not the interface.
+      textDirection: direction,
+      // Start, not left. It resolves against the direction set on the line above,
+      // which is the typed text's own — so this reads from the paragraph's leading
+      // edge whichever way that paragraph runs, and needs no second branch.
+      textAlign: TextAlign.start,
+    );
+  }
 }
 
 /// Shows a message without stacking snack bars on top of each other.

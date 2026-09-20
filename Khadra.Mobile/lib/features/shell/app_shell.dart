@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/khadra_theme.dart';
 import '../../l10n/app_localizations.dart';
 import '../notifications/notification_providers.dart';
 
@@ -27,7 +28,13 @@ class AppShell extends ConsumerWidget {
 
     return Scaffold(
       body: shell,
-      bottomNavigationBar: NavigationBar(
+      // The design separates the bar from the page with a HAIRLINE, not a shadow.
+      // Material's own divider is drawn by elevation, which this theme sets to zero.
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: KhadraColors.divider)),
+        ),
+        child: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (index) {
           // Tapping the tab you are already on returns it to its root, which is
@@ -45,7 +52,7 @@ class AppShell extends ConsumerWidget {
           NavigationDestination(
             icon: const Icon(Icons.search_outlined),
             selectedIcon: const Icon(Icons.search),
-            label: l10n.navBrowse,
+            label: l10n.navHome,
           ),
           NavigationDestination(
             icon: const Icon(Icons.event_note_outlined),
@@ -71,6 +78,7 @@ class AppShell extends ConsumerWidget {
             label: l10n.navProfile,
           ),
         ],
+        ),
       ),
     );
   }

@@ -6,7 +6,11 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { LookupEntry, LookupKind, LookupsService } from '../../core/services/lookups.service';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { TranslationKey } from '../../core/i18n/en';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { Language } from '../../core/i18n/language';
+import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 
 /**
  * The two lists an administrator curates: car types and cities (spec 3.2).
@@ -26,7 +30,9 @@ import { I18nService } from '../../core/i18n/i18n.service';
   imports: [IconComponent],
 })
 export class LookupsComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  private readonly formats = inject(FormatService);
   private readonly service = inject(LookupsService);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
@@ -45,7 +51,9 @@ export class LookupsComponent {
   protected readonly kind = computed(() => this.kindFromRoute());
   protected readonly isCities = computed(() => this.kind() === 'cities');
 
-  protected readonly title = computed(() => (this.isCities() ? 'Cities & regions' : this.t('lookups.carTypes')));
+  protected readonly title = computed(() =>
+    this.isCities() ? this.t('lookups.citiesRegions') : this.t('lookups.carTypes'),
+  );
 
   protected readonly subtitle = computed(() =>
     this.isCities()
@@ -58,11 +66,22 @@ export class LookupsComponent {
   );
 
   protected readonly failure = computed(() => {
-    const error = this.resource.error() as { status?: number } | undefined;
+    const error = this.resource.error();
     if (!error) return null;
-    if (error.status === 403) return this.t('lookups.platformLookupsAreCurated');
-    return this.t('lookups.theListCouldNot');
+    return describe(snapshotProblem(error), this.t, this.i18n.lang());
   });
+
+  /**
+   * The entry's name in the language the console is speaking.
+   *
+   * The table shows both columns side by side on purpose — this is the screen that curates them, and
+   * an administrator adding a city needs to see what a customer reading either language will see. A
+   * dialog title is a sentence, so the name inside it follows the reader instead. The name itself is
+   * never translated here: both spellings come from the server.
+   */
+  private entryName(entry: LookupEntry): string {
+    return this.i18n.lang() === 'ar' && entry.nameAr.trim() !== '' ? entry.nameAr : entry.nameEn;
+  }
 
   protected add(): void {
     const cities = this.isCities();
@@ -70,7 +89,7 @@ export class LookupsComponent {
       {
         icon: 'plus-circle',
         tone: 'accent',
-        title: cities ? 'Add a city' : this.t('lookups.addACarType'),
+        title: cities ? this.t('lookups.addACity') : this.t('lookups.addACarType'),
         body: cities
           ? this.t('lookups.customersFilterTheirSearch')
           : this.t('lookups.dealersChooseFromThis'),
@@ -79,13 +98,19 @@ export class LookupsComponent {
             name: 'nameEn',
             label: this.t('lookups.nameEnglish'),
             type: 'text',
-            placeholder: cities ? 'e.g. Amman' : 'e.g. Sedan',
+            // The example stays in the field's own script — this box holds the English name however
+            // the console is worded — and only "e.g." follows the reader.
+            placeholder: cities
+              ? this.t('lookups.exampleCityEnglish')
+              : this.t('lookups.exampleCarTypeEnglish'),
           },
           {
             name: 'nameAr',
             label: this.t('lookups.nameArabic'),
             type: 'text',
-            placeholder: cities ? 'مثال: عمّان' : 'مثال: سيدان',
+            placeholder: cities
+              ? this.t('lookups.exampleCityArabic')
+              : this.t('lookups.exampleCarTypeArabic'),
           },
           { name: 'displayOrder', label: this.t('lookups.displayOrder'), type: 'text', placeholder: '0' },
           ...(cities
@@ -94,14 +119,14 @@ export class LookupsComponent {
                   name: 'centreLat',
                   label: this.t('lookups.centreLatitude'),
                   type: 'text' as const,
-                  placeholder: 'Optional, e.g. 31.9539',
+                  placeholder: this.t('lookups.optionalExampleLatitude'),
                   optional: true,
                 },
                 {
                   name: 'centreLng',
                   label: this.t('lookups.centreLongitude'),
                   type: 'text' as const,
-                  placeholder: 'Optional, e.g. 35.9106',
+                  placeholder: this.t('lookups.optionalExampleLongitude'),
                   optional: true,
                 },
               ]
@@ -137,13 +162,13 @@ export class LookupsComponent {
       {
         icon: 'pencil-simple',
         tone: 'accent',
-        title: `Rename ${entry.nameEn}`,
+        title: this.t('lookups.renameEntry', { name: this.entryName(entry) }),
         body: this.t('lookups.bothNamesChangeTogether'),
         fields: [
           { name: 'nameEn', label: this.t('lookups.nameEnglish'), type: 'text', placeholder: '', value: entry.nameEn },
           { name: 'nameAr', label: this.t('lookups.nameArabic'), type: 'text', placeholder: '', value: entry.nameAr },
         ],
-        confirm: 'Rename',
+        confirm: this.t('lookups.rename'),
         result: { title: this.t('lookups.renamed'), body: '', tone: 'ok' },
       },
       async (values) => {
@@ -160,18 +185,20 @@ export class LookupsComponent {
   }
 
   protected setActive(entry: LookupEntry, isActive: boolean): void {
+    const name = this.entryName(entry);
+    const done = isActive ? this.t('lookups.restored') : this.t('lookups.retired');
     this.ui.openAction(
       {
         icon: isActive ? 'check-circle' : 'eye-slash',
         tone: isActive ? 'ok' : 'warn',
         danger: !isActive,
-        title: isActive ? `Restore ${entry.nameEn}?` : `Retire ${entry.nameEn}?`,
-        body: isActive
-          ? this.t('lookups.itIsOfferedAgain')
-          : this.t('lookups.itStopsBeingOffered'),
-        confirm: isActive ? 'Restore' : 'Retire',
+        title: isActive
+          ? this.t('lookups.restoreEntry', { name })
+          : this.t('lookups.retireEntry', { name }),
+        body: isActive ? this.t('lookups.itIsOfferedAgain') : this.t('lookups.itStopsBeingOffered'),
+        confirm: isActive ? this.t('lookups.restore') : this.t('lookups.retire'),
         result: {
-          title: isActive ? 'Restored' : 'Retired',
+          title: done,
           body: '',
           tone: isActive ? 'ok' : 'warn',
         },
@@ -180,7 +207,7 @@ export class LookupsComponent {
         await this.service.setActive(this.kind(), entry.id, isActive);
         this.service.refresh();
       },
-      { title: isActive ? 'Restored' : 'Retired', body: '' },
+      { title: done, body: '' },
     );
   }
 
@@ -190,6 +217,16 @@ export class LookupsComponent {
 
   protected centre(entry: LookupEntry): string | null {
     if (entry.centreLatitude === null || entry.centreLongitude === null) return null;
-    return `${entry.centreLatitude.toFixed(4)}, ${entry.centreLongitude.toFixed(4)}`;
+    // One isolated run: two numbers joined by a comma are laid out longitude-first under Arabic.
+    return this.formats.coordinates(entry.centreLatitude, entry.centreLongitude);
   }
+}
+
+function describe(
+  problem: ProblemSnapshot,
+  t: (key: TranslationKey) => string,
+  language: Language,
+): string {
+  if (problem.status === 403) return t('lookups.platformLookupsAreCurated');
+  return serverSentence(problem, language, t) ?? t('lookups.theListCouldNot');
 }

@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
@@ -20,7 +21,8 @@ namespace Khadra.Infrastructure.Notifications;
 /// </summary>
 internal sealed class ResendEmailSender(
     IHttpClientFactory httpClientFactory,
-    IOptions<EmailOptions> options) : IEmailSender
+    IOptions<EmailOptions> options,
+    IClock clock) : IEmailSender
 {
     public const string HttpClientName = "resend";
 
@@ -34,7 +36,7 @@ internal sealed class ResendEmailSender(
         [property: JsonPropertyName("html")] string Html,
         [property: JsonPropertyName("text")] string Text);
 
-    public async Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+    public async Task<EmailSendReceipt> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -60,20 +62,33 @@ internal sealed class ResendEmailSender(
         var client = httpClientFactory.CreateClient(HttpClientName);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
 
-        var response = await client.PostAsJsonAsync(
+        using var response = await client.PostAsJsonAsync(
             "emails",
             new ResendRequest(from, [message.ToAddress], message.Subject, message.HtmlBody, message.TextBody),
             cancellationToken);
 
         if (response.IsSuccessStatusCode)
-            return;
+        {
+            // Resend answers `{"id":"…"}`, the id its email log is searched by. Like any provider's, it
+            // proves the message was ACCEPTED, not that it arrived. Read without the caller's token for
+            // the reason BrevoEmailSender gives: an accepted send must not be reported as a failure.
+            var body = await response.Content.ReadAsStringAsync(CancellationToken.None);
+            return new EmailSendReceipt(
+                EmailOptions.ResendProvider,
+                ProviderReply.JsonString(body, "id"),
+                clock.UtcNow,
+                Attempts: 1,
+                ProviderResponse: null);
+        }
 
         // Resend explains its refusals in the body — an unverified sender, an invalid key, a domain
         // that is not yours. Carrying that text out is the difference between a fixable error and
         // "email failed". The dispatcher catches this and reports the send as failed; it never
-        // reaches the person registering.
+        // reaches the person registering. It is logged at Error, and Resend's free-tier refusal quotes
+        // the account owner's own mailbox, so every address in it comes out first.
         var detail = await response.Content.ReadAsStringAsync(cancellationToken);
         throw new InvalidOperationException(
-            $"Resend refused the message ({(int)response.StatusCode} {response.ReasonPhrase}): {detail}");
+            $"Resend refused the message ({(int)response.StatusCode} {response.ReasonPhrase}): " +
+            ProviderReply.Refusal(detail));
     }
 }

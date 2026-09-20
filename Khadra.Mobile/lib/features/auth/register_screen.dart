@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +14,11 @@ import '../../l10n/app_localizations.dart';
 import 'auth_form_widgets.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
-  const RegisterScreen({super.key});
+  const RegisterScreen({super.key, this.next});
+
+  /// Where the customer was heading when they were asked for an account. Carried
+  /// through verification, so the tap that started all this is the one answered.
+  final String? next;
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -90,6 +96,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             isForeignNational: _isForeignNational,
           );
 
+      // Creating an account is a choice about how to use the app, so the Get
+      // Started screen has been answered and must not ask again.
+      //
+      // Not awaited, for the same reason as in `sign_in_screen.dart`: nothing
+      // between a server call that SUCCEEDED and the navigation that says so may
+      // wait on a disk write. The account exists whatever the preference does.
+      unawaited(ref.read(entryChoiceProvider.notifier).choose());
+
       if (!mounted) return;
 
       context.go(
@@ -101,6 +115,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             // way to that inbox, and the next screen must offer another link
             // rather than tell somebody to wait for one that is not coming.
             if (!registered.verificationEmailSent) 'undelivered': '1',
+            // Where they were heading before they were asked for an account.
+            if (widget.next != null) 'next': widget.next!,
           },
         ).toString(),
       );
@@ -108,7 +124,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = failure.messageFor(l10n);
+        _error = failure.messageFor(
+          l10n,
+          config: ref.read(appConfigProvider).valueOrNull,
+        );
       });
     }
   }
@@ -119,6 +138,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final config = ref.watch(appConfigProvider);
     final formats = ref.watch(formatsProvider);
     final minimumAge = config.valueOrNull?.minimumRenterAge;
+    final passwordPolicy = ref.watch(passwordPolicyProvider);
 
     return AuthScaffold(
       title: l10n.authCreateAccountTitle,
@@ -129,6 +149,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           const SizedBox(height: Space.lg),
         ],
         Form(
+          // Re-validates as a field is corrected, so a message does not outlive the
+          // mistake it described. Without it the error stays until the next submit:
+          // "This is needed." sat under an email box that had just been filled in,
+          // which reads as the form refusing what was typed.
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           key: _formKey,
           child: AutofillGroup(
             child: Column(
@@ -167,9 +192,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 KhadraPasswordField(
                   controller: _password,
                   label: l10n.authPassword,
-                  helper: l10n.authPasswordRules,
+                  // The rule and its sentence are both the PLATFORM's, from
+                  // /app-config -- not an 8 and a promise typed into this file.
+                  helper: Validate.passwordRules(l10n, passwordPolicy),
+                  maxLength: passwordPolicy?.maximumLength,
                   autofillHints: const [AutofillHints.newPassword],
-                  validator: (value) => Validate.password(l10n, value),
+                  validator: (value) =>
+                      Validate.password(l10n, value, policy: passwordPolicy),
                 ),
               ],
             ),
@@ -228,7 +257,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               style: const TextStyle(color: KhadraColors.neutral600),
             ),
             TextButton(
-              onPressed: _busy ? null : () => context.go(Routes.signIn),
+              // `go`, not `push`: these two screens each offer the other, and
+              // pushing would let somebody stack a dozen of them. The destination
+              // still travels across.
+              onPressed: _busy
+                  ? null
+                  : () => context.go(routeWithNext(Routes.signIn, widget.next)),
               child: Text(l10n.authSignIn),
             ),
           ],

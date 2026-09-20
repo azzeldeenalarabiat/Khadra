@@ -381,8 +381,8 @@ if (app.Environment.IsProduction())
         || string.Equals(mailProvider, EmailOptions.LoggingProvider, StringComparison.OrdinalIgnoreCase))
     {
         throw new InvalidOperationException(
-            "Email:Provider selects the Logging transport, which writes every message to the log and " +
-            "delivers nothing. That is the default when the setting is missing, so this is most " +
+            "Email:Provider selects the Logging transport, which delivers nothing. That is the " +
+            "default when the setting is missing, so this is most " +
             "likely an unset variable. Set Email__Provider to 'Brevo' (with Email__ApiKey beginning " +
             "'xkeysib-' and Email__FromAddress set to a sender Brevo has confirmed), 'Resend', or " +
             "'Smtp'. Set it to the bare word, with no surrounding quotes.");

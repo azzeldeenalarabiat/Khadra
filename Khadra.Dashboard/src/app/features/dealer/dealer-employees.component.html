@@ -12,7 +12,7 @@
           type="button"
           class="btn btn-primary btn-md"
           [disabled]="!canInvite()"
-          [title]="canInvite() ? '' : 'Available once your dealership is approved and trading'"
+          [title]="canInvite() ? '' : t('dealerEmployees.availableOnceTrading')"
           (click)="invite()"
         >
           <kh-icon name="user-plus" />
@@ -121,20 +121,24 @@
                       <div class="entity-avatar">{{ initials(e.fullName) }}</div>
                       <div>
                         <div class="entity-name">{{ e.fullName }}</div>
-                        <div class="entity-sub">{{ t('dealerEmployees.added') }} {{ when(e.createdAt) }}</div>
+                        <div class="entity-sub">
+                          {{ t('dealerEmployees.addedOn', { date: when(e.createdAt) }) }}
+                        </div>
                       </div>
                     </div>
                   </td>
                   <td class="td">
-                    <div>{{ e.email }}</div>
-                    <div class="td-sub">{{ e.phone }}</div>
+                    <div><span class="ltr">{{ e.email }}</span></div>
+                    <div class="td-sub"><span class="ltr">{{ e.phone }}</span></div>
                   </td>
                   <td class="td">
                     <span class="pill" [class]="'s-' + tone(e)">{{ statusLabel(e.status) }}</span>
                     @if (e.status === 'Invited') {
                       <div class="td-sub">{{ t('dealerEmployees.hasNotSetA') }}</div>
                     } @else if (e.deactivatedAt) {
-                      <div class="td-sub">{{ t('dealerEmployees.since') }} {{ when(e.deactivatedAt) }}</div>
+                      <div class="td-sub">
+                        {{ t('dealerEmployees.sinceDate', { date: when(e.deactivatedAt) }) }}
+                      </div>
                     }
                   </td>
                   <td class="td">
@@ -146,11 +150,17 @@
                           [disabled]="busy() === e.employeeId"
                           (change)="toggleReports(e)"
                         />
-                        <span>{{ e.canViewReports ? 'Can see reports' : 'Bookings only' }}</span>
+                        <span>{{
+                          e.canViewReports
+                            ? t('dealerEmployees.canSeeReports')
+                            : t('dealerEmployees.bookingsOnly')
+                        }}</span>
                       </label>
                     } @else {
                       <span class="page-sub">{{
-                        e.canViewReports ? 'Can see reports' : 'Bookings only'
+                        e.canViewReports
+                          ? t('dealerEmployees.canSeeReports')
+                          : t('dealerEmployees.bookingsOnly')
                       }}</span>
                     }
                   </td>

@@ -21,20 +21,24 @@
     <div class="dc-head">
       <div class="grow">
         <div class="row row-gap-9">
-          <h1 class="page-title">{{ t('dealerDispute.disputeOn') }} {{ d.booking.reference }}</h1>
-          <span class="pill" [class]="'s-' + tone()">{{
-            d.status === 'UnderReview' ? 'Under review' : d.status
-          }}</span>
+          <h1 class="page-title">
+            {{ t('dealerDispute.disputeOnReference', { reference: d.booking.reference }) }}
+          </h1>
+          <span class="pill" [class]="'s-' + tone()">{{ statusLabel(d.status) }}</span>
         </div>
         <div class="page-sub">
-          {{ t('dealerDispute.opened') }} {{ dateTime(d.openedAt) }} by {{ d.openedByName }} ({{
-            d.openedByParty === 'Dealer' ? 'your side' : 'the customer'
-          }})
+          {{
+            d.openedByParty === 'Dealer'
+              ? t('dealerDispute.openedByYourSide', { when: dateTime(d.openedAt), name: openerName(d) })
+              : t('dealerDispute.openedByCustomer', { when: dateTime(d.openedAt), name: openerName(d) })
+          }}
           @if (sla(); as s) {
             · {{ s }}
           }
-          @if (d.assignedAdminName) {
-            {{ t('dealerDispute.handledBy') }} {{ d.assignedAdminName }}
+          <!-- Whether anyone holds the ticket is the id's answer: a holder whose account has closed
+               still holds it. -->
+          @if (holderName(d); as holder) {
+            · {{ t('dealerDispute.handledByName', { name: holder }) }}
           }
         </div>
       </div>
@@ -53,7 +57,7 @@
         <div class="sect-h">
           <kh-icon name="scales" class="kpi-icon" />
           <span class="sect-t">{{ t('dealerDispute.thePlatformsDecision') }}</span>
-          <span class="sect-hint">{{ dateTime(r.resolvedAt) }} · {{ r.resolvedByName }}</span>
+          <span class="sect-hint">{{ dateTime(r.resolvedAt) }} · {{ resolverName(r) }}</span>
         </div>
         <div class="sect-pad stack stack-9">
           <div class="history-line">
@@ -84,7 +88,8 @@
               ><span class="num">{{ r.dealerCharge | money }} </span>
             </div>
           }
-          <div class="page-sub">“{{ r.note }}”</div>
+          <!-- The administrator's own words: quoted as written, never translated. -->
+          <div class="page-sub">{{ t('disputeDetail.quoted', { text: r.note }) }}</div>
           <div class="note-box is-plain">
             <kh-icon name="info" />
             {{ t('common.decisionRecordedNoFunds') }}
@@ -102,13 +107,13 @@
         @for (s of d.statements; track s.statementId) {
           <div class="row row-gap-12">
             <div class="customer-avatar" [class.s-accent]="s.party === 'Dealer'">
-              {{ initials(s.authorName) }}
+              {{ s.authorAccountClosed ? '—' : initials(s.authorName) }}
             </div>
             <div class="grow">
               <div class="row row-gap-8">
-                <span class="handover-title">{{ s.authorName }}</span>
+                <span class="handover-title user-text">{{ authorName(s) }}</span>
                 <span class="pill" [class]="s.party === 'Dealer' ? 's-accent' : 's-dim'">{{
-                  s.party === 'Dealer' ? 'Your side' : 'Customer'
+                  s.party === 'Dealer' ? t('dealerDispute.yourSide') : t('party.customer')
                 }}</span>
                 <span class="page-sub push">{{ dateTime(s.createdAt) }}</span>
               </div>
@@ -138,7 +143,7 @@
       <section class="sect">
         <div class="sect-h"><span class="sect-t">{{ t('dealerDispute.addToTheDispute') }}</span></div>
         <div class="sect-pad stack stack-10">
-          @if (problem(); as message) {
+          @if (problemText(); as message) {
             <div class="banner s-bad" role="alert">
               <kh-icon name="warning-circle" class="banner-icon" />
               <div class="banner-body">
@@ -169,8 +174,10 @@
             <div class="field-hint">
               {{
                 evidenceNames().length
-                  ? 'Attached: ' + evidenceNames().join(', ')
-                  : 'Photos or a PDF, stored privately.'
+                  ? t('dealerDispute.evidenceAttached', {
+                      files: evidenceNames().join(t('common.listSeparator')),
+                    })
+                  : t('dealerDispute.photosOrAPdfStored')
               }}
             </div>
           </div>
@@ -180,7 +187,7 @@
             [disabled]="busy() || !body().trim()"
             (click)="addStatement()"
           >
-            {{ busy() ? 'Working…' : 'Add statement' }}
+            {{ busy() ? t('common.working') : t('dealerDispute.addStatement') }}
           </button>
         </div>
       </section>

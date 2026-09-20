@@ -6,6 +6,7 @@ import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
 import '../../core/format/booking_presentation.dart';
 import '../../core/providers.dart';
+import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
@@ -27,7 +28,10 @@ class SessionsScreen extends ConsumerWidget {
     final sessions = ref.watch(_sessionsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.profileSessions)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.profile),
+        title: Text(l10n.profileSessions),
+      ),
       body: RefreshIndicator(
         onRefresh: () => ref.refresh(_sessionsProvider.future),
         child: switch (sessions) {

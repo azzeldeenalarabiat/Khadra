@@ -16,7 +16,19 @@ public sealed class PenaltyAssessment : ValueObject
     public Percentage MaxPercent { get; }
     public Money MinAmount { get; }
     public Money MaxAmount { get; }
+    /// <summary>The sentence this platform wrote when the penalty was assessed, frozen on the record.</summary>
     public string Reason { get; }
+
+    /// <summary>
+    /// The stable code behind <see cref="Reason"/>, so a client can say it in its own language.
+    /// </summary>
+    /// <remarks>
+    /// Null on bookings assessed before codes existed, and only then: those records keep their
+    /// sentence and are never rewritten. A client words the code when there is one and falls back to
+    /// the sentence when there is not.
+    /// </remarks>
+    public PenaltyReason? ReasonCode { get; }
+
     public DateTimeOffset AssessedAt { get; }
 
 #pragma warning disable CS8618 // EF materialises this value object by writing its backing fields;
@@ -32,7 +44,7 @@ public sealed class PenaltyAssessment : ValueObject
         Percentage maxPercent,
         Money minAmount,
         Money maxAmount,
-        string reason,
+        PenaltyReason reason,
         DateTimeOffset assessedAt)
     {
         AttributedTo = attributedTo;
@@ -40,31 +52,38 @@ public sealed class PenaltyAssessment : ValueObject
         MaxPercent = maxPercent;
         MinAmount = minAmount;
         MaxAmount = maxAmount;
-        Reason = reason;
+        // The sentence AND the code: the sentence is what older clients print and what the record has
+        // always held; the code is what a client translates.
+        Reason = reason.Sentence;
+        ReasonCode = reason;
         AssessedAt = assessedAt;
     }
 
     // Nothing is owed by anyone: a free cancellation, or an expiry nobody caused.
-    public static PenaltyAssessment None(string reason, string currencyCode, DateTimeOffset assessedAt) =>
-        new(
+    public static PenaltyAssessment None(PenaltyReason reason, string currencyCode, DateTimeOffset assessedAt)
+    {
+        ArgumentNullException.ThrowIfNull(reason);
+        return new PenaltyAssessment(
             BookingParty.Unattributed,
             Percentage.Zero,
             Percentage.Zero,
             Money.ZeroIn(currencyCode),
             Money.ZeroIn(currencyCode),
-            Describe(reason),
+            reason,
             assessedAt);
+    }
 
     public static PenaltyAssessment Fixed(
         BookingParty attributedTo,
         Percentage percent,
         Money basis,
-        string reason,
+        PenaltyReason reason,
         DateTimeOffset assessedAt)
     {
         ArgumentNullException.ThrowIfNull(attributedTo);
         ArgumentNullException.ThrowIfNull(percent);
         ArgumentNullException.ThrowIfNull(basis);
+        ArgumentNullException.ThrowIfNull(reason);
 
         // A fixed penalty is a range whose ends happen to be equal, so both ends are computed
         // separately rather than the same instance being put in both slots: two mapped properties
@@ -75,7 +94,7 @@ public sealed class PenaltyAssessment : ValueObject
             Percentage.FromValidated(percent.Value),
             percent.Of(basis),
             percent.Of(basis),
-            Describe(reason),
+            reason,
             assessedAt);
     }
 
@@ -86,13 +105,14 @@ public sealed class PenaltyAssessment : ValueObject
         Percentage minPercent,
         Percentage maxPercent,
         Money basis,
-        string reason,
+        PenaltyReason reason,
         DateTimeOffset assessedAt)
     {
         ArgumentNullException.ThrowIfNull(attributedTo);
         ArgumentNullException.ThrowIfNull(minPercent);
         ArgumentNullException.ThrowIfNull(maxPercent);
         ArgumentNullException.ThrowIfNull(basis);
+        ArgumentNullException.ThrowIfNull(reason);
 
         if (minPercent.IsGreaterThan(maxPercent))
             throw new DomainException("A penalty range cannot have a minimum above its maximum.");
@@ -103,7 +123,7 @@ public sealed class PenaltyAssessment : ValueObject
             maxPercent,
             minPercent.Of(basis),
             maxPercent.Of(basis),
-            Describe(reason),
+            reason,
             assessedAt);
     }
 
@@ -118,9 +138,6 @@ public sealed class PenaltyAssessment : ValueObject
     public bool RequiresTicketToEnforce => true;
 #pragma warning restore CA1822
 
-    private static string Describe(string reason) =>
-        string.IsNullOrWhiteSpace(reason) ? "Unspecified" : reason.Trim();
-
     protected override IEnumerable<object?> GetEqualityComponents()
     {
         yield return AttributedTo;
@@ -129,6 +146,7 @@ public sealed class PenaltyAssessment : ValueObject
         yield return MinAmount;
         yield return MaxAmount;
         yield return Reason;
+        yield return ReasonCode;
         yield return AssessedAt;
     }
 }

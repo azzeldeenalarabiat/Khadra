@@ -20,7 +20,7 @@ public sealed class EmailOptions
     /// </remarks>
     public const string BrevoProvider = "Brevo";
 
-    // "Smtp" (Mailpit in dev, a real relay in production) or "Logging" (writes the mail to the log).
+    // "Brevo", "Resend", "Smtp" (Mailpit in dev) or "Logging" (delivers nothing; notes each message in the log).
     [Required]
     public string Provider { get; init; } = LoggingProvider;
 

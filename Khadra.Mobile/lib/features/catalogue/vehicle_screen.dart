@@ -15,7 +15,8 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'date_range_sheet.dart';
 import 'search_providers.dart';
-import 'vehicle_card.dart';
+import '../shortlist/save_button.dart';
+import 'vehicle_row.dart';
 
 /// One car in full, with the gallery behind it.
 ///
@@ -34,20 +35,28 @@ class VehicleScreen extends ConsumerWidget {
     final filter = ref.watch(searchFilterProvider);
     final formats = ref.watch(formatsProvider);
 
-    final vehicle = ref.watch(vehicleProvider((
+    final key = (
       id: vehicleId,
       from: filter.hasDates ? filter.pickupAt : null,
       to: filter.hasDates ? filter.returnAt : null,
-    )));
+    );
+    final vehicle = ref.watch(vehicleProvider(key));
 
     return Scaffold(
       body: switch (vehicle) {
         AsyncLoading() => const _VehicleScaffold(child: KhadraLoading()),
         AsyncError(:final error) => _VehicleScaffold(
-            child: _vehicleError(context, l10n, ApiFailure.from(error)),
+            child: _vehicleError(
+              context,
+              l10n,
+              ApiFailure.from(error),
+              () => ref.invalidate(vehicleProvider(key)),
+            ),
           ),
-        AsyncData(:final value) when formats != null =>
-          _VehicleBody(vehicle: value, formats: formats),
+        AsyncData(:final value) when formats != null => RefreshIndicator(
+            onRefresh: () => ref.refresh(vehicleProvider(key).future),
+            child: _VehicleBody(vehicle: value, formats: formats),
+          ),
         _ => const _VehicleScaffold(child: KhadraLoading()),
       },
       bottomNavigationBar: switch (vehicle) {
@@ -59,11 +68,16 @@ class VehicleScreen extends ConsumerWidget {
   }
 
   Widget _vehicleError(
-      BuildContext context, AppLocalizations l10n, ApiFailure failure) {
+    BuildContext context,
+    AppLocalizations l10n,
+    ApiFailure failure,
+    VoidCallback onRetry,
+  ) {
     // 404 covers every reason at once — no such car, a draft, a hidden one, one
     // whose gallery is suspended. The API answers the same to all of them so an
     // anonymous caller cannot enumerate a competitor's unpublished inventory, and
-    // the app must not pretend to know which it was.
+    // the app must not pretend to know which it was. Retrying a 404 would only
+    // fetch the same answer, so that branch offers the way out instead.
     if (failure.isNotFound) {
       return KhadraEmpty(
         icon: Icons.no_transfer_outlined,
@@ -75,7 +89,9 @@ class VehicleScreen extends ConsumerWidget {
         ),
       );
     }
-    return KhadraError(message: failure.messageFor(l10n));
+    // Everything else CAN be retried, and an error with no way forward on a
+    // pushed screen is a dead end: this one has no tabs under it.
+    return KhadraError(message: failure.messageFor(l10n), onRetry: onRetry);
   }
 }
 
@@ -116,7 +132,20 @@ class _VehicleBody extends ConsumerWidget {
           expandedHeight: 260,
           pinned: true,
           backgroundColor: KhadraColors.surface,
-          leading: const KhadraBack(fallback: Routes.search),
+          leading: const Padding(
+            padding: EdgeInsetsDirectional.only(start: Space.sm),
+            child: KhadraBack(fallback: Routes.search, onSurface: true),
+          ),
+          actions: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: Space.sm),
+              child: SaveButton(
+                vehicleId: vehicle.vehicleId,
+                size: 24,
+                onSurface: true,
+              ),
+            ),
+          ],
           flexibleSpace: FlexibleSpaceBar(
             background: _Photos(urls: vehicle.imageUrls),
           ),
@@ -124,18 +153,48 @@ class _VehicleBody extends ConsumerWidget {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.lg),
           sliver: SliverList.list(children: [
-            Text(
-              vehicle.title,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: Space.xs),
-            Text(
-              [
-                vehicle.year.toString(),
-                if (vehicle.carType != null) vehicle.carType!.nameFor(arabic),
-              ].join(' · '),
-              style: const TextStyle(
-                  color: KhadraColors.neutral600, fontSize: 14),
+            // Name on one side, the day rate on the other. The design shows the
+            // rate here AND in the bar, and both read the same field of the same
+            // response, so there is no second figure to drift.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        vehicle.title,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: KhadraType.of(context, -0.5),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        [
+                          vehicle.year.toString(),
+                          if (vehicle.carType != null)
+                            vehicle.carType!.nameFor(arabic),
+                        ].join(' · '),
+                        style: const TextStyle(
+                          color: KhadraColors.neutral600,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: Space.md),
+                DailyRateLabel(
+                  formats: formats,
+                  rate: vehicle.dailyRate,
+                  size: 20,
+                  stacked: true,
+                ),
+              ],
             ),
             const SizedBox(height: Space.lg),
 
@@ -145,7 +204,7 @@ class _VehicleBody extends ConsumerWidget {
                 vehicle.description!.trim().isNotEmpty) ...[
               const SizedBox(height: Space.xl),
               KhadraSectionTitle(l10n.vehicleAbout),
-              Text(
+              UserText(
                 vehicle.description!,
                 style: const TextStyle(fontSize: 15, height: 1.55),
               ),
@@ -153,30 +212,30 @@ class _VehicleBody extends ConsumerWidget {
 
             const SizedBox(height: Space.xl),
             KhadraSectionTitle(l10n.vehicleSpecifications),
-            KhadraCard(
-              child: Column(
-                children: [
-                  KhadraDetailRow(
-                    label: l10n.searchTransmission,
-                    value: Text(_vocabulary(
-                        ref, (v) => v.transmissions, vehicle.transmission, arabic)),
+            KhadraSpecGrid(
+              specs: [
+                (
+                  label: l10n.searchTransmission,
+                  value: _vocabulary(
+                      ref, (v) => v.transmissions, vehicle.transmission, arabic),
+                ),
+                (
+                  label: l10n.vehicleFuel,
+                  value: _vocabulary(
+                      ref, (v) => v.fuelTypes, vehicle.fuelType, arabic),
+                ),
+                (
+                  label: l10n.searchSeats,
+                  value: l10n.vehicleSeats(vehicle.seats),
+                ),
+                if (vehicle.carType != null)
+                  (
+                    label: l10n.searchCarType,
+                    value: vehicle.carType!.nameFor(arabic),
                   ),
-                  KhadraDetailRow(
-                    label: l10n.vehicleFuel,
-                    value: Text(_vocabulary(
-                        ref, (v) => v.fuelTypes, vehicle.fuelType, arabic)),
-                  ),
-                  KhadraDetailRow(
-                    label: l10n.searchSeats,
-                    value: Text(l10n.vehicleSeats(vehicle.seats)),
-                  ),
-                  if (vehicle.color != null && vehicle.color!.isNotEmpty)
-                    KhadraDetailRow(
-                      label: l10n.vehicleColour,
-                      value: Text(vehicle.color!),
-                    ),
-                ],
-              ),
+                if (vehicle.color != null && vehicle.color!.isNotEmpty)
+                  (label: l10n.vehicleColour, value: vehicle.color!),
+              ],
             ),
 
             const SizedBox(height: Space.xl),
@@ -368,15 +427,16 @@ class _AvailabilityLine extends StatelessWidget {
   }
 }
 
-class _GallerySummary extends StatelessWidget {
+class _GallerySummary extends ConsumerWidget {
   const _GallerySummary({required this.gallery, required this.formats});
 
   final PublicGallery gallery;
   final Formats formats;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final city = ref.watch(cityNameProvider(gallery.cityId));
 
     return KhadraCard(
       onTap: () => context.push(Routes.gallery(gallery.dealerId)),
@@ -394,7 +454,7 @@ class _GallerySummary extends StatelessWidget {
                     child: KhadraImage(
                       url: gallery.logoUrl,
                       fit: BoxFit.contain,
-                      borderRadius: const BorderRadius.all(Radii.sm),
+                      borderRadius: Radii.pill,
                     ),
                   ),
                 ),
@@ -407,6 +467,26 @@ class _GallerySummary extends StatelessWidget {
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700),
                     ),
+                    if (city != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.place_outlined,
+                                size: 13, color: KhadraColors.neutral500),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                city,
+                                style: const TextStyle(
+                                    color: KhadraColors.neutral600, fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 2),
                     if (gallery.averageRating != null && gallery.reviewCount > 0)
                       Row(
@@ -429,7 +509,7 @@ class _GallerySummary extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: KhadraColors.neutral400),
+              const KhadraDisclosure(),
             ],
           ),
           const SizedBox(height: Space.md),

@@ -52,7 +52,7 @@
               </div>
             </div>
             <span class="pill" [class]="enabled() ? 's-ok' : 's-dim'">{{
-              enabled() ? 'On' : 'Off'
+              enabled() ? t('common.on') : t('common.off')
             }}</span>
           </label>
         </section>
@@ -60,11 +60,13 @@
         <section class="sect" [class.is-muted]="!enabled()">
           <div class="sect-h">
             <span class="sect-t">{{ t('dealerDelivery.deliveryRadius') }}</span>
-            <span class="sect-hint">{{ t('dealerDelivery.fromYourDealerLocation') }} {{ s.maxRadiusKm }} km</span>
+            <span class="sect-hint">{{
+              t('dealerDelivery.fromYourLocationUpToKm', { km: s.maxRadiusKm })
+            }}</span>
           </div>
           <div class="sect-pad stack stack-10">
             <div class="radius-head">
-              <span class="radius-figure num">{{ radius() }} km</span>
+              <span class="radius-figure num">{{ km(radius()) }}</span>
             </div>
             <input
               class="range"
@@ -78,7 +80,7 @@
               [attr.aria-label]="t('dealerDelivery.deliveryRadiusInKilometres')"
             />
             <div class="range-ends">
-              <span>{{ t('dealerDelivery.1Km') }}</span><span>{{ s.maxRadiusKm }} km</span>
+              <span>{{ t('dealerDelivery.1Km') }}</span><span>{{ km(s.maxRadiusKm) }}</span>
             </div>
             <div class="field">
               <label for="radius-km">{{ t('dealerDelivery.exactRadiusKm') }}</label>
@@ -94,12 +96,16 @@
                 (input)="setRadius($event)"
               />
               @if (radiusInvalid()) {
-                <div class="field-error">{{ t('dealerDelivery.enterARadiusBetween') }} {{ s.maxRadiusKm }} km.</div>
+                <div class="field-error">
+                  {{ t('dealerDelivery.enterRadiusUpToKm', { max: s.maxRadiusKm }) }}
+                </div>
               }
             </div>
 
             <div class="field">
-              <label for="delivery-fee">{{ t('dealerDelivery.whatYouChargePer') }}{{ s.currencyCode }})</label>
+              <label for="delivery-fee">{{
+                t('dealerDelivery.whatYouChargePerDelivery', { currency: s.currencyCode })
+              }}</label>
               <input
                 id="delivery-fee"
                 class="input"
@@ -113,7 +119,11 @@
               />
               @if (feeInvalid()) {
                 <div class="field-error">
-                  {{ t('dealerDelivery.enterWhatYouCharge') }} {{ s.maxFee }} {{ s.currencyCode }}.
+                  {{
+                    t('dealerDelivery.enterFeeUpTo', {
+                      max: money({ amount: s.maxFee, currency: s.currencyCode }),
+                    })
+                  }}
                 </div>
               } @else {
                 <div class="field-hint">
@@ -124,7 +134,7 @@
           </div>
         </section>
 
-        @if (problem(); as message) {
+        @if (problemText(); as message) {
           <div class="banner s-bad" role="alert">
             <kh-icon name="warning-circle" class="banner-icon" />
             <div class="banner-body">

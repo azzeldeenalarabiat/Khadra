@@ -30,11 +30,16 @@
         <div class="grow">
           <div class="sect-t">{{ d.businessName }}</div>
           <div class="page-sub">
-            {{ d.employeeCount }} {{ t('employeeBusiness.activeStaffDealerSince') }} {{ since() }}
+            {{
+              t('employeeBusiness.activeStaffDealerSinceDate', {
+                count: d.employeeCount,
+                date: since(),
+              })
+            }}
           </div>
         </div>
         <span class="pill" [class]="d.canTrade ? 's-ok' : 's-warn'">
-          {{ d.canTrade ? 'Trading' : d.verificationStatus }}
+          {{ d.canTrade ? t('employeeBusiness.trading') : statusLabel(d.verificationStatus) }}
         </span>
       </div>
     </section>
@@ -49,11 +54,11 @@
           <div class="sect-pad kv-narrow">
             <div class="kv">
               <span class="kv-key">{{ t('common.coordinates') }}</span>
-              <span class="kv-val num">{{ d.latitude }}, {{ d.longitude }}</span>
+              <span class="kv-val num">{{ fmt.coordinates(d.latitude, d.longitude) }}</span>
             </div>
             @if (d.description) {
               <div class="kv">
-                <span class="kv-key">{{ t('employeeBusiness.about') }}</span><span class="kv-val">{{ d.description }}</span>
+                <span class="kv-key">{{ t('employeeBusiness.about') }}</span><span class="kv-val"><span class="user-text">{{ d.description }}</span></span>
               </div>
             }
             <!-- The platform stores a map point, not a postal address, and the dealership has no

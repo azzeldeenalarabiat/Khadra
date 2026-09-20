@@ -14,6 +14,10 @@ public sealed record CustomerDocumentDto(
     Guid DocumentId,
     string Type,
     string Status,
+    // What was actually stored, so the owner can tell a scan from a photograph without opening a
+    // signed link. The client has no other way to know: it may be looking at a file uploaded from a
+    // different device, or a year ago, and a screen that guessed from the size would be inventing it.
+    string ContentType,
     long SizeBytes,
     DateTimeOffset UploadedAt,
     string? ReviewNote)
@@ -25,6 +29,7 @@ public sealed record CustomerDocumentDto(
             document.Id.Value,
             document.Type.Name,
             document.Status.Name,
+            document.ContentType,
             document.SizeBytes,
             document.UploadedAt,
             document.ReviewNote);

@@ -60,6 +60,9 @@ internal sealed class CustomerReputationReader(KhadraDbContext context) : ICusto
 
         // Through the BOOKINGS, because a ticket carries no customer id -- only who opened it, which
         // is as often the gallery as the customer. The set is the same handful of ids already read.
+        //
+        // The booking id travels with the resolution now, so a ticket can be matched back to the
+        // outcome it overturned. See `Overturned`.
         var bookingIds = outcomes.Select(outcome => outcome.BookingId).ToList();
         var disputes = bookingIds.Count == 0
             ? []
@@ -68,8 +71,15 @@ internal sealed class CustomerReputationReader(KhadraDbContext context) : ICusto
                 .Where(ticket =>
                     bookingIds.Contains(ticket.BookingId) &&
                     ticket.Status == DisputeStatus.Resolved)
-                .Select(ticket => ticket.Resolution)
+                .Select(ticket => new Adjudication(ticket.BookingId, ticket.Resolution))
                 .ToListAsync(cancellationToken);
+
+        // Every booking whose assessment an administrator overturned. Read once rather than searched
+        // per outcome, and a HashSet because one booking can carry several resolved tickets.
+        var overturned = disputes
+            .Where(Overturned)
+            .Select(adjudication => adjudication.BookingId)
+            .ToHashSet();
 
         var since = await context.Users
             .AsNoTracking()
@@ -81,9 +91,11 @@ internal sealed class CustomerReputationReader(KhadraDbContext context) : ICusto
             rating,
             completed.Count,
             completed.Count(outcome => outcome.DealerId == viewingDealerId),
-            outcomes.Count(outcome => outcome.Status == BookingStatus.NoShow && BlamesCustomer(outcome)),
-            outcomes.Count(outcome => outcome.Status == BookingStatus.Cancelled && BlamesCustomer(outcome)),
-            disputes.Count(WentAgainstCustomer),
+            outcomes.Count(outcome =>
+                outcome.Status == BookingStatus.NoShow && Blames(outcome, overturned)),
+            outcomes.Count(outcome =>
+                outcome.Status == BookingStatus.Cancelled && Blames(outcome, overturned)),
+            disputes.Count(adjudication => WentAgainstCustomer(adjudication.Resolution)),
             since ?? DateTimeOffset.MinValue);
     }
 
@@ -136,15 +148,34 @@ internal sealed class CustomerReputationReader(KhadraDbContext context) : ICusto
     }
 
     /// <summary>
-    /// Whether this booking's own assessment put the fault on the customer.
+    /// Whether this booking still counts against the customer.
     /// </summary>
     /// <remarks>
-    /// A booking with no assessment blames nobody. So does a free cancellation, which records
-    /// <c>PenaltyAssessment.None</c> and therefore <c>Unattributed</c> — a customer who cancelled
-    /// inside their window did nothing another gallery needs to know about.
+    /// <para>
+    /// Two conditions, and the second was missing until 2026-09-11.
+    /// </para>
+    /// <para>
+    /// <b>The assessment blamed them.</b> A booking with no assessment blames nobody. So does a free
+    /// cancellation, which records <c>PenaltyAssessment.None</c> and therefore
+    /// <c>Unattributed</c> — a customer who cancelled inside their window did nothing another gallery
+    /// needs to know about.
+    /// </para>
+    /// <para>
+    /// <b>And no administrator overturned it.</b> An assessment is what a booking closed with; a
+    /// resolved ticket that returned the whole deposit is the PLATFORM saying that assessment was
+    /// wrong. Counting it anyway punished a customer for having been right — and did it in the one
+    /// place they could not see, to the one audience that decides whether to rent to them. It also
+    /// made the dispute pointless: winning changed the money and left the record.
+    /// </para>
+    /// <para>
+    /// The same test <c>WentAgainstCustomer</c> already applied to the disputes counter, which is
+    /// where the reasoning was written down and where it stopped being applied.
+    /// </para>
     /// </remarks>
-    private static bool BlamesCustomer(Outcome outcome) =>
-        outcome.Penalty is { } penalty && penalty.AttributedTo == BookingParty.Customer;
+    private static bool Blames(Outcome outcome, HashSet<Id> overturned) =>
+        outcome.Penalty is { } penalty &&
+        penalty.AttributedTo == BookingParty.Customer &&
+        !overturned.Contains(outcome.BookingId);
 
     /// <summary>
     /// Whether an administrator's resolution went against the customer.
@@ -159,5 +190,15 @@ internal sealed class CustomerReputationReader(KhadraDbContext context) : ICusto
         resolution is not null &&
         resolution.Deposit.RefundToCustomer.Amount < resolution.Deposit.DepositHeld.Amount;
 
+    /// <summary>The mirror image: a ticket the customer won outright.</summary>
+    /// <remarks>
+    /// An UNRESOLVED ticket overturns nothing — the query already asks only for resolved ones, and a
+    /// dispute still open must not clear a record while it is being argued.
+    /// </remarks>
+    private static bool Overturned(Adjudication adjudication) =>
+        adjudication.Resolution is not null && !WentAgainstCustomer(adjudication.Resolution);
+
     private sealed record Outcome(Id BookingId, BookingStatus Status, Id DealerId, PenaltyAssessment? Penalty);
+
+    private sealed record Adjudication(Id BookingId, DisputeResolution? Resolution);
 }

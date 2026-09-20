@@ -87,7 +87,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final user = ref.watch(sessionProvider).user;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.profileEdit)),
+      appBar: AppBar(
+        leading: const KhadraBack(fallback: Routes.profile),
+        title: Text(l10n.profileEdit),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
             Space.lg, Space.lg, Space.lg, Space.bottomInset),
@@ -97,6 +100,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             const SizedBox(height: Space.lg),
           ],
           Form(
+            // Re-validates as a field is corrected, so a message does not outlive the
+            // mistake it described. Without it the error stays until the next submit:
+            // "This is needed." sat under an email box that had just been filled in,
+            // which reads as the form refusing what was typed.
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             key: _formKey,
             child: Column(
               children: [

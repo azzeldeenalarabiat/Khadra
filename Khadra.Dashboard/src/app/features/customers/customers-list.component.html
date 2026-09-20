@@ -21,7 +21,7 @@
           (input)="setSearch($event)"
         />
       </div>
-      @for (chip of chips; track chip.key) {
+      @for (chip of chips(); track chip.key) {
         <button
           type="button"
           class="btn btn-sm"
@@ -32,7 +32,7 @@
           {{ chip.label }}
           <!-- The number is the database's, for the whole platform, not a tally of this page. -->
           @if (count(chip.key) !== null) {
-            <span class="tab-count">{{ count(chip.key) }}</span>
+            <span class="tab-count">{{ formats.number(count(chip.key)) }}</span>
           }
         </button>
       }
@@ -82,27 +82,33 @@
                   <div class="entity">
                     <div class="entity-avatar">{{ initials(row.fullName) }}</div>
                     <div>
-                      <a class="row-link" [routerLink]="['/customers', row.userId]">
+                      <a class="row-link user-text" [routerLink]="['/customers', row.userId]">
                         {{ row.fullName }}
                       </a>
-                      <div class="entity-sub">{{ t('customersList.joined') }} {{ when(row.createdAt) }}</div>
+                      <div class="entity-sub">
+                        {{ t('customersList.joinedOn', { date: when(row.createdAt) }) }}
+                      </div>
                     </div>
                   </div>
                 </td>
                 <td class="td">
-                  {{ row.email }}
-                  <div class="td-sub mono">{{ row.phone }}</div>
+                  <span class="ltr">{{ row.email }}</span>
+                  <div class="td-sub mono"><span class="ltr">{{ row.phone }}</span></div>
                 </td>
                 <td class="td">
                   <span class="pill" [class]="'s-' + tone(row)">{{ statusLabel(row) }}</span>
                 </td>
                 <td class="td">
-                  {{ row.documentCount }} {{ t('customersList.onFile') }}
+                  {{ t('customersList.documentsOnFile', { count: row.documentCount }) }}
                   <div class="td-sub" [class.s-ok]="row.hasCompleteRenterDocuments">
-                    {{ row.hasCompleteRenterDocuments ? 'Complete to rent' : 'Incomplete' }}
+                    {{
+                      row.hasCompleteRenterDocuments
+                        ? t('customersList.completeToRent')
+                        : t('customersList.incomplete')
+                    }}
                   </div>
                 </td>
-                <td class="td td-num">{{ row.bookingCount }}</td>
+                <td class="td td-num">{{ formats.number(row.bookingCount) }}</td>
                 <td class="td">{{ when(row.lastLoginAt) }}</td>
                 <td class="td td-num">
                   <a class="btn btn-secondary btn-xs" [routerLink]="['/customers', row.userId]">

@@ -113,7 +113,14 @@ public sealed class AccountRegistrar(
         // A mail failure must not undo a completed registration — the account and the token are
         // already committed — but it is carried back to the caller so the screen can say so instead
         // of promising an email that nobody sent.
-        var delivered = await emails.SendEmailVerificationAsync(user, rawToken.Value, cancellationToken);
+        //
+        // CancellationToken.None, NOT the request's. Past this line the platform owes this person
+        // an email, and the one thing that must not cancel it is the customer's own phone giving
+        // up on a slow response. It did exactly that: a registration took longer than the client's
+        // receive timeout, the client closed the connection, ASP.NET cancelled RequestAborted, and
+        // MailKit threw mid-DATA — leaving an account that exists, a customer told it failed, and a
+        // verification email that was never sent. The same reasoning as BookingEmailDispatcher.
+        var delivered = await emails.SendEmailVerificationAsync(user, rawToken.Value, CancellationToken.None);
 
         return new RegisteredUserDto(user.Id, user.Email.Value, delivered);
     }

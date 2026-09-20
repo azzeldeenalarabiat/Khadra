@@ -73,16 +73,24 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
 
   Formats get _formats => widget.formats;
 
+  /// The earliest INSTANT a rental may start at.
+  ///
+  /// The platform's minimum lead time is elapsed time and has no zone, so it is
+  /// applied to the clock rather than to a calendar. Rounded up to the next
+  /// minute so a sheet held open for a few seconds does not refuse the very time
+  /// it just offered.
+  DateTime get _earliestPickup {
+    final raw = DateTime.now().toUtc().add(
+          Duration(minutes: widget.config.minimumBookingLeadTimeMinutes),
+        );
+    return DateTime.utc(raw.year, raw.month, raw.day, raw.hour, raw.minute);
+  }
+
   /// The earliest calendar day a rental may start on, in Amman.
   ///
-  /// Derived from the minimum LEAD TIME, which is elapsed time and has no zone —
-  /// then converted, because which calendar day "two hours from now" falls on very
-  /// much does have one.
-  DateTime get _firstDay => _formats.ammanDay(
-        DateTime.now().toUtc().add(
-              Duration(minutes: widget.config.minimumBookingLeadTimeMinutes),
-            ),
-      );
+  /// The same lead time, converted — because which calendar day "two hours from
+  /// now" falls on very much does have a zone.
+  DateTime get _firstDay => _formats.ammanDay(_earliestPickup);
 
   DateTime get _lastDay => _formats.ammanDay(
         DateTime.now().toUtc().add(
@@ -124,13 +132,31 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
       helpText: AppLocalizations.of(context).searchChooseDates,
     );
 
-    if (range != null) {
-      setState(() {
-        _pickupDay = range.start;
-        _returnDay = range.end;
-      });
-    }
+    if (range == null) return;
+
+    setState(() {
+      _pickupDay = range.start;
+      _returnDay = range.end;
+
+      // Choosing TODAY with the sheet's mid-morning default would put the pickup
+      // in the past whenever it is already past mid-morning. Nudging the time up
+      // to the first the platform would accept is kinder than showing an error
+      // about a time the customer never chose; the error stays for the case
+      // where they then move it back.
+      final earliest = _formats.toAmman(_earliestPickup);
+      if (_isSameAmmanDay(range.start, earliest) &&
+          _minutesOf(_pickupTime) < earliest.hour * 60 + earliest.minute) {
+        _pickupTime = TimeOfDay(hour: earliest.hour, minute: earliest.minute);
+      }
+    });
   }
+
+  static int _minutesOf(TimeOfDay time) => time.hour * 60 + time.minute;
+
+  static bool _isSameAmmanDay(DateTime day, DateTime ammanInstant) =>
+      day.year == ammanInstant.year &&
+      day.month == ammanInstant.month &&
+      day.day == ammanInstant.day;
 
   Future<void> _pickTime({required bool pickup}) async {
     final chosen = await showTimePicker(
@@ -159,7 +185,8 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
     );
   }
 
-  /// Only the bounds the picker itself owns. Everything else — opening hours,
+  /// Only the bounds the picker itself owns, and every one of them is a figure
+  /// the SERVER published on `/app-config`. Everything else — opening hours,
   /// availability, the price — is the server's answer, and the app must not
   /// pre-judge any of it with a rule of its own.
   String? _localProblem(AppLocalizations l10n) {
@@ -170,12 +197,24 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
       return l10n.validationReturnAfterPickup;
     }
 
+    // The lead time, applied to the INSTANT and not only to the calendar day.
+    //
+    // `_firstDay` bounds the picker's first selectable date, which is not the
+    // same guard: on that first day the default time is mid-morning, so a
+    // customer opening the sheet at three in the afternoon could apply a pickup
+    // that had already passed — and find out from the server, at the quote, with
+    // nothing on the sheet having said so.
+    final earliest = _earliestPickup;
+    if (chosen.pickupAt.isBefore(earliest)) {
+      return l10n.searchPickupTooSoon(_formats.dateTime(earliest));
+    }
+
     // Judged on CALENDAR days, the same rule the server bills by, so the number a
     // customer is stopped at here is the number the quote would have shown.
     final days = _formats.calendarDaysBetween(chosen.pickupAt, chosen.returnAt);
     final billed = days < 1 ? 1 : days;
     if (billed > widget.config.maxRentalDays) {
-      return l10n.bookDays(widget.config.maxRentalDays);
+      return l10n.searchMaxRentalDays(widget.config.maxRentalDays);
     }
 
     return null;
@@ -189,7 +228,7 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(Space.xl),
+        padding: const EdgeInsets.fromLTRB(Space.lg, 0, Space.lg, Space.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -200,7 +239,7 @@ class _DateRangeSheetState extends State<_DateRangeSheet> {
                   child: Text(
                     l10n.searchChooseDates,
                     style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
+                        fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(

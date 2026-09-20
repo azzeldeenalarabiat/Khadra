@@ -64,6 +64,7 @@ export const EN = {
   'nav.fleet': 'Fleet',
   'nav.employees': 'Employees',
   'nav.dealerProfile': 'Dealer Profile',
+  'nav.customerPage': 'Customer page',
   'nav.delivery': 'Delivery',
   'nav.reports': 'Reports',
   'nav.activity': 'Activity',
@@ -719,10 +720,8 @@ export const EN = {
   'dealerBooking.historyClosed':
     'A customer\u2019s history is shown only while this booking is live.',
   'dealerBooking.ratedByGalleries': 'Rated by galleries',
-  'dealerBooking.ratingsCount': 'from {count} rating(s)',
   'dealerBooking.notRatedYet': 'Not rated yet',
   'dealerBooking.completedRentals': 'Completed rentals',
-  'dealerBooking.withYou': 'with you',
   'dealerBooking.noShows': 'No-shows',
   'dealerBooking.lateCancellations': 'Late cancellations',
   'dealerBooking.disputesAgainst': 'Disputes decided against them',
@@ -818,8 +817,92 @@ export const EN = {
   'dealerDelivery.yourDeliveryFee': 'Your delivery fee',
   'dealerDelivery.yoursToSetEnter': 'Yours to set. Enter 0 if you deliver free of charge.',
 
+  // The customer page: what an office writes for its customers, and what of it it shows.
+  'dealerCustomerPage.title': 'Customer page',
+  'dealerCustomerPage.subtitle':
+    'What you tell customers in your own words, and which of it they see.',
+  'dealerCustomerPage.about': 'About',
+  'dealerCustomerPage.aboutHint': 'Who you are, in a sentence or two',
+  'dealerCustomerPage.aboutPlaceholder':
+    'What you rent, what you are known for, anything a customer should know before booking.',
+  'dealerCustomerPage.rentalConditions': 'Rental conditions',
+  'dealerCustomerPage.rentalConditionsHint': 'Your own conditions for renting from you',
+  'dealerCustomerPage.rentalConditionsPlaceholder':
+    'Extra drivers, smoking, where the car may be taken — whatever you ask of a renter that Khadra does not.',
+  'dealerCustomerPage.insurance': 'Insurance',
+  'dealerCustomerPage.insuranceHint': 'What your cover includes, in your words',
+  'dealerCustomerPage.insurancePlaceholder':
+    'What the cover on your cars includes, and what a renter is liable for.',
+  'dealerCustomerPage.pickupInstructions': 'Pickup instructions',
+  'dealerCustomerPage.pickupInstructionsHint': 'How to find you, and what to bring',
+  'dealerCustomerPage.pickupInstructionsPlaceholder':
+    'Where to park, which floor the office is on, what to bring to the counter.',
+  'dealerCustomerPage.deliveryNotes': 'Delivery notes',
+  'dealerCustomerPage.deliveryNotesHint': 'Shown inside the delivery card on your page',
+  'dealerCustomerPage.deliveryNotesPlaceholder':
+    'The hours you deliver in, and anything you need from a customer to find them.',
+  'dealerCustomerPage.customerNotes': 'Notes for customers',
+  'dealerCustomerPage.customerNotesHint': 'Anything else worth saying',
+  'dealerCustomerPage.customerNotesPlaceholder':
+    'Anything else a customer should know that does not belong above.',
+  'dealerCustomerPage.shown': 'Shown',
+  'dealerCustomerPage.hidden': 'Hidden',
+  'dealerCustomerPage.hiddenMeans':
+    'A hidden section is left off your page entirely. Customers are not told that anything is missing.',
+  'dealerCustomerPage.deliveryIsOff':
+    'You do not offer delivery, so this is not shown on your page. Switch delivery on and it appears.',
+  // The limit is the server's (`ProfileText.MaxLength`), and Arabic words a counted noun four
+  // different ways across the range a limit could take — so these are plural messages keyed on the
+  // limit rather than sentences with a number dropped into them. English needs only two forms; the
+  // point of the shape is that Arabic gets to pick.
+  'dealerCustomerPage.charactersUsed': {
+    one: '{used} of {count} character',
+    other: '{used} of {count} characters',
+  },
+  'dealerCustomerPage.tooLong': {
+    one: 'Shorten this to {count} character or fewer. Nothing is cut for you — a condition trimmed mid-sentence says something you did not write.',
+    other:
+      'Shorten this to {count} characters or fewer. Nothing is cut for you — a condition trimmed mid-sentence says something you did not write.',
+  },
+  'dealerCustomerPage.savePage': 'Save customer page',
+  'dealerCustomerPage.saving': 'Saving…',
+  'dealerCustomerPage.savedTitle': 'Customer page saved',
+  'dealerCustomerPage.savedBody': 'Customers see the new page from now on.',
+  'dealerCustomerPage.couldntLoad': "Couldn't load your customer page",
+  'dealerCustomerPage.couldntLoadNothingChanged':
+    'Your customer page could not be loaded. Nothing has been changed.',
+  'dealerCustomerPage.serviceDidNotRespond':
+    'The service did not respond. Nothing has been saved.',
+  'dealerCustomerPage.onlyTheDealerOwner':
+    'Only the dealer owner can edit this page. You can read it.',
+  'dealerCustomerPage.staleConsoleTitle': 'Saving is turned off on this page',
+  'dealerCustomerPage.staleConsoleBody':
+    'Your page has a section this version of the console cannot show, and saving now would erase what is written in it. Reload the console to get the current version.',
+  'dealerCustomerPage.asCustomersSeeIt': 'As customers see it',
+  'dealerCustomerPage.previewIsSaved': 'This is what is on your page now. It follows when you save.',
+  'dealerCustomerPage.nothingShownYet':
+    'You have not written anything customers can see yet. Your opening hours, delivery, location, rating and cars are on your page regardless.',
+  'dealerCustomerPage.yourWordsNotKhadras':
+    'Customers are told these are your words, not Khadra’s.',
+  'dealerCustomerPage.whatYouDoNotWrite': 'What you do not write here',
+  'dealerCustomerPage.khadrasRules':
+    'Cancellation, payment and the documents a renter needs are Khadra’s, and every booking quote states them.',
+  'dealerCustomerPage.perCarTerms':
+    'Fuel, mileage and the security deposit belong to each car, and you set them in Fleet.',
+  'dealerCustomerPage.alwaysShown':
+    'Your opening hours, delivery terms, address, rating and cars are always on your page. They cannot be hidden.',
+  'dealerCustomerPage.whereElse': 'The rest of your page',
+  'dealerCustomerPage.brandingAndHours':
+    'Your name, logo, cover, location and opening hours are on the dealer page.',
+  'dealerCustomerPage.openDealerPage': 'Open dealer page',
+  'dealerCustomerPage.openDelivery': 'Open delivery settings',
+
   // Dealer profile.
   'dealerProfile.applyToAll': 'Apply to all',
+  'dealerProfile.aboutMovedTitle': 'What you say about your office moved',
+  'dealerProfile.aboutMovedBody':
+    'It is on the customer page now, with the rest of what you tell customers and a switch for showing or hiding each part.',
+  'dealerProfile.openCustomerPage': 'Open customer page',
   'dealerProfile.asACustomerSees': 'As a customer sees it',
   'dealerProfile.branding': 'Branding',
   'dealerProfile.businessName': 'Business name',
@@ -833,6 +916,12 @@ export const EN = {
   'dealerProfile.discard': 'Discard',
   'dealerProfile.dragThePinOr':
     'Drag the pin, or click the map, to set where customers collect cars. Your delivery radius is drawn around it to scale — zoom out to see the whole circle.',
+  'dealerProfile.cityListNotLoaded': 'The city list has not loaded, so the city stays as it is.',
+  'dealerProfile.currentCityNotOffered': 'Your current city (no longer offered)',
+  'dealerProfile.cityNotOfferedHint':
+    'The platform no longer offers this city. Your office stays filed under it — keep it, or move to a city from the list.',
+  'dealerProfile.cityDecidesSearch': 'Customers find your cars when they search for this city.',
+  'dealerProfile.addTheAreaForThisStreet': 'Add the area this street is in, or clear the street.',
   'dealerProfile.enterALatitudeBetween':
     'Enter a latitude between −90 and 90 and a longitude between −180 and 180.',
   'dealerProfile.fromYourLicenceNot': 'From your licence. Not editable.',
@@ -1029,7 +1118,6 @@ export const EN = {
   'carForm.whatACustomerShould': 'What a customer should know about this car.',
 
   // Add-a-vehicle wizard.
-  'vehicleWizard.aPerCarPickup': '; a per-car pickup point is not offered.',
   'vehicleWizard.aPublishedCarIs':
     'A published car is bookable whenever no approved booking holds it. To stop offering it for a while, take it off the road from its page; existing bookings are unaffected.',
   'vehicleWizard.availableForBooking': 'Available for booking',
@@ -1048,8 +1136,6 @@ export const EN = {
   'vehicleWizard.eGElantra': 'e.g. Elantra',
   'vehicleWizard.eGWhite': 'e.g. White',
   'vehicleWizard.eligibleForDelivery': 'Eligible for delivery',
-  'vehicleWizard.everyCarIsCollected':
-    "Every car is collected from your dealership's location. To move it, change the location on your",
   'vehicleWizard.feePerKmOver': 'Fee per km over (JOD)',
   'vehicleWizard.fromItsPage': 'From its page',
   'vehicleWizard.fullToFull': 'Full to full',
@@ -1161,7 +1247,6 @@ export const EN = {
   'renterDocs.view': 'View',
   'renterDocs.hide': 'Hide',
   'renterDocs.openInANewTab': 'Open in a new tab',
-  'renterDocs.uploaded': 'Uploaded',
   'renterDocs.notOnFile': 'Not on file: {documents}',
   'renterDocs.nothingOnFile':
     'This renter has not uploaded any documents. You cannot complete the licence check from the console.',
@@ -1177,7 +1262,6 @@ export const EN = {
   'renterDocs.notReviewed': 'Not reviewed',
   'renterDocs.markAsReviewed': 'Mark as reviewed',
   'renterDocs.reviewedAt': 'Reviewed',
-  'renterDocs.reviewedBy': 'Reviewed by',
   'renterDocs.reviewSaved': 'Recorded as reviewed by your dealership.',
   'renterDocs.reviewFailed': 'That could not be recorded. Nothing has changed.',
   'renterDocs.reviewMeaning':
@@ -1226,7 +1310,6 @@ export const EN = {
   'dealerDecide.reject.needDetails': 'Tell the customer why. The reason is required.',
   'dealerDecide.odometerLabel': 'Odometer (km)',
   'dealerDecide.fuelLabel': 'Fuel level (0–1)',
-  'dealerDecide.cashLabel': 'Cash collected (JOD)',
   'dealerDecide.notesLabel': 'Notes',
   'dealerDecide.mustBeANumber': '{field} must be a number.',
   'dealerDecide.pickup.title': 'Hand over {vehicle}?',
@@ -1300,20 +1383,6 @@ export const EN = {
   'activity.bookingCancelled': 'cancelled booking',
   'activity.bookingExpired': 'expired booking',
   'activity.bookingNoShow': 'recorded a no-show on',
-  'time.justNow': 'Just now',
-  'time.minutesAgo': {
-    one: '{count} min ago',
-    other: '{count} min ago',
-  },
-  'time.hoursAgo': {
-    one: '{count}h ago',
-    other: '{count}h ago',
-  },
-  'time.yesterday': 'Yesterday',
-  'time.daysAgo': {
-    one: '{count}d ago',
-    other: '{count}d ago',
-  },
 
   // Dealer activity feed.
   'dealerActivity.everyChangeOnYour':
@@ -1326,15 +1395,12 @@ export const EN = {
   // Second pass: literal runs that sit beside control flow.
   'dealerDashboard.aRequestExpiresWhen':
     'A request expires when its rental date arrives unanswered',
-  'dealerDashboard.noRequestsWaitingNothing': 'No requests waiting, nothing due in the next',
-  'dealerDashboard.hours': 'hours.',
   'dealerDashboard.upcomingPickups': 'Upcoming pickups',
   'dealerDashboard.noPickupsDueIn': 'No pickups due in this window.',
   'dealerDashboard.upcomingReturns': 'Upcoming returns',
   'dealerDashboard.noReturnsDueIn': 'No returns due in this window.',
   'dealerDashboard.returnedToYourLocation': 'Returned to your location',
   'dealerDashboard.fleetStatus': 'Fleet status',
-  'dealerDashboard.vehicles': 'vehicles',
   'dealerDashboard.noVehiclesYet': 'No vehicles yet.',
   'dealerDashboard.addYourFirstCar': 'Add your first car.',
   'dealerDashboard.recentActivity': 'Recent activity',
@@ -1344,57 +1410,17 @@ export const EN = {
   'disputesList.noDisputeIsOpen':
     'No dispute is open. A customer or a dealer can open one from a finished booking, within the window that booking froze.',
   'disputesList.noTicketMatchesThis': 'No ticket matches this view right now.',
-  'disputesList.tickets': 'tickets',
-  'disputesList.overdue': 'overdue',
-  'disputesList.unassigned': 'unassigned',
-  'disputesList.opened': 'Opened',
-  'vehicleWizard.step': 'Step',
-  'vehicleWizard.of8': 'of 8 ·',
-  'vehicleWizard.of82': 'of 8',
-  'vehicleWizard.customersWithinYour': 'Customers within your',
-  'vehicleWizard.kmRadiusCanAsk': 'km radius can ask for this car to be delivered.',
   'vehicleWizard.deliveryIsSwitchedOff':
     'Delivery is switched off for your dealership, so this only takes effect once you switch it on from the Delivery page.',
   'vehicleWizard.customersInsideYourDelivery':
     'Customers inside your delivery radius can ask for this car to be delivered.',
   'vehicleWizard.notSet': 'Not set',
-  'vehicleWizard.seats': 'seats',
-  'vehicleWizard.jod': 'JOD',
-  'vehicleWizard.perDay': 'per day ·',
-  'vehicleWizard.jodDeposit': 'JOD deposit',
-  'dealerBooking.allAmountsIn': 'All amounts in',
-  'dealerBooking.frozenOnThisBooking': '· frozen on this booking',
-  'dealerBooking.attached': 'Attached:',
-  'dealerBooking.kmFuel': 'km · fuel',
-  'dealerBooking.cashCollected': 'Cash collected:',
-  'dealerBooking.hAfterApproval': 'h after approval',
-  'dealerBooking.hAfterReturn': 'h after return',
   'dealerDelivery.deliveryCanBeChanged':
     'Delivery can be changed once your dealership is approved and trading.',
   'dealerDelivery.onlyTheDealerOwner':
     'Only the dealer owner can change delivery settings. You can read them here.',
-  'dealerDelivery.fromYourDealerLocation': 'From your dealer location · up to',
-  'dealerDelivery.enterARadiusBetween': 'Enter a radius between 0 and',
-  'dealerDelivery.whatYouChargePer': 'What you charge per delivery (',
-  'dealerDelivery.enterWhatYouCharge': 'Enter what you charge, between 0 and',
-  'disputeDetail.opened': 'Opened',
-  'disputeDetail.and': 'and',
-  'disputeDetail.fileSFromBoth': 'file(s) from both parties · links expire',
-  'disputeDetail.refundedToTheCustomer': 'Refunded to the customer (',
-  'disputeDetail.keptByThePlatform': 'Kept by the platform (',
-  'disputeDetail.transferredToTheDealerOpen': 'Transferred to the dealer (',
-  'disputeDetail.chargeToTheDealer': 'Charge to the dealer (',
-  'disputeDetail.optional': ', optional)',
-  'bookingsList.showingOne': 'Showing one',
-  'bookingsList.booked': 'Booked',
   'customersList.couldntLoadTheCustomers': "Couldn't load the customers",
   'customersList.joined': 'Joined',
-  'customersList.onFile': 'on file',
-  'dealerReview.documentsSubmitted': 'documents · submitted',
-  'dealerReview.signedUrls': 'Signed URLs ·',
-  'dealerReview.missing': 'Missing:',
-  'dealerReview.everyOneOfThese':
-    '. Every one of these is required before this application can be approved.',
   'dealerReview.rejectionClarificationAndSuspensio':
     'Rejection, clarification and suspension all require a written reason. Every decision is attributed to you in the audit log, which cannot be edited afterwards.',
   'dealerReview.whoDecidedThisAnd': 'Who decided this and when is in the',
@@ -1402,53 +1428,26 @@ export const EN = {
   'vehicleDetail.editVehicle': 'Edit vehicle',
   'vehicleDetail.changingThisCarIts':
     "Changing this car — its details, its photos, whether it is listed — is the dealer owner's. Everything about it is here for you to work from, and its bookings are yours to handle.",
-  'vehicleDetail.availability': 'Availability ·',
-  'adminBooking.booked': 'Booked',
-  'adminBooking.against': 'Against',
-  'adminBooking.recordedBy': 'Recorded by',
-  'adminBooking.fuel': '· fuel',
-  'adminBooking.photoS': 'photo(s)',
-  'adminBooking.cashCollected': 'Cash collected:',
-  'security.active': 'active',
   'security.signedIn': 'Signed in',
   'security.lastUsed': 'Last used',
   'security.endingASessionStops':
     'Ending a session stops it being refreshed. A request already holding a valid token can keep working for up to',
   'security.minutesAfterThat': 'minutes after that.',
-  'auditLog.automated': '— automated (',
   'auditLog.noEntryMatchesThis':
     'No entry matches this combination. Widen the range or clear the filters.',
   'auditLog.theLogFillsAs':
     'The log fills as administrators act: approving a dealer, resolving a dispute, changing a platform setting. Each entry is written in the same transaction as the action itself.',
-  'dealerActivity.was': '(was',
   'dealerBookings.onceYourVehiclesAre':
     'Once your vehicles are published, customer booking requests land here. Answer a request before its rental date arrives, or it expires.',
   'dealerBookings.noBookingsMatchThis': 'No bookings match this tab right now.',
-  'dealerApply.attached': 'Attached:',
-  'dealerApply.stillNeeded': 'Still needed:',
-  'dealerDispute.disputeOn': 'Dispute on',
-  'dealerDispute.opened': 'Opened',
-  'dealerDispute.handledBy': '· handled by',
-  'dealerEmployees.added': 'Added',
-  'dealerEmployees.since': 'Since',
-  'dealerProfile.noReviewsYet': 'No reviews yet ·',
-  'dealerProfile.platformNote': 'Platform note: “',
-  'employeeNotifications.unreadWhatHappenedAt': 'unread · what happened at your dealership',
   'employeeNotifications.whatHappenedAtYour': 'What happened at your dealership',
-  'employeeNotifications.showing': 'Showing',
   'fleetList.cars': 'cars',
-  'fleetList.showingOfCars': '{shown} of {total} cars',
-  'fleetList.seats': 'seats',
   'lookups.dealersPinTheirLocation':
     'Dealers pin their location on a map, and distance is measured from the coordinates, so the platform works without this list. Adding cities gives customers something to filter by.',
   'lookups.everyCarCurrentlyCarries':
     'Every car currently carries a placeholder type. Adding real types here gives dealers something to choose from and customers something to filter by.',
-  'lookups.inTheList': 'in the list ·',
-  'lookups.offeredOnNewListings': 'offered on new listings',
   'adminUsers.added': 'Added',
   'dealerReports.ammanTime': '· Amman time',
-  'employeeBusiness.activeStaffDealerSince': 'active staff · dealer since',
-  'employeeSettings.employeeOf': 'Employee of',
   'common.pageOf': 'Page {page} of {total}',
 
   // Admin dashboard panels.
@@ -1463,7 +1462,6 @@ export const EN = {
   'adminDashboard.nothingNeedsAttention': 'Nothing needs attention',
   'adminDashboard.noDisputeOrDealer':
     'No dispute or dealer application is approaching its review deadline.',
-  'adminDashboard.bookingsLastDays': 'Bookings · last {days} days',
   'adminDashboard.theBookingTrendCould': 'The booking trend could not be loaded.',
   'adminDashboard.noBookingsWereMade': 'No bookings were made in this period.',
   'adminDashboard.busiestDayWith': {
@@ -1648,7 +1646,6 @@ export const EN = {
   'dealerReports.thisWeek': 'This week',
   'dealerReports.thisMonth': 'This month',
   'disputesList.liveQueue': 'Live queue',
-  'disputesList.underReview': 'Under review',
   'adminDashboard.yourSessionHasExpired': 'Your session has expired',
   'adminDashboard.signInAgainTo': 'Sign in again to see platform figures.',
   'adminDashboard.thisAccountCannotSee': 'This account cannot see the platform dashboard',
@@ -1683,8 +1680,6 @@ export const EN = {
   'dealersList.colRating': 'Rating',
   'dealersList.colReviewDue': 'Review due',
   'dealersList.colActions': 'Actions',
-  'dealersList.showing': 'Showing {from}–{to} of {total} dealers',
-  'dealersList.showingOne': 'Showing 1 of 1 dealer',
   'dealersList.adminOnly': 'Only administrators can see the dealer queue.',
   'dealersList.loadFailed': 'The dealer queue could not be loaded. Nothing has been changed.',
   'status.pendingReview': 'Pending review',
@@ -1767,8 +1762,6 @@ export const EN = {
   'employeeDash.goodEvening': 'Good evening',
   'employeeDash.nothingWaiting': 'nothing waiting',
   'employeeDash.noneOverdue': 'none overdue',
-  'employeeDash.requestIs': 'request is',
-  'employeeDash.requestsAre': 'requests are',
   'employeeDash.bookingRequest': 'Booking request',
   'employeeDash.returnOverdue': 'Return overdue',
   'employeeDash.pickupApproaching': 'Pickup approaching',
@@ -1776,9 +1769,6 @@ export const EN = {
   'employeeDash.thisAccountIsNot': 'This account is not part of a dealership.',
   'employeeDash.yourDashboardCouldNot':
     'Your dashboard could not be loaded. Nothing has been changed.',
-  'employeeDash.handedOver': 'Handed over',
-  'employeeDash.tookBack': 'Took back',
-  'employeeDash.justNow': 'just now',
 
   // The dealer dashboard's KPI sub-labels and activity verbs.
   'dealerDash.allWithinTheirDates': 'all within their dates',
@@ -1787,8 +1777,6 @@ export const EN = {
   'dealerDash.fleetUtilisationLast30': 'fleet utilisation, last 30 days',
   'dealerDash.overdueReturn': 'Overdue return',
   'dealerDash.viewBooking': 'View booking',
-  'dealerDash.handedOver': 'handed over',
-  'dealerDash.tookBack': 'took back',
 
   // Keyed by key-copy.js, 2026-09-08.
   'vehicleDetail.thatCarIsNot': 'That car is not in your fleet, or has been removed.',
@@ -1882,7 +1870,6 @@ export const EN = {
 
   // Keyed by key-copy.js, 2026-09-08.
   'dealerProfile.closedAllWeek': 'Closed all week',
-  'dealerProfile.everyDay': 'Every day',
   'dealerProfile.yourDealerPageCould':
     'Your dealer page could not be loaded. Nothing has been changed.',
   'dealerProfile.dealerPageSaved': 'Dealer page saved',
@@ -1897,12 +1884,10 @@ export const EN = {
   // Keyed by key-copy.js, 2026-09-08.
   'dealerReview.submitted': 'Submitted',
   'dealerReview.lastReviewNote': 'Last review note',
-  'dealerReview.expiredReloadThePage': 'expired — reload the page',
   'dealerReview.thatDealerApplicationNo': 'That dealer application no longer exists.',
   'dealerReview.onlyAdministratorsCanReview': 'Only administrators can review dealer applications.',
   'dealerReview.theApplicationCouldNot':
     'The application could not be loaded. Nothing has been changed.',
-  'dealerReview.note': 'note',
   'dealerReview.note2': 'Note',
 
   // Keyed by key-copy.js, 2026-09-08.
@@ -1942,7 +1927,6 @@ export const EN = {
   'employeeNotif.bookingDecision': 'Booking decision',
   'employeeNotif.yourAccess': 'Your access',
   'employeeNotif.markedAsRead': 'Marked as read',
-  'employeeNotif.oneNotificationMarkedRead': 'One notification marked read.',
 
   // Keyed by key-copy.js, 2026-09-08.
   'carForm.addAtLeastOne': 'Add at least one photo before you can publish this car.',
@@ -1998,7 +1982,6 @@ export const EN = {
   // Keyed by key-copy.js, 2026-09-08.
 
   // Keyed by key-copy.js, 2026-09-08.
-  'bookingsList.oneParty': 'one party',
   'bookingsList.thePlatformBookingList': 'The platform booking list is for administrators.',
   'bookingsList.theBookingsCouldNot': 'The bookings could not be loaded. Nothing has been changed.',
   'bookingsList.vehicleDelisted': 'Vehicle delisted',
@@ -2155,6 +2138,727 @@ export const EN = {
   // Keyed by key-copy.js, 2026-09-08.
 
   // Keyed by key-copy.js, 2026-09-08.
+
+  // Console audit 2026-09-13: shared time phrases, refusals, scoped statuses, and the words for records that no longer resolve
+  'time.minutesShort': {
+    one: '{count}m',
+    other: '{count}m',
+  },
+  'time.hoursShort': {
+    one: '{count}h',
+    other: '{count}h',
+  },
+  'time.daysShort': {
+    one: '{count}d',
+    other: '{count}d',
+  },
+  'common.requestRefused': 'That was refused. Nothing has been changed.',
+  'common.fieldRejected': 'Check this field.',
+  'common.customerAccountClosed': 'Customer account closed',
+  'common.dealerNoLongerOnPlatform': 'Dealer no longer on the platform',
+  'common.accountClosed': 'Account closed',
+  'common.formerStaffMember': 'Former staff member',
+  'common.theRentalOffice': 'The rental office',
+  'common.unassigned': 'Unassigned',
+  'status.requestedDealerBooking': 'Pending',
+  'status.approvedDealerBooking': 'Awaiting deposit',
+  'status.pickedUpDealerBooking': 'Active',
+  'queue.overdue': 'Overdue',
+  'queue.slaLeft': 'SLA {duration}',
+  'queue.actionResolve': 'Resolve',
+  'queue.actionReview': 'Review',
+  'queue.actionOpen': 'Open',
+  'adminDashboard.bookingsOnDay': {
+    one: '{day}: {count} booking',
+    other: '{day}: {count} bookings',
+  },
+  'notifications.overdue': 'Overdue',
+  'notifications.toAnswer': 'To answer',
+  'notifications.pickupRow': 'Pickup — {vehicle}',
+  'notifications.returnRow': 'Return — {vehicle}',
+  'dealerReports.today': 'Today',
+  'dealerBooking.rentalLine': 'Rental · {count} × {rate}',
+  'dealerBooking.depositPaidByCard': 'Deposit paid by card ({percent})',
+  'dealerBooking.platformCommissionFrozen':
+    'Platform commission · {percent} (frozen on this booking)',
+  'dealerBooking.amountFrozen': '{amount} · frozen on this booking',
+  'dealerBooking.mileageAllowance': '{limit} km/day, {fee}/km over',
+
+  // Console audit 2026-09-13: the dealer bookings list and activity feed
+  'dealerActivity.wasStatus': '(was {status})',
+  'dealerActivity.pageSummary': {
+    one: '{shown} of {count} change',
+    other: '{shown} of {count} changes',
+  },
+  'dealerBookings.noBookingsYet': 'No bookings yet',
+  'dealerBookings.nothingInThisTab': 'Nothing in this tab',
+  'dealerBookings.dealerLocation': 'Dealer location',
+  'dealerBookings.tabPending': 'Pending',
+  'dealerBookings.tabUpcoming': 'Upcoming',
+  'dealerBookings.tabActive': 'Active',
+  'dealerBookings.tabReturned': 'Returned',
+  'dealerBookings.tabCompleted': 'Completed',
+  'dealerBookings.tabClosed': 'Closed',
+  'dealerBookings.pageSummary': {
+    one: '{shown} of {count} booking',
+    other: '{shown} of {count} bookings',
+  },
+  'dealerBookings.periodRange': '{start} → {end}',
+
+  // Wave Two 2026-09-17: the dealer application timeline, worded from the server's facts
+  'dealerReview.timelineMeta': '{detail} · {when}',
+  'dealerReview.stepSubmitted': 'Application submitted',
+  'dealerReview.stepDocumentsAttached': 'Documents attached',
+  'dealerReview.documentsOfRequired': '{have} of {need} required',
+  'dealerReview.stepApproved': 'Approved',
+  'dealerReview.stepRejected': 'Rejected',
+  'dealerReview.stepClarificationRequested': 'Clarification requested',
+  'dealerReview.stepDecisionRecorded': 'Decision recorded',
+  'dealerReview.noNoteRecorded': 'No note recorded.',
+  'dealerReview.stepResubmitted': 'Resubmitted by the dealer',
+  'dealerReview.resubmittedDetail': 'The application was corrected and sent back for review.',
+  'dealerReview.stepAwaitingDecision': 'Awaiting admin decision',
+  'dealerReview.noDecisionRecordedYet': 'No decision has been recorded yet.',
+
+  // Wave Two 2026-09-17: dispute parties, holders and closed accounts, worded from the server's facts
+  'party.customer': 'Customer',
+  'party.dealer': 'Dealer',
+  'party.system': 'System',
+  'party.unattributed': 'Unattributed',
+  'party.admin': 'Admin',
+  'disputesList.withHolder': 'With {name}',
+  'disputesList.heldByClosedAccount': 'With a closed account',
+  'disputeDetail.openedLine': 'Opened {when} by {name} ({party})',
+  'disputeDetail.betweenParties': '{dealer} and {customer}',
+  'disputeDetail.nameWithParty': '{name} ({party})',
+  'disputeDetail.partyOpenedIt': '{party} · opened it',
+  'disputeDetail.openedBy': 'Opened by {name}',
+  'disputeDetail.answeredBy': '{name} answered',
+  'disputeDetail.takenOnBy': 'Taken on by {name}',
+  'disputeDetail.resolvedBy': 'Resolved by {name}',
+  'disputeDetail.filesAttached': {
+    one: '{count} file',
+    other: '{count} files',
+  },
+  'disputeDetail.quoted': '“{text}”',
+  'disputeDetail.dueAt': 'Due {when}',
+  'disputeDetail.resolveConfirmBody': '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}. Both parties see the decision, your note and your name, and it is written to the audit log.',
+  'disputeDetail.resolveConfirmBodyWithCharge': '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}, and {charge} charged to the dealer. Both parties see the decision, your note and your name, and it is written to the audit log.',
+  'dealerDispute.openedByYourSide': 'Opened {when} by {name} (your side)',
+  'dealerDispute.openedByCustomer': 'Opened {when} by {name} (the customer)',
+  'dealerDispute.handledByName': 'Handled by {name}',
+  'dealerDispute.yourSide': 'Your side',
+
+  // Wave Two 2026-09-17: booking parties that left the platform, worded from the server's flags
+  'bookingsList.scopedToDealer': 'Showing one dealer: {name}',
+  'bookingsList.scopedToCustomer': 'Showing one customer: {name}',
+  'bookingsList.scopedToOneParty': 'Showing one party',
+  'adminBooking.cancelTitle': 'Cancel {reference}?',
+  'adminBooking.cancelBody': 'The booking ends now and the car is released. No penalty is assessed against {customer} or {dealer} — the platform is cancelling, not either party.',
+  'adminBooking.expireTitle': 'Expire {reference}?',
+  'adminBooking.expireBody': '{which} Expiring releases the car. No penalty is assessed against anyone.',
+  'adminBooking.noShowTitle': 'Mark {reference} as a no-show?',
+  'adminBooking.noShowBody': '{customer} never collected the car. This assesses whatever this booking\'s own terms say is owed — nothing is charged.',
+  'dealerBooking.requestedAt': 'Requested {when}',
+
+  // Wave Two 2026-09-17: one clock for every deadline and SLA — remaining, overdue by, expired
+  'time.remainingMinutes': {
+    one: '{count}m remaining',
+    other: '{count}m remaining',
+  },
+  'time.remainingHours': {
+    one: '{count}h remaining',
+    other: '{count}h remaining',
+  },
+  'time.remainingDays': {
+    one: '{count}d remaining',
+    other: '{count}d remaining',
+  },
+  'time.overdueMinutes': {
+    one: 'Overdue by {count}m',
+    other: 'Overdue by {count}m',
+  },
+  'time.overdueHours': {
+    one: 'Overdue by {count}h',
+    other: 'Overdue by {count}h',
+  },
+  'time.overdueDays': {
+    one: 'Overdue by {count}d',
+    other: 'Overdue by {count}d',
+  },
+  'time.overdue': 'Overdue',
+  'time.expired': 'Expired',
+
+  // Wave Two 2026-09-17: the six hand-written clocks, on the shared SLA and deadline readings
+  'dealerReview.settled': 'Settled',
+  'dealerReview.pastTheReviewSla': {
+    one: 'Past the {count}-hour review SLA.',
+    other: 'Past the {count}-hour review SLA.',
+  },
+  'dealerReview.untilTheReviewSla': {
+    one: 'Until the {count}-hour review SLA.',
+    other: 'Until the {count}-hour review SLA.',
+  },
+  'disputeDetail.closed': 'Closed',
+  'disputesList.closedAt': 'Closed {when}',
+  'dealerDispute.platformDeadline': 'Platform deadline: {clock}',
+  'dealerBooking.expiresAt': 'Expires {when}.',
+
+  // Wave Two 2026-09-17: shared words — a fleet car's status, handover types
+  'status.activeVehicle': 'Published',
+  'status.maintenanceVehicle': 'Off the road',
+  'handoverType.pickup': 'Pickup',
+  'handoverType.return': 'Return',
+
+  // Wave Two 2026-09-17: common words shared by every console, created once before the screen sweep
+  'common.yes': 'Yes',
+  'common.no': 'No',
+  'common.on': 'On',
+  'common.off': 'Off',
+  'common.never': 'Never',
+  'common.saving': 'Saving…',
+  'common.none': 'None',
+  'common.save': 'Save',
+  'common.details': 'Details',
+  'common.hide': 'Hide',
+
+  // Wave Two 2026-09-17: the shared map and the console's own failure toast
+  'map.location': 'Location',
+  'common.thatDidNotGoThrough': 'That did not go through',
+  'common.serviceDidNotRespond': 'The service did not respond.',
+
+  // Wave Two 2026-09-17: Dealer and Employee dashboards, employee notifications — whole messages shared by both dashboards (D10)
+  'employeeDash.goodMorningName': 'Good morning, {name}',
+  'employeeDash.goodAfternoonName': 'Good afternoon, {name}',
+  'employeeDash.goodEveningName': 'Good evening, {name}',
+  'employeeDash.oldestWhen': 'oldest {when}',
+  'employeeDash.nextWhen': 'next: {when}',
+  'employeeDash.noneInNextHours': {
+    one: 'none in the next {count}h',
+    other: 'none in the next {count}h',
+  },
+  'employeeDash.overdueCount': {
+    one: '{count} overdue',
+    other: '{count} overdue',
+  },
+  'employeeDash.requestsWaitingForAnswer': {
+    one: '{count} booking request is waiting for an answer',
+    other: '{count} booking requests are waiting for an answer',
+  },
+  'employeeDash.wasDueBack': '{vehicle} was due back {when}',
+  'employeeDash.pickupAt': '{vehicle} pickup {when}',
+  'employeeDash.deliveryAt': '{vehicle} delivery {when}',
+  'employeeDash.pickupsNextHours': {
+    one: 'Pickups · next {count}h',
+    other: 'Pickups · next {count}h',
+  },
+  'employeeDash.returnsNextHours': {
+    one: 'Returns · next {count}h',
+    other: 'Returns · next {count}h',
+  },
+  'employeeDash.oldestArrived': 'The oldest arrived {when}.',
+  'employeeDash.overdueDesc': '{customer} has not brought the car back. Record the return when it arrives.',
+  'employeeDash.pickupDesc': '{customer}. Record the handover when the car leaves.',
+  'employeeDash.dueBackAt': '{vehicle} due back {when}',
+  'employeeDash.returnDesc': '{customer}’s rental ends. Confirm the return and note any damage.',
+  'employeeDash.activityApproved': 'Approved {reference}',
+  'employeeDash.activityRejected': 'Rejected {reference}',
+  'employeeDash.activityHandedOver': 'Handed over {reference}',
+  'employeeDash.activityTookBack': 'Took back {reference}',
+  'employeeDash.activityCancelled': 'Cancelled {reference}',
+  'employeeDash.activityOther': '{status} {reference}',
+  'dealerDash.statusLine': {
+    one: '{requests} waiting, {pickups} and {returns} in the next hour.',
+    other: '{requests} waiting, {pickups} and {returns} in the next {count} hours.',
+  },
+  'dealerDash.bookingRequestsCount': {
+    one: '{count} booking request',
+    other: '{count} booking requests',
+  },
+  'dealerDash.pickupsCount': {
+    one: '{count} pickup',
+    other: '{count} pickups',
+  },
+  'dealerDash.returnsCount': {
+    one: '{count} return',
+    other: '{count} returns',
+  },
+  'dealerDash.answerBeforePickup': 'answer before pickup',
+  'dealerDash.ofPublished': {
+    one: 'of {count} published',
+    other: 'of {count} published',
+  },
+  'dealerDash.inYourFleet': {
+    one: '{count} in your fleet',
+    other: '{count} in your fleet',
+  },
+  'dealerDash.oldestMadeExpiry': 'The oldest was made {when}. A request expires when its rental date arrives unanswered.',
+  'dealerDash.overdueDesc': '{customer} has not returned the car. Record the return when it comes back, and note any damage within the settlement window.',
+  'dealerDash.pickupDesc': '{customer}. Record the handover with the odometer and fuel level when the keys change hands.',
+  'dealerDash.returnAt': '{vehicle} return {when}',
+  'dealerDash.returnDesc': '{customer}’s rental ends. Confirm the return and note any damage within the settlement window.',
+  'dealerDash.activityApproved': '{actor} approved booking {reference}',
+  'dealerDash.activityRejected': '{actor} rejected booking {reference}',
+  'dealerDash.activityHandedOver': '{actor} handed over booking {reference}',
+  'dealerDash.activityTookBack': '{actor} took back booking {reference}',
+  'dealerDash.activityCancelled': '{actor} cancelled booking {reference}',
+  'dealerDash.activityOther': '{actor} moved booking {reference} to {status}',
+  'dealerDashboard.nothingDueInWindow': {
+    one: 'No requests waiting, nothing due in the next hour.',
+    other: 'No requests waiting, nothing due in the next {count} hours.',
+  },
+  'dealerDashboard.nextHours': {
+    one: 'Next {count}h',
+    other: 'Next {count}h',
+  },
+  'dealerDashboard.deliveryToTheCustomer': 'Delivery to the customer',
+  'dealerDashboard.vehiclesCount': {
+    one: '{count} vehicle',
+    other: '{count} vehicles',
+  },
+
+  // Wave Two 2026-09-17: the dealer's booking, its decisions, its dispute, the application and the gate
+  'dealerBooking.bookingReference': 'Booking {reference}',
+  'dealerBooking.fromRatings': {
+    one: 'from {count} rating',
+    other: 'from {count} ratings',
+  },
+  'dealerBooking.completedWithYou': '({rentals} with you)',
+  'renterDocs.uploadedWhen': 'Uploaded {when}',
+  'renterDocs.reviewedByReviewer': 'Reviewed by {reviewer}',
+  'dealerBooking.allAmountsFrozen': 'All amounts in {currency} · frozen on this booking',
+  'dealerDispute.evidenceAttached': 'Attached: {files}',
+  'dealerBooking.odometerAndFuel': '{km} km · fuel {fuel}',
+  'dealerBooking.cashCollectedAmount': 'Cash collected: {amount}',
+  'dealerBooking.hoursAfterApproval': {
+    one: '{count}h after approval',
+    other: '{count}h after approval',
+  },
+  'dealerBooking.hoursAfterReturn': {
+    one: '{count}h after return',
+    other: '{count}h after return',
+  },
+  'dealerBooking.approvedOrRejected': 'Approved / rejected',
+  'dealerBooking.yourAnswerBefore': 'Your answer, before {when}',
+  'dealerBooking.customerPaysBy': 'The customer pays by {when}',
+  'dealerBooking.scheduledFor': 'Scheduled {when}',
+  'dealerBooking.afterSettlementWindow': {
+    one: 'After the {count}h settlement window',
+    other: 'After the {count}h settlement window',
+  },
+  'dealerBooking.platformWillAnswerWithin': {
+    one: 'The platform will answer within {count} hour.',
+    other: 'The platform will answer within {count} hours.',
+  },
+  'dealerDecide.cashLabelIn': 'Cash collected ({currency})',
+  'dealerDispute.disputeOnReference': 'Dispute on {reference}',
+  'dealerDispute.photosOrAPdfStored': 'Photos or a PDF, stored privately.',
+  'dealerDispute.addStatement': 'Add statement',
+  'dealerApply.withThePlatformForLicenceCheck': '{name} is with the platform for its licence check.',
+  'dealerApply.attachedFile': 'Attached: {name}',
+  'dealerApply.stillNeededDocuments': 'Still needed: {documents}.',
+  'dealerApply.submitting': 'Submitting…',
+  'dealerApply.submitForReview': 'Submit for review',
+
+  // Wave Two 2026-09-17: dealer staff, dealer page, delivery, settings; employee business and settings
+  'dealerEmployees.availableOnceTrading': 'Available once your dealership is approved and trading',
+  'dealerEmployees.addedOn': 'Added {date}',
+  'dealerEmployees.sinceDate': 'Since {date}',
+  'dealerEmployees.canSeeReports': 'Can see reports',
+  'dealerEmployees.bookingsOnly': 'Bookings only',
+  'dealerEmployees.freshLinkOnItsWay': 'A fresh link is on its way to {email}.',
+  'dealerEmployees.canNowSeeReports': '{name} can now see revenue and reports.',
+  'dealerEmployees.reportsNowHidden': '{name} can still handle bookings; reports are hidden.',
+  'dealerEmployees.deactivateName': 'Deactivate {name}?',
+  'dealerEmployees.noLongerHasAccess': '{name} no longer has access.',
+  'dealerEmployees.stillNeedsToAccept': '{name} still needs to accept their invitation and set a password.',
+  'dealerEmployees.canSignInAgain': '{name} can sign in again with their existing password.',
+  'dealerProfile.saveChanges': 'Save changes',
+  'dealerProfile.uploading': 'Uploading…',
+  'dealerProfile.change': 'Change',
+  'dealerProfile.open': 'Open',
+  'dealerProfile.closed': 'Closed',
+  'dealerProfile.yourDealershipLocation': 'Your dealership location',
+  'dealerProfile.noReviewsDeliversUpTo': 'No reviews yet · Delivers up to {km} km',
+  'dealerProfile.noReviewsPickupOnly': 'No reviews yet · Pickup only',
+  'dealerProfile.noDescriptionYet': 'No description yet.',
+  'dealerProfile.listed': 'Listed',
+  'dealerProfile.notListed': 'Not listed',
+  'dealerProfile.platformNoteQuoted': 'Platform note: “{note}”',
+  'dealerProfile.everyDayHours': 'Every day · {opens}–{closes}',
+  'dealerProfile.daysAWeekHours': {
+    one: '{count} day a week · {opens}–{closes}',
+    other: '{count} days a week · {opens}–{closes}',
+  },
+  'dealerProfile.openDaysAWeekHoursVary': {
+    one: 'Open {count} day a week · hours vary',
+    other: 'Open {count} days a week · hours vary',
+  },
+  'dealerDelivery.fromYourLocationUpToKm': 'From your dealer location · up to {km} km',
+  'dealerDelivery.distanceKm': '{km} km',
+  'dealerDelivery.enterRadiusUpToKm': 'Enter a radius between 0 and {max} km.',
+  'dealerDelivery.whatYouChargePerDelivery': 'What you charge per delivery ({currency})',
+  'dealerDelivery.enterFeeUpTo': 'Enter what you charge, between 0 and {max}.',
+  'employeeSettings.changingPassword': 'Changing…',
+  'employeeSettings.passwordUnchanged': 'That is the password you already have. Choose a different one.',
+  'employeeSettings.passwordRulesNotMet': 'The new password does not meet the password rules.',
+  'employeeSettings.security': 'Security',
+  'employeeSettings.notifications': 'Notifications',
+  'employeeSettings.employeeOfBusiness': 'Employee of {business}',
+  'employeeBusiness.detailsCouldNotBeLoaded': 'Your dealership\'s details could not be loaded. Nothing has been changed.',
+  'employeeBusiness.radiusAndFee': '{km} km · {fee}',
+  'employeeBusiness.opensToCloses': '{opens} – {closes}',
+  'employeeBusiness.trading': 'Trading',
+  'employeeBusiness.activeStaffDealerSinceDate': {
+    one: '{count} active staff member · dealer since {date}',
+    other: '{count} active staff · dealer since {date}',
+  },
+
+  // Wave Two 2026-09-17: the fleet list and the car page
+  'fleetList.showingCars': {
+    one: '{shown} of {count} car',
+    other: '{shown} of {count} cars',
+  },
+  'fleetList.seatCount': {
+    one: '{count} seat',
+    other: '{count} seats',
+  },
+  'fleetList.transmissionAutomatic': 'Automatic',
+  'fleetList.transmissionManual': 'Manual',
+  'fleetList.fuelPetrol': 'Petrol',
+  'fleetList.fuelDiesel': 'Diesel',
+  'fleetList.fuelHybrid': 'Hybrid',
+  'fleetList.fuelElectric': 'Electric',
+  'fleetList.securityDeposit': 'Deposit',
+  'fleetList.takeVehicleOffTheRoad': 'Take {vehicle} off the road?',
+  'fleetList.vehicleNotBeingOffered': '{vehicle} is not being offered.',
+  'fleetList.removeVehicle': 'Remove {vehicle}?',
+  'fleetList.vehicleNoLongerListed': '{vehicle} is no longer listed.',
+
+  // Wave Two 2026-09-17: admin dashboard, dealers, customers, admin users, security
+  'adminDashboard.bookingsInTheLastDays': {
+    one: 'Bookings · last {count} day',
+    other: 'Bookings · last {count} days',
+  },
+  'adminDashboard.bookingsTrendHeading': 'Bookings',
+  'adminDashboard.trendRange': '{from} – {to}',
+  'adminDashboard.queueOpenCount': {
+    one: '{count} open',
+    other: '{count} open',
+  },
+  'adminDashboard.queueOverdueCount': {
+    one: '{count} overdue',
+    other: '{count} overdue',
+  },
+  'adminDashboard.currentSlaHours': {
+    one: 'Current SLA {count}h',
+    other: 'Current SLA {count}h',
+  },
+  'dealersList.showingRange': {
+    one: 'Showing {count} of {count} dealer',
+    other: 'Showing {from}–{to} of {count} dealers',
+  },
+  'dealersList.commercialRegistration': 'CR {number}',
+  'dealersList.documentsOfRequired': '{have} of {need}',
+  'dealersList.noReviewsYet': 'No reviews yet',
+  'dealersList.reviewCount': {
+    one: '{count} review',
+    other: '{count} reviews',
+  },
+  'dealerReview.documentsOfCount': {
+    one: '{have} of {count} document',
+    other: '{have} of {count} documents',
+  },
+  'dealerReview.submittedOn': 'submitted {date}',
+  'dealerReview.provided': 'Provided',
+  'dealerReview.linkExpiresAt': 'Link expires {time}',
+  'dealerReview.signedLinksExpireAt': 'Signed URLs · expire at {time}',
+  'dealerReview.signedLinksExpired': 'Signed URLs · expired — reload the page',
+  'dealerReview.documentCommercialRegistration': 'Commercial registration',
+  'dealerReview.documentVehicleRegistration': 'Vehicle registration',
+  'dealerReview.documentOwnerIdentity': 'Owner identity',
+  'dealerReview.missingDocumentsRequired': 'Missing: {documents}. Every one of these is required before this application can be approved.',
+  'dealerReview.approveNameQuestion': 'Approve {name}?',
+  'dealerReview.nameCanNowTrade': '{name} can now trade.',
+  'dealerReview.rejectNameQuestion': 'Reject {name}?',
+  'dealerReview.nameWasToldWhy': '{name} was told why.',
+  'dealerReview.suspendNameQuestion': 'Suspend {name}?',
+  'dealerReview.nameCanNoLongerTrade': '{name} can no longer trade.',
+  'dealerReview.reactivateNameQuestion': 'Reactivate {name}?',
+  'dealerReview.nameCanTradeAgain': '{name} can trade again.',
+  'dealerReview.decision': 'Decision',
+  'dealerReview.decisionOnRecord': 'Decision on record',
+  'customersList.showingRange': {
+    one: 'Showing {count} of {count} customer',
+    other: 'Showing {from}–{to} of {count} customers',
+  },
+  'customersList.joinedOn': 'Joined {date}',
+  'customersList.documentsOnFile': {
+    one: '{count} on file',
+    other: '{count} on file',
+  },
+  'customersList.completeToRent': 'Complete to rent',
+  'customersList.incomplete': 'Incomplete',
+  'customerProfile.suspendNameQuestion': 'Suspend {name}?',
+  'customerProfile.reactivateNameQuestion': 'Reactivate {name}?',
+  'customerProfile.sizeInKilobytes': '{size} KB',
+  'customerProfile.uploadedOn': 'uploaded {date}',
+  'adminUsers.addedOn': 'Added {date}',
+  'adminUsers.canAcceptUntil': '{email} can accept until {date}.',
+  'adminUsers.deactivateNameQuestion': 'Deactivate {name}?',
+  'adminUsers.reactivateNameQuestion': 'Reactivate {name}?',
+
+  // Wave Two 2026-09-17: Admin bookings, disputes, audit log, lookups, platform settings
+  'bookingsList.tabUnpaid': 'Unpaid',
+  'bookingsList.pageSummary': {
+    one: 'Showing {from}–{to} of {count} booking',
+    other: 'Showing {from}–{to} of {count} bookings',
+  },
+  'bookingsList.bookedOn': 'Booked {date}',
+  'bookingsList.periodUntil': 'to {end}',
+  'adminBooking.dailyRateForDays': {
+    one: 'Daily rate × {count} day',
+    other: 'Daily rate × {count} days',
+  },
+  'adminBooking.depositWithPercent': 'Deposit ({percent})',
+  'adminBooking.platformCommissionWithPercent': 'Platform commission ({percent})',
+  'adminBooking.hours': {
+    one: '{count} hour',
+    other: '{count} hours',
+  },
+  'adminBooking.periodRange': '{start} to {end}',
+  'adminBooking.againstParty': 'Against {party}',
+  'adminBooking.recordedByParty': 'Recorded by {party}',
+  'adminBooking.odometerKm': '{km} km',
+  'adminBooking.fuelLevel': 'fuel {level}',
+  'adminBooking.photoCount': {
+    one: '{count} photo',
+    other: '{count} photos',
+  },
+  'adminBooking.cashCollectedAmount': 'Cash collected: {amount}',
+  'disputesList.nothingWaitingOnYou': 'Nothing waiting on you',
+  'disputesList.nothingInThisView': 'Nothing in this view',
+  'disputesList.shownOfTickets': {
+    one: '{shown} of {count} ticket',
+    other: '{shown} of {count} tickets',
+  },
+  'disputesList.overdueCount': {
+    one: '{count} overdue',
+    other: '{count} overdue',
+  },
+  'disputesList.unassignedCount': {
+    one: '{count} unassigned',
+    other: '{count} unassigned',
+  },
+  'disputesList.openedAt': 'Opened {when}',
+  'disputesList.statementCount': {
+    one: '{count} statement',
+    other: '{count} statements',
+  },
+  'disputesList.view': 'View',
+  'disputeDetail.periodRange': '{start} – {end}',
+  'disputeDetail.evidenceFromBothParties': {
+    one: '{count} file from both parties · links expire',
+    other: '{count} files from both parties · links expire',
+  },
+  'disputeDetail.refundedToCustomerIn': 'Refunded to the customer ({currency})',
+  'disputeDetail.keptByPlatformIn': 'Kept by the platform ({currency})',
+  'disputeDetail.transferredToDealerIn': 'Transferred to the dealer ({currency})',
+  'disputeDetail.chargeToDealerOptionalIn': 'Charge to the dealer ({currency}, optional)',
+  'disputeDetail.balancesAgainstTheDepositHeld': 'Balances against the deposit held',
+  'disputeDetail.leftToAllocate': 'Left to allocate',
+  'disputeDetail.allocatedOfHeld': '{allocated} of {held}',
+
+  // Wave Two 2026-09-18: the audit log's own vocabulary, the security sessions and the employee notifications
+  'auditLog.actionDealerApproved': 'Dealer approved',
+  'auditLog.actionDealerRejected': 'Dealer rejected',
+  'auditLog.actionDealerClarificationRequested': 'Dealer clarification requested',
+  'auditLog.actionDealerSuspended': 'Dealer suspended',
+  'auditLog.actionDealerReactivated': 'Dealer reactivated',
+  'auditLog.actionCustomerSuspended': 'Customer suspended',
+  'auditLog.actionCustomerReactivated': 'Customer reactivated',
+  'auditLog.actionDisputeOpened': 'Dispute opened',
+  'auditLog.actionDisputeAssigned': 'Dispute assigned',
+  'auditLog.actionDisputeResolved': 'Dispute resolved',
+  'auditLog.actionBusinessRuleChanged': 'Business rule changed',
+  'auditLog.actionReviewHidden': 'Review hidden',
+  'auditLog.actionReviewRestored': 'Review restored',
+  'auditLog.actionAdminInvited': 'Admin invited',
+  'auditLog.actionAdminDeactivated': 'Admin deactivated',
+  'auditLog.actionAdminReactivated': 'Admin reactivated',
+  'auditLog.actionBookingCancelledByAdmin': 'Booking cancelled by admin',
+  'auditLog.actionBookingExpired': 'Booking expired',
+  'auditLog.actionBookingMarkedNoShow': 'Booking marked no-show',
+  'auditLog.actionLookupCreated': 'Lookup created',
+  'auditLog.actionLookupRenamed': 'Lookup renamed',
+  'auditLog.actionLookupRetired': 'Lookup retired',
+  'auditLog.actionLookupRestored': 'Lookup restored',
+  'auditLog.entityDealer': 'Dealer',
+  'auditLog.entityCustomer': 'Customer',
+  'auditLog.entityBooking': 'Booking',
+  'auditLog.entityDispute': 'Dispute',
+  'auditLog.entityReview': 'Review',
+  'auditLog.entitySetting': 'Setting',
+  'auditLog.entityAdminUser': 'Admin user',
+  'auditLog.entityCity': 'City',
+  'auditLog.entityCarType': 'Car type',
+  'auditLog.pageSummary': {
+    one: 'Showing {from}–{to} of {count} entry',
+    other: 'Showing {from}–{to} of {count} entries',
+  },
+  'auditLog.timesAndDatesIn': 'Times and dates in {zone}',
+  'auditLog.nothingMatchesThoseFilters': 'Nothing matches those filters',
+  'auditLog.noActionsRecordedYet': 'No actions have been recorded yet',
+  'auditLog.automatedActor': 'Automated',
+  'auditLog.automatedActorOption': '{name} — automated ({count})',
+  'auditLog.noReasonRecordedWithAction': 'No reason was recorded with this action.',
+  'security.activeSessionsCount': {
+    one: '{count} active session',
+    other: '{count} active sessions',
+  },
+  'security.sessionActive': 'Active',
+  'security.ended': 'Ended',
+  'security.signedInCannotBeRefreshed': 'Signed in {date}. It cannot be refreshed after this.',
+  'security.signedInFromCannotBeRefreshed': 'Signed in {date} from {address}. It cannot be refreshed after this.',
+  'security.inFlightForUpToMinutes': {
+    one: 'A session already in flight can keep working for up to {count} minute before it has to refresh. If this is the session you are using now, you will be signed out.',
+    other: 'A session already in flight can keep working for up to {count} minutes before it has to refresh. If this is the session you are using now, you will be signed out.',
+  },
+  'employeeNotifications.unreadSummary': {
+    one: '{count} unread · what happened at your dealership',
+    other: '{count} unread · what happened at your dealership',
+  },
+  'employeeNotifications.nothingUnread': 'Nothing unread',
+  'employeeNotifications.marking': 'Marking…',
+  'employeeNotifications.markAllRead': 'Mark all read',
+  'employeeNotifications.showingOf': {
+    one: 'Showing {shown} of {count} notification.',
+    other: 'Showing {shown} of {count} notifications.',
+  },
+  'employeeNotif.team': 'Team',
+  'employeeNotif.dealership': 'Dealership',
+  'employeeNotif.notificationsMarkedRead': {
+    one: '{count} notification marked read.',
+    other: '{count} notifications marked read.',
+  },
+
+  // Wave Two 2026-09-18: the twelve system penalty reasons, worded from their stable codes
+  'penaltyReason.paymentWindowLapsed': 'The deposit was not paid within the payment window.',
+  'penaltyReason.dealerAnswerWindowLapsed': 'The dealer did not answer within the agreed window.',
+  'penaltyReason.dealerRejected': 'The dealer rejected the request.',
+  'penaltyReason.dealerDidNotHandOver': 'The dealer did not hand over the vehicle after approving the booking.',
+  'penaltyReason.customerNoShow': 'The customer did not collect the vehicle within the no-show window.',
+  'penaltyReason.deliveryNoShowUndetermined': 'The vehicle was never handed over on a delivery booking; responsibility is undetermined.',
+  'penaltyReason.cancelledBeforeDeposit': 'Cancelled before the deposit was paid.',
+  'penaltyReason.cancelledInFreeWindow': 'Cancelled inside the free cancellation window.',
+  'penaltyReason.customerCancelledAfterFreeWindow': 'The customer cancelled after the free cancellation window.',
+  'penaltyReason.dealerCancelledAfterFreeWindow': 'The dealer cancelled after the free cancellation window.',
+  'penaltyReason.cancelledByPlatform': 'Cancelled by the platform.',
+  'penaltyReason.notCancellable': 'This booking can no longer be cancelled.',
+
+  // Wave Two 2026-09-17: lookups (cities & car types) and platform settings
+  'lookups.citiesRegions': 'Cities & regions',
+  'lookups.addACity': 'Add a city',
+  'lookups.addTheFirstCity': 'Add the first city',
+  'lookups.addTheFirstCarType': 'Add the first car type',
+  'lookups.exampleCityEnglish': 'e.g. Amman',
+  'lookups.exampleCityArabic': 'e.g. عمّان',
+  'lookups.exampleCarTypeEnglish': 'e.g. Sedan',
+  'lookups.exampleCarTypeArabic': 'e.g. سيدان',
+  'lookups.optionalExampleLatitude': 'Optional, e.g. 31.9539',
+  'lookups.optionalExampleLongitude': 'Optional, e.g. 35.9106',
+  'lookups.renameEntry': 'Rename {name}',
+  'lookups.restoreEntry': 'Restore {name}?',
+  'lookups.retireEntry': 'Retire {name}?',
+  'lookups.restored': 'Restored',
+  'lookups.retired': 'Retired',
+  'lookups.notPinned': 'Not pinned',
+  'lookups.stateOffered': 'Offered',
+  'lookups.stateRetired': 'Retired',
+  'lookups.entriesInTheList': {
+    one: '{count} in the list',
+    other: '{count} in the list',
+  },
+  'lookups.offeredCount': {
+    one: '{count} offered on new listings',
+    other: '{count} offered on new listings',
+  },
+  'settings.percentOfTheRentalTotal': '{percent} of the rental total',
+  'settings.percentOfTheDeposit': '{percent} of the deposit',
+  'settings.percentOfTheRental': '{percent} of the rental',
+  'settings.minutes': {
+    one: '{count} minute',
+    other: '{count} minutes',
+  },
+
+  // Wave Two 2026-09-17: the car page, the add-a-car wizard and the car form
+  'vehicleDetail.tabOverview': 'Overview',
+  'vehicleDetail.tabAvailability': 'Availability',
+  'vehicleDetail.tabActivity': 'Activity',
+  'vehicleDetail.free': 'Free',
+  'vehicleDetail.booked': 'Booked',
+  'vehicleDetail.requested': 'Requested',
+  'vehicleDetail.notOffered': 'Not offered',
+  'vehicleDetail.makeModel': 'Make / model',
+  'vehicleDetail.dateAdded': 'Date added',
+  'vehicleDetail.plateFact': 'Plate {plate}',
+  'vehicleDetail.addedFact': 'Added {date}',
+  'vehicleDetail.deliveryEligibleRadiusFee': 'Eligible · radius {radius} km · your fee {fee}',
+  'vehicleDetail.periodRange': '{start} – {end}',
+  'vehicleDetail.completedCount': {
+    one: '{count} completed',
+    other: '{count} completed',
+  },
+  'vehicleDetail.upcomingCount': {
+    one: '{count} upcoming',
+    other: '{count} upcoming',
+  },
+  'vehicleDetail.currentRental': 'Current rental',
+  'vehicleDetail.nextRental': 'Next rental',
+  'vehicleDetail.currentRentalDelivered': '{customer}, {period}, delivered.',
+  'vehicleDetail.currentRentalCollected': '{customer}, {period}, collected.',
+  'vehicleDetail.nextRentalDelivery': '{customer}, {period}, delivery.',
+  'vehicleDetail.nextRentalPickup': '{customer}, {period}, pickup.',
+  'vehicleDetail.statusByActor': '{status} by {actor}',
+  'vehicleDetail.photoNumber': 'Photo {number}',
+  'vehicleDetail.noPhotosYet': 'No photos yet',
+  'vehicleDetail.noPhotosYetAddOne': 'No photos yet — add one before publishing',
+  'vehicleDetail.availabilityInMonth': 'Availability · {month}',
+  'vehicleDetail.backOnTheRoadDone': 'Back on the road',
+  'vehicleWizard.specifications': 'Specifications',
+  'vehicleWizard.pricing': 'Pricing',
+  'vehicleWizard.availability': 'Availability',
+  'vehicleWizard.review': 'Review',
+  'vehicleWizard.stepOfTotal': 'Step {current} of {total}',
+  'vehicleWizard.perDayAndDeposit': 'per day · {deposit} deposit',
+  'vehicleWizard.eligible': 'Eligible',
+  'vehicleWizard.eligibleYourFee': 'Eligible · your fee {fee}',
+  'vehicleWizard.photosUploaded': {
+    one: '{count} uploaded',
+    other: '{count} uploaded',
+  },
+  'vehicleWizard.plateIsOnYourDraft': '{plate} is on a draft you already started ({vehicle}). Continue that draft instead of creating another.',
+  'vehicleWizard.plateIsOnYourCar': '{plate} is already on {vehicle} in your fleet.',
+  'vehicleWizard.vehicleIsLive': '{vehicle} is live in your fleet.',
+  'vehicleWizard.vehicleIsADraft': '{vehicle} is in your fleet as a draft.',
+  'vehicleWizard.vehicleStaysADraft': '{vehicle} stays in your fleet as a draft. Open it from the fleet to finish.',
+  'vehicleWizard.pickupFromYourLocation': 'Every car is collected from your dealership\'s location. To move it, change the location on your {profile}; a per-car pickup point is not offered.',
+  'vehicleWizard.pickupLocationOf': '{business} — pickup location',
+  'vehicleWizard.customersWithinRadius': 'Customers within your {radius} km radius can ask for this car to be delivered.',
+  'vehicleWizard.addPhoto': 'Add photo',
+  'vehicleWizard.uploading': 'Uploading…',
+  'vehicleWizard.continue': 'Continue',
+  'vehicleWizard.saveDraft': 'Save draft',
+  'vehicleWizard.saveAndPublish': 'Save & publish',
+  'vehicleWizard.savingPublishes': 'Saving publishes the vehicle to customer search and makes it bookable straight away.',
+  'vehicleWizard.savingKeepsADraft': 'Saving keeps the vehicle as a draft. Publish it from its page when it is ready.',
+  'carForm.editCar': 'Edit car',
+  'carForm.saveChanges': 'Save changes',
+  'carForm.savedAsStatus': '{vehicle} is saved as {status}.',
+  'carForm.photoFormats': 'JPEG, PNG or WebP.',
+
+  // Wave Two 2026-09-18: the advisor's review — a note that is gone, not absent
+  'dealerReview.noteNoLongerOnRecord': 'The note is no longer on record.',
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

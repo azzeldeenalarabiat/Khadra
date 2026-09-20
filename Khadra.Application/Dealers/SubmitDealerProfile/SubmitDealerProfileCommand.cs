@@ -119,6 +119,14 @@ public sealed class SubmitDealerProfileHandler(
         if (hours.IsFailure)
             return hours.Error;
 
+        // The About text enters the platform here, so it is held to the same rule it will be held to
+        // on every later edit: refused rather than cut, line endings normalised, control characters
+        // refused. The registration door used to truncate at 2000 silently and accept anything else —
+        // including U+0000, which PostgreSQL refuses outright, so the registration 500ed.
+        var about = ProfileText.Normalize(request.Description, PublicProfileSection.About);
+        if (about.IsFailure)
+            return about.Error;
+
         var uploads = ResolveUploads(request.Documents);
         if (uploads.IsFailure)
             return uploads.Error;
@@ -141,7 +149,7 @@ public sealed class SubmitDealerProfileHandler(
             hours.Value,
             now,
             TimeSpan.FromHours(rules.AdminSlaHours),
-            request.Description,
+            about.Value,
             request.CityId,
             address.Value);
 

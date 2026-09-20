@@ -9,6 +9,7 @@ using Khadra.Domain.Common;
 using Khadra.WebAPI;
 using Khadra.WebAPI.Controllers;
 using MediatR;
+using Khadra.Tests.Support;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -44,6 +45,7 @@ public sealed class RenterDocumentEndpointTests : IDisposable
             .WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
+                builder.IsolateFromDeveloperDatabase();
                 builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=khadra_tests;Username=x;Password=y");
                 builder.UseSetting("Authentication:Jwt:SigningKey", new string('k', 48));
                 builder.UseSetting("Database:AutoMigrate", "false");

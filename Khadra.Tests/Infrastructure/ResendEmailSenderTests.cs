@@ -3,6 +3,7 @@ using System.Text.Json;
 using Khadra.Application.Common.Ports;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Notifications;
+using Khadra.Tests.Support;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -57,8 +58,10 @@ public sealed class ResendEmailSenderTests
             FromName = "Khadra",
         });
 
-        return (new ResendEmailSender(factory, options), handler);
+        return (new ResendEmailSender(factory, options, new TestClock(Now)), handler);
     }
+
+    private static readonly DateTimeOffset Now = new(2026, 9, 17, 9, 30, 0, TimeSpan.Zero);
 
     private static EmailMessage Message() =>
         new("owner@gallery.jo", "Rami Odeh", "Verify your Khadra email address", "<p>link</p>", "link");
@@ -68,7 +71,13 @@ public sealed class ResendEmailSenderTests
     {
         var (sender, handler) = Build(HttpStatusCode.OK, """{"id":"abc-123"}""");
 
-        await sender.SendAsync(Message());
+        var receipt = await sender.SendAsync(Message());
+
+        // Resend's id is what its email log is searched by. The receipt claims acceptance and no more.
+        Assert.Equal("Resend", receipt.Provider);
+        Assert.Equal("abc-123", receipt.ProviderMessageId);
+        Assert.Equal(Now, receipt.AcceptedAt);
+        Assert.Equal(1, receipt.Attempts);
 
         Assert.Equal(HttpMethod.Post, handler.Request!.Method);
         Assert.Equal("https://api.resend.com/emails", handler.Request.RequestUri!.ToString());
@@ -101,6 +110,23 @@ public sealed class ResendEmailSenderTests
         // The operator needs Resend's sentence, not "email failed".
         Assert.Contains("not verified", thrown.Message, StringComparison.Ordinal);
         Assert.Contains("403", thrown.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Resend's free tier refuses by quoting the account owner's own mailbox, and the refusal is logged
+    /// at Error. The reason is what an operator needs, and it survives without the address.
+    /// </summary>
+    [Fact]
+    public async Task A_free_tier_refusal_does_not_carry_the_account_owners_address_out()
+    {
+        var (sender, _) = Build(
+            HttpStatusCode.Forbidden,
+            """{"statusCode":403,"message":"You can only send testing emails to your own email address (owner@example.com).","name":"validation_error"}""");
+
+        var thrown = await Assert.ThrowsAsync<InvalidOperationException>(() => sender.SendAsync(Message()));
+
+        Assert.Contains("You can only send testing emails", thrown.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("owner@example.com", thrown.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

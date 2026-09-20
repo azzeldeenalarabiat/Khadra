@@ -7,6 +7,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../auth/account_required.dart';
 import '../documents/document_providers.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -19,138 +20,148 @@ class ProfileScreen extends ConsumerWidget {
     final formats = ref.watch(formatsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.profileTitle)),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: Space.bottomInset),
-        children: [
-          if (session.isSignedIn) ...[
-            _AccountHeader(
-              name: session.user!.fullName,
-              email: session.user!.email,
-              memberSince: formats == null
-                  ? null
-                  : l10n.profileMemberSince(
-                      formats.longDate(session.user!.createdAt)),
-              verified: session.user!.isEmailVerified,
-            ),
-            if (!session.user!.isEmailVerified)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    Space.lg, 0, Space.lg, Space.lg),
-                child: KhadraNotice(
-                  title: l10n.profileEmailUnverified,
-                  body: l10n.authVerifyEmailWhy,
-                  tone: NoticeTone.warn,
-                  icon: Icons.mark_email_unread_outlined,
-                  action: OutlinedButton(
-                    onPressed: () => context.push(
-                      Uri(
-                        path: Routes.verifyEmail,
-                        queryParameters: {'email': session.user!.email},
-                      ).toString(),
+      appBar: AppBar(title: KhadraLargeTitle(l10n.profileTitle)),
+      body: RefreshIndicator(
+        // The account and the document checklist are BOTH read here, and both
+        // go stale while the app is open: an email verified in a browser, or a
+        // licence approved by the office, changes what this screen should say.
+        // Without this the only way to see either was to sign out.
+        onRefresh: () async {
+          ref.invalidate(myDocumentsProvider);
+          await ref.read(sessionProvider.notifier).reload();
+        },
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: Space.bottomInset),
+          children: [
+            if (session.isSignedIn) ...[
+              _AccountHeader(
+                name: session.user!.fullName,
+                email: session.user!.email,
+                memberSince: formats == null
+                    ? null
+                    : l10n.profileMemberSince(
+                        formats.longDate(session.user!.createdAt)),
+                verified: session.user!.isEmailVerified,
+              ),
+              if (!session.user!.isEmailVerified)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      Space.lg, 0, Space.lg, Space.lg),
+                  child: KhadraNotice(
+                    title: l10n.profileEmailUnverified,
+                    body: l10n.authVerifyEmailWhy,
+                    tone: NoticeTone.warn,
+                    icon: Icons.mark_email_unread_outlined,
+                    action: OutlinedButton(
+                      onPressed: () => context.push(
+                        Uri(
+                          path: Routes.verifyEmail,
+                          queryParameters: {'email': session.user!.email},
+                        ).toString(),
+                      ),
+                      child: Text(l10n.authResendVerification),
                     ),
-                    child: Text(l10n.authResendVerification),
                   ),
                 ),
+              _Group(
+                title: l10n.profilePersonalDetails,
+                children: [
+                  _Row(
+                    icon: Icons.person_outline,
+                    label: l10n.profileEdit,
+                    onTap: () => context.push(Routes.editProfile),
+                  ),
+                  _Row(
+                    icon: Icons.favorite_border,
+                    label: l10n.shortlistTitle,
+                    onTap: () => context.push(Routes.shortlist),
+                  ),
+                  _DocumentsRow(),
+                ],
               ),
+              _Group(
+                title: l10n.profileSecurity,
+                children: [
+                  _Row(
+                    icon: Icons.lock_outline,
+                    label: l10n.authChangePassword,
+                    onTap: () => context.push(Routes.changePassword),
+                  ),
+                  _Row(
+                    icon: Icons.devices_outlined,
+                    label: l10n.profileSessions,
+                    onTap: () => context.push(Routes.sessions),
+                  ),
+                ],
+              ),
+              _Group(
+                title: l10n.reputationGroupTitle,
+                children: [
+                  // No badge. A badge would run the reputation reader on every
+                  // visit to this tab, for a figure that changes a few times a
+                  // year — and a customer with one bad mark would carry it on
+                  // every screen they open.
+                  _Row(
+                    icon: Icons.workspace_premium_outlined,
+                    label: l10n.reputationTitle,
+                    onTap: () => context.push(Routes.reputation),
+                  ),
+                ],
+              ),
+            ] else
+              // The same panel Bookings and Alerts show, so the three cannot
+              // disagree about what an account is for or how to get one. The
+              // language group and About stay BELOW it: this tab is the one place
+              // a signed-out Arabic speaker can get the app out of English, which
+              // is why it is not gated.
+              AccountRequired(
+                icon: Icons.person_outline,
+                title: l10n.profileSignedOutTitle,
+                next: Routes.profile,
+              ),
+
+            const _LanguageGroup(),
+
             _Group(
-              title: l10n.profilePersonalDetails,
+              title: l10n.profileAbout,
               children: [
-                _Row(
-                  icon: Icons.person_outline,
-                  label: l10n.profileEdit,
-                  onTap: () => context.push(Routes.editProfile),
+                Padding(
+                  padding: const EdgeInsets.all(Space.lg),
+                  child: Text(
+                    l10n.profileAboutBody,
+                    style: const TextStyle(
+                        fontSize: 14, height: 1.55, color: KhadraColors.neutral700),
+                  ),
                 ),
-                _DocumentsRow(),
               ],
             ),
-            _Group(
-              title: l10n.profileSecurity,
-              children: [
-                _Row(
-                  icon: Icons.lock_outline,
-                  label: l10n.authChangePassword,
-                  onTap: () => context.push(Routes.changePassword),
-                ),
-                _Row(
-                  icon: Icons.devices_outlined,
-                  label: l10n.profileSessions,
-                  onTap: () => context.push(Routes.sessions),
-                ),
-              ],
-            ),
-          ] else
-            Padding(
-              padding: const EdgeInsets.all(Space.lg),
-              child: KhadraCard(
+
+            if (session.isSignedIn) ...[
+              const SizedBox(height: Space.sm),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Space.lg),
                 child: Column(
                   children: [
-                    const KhadraWordmark(logoSize: 64),
-                    const SizedBox(height: Space.lg),
-                    Text(
-                      l10n.bookingsSignedOutBody,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: KhadraColors.neutral600,
-                          fontSize: 14,
-                          height: 1.5),
-                    ),
-                    const SizedBox(height: Space.lg),
-                    FilledButton(
-                      onPressed: () => context.push(Routes.signIn),
-                      child: Text(l10n.authSignIn),
+                    OutlinedButton.icon(
+                      onPressed: () => _signOut(context, ref, allDevices: false),
+                      icon: const Icon(Icons.logout, size: 18),
+                      label: Text(l10n.authSignOut),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: KhadraColors.bad,
+                        side: const BorderSide(color: KhadraColors.bad),
+                      ),
                     ),
                     const SizedBox(height: Space.sm),
-                    OutlinedButton(
-                      onPressed: () => context.push(Routes.register),
-                      child: Text(l10n.authSignUp),
+                    TextButton(
+                      onPressed: () => _signOut(context, ref, allDevices: true),
+                      child: Text(l10n.authSignOutEverywhere),
                     ),
                   ],
                 ),
               ),
-            ),
-
-          const _LanguageGroup(),
-
-          _Group(
-            title: l10n.profileAbout,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(Space.lg),
-                child: Text(
-                  l10n.profileAboutBody,
-                  style: const TextStyle(
-                      fontSize: 14, height: 1.55, color: KhadraColors.neutral700),
-                ),
-              ),
             ],
-          ),
-
-          if (session.isSignedIn) ...[
-            const SizedBox(height: Space.sm),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-              child: Column(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () => _signOut(context, ref, allDevices: false),
-                    icon: const Icon(Icons.logout, size: 18),
-                    label: Text(l10n.authSignOut),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: KhadraColors.bad,
-                      side: const BorderSide(color: KhadraColors.bad),
-                    ),
-                  ),
-                  const SizedBox(height: Space.sm),
-                  TextButton(
-                    onPressed: () => _signOut(context, ref, allDevices: true),
-                    child: Text(l10n.authSignOutEverywhere),
-                  ),
-                ],
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -189,7 +200,18 @@ class ProfileScreen extends ConsumerWidget {
 
     if (confirmed != true) return;
     await ref.read(sessionProvider.notifier).signOut(allDevices: allDevices);
-    if (context.mounted) context.go(Routes.search);
+
+    // Signing out returns the app to the UNAUTHENTICATED FLOW, which means the
+    // screen it starts at, not the catalogue behind it. Forgetting the entry
+    // choice is what makes the next launch land in the same place rather than
+    // contradicting the screen they were left on -- and Get Started's Sign in is
+    // the switch-account path, which is the neutral thing to show on a phone that
+    // has just been handed to somebody else.
+    //
+    // Only a DELIBERATE sign-out does this. An expiry or a suspension leaves the
+    // choice alone: that customer has an account and made their choice long ago.
+    await ref.read(entryChoiceProvider.notifier).forget();
+    if (context.mounted) context.go(Routes.welcome);
   }
 }
 
@@ -212,14 +234,22 @@ class _AccountHeader extends StatelessWidget {
         child: KhadraCard(
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: KhadraColors.accent100,
+              // The design's monogram is a dark ROUNDED SQUARE, not a pale
+              // circle: it is the only heavy shape on the screen, and it is what
+              // tells somebody at a glance whose account this is.
+              Container(
+                width: 56,
+                height: 56,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: KhadraColors.price,
+                  borderRadius: Radii.feature,
+                ),
                 child: Text(
                   _initials(name),
                   style: const TextStyle(
-                    color: KhadraColors.accent,
-                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
                     fontSize: 18,
                   ),
                 ),
@@ -232,7 +262,7 @@ class _AccountHeader extends StatelessWidget {
                     Text(
                       name,
                       style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w700),
+                          fontSize: 17, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 2),
                     // Latin inside an Arabic layout: isolated so the address does
@@ -240,22 +270,32 @@ class _AccountHeader extends StatelessWidget {
                     LatinRun(
                       email,
                       style: const TextStyle(
-                          color: KhadraColors.neutral600, fontSize: 13),
+                        color: KhadraColors.neutral600,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (memberSince != null) ...[
                       const SizedBox(height: 2),
                       Text(
                         memberSince!,
                         style: const TextStyle(
-                            color: KhadraColors.neutral500, fontSize: 12),
+                          color: KhadraColors.neutral500,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    if (verified) ...[
+                      const SizedBox(height: 6),
+                      KhadraBadge(
+                        label: AppLocalizations.of(context).authVerifiedTitle,
+                        colour: KhadraColors.accent,
                       ),
                     ],
                   ],
                 ),
               ),
-              if (verified)
-                const Icon(Icons.verified_outlined,
-                    color: KhadraColors.accent, size: 20),
             ],
           ),
         ),
@@ -298,8 +338,21 @@ class _DocumentsRow extends ConsumerWidget {
   }
 }
 
+/// The language switch, including the state it starts in.
+///
+/// **"Follow the device" is an option, not the absence of one.** Null is the
+/// default and the right one — a phone set to Arabic should open in Arabic
+/// without being asked — but rendering only `en` and `ar` against a null value
+/// left a fresh install showing two radios with NEITHER selected, which reads as
+/// a broken control rather than as a sensible default. It is also the only way
+/// back to following the device once a language has been chosen.
 class _LanguageGroup extends ConsumerWidget {
   const _LanguageGroup();
+
+  /// The sentinel for "follow the device". `RadioGroup` distinguishes options by
+  /// value, so the third one needs a value of its own rather than null — which
+  /// is exactly what a stored language being absent looks like.
+  static const _system = '';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -309,13 +362,14 @@ class _LanguageGroup extends ConsumerWidget {
     return _Group(
       title: l10n.profileLanguage,
       children: [
-        RadioGroup<String?>(
-          groupValue: current?.languageCode,
+        RadioGroup<String>(
+          groupValue: current?.languageCode ?? _system,
           onChanged: (value) => ref.read(localeProvider.notifier).set(
-                value == null ? null : Locale(value),
+                value == null || value == _system ? null : Locale(value),
               ),
           child: const Column(
             children: [
+              _LanguageOption(value: _system),
               _LanguageOption(value: 'en'),
               _LanguageOption(value: 'ar'),
             ],
@@ -334,13 +388,17 @@ class _LanguageOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return RadioListTile<String?>(
+    return RadioListTile<String>(
       value: value,
-      title: Text(
-        value == 'ar' ? l10n.profileLanguageArabic : l10n.profileLanguageEnglish,
-      ),
-      // The label is written in its OWN language, always: somebody who has the app
-      // in the wrong language has to be able to find their way out of it.
+      // A named language is written in its OWN language, always: somebody who
+      // has the app in the wrong one has to be able to find their way out of it.
+      // "Follow the device" names no language, so it is translated like any other
+      // sentence.
+      title: Text(switch (value) {
+        'ar' => l10n.profileLanguageArabic,
+        'en' => l10n.profileLanguageEnglish,
+        _ => l10n.profileLanguageSystem,
+      }),
       contentPadding: const EdgeInsets.symmetric(horizontal: Space.lg),
     );
   }
@@ -353,31 +411,55 @@ class _Group extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-                Space.lg, Space.lg, Space.lg, Space.sm),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: KhadraColors.neutral600,
-                letterSpacing: 0.4,
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // A quiet uppercase label ABOVE the group rather than a grey band
+            // across the screen: the design lets the card do the separating, and
+            // the label only has to say what the card is.
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 2, bottom: 9),
+              child: Text(
+                title.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: KhadraColors.neutral500,
+                  letterSpacing: KhadraType.of(context, 0.7),
+                ),
               ),
             ),
-          ),
-          // A Material, not a Container. A ColoredBox here paints over the
-          // Scaffold canvas that the tiles ink onto, so every row in the group
-          // would swallow its own ripple -- and a tap with no feedback reads as a
-          // tap that did not land.
-          Material(
-            color: KhadraColors.surface,
-            child: Column(children: children),
-          ),
-        ],
+            // A Material, not a Container. A ColoredBox here paints over the
+            // Scaffold canvas that the tiles ink onto, so every row in the group
+            // would swallow its own ripple -- and a tap with no feedback reads as
+            // a tap that did not land. `clipBehavior` is what keeps the first and
+            // last rows' ink inside the rounded corners.
+            Material(
+              color: KhadraColors.surface,
+              shape: const RoundedRectangleBorder(
+                borderRadius: Radii.card,
+                side: BorderSide(color: KhadraColors.neutral200),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  for (var i = 0; i < children.length; i++) ...[
+                    if (i > 0)
+                      const Divider(
+                        height: 1,
+                        indent: Space.lg,
+                        endIndent: Space.lg,
+                        color: KhadraColors.divider,
+                      ),
+                    children[i],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 }
 
@@ -396,8 +478,14 @@ class _Row extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-        leading: Icon(icon, color: KhadraColors.neutral600),
-        title: Text(label, style: const TextStyle(fontSize: 15)),
+        leading: Icon(icon, color: KhadraColors.neutral600, size: 20),
+        horizontalTitleGap: Space.md,
+        minLeadingWidth: 20,
+        contentPadding: const EdgeInsetsDirectional.symmetric(horizontal: Space.lg),
+        title: Text(
+          label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
         // Bounded on purpose. A ListTile gives its trailing widget as much width
         // as it asks for, so an unbounded one crushes the title -- which is how
         // "My documents" ended up rendering one character per line.
@@ -410,7 +498,7 @@ class _Row extends StatelessWidget {
                 Flexible(child: trailing!),
                 const SizedBox(width: Space.sm),
               ],
-              const Icon(Icons.chevron_right, color: KhadraColors.neutral400),
+              const KhadraDisclosure(),
             ],
           ),
         ),

@@ -3,6 +3,7 @@ using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.Shortlist;
 
 namespace Khadra.Tests.Support;
 
@@ -283,5 +284,19 @@ internal static class Build
         booking.ConfirmDepositPaid(Id.New(), moment);
         booking.ClearDomainEvents();
         return booking;
+    }
+
+    // A shortlist entry built OUTSIDE its aggregate, so a test can stage the race the unique index
+    // exists to lose: two requests that both read a list without the car on it. The aggregate
+    // deliberately gives no way to do this.
+    public static ShortlistEntry ShortlistEntry(Id shortlistId, Id vehicleId, DateTimeOffset savedAt)
+    {
+        var entry = (ShortlistEntry)Activator.CreateInstance(typeof(ShortlistEntry), nonPublic: true)!;
+        var type = typeof(ShortlistEntry);
+        type.GetProperty("Id")!.SetValue(entry, Id.New());
+        type.GetProperty("ShortlistId")!.SetValue(entry, shortlistId);
+        type.GetProperty("VehicleId")!.SetValue(entry, vehicleId);
+        type.GetProperty("SavedAt")!.SetValue(entry, savedAt);
+        return entry;
     }
 }

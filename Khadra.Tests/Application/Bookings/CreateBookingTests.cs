@@ -72,7 +72,7 @@ public sealed class CreateBookingTests
                 .When(notifier => notifier.RaiseMany(Arg.Any<IEnumerable<Notification>>()))
                 .Do(call => Notified.AddRange(call.Arg<IEnumerable<Notification>>()));
             Reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
-                .Returns(new BookingContext(null, "Petra Rentals", "Rana Sharif", null, null));
+                .Returns(new BookingContext(null, "Petra Rentals", false, "Rana Sharif", false, null, null));
 
             // A substituted IUnitOfWork returns a completed task and never invokes the delegate, so
             // every guard inside the transaction would be silently skipped and every test would
@@ -181,7 +181,9 @@ public sealed class CreateBookingTests
         Assert.Equal(18m, booking.Pricing.DepositAmount.Amount);
         Assert.Equal(20m, booking.Terms.DepositPercent.Value);
         Assert.Equal(TimeSpan.FromHours(48), booking.Terms.AnswerWindow);
-        Assert.Equal(TimeSpan.FromHours(24), booking.Terms.PaymentWindow);
+        // TWO hours since 2026-09-11, and a different rule from the 120-minute lead time it now
+        // matches. PaymentWindowTests is where that pair is held apart on purpose.
+        Assert.Equal(TimeSpan.FromHours(2), booking.Terms.PaymentWindow);
         Assert.Equal(TimeSpan.FromHours(2), booking.Terms.TurnaroundBuffer);
         // The owner's 15 MINUTES, in the unit it was decided in. This assertion is the guard on the
         // unit itself: the value used to be configured in hours, and reading 15 through the old
@@ -488,7 +490,9 @@ public sealed class CreateBookingTests
             context.Command(pickupAt: Now.AddMinutes(90)), CancellationToken.None);
 
         Assert.Equal("booking.too_soon", result.Error.Code);
-        Assert.Contains("2 hours", result.Error.Message, StringComparison.Ordinal);
+        // The configured lead time, in the sentence. Four hours since 2026-09-11, when it had to grow
+        // past the payment window so a gallery would have time to answer a last-minute request.
+        Assert.Contains("4 hours", result.Error.Message, StringComparison.Ordinal);
         Assert.Empty(context.Added);
     }
 
@@ -496,11 +500,21 @@ public sealed class CreateBookingTests
     public async Task A_rental_exactly_at_the_lead_time_is_accepted()
     {
         var context = new Context();
+        // Wound back two hours, so a pickup exactly four hours later lands at three in the afternoon
+        // in Amman rather than on the stroke of closing. The lead time is what is being tested; the
+        // gallery's opening hours are a separate refusal with its own tests.
+        context.Clock.UtcNow = Now.AddHours(-2);
+        var pickupAt = context.Clock.UtcNow.AddHours(4);
 
         var result = await context.Handler().Handle(
-            context.Command(pickupAt: Now.AddHours(2)), CancellationToken.None);
+            context.Command(pickupAt: pickupAt), CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+
+        // And the gallery gets the difference between the two rules to answer in: four hours of lead
+        // time less the two-hour payment window. Zero would mean this booking was born unapprovable.
+        var booking = Assert.Single(context.Added);
+        Assert.Equal(pickupAt.AddHours(-2), booking.DecisionDeadline);
     }
 
     [Fact]

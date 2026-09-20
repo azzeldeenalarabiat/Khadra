@@ -104,7 +104,9 @@
             (input)="setSearch($event)"
           />
         </div>
-        <span class="page-sub push">{{ t('fleetList.showingOfCars', { shown: rows().length, total: cars().length }) }}</span>
+        <span class="page-sub push">{{
+          t('fleetList.showingCars', { shown: rows().length, count: cars().length })
+        }}</span>
       </div>
 
       @if (rows().length === 0) {
@@ -159,7 +161,8 @@
                 </div>
 
                 <div class="car-card-spec">
-                  {{ car.transmission }} · {{ car.fuelType }} · {{ car.seats }} {{ t('fleetList.seats') }}{{
+                  {{ transmissionName(car) }} · {{ fuelName(car) }} ·
+                  {{ t('fleetList.seatCount', { count: car.seats }) }}{{
                     car.color ? ' · ' + car.color : ''
                   }}
                 </div>
@@ -172,7 +175,7 @@
                     <span class="num">{{ car.dailyRate | money }} </span>
                   </div>
                   <div class="car-card-figure">
-                    <span class="k">{{ t('common.deposit') }}</span>
+                    <span class="k">{{ t('fleetList.securityDeposit') }}</span>
                     <span class="num"
                       >{{ car.securityDeposit | money }} </span
                     >

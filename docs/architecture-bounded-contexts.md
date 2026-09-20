@@ -15,6 +15,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Reviews | done | done | **both directions done**; customer reputation read model done |
 | Platform Settings | done | pending (configuration-backed) | pending |
 | Payments | done | done | **deposit checkout + provider webhook done**; NO PROVIDER CONFIGURED |
+| Shortlist | done | done | **save / forget / list / membership done** |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
@@ -32,7 +33,8 @@ Dealers ──(DealerId, delivery settings, approval status)──▶ Fleet, Boo
 Fleet ──(VehicleId, rate, deposit, delivery-eligible)──▶ Bookings
 Bookings ──events (Approved, PickedUp, Cancelled, NoShow, Completed)──▶ Payments, Disputes, Reviews
 Disputes ──resolution (money instructions)──▶ Payments, Bookings
-Platform Settings ──IBusinessRulesProvider──▶ Bookings (frozen onto each booking as BookingTerms)
+Platform Settings ──IBusinessRulesProvider──▶ Bookings (frozen onto each booking as BookingTerms), Shortlist (the cap)
+Shortlist ──(VehicleId only)──▶ reads Fleet's catalogue; Fleet learns nothing about customers
 ```
 
 Communication is by `Id`, by explicit application contracts, or by domain events. A context never mutates another context's aggregate, and there are no navigation properties across contexts.
@@ -179,6 +181,49 @@ by hand.
 implementation, and a stub that confirmed bookings without money would be indistinguishable, in every
 table and on every screen, from a real payment. Tests substitute `IPaymentProvider` at the handler
 boundary. Writing a real adapter is one class implementing four methods; nothing above it changes.
+
+## 9. Shortlist
+
+`CustomerShortlist` is ONE AGGREGATE PER CUSTOMER, keyed by the customer's own id, with
+`ShortlistEntry` children carrying a `VehicleId` and the moment it was saved. Nothing else: a snapshot
+of the make, model or price would go stale the first time a gallery corrected a listing, and a screen
+rendering last month's price beside today's car is worse than a screen rendering neither.
+
+**Why its own context and not Fleet.** Fleet is the dealer's inventory, and its customer-facing side is
+an anonymous read model whose own remarks warn against sharing types with dealer DTOs — a per-customer
+flag on the catalogue is exactly that leak, and it would teach Fleet what a customer is. Not
+Identity & Access either: that holds `CustomerDocument` because identity verification is identity; a
+shopping preference is not.
+
+**Both mutations are idempotent**, because a heart is a toggle on a mobile network and a retried tap
+must not become an error. Saving what is already saved succeeds; forgetting what was never saved
+succeeds. Forgetting deliberately does NOT require the car to still be visible — an entry for a
+withdrawn listing is precisely the one a customer most wants gone.
+
+**Saving goes through `ICatalogueReader.GetAsync`, never a visibility check of its own.** Saving is
+otherwise the cheapest enumeration oracle on this platform: "saved" on an id the public catalogue
+answers 404 to would confirm that id exists, and anyone with an account could walk a competitor's
+unpublished inventory a request at a time. One predicate, in one place, answering the same for a
+draft, a hidden car, one in maintenance, a suspended gallery's, a deleted one and an unknown id.
+
+**A saved car that stops being bookable keeps its row.** `Maintenance -> Hidden -> Active` is a
+normal round trip for a gallery, and an entry auto-removed on the way through would be a customer's
+list quietly editing itself. `IShortlistReader` returns such an entry NAMED — make, model, year and
+its gallery — with no listing beside it, and no reason.
+
+The split is the point. Naming the car is safe because nothing reaches a shortlist that the public
+catalogue did not return first: `SaveVehicleCommand` refuses any id `ICatalogueReader.GetAsync`
+answers null to, so every name on this list is a car the customer was already shown. Naming the
+REASON would distinguish the cases the catalogue is shaped never to distinguish, and there is no
+field on the wire that could.
+
+The name is read live and **past the soft-delete filter**, which is a correctness requirement rather
+than a convenience: with the filter respected, a deleted car would come back unnamed while a hidden
+one came back named, and deletion would become the single de-listing reason a customer could tell
+apart.
+
+The cap is `BusinessRules:MaxShortlistEntries`, configured rather than constant, settled by the owner
+at 100 on 2026-09-11.
 
 ## Owner decisions required
 

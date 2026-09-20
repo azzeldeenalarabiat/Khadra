@@ -75,7 +75,9 @@
       <div class="row row-gap-8">
         <button type="button" class="btn btn-primary btn-md" (click)="retry()">{{ t('common.tryAgain') }}</button>
       </div>
-      <div class="mono">GET /api/v1/dealers/me</div>
+      <!-- The call that failed, for whoever the dealer reads it to: an endpoint, so Latin in both
+           languages and kept in its own left-to-right run. -->
+      <div class="mono"><span class="ltr">GET /api/v1/dealers/me</span></div>
     </div>
   </div>
 } @else if (locked() && copy(); as block) {

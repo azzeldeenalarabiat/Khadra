@@ -92,7 +92,7 @@ class ReviewsScreen extends ConsumerWidget {
                   ),
                 const SizedBox(height: Space.lg),
                 for (final review in value.items) ...[
-                  _ReviewCard(review: review, formats: formats),
+                  ReviewCard(review: review, formats: formats),
                   const SizedBox(height: Space.md),
                 ],
                 const SizedBox(height: Space.md),
@@ -111,8 +111,10 @@ class ReviewsScreen extends ConsumerWidget {
   }
 }
 
-class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review, required this.formats});
+/// One review, as it appears on the reviews screen and — for the latest few — on
+/// the rental office's own page.
+class ReviewCard extends StatelessWidget {
+  const ReviewCard({super.key, required this.review, required this.formats});
 
   final GalleryReview review;
   final Formats formats;
@@ -152,7 +154,7 @@ class _ReviewCard extends StatelessWidget {
             ),
           ] else if (review.comment != null && review.comment!.isNotEmpty) ...[
             const SizedBox(height: Space.sm),
-            Text(
+            UserText(
               review.comment!,
               style: const TextStyle(fontSize: 14, height: 1.5),
             ),
