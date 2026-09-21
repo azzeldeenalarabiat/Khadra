@@ -173,6 +173,16 @@ class FakeApi extends KhadraApi {
   @override
   Future<Map<String, int>> bookingTabCounts() async => const {};
 
+  /// The one booking the detail endpoint answers with. Set by the detail tests.
+  Booking? bookingById;
+
+  @override
+  Future<Booking> booking(String bookingId) async {
+    final found = bookingById;
+    if (found == null) throw StateError("no booking was staged for $bookingId");
+    return found;
+  }
+
   @override
   Future<NotificationFeed> notifications({int page = 1, int pageSize = 25}) async =>
       const NotificationFeed(
@@ -252,6 +262,20 @@ class FakeApi extends KhadraApi {
         if (entry.vehicleId != vehicleId) entry,
     ];
   }
+
+  // ── Registered devices ──────────────────────────────────────────────────────
+
+  /// What `/auth/sessions` answers. Empty by default, because most screens never
+  /// ask; the devices screen sets its own.
+  MySessions mySessions = const MySessions(<SessionSummary>[], 15);
+
+  final List<String> revokedFamilies = <String>[];
+
+  @override
+  Future<MySessions> sessions() async => mySessions;
+
+  @override
+  Future<void> revokeSession(String familyId) async => revokedFamilies.add(familyId);
 }
 
 /// The token store, in memory.

@@ -94,6 +94,19 @@
                       {{ t('common.reactivate') }}
                     </button>
                   } @else {
+                    <!-- An invitation nobody has accepted. The account is committed before the
+                         email is attempted, so a relay that refused leaves a real administrator
+                         nobody can reach and an address that can never be invited again: this is
+                         the way out of that, and the only one. -->
+                    @if (admin.invitationPending) {
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-xs"
+                        (click)="resend(admin)"
+                      >
+                        {{ t('adminUsers.resendInvitation') }}
+                      </button>
+                    }
                     <!-- Restricted actions stay visible but disabled, with the reason attached,
                          rather than vanishing and leaving the admin to guess. -->
                     <button

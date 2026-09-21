@@ -106,8 +106,20 @@ export class ConfirmModalComponent {
     this.values.update((current) => ({ ...current, [name]: value }));
   }
 
+  /**
+   * Values are trimmed on the way out.
+   *
+   * `canConfirm` already judges a field by its trimmed length, so a value made only of spaces was
+   * never sendable; what was still sendable was a real value with whitespace around it — and an
+   * email address with a trailing space or newline is refused by the API's own model validation
+   * before the domain normalises it. Nothing in this dialog is a value where the surrounding
+   * whitespace means anything.
+   */
   protected confirm(): void {
     if (!this.canConfirm()) return;
-    void this.ui.confirmModal({ ...this.values() });
+    const trimmed = Object.fromEntries(
+      Object.entries(this.values()).map(([name, value]) => [name, value.trim()]),
+    );
+    void this.ui.confirmModal(trimmed);
   }
 }

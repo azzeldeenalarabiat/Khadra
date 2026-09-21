@@ -15,6 +15,7 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'date_range_sheet.dart';
 import 'search_providers.dart';
+import 'vehicle_gallery_viewer.dart';
 import '../shortlist/save_button.dart';
 import 'vehicle_row.dart';
 
@@ -367,7 +368,18 @@ class _PhotosState extends State<_Photos> {
           controller: _controller,
           itemCount: widget.urls.length,
           onPageChanged: (index) => setState(() => _index = index),
-          itemBuilder: (_, index) => KhadraImage(url: widget.urls[index]),
+          // Every photograph opens full screen, on the one that was tapped.
+          // Nothing else about this carousel changes: it is the same list, in
+          // the same order, from the same server.
+          itemBuilder: (_, index) => GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => showVehicleGallery(
+              context,
+              urls: widget.urls,
+              initialIndex: index,
+            ),
+            child: KhadraImage(url: widget.urls[index]),
+          ),
         ),
         if (widget.urls.length > 1)
           Padding(

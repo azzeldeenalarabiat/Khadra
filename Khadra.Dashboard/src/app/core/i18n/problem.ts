@@ -1,5 +1,5 @@
 import { TranslationKey } from './en';
-import { Language } from './language';
+import { Language, MessageParams } from './language';
 
 /**
  * What a failed request said, kept as facts rather than as a sentence.
@@ -57,6 +57,99 @@ export function serverSentence(
 ): string | null {
   if (!problem.title) return null;
   return language === 'en' ? problem.title : t('common.requestRefused');
+}
+
+/**
+ * Refusals this console can word ITSELF, in either language, from the server's stable `code`.
+ *
+ * The `code` is the only part of a ProblemDetails a client may translate — the `title` is prose the
+ * API writes in English — so every entry here is a refusal an operator can act on: a taken address,
+ * a malformed number, a rule about the set of administrators. Anything not listed still falls back
+ * to the server's own sentence in English and to a status-shaped line in Arabic, which is what this
+ * map exists to stop being the ONLY answer.
+ */
+const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
+  'auth.email_taken': 'problem.emailTaken',
+  'auth.phone_taken': 'problem.phoneTaken',
+  'auth.invalid_email': 'problem.invalidEmail',
+  'auth.invalid_phone': 'problem.invalidPhone',
+  'auth.invalid_name': 'problem.invalidName',
+  'auth.user_not_found': 'problem.notFound',
+  'auth.account_suspended': 'problem.accountSuspended',
+  'auth.invalid_token': 'problem.invalidToken',
+  'admin.cannot_deactivate_self': 'adminUsers.youCannotDeactivateYour',
+  'admin.last_administrator': 'adminUsers.thisIsTheLast',
+  'admin.invitation_accepted': 'problem.invitationAccepted',
+  'admin.invitation_target_inactive': 'problem.invitationTargetInactive',
+  'admin.invitation_email_not_sent': 'problem.invitationEmailNotSent',
+};
+
+/** The same, for the fields a validation failure can name. Keys are lower-cased server names. */
+const WORDED_FIELDS: Readonly<Record<string, TranslationKey>> = {
+  email: 'problem.invalidEmail',
+  phone: 'problem.invalidPhone',
+  fullname: 'problem.invalidName',
+};
+
+/** What a bare status means, when nothing more specific is available. */
+function statusSentence(status: number): TranslationKey | null {
+  if (status === 401) return 'problem.signedOut';
+  if (status === 403) return 'problem.notPermitted';
+  if (status === 404) return 'problem.notFound';
+  if (status === 409) return 'problem.conflict';
+  if (status === 429) return 'problem.tooMany';
+  if (status >= 500) return 'problem.unavailable';
+  if (status === 400 || status === 422) return 'problem.rejectedDetails';
+  return null;
+}
+
+/**
+ * The most specific sentence this console can say about a refusal, in the language on screen.
+ *
+ * Resolution runs from the most specific to the least, and stops at the first answer:
+ *
+ * 1. the server's stable `code`, worded here in both languages;
+ * 2. a single named field from a validation failure, worded the same way;
+ * 3. the server's own `title` — but only in English, because that is the language it writes;
+ * 4. what the HTTP status alone means, with the trace id appended so support has something to
+ *    quote.
+ *
+ * Step 4 is why this exists. Before it, an Arabic operator inviting an administrator whose address
+ * was already taken read "That was refused. Nothing has been changed." — true, useless, and
+ * identical to a malformed phone number, a lapsed session and a server that fell over. The console
+ * knew the difference and threw it away.
+ *
+ * Returns `null` only when there was no answer at all, which is the case each screen's "the service
+ * did not respond" line is for.
+ */
+export function problemMessage(
+  problem: ProblemSnapshot,
+  language: Language,
+  t: (key: TranslationKey, params?: MessageParams) => string,
+): string | null {
+  const byCode = problem.code ? WORDED_CODES[problem.code] : undefined;
+  if (byCode) return t(byCode);
+
+  const named = problem.errors ? Object.keys(problem.errors) : [];
+  if (named.length === 1) {
+    const byField = WORDED_FIELDS[named[0].toLowerCase()];
+    if (byField) return t(byField);
+  }
+
+  if (language === 'en' && problem.title) return problem.title;
+
+  // Null ONLY when the request never got an answer, which is the case each
+  // screen's "the service did not respond" line is for. A status this map does
+  // not know still happened, and saying nothing responded would be a different
+  // and wrong claim — a 200 whose body would not parse lands here.
+  if (problem.status === 0) return null;
+
+  const byStatus = statusSentence(problem.status) ?? 'common.requestRefused';
+
+  // The trace id is the one thing that turns "it was refused" into something support can look up,
+  // and this is the branch where the console admits it could not say more than that.
+  const sentence = t(byStatus);
+  return problem.traceId ? `${sentence} · ${t('problem.reference', { traceId: problem.traceId })}` : sentence;
 }
 
 /** The server's first message for one field, under the same language rule. Null when there is none. */

@@ -2899,7 +2899,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Fleet.Vehicle", null)
                         .WithMany("Images")
                         .HasForeignKey("VehicleId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_vehicle_images_vehicles_vehicle_id");
                 });
@@ -3091,7 +3091,7 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasOne("Khadra.Domain.Shortlist.CustomerShortlist", null)
                         .WithMany("_entries")
                         .HasForeignKey("ShortlistId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.ClientCascade)
                         .IsRequired()
                         .HasConstraintName("fk_shortlist_entries_customer_shortlists_shortlist_id");
                 });

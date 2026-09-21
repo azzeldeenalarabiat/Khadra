@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../api/dtos.dart';
+import '../../core/format/greeting.dart';
+import '../../core/format/booking_presentation.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -26,7 +28,74 @@ class SearchLanding extends StatelessWidget {
   const SearchLanding({super.key});
 
   @override
-  Widget build(BuildContext context) => const _NextBookingCard();
+  Widget build(BuildContext context) => const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [_Greeting(), _NextBookingCard()],
+      );
+}
+
+/// Who is looking at this screen, when they are signed in.
+///
+/// Two lines and nothing else: the customer's own first name, and the question
+/// the controls below it answer. It is the whole difference between Home signed
+/// in and Home as a guest, which otherwise render identically — and a guest gets
+/// NOTHING here rather than a greeting addressed to nobody.
+///
+/// **The name is the server's.** It comes from the `UserDto` behind the session,
+/// which is the same name the profile screen shows and the same one an edit
+/// changes; nothing here stores, guesses or abbreviates a customer. Which part of
+/// it to say is `givenName`'s job, and it is not a whitespace split: عبد الله is
+/// one name, and "صباح الخير، عبد" would address a Jordanian customer as
+/// "servant". An account whose name has not arrived yet renders no greeting
+/// rather than an empty one.
+class _Greeting extends ConsumerWidget {
+  const _Greeting();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    if (!session.isSignedIn) return const SizedBox.shrink();
+
+    final name = givenName(session.user!.fullName);
+    if (name == null) return const SizedBox.shrink();
+
+    final l10n = AppLocalizations.of(context);
+    final greeting = switch (greetingBucket(DateTime.now())) {
+      DayPart.morning => l10n.homeGreetingMorning(name),
+      DayPart.afternoon => l10n.homeGreetingAfternoon(name),
+      DayPart.evening => l10n.homeGreetingEvening(name),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            // The wave is punctuation, not a word, so it sits at the end of the
+            // sentence in both scripts rather than being written into either
+            // translation — where in Arabic it would land at the wrong end.
+            '$greeting 👋',
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: KhadraColors.text,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            l10n.homeGreetingPrompt,
+            style: const TextStyle(
+                color: KhadraColors.neutral600, fontSize: 13),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The booking that needs the customer's attention, if there is one.
@@ -90,7 +159,8 @@ class _NextBookingCard extends ConsumerWidget {
                   Text(
                     // A booking outlives the listing behind it, so the car can be
                     // gone; the gallery's name is what identifies it then.
-                    booking.vehicle?.title ?? booking.dealerName,
+                    booking.vehicle?.title ??
+                        BookingPresentation.dealerName(l10n, booking),
                     style: const TextStyle(
                         color: KhadraColors.neutral700, fontSize: 13),
                     maxLines: 1,

@@ -44,6 +44,18 @@
                 </option>
               }
             </select>
+          } @else if (field.type === 'line') {
+            <!-- Single line: Return submits nothing and cannot be typed into the value. -->
+            <input
+              class="input"
+              type="text"
+              [id]="'modal-field-' + $index"
+              [attr.inputmode]="field.inputMode ?? null"
+              [attr.autocomplete]="field.autocomplete ?? 'off'"
+              [placeholder]="field.placeholder ?? ''"
+              [value]="field.value ?? ''"
+              (input)="setField(field.name, $event)"
+            />
           } @else if (field.type === 'password') {
             <!-- Masked and single-line. A textarea here would show the password to the room. -->
             <input

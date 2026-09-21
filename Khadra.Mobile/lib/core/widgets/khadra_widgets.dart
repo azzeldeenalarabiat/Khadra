@@ -930,14 +930,22 @@ class UserText extends StatelessWidget {
 }
 
 /// Shows a message without stacking snack bars on top of each other.
-void showKhadraMessage(BuildContext context, String message, {bool isError = false}) {
+void showKhadraMessage(
+  BuildContext context,
+  String message, {
+  bool isError = false,
+  /// Override the default only where the message describes a window the caller
+  /// is counting — the Back-to-exit hint, which must not outlive the two seconds
+  /// it is offering.
+  Duration? duration,
+}) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? KhadraColors.bad : KhadraColors.neutral900,
-        duration: Duration(seconds: isError ? 5 : 3),
+        duration: duration ?? Duration(seconds: isError ? 5 : 3),
       ),
     );
 }

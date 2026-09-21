@@ -29,6 +29,7 @@ public sealed class EmployeeAccountProvisioner(
     IPasswordHasher passwordHasher,
     IOpaqueTokenService opaqueTokens,
     IAuthPolicySettings policy,
+    InvitationReissuer reissuer,
     IClock clock)
 {
     public async Task<Result<ProvisionedEmployee, Error>> ProvisionAsync(
@@ -73,18 +74,14 @@ public sealed class EmployeeAccountProvisioner(
     }
 
     /// <summary>A fresh invitation for someone who has not accepted yet; every older one dies.</summary>
+    /// <remarks>
+    /// The invalidate-then-issue pair lives in <see cref="InvitationReissuer"/>, because an
+    /// administrator's invitation now needs the same two steps in the same order and a second copy
+    /// is a second place for one of them to be forgotten.
+    /// </remarks>
     public async Task<string> ReissueInvitationAsync(User user, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(user);
-
-        var now = clock.UtcNow;
-        await verificationTokens.InvalidateActiveAsync(user.Id, VerificationPurpose.EmployeeInvitation, now, cancellationToken);
-
-        var invitation = opaqueTokens.Generate();
-        await verificationTokens.AddAsync(
-            VerificationToken.Issue(user.Id, VerificationPurpose.EmployeeInvitation, invitation.Hash, now, policy.EmployeeInvitationLifetime),
-            cancellationToken);
-
-        return invitation.Value;
+        var reissued = await reissuer.ReissueAsync(user, VerificationPurpose.EmployeeInvitation, cancellationToken);
+        return reissued.RawToken;
     }
 }

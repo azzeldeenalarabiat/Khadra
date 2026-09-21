@@ -71,6 +71,12 @@ class ProfileScreen extends ConsumerWidget {
                     label: l10n.profileEdit,
                     onTap: () => context.push(Routes.editProfile),
                   ),
+                  // Unchanged, and deliberately so: the bar gained a shortcut to
+                  // saved cars, which is a reason to have TWO ways in and no
+                  // reason to alter this one. It still pushes its own screen and
+                  // still comes back here. `Routes.shortlist`, not `Routes.saved`
+                  // — pushing the tab's path would stack a second copy of the
+                  // screen above the bar.
                   _Row(
                     icon: Icons.favorite_border,
                     label: l10n.shortlistTitle,

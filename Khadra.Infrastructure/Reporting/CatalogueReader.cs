@@ -183,9 +183,21 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                 MoneyDto.FromOptional(vehicle.Mileage.ExcessFeePerKm)),
             vehicle.FuelPolicy.Name,
             vehicle.IsDeliveryEligible,
-            // Images already come back primary-first, then by position: VehicleImage.Position is what
-            // SetPrimaryImage reorders.
-            [.. vehicle.Images.Select(image => VehicleImageDto.PublicPath + "/" + image.StorageKey)],
+            // The cover photo first, then the rest in the dealer's order.
+            //
+            // `Vehicle.Images` orders by position ALONE, and `SetPrimaryImage` sets a flag without
+            // moving anything -- so the list arrives here cover-or-not, whatever position 0 happens
+            // to hold. The comment that used to sit on this line claimed the opposite, and the
+            // consequence was visible: the search card picks the primary (below), while the car's own
+            // page opened on position 0, so a dealer who made the third photo their cover saw one
+            // photograph on the card and a different one when they tapped it. The customer app now
+            // opens this same list FULL SCREEN, which makes the disagreement harder to miss and no
+            // more correct. Ordering it here fixes both without touching what a dealer's own console
+            // shows them.
+            [.. vehicle.Images
+                .OrderByDescending(image => image.IsPrimary)
+                .ThenBy(image => image.Position)
+                .Select(image => VehicleImageDto.PublicPath + "/" + image.StorageKey)],
             gallery,
             isAvailable);
     }

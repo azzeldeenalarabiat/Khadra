@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_environment.dart';
+import '../config/device_stamp.dart';
 import 'api_failure.dart';
 
 /// The one way this app talks to the Khadra API.
@@ -27,12 +28,31 @@ class ApiClient {
           // NO sendTimeout here. It only means anything for a request with a body,
           // and on the web Dio warns about it on every GET -- which is most of
           // them. The two calls that upload set their own; see `upload`.
-          headers: const {'Accept': 'application/json'},
+          headers: _headers(),
           // Handled by ApiFailure rather than thrown as a status check, so one
           // reader turns every ProblemDetails body into a code the app can act on.
           validateStatus: (status) => status != null && status < 400,
         ),
       );
+
+  /// The headers every request carries.
+  ///
+  /// The `User-Agent` is the reason this is a function. The server stores it on
+  /// the refresh token and Registered Devices reads it back, and without one the
+  /// HTTP client sent `Dart/3.x (dart:io)` — which that screen turned into the
+  /// word "Khadra", the app's own name, told the customer nothing about which
+  /// phone they were looking at, and read as though the app were the device.
+  ///
+  /// It says the operating system and its version, and nothing that identifies
+  /// the handset: see `deviceStamp`. On the web it is omitted, because a browser
+  /// writes its own and will not accept a substitute.
+  static Map<String, String> _headers() {
+    final device = deviceStamp();
+    return {
+      'Accept': 'application/json',
+      if (device.isNotEmpty) 'User-Agent': 'Khadra ($device)',
+    };
+  }
 
   Future<T> get<T>(
     String path, {

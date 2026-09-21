@@ -17,6 +17,7 @@ import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'booking_providers.dart';
+import 'booking_timeline.dart';
 import 'cancel_booking_sheet.dart';
 
 /// One booking, in full.
@@ -108,7 +109,16 @@ class _BookingDetailScreenState extends ConsumerState<BookingDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: const KhadraBack(fallback: Routes.bookings),
-        title: Text(l10n.bookingsTitle),
+        // The booking's own reference, which is what identifies this screen and
+        // what somebody reads out on the phone to the office. Latin in both
+        // languages, so it is isolated rather than left to bidi.
+        title: switch (booking) {
+          AsyncData(:final value) => LatinRun(
+              value.reference,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+          _ => Text(l10n.bookingsTitle),
+        },
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -144,26 +154,46 @@ class _Body extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(
           Space.lg, Space.lg, Space.lg, Space.bottomInset),
       children: [
-        _Header(booking: booking, formats: formats),
-
-        const SizedBox(height: Space.lg),
+        // FIRST, and it earns the place: the deposit window is two hours and
+        // there is no push channel, so this screen is the only surface that can
+        // tell a customer in time. It renders nothing when there is nothing
+        // urgent to say, and then the summary below is what leads the page.
+        //
+        // A penalty stays welded to the outcome that caused it — "assessed, not
+        // charged" is the sentence that answers the question a cancelled or
+        // missed booking raises, and it must not be a scroll away from it.
         _StateNotice(booking: booking, formats: formats),
-
-        const SizedBox(height: Space.xl),
-        _Actions(booking: booking),
-
-        const SizedBox(height: Space.xl),
-        KhadraSectionTitle(l10n.bookingCar),
-        _VehicleCard(booking: booking),
-
-        const SizedBox(height: Space.xl),
-        KhadraSectionTitle(l10n.bookingPrice),
-        _Price(booking: booking, formats: formats),
+        if (_StateNotice.speaks(booking)) const SizedBox(height: Space.lg),
 
         if (booking.penalty != null && !booking.penalty!.isNothingOwed) ...[
-          const SizedBox(height: Space.lg),
           _Penalty(penalty: booking.penalty!, formats: formats),
+          const SizedBox(height: Space.lg),
         ],
+
+        // The car, the office and the dates, with the status on it: what this
+        // booking IS, in one card.
+        _VehicleCard(booking: booking, formats: formats),
+
+        // Cancel, dispute and non-delivery stay above the cards. The dispute
+        // window runs on a frozen settlement period and closes for good; a
+        // customer who cannot find the button before it does has lost the right.
+        if (_Actions.has(booking)) ...[
+          const SizedBox(height: Space.xl),
+          KhadraSectionTitle(l10n.bookingActions),
+          _Actions(booking: booking),
+        ],
+
+        const SizedBox(height: Space.xl),
+        KhadraSectionTitle(l10n.bookingProgress),
+        BookingTimeline(booking: booking, formats: formats),
+
+        const SizedBox(height: Space.xl),
+        KhadraSectionTitle(l10n.bookingPaymentSummary),
+        _Price(booking: booking, formats: formats),
+
+        const SizedBox(height: Space.xl),
+        KhadraSectionTitle(l10n.bookingPickupReturn),
+        _PickupAndReturn(booking: booking, formats: formats),
 
         if (booking.handovers.isNotEmpty) ...[
           const SizedBox(height: Space.xl),
@@ -173,14 +203,20 @@ class _Body extends ConsumerWidget {
 
         const SizedBox(height: Space.xl),
         KhadraSectionTitle(l10n.bookingHistory),
-        _Timeline(booking: booking, formats: formats),
+        _Activity(booking: booking, formats: formats),
       ],
     );
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header({required this.booking, required this.formats});
+/// Where and when the car is handed over, and how.
+///
+/// Separated from the summary above it because these are the facts somebody
+/// opens the booking to check on the morning of the rental, and they were
+/// previously mixed in with the reference and the status in one undifferentiated
+/// list of rows.
+class _PickupAndReturn extends StatelessWidget {
+  const _PickupAndReturn({required this.booking, required this.formats});
 
   final Booking booking;
   final Formats formats;
@@ -193,32 +229,6 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              KhadraBadge(
-                label: BookingPresentation.label(l10n, booking.status),
-                colour: BookingPresentation.colour(booking.status),
-                icon: BookingPresentation.icon(booking.status),
-              ),
-              const Spacer(),
-              LatinRun(
-                booking.reference,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: KhadraColors.neutral500,
-                  // rtl-audit: allow — a reference is Latin in both languages.
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: Space.md),
-          KhadraDetailRow(
-            label: l10n.bookingWhen,
-            value: Text(
-              formats.dateRange(booking.periodStart, booking.periodEnd),
-            ),
-          ),
           KhadraDetailRow(
             label: l10n.searchPickup,
             value: Text(formats.dateTime(booking.periodStart)),
@@ -226,6 +236,10 @@ class _Header extends StatelessWidget {
           KhadraDetailRow(
             label: l10n.searchReturn,
             value: Text(formats.dateTime(booking.periodEnd)),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: Space.sm),
+            child: Divider(height: 1),
           ),
           KhadraDetailRow(
             label: l10n.bookingWhere,
@@ -235,9 +249,9 @@ class _Header extends StatelessWidget {
           ),
           KhadraDetailRow(
             label: l10n.bookingGallery,
-            value: Text(booking.dealerName),
+            value: Text(BookingPresentation.dealerName(l10n, booking)),
           ),
-          const SizedBox(height: Space.xs),
+          const SizedBox(height: Space.sm),
           Text(
             l10n.timeAmmanNote,
             style: const TextStyle(color: KhadraColors.neutral500, fontSize: 11),
@@ -255,14 +269,57 @@ class _StateNotice extends StatelessWidget {
   final Booking booking;
   final Formats formats;
 
+  /// Whether this has anything to say, so the page does not leave a gap under
+  /// silence. The one status that renders nothing is a booking quietly in
+  /// progress — Confirmed, PickedUp or Returned with its window still open —
+  /// where the badge on the summary already says everything there is to say.
+  static bool speaks(Booking booking) {
+    if (booking.isAwaitingDecision || booking.isAwaitingPayment) return true;
+    if (!booking.isTerminal &&
+        ((booking.status == 'Requested' && !booking.isAwaitingDecision) ||
+            (booking.status == 'Approved' && !booking.isAwaitingPayment))) {
+      return true;
+    }
+    return const {'Expired', 'Rejected', 'Cancelled', 'NoShow', 'Completed'}
+        .contains(booking.status);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
+    // The two states that used to render NOTHING.
+    //
+    // A request whose decision deadline has passed, or an approval whose payment
+    // window has closed, still reads `Requested` / `Approved` until the
+    // settlement sweep gets to it — up to a minute. The badge said "deposit due"
+    // above an empty space, and the customer had no way to tell that the chance
+    // was gone. The SERVER's verdict is what says so; the app never compares a
+    // deadline with its own clock.
+    if (!booking.isTerminal) {
+      if (booking.status == 'Requested' && !booking.isAwaitingDecision) {
+        return KhadraNotice(
+          title: l10n.bookingLapsedDecisionTitle,
+          body: l10n.bookingLapsedDecisionBody,
+          tone: NoticeTone.neutral,
+          icon: Icons.timer_off_outlined,
+        );
+      }
+      if (booking.status == 'Approved' && !booking.isAwaitingPayment) {
+        return KhadraNotice(
+          title: l10n.bookingLapsedPaymentTitle,
+          body: l10n.bookingLapsedPaymentBody,
+          tone: NoticeTone.neutral,
+          icon: Icons.timer_off_outlined,
+        );
+      }
+    }
+
     // Server verdicts, in order of what matters most to the reader.
     if (booking.isAwaitingDecision) {
       return KhadraNotice(
-        title: l10n.bookingAwaitingDecisionTitle(booking.dealerName),
+        title: l10n.bookingAwaitingDecisionTitle(
+            BookingPresentation.dealerName(l10n, booking)),
         body: '${l10n.bookingAwaitingDecisionBody(formats.dateTime(booking.decisionDeadline))}\n'
             '${BookingPresentation.countdown(l10n, booking.decisionDeadline)}',
         tone: NoticeTone.warn,
@@ -328,8 +385,15 @@ class _StateNotice extends StatelessWidget {
     final party = BookingPresentation.party(l10n, booking.cancelledBy);
     final typed = booking.cancellationReason;
 
+    // The CUSTOMER gets their own sentence rather than their pronoun dropped
+    // into a shared one. Arabic attaches a pronoun to the preposition — "من
+    // قِبلك", not "من قِبل" + a word for "you" — so composing the two produced
+    // "أُلغي من قِبل عليك", which doubles the preposition and is not a sentence.
     final parts = <String>[
-      if (booking.cancelledBy != null) l10n.bookingCancelledBy(party),
+      if (booking.cancelledBy == 'Customer')
+        l10n.bookingCancelledByYou
+      else if (booking.cancelledBy != null)
+        l10n.bookingCancelledBy(party),
       if (label != null) label,
       if (typed != null && typed.isNotEmpty) typed,
     ];
@@ -468,6 +532,16 @@ class _Actions extends ConsumerWidget {
 
   final Booking booking;
 
+  /// Whether there is anything to put under a heading. Asked by the page so an
+  /// empty section title does not sit above nothing.
+  static bool has(Booking booking) =>
+      booking.cancellation.canCancel ||
+      booking.canReportNonDelivery ||
+      booking.status == 'Confirmed' ||
+      booking.liveDisputeId != null ||
+      booking.canBeDisputed ||
+      booking.canBeReviewed;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -500,21 +574,32 @@ class _Actions extends ConsumerWidget {
         ),
       );
     } else if (booking.status == 'Confirmed') {
+      // Why it is off, as VISIBLE text under the control. It was a Tooltip,
+      // which on a phone needs a long press nobody performs on a disabled
+      // button — so the reason existed and could not be read.
       actions.add(
-        Tooltip(
-          // Falls back to the general sentence when the config has not arrived and
-          // there is no formatter yet: a tooltip without a time still says why the
-          // button is off, which is more than a bare disabled control does.
-          message: switch (ref.watch(formatsProvider)) {
-            final formats? =>
-              l10n.nonDeliveryNotYet(formats.dateTime(booking.nonDeliveryReportableFrom)),
-            null => l10n.nonDeliveryTooEarly,
-          },
-          child: OutlinedButton.icon(
-            onPressed: null,
-            icon: const Icon(Icons.report_gmailerrorred_outlined, size: 18),
-            label: Text(l10n.nonDeliveryTitle),
-          ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.report_gmailerrorred_outlined, size: 18),
+              label: Text(l10n.nonDeliveryTitle),
+            ),
+            const SizedBox(height: Space.xs),
+            Text(
+              // Falls back to the general sentence when the config has not
+              // arrived and there is no formatter yet: a reason without a time
+              // still says why the button is off.
+              switch (ref.watch(formatsProvider)) {
+                final formats? => l10n
+                    .nonDeliveryNotYet(formats.dateTime(booking.nonDeliveryReportableFrom)),
+                null => l10n.nonDeliveryTooEarly,
+              },
+              style: const TextStyle(
+                  color: KhadraColors.neutral600, fontSize: 12, height: 1.4),
+            ),
+          ],
         ),
       );
     }
@@ -675,67 +760,129 @@ class _NonDeliveryDialogState extends State<_NonDeliveryDialog> {
   }
 }
 
-class _VehicleCard extends StatelessWidget {
-  const _VehicleCard({required this.booking});
+/// What this booking IS: the car, who it is from, and when.
+///
+/// The screen's hero. It carries the status badge, because "which booking is
+/// this and how is it going" is one question and used to be answered by two
+/// blocks a scroll apart.
+class _VehicleCard extends ConsumerWidget {
+  const _VehicleCard({required this.booking, required this.formats});
 
   final Booking booking;
+  final Formats formats;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final vehicle = booking.vehicle;
+    final city = ref.watch(cityNameProvider(booking.dealerCityId));
 
     return KhadraCard(
+      padding: const EdgeInsets.all(Space.md),
       onTap: vehicle == null
           ? null
           : () => context.push(Routes.vehicle(vehicle.vehicleId)),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 80,
-            height: 60,
-            child: KhadraImage(
-              url: vehicle?.coverImageUrl,
-              borderRadius: Radii.field,
-            ),
-          ),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  // A booking outlives the listing behind it, so the car can be
-                  // gone. The gallery's name is what is left to identify it by.
-                  vehicle?.title ?? booking.dealerName,
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 96,
+                height: 72,
+                child: KhadraImage(
+                  url: vehicle?.coverImageUrl,
+                  borderRadius: Radii.field,
                 ),
-                if (vehicle != null) ...[
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        '${vehicle.year}',
-                        style: const TextStyle(
-                            color: KhadraColors.neutral600, fontSize: 12),
-                      ),
-                      const SizedBox(width: Space.sm),
-                      Text(
-                        '${l10n.bookingPlate}: ',
-                        style: const TextStyle(
-                            color: KhadraColors.neutral600, fontSize: 12),
-                      ),
-                      LatinRun(
-                        vehicle.plateNumber,
-                        style: const TextStyle(
-                            color: KhadraColors.neutral600, fontSize: 12),
+              ),
+              const SizedBox(width: Space.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      // A booking outlives the listing behind it, so the car can
+                      // be gone. The office's name is what identifies it then.
+                      vehicle?.title ??
+                          BookingPresentation.dealerName(l10n, booking),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w800),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (vehicle != null) ...[
+                      const SizedBox(height: 3),
+                      Wrap(
+                        spacing: Space.sm,
+                        runSpacing: 2,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            '${vehicle.year}',
+                            style: const TextStyle(
+                                color: KhadraColors.neutral600, fontSize: 12),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${l10n.bookingPlate}: ',
+                                style: const TextStyle(
+                                    color: KhadraColors.neutral600, fontSize: 12),
+                              ),
+                              LatinRun(
+                                vehicle.plateNumber,
+                                style: const TextStyle(
+                                    color: KhadraColors.neutral600, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 4),
+                    Text(
+                      // The office, and the city it is in where the platform
+                      // knows one. `cityNameProvider` answers null for a city
+                      // that has not loaded or has been retired, and then the
+                      // line is simply the office.
+                      city == null
+                          ? BookingPresentation.dealerName(l10n, booking)
+                          : '${BookingPresentation.dealerName(l10n, booking)} · $city',
+                      style: const TextStyle(
+                          color: KhadraColors.neutral700,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: Space.md),
+            child: Divider(height: 1),
+          ),
+          Row(
+            children: [
+              const Icon(Icons.calendar_today_outlined,
+                  size: 15, color: KhadraColors.neutral600),
+              const SizedBox(width: Space.sm),
+              Expanded(
+                child: Text(
+                  formats.dateRange(booking.periodStart, booking.periodEnd),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+              KhadraBadge(
+                label: BookingPresentation.label(l10n, booking.status),
+                colour: BookingPresentation.colour(booking.status),
+                icon: BookingPresentation.icon(booking.status),
+              ),
+            ],
           ),
         ],
       ),
@@ -754,59 +901,149 @@ class _Price extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final pricing = booking.pricing;
 
-    return KhadraCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          KhadraDetailRow(
-            label: l10n.bookDailyRate,
-            value: Text(
-              // The frozen figures: the rate, the calendar dates it was priced
-              // between, and the count they produced.
-              '${formats.money(pricing.dailyRate)} × ${l10n.bookDays(pricing.days)}',
-            ),
+    return Column(
+      children: [
+        // BLOCK ONE: what the rental costs.
+        KhadraCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BlockLabel(l10n.bookingRentalCost),
+              KhadraDetailRow(
+                label: l10n.bookDailyRate,
+                value: Text(
+                  // ONE text run, not two cells: the rate, the multiplication
+                  // sign and the day count reorder against each other in Arabic
+                  // if bidi is left to resolve them separately. The figures are
+                  // the frozen ones — the rate, and the count the Amman calendar
+                  // dates produced.
+                  '${formats.money(pricing.dailyRate)} × ${l10n.bookDays(pricing.days)}',
+                ),
+              ),
+              KhadraDetailRow(
+                label: l10n.bookRentalTotal,
+                value: Text(formats.money(pricing.rentalTotal)),
+              ),
+              if (!pricing.deliveryFee.isZero)
+                KhadraDetailRow(
+                  label: l10n.bookDeliveryFee,
+                  value: Text(formats.money(pricing.deliveryFee)),
+                ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: Space.sm),
+                child: Divider(height: 1),
+              ),
+              KhadraDetailRow(
+                label: l10n.bookTotal,
+                value: Text(formats.money(pricing.totalPrice)),
+                valueStyle: const TextStyle(
+                    fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+            ],
           ),
-          KhadraDetailRow(
-            label: l10n.bookRentalTotal,
-            value: Text(formats.money(pricing.rentalTotal)),
+        ),
+
+        // BLOCK TWO: how that total is paid. These two figures ADD UP to the
+        // total above, which is why they are together and apart from what
+        // follows.
+        const SizedBox(height: Space.md),
+        KhadraCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BlockLabel(l10n.bookingHowItIsPaid),
+              KhadraDetailRow(
+                label: l10n.bookDepositNow(formats.percent(pricing.depositPercent)),
+                value: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(formats.money(pricing.depositAmount)),
+                    // Whether it is already paid is a FACT on the booking, not
+                    // a guess from the status.
+                    if (booking.depositPaid) ...[
+                      const SizedBox(width: Space.sm),
+                      KhadraBadge(
+                        label: l10n.bookingDepositPaidNote,
+                        colour: KhadraColors.ok,
+                        icon: Icons.check_rounded,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              KhadraDetailRow(
+                label: l10n.bookBalanceAtPickup,
+                value: Text(formats.money(pricing.balanceDue)),
+              ),
+              if (!pricing.deliveryFee.isZero) ...[
+                const SizedBox(height: 2),
+                // Otherwise a reader adds the delivery line from the block above
+                // a second time: the fee is inside the cash figure, because the
+                // driver collects it.
+                Text(
+                  l10n.bookingBalanceIncludesDelivery,
+                  style: const TextStyle(
+                      color: KhadraColors.neutral500, fontSize: 12),
+                ),
+              ],
+            ],
           ),
-          if (!pricing.deliveryFee.isZero)
-            KhadraDetailRow(
-              label: l10n.bookDeliveryFee,
-              value: Text(formats.money(pricing.deliveryFee)),
-            ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: Space.sm),
-            child: Divider(height: 1),
-          ),
-          KhadraDetailRow(
-            label: l10n.bookTotal,
-            value: Text(formats.money(pricing.totalPrice)),
-            valueStyle: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          KhadraDetailRow(
-            label: l10n.bookDepositNow(formats.percent(pricing.depositPercent)),
-            value: Text(formats.money(pricing.depositAmount)),
-          ),
-          KhadraDetailRow(
-            label: l10n.bookBalanceAtPickup,
-            value: Text(formats.money(pricing.balanceDue)),
-          ),
-          KhadraDetailRow(
-            label: l10n.vehicleSecurityDeposit,
-            value: Text(formats.money(pricing.securityDeposit)),
-          ),
+        ),
+
+        // BLOCK THREE, visibly apart: the security deposit is NOT part of the
+        // total and is not Khadra's. In one aligned column with the figures
+        // above it reads either as money owed on top or as a total that does not
+        // add up, so it gets its own card and the sentence that explains it.
+        if (!pricing.securityDeposit.isZero) ...[
           const SizedBox(height: Space.md),
-          Text(
-            l10n.bookingTermsFrozen,
-            style: const TextStyle(
-                color: KhadraColors.neutral500, fontSize: 12, height: 1.45),
+          KhadraCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                KhadraDetailRow(
+                  label: l10n.vehicleSecurityDeposit,
+                  value: Text(formats.money(pricing.securityDeposit)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.vehicleSecurityDepositHelp,
+                  style: const TextStyle(
+                      color: KhadraColors.neutral600, fontSize: 12, height: 1.45),
+                ),
+              ],
+            ),
           ),
         ],
-      ),
+
+        const SizedBox(height: Space.md),
+        Text(
+          l10n.bookingTermsFrozen,
+          style: const TextStyle(
+              color: KhadraColors.neutral500, fontSize: 12, height: 1.45),
+        ),
+      ],
     );
   }
+}
+
+/// The heading inside a card, for the blocks of the payment summary.
+class _BlockLabel extends StatelessWidget {
+  const _BlockLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: Space.xs),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: KhadraColors.neutral600,
+          ),
+        ),
+      );
 }
 
 /// A penalty as an ASSESSMENT.
@@ -825,14 +1062,24 @@ class _Penalty extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final party = BookingPresentation.party(l10n, penalty.attributedTo);
 
+    // Same reason as the cancellation line: "على" + "عليك" is not Arabic.
+    final onCustomer = penalty.attributedTo == 'Customer';
+
     return KhadraNotice(
       title: penalty.isRange
-          ? l10n.bookingPenaltyRange(
-              formats.money(penalty.minAmount),
-              formats.money(penalty.maxAmount),
-              party,
-            )
-          : l10n.bookingPenaltyAssessed(formats.money(penalty.maxAmount), party),
+          ? (onCustomer
+              ? l10n.bookingPenaltyRangeOnYou(
+                  formats.money(penalty.minAmount),
+                  formats.money(penalty.maxAmount),
+                )
+              : l10n.bookingPenaltyRange(
+                  formats.money(penalty.minAmount),
+                  formats.money(penalty.maxAmount),
+                  party,
+                ))
+          : (onCustomer
+              ? l10n.bookingPenaltyAssessedOnYou(formats.money(penalty.maxAmount))
+              : l10n.bookingPenaltyAssessed(formats.money(penalty.maxAmount), party)),
       body: penalty.requiresTicketToEnforce
           ? l10n.bookingPenaltyNotCharged
           : null,
@@ -923,9 +1170,17 @@ class _Handovers extends StatelessWidget {
   }
 }
 
-/// Everything that has happened, oldest first.
-class _Timeline extends ConsumerWidget {
-  const _Timeline({required this.booking, required this.formats});
+/// Everything that has happened, newest first.
+///
+/// The lifecycle card above summarises where the booking got to; this is the
+/// evidence underneath it — every transition the platform recorded, with who
+/// acted and why where a reason exists.
+///
+/// **Newest first**, unlike the lifecycle. A timeline is read forwards because
+/// it is about progress; a log is read backwards because the last thing that
+/// happened is the thing being looked for.
+class _Activity extends ConsumerWidget {
+  const _Activity({required this.booking, required this.formats});
 
   final Booking booking;
   final Formats formats;
@@ -941,54 +1196,19 @@ class _Timeline extends ConsumerWidget {
             .rejectionReasons ??
         const <VocabularyEntry>[];
 
+    final entries = booking.history.reversed.toList();
+
     return KhadraCard(
       child: Column(
         children: [
-          for (final change in booking.history) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(top: 2, end: Space.md),
-                  child: Icon(
-                    BookingPresentation.icon(change.toStatus),
-                    size: 18,
-                    color: BookingPresentation.colour(change.toStatus),
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        BookingPresentation.label(l10n, change.toStatus),
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        formats.dateTime(change.occurredAt),
-                        style: const TextStyle(
-                            color: KhadraColors.neutral500, fontSize: 12),
-                      ),
-                      if (_reasonLine(l10n, change, rejectionReasons, arabic)
-                          case final line?) ...[
-                        const SizedBox(height: Space.xs),
-                        UserText(
-                          line,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            height: 1.45,
-                            color: KhadraColors.neutral700,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+          for (var i = 0; i < entries.length; i++) ...[
+            _ActivityRow(
+              change: entries[i],
+              line: _reasonLine(l10n, entries[i], rejectionReasons, arabic),
+              formats: formats,
+              l10n: l10n,
             ),
-            if (change != booking.history.last)
+            if (i != entries.length - 1)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: Space.md),
                 child: Divider(height: 1),
@@ -1005,6 +1225,13 @@ class _Timeline extends ConsumerWidget {
   /// Whatever the actor typed follows it, unchanged and in whatever language they
   /// typed it — their words are theirs, and translating them would be inventing
   /// what they said.
+  ///
+  /// **The platform's OWN sentences are dropped.** A transition the system made
+  /// on a timer carries an English sentence and no code — "Payment window
+  /// elapsed.", "Dealer did not respond." — which is untranslatable prose the app
+  /// would be printing into an Arabic screen. The status name beside it already
+  /// says the same thing in the reader's language, so nothing is lost. A person's
+  /// typed words still show, whoever they are.
   String? _reasonLine(
     AppLocalizations l10n,
     BookingStatusChange change,
@@ -1012,7 +1239,10 @@ class _Timeline extends ConsumerWidget {
     bool arabic,
   ) {
     final label = _codeLabel(l10n, change, rejectionReasons, arabic);
-    final typed = change.reason;
+    final actedByPlatform =
+        change.actorParty == 'System' || change.actorParty == 'Admin';
+    final typed =
+        label == null && actedByPlatform ? null : change.reason;
 
     if (label == null && (typed == null || typed.isEmpty)) return null;
     if (label == null) return typed;
@@ -1040,5 +1270,89 @@ class _Timeline extends ConsumerWidget {
     // Falls back to the code itself for one the platform has not published, which
     // is at least a word somebody can search for.
     return Vocabularies.label(rejectionReasons, code, arabic);
+  }
+}
+
+/// One entry in the activity log: what changed, when, who did it, and why.
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({
+    required this.change,
+    required this.line,
+    required this.formats,
+    required this.l10n,
+  });
+
+  final BookingStatusChange change;
+  final String? line;
+  final Formats formats;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final party = BookingPresentation.party(l10n, change.actorParty);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsetsDirectional.only(top: 1, end: Space.md),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: BookingPresentation.colour(change.toStatus)
+                .withValues(alpha: 0.12),
+          ),
+          child: Icon(
+            BookingPresentation.icon(change.toStatus),
+            size: 16,
+            color: BookingPresentation.colour(change.toStatus),
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      stageLabel(l10n, change.toStatus),
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: Space.sm),
+                  Text(
+                    formats.dateTime(change.occurredAt),
+                    style: const TextStyle(
+                        color: KhadraColors.neutral500, fontSize: 11),
+                  ),
+                ],
+              ),
+              if (party.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  l10n.bookingActivityBy(party),
+                  style: const TextStyle(
+                      color: KhadraColors.neutral600, fontSize: 12),
+                ),
+              ],
+              if (line case final reason?) ...[
+                const SizedBox(height: Space.xs),
+                UserText(
+                  reason,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: KhadraColors.neutral700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

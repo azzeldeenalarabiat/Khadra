@@ -11,6 +11,7 @@
 import 'dart:typed_data';
 
 import '../core/config/app_environment.dart';
+import '../core/format/booking_presentation.dart' show HasDealerLabel;
 
 int _int(dynamic value, [int fallback = 0]) => switch (value) {
       int v => v,
@@ -440,6 +441,7 @@ class SessionSummary {
     required this.createdByIp,
     required this.userAgent,
     required this.isActive,
+    required this.isCurrent,
   });
 
   final String familyId;
@@ -450,6 +452,18 @@ class SessionSummary {
   final String? userAgent;
   final bool isActive;
 
+  /// Whether this is the phone in the customer's hand.
+  ///
+  /// The SERVER says so, from the session id in the access token this request carried — the app
+  /// cannot work it out, and must not try: nothing here is read out of the JWT, and the obvious
+  /// guess (the most recently used row) is wrong, because "last used" is the last token refresh
+  /// and another device may have rotated more recently.
+  ///
+  /// False also means "this build of the server could not say", which is the case for a token
+  /// minted before the claim existed. So a row is marked only when this is true; nothing is
+  /// inferred from its absence.
+  final bool isCurrent;
+
   static SessionSummary fromJson(Map<String, dynamic> json) => SessionSummary(
         familyId: json['familyId'] as String? ?? '',
         signedInAt: _requiredDateTime(json['signedInAt']),
@@ -458,6 +472,7 @@ class SessionSummary {
         createdByIp: json['createdByIp'] as String?,
         userAgent: json['userAgent'] as String?,
         isActive: json['isActive'] as bool? ?? true,
+        isCurrent: json['isCurrent'] as bool? ?? false,
       );
 }
 
@@ -1378,7 +1393,7 @@ class PaymentAvailability {
       : null;
 }
 
-class Booking {
+class Booking implements HasDealerLabel {
   const Booking({
     required this.bookingId,
     required this.reference,
@@ -1417,6 +1432,8 @@ class Booking {
     required this.myReviewId,
     required this.vehicle,
     required this.dealerName,
+    required this.dealerRemoved,
+    required this.dealerCityId,
     required this.handovers,
     required this.history,
   });
@@ -1472,7 +1489,20 @@ class Booking {
   final bool canBeReviewed;
   final String? myReviewId;
   final VehicleLabel? vehicle;
+
+  /// The office's name — an English STAND-IN when [dealerRemoved] is true, which
+  /// is why no screen prints this directly. `BookingPresentation.dealerName`
+  /// words the removed case in the reader's own language.
+  @override
   final String dealerName;
+
+  @override
+  final bool dealerRemoved;
+
+  /// The office's city, by lookup id. Named through `cityNameProvider`, which
+  /// answers null for a city that has not loaded or has been retired.
+  final String? dealerCityId;
+
   final List<Handover> handovers;
   final List<BookingStatusChange> history;
 
@@ -1521,6 +1551,8 @@ class Booking {
         myReviewId: json['myReviewId'] as String?,
         vehicle: VehicleLabel.maybe(json['vehicle']),
         dealerName: json['dealerName'] as String? ?? '',
+        dealerRemoved: json['dealerRemoved'] as bool? ?? false,
+        dealerCityId: json['dealerCityId'] as String?,
         handovers: (json['handovers'] as List<dynamic>? ?? const [])
             .whereType<Map<String, dynamic>>()
             .map(Handover.fromJson)
@@ -1532,7 +1564,7 @@ class Booking {
       );
 }
 
-class BookingListItem {
+class BookingListItem implements HasDealerLabel {
   const BookingListItem({
     required this.bookingId,
     required this.reference,
@@ -1546,6 +1578,7 @@ class BookingListItem {
     required this.createdAt,
     required this.vehicle,
     required this.dealerName,
+    required this.dealerRemoved,
     required this.hasLiveDispute,
     required this.dealerId,
   });
@@ -1563,7 +1596,11 @@ class BookingListItem {
   final String currency;
   final DateTime createdAt;
   final VehicleLabel? vehicle;
+  @override
   final String dealerName;
+
+  @override
+  final bool dealerRemoved;
   final bool hasLiveDispute;
   final String dealerId;
 
@@ -1580,6 +1617,7 @@ class BookingListItem {
         createdAt: _requiredDateTime(json['createdAt']),
         vehicle: VehicleLabel.maybe(json['vehicle']),
         dealerName: json['dealerName'] as String? ?? '',
+        dealerRemoved: json['dealerRemoved'] as bool? ?? false,
         hasLiveDispute: json['hasLiveDispute'] as bool? ?? false,
         dealerId: json['dealerId'] as String? ?? '',
       );

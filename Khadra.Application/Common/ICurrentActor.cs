@@ -15,5 +15,17 @@ public interface ICurrentActor
     // on every privileged action.
     string? Name { get; }
     Guid? SecurityStamp { get; }
+
+    /// <summary>
+    /// Which of this user's sessions is making the request: the refresh-token family the access
+    /// token was minted for.
+    /// </summary>
+    /// <remarks>
+    /// Null for a token issued before the claim existed, which is a state that lasts one access
+    /// token. Nothing may refuse a request over it — the only thing that reads it is the devices
+    /// screen, marking the row you are on.
+    /// </remarks>
+    Guid? SessionId { get; }
+
     string CorrelationId { get; }
 }

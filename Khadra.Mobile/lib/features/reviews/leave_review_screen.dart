@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_failure.dart';
 import '../../core/api/api_failure_messages.dart';
+import '../../core/format/booking_presentation.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -71,7 +72,10 @@ class _LeaveReviewScreenState extends ConsumerState<LeaveReviewScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final booking = ref.watch(bookingProvider(widget.bookingId));
-    final galleryName = booking.valueOrNull?.dealerName ?? '';
+    final galleryName = switch (booking.valueOrNull) {
+      final loaded? => BookingPresentation.dealerName(l10n, loaded),
+      null => '',
+    };
 
     return Scaffold(
       appBar: AppBar(

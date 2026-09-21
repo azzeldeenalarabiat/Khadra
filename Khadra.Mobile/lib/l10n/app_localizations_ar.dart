@@ -24,6 +24,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get actionClose => 'إغلاق';
 
   @override
+  String vehiclePhotoPosition(String index, String count) {
+    return '$index / $count';
+  }
+
+  @override
   String get actionSave => 'حفظ';
 
   @override
@@ -296,7 +301,31 @@ class AppLocalizationsAr extends AppLocalizations {
   String get navNotifications => 'التنبيهات';
 
   @override
+  String get navSaved => 'المحفوظة';
+
+  @override
   String get navProfile => 'حسابي';
+
+  @override
+  String homeGreetingMorning(String name) {
+    return 'صباح الخير، $name';
+  }
+
+  @override
+  String homeGreetingAfternoon(String name) {
+    return 'مساء الخير، $name';
+  }
+
+  @override
+  String homeGreetingEvening(String name) {
+    return 'مساء الخير، $name';
+  }
+
+  @override
+  String get homeGreetingPrompt => 'وين حاب تستلم سيارتك؟';
+
+  @override
+  String get backAgainToExit => 'اضغط مرة أخرى للخروج';
 
   @override
   String get searchTitle => 'ابحث عن سيارة';
@@ -918,6 +947,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingGallery => 'مكتب التأجير';
 
   @override
+  String get bookingDealerRemoved => 'مكتب لم يعد على خضرا';
+
+  @override
   String get bookingCar => 'السيارة';
 
   @override
@@ -925,6 +957,85 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookingHistory => 'ما جرى';
+
+  @override
+  String get bookingProgress => 'مسار الحجز';
+
+  @override
+  String bookingActivityBy(String party) {
+    return 'بواسطة $party';
+  }
+
+  @override
+  String get bookingPaymentSummary => 'الدفع';
+
+  @override
+  String get bookingPickupReturn => 'الاستلام والإرجاع';
+
+  @override
+  String get bookingActions => 'ما يمكنك فعله';
+
+  @override
+  String get bookingStageRequested => 'تم إرسال الطلب';
+
+  @override
+  String get bookingStageApproved => 'وافق المكتب';
+
+  @override
+  String get bookingStageConfirmed => 'دُفع العربون';
+
+  @override
+  String get bookingStagePickedUp => 'استُلمت السيارة';
+
+  @override
+  String get bookingStageReturned => 'أُعيدت السيارة';
+
+  @override
+  String get bookingStageCompleted => 'انتهى الحجز';
+
+  @override
+  String get bookingStageRejected => 'رفض المكتب الطلب';
+
+  @override
+  String get bookingStageCancelled => 'أُلغي الحجز';
+
+  @override
+  String get bookingStageNoShow => 'لم تُستلم السيارة';
+
+  @override
+  String get bookingStageExpired => 'انتهت المهلة';
+
+  @override
+  String get bookingStageWaitingSettlement => 'بعد انتهاء مهلة التسوية';
+
+  @override
+  String get bookingStageWaitingDispute => 'بعد تسوية النزاع';
+
+  @override
+  String get bookingLapsedDecisionTitle => 'لم يردّ المكتب في الوقت المحدد';
+
+  @override
+  String get bookingLapsedDecisionBody =>
+      'عادت السيارة إلى العرض وهذا الحجز في طريقه إلى الإغلاق. لا شيء مستحق عليك.';
+
+  @override
+  String get bookingLapsedPaymentTitle => 'انتهت مهلة دفع العربون';
+
+  @override
+  String get bookingLapsedPaymentBody =>
+      'هذا الحجز في طريقه إلى الإغلاق وعادت السيارة إلى العرض. لا شيء مستحق عليك.';
+
+  @override
+  String get bookingDepositPaidNote => 'مدفوع';
+
+  @override
+  String get bookingRentalCost => 'تكلفة الإيجار';
+
+  @override
+  String get bookingHowItIsPaid => 'طريقة الدفع';
+
+  @override
+  String get bookingBalanceIncludesDelivery => 'يشمل رسوم التوصيل.';
 
   @override
   String get bookingHandoversTitle => 'الاستلام والإرجاع';
@@ -992,6 +1103,9 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get bookingCancelledByYou => 'أُلغي من قِبلك';
+
+  @override
   String get bookingNoShowTitle => 'لم تُستلم السيارة';
 
   @override
@@ -1003,8 +1117,18 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String bookingPenaltyAssessedOnYou(String amount) {
+    return 'قُدِّر مبلغ $amount عليك.';
+  }
+
+  @override
   String bookingPenaltyRange(String min, String max, String party) {
     return 'قُدِّر مبلغ بين $min و$max على $party.';
+  }
+
+  @override
+  String bookingPenaltyRangeOnYou(String min, String max) {
+    return 'قُدِّر مبلغ بين $min و$max عليك.';
   }
 
   @override
@@ -1454,7 +1578,10 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get profileSessionRevoke => 'تسجيل الخروج';
+  String get profileSessionRevoke => 'تسجيل الخروج من هذا الجهاز';
+
+  @override
+  String get profileSessionUnknownDevice => 'جهاز غير معروف';
 
   @override
   String get profileSessionRevoked => 'تم تسجيل خروج ذلك الجهاز.';
@@ -1957,6 +2084,9 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get shortlistEmptyBody =>
       'اضغط على القلب في أي سيارة لتبقى هنا بينما تقارن.';
+
+  @override
+  String get shortlistSignedOutTitle => 'سجّل الدخول لعرض سياراتك المحفوظة';
 
   @override
   String get shortlistUnavailable => 'غير متاحة حاليًا';

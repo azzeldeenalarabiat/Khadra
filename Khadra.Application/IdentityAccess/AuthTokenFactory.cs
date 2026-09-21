@@ -66,9 +66,15 @@ public sealed class AuthTokenFactory(
         return Build(user, raw.Value, replacement, now);
     }
 
+    /// <remarks>
+    /// The access token carries the refresh token's FAMILY id. Both paths above land here — a new
+    /// family at sign-in and a replacement on every rotation — and the replacement inherits the
+    /// family, so the claim is stable for the life of the session and there is nothing extra for the
+    /// refresh path to do.
+    /// </remarks>
     private AuthTokensDto Build(User user, string rawRefreshToken, RefreshToken refreshToken, DateTimeOffset now)
     {
-        var access = accessTokens.Issue(user, now);
+        var access = accessTokens.Issue(user, refreshToken.FamilyId, now);
         return new AuthTokensDto(
             access.Token,
             access.ExpiresAt,

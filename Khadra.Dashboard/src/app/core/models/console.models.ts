@@ -172,11 +172,20 @@ export interface ModalField {
   /**
    * `text` is a textarea — these are reasons and notes, which run to sentences.
    *
+   * `line` is a single-line input, and exists because an identifier is not a sentence. An email
+   * address and a phone number were being typed into the textarea, where Return inserts a newline
+   * instead of submitting — and an address with a trailing newline is refused by the API's model
+   * validation before the domain gets to trim it, which the console then reported as an
+   * unexplained refusal. A single-line input cannot hold one.
+   *
    * `password` is a single-line masked input, and has to be its own type rather than a `text` one:
    * the textarea would put the password on screen in clear, next to whoever is standing behind the
    * person typing it.
    */
-  readonly type: 'select' | 'text' | 'password';
+  readonly type: 'select' | 'text' | 'line' | 'password';
+  /** For a `line` field: the on-screen keyboard to ask for, and what the browser may autofill. */
+  readonly inputMode?: 'text' | 'email' | 'tel';
+  readonly autocomplete?: string;
   /**
    * Choices for a `select`. Value and label are separate for the same reason `name` exists: the
    * rejection dialog used to map the chosen LABEL back to a reason code by string comparison, so an

@@ -90,10 +90,40 @@ class _SessionCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      _describe(session.userAgent),
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _describe(session.userAgent, l10n),
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Which row is the phone being held. The server answers it — see
+                        // SessionSummary.isCurrent — and an unmarked list is the honest
+                        // state of a build that cannot say, not a reason to guess.
+                        if (session.isCurrent) ...[
+                          const SizedBox(width: Space.sm),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: Space.sm, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: KhadraColors.accent.withValues(alpha: 0.12),
+                              borderRadius: Radii.pill,
+                            ),
+                            child: Text(
+                              l10n.profileSessionThis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: KhadraColors.accent,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -155,30 +185,56 @@ class _SessionCard extends ConsumerWidget {
     }
   }
 
+  /// The app's own stamp: `Khadra (Android 16)`. What is in the brackets is the
+  /// operating system and its version, which is the part worth reading.
+  static final RegExp _ourStamp = RegExp(r'^Khadra \((.+)\)$');
+
+  /// `ios` as a WORD. As a bare substring it also matches `axios/1.x`, which is
+  /// a script somebody ran and not an iPhone.
+  static final RegExp _iosToken = RegExp(r'(?<![a-z])ios(?![a-z])');
+
   /// A readable device name from a user agent string.
   ///
   /// Coarse on purpose: the point is "was that me?", and a full UA string is
   /// unreadable on a phone.
-  static String _describe(String? userAgent) {
-    if (userAgent == null || userAgent.isEmpty) return '—';
-    final agent = userAgent.toLowerCase();
-    if (agent.contains('android')) return 'Android';
-    if (agent.contains('iphone') || agent.contains('ios')) return 'iPhone';
+  ///
+  /// It used to answer "Khadra" for anything sent by this app, because the app
+  /// set no `User-Agent` and the HTTP client's default — `Dart/3.x (dart:io)` —
+  /// was matched on the word "dart". A customer opening Registered Devices read
+  /// the app's own name where the device should be, on every row, which says
+  /// nothing about which phone it is and reads as though Khadra were a device.
+  /// The app now stamps the operating system; a session from a build that did
+  /// not is named as what it is, which is unrecognised.
+  static String _describe(String? userAgent, AppLocalizations l10n) {
+    final raw = userAgent?.trim() ?? '';
+    if (raw.isEmpty) return l10n.profileSessionUnknownDevice;
+
+    final ours = _ourStamp.firstMatch(raw);
+    if (ours != null) return ours.group(1)!.trim();
+
+    final agent = raw.toLowerCase();
     if (agent.contains('ipad')) return 'iPad';
-    if (agent.contains('dart') || agent.contains('okhttp')) return 'Khadra';
+    if (agent.contains('iphone') || _iosToken.hasMatch(agent)) return 'iPhone';
+    if (agent.contains('android')) return 'Android';
     if (agent.contains('windows')) return 'Windows';
     if (agent.contains('mac')) return 'Mac';
-    return userAgent.length > 40 ? '${userAgent.substring(0, 40)}…' : userAgent;
+    if (agent.contains('linux')) return 'Linux';
+    if (agent.contains('dart') || agent.contains('okhttp')) {
+      return l10n.profileSessionUnknownDevice;
+    }
+    return raw.length > 40 ? '${raw.substring(0, 40)}…' : raw;
   }
 
   static IconData _icon(String? userAgent) {
     final agent = (userAgent ?? '').toLowerCase();
+    if (agent.contains('ipad')) return Icons.tablet_outlined;
     if (agent.contains('android') ||
         agent.contains('iphone') ||
-        agent.contains('dart')) {
+        _iosToken.hasMatch(agent) ||
+        agent.contains('dart') ||
+        agent.contains('okhttp')) {
       return Icons.smartphone_outlined;
     }
-    if (agent.contains('ipad')) return Icons.tablet_outlined;
     return Icons.computer_outlined;
   }
 }

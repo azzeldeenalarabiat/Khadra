@@ -3,6 +3,15 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../theme/khadra_theme.dart';
 
+/// Anything that names a dealership and knows whether it is still one.
+///
+/// Both `Booking` and `BookingListItem` carry the pair, and both are read by
+/// screens that must not print the server's English stand-in.
+abstract interface class HasDealerLabel {
+  String get dealerName;
+  bool get dealerRemoved;
+}
+
 /// How a booking status reads and looks.
 ///
 /// Kept in one place because four screens render the same status and they must
@@ -13,6 +22,18 @@ import '../theme/khadra_theme.dart';
 /// status added to the platform tomorrow should show as itself on an old build,
 /// not vanish.
 abstract final class BookingPresentation {
+  /// The office's name, or THIS APP's words for an office that is gone.
+  ///
+  /// `dealerName` is a string the server always fills, and when the dealership
+  /// no longer resolves it fills it with an English stand-in — deliberately, so
+  /// that a shipped client which prints it raw shows something rather than
+  /// nothing. `dealerRemoved` is the flag that says which it is, and a client
+  /// that reads the flag is expected to word the case itself. This app reads it:
+  /// an Arabic screen said "Dealer no longer on the platform" in Latin script in
+  /// the middle of a sentence about a customer's own booking.
+  static String dealerName(AppLocalizations l10n, HasDealerLabel booking) =>
+      booking.dealerRemoved ? l10n.bookingDealerRemoved : booking.dealerName;
+
   static String label(AppLocalizations l10n, String status) => switch (status) {
         'Requested' => l10n.statusRequested,
         'Approved' => l10n.statusApproved,

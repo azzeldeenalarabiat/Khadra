@@ -57,6 +57,21 @@ public static class FleetErrors
     public static readonly Error ImageRequiredToPublish =
         Error.Validation("vehicle.image_required", "A vehicle needs at least one photo before it can be published.");
 
+    /// <summary>
+    /// The same rule as <see cref="ImageRequiredToPublish"/>, read from the other end.
+    /// </summary>
+    /// <remarks>
+    /// Publishing refuses a listing with no photograph, so a published listing has one; removing the
+    /// last one would leave a live listing on the catalogue with an empty frame where the car should
+    /// be. The dealer hides the listing first, or adds the replacement before taking the old one off.
+    /// Not an automatic hide: a status change nobody asked for, triggered by deleting a photo, is
+    /// harder to understand than being told no.
+    /// </remarks>
+    public static readonly Error LastImageOfPublishedVehicle =
+        Error.Conflict(
+            "vehicle.last_image",
+            "A published listing must keep at least one photo. Hide the listing or add another photo first.");
+
     public static readonly Error CurrencyMismatch =
         Error.Validation("vehicle.currency_mismatch", "The daily rate and the security deposit must use the same currency.");
 

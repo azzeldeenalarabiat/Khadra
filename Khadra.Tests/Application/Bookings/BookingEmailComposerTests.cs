@@ -58,6 +58,7 @@ public sealed class BookingEmailComposerTests
             new VehicleLabel(Guid.NewGuid(), "Kia", "Sportage", 2024, "White", "12-34567", null),
             "Rami Haddad Rentals",
             false,
+            null,
             "Nour Al-Masri",
             false,
             null,

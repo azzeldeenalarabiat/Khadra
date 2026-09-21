@@ -29,5 +29,8 @@ internal sealed class HttpCurrentActor(IHttpContextAccessor httpContextAccessor)
     public Guid? SecurityStamp =>
         Guid.TryParse(Context?.User.FindFirst(KhadraClaimTypes.SecurityStamp)?.Value, out var stamp) ? stamp : null;
 
+    public Guid? SessionId =>
+        Guid.TryParse(Context?.User.FindFirst(KhadraClaimTypes.SessionId)?.Value, out var session) ? session : null;
+
     public string CorrelationId => Context?.TraceIdentifier ?? "n/a";
 }

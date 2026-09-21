@@ -64,16 +64,21 @@ export class AdminUsersComponent {
 
   protected tone(admin: AdminUserListItem): Tone {
     if (admin.status === 'Suspended') return 'bad';
-    return admin.isEmailVerified ? 'ok' : 'warn';
+    return admin.invitationPending ? 'warn' : 'ok';
   }
 
   /**
-   * "Invited" is not a stored status: it is an active account whose address has never been proved,
-   * which is exactly what an unaccepted invitation looks like.
+   * "Invited" is not a stored status: it is an account on which nobody has chosen a password, which
+   * is exactly what an unaccepted invitation looks like.
+   *
+   * It reads `invitationPending`, NOT `isEmailVerified`, and the two differ on one real person:
+   * somebody invited who proved their address through resend-verification and still holds no
+   * password. Keying the label on verification showed them as Active, in green, beside a Resend
+   * button — one row saying two different things about the same account.
    */
   protected statusLabel(admin: AdminUserListItem): string {
     if (admin.status === 'Suspended') return this.t('status.deactivated');
-    return admin.isEmailVerified ? this.t('status.active') : this.t('status.invited');
+    return admin.invitationPending ? this.t('status.invited') : this.t('status.active');
   }
 
   protected invite(): void {
@@ -88,22 +93,30 @@ export class AdminUsersComponent {
           // `name` is the key each typed value is stored under and read back by below: a machine
           // name, never a translation, or an Arabic screen sends an empty email and phone. The two
           // placeholders are format hints, the same in both languages.
+          //
+          // `line`, not `text`. A `text` field is a textarea — right for a reason or a note, wrong
+          // for a name, an address and a number, where Return inserts a newline instead of
+          // submitting and an address carrying one is refused by the API's model validation before
+          // the domain ever gets to trim it.
           {
             name: 'fullName',
             label: this.t('adminUsers.fullName'),
-            type: 'text',
+            type: 'line',
             placeholder: this.t('adminUsers.eGYousefBarakat'),
+            autocomplete: 'name',
           },
           {
             name: 'email',
             label: this.t('dealerSettings.email'),
-            type: 'text',
+            type: 'line',
+            inputMode: 'email',
             placeholder: 'name@khadra.jo',
           },
           {
             name: 'phone',
             label: this.t('customerProfile.phone'),
-            type: 'text',
+            type: 'line',
+            inputMode: 'tel',
             placeholder: '07XXXXXXXX',
           },
         ],
@@ -118,13 +131,58 @@ export class AdminUsersComponent {
         );
         this.service.refresh();
         // The expiry is the token's, not a literal: the lifetime is configuration.
-        this.ui.showToast(
-          this.t('adminUsers.invitationSent'),
-          this.t('adminUsers.canAcceptUntil', {
-            email: invited.email,
-            date: this.formats.dateTime(invited.expiresAt),
+        //
+        // And what is reported is what HAPPENED. The account exists either way — it is committed
+        // before the email is attempted, deliberately — but "Invitation sent" over a relay that
+        // refused the message sends the inviting administrator away satisfied while the person they
+        // invited waits at an inbox nothing was posted to, and nobody else can tell.
+        return invited.invitationEmailSent
+          ? {
+              title: this.t('adminUsers.invitationSent'),
+              body: this.t('adminUsers.canAcceptUntil', {
+                email: invited.email,
+                date: this.formats.dateTime(invited.expiresAt),
+              }),
+            }
+          : {
+              title: this.t('adminUsers.invitationNotEmailed'),
+              body: this.t('adminUsers.accountCreatedEmailFailed', { email: invited.email }),
+              tone: 'warn' as const,
+            };
+      },
+      { title: this.t('adminUsers.invitationSent'), body: '' },
+    );
+  }
+
+  /**
+   * Send the invitation again.
+   *
+   * Through the same dialog as every other action that changes something, because it does: the
+   * previous link stops working the moment this one is issued, and an administrator should be told
+   * that before they do it rather than discover it when somebody reports a dead link.
+   */
+  protected resend(admin: AdminUserListItem): void {
+    this.ui.openAction(
+      {
+        // 'do it again', which is what Resend is. The set has no envelope.
+        icon: 'arrow-counter-clockwise',
+        tone: 'accent',
+        title: this.t('adminUsers.resendNameQuestion', { name: admin.fullName }),
+        body: this.t('adminUsers.resendBody', { email: admin.email }),
+        note: this.t('adminUsers.resendNote'),
+        confirm: this.t('adminUsers.resendInvitation'),
+        result: { title: this.t('adminUsers.invitationSent'), body: '', tone: 'ok' },
+      },
+      async () => {
+        const sent = await this.service.resendInvitation(admin.userId);
+        this.service.refresh();
+        return {
+          title: this.t('adminUsers.invitationSent'),
+          body: this.t('adminUsers.canAcceptUntil', {
+            email: sent.email,
+            date: this.formats.dateTime(sent.expiresAt),
           }),
-        );
+        };
       },
       { title: this.t('adminUsers.invitationSent'), body: '' },
     );
@@ -155,7 +213,10 @@ export class AdminUsersComponent {
         await this.service.deactivate(admin.userId, values['reason'] ?? '');
         this.service.refresh();
       },
-      { title: this.t('adminUsers.administratorDeactivated'), body: this.t('adminUsers.theirSessionsEndedImmediately') },
+      {
+        title: this.t('adminUsers.administratorDeactivated'),
+        body: this.t('adminUsers.theirSessionsEndedImmediately'),
+      },
     );
   }
 

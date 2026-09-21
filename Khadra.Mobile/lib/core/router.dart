@@ -38,6 +38,14 @@ abstract final class Routes {
   static const search = '/search';
   static const bookings = '/bookings';
   static const notifications = '/notifications';
+
+  /// The cars a customer has saved, as a tab of its own: the bar's shortcut.
+  ///
+  /// The SECOND way in, not the only one. [shortlist] below is the entry that has
+  /// always been in My Account and stays exactly where it was, behaving exactly
+  /// as it did — the owner asked for the tab to be additional, and a shortcut
+  /// that swallows the thing it is a shortcut to is not one.
+  static const saved = '/saved';
   static const profile = '/profile';
 
   static const signIn = '/sign-in';
@@ -51,6 +59,14 @@ abstract final class Routes {
   static const changePassword = '/profile/password';
   static const sessions = '/profile/sessions';
   static const reputation = '/profile/reputation';
+
+  /// Saved cars opened from My Account, which is where that entry has always
+  /// been and where it stays.
+  ///
+  /// A pushed screen with a back arrow to Profile, and guarded like every other
+  /// account route — unchanged by the bar gaining a shortcut to the same list.
+  /// One screen, two ways in, and they are genuinely different ways: this one is
+  /// a step taken inside an account and returns to where it was taken from.
   static const shortlist = '/profile/saved';
 
   static String vehicle(String id) => '/vehicle/$id';
@@ -88,11 +104,18 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Which routes act on an ACCOUNT, as opposed to merely showing one.
       //
-      // The four TABS are deliberately absent. Bookings, Alerts and Profile all
-      // render their own signed-out state with a way in, which is gentler than
-      // being thrown into a form — and the Profile tab is where the LANGUAGE
-      // switch lives, so gating it would leave an Arabic speaker who has not
-      // signed in with no way to change the app out of English.
+      // The five TABS are deliberately absent. Bookings, Alerts, Saved and
+      // Profile all render their own signed-out state with a way in, which is
+      // gentler than being thrown into a form — and the Profile tab is where the
+      // LANGUAGE switch lives, so gating it would leave an Arabic speaker who has
+      // not signed in with no way to change the app out of English.
+      //
+      // Saved cars is in BOTH shapes and only one of them is here. The TAB
+      // (`Routes.saved`) is absent, like the other four: being thrown into a
+      // sign-in form by the bottom bar is exactly what the 2026-09-12 decision
+      // ruled out, and the tab shows the shared panel instead. The entry inside
+      // My Account (`Routes.shortlist`) keeps its guard, because it is only ever
+      // reached from inside an account and has always behaved that way.
       //
       // Browsing needs no account either: a tourist comparing prices before flying
       // to Jordan has no reason to create one first.
@@ -214,7 +237,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // The four tabs, sharing one shell so the bar does not rebuild between them.
+      // The five tabs, sharing one shell so the bar does not rebuild between them.
+      // The ORDER here is the order in the bar, and `AppShell` refreshes the
+      // unread badge by index, so the two are read together.
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => AppShell(shell: shell),
         branches: [
@@ -228,6 +253,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(
               path: Routes.notifications,
               builder: (_, __) => const NotificationsScreen(),
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: Routes.saved,
+              builder: (_, __) => const ShortlistScreen(asTab: true),
             ),
           ]),
           StatefulShellBranch(routes: [
@@ -294,6 +325,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.reputation,
         builder: (_, __) => const ReputationScreen(),
       ),
+      // The My Account entry, unchanged: a pushed screen with a back arrow to
+      // Profile. The bar's `Routes.saved` renders the SAME screen in its tab
+      // form; the difference is the chrome and the way out, which is the whole
+      // difference between a shortcut and the place it points at.
       GoRoute(
         path: Routes.shortlist,
         builder: (_, __) => const ShortlistScreen(),

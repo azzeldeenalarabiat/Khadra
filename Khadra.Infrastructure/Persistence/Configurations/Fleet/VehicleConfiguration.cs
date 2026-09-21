@@ -68,10 +68,20 @@ internal sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         entity.Property(vehicle => vehicle.CreatedAt).IsRequired();
         entity.Property(vehicle => vehicle.IsDeleted).IsRequired();
 
+        // A photograph belongs to this car and to nothing else: taking it out of the collection IS
+        // deleting it, and ClientCascade is how that is said. The DATABASE constraint is unchanged --
+        // ClientCascade and Restrict both emit ON DELETE RESTRICT -- so no cascade can ever reach
+        // these rows from the database side. Only EF's behaviour changes: it deletes the orphan
+        // instead of trying to null a foreign key that cannot be null.
+        //
+        // It was Restrict, and that is not the stricter setting, it is an impossible one. Severing a
+        // required association left EF with nowhere to put the child, so it threw
+        // "The association between entity types 'Vehicle' and 'VehicleImage' has been severed" and
+        // every dealer who pressed Remove on a photo got a 500, on a button the console offers.
         entity.HasMany(vehicle => vehicle.Images)
             .WithOne()
             .HasForeignKey(image => image.VehicleId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.ClientCascade);
         entity.Metadata.FindNavigation(nameof(Vehicle.Images))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 

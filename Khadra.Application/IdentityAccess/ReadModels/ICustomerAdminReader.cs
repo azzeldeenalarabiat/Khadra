@@ -99,7 +99,18 @@ public sealed record AdminUserListItem(
     DateTimeOffset CreatedAt,
     string? SuspensionReason,
     /// <summary>How many entries in the append-only trail are attributed to them.</summary>
-    int AuditedActions);
+    int AuditedActions,
+    /// <summary>
+    /// Whether the invitation is still open: nobody has chosen a password on this account.
+    /// </summary>
+    /// <remarks>
+    /// NOT the negation of <c>IsEmailVerified</c>, which is the near miss. Resend-verification
+    /// gates on the address rather than the role, so an invited administrator can prove their
+    /// mailbox and still hold no password — verified, and unable to sign in, and in need of the
+    /// very link a check on verification would refuse them. <c>AcceptInvitation</c> and
+    /// <c>ResendAdminInvitation</c> both read the password instead, and so does this.
+    /// </remarks>
+    bool InvitationPending = false);
 
 public interface IAdminUserReader
 {
@@ -114,6 +125,20 @@ public interface IAdminUserReader
 /// sign-in and every refresh replaces it inside the same family. Listing rows would show the same
 /// device a dozen times, once per refresh.
 /// </remarks>
+/// <param name="IsCurrent">
+/// Whether this is the session asking. The SERVER decides it, from the family id in the caller's
+/// own access token, because no client can.
+/// </param>
+/// <remarks>
+/// A browser never holds a token at all (the BFF keeps it), and the customer app's standing rule is
+/// that nothing is read out of the JWT. Guessing was worse: the obvious heuristic — the newest
+/// active row — is wrong on this data, because <c>LastUsedAt</c> is the last REFRESH, so whichever
+/// device rotated most recently wins, and a second phone signed in five minutes ago would be marked
+/// as the one in your hand.
+///
+/// False for a token minted before the claim existed, which lasts at most one access token. A
+/// client must therefore mark a row only when this is true, and infer nothing from its absence.
+/// </remarks>
 public sealed record SessionSummary(
     Guid FamilyId,
     DateTimeOffset SignedInAt,
@@ -121,7 +146,8 @@ public sealed record SessionSummary(
     DateTimeOffset ExpiresAt,
     string? CreatedByIp,
     string? UserAgent,
-    bool IsActive);
+    bool IsActive,
+    bool IsCurrent = false);
 
 public interface ISessionReader
 {

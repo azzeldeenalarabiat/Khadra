@@ -19,6 +19,14 @@ public static class KhadraClaimTypes
     public const string EmailVerified = "email_verified";
     public const string SecurityStamp = "khadra:security_stamp";
     public const string MustChangePassword = "khadra:must_change_password";
+
+    /// <summary>The refresh-token family this access token was minted for: one sign-in, one device.</summary>
+    /// <remarks>
+    /// The registered <c>sid</c> name rather than a <c>khadra:</c> one, because that is what it is.
+    /// Tokens minted before this claim existed simply do not carry it, and nothing may refuse a
+    /// request for that: it is worth at most fifteen minutes of "this device" not being marked.
+    /// </remarks>
+    public const string SessionId = "sid";
 }
 
 internal sealed class JwtAccessTokenIssuer(IOptions<JwtOptions> options) : IAccessTokenIssuer
@@ -26,7 +34,7 @@ internal sealed class JwtAccessTokenIssuer(IOptions<JwtOptions> options) : IAcce
     private readonly JwtOptions _options = options.Value;
     private readonly JsonWebTokenHandler _handler = new() { SetDefaultTimesOnTokenCreation = false };
 
-    public IssuedAccessToken Issue(User user, DateTimeOffset now)
+    public IssuedAccessToken Issue(User user, Guid sessionId, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(user);
 
@@ -40,6 +48,7 @@ internal sealed class JwtAccessTokenIssuer(IOptions<JwtOptions> options) : IAcce
             [KhadraClaimTypes.EmailVerified] = user.IsEmailVerified,
             [KhadraClaimTypes.SecurityStamp] = user.SecurityStamp.ToString("N"),
             [KhadraClaimTypes.MustChangePassword] = user.MustChangePassword,
+            [KhadraClaimTypes.SessionId] = sessionId.ToString("N"),
             [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString("N")
         };
 

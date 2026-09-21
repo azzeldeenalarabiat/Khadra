@@ -311,7 +311,8 @@ class _BookingRow extends StatelessWidget {
                           child: Text(
                             // The car can be null: a booking is a financial record
                             // that outlives the listing behind it.
-                            booking.vehicle?.title ?? booking.dealerName,
+                            booking.vehicle?.title ??
+                                BookingPresentation.dealerName(l10n, booking),
                             style: const TextStyle(
                                 fontSize: 14, fontWeight: FontWeight.w800),
                             maxLines: 1,
@@ -327,7 +328,7 @@ class _BookingRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      booking.dealerName,
+                      BookingPresentation.dealerName(l10n, booking),
                       style: const TextStyle(
                         color: KhadraColors.neutral600,
                         fontSize: 11,

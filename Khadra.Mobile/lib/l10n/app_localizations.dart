@@ -128,6 +128,12 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get actionClose;
 
+  /// Where the customer is in a car's photographs. Digits are Latin in both languages and the run is isolated, so it is not reordered inside Arabic.
+  ///
+  /// In en, this message translates to:
+  /// **'{index} / {count}'**
+  String vehiclePhotoPosition(String index, String count);
+
   /// No description provided for @actionSave.
   ///
   /// In en, this message translates to:
@@ -596,11 +602,47 @@ abstract class AppLocalizations {
   /// **'Alerts'**
   String get navNotifications;
 
+  /// No description provided for @navSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get navSaved;
+
   /// No description provided for @navProfile.
   ///
   /// In en, this message translates to:
   /// **'Profile'**
   String get navProfile;
+
+  /// No description provided for @homeGreetingMorning.
+  ///
+  /// In en, this message translates to:
+  /// **'Good morning, {name}'**
+  String homeGreetingMorning(String name);
+
+  /// No description provided for @homeGreetingAfternoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Good afternoon, {name}'**
+  String homeGreetingAfternoon(String name);
+
+  /// No description provided for @homeGreetingEvening.
+  ///
+  /// In en, this message translates to:
+  /// **'Good evening, {name}'**
+  String homeGreetingEvening(String name);
+
+  /// No description provided for @homeGreetingPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Where would you like to pick up your car?'**
+  String get homeGreetingPrompt;
+
+  /// No description provided for @backAgainToExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Press back again to exit'**
+  String get backAgainToExit;
 
   /// No description provided for @searchTitle.
   ///
@@ -1508,6 +1550,12 @@ abstract class AppLocalizations {
   /// **'Rental office'**
   String get bookingGallery;
 
+  /// No description provided for @bookingDealerRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Office no longer on Khadra'**
+  String get bookingDealerRemoved;
+
   /// No description provided for @bookingCar.
   ///
   /// In en, this message translates to:
@@ -1525,6 +1573,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'What has happened'**
   String get bookingHistory;
+
+  /// No description provided for @bookingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get bookingProgress;
+
+  /// No description provided for @bookingActivityBy.
+  ///
+  /// In en, this message translates to:
+  /// **'by {party}'**
+  String bookingActivityBy(String party);
+
+  /// No description provided for @bookingPaymentSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get bookingPaymentSummary;
+
+  /// No description provided for @bookingPickupReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Collection and return'**
+  String get bookingPickupReturn;
+
+  /// No description provided for @bookingActions.
+  ///
+  /// In en, this message translates to:
+  /// **'What you can do'**
+  String get bookingActions;
+
+  /// No description provided for @bookingStageRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested'**
+  String get bookingStageRequested;
+
+  /// No description provided for @bookingStageApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved by the office'**
+  String get bookingStageApproved;
+
+  /// No description provided for @bookingStageConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit paid'**
+  String get bookingStageConfirmed;
+
+  /// No description provided for @bookingStagePickedUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected'**
+  String get bookingStagePickedUp;
+
+  /// No description provided for @bookingStageReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'Returned'**
+  String get bookingStageReturned;
+
+  /// No description provided for @bookingStageCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get bookingStageCompleted;
+
+  /// No description provided for @bookingStageRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Declined by the office'**
+  String get bookingStageRejected;
+
+  /// No description provided for @bookingStageCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get bookingStageCancelled;
+
+  /// No description provided for @bookingStageNoShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not collected'**
+  String get bookingStageNoShow;
+
+  /// No description provided for @bookingStageExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Time ran out'**
+  String get bookingStageExpired;
+
+  /// No description provided for @bookingStageWaitingSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'After the settlement window'**
+  String get bookingStageWaitingSettlement;
+
+  /// No description provided for @bookingStageWaitingDispute.
+  ///
+  /// In en, this message translates to:
+  /// **'After the dispute is settled'**
+  String get bookingStageWaitingDispute;
+
+  /// No description provided for @bookingLapsedDecisionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The office did not answer in time'**
+  String get bookingLapsedDecisionTitle;
+
+  /// No description provided for @bookingLapsedDecisionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The car has gone back on the market and this booking is closing. Nothing is owed.'**
+  String get bookingLapsedDecisionBody;
+
+  /// No description provided for @bookingLapsedPaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The time to pay the deposit has passed'**
+  String get bookingLapsedPaymentTitle;
+
+  /// No description provided for @bookingLapsedPaymentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This booking is closing and the car has gone back on the market. Nothing is owed.'**
+  String get bookingLapsedPaymentBody;
+
+  /// No description provided for @bookingDepositPaidNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get bookingDepositPaidNote;
+
+  /// No description provided for @bookingRentalCost.
+  ///
+  /// In en, this message translates to:
+  /// **'What the rental costs'**
+  String get bookingRentalCost;
+
+  /// No description provided for @bookingHowItIsPaid.
+  ///
+  /// In en, this message translates to:
+  /// **'How it is paid'**
+  String get bookingHowItIsPaid;
+
+  /// No description provided for @bookingBalanceIncludesDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes the delivery fee.'**
+  String get bookingBalanceIncludesDelivery;
 
   /// No description provided for @bookingHandoversTitle.
   ///
@@ -1628,6 +1826,12 @@ abstract class AppLocalizations {
   /// **'Cancelled by {party}'**
   String bookingCancelledBy(String party);
 
+  /// No description provided for @bookingCancelledByYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled by you'**
+  String get bookingCancelledByYou;
+
   /// No description provided for @bookingNoShowTitle.
   ///
   /// In en, this message translates to:
@@ -1646,11 +1850,23 @@ abstract class AppLocalizations {
   /// **'An amount of {amount} has been assessed against {party}.'**
   String bookingPenaltyAssessed(String amount, String party);
 
+  /// No description provided for @bookingPenaltyAssessedOnYou.
+  ///
+  /// In en, this message translates to:
+  /// **'An amount of {amount} has been assessed against you.'**
+  String bookingPenaltyAssessedOnYou(String amount);
+
   /// No description provided for @bookingPenaltyRange.
   ///
   /// In en, this message translates to:
   /// **'Between {min} and {max} has been assessed against {party}.'**
   String bookingPenaltyRange(String min, String max, String party);
+
+  /// No description provided for @bookingPenaltyRangeOnYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Between {min} and {max} has been assessed against you.'**
+  String bookingPenaltyRangeOnYou(String min, String max);
 
   /// No description provided for @bookingPenaltyNotCharged.
   ///
@@ -2363,8 +2579,14 @@ abstract class AppLocalizations {
   /// No description provided for @profileSessionRevoke.
   ///
   /// In en, this message translates to:
-  /// **'Sign out'**
+  /// **'Sign out of this device'**
   String get profileSessionRevoke;
+
+  /// No description provided for @profileSessionUnknownDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Unrecognised device'**
+  String get profileSessionUnknownDevice;
 
   /// No description provided for @profileSessionRevoked.
   ///
@@ -3097,6 +3319,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap the heart on a car to keep it here while you compare.'**
   String get shortlistEmptyBody;
+
+  /// No description provided for @shortlistSignedOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to see your saved cars'**
+  String get shortlistSignedOutTitle;
 
   /// The owner's wording, settled 2026-09-11. CURRENTLY, because a gallery moving a car through Maintenance and back is routine and the entry is never removed for it. No reason is given: the catalogue answers hidden, in maintenance, suspended and deleted identically on purpose.
   ///

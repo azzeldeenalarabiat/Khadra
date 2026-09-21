@@ -66,7 +66,10 @@ internal sealed class AuthHandlerTestContext
         UserRepository, VerificationTokens, Hasher, OpaqueTokens, Policy,
         BusinessRules, Calendar, Clock, UnitOfWork, Emails);
 
-    public AuthTokenFactory TokenFactory => new(new StubAccessTokenIssuer(), OpaqueTokens, RefreshTokens, Policy);
+    /// <summary>What the access tokens were minted for, so a test can read the session claim back.</summary>
+    public StubAccessTokenIssuer AccessTokens { get; } = new();
+
+    public AuthTokenFactory TokenFactory => new(AccessTokens, OpaqueTokens, RefreshTokens, Policy);
 
     public AuthEmailDispatcher Emails => new(EmailComposer, EmailSender, NullLogger<AuthEmailDispatcher>.Instance);
 

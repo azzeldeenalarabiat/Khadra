@@ -102,6 +102,12 @@ public sealed record BookingDto(
     string DealerName,
     /// <summary>True exactly when the dealership no longer resolves: it is no longer on the platform.</summary>
     bool DealerRemoved,
+    /// <summary>The city the dealership operates from, by lookup id. Null when it has none.</summary>
+    /// <remarks>
+    /// An id, as every other read model on this platform sends a city; the client names it in its
+    /// own reader's language from <c>/api/v1/cities</c>.
+    /// </remarks>
+    Guid? DealerCityId,
     /// <summary>The customer's name, or an English stand-in when <see cref="CustomerAccountClosed"/> is true.</summary>
     string CustomerName,
     /// <summary>True exactly when the customer's account no longer resolves: it was closed.</summary>
@@ -159,6 +165,7 @@ public sealed record BookingDto(
             context.Vehicle,
             context.DealerName,
             context.DealerRemoved,
+            context.DealerCityId,
             context.CustomerName,
             context.CustomerAccountClosed,
             booking.Handovers.OrderBy(handover => handover.RecordedAt).Select(HandoverDto.From).ToList(),

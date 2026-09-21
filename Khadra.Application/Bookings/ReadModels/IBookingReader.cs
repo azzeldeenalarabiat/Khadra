@@ -49,6 +49,18 @@ public sealed record BookingContext(
     string DealerName,
     // True exactly when the dealership no longer resolves, so DealerName holds the stand-in.
     bool DealerRemoved,
+    /// <summary>The city the dealership operates from, by LOOKUP ID. Null when it has none.</summary>
+    /// <remarks>
+    /// An id, not a name, because that is the shape every read model on this platform already uses
+    /// for a city — the catalogue and the public gallery page both send one — and each client
+    /// resolves it against <c>/api/v1/cities</c> in its own reader's language. A name composed here
+    /// would be the first server-side join into PlatformSettings and a second way of naming one
+    /// thing.
+    ///
+    /// LIVE, like <c>DealerName</c>: an office that moves re-labels its old bookings. That is
+    /// correct — a city is not a term the booking froze, and nothing is priced or judged from it.
+    /// </remarks>
+    Guid? DealerCityId,
     // Kept as a string (an English stand-in when the account no longer resolves) only for older clients.
     string CustomerName,
     // True exactly when the customer's account no longer resolves, so CustomerName holds the stand-in.

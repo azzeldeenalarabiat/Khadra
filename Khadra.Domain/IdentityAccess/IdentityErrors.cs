@@ -103,6 +103,31 @@ public static class IdentityErrors
     // Nothing creates an administrator except another administrator — the one exception, the
     // configured bootstrap, fires only on a database that has NEVER held one — so an empty set here
     // is permanent, and the platform would be locked out of its own console.
+    // Resending an invitation to somebody who has already chosen a password would mint a working
+    // credential for an account that is in use. PasswordChangedAt, not IsEmailVerified, is what
+    // "accepted" means -- see AcceptInvitationHandler, which gates on the same field, and note that
+    // an invited administrator can prove their address through resend-verification while still
+    // holding no password. That person needs the button; only a real password closes it.
+    public static readonly Error InvitationAlreadyAccepted =
+        Error.Conflict(
+            "admin.invitation_accepted",
+            "That administrator has already set a password. There is nothing to resend.");
+
+    // A fresh link would verify the address and set a password on an account the platform has
+    // deactivated: AcceptInvitation does not check status, so the refusal belongs here.
+    public static readonly Error InvitationTargetInactive =
+        Error.Conflict(
+            "admin.invitation_target_inactive",
+            "That administrator account is deactivated. Reactivate it before resending the invitation.");
+
+    // The reissued token STANDS: the button can be pressed again once mail is working, which is the
+    // opposite of the bootstrapper, whose only retry is the next boot and which therefore retires
+    // the token it could not deliver.
+    public static readonly Error InvitationEmailNotSent =
+        Error.Unavailable(
+            "admin.invitation_email_not_sent",
+            "We could not send the invitation just now. The link is valid; try again in a few minutes.");
+
     public static readonly Error LastAdministrator =
         Error.Conflict(
             "admin.last_administrator",

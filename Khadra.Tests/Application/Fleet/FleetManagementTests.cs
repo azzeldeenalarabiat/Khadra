@@ -10,6 +10,7 @@ using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Tests.Support;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Khadra.Tests.Application.Fleet;
@@ -70,7 +71,8 @@ public sealed class FleetManagementTests
                 UnitOfWork);
 
         public VehicleImageHandlers Images() => new(
-            Vehicles, Dealers, new StubUploadTickets(), Storage, FakeDocumentPolicy.Default, Clock, UnitOfWork);
+            Vehicles, Dealers, new StubUploadTickets(), Storage, FakeDocumentPolicy.Default, Clock, UnitOfWork,
+            NullLogger<VehicleImageHandlers>.Instance);
     }
 
     private sealed class StubUploadTickets : Khadra.Application.Common.Ports.IUploadTicketService

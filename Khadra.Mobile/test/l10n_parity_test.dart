@@ -62,6 +62,10 @@ void main() {
       'profileLanguageArabic',
       'authPhoneHint',
       'documentsFileSummary',
+      // A position in a car's photographs: two numerals and a solidus, with the
+      // digits Latin in both languages. There is nothing in it to translate,
+      // and inventing a difference would only be a way to satisfy this test.
+      'vehiclePhotoPosition',
     };
 
     final untranslated = <String>[];

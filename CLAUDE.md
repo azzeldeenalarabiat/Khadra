@@ -40,7 +40,7 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 - Aggregates: private setters, static factories, behaviour methods returning `Result`/`UnitResult<Error>` (CSharpFunctionalExtensions) for expected failures; `DomainException` only for programming errors.
 - Status/type fields are smart enums (`Enumeration`), never plain C# `enum`. Email, phone, name, money, geo, date ranges are value objects.
 - Cross-context references by `Id` only. No navigation properties or EF relationships across contexts.
-- Soft delete via `ISoftDeletable`; `DeleteBehavior.Restrict` on every FK; never hard-delete.
+- Soft delete via `ISoftDeletable`; no FK cascades in the database ever (every constraint restricts); never hard-delete an aggregate. In the model that means `DeleteBehavior.Restrict` for references and `DeleteBehavior.ClientCascade` for a child collection the aggregate removes from, where EF deletes the orphan instead of throwing "the association … has been severed". See `.claude/rules/backend/architecture.md`.
 - Handlers return `Result<T, Error>` / `UnitResult<Error>`; `Error.Kind` maps to HTTP status in `ApiControllerBase.Failure`. Do not throw for business outcomes. Handlers call `IUnitOfWork.SaveChangesAsync` explicitly and never touch `HttpContext` (use `ClientInfo` / `ICurrentActor`).
 - Business numbers (commission %, deposit %, no-show hours, penalties, cancellation window, SLA, turnaround minutes, shortlist cap) come ONLY from `IBusinessRulesProvider` (configuration section `BusinessRules` today, admin-editable aggregate later). Never a constant.
 - **The delivery fee is NOT one of them.** It was, and the owner moved it (2026-09-06) onto the dealership that performs the delivery: it lives on `DeliverySettings` beside the radius, each gallery sets its own from `/dealer/delivery`, and there is no platform-wide figure any more. That matches where the money already went — `BookingPricing` leaves the fee out of the deposit base, so the platform takes no commission on it, and puts it in `BalanceDue` for the driver to collect in cash. A booking still freezes the fee it was made under, so a gallery raising its price never re-prices an existing booking.
@@ -129,8 +129,21 @@ and every one of those endpoints is refused server-side), while a redirect would
 the tab shell — the bottom bar disappears — and Profile is where the language switch
 lives, so gating it would strand an Arabic speaker who has not signed in. The hard
 redirect stays for routes that ACT on an account: documents, edit profile, change
-password, sessions, saved cars, `/book`, `/bookings/*`, `/disputes/*`. **And sign-out
+password, sessions, `/book`, `/bookings/*`, `/disputes/*`. **And sign-out
 returns to Get Started**, not to the catalogue.
+
+**Saved cars gained a TAB on 2026-09-20** (owner), so the bar is Home, Bookings,
+Alerts, Saved, Profile — five destinations, and `bottom_nav_test.dart` measures that
+they arrive whole at 375 and 360 in both languages. The tab is an ADDITION, settled
+again on 2026-09-21: the entry in My Account stays exactly where it was and behaves
+exactly as it did, pushing its own screen with a back arrow to Profile. So one screen,
+two ways in, and they differ where it matters — `/saved` is a tab, absent from the
+hard-redirect set, showing the shared `AccountRequired` panel to a guest the way the
+other four tabs do; `/profile/saved` is a step taken from inside an account and keeps
+its guard. `ShortlistScreen.asTab` is which. **Android Back on a tab** returns to Home
+from the other four, and on Home asks once before it will close the app (`AppShell`, a
+two-second window). Predictive back is off for the tabs as a consequence and untouched
+everywhere else.
 
 `khadra.session_owned` is what makes "must not restore a stale session" true rather
 than hoped for — see `docs/auth-and-sessions.md`. It replaces `khadra.install_marker`.

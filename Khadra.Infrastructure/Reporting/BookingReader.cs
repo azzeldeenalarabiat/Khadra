@@ -332,9 +332,14 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                             .Select(image => VehicleImageDto.PublicPath + "/" + image.StorageKey)
                             .FirstOrDefault()))
                     .FirstOrDefault(),
+                // ONE subquery, two columns. The dealership must be read exactly once, or the name
+                // and the "no longer resolves" flag could disagree; the city rides in the same
+                // SELECT rather than opening a second lookup for it.
                 context.Dealers
                     .Where(dealer => dealer.Id == booking.DealerId)
-                    .Select(dealer => dealer.BusinessName.Value)
+                    .Select(dealer => new DealerLabel(
+                        dealer.BusinessName.Value,
+                        dealer.CityId == null ? null : (Guid?)dealer.CityId.Value))
                     .FirstOrDefault(),
                 context.Users
                     .Where(user => user.Id == booking.CustomerId)
@@ -358,12 +363,13 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         // cannot happen (bookings are never deleted). Empty labels keep the contract total anyway, and
         // no flag is raised: nothing was looked up, so nothing failed to resolve.
         if (found is null)
-            return new BookingContext(null, string.Empty, DealerRemoved: false, string.Empty, CustomerAccountClosed: false, null, null);
+            return new BookingContext(null, string.Empty, DealerRemoved: false, null, string.Empty, CustomerAccountClosed: false, null, null);
 
         return new BookingContext(
             found.Vehicle,
-            found.DealerName ?? RemovedDealerName,
-            DealerRemoved: found.DealerName is null,
+            found.Dealer?.Name ?? RemovedDealerName,
+            DealerRemoved: found.Dealer is null,
+            found.Dealer?.CityId,
             found.CustomerName ?? ClosedCustomerName,
             CustomerAccountClosed: found.CustomerName is null,
             found.LiveDisputeId,
@@ -371,9 +377,12 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
     }
 
     /// <summary>A booking's context as it leaves the database: each party's name is null when it did not resolve.</summary>
+    /// <summary>The dealership as the query found it, or null when it no longer resolves.</summary>
+    private sealed record DealerLabel(string Name, Guid? CityId);
+
     private sealed record ContextRow(
         VehicleLabel? Vehicle,
-        string? DealerName,
+        DealerLabel? Dealer,
         string? CustomerName,
         Guid? LiveDisputeId,
         Guid? MyReviewId);

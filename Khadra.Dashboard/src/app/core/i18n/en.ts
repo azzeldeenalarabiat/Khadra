@@ -1379,6 +1379,7 @@ export const EN = {
   'activity.reviewHidden': 'hid review',
   'activity.reviewRestored': 'restored review',
   'activity.adminInvited': 'invited admin',
+  'activity.adminInvitationResent': 'resent the invitation to',
   'activity.adminDeactivated': 'deactivated admin',
   'activity.bookingCancelled': 'cancelled booking',
   'activity.bookingExpired': 'expired booking',
@@ -1662,6 +1663,14 @@ export const EN = {
   'adminUsers.eGYousefBarakat': 'e.g. Yousef Barakat',
   'adminUsers.sendInvitation': 'Send invitation',
   'adminUsers.invitationSent': 'Invitation sent',
+  'adminUsers.resendInvitation': 'Resend invitation',
+  'adminUsers.resendNameQuestion': 'Send {name} their invitation again?',
+  'adminUsers.resendBody': 'A new link goes to {email}, valid from now.',
+  'adminUsers.resendNote':
+    'Any earlier link for this account stops working immediately. If the message cannot be sent, nothing is reported as sent and you can try again.',
+  'adminUsers.invitationNotEmailed': 'The account was created — the email was not sent',
+  'adminUsers.accountCreatedEmailFailed':
+    'The account for {email} was created and its invitation is valid, but the mail service would not accept the message. Nothing reached them. Resend the invitation from the row below once mail is working; inviting the address again will be refused.',
   'adminUsers.theyAreSignedOut':
     'They are signed out everywhere and cannot administer the platform until reactivated. Everything they have already done stays on the record.',
   'adminUsers.reversibleTheAccountIs':
@@ -2154,6 +2163,34 @@ export const EN = {
   },
   'common.requestRefused': 'That was refused. Nothing has been changed.',
   'common.fieldRejected': 'Check this field.',
+
+  // What a refusal MEANS, worded here rather than left to the server's English. See
+  // `problemMessage` in core/i18n/problem.ts for the order these are chosen in. Each says what to
+  // do next, because an operator reading one is in the middle of trying to do something.
+  'problem.emailTaken':
+    'That email address already belongs to an account on Khadra. Use a different address.',
+  'problem.phoneTaken':
+    'That phone number already belongs to an account on Khadra. Use a different number.',
+  'problem.invalidEmail': 'That email address is not valid. Check it and send again.',
+  'problem.invalidPhone':
+    'That phone number is not valid. Use 07XXXXXXXX, or an international number beginning with +.',
+  'problem.invalidName': 'The full name must be between 2 and 150 characters.',
+  'problem.accountSuspended': 'That account is deactivated.',
+  'problem.invalidToken': 'That link is no longer valid. A new one has to be issued.',
+  'problem.invitationAccepted':
+    'That administrator has already set a password, so there is nothing to resend.',
+  'problem.invitationTargetInactive':
+    'That account is deactivated. Reactivate it before sending the invitation again.',
+  'problem.invitationEmailNotSent':
+    'The mail service would not take the message. The new link is valid — try again in a few minutes.',
+  'problem.signedOut': 'Your session has ended. Sign in again and retry.',
+  'problem.notPermitted': 'Your account is not allowed to do that.',
+  'problem.notFound': 'That record no longer exists. Reload the screen.',
+  'problem.conflict': 'That conflicts with the record as it stands now. Reload and check it.',
+  'problem.tooMany': 'Too many attempts. Wait a moment and try again.',
+  'problem.unavailable': 'The service could not complete that. Nothing has been changed.',
+  'problem.rejectedDetails': 'The details were rejected. Check them and send again.',
+  'problem.reference': 'reference {traceId}',
   'common.customerAccountClosed': 'Customer account closed',
   'common.dealerNoLongerOnPlatform': 'Dealer no longer on the platform',
   'common.accountClosed': 'Account closed',
@@ -2684,6 +2721,7 @@ export const EN = {
   'auditLog.actionReviewHidden': 'Review hidden',
   'auditLog.actionReviewRestored': 'Review restored',
   'auditLog.actionAdminInvited': 'Admin invited',
+  'auditLog.actionAdminInvitationResent': 'Admin invitation resent',
   'auditLog.actionAdminDeactivated': 'Admin deactivated',
   'auditLog.actionAdminReactivated': 'Admin reactivated',
   'auditLog.actionBookingCancelledByAdmin': 'Booking cancelled by admin',
