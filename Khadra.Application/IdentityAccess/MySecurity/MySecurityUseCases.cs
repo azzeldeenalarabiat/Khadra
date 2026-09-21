@@ -40,7 +40,18 @@ public sealed class GetMySessionsHandler(
             return IdentityErrors.UserNotFound;
 
         var list = await sessions.ListForUserAsync(userId, cancellationToken);
-        return new MySessionsView(list, tokens.AccessTokenMinutes);
+
+        // Which row is the caller's own, marked HERE rather than in the reader: the reader answers
+        // what is stored, and who is asking is not stored anywhere. `actor.SessionId` is the
+        // refresh-token family the access token in this request was minted for, so the match is
+        // exact — and null, for a token issued before that claim existed, marks nothing rather than
+        // guessing.
+        var current = actor.SessionId;
+        var marked = current is null
+            ? list
+            : list.Select(session => session with { IsCurrent = session.FamilyId == current }).ToList();
+
+        return new MySessionsView(marked, tokens.AccessTokenMinutes);
     }
 }
 

@@ -1,7 +1,10 @@
 using Khadra.Application.Common;
 using Khadra.Application.IdentityAccess.ChangePassword;
 using Khadra.Application.IdentityAccess.GetCurrentUser;
+using Khadra.Application.Common.Ports;
 using Khadra.Application.IdentityAccess.Logout;
+using Khadra.Application.IdentityAccess.MySecurity;
+using Khadra.Application.IdentityAccess.ReadModels;
 using Khadra.Application.IdentityAccess.RefreshTokens;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
@@ -100,6 +103,24 @@ public sealed class RefreshTokensHandlerTests
         Assert.Equal(current.FamilyId, replacement.FamilyId);
         Assert.Equal(context.OpaqueTokens.Hash(result.Value.RefreshToken), replacement.TokenHash);
         Assert.NotEqual(raw, result.Value.RefreshToken);
+    }
+
+    [Fact]
+    public async Task The_access_token_carries_the_family_it_belongs_to_across_a_rotation()
+    {
+        // The claim is what lets the server say which of somebody's devices is asking, on their own
+        // Registered Devices screen. A family survives every rotation, so the value has to survive
+        // one too — an id that changed on each refresh would mark a different row every quarter of
+        // an hour, which is worse than marking none.
+        var context = new AuthHandlerTestContext();
+        var user = context.KnownUser(Users.Customer());
+        var current = Stored(context, user, out var raw);
+        context.Clock.Advance(TimeSpan.FromHours(1));
+
+        var result = await Handler(context).Handle(new RefreshTokensCommand(raw, Client), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(current.FamilyId, Assert.Single(context.AccessTokens.IssuedFor));
     }
 
     /// <summary>
@@ -336,5 +357,70 @@ public sealed class GetCurrentUserHandlerTests
         Assert.Equal("Customer", found.Value.Role);
         Assert.True(found.Value.IsEmailVerified);
         Assert.Equal("auth.user_not_found", missing.Error.Code);
+    }
+}
+
+/// <summary>
+/// Which of somebody's devices is the one they are holding.
+/// </summary>
+/// <remarks>
+/// The screen used to have no way to know, and the obvious guess — the most recently used active
+/// row — is wrong on this data: <c>LastUsedAt</c> is the last REFRESH, so a second phone that
+/// rotated a minute ago outranks the one in your hand. The answer comes from the caller's own
+/// access token instead, which is the only place it exists.
+/// </remarks>
+public sealed class GetMySessionsHandlerTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 9, 20, 10, 0, 0, TimeSpan.Zero);
+
+    private static SessionSummary Session(Guid familyId, string agent) =>
+        new(familyId, Now.AddDays(-2), Now.AddMinutes(-1), Now.AddDays(12), "10.0.0.5", agent, IsActive: true);
+
+    private static (GetMySessionsHandler Handler, ICurrentActor Actor) Build(
+        Id userId,
+        params SessionSummary[] sessions)
+    {
+        var reader = Substitute.For<ISessionReader>();
+        reader.ListForUserAsync(userId, Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<SessionSummary>>(_ => sessions);
+
+        var tokens = Substitute.For<IAccessTokenSettings>();
+        tokens.AccessTokenMinutes.Returns(15);
+
+        var actor = Substitute.For<ICurrentActor>();
+        actor.UserId.Returns(userId);
+
+        return (new GetMySessionsHandler(reader, tokens, actor), actor);
+    }
+
+    [Fact]
+    public async Task Marks_the_session_whose_family_the_access_token_names()
+    {
+        var userId = Id.New();
+        var thisPhone = Guid.NewGuid();
+        var otherPhone = Guid.NewGuid();
+        var (handler, actor) = Build(userId, Session(thisPhone, "Khadra (Android 14)"), Session(otherPhone, "Khadra (iOS 18)"));
+        actor.SessionId.Returns(thisPhone);
+
+        var result = await handler.Handle(new GetMySessionsQuery(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.Sessions.Single(session => session.FamilyId == thisPhone).IsCurrent);
+        Assert.False(result.Value.Sessions.Single(session => session.FamilyId == otherPhone).IsCurrent);
+    }
+
+    [Fact]
+    public async Task Marks_nothing_for_a_token_issued_before_the_claim_existed()
+    {
+        // Worth at most one access token's lifetime after a deploy, and the honest answer is that
+        // this build cannot tell — not a guess that would put "This device" on the wrong row.
+        var userId = Id.New();
+        var (handler, actor) = Build(userId, Session(Guid.NewGuid(), "Khadra (Android 14)"));
+        actor.SessionId.Returns((Guid?)null);
+
+        var result = await handler.Handle(new GetMySessionsQuery(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.All(result.Value.Sessions, session => Assert.False(session.IsCurrent));
     }
 }

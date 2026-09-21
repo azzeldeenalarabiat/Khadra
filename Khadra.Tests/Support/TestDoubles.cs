@@ -67,8 +67,20 @@ internal sealed record TestAuthPolicy(
 
 internal sealed class StubAccessTokenIssuer : IAccessTokenIssuer
 {
-    public IssuedAccessToken Issue(User user, DateTimeOffset now) =>
-        new($"access-for-{user.Id}", now.AddMinutes(15));
+    /// <summary>The session id each token was asked for, newest last.</summary>
+    /// <remarks>
+    /// Recorded rather than discarded: the family id riding in the access token is what lets the
+    /// server say which device is asking, and the only way to see that it is the RIGHT family after
+    /// a rotation is to look at what the factory handed over.
+    /// </remarks>
+    public List<Guid> IssuedFor { get; } = [];
+
+    public IssuedAccessToken Issue(User user, Guid sessionId, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        IssuedFor.Add(sessionId);
+        return new($"access-for-{user.Id}", now.AddMinutes(15));
+    }
 }
 
 internal static class Users
