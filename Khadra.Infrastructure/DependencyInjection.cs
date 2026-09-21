@@ -213,7 +213,11 @@ public static class DependencyInjection
         services.AddScoped<IDocumentAccessLog, DocumentAccessLog>();
         services.AddScoped<IDealerRepository, DealerRepository>();
         services.AddScoped<IVehicleRepository, VehicleRepository>();
-        services.AddScoped<IBookingRepository, BookingRepository>();
+        // The write-side booking repository, wrapped so every single-booking load arrives settled
+        // against the clock. See SettlingBookingRepository: it settles without saving, so no read
+        // becomes a write, and no handler has to remember the lapse rule.
+        services.AddScoped<BookingRepository>();
+        services.AddScoped<IBookingRepository, SettlingBookingRepository>();
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();
