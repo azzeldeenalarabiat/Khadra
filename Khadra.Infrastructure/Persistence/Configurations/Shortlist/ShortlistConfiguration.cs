@@ -48,9 +48,17 @@ internal sealed class ShortlistConfiguration : IEntityTypeConfiguration<Customer
         entity.HasMany<ShortlistEntry>("_entries")
             .WithOne()
             .HasForeignKey(entry => entry.ShortlistId)
-            // Every FK on this platform restricts. A shortlist is never hard-deleted, so this is
-            // the convention holding rather than a decision about cascade.
-            .OnDelete(DeleteBehavior.Restrict);
+            // A saved car is a child of the shortlist and of nothing else: un-hearting it IS deleting
+            // the row. The DATABASE constraint is unchanged -- ClientCascade and Restrict both emit
+            // ON DELETE RESTRICT -- so the platform's "no database cascades" rule still holds. What
+            // changes is that EF deletes the orphan instead of throwing.
+            //
+            // The comment here used to say a shortlist is never hard-deleted, so Restrict was just
+            // the convention holding rather than a decision. It was a decision, and the wrong one:
+            // DeleteBehavior also governs what happens when a CHILD is severed, and `Remove` severs
+            // one on every un-heart. So un-saving a car returned 500 -- a customer could add to the
+            // saved list and never take anything off it.
+            .OnDelete(DeleteBehavior.ClientCascade);
 
         entity.Navigation("_entries").UsePropertyAccessMode(PropertyAccessMode.Field);
     }

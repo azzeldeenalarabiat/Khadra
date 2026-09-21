@@ -225,11 +225,21 @@ public sealed class Vehicle : AggregateRoot, ISoftDeletable
         if (image is null)
             return UnitResult.Failure(FleetErrors.ImageNotFound);
 
+        // Publish refuses a listing with no photograph, and this is the same rule from the other
+        // side: the last photo cannot leave a listing that is live on the catalogue.
+        if (Status == VehicleStatus.Active && _images.Count == 1)
+            return UnitResult.Failure(FleetErrors.LastImageOfPublishedVehicle);
+
         _images.Remove(image);
         Reindex();
         // Removing the cover photo promotes the next one so the listing never renders without an image.
+        //
+        // By POSITION, not by list order. The repository loads Images with no ordering, so `_images[0]`
+        // is whatever row the database handed back first -- usually insertion order, and not promised
+        // to be either that or the dealer's own arrangement. The customer sees position order, so the
+        // photograph the customer would call "the next one" is the one at the lowest position.
         if (image.IsPrimary && _images.Count > 0)
-            _images[0].SetPrimary(true);
+            _images.OrderBy(candidate => candidate.Position).First().SetPrimary(true);
 
         return UnitResult.Success<Error>();
     }

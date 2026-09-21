@@ -8,6 +8,7 @@ using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.Fleet.Repositories;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace Khadra.Application.Fleet.VehicleImages;
 
@@ -45,14 +46,15 @@ public sealed class AttachVehicleImageCommandValidator : AbstractValidator<Attac
         RuleFor(command => command.StorageKey).NotEmpty().MaximumLength(500);
 }
 
-public sealed class VehicleImageHandlers(
+public sealed partial class VehicleImageHandlers(
     IVehicleRepository vehicles,
     IDealerRepository dealers,
     IUploadTicketService tickets,
     IDocumentStorage storage,
     IDocumentPolicySettings policy,
     IClock clock,
-    IUnitOfWork unitOfWork) :
+    IUnitOfWork unitOfWork,
+    ILogger<VehicleImageHandlers> logger) :
     IRequestHandler<RequestVehicleImageUploadCommand, Result<UploadTicket, Error>>,
     IRequestHandler<AttachVehicleImageCommand, Result<VehicleDto, Error>>,
     IRequestHandler<RemoveVehicleImageCommand, Result<VehicleDto, Error>>,
@@ -129,8 +131,23 @@ public sealed class VehicleImageHandlers(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Delete the blob only once the row is gone, so a failed save never orphans the listing.
+        //
+        // And never let that delete fail the request. The row is committed by this point: the photo
+        // IS off the listing, and throwing here would answer 500 to a removal that succeeded, while
+        // the retry the dealer then makes finds nothing to remove and answers 404. An orphaned file
+        // in storage costs disk; a lying status code costs the dealer their understanding of what
+        // their own listing looks like. Same policy as the post-commit email dispatchers.
         if (image is not null)
-            await storage.DeleteAsync(image.StorageKey, cancellationToken);
+        {
+            try
+            {
+                await storage.DeleteAsync(image.StorageKey, cancellationToken);
+            }
+            catch (Exception failure) when (failure is not OperationCanceledException)
+            {
+                LogBlobDeleteFailed(logger, image.StorageKey, failure);
+            }
+        }
 
         return await DescribeAsync(request.OwnerUserId, owned.Value, cancellationToken);
     }
@@ -186,4 +203,9 @@ public sealed class VehicleImageHandlers(
             "image/webp" => ".webp",
             _ => ".jpg"
         };
+
+    [LoggerMessage(1400, LogLevel.Error,
+        "The photo row for {StorageKey} was removed, but the stored file could not be deleted. " +
+        "The removal stands; the file is orphaned in storage.")]
+    private static partial void LogBlobDeleteFailed(ILogger logger, string storageKey, Exception exception);
 }
