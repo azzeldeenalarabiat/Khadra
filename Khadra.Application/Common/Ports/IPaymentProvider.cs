@@ -3,6 +3,35 @@ using Khadra.Domain.Common;
 
 namespace Khadra.Application.Common.Ports;
 
+/// <summary>
+/// What kind of money this platform is moving right now. Published to every client.
+/// </summary>
+/// <remarks>
+/// <para>
+/// One value, not a name and a flag. A client's rule is "show the test banner when this reads
+/// <see cref="Sandbox"/>, and not otherwise" — and getting that wrong in the wrong direction tells a
+/// paying customer their payment was fake, which is far worse than missing a banner on a test host.
+/// A single field cannot disagree with itself.
+/// </para>
+/// <para>
+/// It is deliberately NOT the provider's name. A client comparing against "HyperPay" would be
+/// hard-coding an infrastructure detail into a screen, and would need a release every time the
+/// platform changed processor. What a screen needs to know is the CLASS of the answer, and there are
+/// only three.
+/// </para>
+/// </remarks>
+public enum PaymentMode
+{
+    /// <summary>No provider. Every checkout is refused, and the screens say so.</summary>
+    None = 0,
+
+    /// <summary>A provider that completes a checkout and moves no money. Never Production.</summary>
+    Sandbox = 1,
+
+    /// <summary>A real processor. Money moves.</summary>
+    Live = 2
+}
+
 /// <summary>What a provider event turned out to be, once the adapter had normalised it.</summary>
 public enum ProviderEventKind
 {
@@ -68,10 +97,14 @@ public sealed record ProviderRefund(string ProviderReference);
 /// <c>payments.provider_unavailable</c>.
 /// </para>
 /// <para>
-/// <b>Nothing may be added here that simulates success.</b> A stub that confirms a booking would be
-/// indistinguishable on screen from a real payment, would be trusted within a day, and is exactly the
-/// cash path the owner has already forbidden (pre-launch item 2). Tests substitute this interface;
-/// the shipped build refuses.
+/// <b>Nothing may be added here that simulates success, except the one thing that was.</b> A stub
+/// that confirms a booking is indistinguishable on screen from a real payment, would be trusted
+/// within a day, and is exactly the cash path the owner has already forbidden (pre-launch item 2).
+/// That rule stands. The owner approved ONE recorded exception on 2026-09-21 —
+/// <c>SandboxPaymentProvider</c>, reporting <see cref="PaymentMode.Sandbox"/> — on the condition that
+/// it be structurally impossible to operate in Production, which three mechanisms enforce and
+/// <c>SandboxPaymentGuardTests</c> proves. A second one does not get to point at the first as
+/// precedent: what made that one allowable was the guards, not the intention.
 /// </para>
 /// </remarks>
 public interface IPaymentProvider
@@ -79,8 +112,26 @@ public interface IPaymentProvider
     /// <summary>The name stored on every payment row, so a later provider swap can still refund old captures.</summary>
     string Name { get; }
 
-    /// <summary>Whether this platform can actually take money right now.</summary>
-    bool IsConfigured { get; }
+    /// <summary>
+    /// What class of money this provider moves. The one fact the clients are told.
+    /// </summary>
+    /// <remarks>
+    /// Answered by the adapter rather than worked out from <see cref="Name"/> by whoever is asking:
+    /// a caller that compared the name against a constant would be deciding, in its own layer, a
+    /// question the adapter already knows the answer to.
+    /// </remarks>
+    PaymentMode Mode { get; }
+
+    /// <summary>
+    /// Whether this platform can actually take a deposit right now.
+    /// </summary>
+    /// <remarks>
+    /// True for the sandbox, which really does complete a checkout. It answers "will the Pay button
+    /// work", not "is this real" — <see cref="Mode"/> is the one that answers that, and conflating
+    /// them would make the lifecycle untestable, since a screen that hides Pay can never be driven
+    /// through to Confirmed.
+    /// </remarks>
+    bool IsConfigured => Mode != PaymentMode.None;
 
     Task<Result<CheckoutSession, Error>> CreateCheckoutAsync(
         CheckoutRequest request,

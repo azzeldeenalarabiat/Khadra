@@ -11,14 +11,23 @@ namespace Khadra.Tests.Support;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A substitute at the PORT, never a class in the shipped assemblies. The production build has
-/// exactly one implementation and it refuses everything; a second one that succeeded would be a lie
-/// the database could not tell apart from a real payment, which is why
-/// <c>UnconfiguredPaymentProvider</c> says nobody may add one.
+/// A substitute at the PORT, never a class in the shipped assemblies. What Production runs is
+/// <c>UnconfiguredPaymentProvider</c>, which refuses everything; a second implementation that
+/// succeeded would be a lie the database could not tell apart from a real payment, which is why that
+/// class says nobody may add one.
 /// </para>
 /// <para>
 /// A test double is a different thing: it lives here, it is never registered in the container, and
 /// nothing outside a test can reach it.
+/// </para>
+/// <para>
+/// <b>There is now one provider in the shipped assemblies that succeeds, and it is not this.</b>
+/// <c>SandboxPaymentProvider</c> was approved by the owner on 2026-09-21 as a recorded exception so
+/// the lifecycle can be clicked through end to end, and it is selectable only on a non-Production
+/// host whose database has never held any other kind of payment. It changes nothing here: these
+/// doubles remain the right tool for a handler test, because a handler test wants to name the
+/// outcome rather than click for it. <c>SandboxPaymentGuardTests</c> and
+/// <c>SandboxPaymentProviderTests</c> cover the real thing.
 /// </para>
 /// </remarks>
 internal static class TestPayments

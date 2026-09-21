@@ -35,6 +35,7 @@ using Khadra.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Khadra.Infrastructure;
 
@@ -175,6 +176,28 @@ public static class DependencyInjection
             // would be refused before it opened.
             .Validate(options => options.CheckoutClosesBeforeDeadlineMinutes < options.CheckoutSessionMinutes,
                 "Payments: CheckoutClosesBeforeDeadlineMinutes must be less than CheckoutSessionMinutes.")
+            // A name nothing implements must not quietly resolve to the refusing provider. It would
+            // "work" — every checkout refused, the boot log saying PAYMENTS ARE NOT ACCEPTED — and a
+            // typo would look exactly like a deliberate None. Name the two that exist, and fail on
+            // anything else while somebody is still reading the console.
+            .Validate(options => PaymentOptions.KnownProviders.Contains(options.SelectedProvider,
+                    StringComparer.OrdinalIgnoreCase),
+                $"Payments: Provider must be one of {string.Join(", ", PaymentOptions.KnownProviders)}.")
+            // The sandbox signs its own deliveries, and an unsigned webhook on a reachable host lets a
+            // customer confirm their own booking. Refusing at boot beats a checkout that opens and
+            // then cannot be completed.
+            .Validate(options => options.SelectedProvider != PaymentOptions.SandboxProvider
+                || !string.IsNullOrWhiteSpace(options.WebhookSecret),
+                "Payments: the SANDBOX provider requires Payments:WebhookSecret to be set.")
+            // And somewhere to put its checkout page. A phone opens that link in its own browser, so
+            // it must be this API's absolute address as the phone reaches it; without one the
+            // checkout opens onto a URL that cannot resolve, and the customer's screen shows a Pay
+            // button that goes nowhere.
+            .Validate(options => options.SelectedProvider != PaymentOptions.SandboxProvider
+                || (Uri.TryCreate(options.SandboxConsoleBaseUrl, UriKind.Absolute, out var console)
+                    && (console.Scheme == Uri.UriSchemeHttp || console.Scheme == Uri.UriSchemeHttps)),
+                "Payments: the SANDBOX provider requires Payments:SandboxConsoleBaseUrl to be an "
+                + "absolute http(s) address for this API, as the customer's device reaches it.")
             .ValidateOnStart();
     }
 
@@ -262,10 +285,37 @@ public static class DependencyInjection
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();
         services.AddSingleton<IPaymentSettings, PaymentSettings>();
-        // The ONLY implementation this build ships. See UnconfiguredPaymentProvider for why nothing
-        // that simulates a successful capture may ever be registered here.
-        services.AddSingleton<IPaymentProvider, UnconfiguredPaymentProvider>();
+        services.AddSingleton<IPaymentProvider>(SelectPaymentProvider);
         services.AddSingleton<IPaymentProviderProbe, PaymentProviderProbe>();
+    }
+
+    /// <summary>
+    /// Picks the provider named in configuration. Refusal is the default, and the only fallback.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A switch rather than a list of conditional registrations, so that exactly one provider is ever
+    /// registered and the <c>default</c> arm is the one that takes no money. An unrecognised name
+    /// cannot reach here — <see cref="AddOptions"/> refuses it at boot — but the arm stays, because a
+    /// container that silently resolves to nothing is worse than one that refuses a payment.
+    /// </para>
+    /// <para>
+    /// <see cref="SandboxPaymentProvider"/> confirms bookings without money, and is selectable ONLY
+    /// because two guards outside this file make it impossible to operate in Production: the
+    /// environment check in <c>Program.cs</c>, and the database check in <c>PaymentsStartupCheck</c>
+    /// that refuses any database holding a payment from another provider. Neither is a comment, and
+    /// neither may be removed to make this line convenient.
+    /// </para>
+    /// </remarks>
+    private static IPaymentProvider SelectPaymentProvider(IServiceProvider services)
+    {
+        var configured = services.GetRequiredService<IOptions<PaymentOptions>>().Value;
+
+        return configured.SelectedProvider switch
+        {
+            SandboxPaymentProvider.ProviderName => ActivatorUtilities.CreateInstance<SandboxPaymentProvider>(services),
+            _ => ActivatorUtilities.CreateInstance<UnconfiguredPaymentProvider>(services),
+        };
     }
 
     private static void AddSecurity(IServiceCollection services)

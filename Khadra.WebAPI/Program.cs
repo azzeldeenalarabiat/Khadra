@@ -407,6 +407,27 @@ if (app.Environment.IsProduction())
             "most likely an unset variable. Set Documents__Provider to 'Supabase', with " +
             "Documents__Supabase__Url, __Bucket and __ServiceKey, and create the bucket PRIVATE first.");
     }
+
+    // And Production must never be able to confirm a booking without money.
+    //
+    // The sandbox provider exists so the whole lifecycle can be clicked through end to end; it
+    // captures nothing and moves nothing. In Production that is the cash path the owner forbade in
+    // pre-launch item 2, wearing a different hat: the row would read Confirmed, the gallery would
+    // prepare a car, and the record would be indistinguishable from a rental somebody paid for.
+    //
+    // Thrown here, beside the mail and document guards, because a platform that CANNOT be trusted
+    // about money must not serve traffic at all. The second guard -- the one that asks the database
+    // rather than the environment -- is in PaymentsStartupCheck, and it is the one that catches a
+    // staging process pointed at the production connection string.
+    var paymentProvider = builder.Configuration[$"{PaymentOptions.SectionName}:Provider"]?.Trim();
+    if (string.Equals(paymentProvider, PaymentOptions.SandboxProvider, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            $"Payments:Provider is '{PaymentOptions.SandboxProvider}', which confirms bookings " +
+            "without taking money. It exists for end-to-end testing and must never run in " +
+            "Production. Set Payments__Provider to 'None' (the safe default, which refuses every " +
+            "checkout) or to a real provider.");
+    }
 }
 
 // Report the forwarding facts for the requests that can actually tell us something.
@@ -598,6 +619,14 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/health/ready", new() { Predicate = check => check.Tags.Contains("ready") }).AllowAnonymous();
+
+// The sandbox checkout page, and ONLY when the sandbox is the registered provider.
+//
+// A minimal-API group rather than a controller, deliberately: controllers are discovered by
+// assembly scan whatever the configuration says, so a sandbox controller would exist on every host
+// and be kept out by an attribute — which is a decision made in the wrong place. This route simply
+// is not there unless the provider is. The method also refuses Production outright; see the class.
+app.MapSandboxCheckout();
 
 await app.RunAsync();
 

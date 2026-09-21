@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
+using Khadra.Domain.Payments;
 using Microsoft.Extensions.Options;
 
 namespace Khadra.Infrastructure.Configuration;
@@ -18,19 +19,69 @@ public sealed class PaymentOptions
     public const string SectionName = "Payments";
 
     /// <summary>
-    /// The only value this platform ships with. It refuses every checkout with
+    /// The default, and the only value Production may hold. It refuses every checkout with
     /// <c>payments.provider_unavailable</c>.
     /// </summary>
-    public const string NoProvider = "None";
+    public const string NoProvider = PaymentProviders.None;
+
+    /// <summary>
+    /// Selects the sandbox: a provider that completes a checkout and moves no money. NEVER Production.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The value is also the string written to <c>Payment.Provider</c> on every row the sandbox
+    /// touches, which is what makes a sandbox payment permanently tellable from a real one in the
+    /// data itself rather than by a flag somebody has to remember. Deliberately shouted, so that it
+    /// is unmistakable in a database dump, a log line and a support conversation.
+    /// </para>
+    /// <para>
+    /// An alias for <see cref="PaymentProviders.Sandbox"/>, which is where it belongs: the meaning of
+    /// the string is a property of the stored record, not of this configuration file. One symbol, so
+    /// the guards, the registration, the adapter and the row cannot drift apart by a letter.
+    /// </para>
+    /// </remarks>
+    public const string SandboxProvider = PaymentProviders.Sandbox;
+
+    /// <summary>Every value <see cref="Provider"/> may hold. Anything else is refused at startup.</summary>
+    public static readonly IReadOnlyList<string> KnownProviders = [NoProvider, SandboxProvider];
+
+    /// <summary>
+    /// <see cref="Provider"/> as the guards compare it: trimmed, upper-cased, never null.
+    /// </summary>
+    /// <remarks>
+    /// One expression, because three places ask this question — the two startup validations and the
+    /// registration switch — and a null here is not hypothetical. An ABSENT key leaves the property
+    /// at its default, but a key set to an empty value binds null over it, and <c>.Trim()</c> on that
+    /// is a <c>NullReferenceException</c> thrown from inside options validation, where it surfaces as
+    /// a bare NRE with no mention of payments at all. <c>[Required]</c> is what reports the missing
+    /// value; this only has to survive long enough to let it.
+    /// </remarks>
+    public string SelectedProvider => (Provider ?? string.Empty).Trim().ToUpperInvariant();
 
     /// <summary>
     /// Which provider to talk to. <see cref="NoProvider"/> until there is an account to talk to.
     /// </summary>
     /// <remarks>
-    /// There is deliberately no "Simulated" or "Development" value, and nobody should add one. A
-    /// provider that confirms bookings without money would be indistinguishable on screen from a real
-    /// one, would be trusted within a day, and is the cash path the owner has already forbidden
-    /// (pre-launch item 2). Tests substitute <c>IPaymentProvider</c> directly.
+    /// <para>
+    /// <b>The standing rule has not been repealed.</b> A provider that confirms bookings without
+    /// money is indistinguishable on screen from a real one, would be trusted within a day, and is
+    /// the cash path the owner has already forbidden (pre-launch item 2). That is still true, and it
+    /// is still forbidden in Production.
+    /// </para>
+    /// <para>
+    /// <b><see cref="SandboxProvider"/> is a recorded exception to it, not a loophole.</b> The owner
+    /// asked for a clickable end-to-end lifecycle on 2026-09-21 and approved it on the condition that
+    /// operating it in Production be made structurally impossible. Three things enforce that, and
+    /// none of them is a comment: the environment guard in <c>Program.cs</c> refuses to start a
+    /// Production host with this value; <c>PaymentsStartupCheck</c> refuses to start against any
+    /// database that has ever held a payment from another provider; and every row the sandbox writes
+    /// carries this string in <c>Payment.Provider</c> for as long as the row exists. Weakening any of
+    /// the three turns the exception back into the thing that was forbidden.
+    /// </para>
+    /// <para>
+    /// Do not add a third value for convenience. Tests substitute <c>IPaymentProvider</c> directly
+    /// and need nothing here.
+    /// </para>
     /// </remarks>
     [Required]
     public string Provider { get; init; } = NoProvider;
@@ -78,6 +129,32 @@ public sealed class PaymentOptions
     /// resumes, not where a booking is decided.
     /// </remarks>
     public string ReturnUrlBase { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The API's own public address, for the sandbox checkout page. Required by the sandbox, unused
+    /// by anything else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Deliberately NOT <see cref="ReturnUrlBase"/>, though both are URLs about a checkout. That one
+    /// is where the provider drops the customer AFTERWARDS and falls back to the dealer console's
+    /// address, which serves no checkout page and is somewhere a customer should never be sent. This
+    /// one is where the fake checkout LIVES, which for the sandbox is this API itself.
+    /// </para>
+    /// <para>
+    /// It has to be stated rather than derived, because an ASP.NET process has no reliable idea of
+    /// the address a phone reaches it on: behind a proxy the host header is the proxy's, and on a LAN
+    /// the binding is <c>0.0.0.0</c>. So on a developer machine this is the machine's LAN address —
+    /// the same one the app's own base URL uses — and a relative path is not an option, because the
+    /// phone opens the link in its own browser.
+    /// </para>
+    /// <para>
+    /// Empty is the shipped value, and it is valid for every provider but the sandbox: startup
+    /// refuses <c>SANDBOX</c> without it, next to the webhook-secret rule, rather than letting a
+    /// checkout open onto a URL that cannot resolve.
+    /// </para>
+    /// </remarks>
+    public string SandboxConsoleBaseUrl { get; init; } = string.Empty;
 }
 
 /// <summary>Reads <see cref="PaymentOptions"/> as the application layer's port.</summary>

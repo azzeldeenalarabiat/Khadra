@@ -18,7 +18,11 @@ namespace Khadra.Infrastructure.Payments;
 /// and the same request will work the day a provider is wired in.
 /// </para>
 /// <para>
-/// <b>This must never be replaced by something that succeeds.</b> A stub that captured and confirmed
+/// <b>This must never be replaced by something that succeeds — and was not.</b> The owner approved
+/// <see cref="SandboxPaymentProvider"/> on 2026-09-21 as a recorded exception, SELECTABLE beside this
+/// one and never in place of it: <c>Payments:Provider</c> still defaults to <c>None</c>, Production
+/// still cannot hold any other value, and a database that has taken sandbox payments can never be
+/// served by this class afterwards. Everything below is still the rule. A stub that captured and confirmed
 /// would be indistinguishable, on every screen and in every table, from a real payment: bookings
 /// would read Confirmed, the gallery would prepare a car, and nobody looking at the system could tell
 /// which rentals had money behind them. The owner has already forbidden the same thing in its other
@@ -33,9 +37,10 @@ namespace Khadra.Infrastructure.Payments;
 /// </remarks>
 internal sealed class UnconfiguredPaymentProvider(IOptions<PaymentOptions> options) : IPaymentProvider
 {
-    public string Name => PaymentOptions.NoProvider;
+    public string Name => PaymentProviders.None;
 
-    public bool IsConfigured => false;
+    /// <summary>None: no provider, no money, and every screen is told so rather than guessing.</summary>
+    public PaymentMode Mode => PaymentMode.None;
 
     public Task<Result<CheckoutSession, Error>> CreateCheckoutAsync(
         CheckoutRequest request,
@@ -79,15 +84,34 @@ internal sealed class UnconfiguredPaymentProvider(IOptions<PaymentOptions> optio
 internal sealed class PaymentProviderProbe(IPaymentProvider provider, IOptions<PaymentOptions> options)
     : IPaymentProviderProbe
 {
+    /// <summary>
+    /// One line at boot, in the place people are told to look first — so it must not flatter.
+    /// </summary>
+    /// <remarks>
+    /// The sandbox is called out by name rather than folded into "a provider is configured". It IS
+    /// configured and deposits genuinely can be taken through it, so the ordinary sentence would be
+    /// true and still misleading: it would print "Deposits can be taken" one line after the warning
+    /// that no money moves, in the exact place the operator is looking to find out whether money
+    /// moves. The mail probe learned this — "Email ready" for the transport that delivered nothing
+    /// is what hid a real outage for days.
+    /// </remarks>
     public Task<string> DescribeAsync(CancellationToken cancellationToken = default)
     {
         var configured = options.Value.Provider;
-        return Task.FromResult(provider.IsConfigured
-            ? $"Provider '{provider.Name}' is configured. Deposits can be taken."
-            : string.Equals(configured, PaymentOptions.NoProvider, StringComparison.OrdinalIgnoreCase)
-                ? "Payments:Provider is 'None', so no deposit can be paid and every approved booking "
-                  + "will expire. Customers are told this on their own booking."
-                : $"Payments:Provider is '{configured}', which this build has no adapter for. "
-                  + "No deposit can be paid.");
+        return Task.FromResult(provider.Mode switch
+        {
+            PaymentMode.Sandbox =>
+                "Provider is the SANDBOX. Checkouts complete and NO MONEY MOVES. Every payment row "
+                + "is stamped SANDBOX for as long as it exists. This database has never held a "
+                + "payment from any other provider, and this host is not Production — both checked.",
+            PaymentMode.Live =>
+                $"Provider '{provider.Name}' is configured. Deposits can be taken.",
+            _ when string.Equals(configured, PaymentProviders.None, StringComparison.OrdinalIgnoreCase) =>
+                "Payments:Provider is 'None', so no deposit can be paid and every approved booking "
+                + "will expire. Customers are told this on their own booking.",
+            _ =>
+                $"Payments:Provider is '{configured}', which this build has no adapter for. "
+                + "No deposit can be paid.",
+        });
     }
 }

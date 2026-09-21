@@ -50,6 +50,16 @@ public sealed class Payment : AggregateRoot
     /// </remarks>
     public string Provider { get; private set; } = null!;
 
+    /// <summary>
+    /// Whether no money moved for this attempt, and never could have.
+    /// </summary>
+    /// <remarks>
+    /// Read from <see cref="Provider"/> rather than stored beside it, deliberately. A second
+    /// persisted flag can disagree with the first, and the one that would be trusted is whichever the
+    /// screen happened to read. This is the same fact asked a different way, so it cannot drift.
+    /// </remarks>
+    public bool IsSandbox => PaymentProviders.IsSandbox(Provider);
+
     /// <summary>The provider's own id for this session. Null until they answer.</summary>
     public string? ProviderReference { get; private set; }
 
