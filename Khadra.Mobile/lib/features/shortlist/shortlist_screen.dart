@@ -11,6 +11,7 @@ import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../auth/account_required.dart';
 import '../catalogue/vehicle_row.dart';
 import 'shortlist_providers.dart';
 
@@ -36,19 +37,45 @@ import 'shortlist_providers.dart';
 /// Nothing on this screen says whether a car is AVAILABLE for dates. A saved car
 /// carries no dates, and "is it free" has no answer without a period to ask about.
 class ShortlistScreen extends ConsumerWidget {
-  const ShortlistScreen({super.key});
+  const ShortlistScreen({super.key, this.asTab = false});
+
+  /// Whether this is the bottom bar's destination rather than the screen pushed
+  /// from My Account.
+  ///
+  /// One screen, one provider, one list from the server — both ways in show the
+  /// same cars. What differs is how somebody got here and therefore what the
+  /// chrome owes them. A TAB has nothing beneath it, so it carries no back
+  /// arrow, and a guest who taps it gets the panel the other four tabs give
+  /// rather than being thrown into a sign-in form (the owner settled that for
+  /// tabs on 2026-09-12). The PUSHED screen keeps its back arrow to Profile and
+  /// its guard, unchanged by the bar gaining a shortcut to the same list.
+  final bool asTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final saved = ref.watch(shortlistProvider);
     final formats = ref.watch(formatsProvider);
 
+    if (asTab && !ref.watch(sessionProvider).isSignedIn) {
+      return Scaffold(
+        appBar: AppBar(title: KhadraLargeTitle(l10n.shortlistTitle)),
+        body: AccountRequired(
+          icon: Icons.favorite_border,
+          title: l10n.shortlistSignedOutTitle,
+          next: Routes.saved,
+        ),
+      );
+    }
+
+    final saved = ref.watch(shortlistProvider);
+
     return Scaffold(
-      appBar: AppBar(
-        leading: const KhadraBack(fallback: Routes.profile),
-        title: Text(l10n.shortlistTitle),
-      ),
+      appBar: asTab
+          ? AppBar(title: KhadraLargeTitle(l10n.shortlistTitle))
+          : AppBar(
+              leading: const KhadraBack(fallback: Routes.profile),
+              title: Text(l10n.shortlistTitle),
+            ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(shortlistProvider);
