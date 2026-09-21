@@ -74,6 +74,23 @@ public sealed class Payment : AggregateRoot
     /// The provider's own word for why this failed, or ours. A code, never a sentence: an admin
     /// screen groups on it and a customer reads it in their own language.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It belongs to <see cref="PaymentStatus.Failed"/> and to nothing else.</b> A payment that
+    /// took money explains itself with <see cref="AmountCaptured"/> and, if the money could not be
+    /// used, with <see cref="OrphanReason"/>; a failure code on such a row is describing an attempt
+    /// that is over. So every transition into a CAPTURED state clears it, and the only one that sets
+    /// it is <see cref="Fail"/>.
+    /// </para>
+    /// <para>
+    /// This is not hypothetical tidiness. A payment can legitimately fail and then be captured: the
+    /// sweep closes an attempt whose session the provider has forgotten, and a real capture for that
+    /// same session lands afterwards, inside the booking's own payment window. Before 2026-09-21 the
+    /// row then read <c>Applied</c> while still carrying <c>sandbox_session_forgotten</c> — a paid
+    /// booking whose payment record gave a reason it had not worked. The manual lifecycle run
+    /// produced exactly that row.
+    /// </para>
+    /// </remarks>
     public string? FailureCode { get; private set; }
 
     /// <summary>Why the capture could not be applied. Set only on an orphan.</summary>
@@ -193,6 +210,9 @@ public sealed class Payment : AggregateRoot
         CapturedAt = capturedAt;
         AppliedAt = now;
         Status = PaymentStatus.Applied;
+        // The attempt succeeded, so whatever an earlier pass thought had gone wrong is no longer
+        // true of this payment. Leaving it would put a failure reason on a row that took money.
+        FailureCode = null;
         AddDomainEvent(new PaymentApplied(Id, BookingId, CustomerId, captured.Amount, captured.CurrencyCode, now));
         return UnitResult.Success<Error>();
     }
@@ -228,6 +248,10 @@ public sealed class Payment : AggregateRoot
         OrphanedAt = now;
         OrphanReason = reason;
         Status = PaymentStatus.Orphaned;
+        // Same rule as Apply, and reachable by the same route: a swept-Failed attempt whose late
+        // capture cannot be used is orphaned, and must not also carry the reason the sweep gave.
+        // Money moved; OrphanReason is what explains this row now.
+        FailureCode = null;
         _refunds.Add(Refund.Request(Id, captured, RefundReason.OrphanedCapture, disputeTicketId: null, now));
         AddDomainEvent(new PaymentOrphaned(
             Id, BookingId, CustomerId, captured.Amount, captured.CurrencyCode, reason, now));

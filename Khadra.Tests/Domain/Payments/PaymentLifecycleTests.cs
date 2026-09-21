@@ -300,4 +300,99 @@ public sealed class PaymentLifecycleTests
 
         Assert.Same(RefundStatus.Settled, refund.Status);
     }
+
+    // ---------------------------------------------- a failure code belongs to a failure, and to nothing else
+
+    /// <summary>
+    /// A capture landing on an attempt the platform had already given up on clears the reason.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Not a hypothetical ordering. The sweep closes an attempt whose session the provider says it
+    /// has forgotten, and a real capture for that same session arrives afterwards, still inside the
+    /// booking's own payment window — the webhook is deliberately not gated on that deadline, because
+    /// refusing money that has moved would mean keeping it. The manual lifecycle run on 2026-09-21
+    /// produced this exact row: <c>Applied</c>, 27.000 taken, and <c>sandbox_session_forgotten</c>
+    /// still sitting on it.
+    /// </para>
+    /// <para>
+    /// The row was a paid booking whose payment record gave a reason it had not worked. Nothing
+    /// downstream was wrong — the booking confirmed, the money was accounted for — which is what
+    /// makes it worth a test: a field that contradicts the row it is on is the kind of thing somebody
+    /// reads at three in the morning and believes.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_failed_attempt_that_is_later_captured_carries_no_failure_code()
+    {
+        var payment = Pending();
+        payment.Fail("sandbox_session_forgotten", Now.AddMinutes(1));
+        Assert.Equal("sandbox_session_forgotten", payment.FailureCode);
+
+        var applied = payment.Apply(Deposit, Now.AddMinutes(2), Now.AddMinutes(2));
+
+        Assert.True(applied.IsSuccess);
+        Assert.Same(PaymentStatus.Applied, payment.Status);
+        Assert.Null(payment.FailureCode);
+    }
+
+    /// <summary>And the same capture, when it cannot be used, is explained by the orphan reason.</summary>
+    /// <remarks>
+    /// Reachable by the same route: the late capture arrives after the booking has expired, so it is
+    /// orphaned and refunded rather than applied. <c>OrphanReason</c> is what describes that row; the
+    /// sweep's failure code would be a second, stale answer to the same question.
+    /// </remarks>
+    [Fact]
+    public void A_failed_attempt_that_is_later_orphaned_carries_no_failure_code()
+    {
+        var payment = Pending();
+        payment.Fail("sandbox_session_forgotten", Now.AddMinutes(1));
+
+        var orphaned = payment.Orphan(Deposit, Now.AddMinutes(2), "BookingExpired", Now.AddMinutes(2));
+
+        Assert.True(orphaned.IsSuccess);
+        Assert.Same(PaymentStatus.Orphaned, payment.Status);
+        Assert.Null(payment.FailureCode);
+        Assert.Equal("BookingExpired", payment.OrphanReason);
+    }
+
+    /// <summary>A failure that stays a failure keeps its code. That half is the point of the field.</summary>
+    [Fact]
+    public void A_failed_attempt_keeps_its_code()
+    {
+        var payment = Pending();
+
+        payment.Fail("card_declined", Now.AddMinutes(1));
+
+        Assert.Same(PaymentStatus.Failed, payment.Status);
+        Assert.Equal("card_declined", payment.FailureCode);
+    }
+
+    /// <summary>
+    /// And a retry is a NEW attempt: the declined one keeps its reason, the successful one has none.
+    /// </summary>
+    /// <remarks>
+    /// The customer-visible shape of the same rule. Two rows, one booking: the history stays readable
+    /// — this is why it declined — while the row that took the money says only that it did.
+    /// </remarks>
+    [Fact]
+    public void A_retry_after_a_decline_leaves_the_successful_payment_clean()
+    {
+        var bookingId = Id.New();
+        var customerId = Id.New();
+
+        var declined = Payment.Open(bookingId, customerId, Deposit, "TestProvider", Now.AddMinutes(30), Now);
+        declined.AttachProviderSession("sess_1", "https://provider.test/sess_1");
+        declined.Fail("card_declined", Now.AddMinutes(1));
+
+        var retry = Payment.Open(bookingId, customerId, Deposit, "TestProvider", Now.AddMinutes(40), Now.AddMinutes(2));
+        retry.AttachProviderSession("sess_2", "https://provider.test/sess_2");
+        retry.Apply(Deposit, Now.AddMinutes(3), Now.AddMinutes(3));
+
+        Assert.Same(PaymentStatus.Failed, declined.Status);
+        Assert.Equal("card_declined", declined.FailureCode);
+
+        Assert.Same(PaymentStatus.Applied, retry.Status);
+        Assert.Null(retry.FailureCode);
+    }
 }
