@@ -661,5 +661,8 @@
   "shortlistUnavailable": "غير متاحة حاليًا",
   "shortlistSavedOn": "حُفظت في {date}",
   "errorShortlistFull": "قائمة المحفوظات ممتلئة. أزل سيارة قبل حفظ أخرى.",
-  "errorShortlistVehicleNotFound": "لم تعد هذه السيارة معروضة، فلا يمكن حفظها."
+  "errorShortlistVehicleNotFound": "لم تعد هذه السيارة معروضة، فلا يمكن حفظها.",
+  "sandboxPaymentsTitle": "مدفوعات تجريبية",
+  "sandboxPaymentsBody": "هذه نسخة تجريبية. لا تُخصم أي بطاقة ولا تنتقل أي أموال. أي حجز تؤكّده هنا ليس حجزًا حقيقيًا.",
+  "sandboxPaymentsAttempt": "دفعة تجريبية — لم تنتقل أي أموال."
 }

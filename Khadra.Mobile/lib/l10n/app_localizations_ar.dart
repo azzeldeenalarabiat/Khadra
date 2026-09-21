@@ -2103,4 +2103,14 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get errorShortlistVehicleNotFound =>
       'لم تعد هذه السيارة معروضة، فلا يمكن حفظها.';
+
+  @override
+  String get sandboxPaymentsTitle => 'مدفوعات تجريبية';
+
+  @override
+  String get sandboxPaymentsBody =>
+      'هذه نسخة تجريبية. لا تُخصم أي بطاقة ولا تنتقل أي أموال. أي حجز تؤكّده هنا ليس حجزًا حقيقيًا.';
+
+  @override
+  String get sandboxPaymentsAttempt => 'دفعة تجريبية — لم تنتقل أي أموال.';
 }

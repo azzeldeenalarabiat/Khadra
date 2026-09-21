@@ -20,6 +20,14 @@
   padding: 20px 22px 32px;
 }
 
+/* The sandbox banner, between the topbar and the scrolling page.
+   Outside .page deliberately: "no money moves here" must not scroll away from the figures it is
+   about. It is absent entirely on every normal deployment, so it costs that layout nothing. */
+.sandbox-banner {
+  flex: none;
+  margin: 12px 22px 0;
+}
+
 /* — sidebar — */
 .sidebar {
   width: 248px;

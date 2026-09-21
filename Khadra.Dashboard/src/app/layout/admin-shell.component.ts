@@ -5,6 +5,7 @@ import { filter } from 'rxjs';
 import { AdminSidebarComponent } from './admin-sidebar.component';
 import { AdminTopbarComponent } from './admin-topbar.component';
 import { ConfirmModalComponent } from '../shared/confirm-modal/confirm-modal.component';
+import { SandboxBannerComponent } from '../shared/sandbox-banner/sandbox-banner.component';
 import { ToastComponent } from '../shared/toast/toast.component';
 
 /**
@@ -20,6 +21,7 @@ import { ToastComponent } from '../shared/toast/toast.component';
     AdminSidebarComponent,
     AdminTopbarComponent,
     ConfirmModalComponent,
+    SandboxBannerComponent,
     ToastComponent,
   ],
 })

@@ -47,7 +47,39 @@ public sealed record AppConfigDto(
     int PaymentWindowHours,
     DocumentLimitsDto Documents,
     PasswordPolicyDto Password,
+    /// What kind of money this deployment is moving. Every client reads it before it shows a price.
+    PaymentsConfigDto Payments,
     VocabulariesDto Vocabularies);
+
+/// <summary>
+/// What kind of money this deployment moves, published so no screen has to guess.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>One field.</b> <see cref="Mode"/> is <c>None</c>, <c>Sandbox</c> or <c>Live</c>, and a client's
+/// rule is "show the test banner when it reads Sandbox, and not otherwise". A second derived flag
+/// beside it would be two encodings of one fact, and the failure it enables is the expensive
+/// direction: telling a paying customer their payment was fake is far worse than missing a banner on
+/// a test host.
+/// </para>
+/// <para>
+/// <b>Not the provider's name.</b> A client comparing against "HyperPay" would be hard-coding an
+/// infrastructure detail into a screen and would need a release the day the platform changed
+/// processor. What a screen needs is the CLASS of the answer, and there are three of them.
+/// </para>
+/// <para>
+/// <b>Not a disclosure.</b> This says nothing a customer is not already told: with no provider the
+/// 503 body and the booking's own <c>unavailableReason</c> both say plainly that no deposit can be
+/// taken. And Production can never report Sandbox — the startup guard refuses to boot on it — so the
+/// value is only ever news on a host where the news is true.
+/// </para>
+/// <para>
+/// It is fixed for the lifetime of the process, so a client caching <c>/app-config</c> once per
+/// launch is correct. A client left open across an API restart shows a stale banner until it is
+/// relaunched, which is an acceptable cost for a flag that only appears on test hosts.
+/// </para>
+/// </remarks>
+public sealed record PaymentsConfigDto(string Mode);
 
 /// <summary>
 /// What makes a password acceptable here.
@@ -125,7 +157,8 @@ public sealed class GetAppConfigHandler(
     IReportingCalendar calendar,
     IBusinessRulesProvider businessRules,
     IDocumentPolicySettings documents,
-    IAuthPolicySettings authPolicy)
+    IAuthPolicySettings authPolicy,
+    IPaymentProvider payments)
     : IRequestHandler<GetAppConfigQuery, Result<AppConfigDto, Error>>
 {
     public async Task<Result<AppConfigDto, Error>> Handle(
@@ -151,6 +184,10 @@ public sealed class GetAppConfigHandler(
                 RequiresLetter: true,
                 RequiresDigit: true,
                 AllowsWhitespace: false),
+            // Asked of the adapter, never worked out from a provider name here: the adapter is the
+            // only thing that knows what class of money it moves, and a caller comparing strings
+            // would be deciding that question in the wrong layer.
+            new PaymentsConfigDto(payments.Mode.ToString()),
             new VocabulariesDto(
                 [.. Enumeration.GetAll<TransmissionType>().Select(Vocabulary.Describe)],
                 [.. Enumeration.GetAll<FuelType>().Select(Vocabulary.Describe)],

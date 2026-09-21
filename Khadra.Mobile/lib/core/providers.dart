@@ -230,6 +230,16 @@ final passwordPolicyProvider = Provider<PasswordPolicy?>(
   (ref) => ref.watch(appConfigProvider).valueOrNull?.password,
 );
 
+/// Whether this build is talking to a server that takes no real money.
+///
+/// False until the config has arrived, and false for every value the app does not
+/// recognise. That asymmetry is the point: a banner missed on a test host is a
+/// nuisance, and a banner shown to a paying customer tells them their payment was
+/// fake. Silence is the safe direction, so silence is the default.
+final sandboxPaymentsProvider = Provider<bool>(
+  (ref) => ref.watch(appConfigProvider).valueOrNull?.payments.isSandbox ?? false,
+);
+
 final citiesProvider = FutureProvider<List<Lookup>>((ref) async {
   ref.keepAlive();
   return ref.watch(apiProvider).cities();

@@ -2038,4 +2038,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorShortlistVehicleNotFound =>
       'That car is no longer listed, so it cannot be saved.';
+
+  @override
+  String get sandboxPaymentsTitle => 'Test payments';
+
+  @override
+  String get sandboxPaymentsBody =>
+      'This is a test build. No card is charged and no money moves. Any booking you confirm here is not a real rental.';
+
+  @override
+  String get sandboxPaymentsAttempt => 'Test payment — no money moved.';
 }

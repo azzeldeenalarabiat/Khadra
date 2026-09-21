@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { FormatService } from '../i18n/format.service';
 
@@ -7,6 +7,7 @@ import { FormatService } from '../i18n/format.service';
 interface AppConfigResponse {
   readonly timeZone?: string;
   readonly currency?: { readonly code?: string; readonly minorUnits?: number };
+  readonly payments?: { readonly mode?: string };
 }
 
 /**
@@ -34,13 +35,27 @@ export class PlatformConfigService {
   private readonly http = inject(HttpClient);
   private readonly formats = inject(FormatService);
 
+  private readonly sandbox = signal(false);
+
+  /**
+   * Whether this deployment takes no real money.
+   *
+   * False until the server has said Sandbox, and false for anything else — an older API, a failed
+   * call, a value this build has never heard of. The asymmetry is the whole design: a banner missed
+   * on a test host is a nuisance, while a banner shown over a real dealer's real bookings tells them
+   * their takings are fake. Silence is the safe direction, so silence is the default.
+   *
+   * A Production API can never report Sandbox — it refuses to start on that provider — so the banner
+   * only ever appears where it is true.
+   */
+  readonly isSandbox = this.sandbox.asReadonly();
+
   async load(): Promise<void> {
     try {
-      const config = await firstValueFrom(
-        this.http.get<AppConfigResponse>('/api/v1/app-config'),
-      );
+      const config = await firstValueFrom(this.http.get<AppConfigResponse>('/api/v1/app-config'));
       this.formats.useCurrencyMinorUnits(config?.currency?.minorUnits);
       this.formats.useTimeZone(config?.timeZone);
+      this.sandbox.set(config?.payments?.mode?.toLowerCase() === 'sandbox');
     } catch {
       // Deliberately swallowed. See the class comment: the console still works.
     }

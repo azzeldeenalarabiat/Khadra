@@ -893,8 +893,7 @@ export const AR = {
   'dealerCustomerPage.savedTitle': 'تم حفظ صفحة العملاء',
   'dealerCustomerPage.savedBody': 'يرى العملاء الصفحة الجديدة من الآن.',
   'dealerCustomerPage.couldntLoad': 'تعذّر تحميل صفحة العملاء',
-  'dealerCustomerPage.couldntLoadNothingChanged':
-    'تعذّر تحميل صفحة العملاء. لم يتغيّر شيء.',
+  'dealerCustomerPage.couldntLoadNothingChanged': 'تعذّر تحميل صفحة العملاء. لم يتغيّر شيء.',
   'dealerCustomerPage.serviceDidNotRespond': 'لم تستجب الخدمة. لم يُحفظ شيء.',
   'dealerCustomerPage.onlyTheDealerOwner':
     'يمكن لمالك المكتب وحده تعديل هذه الصفحة. ويمكنك قراءتها.',
@@ -905,8 +904,7 @@ export const AR = {
   'dealerCustomerPage.previewIsSaved': 'هذا ما في صفحتك الآن، ويتبع ما تحفظه.',
   'dealerCustomerPage.nothingShownYet':
     'لم تكتب بعد شيئًا يراه العملاء. أما ساعات العمل والتوصيل والموقع والتقييم والسيارات فتظهر في صفحتك على كل حال.',
-  'dealerCustomerPage.yourWordsNotKhadras':
-    'يُقال للعملاء إن هذه كلماتك أنت، لا كلمات خضرا.',
+  'dealerCustomerPage.yourWordsNotKhadras': 'يُقال للعملاء إن هذه كلماتك أنت، لا كلمات خضرا.',
   'dealerCustomerPage.whatYouDoNotWrite': 'ما لا تكتبه هنا',
   'dealerCustomerPage.khadrasRules':
     'الإلغاء والدفع والوثائق المطلوبة من المستأجر شؤون خضرا، ويذكرها كل عرض سعر للحجز.',
@@ -915,8 +913,7 @@ export const AR = {
   'dealerCustomerPage.alwaysShown':
     'ساعات عملك وشروط التوصيل والعنوان والتقييم والسيارات تظهر دائمًا في صفحتك، ولا يمكن إخفاؤها.',
   'dealerCustomerPage.whereElse': 'بقية صفحتك',
-  'dealerCustomerPage.brandingAndHours':
-    'اسمك وشعارك والغلاف والموقع وساعات العمل في صفحة المكتب.',
+  'dealerCustomerPage.brandingAndHours': 'اسمك وشعارك والغلاف والموقع وساعات العمل في صفحة المكتب.',
   'dealerCustomerPage.openDealerPage': 'فتح صفحة المكتب',
   'dealerCustomerPage.openDelivery': 'فتح إعدادات التوصيل',
 
@@ -1972,8 +1969,7 @@ export const AR = {
   'problem.accountSuspended': 'هذا الحساب مُعطَّل.',
   'problem.invalidToken': 'هذا الرابط لم يعد صالحًا، ويلزم إصدار رابط جديد.',
   'problem.invitationAccepted': 'هذا المشرف اختار كلمة مرور بالفعل، فلا شيء لإعادة إرساله.',
-  'problem.invitationTargetInactive':
-    'هذا الحساب مُعطَّل. أعد تفعيله قبل إرسال الدعوة من جديد.',
+  'problem.invitationTargetInactive': 'هذا الحساب مُعطَّل. أعد تفعيله قبل إرسال الدعوة من جديد.',
   'problem.invitationEmailNotSent':
     'لم تقبل خدمة البريد الرسالة. الرابط الجديد صالح — أعد المحاولة بعد دقائق.',
   'problem.signedOut': 'انتهت جلستك. سجّل الدخول ثم أعد المحاولة.',
@@ -2087,8 +2083,10 @@ export const AR = {
   },
   'disputeDetail.quoted': '«{text}»',
   'disputeDetail.dueAt': 'موعد البتّ {when}',
-  'disputeDetail.resolveConfirmBody': 'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}. يرى الطرفان القرار وملاحظتك واسمك، ويُسجَّل في سجل التدقيق.',
-  'disputeDetail.resolveConfirmBodyWithCharge': 'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}، ويُحصَّل {charge} من المكتب. يرى الطرفان القرار وملاحظتك واسمك، ويُسجَّل في سجل التدقيق.',
+  'disputeDetail.resolveConfirmBody':
+    'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}. يرى الطرفان القرار وملاحظتك واسمك، ويُسجَّل في سجل التدقيق.',
+  'disputeDetail.resolveConfirmBodyWithCharge':
+    'تُعاد {refund} إلى {customer}، وتحتفظ المنصة بـ{platform}، وتُحوَّل {dealerShare} إلى {dealer}، ويُحصَّل {charge} من المكتب. يرى الطرفان القرار وملاحظتك واسمك، ويُسجَّل في سجل التدقيق.',
   'dealerDispute.openedByYourSide': 'فُتح في {when} من قِبل {name} (من جانبكم)',
   'dealerDispute.openedByCustomer': 'فُتح في {when} من قِبل {name} (العميل)',
   'dealerDispute.handledByName': 'يتولّاه {name}',
@@ -2099,11 +2097,14 @@ export const AR = {
   'bookingsList.scopedToCustomer': 'يُعرض عميل واحد: {name}',
   'bookingsList.scopedToOneParty': 'يُعرض طرف واحد',
   'adminBooking.cancelTitle': 'إلغاء الحجز {reference}؟',
-  'adminBooking.cancelBody': 'ينتهي الحجز الآن وتُحرَّر السيارة. ولا تُقدَّر أي غرامة على {customer} أو {dealer}، فالمنصة هي التي تُلغي وليس أيٌّ من الطرفين.',
+  'adminBooking.cancelBody':
+    'ينتهي الحجز الآن وتُحرَّر السيارة. ولا تُقدَّر أي غرامة على {customer} أو {dealer}، فالمنصة هي التي تُلغي وليس أيٌّ من الطرفين.',
   'adminBooking.expireTitle': 'إنهاء صلاحية الحجز {reference}؟',
-  'adminBooking.expireBody': '{which} إنهاء الصلاحية يُحرِّر السيارة، ولا تُقدَّر أي غرامة على أحد.',
+  'adminBooking.expireBody':
+    '{which} إنهاء الصلاحية يُحرِّر السيارة، ولا تُقدَّر أي غرامة على أحد.',
   'adminBooking.noShowTitle': 'تسجيل عدم حضور على الحجز {reference}؟',
-  'adminBooking.noShowBody': 'لم تُستلَم السيارة من قِبل {customer}. يُقدِّر هذا ما تنص عليه شروط هذا الحجز نفسه، ولا يُحصَّل أي مبلغ.',
+  'adminBooking.noShowBody':
+    'لم تُستلَم السيارة من قِبل {customer}. يُقدِّر هذا ما تنص عليه شروط هذا الحجز نفسه، ولا يُحصَّل أي مبلغ.',
   'dealerBooking.requestedAt': 'طُلب في {when}',
 
   // Wave Two 2026-09-17: one clock for every deadline and SLA — remaining, overdue by, expired
@@ -2313,11 +2314,15 @@ export const AR = {
     many: '{count} سيارة في أسطولك',
     other: '{count} سيارة في أسطولك',
   },
-  'dealerDash.oldestMadeExpiry': 'قُدِّم أقدمها {when}. وينتهي الطلب إذا حلّ تاريخ تأجيره دون إجابة.',
-  'dealerDash.overdueDesc': 'العميل: {customer}. لم تُعَد السيارة بعد؛ سجّل الإعادة عند عودتها، ودوّن أي أضرار خلال مهلة التسوية.',
-  'dealerDash.pickupDesc': 'العميل: {customer}. سجّل التسليم مع قراءة العداد ومستوى الوقود عند تسليم المفاتيح.',
+  'dealerDash.oldestMadeExpiry':
+    'قُدِّم أقدمها {when}. وينتهي الطلب إذا حلّ تاريخ تأجيره دون إجابة.',
+  'dealerDash.overdueDesc':
+    'العميل: {customer}. لم تُعَد السيارة بعد؛ سجّل الإعادة عند عودتها، ودوّن أي أضرار خلال مهلة التسوية.',
+  'dealerDash.pickupDesc':
+    'العميل: {customer}. سجّل التسليم مع قراءة العداد ومستوى الوقود عند تسليم المفاتيح.',
   'dealerDash.returnAt': '{vehicle} — الإعادة {when}',
-  'dealerDash.returnDesc': 'العميل: {customer}. ينتهي الإيجار؛ أكّد الإعادة ودوّن أي أضرار خلال مهلة التسوية.',
+  'dealerDash.returnDesc':
+    'العميل: {customer}. ينتهي الإيجار؛ أكّد الإعادة ودوّن أي أضرار خلال مهلة التسوية.',
   'dealerDash.activityApproved': 'تمت الموافقة على الحجز {reference} من قِبل {actor}',
   'dealerDash.activityRejected': 'رُفض الحجز {reference} من قِبل {actor}',
   'dealerDash.activityHandedOver': 'سُلّمت سيارة الحجز {reference} من قِبل {actor}',
@@ -2421,7 +2426,8 @@ export const AR = {
   'dealerEmployees.bookingsOnly': 'الحجوزات فقط',
   'dealerEmployees.freshLinkOnItsWay': 'يجري إرسال رابط جديد إلى {email}.',
   'dealerEmployees.canNowSeeReports': 'أصبح بإمكان {name} الاطّلاع على الإيرادات والتقارير.',
-  'dealerEmployees.reportsNowHidden': 'ما زال بإمكان {name} التعامل مع الحجوزات، أما التقارير فأصبحت مخفية.',
+  'dealerEmployees.reportsNowHidden':
+    'ما زال بإمكان {name} التعامل مع الحجوزات، أما التقارير فأصبحت مخفية.',
   'dealerEmployees.deactivateName': 'إيقاف {name}؟',
   'dealerEmployees.noLongerHasAccess': 'لم يعد لدى {name} صلاحية الدخول.',
   'dealerEmployees.stillNeedsToAccept': 'ما زال على {name} قبول الدعوة وتعيين كلمة مرور.',
@@ -2578,7 +2584,8 @@ export const AR = {
   'dealerReview.documentCommercialRegistration': 'السجل التجاري',
   'dealerReview.documentVehicleRegistration': 'تسجيل السيارات',
   'dealerReview.documentOwnerIdentity': 'هوية صاحب المكتب',
-  'dealerReview.missingDocumentsRequired': 'الناقص: {documents}. وكل واحدة من هذه الوثائق مطلوبة قبل أن يُعتمد هذا الطلب.',
+  'dealerReview.missingDocumentsRequired':
+    'الناقص: {documents}. وكل واحدة من هذه الوثائق مطلوبة قبل أن يُعتمد هذا الطلب.',
   'dealerReview.approveNameQuestion': 'اعتماد {name}؟',
   'dealerReview.nameCanNowTrade': 'أصبح بإمكان {name} العمل الآن.',
   'dealerReview.rejectNameQuestion': 'رفض طلب {name}؟',
@@ -2773,14 +2780,16 @@ export const AR = {
   'security.sessionActive': 'نشطة',
   'security.ended': 'منتهية',
   'security.signedInCannotBeRefreshed': 'سُجّل الدخول في {date}. ولا يمكن تجديد الجلسة بعد ذلك.',
-  'security.signedInFromCannotBeRefreshed': 'سُجّل الدخول في {date} من {address}. ولا يمكن تجديد الجلسة بعد ذلك.',
+  'security.signedInFromCannotBeRefreshed':
+    'سُجّل الدخول في {date} من {address}. ولا يمكن تجديد الجلسة بعد ذلك.',
   'security.inFlightForUpToMinutes': {
     zero: 'قد تستمر جلسة جارية في العمل حتى {count} دقيقة قبل أن تحتاج إلى تجديد. وإن كانت هذه الجلسة التي تستخدمها الآن، فسيُسجَّل خروجك.',
     one: 'قد تستمر جلسة جارية في العمل حتى دقيقة واحدة قبل أن تحتاج إلى تجديد. وإن كانت هذه الجلسة التي تستخدمها الآن، فسيُسجَّل خروجك.',
     two: 'قد تستمر جلسة جارية في العمل حتى دقيقتين قبل أن تحتاج إلى تجديد. وإن كانت هذه الجلسة التي تستخدمها الآن، فسيُسجَّل خروجك.',
     few: 'قد تستمر جلسة جارية في العمل حتى {count} دقائق قبل أن تحتاج إلى تجديد. وإن كانت هذه الجلسة التي تستخدمها الآن، فسيُسجَّل خروجك.',
     many: 'قد تستمر جلسة جارية في العمل حتى {count} دقيقة قبل أن تحتاج إلى تجديد. وإن كانت هذه الجلسة التي تستخدمها الآن، فسيُسجَّل خروجك.',
-    other: 'قد تستمر جلسة جارية في العمل حتى {count} دقيقة قبل أن تحتاج إلى تجديد. وإن كانت هذه الجلسة التي تستخدمها الآن، فسيُسجَّل خروجك.',
+    other:
+      'قد تستمر جلسة جارية في العمل حتى {count} دقيقة قبل أن تحتاج إلى تجديد. وإن كانت هذه الجلسة التي تستخدمها الآن، فسيُسجَّل خروجك.',
   },
   'employeeNotifications.unreadSummary': {
     zero: 'لا إشعارات غير مقروءة · ما جرى في مكتبك',
@@ -2818,7 +2827,8 @@ export const AR = {
   'penaltyReason.dealerRejected': 'رفض المكتب الطلب.',
   'penaltyReason.dealerDidNotHandOver': 'لم يسلّم المكتب السيارة بعد قبوله الحجز.',
   'penaltyReason.customerNoShow': 'لم يستلم العميل السيارة خلال مهلة عدم الحضور.',
-  'penaltyReason.deliveryNoShowUndetermined': 'لم تُسلَّم السيارة في حجز بالتوصيل، والمسؤولية غير محددة.',
+  'penaltyReason.deliveryNoShowUndetermined':
+    'لم تُسلَّم السيارة في حجز بالتوصيل، والمسؤولية غير محددة.',
   'penaltyReason.cancelledBeforeDeposit': 'أُلغي الحجز قبل دفع العربون.',
   'penaltyReason.cancelledInFreeWindow': 'أُلغي الحجز ضمن مدة الإلغاء المجاني.',
   'penaltyReason.customerCancelledAfterFreeWindow': 'ألغى العميل بعد انتهاء مدة الإلغاء المجاني.',
@@ -2931,21 +2941,26 @@ export const AR = {
     many: '{count} صورة مرفوعة',
     other: '{count} صورة مرفوعة',
   },
-  'vehicleWizard.plateIsOnYourDraft': 'رقم اللوحة {plate} مسجّل على مسودة بدأتها ({vehicle}). أكمل تلك المسودة بدل إنشاء أخرى.',
+  'vehicleWizard.plateIsOnYourDraft':
+    'رقم اللوحة {plate} مسجّل على مسودة بدأتها ({vehicle}). أكمل تلك المسودة بدل إنشاء أخرى.',
   'vehicleWizard.plateIsOnYourCar': 'رقم اللوحة {plate} مسجّل على {vehicle} ضمن أسطولك.',
   'vehicleWizard.vehicleIsLive': '{vehicle} معروضة الآن ضمن أسطولك.',
   'vehicleWizard.vehicleIsADraft': '{vehicle} محفوظة ضمن أسطولك كمسودة.',
-  'vehicleWizard.vehicleStaysADraft': 'تبقى {vehicle} ضمن أسطولك كمسودة. افتحها من الأسطول لإكمالها.',
-  'vehicleWizard.pickupFromYourLocation': 'تُستلم كل سيارة من موقع مكتبك. ولتغيير ذلك، عدّل الموقع في {profile}؛ ولا يُتاح تحديد نقطة استلام خاصة بكل سيارة.',
+  'vehicleWizard.vehicleStaysADraft':
+    'تبقى {vehicle} ضمن أسطولك كمسودة. افتحها من الأسطول لإكمالها.',
+  'vehicleWizard.pickupFromYourLocation':
+    'تُستلم كل سيارة من موقع مكتبك. ولتغيير ذلك، عدّل الموقع في {profile}؛ ولا يُتاح تحديد نقطة استلام خاصة بكل سيارة.',
   'vehicleWizard.pickupLocationOf': '{business} — موقع الاستلام',
-  'vehicleWizard.customersWithinRadius': 'يستطيع العملاء ضمن نطاق {radius} كم طلب توصيل هذه السيارة.',
+  'vehicleWizard.customersWithinRadius':
+    'يستطيع العملاء ضمن نطاق {radius} كم طلب توصيل هذه السيارة.',
   'vehicleWizard.addPhoto': 'إضافة صورة',
   'vehicleWizard.uploading': 'جارٍ الرفع…',
   'vehicleWizard.continue': 'متابعة',
   'vehicleWizard.saveDraft': 'حفظ المسودة',
   'vehicleWizard.saveAndPublish': 'حفظ وعرض',
   'vehicleWizard.savingPublishes': 'الحفظ يعرض السيارة في بحث العملاء ويجعلها قابلة للحجز فورًا.',
-  'vehicleWizard.savingKeepsADraft': 'الحفظ يُبقي السيارة مسودة. اعرضها من صفحتها عندما تكون جاهزة.',
+  'vehicleWizard.savingKeepsADraft':
+    'الحفظ يُبقي السيارة مسودة. اعرضها من صفحتها عندما تكون جاهزة.',
   'carForm.editCar': 'تعديل السيارة',
   'carForm.saveChanges': 'حفظ التغييرات',
   'carForm.savedAsStatus': 'حُفظت {vehicle} بالحالة {status}.',
@@ -2953,4 +2968,9 @@ export const AR = {
 
   // Wave Two 2026-09-18: the advisor's review — a note that is gone, not absent
   'dealerReview.noteNoLongerOnRecord': 'لم تعد الملاحظة موجودة في السجل.',
+
+  // 2026-09-21: the sandbox payment provider.
+  'sandbox.title': 'مدفوعات تجريبية',
+  'sandbox.body':
+    'تعمل المنصّة الآن بمزوّد دفع تجريبي. لا تُخصم أي بطاقة ولا تنتقل أي أموال، فأي حجز يُؤكَّد هنا ليس حجزًا حقيقيًا.',
 } as const satisfies Record<TranslationKey, Message>;

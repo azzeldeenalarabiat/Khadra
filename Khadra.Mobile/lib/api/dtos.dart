@@ -118,6 +118,7 @@ class AppConfig {
     required this.maxRentalDays,
     required this.documents,
     required this.password,
+    required this.payments,
     required this.vocabularies,
   });
 
@@ -142,6 +143,13 @@ class AppConfig {
   /// all and lets the server judge, which is the only honest fallback.
   final PasswordPolicy? password;
 
+  /// What kind of money this deployment moves.
+  ///
+  /// Nothing else the app is told can answer it. A booking says nothing about it,
+  /// and `canPay` answers "will the button work", which is a different question
+  /// from "is any of this real". The test banner keys on this and only this.
+  final PaymentsConfig payments;
+
   final Vocabularies vocabularies;
 
   static AppConfig fromJson(Map<String, dynamic> json) => AppConfig(
@@ -160,8 +168,36 @@ class AppConfig {
         // password rule invented on the phone is the exact drift this field
         // exists to end, and `?? 8` would reintroduce it wearing a different hat.
         password: PasswordPolicy.maybe(json['password']),
+        payments: PaymentsConfig.fromJson(json['payments']),
         vocabularies: Vocabularies.fromJson(
             json['vocabularies'] as Map<String, dynamic>? ?? const {}),
+      );
+}
+
+/// What kind of money this deployment moves: `None`, `Sandbox` or `Live`.
+///
+/// One field, and the app's rule is "show the test banner when it reads Sandbox,
+/// and not otherwise". A second derived flag beside it would be two encodings of
+/// one fact, and the failure that enables is the expensive direction: telling a
+/// paying customer their payment was fake is far worse than missing a banner on a
+/// test build.
+///
+/// **Unknown is not Sandbox.** An older server, a field that never arrived, a
+/// value this release has never heard of — all of them mean the app says nothing,
+/// because a banner shown wrongly is worse than one missed. The server is where
+/// the truth about money lives, and it says so plainly or it says nothing.
+class PaymentsConfig {
+  const PaymentsConfig(this.mode);
+
+  /// Exactly as the server wrote it. Compared case-insensitively, never parsed
+  /// into an enum the app would then have to grow a case for.
+  final String mode;
+
+  /// The one thing any screen asks. Everything else is "not sandbox".
+  bool get isSandbox => mode.toLowerCase() == 'sandbox';
+
+  static PaymentsConfig fromJson(dynamic value) => PaymentsConfig(
+        value is Map<String, dynamic> ? value['mode'] as String? ?? '' : '',
       );
 }
 
@@ -1335,6 +1371,7 @@ class PaymentAttempt {
     required this.checkoutUrl,
     required this.expiresAt,
     required this.failureCode,
+    required this.isSandbox,
   });
 
   final String paymentId;
@@ -1344,6 +1381,14 @@ class PaymentAttempt {
   final DateTime expiresAt;
   final String? failureCode;
 
+  /// Whether no money moved for THIS attempt and none ever could have.
+  ///
+  /// A property of the record rather than of the deployment, which is why it is
+  /// here as well as on `AppConfig.payments`. That one says what this host is
+  /// doing now; this says what was true when the attempt was opened, and the two
+  /// can differ — which is the whole point of a marker that outlives a setting.
+  final bool isSandbox;
+
   static PaymentAttempt? maybe(dynamic value) => value is Map<String, dynamic>
       ? PaymentAttempt(
           paymentId: value['paymentId'] as String? ?? '',
@@ -1352,6 +1397,7 @@ class PaymentAttempt {
           checkoutUrl: value['checkoutUrl'] as String?,
           expiresAt: _requiredDateTime(value['expiresAt']),
           failureCode: value['failureCode'] as String?,
+          isSandbox: value['isSandbox'] as bool? ?? false,
         )
       : null;
 }

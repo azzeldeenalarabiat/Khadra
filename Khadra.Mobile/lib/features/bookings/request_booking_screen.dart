@@ -12,6 +12,7 @@ import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
+import '../../core/widgets/sandbox_banner.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import '../catalogue/date_range_sheet.dart';
@@ -750,6 +751,11 @@ class _Terms extends StatelessWidget {
               _hours(terms.freeCancellationWindowHours))),
           _Bullet(l10n.bookTermsCancellationPenalty(
               formats.percent(terms.customerCancellationPenaltyPercent))),
+          // The terms the customer is agreeing to are real; on a test build the
+          // money behind them is not. Said here, under the terms, because this is
+          // where they commit — not on the screen where the deposit falls due,
+          // which is hours later and a different decision.
+          const SandboxPaymentsBanner(padding: EdgeInsets.only(top: Space.sm)),
         ],
       ),
     );

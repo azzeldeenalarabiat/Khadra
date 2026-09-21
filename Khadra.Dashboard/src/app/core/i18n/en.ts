@@ -871,15 +871,15 @@ export const EN = {
   'dealerCustomerPage.couldntLoad': "Couldn't load your customer page",
   'dealerCustomerPage.couldntLoadNothingChanged':
     'Your customer page could not be loaded. Nothing has been changed.',
-  'dealerCustomerPage.serviceDidNotRespond':
-    'The service did not respond. Nothing has been saved.',
+  'dealerCustomerPage.serviceDidNotRespond': 'The service did not respond. Nothing has been saved.',
   'dealerCustomerPage.onlyTheDealerOwner':
     'Only the dealer owner can edit this page. You can read it.',
   'dealerCustomerPage.staleConsoleTitle': 'Saving is turned off on this page',
   'dealerCustomerPage.staleConsoleBody':
     'Your page has a section this version of the console cannot show, and saving now would erase what is written in it. Reload the console to get the current version.',
   'dealerCustomerPage.asCustomersSeeIt': 'As customers see it',
-  'dealerCustomerPage.previewIsSaved': 'This is what is on your page now. It follows when you save.',
+  'dealerCustomerPage.previewIsSaved':
+    'This is what is on your page now. It follows when you save.',
   'dealerCustomerPage.nothingShownYet':
     'You have not written anything customers can see yet. Your opening hours, delivery, location, rating and cars are on your page regardless.',
   'dealerCustomerPage.yourWordsNotKhadras':
@@ -2279,8 +2279,10 @@ export const EN = {
   },
   'disputeDetail.quoted': '“{text}”',
   'disputeDetail.dueAt': 'Due {when}',
-  'disputeDetail.resolveConfirmBody': '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}. Both parties see the decision, your note and your name, and it is written to the audit log.',
-  'disputeDetail.resolveConfirmBodyWithCharge': '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}, and {charge} charged to the dealer. Both parties see the decision, your note and your name, and it is written to the audit log.',
+  'disputeDetail.resolveConfirmBody':
+    '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}. Both parties see the decision, your note and your name, and it is written to the audit log.',
+  'disputeDetail.resolveConfirmBodyWithCharge':
+    '{refund} back to {customer}, {platform} kept by the platform, {dealerShare} to {dealer}, and {charge} charged to the dealer. Both parties see the decision, your note and your name, and it is written to the audit log.',
   'dealerDispute.openedByYourSide': 'Opened {when} by {name} (your side)',
   'dealerDispute.openedByCustomer': 'Opened {when} by {name} (the customer)',
   'dealerDispute.handledByName': 'Handled by {name}',
@@ -2291,11 +2293,14 @@ export const EN = {
   'bookingsList.scopedToCustomer': 'Showing one customer: {name}',
   'bookingsList.scopedToOneParty': 'Showing one party',
   'adminBooking.cancelTitle': 'Cancel {reference}?',
-  'adminBooking.cancelBody': 'The booking ends now and the car is released. No penalty is assessed against {customer} or {dealer} — the platform is cancelling, not either party.',
+  'adminBooking.cancelBody':
+    'The booking ends now and the car is released. No penalty is assessed against {customer} or {dealer} — the platform is cancelling, not either party.',
   'adminBooking.expireTitle': 'Expire {reference}?',
-  'adminBooking.expireBody': '{which} Expiring releases the car. No penalty is assessed against anyone.',
+  'adminBooking.expireBody':
+    '{which} Expiring releases the car. No penalty is assessed against anyone.',
   'adminBooking.noShowTitle': 'Mark {reference} as a no-show?',
-  'adminBooking.noShowBody': '{customer} never collected the car. This assesses whatever this booking\'s own terms say is owed — nothing is charged.',
+  'adminBooking.noShowBody':
+    "{customer} never collected the car. This assesses whatever this booking's own terms say is owed — nothing is charged.",
   'dealerBooking.requestedAt': 'Requested {when}',
 
   // Wave Two 2026-09-17: one clock for every deadline and SLA — remaining, overdue by, expired
@@ -2394,7 +2399,8 @@ export const EN = {
     other: 'Returns · next {count}h',
   },
   'employeeDash.oldestArrived': 'The oldest arrived {when}.',
-  'employeeDash.overdueDesc': '{customer} has not brought the car back. Record the return when it arrives.',
+  'employeeDash.overdueDesc':
+    '{customer} has not brought the car back. Record the return when it arrives.',
   'employeeDash.pickupDesc': '{customer}. Record the handover when the car leaves.',
   'employeeDash.dueBackAt': '{vehicle} due back {when}',
   'employeeDash.returnDesc': '{customer}’s rental ends. Confirm the return and note any damage.',
@@ -2429,11 +2435,15 @@ export const EN = {
     one: '{count} in your fleet',
     other: '{count} in your fleet',
   },
-  'dealerDash.oldestMadeExpiry': 'The oldest was made {when}. A request expires when its rental date arrives unanswered.',
-  'dealerDash.overdueDesc': '{customer} has not returned the car. Record the return when it comes back, and note any damage within the settlement window.',
-  'dealerDash.pickupDesc': '{customer}. Record the handover with the odometer and fuel level when the keys change hands.',
+  'dealerDash.oldestMadeExpiry':
+    'The oldest was made {when}. A request expires when its rental date arrives unanswered.',
+  'dealerDash.overdueDesc':
+    '{customer} has not returned the car. Record the return when it comes back, and note any damage within the settlement window.',
+  'dealerDash.pickupDesc':
+    '{customer}. Record the handover with the odometer and fuel level when the keys change hands.',
   'dealerDash.returnAt': '{vehicle} return {when}',
-  'dealerDash.returnDesc': '{customer}’s rental ends. Confirm the return and note any damage within the settlement window.',
+  'dealerDash.returnDesc':
+    '{customer}’s rental ends. Confirm the return and note any damage within the settlement window.',
   'dealerDash.activityApproved': '{actor} approved booking {reference}',
   'dealerDash.activityRejected': '{actor} rejected booking {reference}',
   'dealerDash.activityHandedOver': '{actor} handed over booking {reference}',
@@ -2491,7 +2501,8 @@ export const EN = {
   'dealerDispute.disputeOnReference': 'Dispute on {reference}',
   'dealerDispute.photosOrAPdfStored': 'Photos or a PDF, stored privately.',
   'dealerDispute.addStatement': 'Add statement',
-  'dealerApply.withThePlatformForLicenceCheck': '{name} is with the platform for its licence check.',
+  'dealerApply.withThePlatformForLicenceCheck':
+    '{name} is with the platform for its licence check.',
   'dealerApply.attachedFile': 'Attached: {name}',
   'dealerApply.stillNeededDocuments': 'Still needed: {documents}.',
   'dealerApply.submitting': 'Submitting…',
@@ -2508,7 +2519,8 @@ export const EN = {
   'dealerEmployees.reportsNowHidden': '{name} can still handle bookings; reports are hidden.',
   'dealerEmployees.deactivateName': 'Deactivate {name}?',
   'dealerEmployees.noLongerHasAccess': '{name} no longer has access.',
-  'dealerEmployees.stillNeedsToAccept': '{name} still needs to accept their invitation and set a password.',
+  'dealerEmployees.stillNeedsToAccept':
+    '{name} still needs to accept their invitation and set a password.',
   'dealerEmployees.canSignInAgain': '{name} can sign in again with their existing password.',
   'dealerProfile.saveChanges': 'Save changes',
   'dealerProfile.uploading': 'Uploading…',
@@ -2537,12 +2549,14 @@ export const EN = {
   'dealerDelivery.whatYouChargePerDelivery': 'What you charge per delivery ({currency})',
   'dealerDelivery.enterFeeUpTo': 'Enter what you charge, between 0 and {max}.',
   'employeeSettings.changingPassword': 'Changing…',
-  'employeeSettings.passwordUnchanged': 'That is the password you already have. Choose a different one.',
+  'employeeSettings.passwordUnchanged':
+    'That is the password you already have. Choose a different one.',
   'employeeSettings.passwordRulesNotMet': 'The new password does not meet the password rules.',
   'employeeSettings.security': 'Security',
   'employeeSettings.notifications': 'Notifications',
   'employeeSettings.employeeOfBusiness': 'Employee of {business}',
-  'employeeBusiness.detailsCouldNotBeLoaded': 'Your dealership\'s details could not be loaded. Nothing has been changed.',
+  'employeeBusiness.detailsCouldNotBeLoaded':
+    "Your dealership's details could not be loaded. Nothing has been changed.",
   'employeeBusiness.radiusAndFee': '{km} km · {fee}',
   'employeeBusiness.opensToCloses': '{opens} – {closes}',
   'employeeBusiness.trading': 'Trading',
@@ -2614,7 +2628,8 @@ export const EN = {
   'dealerReview.documentCommercialRegistration': 'Commercial registration',
   'dealerReview.documentVehicleRegistration': 'Vehicle registration',
   'dealerReview.documentOwnerIdentity': 'Owner identity',
-  'dealerReview.missingDocumentsRequired': 'Missing: {documents}. Every one of these is required before this application can be approved.',
+  'dealerReview.missingDocumentsRequired':
+    'Missing: {documents}. Every one of these is required before this application can be approved.',
   'dealerReview.approveNameQuestion': 'Approve {name}?',
   'dealerReview.nameCanNowTrade': '{name} can now trade.',
   'dealerReview.rejectNameQuestion': 'Reject {name}?',
@@ -2757,10 +2772,12 @@ export const EN = {
   'security.sessionActive': 'Active',
   'security.ended': 'Ended',
   'security.signedInCannotBeRefreshed': 'Signed in {date}. It cannot be refreshed after this.',
-  'security.signedInFromCannotBeRefreshed': 'Signed in {date} from {address}. It cannot be refreshed after this.',
+  'security.signedInFromCannotBeRefreshed':
+    'Signed in {date} from {address}. It cannot be refreshed after this.',
   'security.inFlightForUpToMinutes': {
     one: 'A session already in flight can keep working for up to {count} minute before it has to refresh. If this is the session you are using now, you will be signed out.',
-    other: 'A session already in flight can keep working for up to {count} minutes before it has to refresh. If this is the session you are using now, you will be signed out.',
+    other:
+      'A session already in flight can keep working for up to {count} minutes before it has to refresh. If this is the session you are using now, you will be signed out.',
   },
   'employeeNotifications.unreadSummary': {
     one: '{count} unread · what happened at your dealership',
@@ -2784,13 +2801,18 @@ export const EN = {
   'penaltyReason.paymentWindowLapsed': 'The deposit was not paid within the payment window.',
   'penaltyReason.dealerAnswerWindowLapsed': 'The dealer did not answer within the agreed window.',
   'penaltyReason.dealerRejected': 'The dealer rejected the request.',
-  'penaltyReason.dealerDidNotHandOver': 'The dealer did not hand over the vehicle after approving the booking.',
-  'penaltyReason.customerNoShow': 'The customer did not collect the vehicle within the no-show window.',
-  'penaltyReason.deliveryNoShowUndetermined': 'The vehicle was never handed over on a delivery booking; responsibility is undetermined.',
+  'penaltyReason.dealerDidNotHandOver':
+    'The dealer did not hand over the vehicle after approving the booking.',
+  'penaltyReason.customerNoShow':
+    'The customer did not collect the vehicle within the no-show window.',
+  'penaltyReason.deliveryNoShowUndetermined':
+    'The vehicle was never handed over on a delivery booking; responsibility is undetermined.',
   'penaltyReason.cancelledBeforeDeposit': 'Cancelled before the deposit was paid.',
   'penaltyReason.cancelledInFreeWindow': 'Cancelled inside the free cancellation window.',
-  'penaltyReason.customerCancelledAfterFreeWindow': 'The customer cancelled after the free cancellation window.',
-  'penaltyReason.dealerCancelledAfterFreeWindow': 'The dealer cancelled after the free cancellation window.',
+  'penaltyReason.customerCancelledAfterFreeWindow':
+    'The customer cancelled after the free cancellation window.',
+  'penaltyReason.dealerCancelledAfterFreeWindow':
+    'The dealer cancelled after the free cancellation window.',
   'penaltyReason.cancelledByPlatform': 'Cancelled by the platform.',
   'penaltyReason.notCancellable': 'This booking can no longer be cancelled.',
 
@@ -2875,21 +2897,27 @@ export const EN = {
     one: '{count} uploaded',
     other: '{count} uploaded',
   },
-  'vehicleWizard.plateIsOnYourDraft': '{plate} is on a draft you already started ({vehicle}). Continue that draft instead of creating another.',
+  'vehicleWizard.plateIsOnYourDraft':
+    '{plate} is on a draft you already started ({vehicle}). Continue that draft instead of creating another.',
   'vehicleWizard.plateIsOnYourCar': '{plate} is already on {vehicle} in your fleet.',
   'vehicleWizard.vehicleIsLive': '{vehicle} is live in your fleet.',
   'vehicleWizard.vehicleIsADraft': '{vehicle} is in your fleet as a draft.',
-  'vehicleWizard.vehicleStaysADraft': '{vehicle} stays in your fleet as a draft. Open it from the fleet to finish.',
-  'vehicleWizard.pickupFromYourLocation': 'Every car is collected from your dealership\'s location. To move it, change the location on your {profile}; a per-car pickup point is not offered.',
+  'vehicleWizard.vehicleStaysADraft':
+    '{vehicle} stays in your fleet as a draft. Open it from the fleet to finish.',
+  'vehicleWizard.pickupFromYourLocation':
+    "Every car is collected from your dealership's location. To move it, change the location on your {profile}; a per-car pickup point is not offered.",
   'vehicleWizard.pickupLocationOf': '{business} — pickup location',
-  'vehicleWizard.customersWithinRadius': 'Customers within your {radius} km radius can ask for this car to be delivered.',
+  'vehicleWizard.customersWithinRadius':
+    'Customers within your {radius} km radius can ask for this car to be delivered.',
   'vehicleWizard.addPhoto': 'Add photo',
   'vehicleWizard.uploading': 'Uploading…',
   'vehicleWizard.continue': 'Continue',
   'vehicleWizard.saveDraft': 'Save draft',
   'vehicleWizard.saveAndPublish': 'Save & publish',
-  'vehicleWizard.savingPublishes': 'Saving publishes the vehicle to customer search and makes it bookable straight away.',
-  'vehicleWizard.savingKeepsADraft': 'Saving keeps the vehicle as a draft. Publish it from its page when it is ready.',
+  'vehicleWizard.savingPublishes':
+    'Saving publishes the vehicle to customer search and makes it bookable straight away.',
+  'vehicleWizard.savingKeepsADraft':
+    'Saving keeps the vehicle as a draft. Publish it from its page when it is ready.',
   'carForm.editCar': 'Edit car',
   'carForm.saveChanges': 'Save changes',
   'carForm.savedAsStatus': '{vehicle} is saved as {status}.',
@@ -2897,6 +2925,14 @@ export const EN = {
 
   // Wave Two 2026-09-18: the advisor's review — a note that is gone, not absent
   'dealerReview.noteNoLongerOnRecord': 'The note is no longer on record.',
+
+  // 2026-09-21: the sandbox payment provider. Shown only when the API itself reports
+  // payments.mode = Sandbox, which a Production API can never do — it refuses to start on that
+  // provider. Both consoles show it, because a dealer preparing a car and an administrator reading
+  // a figure are equally entitled to know the money behind it is not real.
+  'sandbox.title': 'Test payments',
+  'sandbox.body':
+    'This platform is running a sandbox payment provider. No card is charged and no money moves, so any booking confirmed here is not a real rental.',
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

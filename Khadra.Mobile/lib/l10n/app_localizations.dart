@@ -3349,6 +3349,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That car is no longer listed, so it cannot be saved.'**
   String get errorShortlistVehicleNotFound;
+
+  /// Shown only when /app-config reports payments.mode = Sandbox, which a Production server can never report: the API refuses to start on that provider outside a test host. It is the customer-facing half of the rule that a sandbox payment must never be mistakable for a real one.
+  ///
+  /// In en, this message translates to:
+  /// **'Test payments'**
+  String get sandboxPaymentsTitle;
+
+  /// No description provided for @sandboxPaymentsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is a test build. No card is charged and no money moves. Any booking you confirm here is not a real rental.'**
+  String get sandboxPaymentsBody;
+
+  /// On one attempt, from the record's own isSandbox rather than the platform mode: a booking paid on a sandbox host stays a sandbox booking however the platform is configured when it is read later.
+  ///
+  /// In en, this message translates to:
+  /// **'Test payment — no money moved.'**
+  String get sandboxPaymentsAttempt;
 }
 
 class _AppLocalizationsDelegate

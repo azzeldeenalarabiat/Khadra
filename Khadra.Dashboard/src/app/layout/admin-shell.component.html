@@ -2,6 +2,9 @@
   <kh-admin-sidebar />
   <div class="shell-main">
     <kh-admin-topbar />
+    <!-- Outside the scrolling page area on purpose: "the money here is not real" must not scroll
+         away from the figure it is about. Renders nothing unless the API itself reports Sandbox. -->
+    <kh-sandbox-banner />
     <main #page class="page">
       <router-outlet />
     </main>

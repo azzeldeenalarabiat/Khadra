@@ -20,8 +20,12 @@ public sealed class AppConfigTests
 {
     private static GetAppConfigHandler Handler(
         int? minimumRenterAge = 21,
-        int passwordMinimumLength = 8)
+        int passwordMinimumLength = 8,
+        PaymentMode paymentMode = PaymentMode.None)
     {
+        var payments = Substitute.For<IPaymentProvider>();
+        payments.Mode.Returns(paymentMode);
+
         var calendar = Substitute.For<IReportingCalendar>();
         calendar.TimeZoneId.Returns("Asia/Amman");
 
@@ -36,7 +40,35 @@ public sealed class AppConfigTests
             calendar,
             TestBusinessRules.Provider(minimumRenterAge: minimumRenterAge),
             documents,
-            authPolicy);
+            authPolicy,
+            payments);
+    }
+
+    /// <summary>
+    /// What kind of money this deployment moves, in one word, before any screen shows a price.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It cannot be worked out from anything else a client is told: the booking says nothing about
+    /// it, and the payment availability verdict answers "can I pay", not "is it real". The value is
+    /// what the sandbox banner keys on, and the banner is what keeps a test booking from looking like
+    /// a paid one to whoever opens the app next.
+    /// </para>
+    /// <para>
+    /// Taken straight from the adapter's own <c>Mode</c>, so a future provider reports itself rather
+    /// than being recognised here by name.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData(PaymentMode.None, "None")]
+    [InlineData(PaymentMode.Sandbox, "Sandbox")]
+    [InlineData(PaymentMode.Live, "Live")]
+    public async Task It_says_what_kind_of_money_this_deployment_moves(PaymentMode mode, string published)
+    {
+        var config = (await Handler(paymentMode: mode)
+            .Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        Assert.Equal(published, config.Payments.Mode);
     }
 
     [Fact]
