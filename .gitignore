@@ -8,6 +8,14 @@ obj/
 *.swp
 [Dd]ebug/
 [Rr]elease/
+
+# ...but Android's build-type source sets are SOURCE, not build output. `src/debug/` and
+# `src/release/` are where a Gradle build type overrides a resource, and the debug one carries the
+# only copy of the development network allowlist. The rules above are written for .NET's bin/Debug,
+# and they swallowed it: the file existed on every machine it had been made on and on no other, so a
+# fresh clone built a debug APK that could not reach a local API at all.
+!Khadra.Mobile/android/app/src/debug/
+!Khadra.Mobile/android/app/src/release/
 [Tt]est[Rr]esult*/
 .vs/
 .vscode/
