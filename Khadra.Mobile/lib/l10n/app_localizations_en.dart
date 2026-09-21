@@ -24,6 +24,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get actionClose => 'Close';
 
   @override
+  String vehiclePhotoPosition(String index, String count) {
+    return '$index / $count';
+  }
+
+  @override
   String get actionSave => 'Save';
 
   @override
@@ -292,7 +297,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navNotifications => 'Alerts';
 
   @override
+  String get navSaved => 'Saved';
+
+  @override
   String get navProfile => 'Profile';
+
+  @override
+  String homeGreetingMorning(String name) {
+    return 'Good morning, $name';
+  }
+
+  @override
+  String homeGreetingAfternoon(String name) {
+    return 'Good afternoon, $name';
+  }
+
+  @override
+  String homeGreetingEvening(String name) {
+    return 'Good evening, $name';
+  }
+
+  @override
+  String get homeGreetingPrompt => 'Where would you like to pick up your car?';
+
+  @override
+  String get backAgainToExit => 'Press back again to exit';
 
   @override
   String get searchTitle => 'Find a car';
@@ -881,6 +910,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingGallery => 'Rental office';
 
   @override
+  String get bookingDealerRemoved => 'Office no longer on Khadra';
+
+  @override
   String get bookingCar => 'Car';
 
   @override
@@ -888,6 +920,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookingHistory => 'What has happened';
+
+  @override
+  String get bookingProgress => 'Progress';
+
+  @override
+  String bookingActivityBy(String party) {
+    return 'by $party';
+  }
+
+  @override
+  String get bookingPaymentSummary => 'Payment';
+
+  @override
+  String get bookingPickupReturn => 'Collection and return';
+
+  @override
+  String get bookingActions => 'What you can do';
+
+  @override
+  String get bookingStageRequested => 'Requested';
+
+  @override
+  String get bookingStageApproved => 'Approved by the office';
+
+  @override
+  String get bookingStageConfirmed => 'Deposit paid';
+
+  @override
+  String get bookingStagePickedUp => 'Collected';
+
+  @override
+  String get bookingStageReturned => 'Returned';
+
+  @override
+  String get bookingStageCompleted => 'Finished';
+
+  @override
+  String get bookingStageRejected => 'Declined by the office';
+
+  @override
+  String get bookingStageCancelled => 'Cancelled';
+
+  @override
+  String get bookingStageNoShow => 'Not collected';
+
+  @override
+  String get bookingStageExpired => 'Time ran out';
+
+  @override
+  String get bookingStageWaitingSettlement => 'After the settlement window';
+
+  @override
+  String get bookingStageWaitingDispute => 'After the dispute is settled';
+
+  @override
+  String get bookingLapsedDecisionTitle => 'The office did not answer in time';
+
+  @override
+  String get bookingLapsedDecisionBody =>
+      'The car has gone back on the market and this booking is closing. Nothing is owed.';
+
+  @override
+  String get bookingLapsedPaymentTitle =>
+      'The time to pay the deposit has passed';
+
+  @override
+  String get bookingLapsedPaymentBody =>
+      'This booking is closing and the car has gone back on the market. Nothing is owed.';
+
+  @override
+  String get bookingDepositPaidNote => 'Paid';
+
+  @override
+  String get bookingRentalCost => 'What the rental costs';
+
+  @override
+  String get bookingHowItIsPaid => 'How it is paid';
+
+  @override
+  String get bookingBalanceIncludesDelivery => 'Includes the delivery fee.';
 
   @override
   String get bookingHandoversTitle => 'Collection and return';
@@ -956,6 +1068,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get bookingCancelledByYou => 'Cancelled by you';
+
+  @override
   String get bookingNoShowTitle => 'The car was not collected';
 
   @override
@@ -967,8 +1082,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String bookingPenaltyAssessedOnYou(String amount) {
+    return 'An amount of $amount has been assessed against you.';
+  }
+
+  @override
   String bookingPenaltyRange(String min, String max, String party) {
     return 'Between $min and $max has been assessed against $party.';
+  }
+
+  @override
+  String bookingPenaltyRangeOnYou(String min, String max) {
+    return 'Between $min and $max has been assessed against you.';
   }
 
   @override
@@ -1394,7 +1519,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get profileSessionRevoke => 'Sign out';
+  String get profileSessionRevoke => 'Sign out of this device';
+
+  @override
+  String get profileSessionUnknownDevice => 'Unrecognised device';
 
   @override
   String get profileSessionRevoked => 'That device has been signed out.';
@@ -1891,6 +2019,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get shortlistEmptyBody =>
       'Tap the heart on a car to keep it here while you compare.';
+
+  @override
+  String get shortlistSignedOutTitle => 'Sign in to see your saved cars';
 
   @override
   String get shortlistUnavailable => 'Currently unavailable';
