@@ -2012,8 +2012,32 @@ with no secret there is no way to tell a provider from anyone else who found the
 **Nobody may close this with a simulated provider.** One that captured and confirmed would be
 indistinguishable, in every table and on every screen, from a real payment: bookings would read
 Confirmed, galleries would prepare cars, and nobody could tell which rentals had money behind them.
-That is the same prohibition item 2 records about cash paid out of band, in a different costume. There
-is deliberately no `Payments:Provider` value that does it, and none should be added.
+That is the same prohibition item 2 records about cash paid out of band, in a different costume.
+
+**One `Payments:Provider` value now does exactly that, and it does not close this item.** `SANDBOX`
+was approved by the owner on 2026-09-21 so the booking and payment lifecycle could be clicked through
+end to end before a merchant account exists. It is an exception to the prohibition, not a repeal of
+it, and what makes it allowable is three mechanisms rather than an intention — each of which
+`SandboxPaymentGuardTests` proves actually fires:
+
+1. **Environment.** `Program.cs` refuses to start a Production host on it, beside the mail and
+   document guards. Render leaves `ASPNETCORE_ENVIRONMENT` unset, which defaults to Production, so
+   this bites exactly where it should.
+2. **Data, in both directions.** `PaymentsStartupCheck` refuses to start whenever this database's
+   payments and this process's provider are different kinds of money. The sandbox will not run on a
+   database holding real payments — the guard that catches a local process pointed at the production
+   connection string — and **nothing else will run on a database holding sandbox payments**, which is
+   the direction that would otherwise bite on launch day: sandbox-confirmed bookings, reading
+   Confirmed with a deposit marked paid and a gallery already notified, still there when a real
+   adapter is switched on. A database used for sandbox payments stays on the sandbox for good.
+3. **The record.** Every row it writes carries `SANDBOX` in `payments.provider` for as long as the
+   row exists, and that one stored value is what `PaymentDto.isSandbox` and the boot log both read.
+   No second flag, because a second flag can disagree with the first.
+
+It is also published: `/app-config` carries `payments.mode` (`None`/`Sandbox`/`Live`), and the
+customer app and both consoles show a standing banner on Sandbox and on nothing else.
+
+**This item stays open until a real provider takes real JOD.** The sandbox takes none.
 
 **To close:** an account with a provider that can take JOD; one class implementing the four methods of
 `IPaymentProvider`; the three settings in user-secrets or the environment; the webhook URL registered
@@ -3511,3 +3535,58 @@ rather than by the record being unambiguous.
 **To close:** decide whether "primary" is a flag or simply position 0. If it is position 0, make
 `SetPrimaryImage` move the photograph and reindex, drop the ordering from the readers, and the
 question cannot be got wrong again.
+
+### 123. The sandbox payment provider, and everything that must go with it
+
+**Status:** open · **Raised:** 2026-09-21 · **Blocks:** nothing today, blocks the real adapter
+
+`SandboxPaymentProvider` completes a checkout and moves no money. The owner approved it on 2026-09-21
+so the booking and payment lifecycle could be clicked through end to end; the three mechanisms that
+make it impossible to operate in Production are described under item 76, and
+`SandboxPaymentGuardTests` proves each of them fires. This item is not about whether it is safe now.
+It is about the fact that the class promises its own deletion, and a promise made in a doc comment is
+a promise nobody keeps.
+
+**To close, when a real adapter ships:**
+
+- Delete `SandboxPaymentProvider`, `SandboxEvents`, `SandboxCheckoutEndpoints`, the
+  `Payments:SandboxConsoleBaseUrl` setting and the `SANDBOX` entry in `PaymentOptions.KnownProviders`.
+  The banner on the three clients can stay: `payments.mode` still answers `Live`, and a mode nobody
+  reports costs nothing.
+- Wipe or retire every database that ever held a `SANDBOX` payment. The startup guard already refuses
+  to serve one with a real provider, so this is not optional — it is the step that guard forces, and
+  doing it deliberately beats discovering it at a deploy.
+
+**And one hole the boot-time guard cannot close.** It runs once, at startup. Two processes starting
+against one empty database — one sandbox, one real — both pass, and afterwards both write. Only the
+database can refuse that: an INSERT trigger on `payments` rejecting a row whose class (SANDBOX versus
+not) differs from any existing row's, in the same idiom as the trigger `audit_entries` already has.
+It needs a real adapter to be reachable at all, so it is written with that adapter, in the same
+migration.
+
+### 124. The customer app's bookings list never leaves its loading state
+
+**Status:** open · **Raised:** 2026-09-21 · **Owner decision:** deferred to the realtime/refresh batch
+
+Found during the manual sandbox payment lifecycle. Opening the customer app's bookings list shows a
+spinner that never resolves, while the API answers correctly and quickly.
+
+**Exactly what was observed, on a local build against a local API:**
+
+- The bookings list remains in its loading state indefinitely.
+- Requests repeat rather than settling.
+- **16 `GET /api/v1/bookings?tab=…` and 16 `GET /api/v1/bookings/tab-counts`** were counted in one
+  API process from **two** openings of the screen.
+- The API itself returns **200** for both, in roughly 200 ms.
+
+So this is a client-side refresh loop, not a server fault. `bookings_screen.dart` matches
+`AsyncLoading()` before its data arm and falls through to `_ => const KhadraLoading()`, so a provider
+that is perpetually re-fetching renders as a permanent spinner rather than as stale data or an error.
+
+**Not caused by the sandbox payment work.** Nothing in that batch touches this screen or its
+providers, and the booking DETAIL screen — which the payment flow uses — works throughout: it renders
+the deposit, the countdown, the Pay button and the confirmed timeline.
+
+**To close:** it belongs with the next batch's realtime refresh and request deduplication. Whatever
+fixes the loop should also make this screen unable to present a loading state forever — a list that
+has data must show it, and a list that has failed must say so.
