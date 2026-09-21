@@ -440,6 +440,7 @@ class SessionSummary {
     required this.createdByIp,
     required this.userAgent,
     required this.isActive,
+    required this.isCurrent,
   });
 
   final String familyId;
@@ -450,6 +451,18 @@ class SessionSummary {
   final String? userAgent;
   final bool isActive;
 
+  /// Whether this is the phone in the customer's hand.
+  ///
+  /// The SERVER says so, from the session id in the access token this request carried — the app
+  /// cannot work it out, and must not try: nothing here is read out of the JWT, and the obvious
+  /// guess (the most recently used row) is wrong, because "last used" is the last token refresh
+  /// and another device may have rotated more recently.
+  ///
+  /// False also means "this build of the server could not say", which is the case for a token
+  /// minted before the claim existed. So a row is marked only when this is true; nothing is
+  /// inferred from its absence.
+  final bool isCurrent;
+
   static SessionSummary fromJson(Map<String, dynamic> json) => SessionSummary(
         familyId: json['familyId'] as String? ?? '',
         signedInAt: _requiredDateTime(json['signedInAt']),
@@ -458,6 +471,7 @@ class SessionSummary {
         createdByIp: json['createdByIp'] as String?,
         userAgent: json['userAgent'] as String?,
         isActive: json['isActive'] as bool? ?? true,
+        isCurrent: json['isCurrent'] as bool? ?? false,
       );
 }
 

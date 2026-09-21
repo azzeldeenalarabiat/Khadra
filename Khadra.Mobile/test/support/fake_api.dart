@@ -252,6 +252,20 @@ class FakeApi extends KhadraApi {
         if (entry.vehicleId != vehicleId) entry,
     ];
   }
+
+  // ── Registered devices ──────────────────────────────────────────────────────
+
+  /// What `/auth/sessions` answers. Empty by default, because most screens never
+  /// ask; the devices screen sets its own.
+  MySessions mySessions = const MySessions(<SessionSummary>[], 15);
+
+  final List<String> revokedFamilies = <String>[];
+
+  @override
+  Future<MySessions> sessions() async => mySessions;
+
+  @override
+  Future<void> revokeSession(String familyId) async => revokedFamilies.add(familyId);
 }
 
 /// The token store, in memory.
