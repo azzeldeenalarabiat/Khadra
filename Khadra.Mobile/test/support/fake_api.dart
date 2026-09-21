@@ -173,6 +173,16 @@ class FakeApi extends KhadraApi {
   @override
   Future<Map<String, int>> bookingTabCounts() async => const {};
 
+  /// The one booking the detail endpoint answers with. Set by the detail tests.
+  Booking? bookingById;
+
+  @override
+  Future<Booking> booking(String bookingId) async {
+    final found = bookingById;
+    if (found == null) throw StateError("no booking was staged for $bookingId");
+    return found;
+  }
+
   @override
   Future<NotificationFeed> notifications({int page = 1, int pageSize = 25}) async =>
       const NotificationFeed(

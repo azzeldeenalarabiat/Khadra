@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../api/dtos.dart';
 import '../../core/format/greeting.dart';
+import '../../core/format/booking_presentation.dart';
 import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -158,7 +159,8 @@ class _NextBookingCard extends ConsumerWidget {
                   Text(
                     // A booking outlives the listing behind it, so the car can be
                     // gone; the gallery's name is what identifies it then.
-                    booking.vehicle?.title ?? booking.dealerName,
+                    booking.vehicle?.title ??
+                        BookingPresentation.dealerName(l10n, booking),
                     style: const TextStyle(
                         color: KhadraColors.neutral700, fontSize: 13),
                     maxLines: 1,
