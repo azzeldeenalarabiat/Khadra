@@ -22,13 +22,23 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
         // owned Period does not translate, and the dealer's scope is a few hundred rows at most.
         var mine = context.Bookings.Where(booking => booking.DealerId == dealerId);
 
-        var requestedCount = await mine.CountAsync(booking => booking.Status == requested, cancellationToken);
+        // Only the ones whose window is still open.
+        //
+        // `Status` alone was the bug. A request past its decision deadline and an approval past its
+        // payment deadline are over the instant the clock says so -- the car is already free, and
+        // `BookingHolds.Live` has always known it -- but the row reads Requested or Approved until
+        // the settlement sweep gets to it. On Render's free tier the API sleeps after fifteen minutes
+        // idle, so "until the sweep gets to it" can be hours, and this queue counted every one of
+        // them as work waiting for the dealer.
+        var live = mine.Where(BookingLapse.HasNotLapsedAt(now));
+
+        var requestedCount = await live.CountAsync(booking => booking.Status == requested, cancellationToken);
         var oldest = requestedCount == 0
             ? null
-            : await mine.Where(booking => booking.Status == requested).MinAsync(booking => booking.RequestedAt, cancellationToken);
+            : await live.Where(booking => booking.Status == requested).MinAsync(booking => booking.RequestedAt, cancellationToken);
         // Counted apart, never summed into one "approved" figure: a car nobody has paid for is not
         // the same thing to a gallery as a rental going out on Tuesday.
-        var awaitingDeposit = await mine.CountAsync(booking => booking.Status == approved, cancellationToken);
+        var awaitingDeposit = await live.CountAsync(booking => booking.Status == approved, cancellationToken);
         var confirmedCount = await mine.CountAsync(booking => booking.Status == confirmed, cancellationToken);
         var pickedUpCount = await mine.CountAsync(booking => booking.Status == pickedUp, cancellationToken);
         var overdue = await mine.CountAsync(booking => booking.Status == pickedUp && booking.Period.End < now, cancellationToken);
@@ -40,9 +50,15 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
     {
         // Approved AND confirmed. Listing only one would either have staff preparing cars for
         // customers who have not paid, or hide the ones who have.
+        //
+        // Lapse-filtered for the same reason as the counts above, and it matters more here: this is
+        // the list staff work from. An approval whose payment window closed is a car nobody is
+        // coming for, and the platform has already put it back on the market -- preparing it wastes
+        // the morning, and worse, hides that the slot is free.
         var approved = BookingStatus.Approved;
         var confirmed = BookingStatus.Confirmed;
         return await Handovers(context.Bookings
+                .Where(BookingLapse.HasNotLapsedAt(from))
                 .Where(booking => booking.DealerId == dealerId &&
                                   (booking.Status == approved || booking.Status == confirmed) &&
                                   booking.Period.Start >= from && booking.Period.Start < to)

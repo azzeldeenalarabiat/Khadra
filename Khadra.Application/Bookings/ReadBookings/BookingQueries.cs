@@ -115,7 +115,7 @@ public sealed class ListMyBookingsHandler(IBookingReader reader, DealerMembershi
 public sealed record GetMyNextBookingQuery(Id UserId, UserRole Role)
     : IQuery<Result<NextBooking?, Error>>;
 
-public sealed class GetMyNextBookingHandler(IBookingReader reader)
+public sealed class GetMyNextBookingHandler(IBookingReader reader, IClock clock)
     : IRequestHandler<GetMyNextBookingQuery, Result<NextBooking?, Error>>
 {
     public async Task<Result<NextBooking?, Error>> Handle(
@@ -128,7 +128,7 @@ public sealed class GetMyNextBookingHandler(IBookingReader reader)
             return BookingErrors.NotAParty;
 
         return Result.Success<NextBooking?, Error>(
-            await reader.NextForCustomerAsync(request.UserId, cancellationToken));
+            await reader.NextForCustomerAsync(request.UserId, clock.UtcNow, cancellationToken));
     }
 }
 

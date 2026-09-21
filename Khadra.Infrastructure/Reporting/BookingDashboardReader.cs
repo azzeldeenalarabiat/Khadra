@@ -10,6 +10,7 @@ internal sealed class BookingDashboardReader(KhadraDbContext context) : IBooking
 {
     public async Task<BookingCounts> CountsAsync(
         DateTimeOffset createdSince,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         var requested = BookingStatus.Requested;
@@ -20,23 +21,45 @@ internal sealed class BookingDashboardReader(KhadraDbContext context) : IBooking
         var confirmed = BookingStatus.Confirmed;
         var pickedUp = BookingStatus.PickedUp;
 
-        var counts = await context.Bookings
+        // The two figures that are not about liveness, still in one aggregate: a booking that
+        // expired still happened, and neither of these asks whether it is over.
+        var totals = await context.Bookings
             .GroupBy(_ => 1)
-            .Select(group => new BookingCounts(
-                group.Count(),
+            .Select(group => new
+            {
+                All = group.Count(),
                 // Today, as one more filter on the aggregate the card already pays for. No upper
                 // bound: createdSince is local midnight of the day in progress, and a booking cannot
                 // be created after now.
-                group.Count(booking => booking.CreatedAt >= createdSince),
-                group.Count(booking =>
-                    booking.Status == requested ||
-                    booking.Status == approved ||
-                    booking.Status == confirmed ||
-                    booking.Status == pickedUp),
-                group.Count(booking => booking.Status == requested)))
+                Today = group.Count(booking => booking.CreatedAt >= createdSince),
+            })
             .SingleOrDefaultAsync(cancellationToken);
 
-        return counts ?? new BookingCounts(0, 0, 0, 0);
+        // ...and the two that ARE, asked separately so the rule stays in one place.
+        //
+        // `BookingLapse.HasNotLapsedAt` is an expression over a Booking, which composes into a
+        // `Where` but cannot go inside the conditional aggregates above. Spelling the deadlines out
+        // there instead would put a second copy of the lapse rule in this file -- the duplication
+        // `CatalogueReader` already warns about, and the one `BookingLapseTests` exists to prevent.
+        // Two extra indexed counts is the cheaper mistake.
+        //
+        // Why it is needed at all: "active" and "pending" both mean a window that has not closed. A
+        // request past its decision deadline and an approval past its payment deadline are finished
+        // the moment the clock says so -- the catalogue has already released the car -- and the row
+        // only catches up when the settlement sweep runs. On Render's free tier the API sleeps, so
+        // that can be hours, and both figures were inflated for the whole of it.
+        var live = context.Bookings.Where(BookingLapse.HasNotLapsedAt(now));
+
+        var active = await live.CountAsync(
+            booking => booking.Status == requested ||
+                       booking.Status == approved ||
+                       booking.Status == confirmed ||
+                       booking.Status == pickedUp,
+            cancellationToken);
+
+        var pending = await live.CountAsync(booking => booking.Status == requested, cancellationToken);
+
+        return new BookingCounts(totals?.All ?? 0, totals?.Today ?? 0, active, pending);
     }
 
     public async Task<IReadOnlyList<DateTimeOffset>> CreatedBetweenAsync(

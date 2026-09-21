@@ -283,13 +283,21 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
     /// </remarks>
     public async Task<NextBooking?> NextForCustomerAsync(
         Id customerId,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
         // Soonest first in every case. A customer with two upcoming rentals wants the one that
         // starts on Thursday, not the one they happened to book last.
+        //
+        // Lapse-filtered, and this is the most consequential of the four readers that were not.
+        // `Approved` is reported as AwaitingPayment, and the app turns that into "your deposit is
+        // due" with a countdown -- so an approval whose window had closed was asking a customer to
+        // pay for a rental the platform had already released, and would have taken their money for
+        // a car somebody else could book. The clock is what makes it a live booking, not the status.
         async Task<NextBooking?> FirstAsync(BookingStatus status, string reason, bool byEnd = false)
         {
             var query = context.Bookings
+                .Where(BookingLapse.HasNotLapsedAt(now))
                 .Where(booking => booking.CustomerId == customerId && booking.Status == status);
 
             query = byEnd

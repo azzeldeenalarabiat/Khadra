@@ -23,8 +23,15 @@ public interface IBookingDashboardReader
     /// take their day from <see cref="Common.Ports.IReportingCalendar"/> — one definition of which
     /// local day it is, not one query. Any other way of deciding "today" would be a second calendar.
     /// </summary>
+    /// <param name="now">
+    /// The instant the two LIVE figures are judged against. Separate from
+    /// <paramref name="createdSince"/>, which is a calendar boundary rather than a clock: "active"
+    /// and "pending" mean a window that has not closed, and a request past its decision deadline is
+    /// neither, whatever its stored status still says. See <c>BookingLapse</c>.
+    /// </param>
     Task<BookingCounts> CountsAsync(
         DateTimeOffset createdSince,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
     /// <summary>

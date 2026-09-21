@@ -151,7 +151,7 @@ public sealed class BookingReaderTests : IDisposable
     private Task<NextBooking?> NextAsync()
     {
         var context = NewContext();
-        return new BookingReader(context).NextForCustomerAsync(_customerId);
+        return new BookingReader(context).NextForCustomerAsync(_customerId, Build.Now);
     }
 
     private async Task SaveMineAsync(params Booking[] bookings)

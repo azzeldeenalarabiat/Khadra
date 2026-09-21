@@ -43,7 +43,7 @@ public sealed class DashboardPanelQueryTests
     public async Task Bookings_today_is_counted_from_local_midnight_not_utc_midnight()
     {
         var bookings = Substitute.For<IBookingDashboardReader>();
-        bookings.CountsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+        bookings.CountsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
             .Returns(new BookingCounts(402, 3, 153, 55));
 
         var handler = new GetBookingCountsHandler(bookings, Amman, new TestClock(Now));
@@ -57,6 +57,7 @@ public sealed class DashboardPanelQueryTests
         // exactly the case a UTC-based window would get wrong.
         await bookings.Received(1).CountsAsync(
             new DateTimeOffset(2026, 9, 3, 21, 0, 0, TimeSpan.Zero),
+            Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
     }
 

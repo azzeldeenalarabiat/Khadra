@@ -31,7 +31,7 @@ public sealed class GetBookingCountsHandler(
     {
         var now = clock.UtcNow;
         var startOfToday = calendar.StartOfDay(calendar.Today(now));
-        var counts = await bookings.CountsAsync(startOfToday, cancellationToken);
+        var counts = await bookings.CountsAsync(startOfToday, now, cancellationToken);
 
         return new BookingCountsDto(now, counts.Total, counts.Today, counts.Active, counts.PendingApproval);
     }

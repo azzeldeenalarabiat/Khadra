@@ -216,7 +216,12 @@ public interface IBookingReader
     /// Null is the ordinary answer for most people most of the time, and the landing surface renders
     /// nothing at all for it — never a placeholder card.
     /// </remarks>
+    /// <param name="now">
+    /// The instant "live" is judged against. A booking whose decision or payment window has closed is
+    /// not the customer's next one, whatever its stored status still reads — see <c>BookingLapse</c>.
+    /// </param>
     Task<NextBooking?> NextForCustomerAsync(
         Id customerId,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 }
