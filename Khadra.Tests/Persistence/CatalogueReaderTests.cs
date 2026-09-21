@@ -508,6 +508,48 @@ public sealed class CatalogueBrandingUrlTests : IDisposable
 
     public void Dispose() => _connection.Dispose();
 
+    /// <summary>
+    /// The car's own page opens on the photograph the dealer chose as the cover.
+    /// </summary>
+    /// <remarks>
+    /// The search card has always shown the primary. The detail list was ordered by position alone,
+    /// so a dealer who promoted their third photograph saw it on the card and something else when
+    /// they tapped through — and the customer app opens this list full screen, which is where that
+    /// disagreement would be seen.
+    /// </remarks>
+    [Fact]
+    public async Task The_cover_photo_leads_the_car_page_and_the_rest_keep_the_dealers_order()
+    {
+        var dealer = Build.ApprovedDealer();
+        var vehicle = Build.Vehicle(dealer.Id);
+        vehicle.AddImage("cars/one.jpg", Build.Now);
+        vehicle.AddImage("cars/two.jpg", Build.Now);
+        var chosen = vehicle.AddImage("cars/three.jpg", Build.Now).Value;
+        vehicle.Publish(dealerCanTrade: true, Build.Now);
+        // The dealer promotes the third photograph, which does NOT move it.
+        Assert.True(vehicle.SetPrimaryImage(chosen.Id).IsSuccess);
+        Assert.Equal(2, chosen.Position);
+
+        await using (var context = new KhadraDbContext(_options))
+        {
+            context.Dealers.Add(dealer);
+            context.Vehicles.Add(vehicle);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = new KhadraDbContext(_options);
+        var car = await new CatalogueReader(reader).GetAsync(vehicle.Id, window: null);
+
+        Assert.NotNull(car);
+        Assert.Equal(
+            [
+                "/api/v1/vehicle-images/cars/three.jpg",
+                "/api/v1/vehicle-images/cars/one.jpg",
+                "/api/v1/vehicle-images/cars/two.jpg",
+            ],
+            car.ImageUrls);
+    }
+
     [Fact]
     public async Task A_gallery_logo_is_addressed_at_the_path_that_actually_serves_it()
     {
