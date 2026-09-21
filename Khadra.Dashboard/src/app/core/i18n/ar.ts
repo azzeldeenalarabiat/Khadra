@@ -1279,6 +1279,7 @@ export const AR = {
   'activity.reviewHidden': 'أخفى التقييم',
   'activity.reviewRestored': 'أعاد التقييم',
   'activity.adminInvited': 'دعا مشرفًا',
+  'activity.adminInvitationResent': 'أعاد إرسال الدعوة إلى',
   'activity.adminDeactivated': 'أوقف مشرفًا',
   'activity.bookingCancelled': 'ألغى الحجز',
   'activity.bookingExpired': 'أنهى صلاحية الحجز',
@@ -1552,6 +1553,14 @@ export const AR = {
   'adminUsers.eGYousefBarakat': 'مثال: يوسف بركات',
   'adminUsers.sendInvitation': 'إرسال الدعوة',
   'adminUsers.invitationSent': 'أُرسلت الدعوة',
+  'adminUsers.resendInvitation': 'إعادة إرسال الدعوة',
+  'adminUsers.resendNameQuestion': 'إعادة إرسال الدعوة إلى {name}؟',
+  'adminUsers.resendBody': 'يُرسَل رابط جديد إلى {email}، صالح من الآن.',
+  'adminUsers.resendNote':
+    'أي رابط سابق لهذا الحساب يتوقف فوراً. وإن تعذّر إرسال الرسالة فلن يُقال إنها أُرسلت، ويمكنك إعادة المحاولة.',
+  'adminUsers.invitationNotEmailed': 'أُنشئ الحساب — ولم يُرسَل البريد',
+  'adminUsers.accountCreatedEmailFailed':
+    'أُنشئ حساب {email} ودعوته صالحة، لكن خدمة البريد لم تقبل الرسالة، فلم يصل إليه شيء. أعد إرسال الدعوة من السطر أدناه بعد عودة البريد؛ أما دعوة العنوان نفسه من جديد فستُرفض.',
   'adminUsers.theyAreSignedOut':
     'يُسجَّل خروجه من كل مكان ولا يستطيع إدارة المنصة إلى أن يُعاد تفعيله. ويبقى كل ما فعله مسجَّلًا.',
   'adminUsers.reversibleTheAccountIs':
@@ -1951,6 +1960,30 @@ export const AR = {
   },
   'common.requestRefused': 'رُفض الطلب. لم يتغيّر شيء.',
   'common.fieldRejected': 'راجع هذا الحقل.',
+
+  // معنى الرفض، مكتوبًا هنا بدل ترك جملة الخادم الإنجليزية. الترتيب في
+  // `problemMessage` ضمن core/i18n/problem.ts. كل جملة تقول ما العمل، لأن من يقرأها
+  // يكون في منتصف تنفيذ إجراء.
+  'problem.emailTaken': 'هذا البريد الإلكتروني مرتبط بحساب قائم على خضرا. استخدم بريدًا آخر.',
+  'problem.phoneTaken': 'هذا الرقم مرتبط بحساب قائم على خضرا. استخدم رقمًا آخر.',
+  'problem.invalidEmail': 'البريد الإلكتروني غير صالح. راجعه وأعد الإرسال.',
+  'problem.invalidPhone': 'رقم الهاتف غير صالح. استخدم 07XXXXXXXX أو رقمًا دوليًا يبدأ بـ +.',
+  'problem.invalidName': 'الاسم الكامل يجب أن يكون بين حرفين و150 حرفًا.',
+  'problem.accountSuspended': 'هذا الحساب مُعطَّل.',
+  'problem.invalidToken': 'هذا الرابط لم يعد صالحًا، ويلزم إصدار رابط جديد.',
+  'problem.invitationAccepted': 'هذا المشرف اختار كلمة مرور بالفعل، فلا شيء لإعادة إرساله.',
+  'problem.invitationTargetInactive':
+    'هذا الحساب مُعطَّل. أعد تفعيله قبل إرسال الدعوة من جديد.',
+  'problem.invitationEmailNotSent':
+    'لم تقبل خدمة البريد الرسالة. الرابط الجديد صالح — أعد المحاولة بعد دقائق.',
+  'problem.signedOut': 'انتهت جلستك. سجّل الدخول ثم أعد المحاولة.',
+  'problem.notPermitted': 'حسابك لا يملك صلاحية هذا الإجراء.',
+  'problem.notFound': 'هذا السجل لم يعد موجودًا. أعد تحميل الشاشة.',
+  'problem.conflict': 'هذا يتعارض مع حالة السجل الحالية. أعد التحميل وراجعه.',
+  'problem.tooMany': 'محاولات كثيرة. انتظر قليلًا ثم أعد المحاولة.',
+  'problem.unavailable': 'تعذّر على الخدمة إتمام العملية. لم يتغيّر شيء.',
+  'problem.rejectedDetails': 'رُفضت البيانات. راجعها وأعد الإرسال.',
+  'problem.reference': 'المرجع {traceId}',
   'common.customerAccountClosed': 'حساب العميل مغلق',
   'common.dealerNoLongerOnPlatform': 'مكتب التأجير لم يعد على المنصة',
   'common.accountClosed': 'حساب مغلق',
@@ -2696,6 +2729,7 @@ export const AR = {
   'auditLog.actionReviewHidden': 'أُخفي تقييم',
   'auditLog.actionReviewRestored': 'أُعيد إظهار تقييم',
   'auditLog.actionAdminInvited': 'دُعي مشرف',
+  'auditLog.actionAdminInvitationResent': 'أُعيد إرسال دعوة مشرف',
   'auditLog.actionAdminDeactivated': 'عُطّل حساب مشرف',
   'auditLog.actionAdminReactivated': 'أُعيد تفعيل حساب مشرف',
   'auditLog.actionBookingCancelledByAdmin': 'ألغى المشرف الحجز',

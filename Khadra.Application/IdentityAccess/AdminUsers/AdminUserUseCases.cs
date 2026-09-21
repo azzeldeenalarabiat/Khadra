@@ -39,6 +39,24 @@ public sealed record InviteAdminResult(
 public sealed record InviteAdminCommand(string Email, string Phone, string FullName)
     : ICommand<Result<InviteAdminResult, Error>>;
 
+/// <summary>
+/// A second invitation email for an administrator who has not accepted the first.
+/// </summary>
+/// <remarks>
+/// Without this, an invitation whose email the relay refused was unrecoverable: the account exists,
+/// its address is taken for ever by the cross-deleted unique index, so re-inviting answers 409 —
+/// and the console had no way to say so, let alone fix it. The invitation is committed before the
+/// email is attempted, deliberately, so this is the other half of that decision rather than a
+/// feature beside it.
+///
+/// Unlike the first invitation, this command exists ONLY to put an email in front of somebody. The
+/// account already existed and the administrator pressed the button precisely because nothing
+/// arrived, so a relay that refuses FAILS the command — the reissued token stands, and the button
+/// works again once mail does.
+/// </remarks>
+public sealed record ResendAdminInvitationCommand(Id UserId)
+    : ICommand<Result<InviteAdminResult, Error>>;
+
 public sealed record DeactivateAdminCommand(Id UserId, string Reason) : ICommand<UnitResult<Error>>;
 
 public sealed record ReactivateAdminCommand(Id UserId) : ICommand<UnitResult<Error>>;
@@ -83,11 +101,13 @@ public sealed class AdminUserCommandHandlers(
     IOpaqueTokenService opaqueTokens,
     IAuthPolicySettings policy,
     AuthEmailDispatcher emails,
+    InvitationReissuer reissuer,
     AdminActionRecorder audit,
     ICurrentActor actor,
     IUnitOfWork unitOfWork,
     IClock clock) :
     IRequestHandler<InviteAdminCommand, Result<InviteAdminResult, Error>>,
+    IRequestHandler<ResendAdminInvitationCommand, Result<InviteAdminResult, Error>>,
     IRequestHandler<DeactivateAdminCommand, UnitResult<Error>>,
     IRequestHandler<ReactivateAdminCommand, UnitResult<Error>>
 {
@@ -147,6 +167,49 @@ public sealed class AdminUserCommandHandlers(
         var delivered = await emails.SendAdminInvitationAsync(invited, invitation.Value, cancellationToken);
 
         return new InviteAdminResult(invited.Id.Value, invited.Email.Value, expiresAt, delivered);
+    }
+
+    public async Task<Result<InviteAdminResult, Error>> Handle(ResendAdminInvitationCommand request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var user = await users.GetByIdAsync(request.UserId, cancellationToken);
+        if (user is null || user.Role != UserRole.Admin)
+            return IdentityErrors.UserNotFound;
+
+        // "Accepted" is a chosen password, NOT a verified address, and the difference is the whole
+        // case this button exists for. `AcceptInvitationHandler` gates on the same field and says
+        // why: resend-verification is open to any unverified address, so an invited administrator
+        // can prove their mailbox and still hold no password. That person still needs the link, and
+        // reading `IsEmailVerified` here would refuse exactly them.
+        if (user.PasswordChangedAt is not null)
+            return IdentityErrors.InvitationAlreadyAccepted;
+
+        // Accepting an invitation verifies the address and sets a password, and it does not look at
+        // status on the way through. So a fresh link for a deactivated account would quietly put it
+        // back into service; the refusal has to be here.
+        if (user.Status != UserStatus.Active)
+            return IdentityErrors.InvitationTargetInactive;
+
+        var reissued = await reissuer.ReissueAsync(user, VerificationPurpose.AdminInvitation, cancellationToken);
+
+        // On the record in the same transaction as the token, because what happened is that
+        // somebody cut a second key to an administrator account.
+        audit.Record(
+            AuditAction.AdminInvitationResent,
+            AuditEntityType.AdminUser,
+            user.Id,
+            user.Name.Value,
+            null,
+            UserRole.Admin.Name);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var delivered = await emails.SendAdminInvitationAsync(user, reissued.RawToken, cancellationToken);
+        if (!delivered)
+            return IdentityErrors.InvitationEmailNotSent;
+
+        return new InviteAdminResult(user.Id.Value, user.Email.Value, reissued.ExpiresAt, InvitationEmailSent: true);
     }
 
     public async Task<UnitResult<Error>> Handle(DeactivateAdminCommand request, CancellationToken cancellationToken)

@@ -30,7 +30,8 @@ internal sealed class AdminUserReader(KhadraDbContext context) : IAdminUserReade
                 // Correlated rather than joined: Auditing is another bounded context. It answers the
                 // one question worth asking before deactivating somebody — whether the account has
                 // ever done anything the platform is accountable for.
-                context.AuditEntries.Count(entry => entry.ActorUserId == user.Id)))
+                context.AuditEntries.Count(entry => entry.ActorUserId == user.Id),
+                user.PasswordChangedAt == null))
             .ToListAsync(cancellationToken);
     }
 }

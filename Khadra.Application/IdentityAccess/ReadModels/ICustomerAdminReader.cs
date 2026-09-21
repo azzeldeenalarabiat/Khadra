@@ -99,7 +99,18 @@ public sealed record AdminUserListItem(
     DateTimeOffset CreatedAt,
     string? SuspensionReason,
     /// <summary>How many entries in the append-only trail are attributed to them.</summary>
-    int AuditedActions);
+    int AuditedActions,
+    /// <summary>
+    /// Whether the invitation is still open: nobody has chosen a password on this account.
+    /// </summary>
+    /// <remarks>
+    /// NOT the negation of <c>IsEmailVerified</c>, which is the near miss. Resend-verification
+    /// gates on the address rather than the role, so an invited administrator can prove their
+    /// mailbox and still hold no password — verified, and unable to sign in, and in need of the
+    /// very link a check on verification would refuse them. <c>AcceptInvitation</c> and
+    /// <c>ResendAdminInvitation</c> both read the password instead, and so does this.
+    /// </remarks>
+    bool InvitationPending = false);
 
 public interface IAdminUserReader
 {

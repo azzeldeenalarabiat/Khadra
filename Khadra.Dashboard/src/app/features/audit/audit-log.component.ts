@@ -34,6 +34,7 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   ReviewHidden: 'auditLog.actionReviewHidden',
   ReviewRestored: 'auditLog.actionReviewRestored',
   AdminInvited: 'auditLog.actionAdminInvited',
+  AdminInvitationResent: 'auditLog.actionAdminInvitationResent',
   AdminDeactivated: 'auditLog.actionAdminDeactivated',
   AdminReactivated: 'auditLog.actionAdminReactivated',
   BookingCancelledByAdmin: 'auditLog.actionBookingCancelledByAdmin',

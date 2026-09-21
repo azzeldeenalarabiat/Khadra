@@ -66,7 +66,14 @@ public sealed class EmployeeTests
 
         public EmployeeHandlers Handlers() => new(
             new DealerMembershipResolver(Dealers),
-            new EmployeeAccountProvisioner(Users, Tokens, Hasher, Opaque, TestAuthPolicy.Default, Clock),
+            new EmployeeAccountProvisioner(
+                Users,
+                Tokens,
+                Hasher,
+                Opaque,
+                TestAuthPolicy.Default,
+                new InvitationReissuer(Tokens, Opaque, TestAuthPolicy.Default, Clock),
+                Clock),
             Users,
             Reader,
             new AuthEmailDispatcher(Composer, Sender, NullLogger<AuthEmailDispatcher>.Instance),

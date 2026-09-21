@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { ModalConfig, Toast, Tone } from '../models/console.models';
 import { I18nService } from '../i18n/i18n.service';
-import { serverSentence, snapshotProblem } from '../i18n/problem';
+import { problemMessage, snapshotProblem } from '../i18n/problem';
 
 /**
  * Console-wide UI state: the open confirmation dialog and the transient toast.
@@ -31,7 +31,7 @@ export class ConsoleUiService {
   readonly modalBusy = signal(false);
 
   // The work the open dialog will do when confirmed. A dialog cannot be opened without one.
-  private pendingAction: ((values: Record<string, string>) => Promise<void>) | null = null;
+  private pendingAction: ((values: Record<string, string>) => Promise<ActionOutcome>) | null = null;
   private pendingResult: { title: string; body: string; tone?: Tone } | null = null;
 
   run(action: string): void {
@@ -57,7 +57,7 @@ export class ConsoleUiService {
    */
   openAction(
     config: ModalConfig,
-    action: (values: Record<string, string>) => Promise<void>,
+    action: (values: Record<string, string>) => Promise<ActionOutcome>,
     result: { title: string; body: string; tone?: Tone },
   ): void {
     this.pendingAction = action;
@@ -86,30 +86,51 @@ export class ConsoleUiService {
 
     this.modalBusy.set(true);
     try {
-      await action(values);
+      // What the work itself found, where that differs from what the dialog promised. An action
+      // that reports nothing keeps the wording it was opened with; one that learned something the
+      // caller could not know in advance — an invitation whose email the relay refused — says so
+      // HERE, because a toast it raised on its own would be overwritten by this line a moment later.
+      const outcome = await action(values);
       this.modalBusy.set(false);
       this.closeModal();
-      this.showToast(result.title, result.body, result.tone ?? 'ok');
+      this.showToast(
+        outcome?.title ?? result.title,
+        outcome?.body ?? result.body,
+        outcome?.tone ?? result.tone ?? 'ok',
+      );
     } catch (error) {
       // The dialog stays open on failure: closing it would leave the admin unsure whether the
       // decision landed, which for an approval is the worst thing to be unsure about.
       this.modalBusy.set(false);
       // Worded as it is shown, in the language on screen: a toast is gone in seconds, so there is no
       // refusal left standing to re-word on a switch. The server's English only ever reads in English.
+      //
+      // Through `problemMessage`, not the server's sentence alone. An Arabic console used to answer
+      // every refusal with one line — "رُفض الطلب. لم يتغيّر شيء." — so a taken email address, a
+      // malformed phone number, an expired session and a fallen-over service were indistinguishable
+      // on screen, and the one thing the operator needed was the one thing thrown away.
       const t = this.i18n.t;
       this.showToast(
         t('common.thatDidNotGoThrough'),
-        serverSentence(snapshotProblem(error), this.i18n.lang(), t) ??
+        problemMessage(snapshotProblem(error), this.i18n.lang(), t) ??
           t('common.serviceDidNotRespond'),
         'bad',
       );
     }
   }
 
+  /**
+   * A refusal stays up longer than a confirmation.
+   *
+   * 4.2 seconds is right for "Administrator deactivated" — the reader already knows what they did.
+   * It is not right for a sentence naming what was wrong and what to do about it, which is a
+   * sentence somebody has to read, in Arabic or English, while looking at a form they are about to
+   * correct.
+   */
   showToast(title: string, body: string, tone: Tone = 'ok'): void {
     this.toast.set({ title, body, tone });
     clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => this.toast.set(null), 4200);
+    this.toastTimer = setTimeout(() => this.toast.set(null), tone === 'bad' ? 9000 : 4200);
   }
 
   dismissToast(): void {
@@ -117,6 +138,15 @@ export class ConsoleUiService {
     this.toast.set(null);
   }
 }
+
+/**
+ * What a confirmed action may say about itself, overriding the wording the dialog was opened with.
+ *
+ * `void` is the normal case: the dialog already stated the consequence, and the outcome is that it
+ * happened. An override is for what only the work can know — a record created but an email the
+ * relay would not take — which the dialog could not have predicted and must not paper over.
+ */
+export type ActionOutcome = { title?: string; body?: string; tone?: Tone } | void;
 
 /** Splits on the first separator only, so a body may itself contain one. */
 function splitOnce(value: string, separator: string): [string, string] {

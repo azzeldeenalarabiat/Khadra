@@ -39,6 +39,7 @@ public sealed class AdminUserTests
         public TestClock Clock { get; } = new(Now);
         public List<AuditEntry> Recorded { get; } = [];
         public List<User> Added { get; } = [];
+        public List<VerificationToken> IssuedTokens { get; } = [];
         public Id ActingAdminId { get; } = Id.New();
 
         public Context()
@@ -48,6 +49,8 @@ public sealed class AdminUserTests
                 .Do(call => Recorded.Add(call.Arg<AuditEntry>()));
             Users.When(repo => repo.AddAsync(Arg.Any<User>(), Arg.Any<CancellationToken>()))
                 .Do(call => Added.Add(call.Arg<User>()));
+            Tokens.When(repo => repo.AddAsync(Arg.Any<VerificationToken>(), Arg.Any<CancellationToken>()))
+                .Do(call => IssuedTokens.Add(call.Arg<VerificationToken>()));
             Actor.UserId.Returns(ActingAdminId);
             Actor.Role.Returns(UserRole.Admin);
             Actor.Name.Returns("Rania Haddad");
@@ -74,6 +77,7 @@ public sealed class AdminUserTests
             new FakeOpaqueTokens(),
             TestAuthPolicy.Default,
             new AuthEmailDispatcher(Composer, Email, NullLogger<AuthEmailDispatcher>.Instance),
+            new InvitationReissuer(Tokens, new FakeOpaqueTokens(), TestAuthPolicy.Default, Clock),
             new AdminActionRecorder(AuditTrail, Actor, Clock),
             Actor,
             UnitOfWork,
@@ -197,6 +201,169 @@ public sealed class AdminUserTests
         Assert.True(result.IsFailure);
         Assert.Empty(context.Added);
         await context.Email.DidNotReceive().SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>());
+    }
+
+    // Resending an invitation, which is the only way out of a trap the first one can leave: the
+    // account is committed BEFORE the email is attempted, so a relay that refuses leaves a real
+    // administrator nobody can reach and an address the unique index has spent for ever.
+
+    /// <summary>An administrator who was invited and has never accepted.</summary>
+    private static User Invited(string email = "nadia@khadra.jo", string phone = "0790000004") =>
+        User.CreateInvitedAdmin(
+            EmailAddress.Create(email).Value,
+            PhoneNumber.Create(phone).Value,
+            PersonName.Create("Nadia Qasem").Value,
+            PasswordHash.FromHash("unusable"),
+            Now.AddDays(-1));
+
+    [Fact]
+    public async Task Resending_retires_every_older_link_before_issuing_one()
+    {
+        var context = new Context();
+        var invited = context.Given(Invited());
+
+        var result = await context.Handlers().Handle(
+            new ResendAdminInvitationCommand(invited.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // Both halves, in this order. Adding without invalidating would leave two working links to
+        // one administrator account, and the older is the one likeliest to be somewhere nobody owns.
+        Received.InOrder(() =>
+        {
+            context.Tokens.InvalidateActiveAsync(
+                invited.Id, VerificationPurpose.AdminInvitation, Now, Arg.Any<CancellationToken>());
+            context.Tokens.AddAsync(Arg.Any<VerificationToken>(), Arg.Any<CancellationToken>());
+        });
+        var issued = Assert.Single(context.IssuedTokens);
+        Assert.Same(VerificationPurpose.AdminInvitation, issued.Purpose);
+        Assert.Equal(Now.Add(TestAuthPolicy.Default.EmployeeInvitationLifetime), result.Value.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Resending_is_on_the_record_as_a_second_key_to_the_same_account()
+    {
+        var context = new Context();
+        var invited = context.Given(Invited());
+
+        await context.Handlers().Handle(
+            new ResendAdminInvitationCommand(invited.Id),
+            CancellationToken.None);
+
+        var entry = Assert.Single(context.Recorded);
+        Assert.Same(AuditAction.AdminInvitationResent, entry.Action);
+        Assert.Same(AuditEntityType.AdminUser, entry.EntityType);
+        Assert.Equal(invited.Id, entry.EntityId);
+    }
+
+    [Fact]
+    public async Task A_refused_message_fails_the_resend_and_leaves_the_new_link_standing()
+    {
+        var context = new Context();
+        var invited = context.Given(Invited());
+        // The relay refuses. The whole point of the button was to deliver a message, so reporting
+        // success would send the administrator back to press it again believing it had worked.
+        context.Email
+            .SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>())
+            .Returns<EmailSendReceipt>(_ => throw new InvalidOperationException("relay refused"));
+
+        var result = await context.Handlers().Handle(
+            new ResendAdminInvitationCommand(invited.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(IdentityErrors.InvitationEmailNotSent.Code, result.Error.Code);
+
+        // COMMITTED BEFORE THE SEND, which is the property the whole design hangs on: the token is
+        // durable before anything is posted, so a refused message leaves a link that still works.
+        // Asserted as an order, because "both happened" is also true of the arrangement that would
+        // lose the link.
+        Received.InOrder(() =>
+        {
+            context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>());
+            context.Email.SendAsync(Arg.Any<EmailMessage>(), Arg.Any<CancellationToken>());
+        });
+
+        // And the link STANDS. `Single(IssuedTokens)` alone would also pass if the handler then
+        // retired it the way AdminBootstrapper does on a failed delivery -- which is the opposite
+        // policy, for a caller that has no button to press again.
+        Assert.Single(context.IssuedTokens);
+        await context.Tokens.Received(1).InvalidateActiveAsync(
+            invited.Id, VerificationPurpose.AdminInvitation, Now, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_administrator_who_has_chosen_a_password_cannot_be_sent_another_invitation()
+    {
+        var context = new Context();
+        var working = context.Given(Admin());
+        working.ChangePassword(PasswordHash.FromHash("their-own"), Now.AddDays(-2));
+
+        var result = await context.Handlers().Handle(
+            new ResendAdminInvitationCommand(working.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(IdentityErrors.InvitationAlreadyAccepted.Code, result.Error.Code);
+        Assert.Empty(context.IssuedTokens);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Proving_the_address_is_not_accepting_the_invitation()
+    {
+        // The near miss this guard exists for. Resend-verification gates on the ADDRESS rather than
+        // the role, so an invited administrator can verify their mailbox and still hold no
+        // password: verified, unable to sign in, and needing the very link that reading
+        // IsEmailVerified here would refuse them.
+        var context = new Context();
+        var invited = context.Given(Invited());
+        invited.VerifyEmail(Now.AddHours(-1));
+
+        var result = await context.Handlers().Handle(
+            new ResendAdminInvitationCommand(invited.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Single(context.IssuedTokens);
+    }
+
+    [Fact]
+    public async Task A_deactivated_administrator_is_not_sent_a_fresh_link()
+    {
+        // Accepting an invitation verifies the address and sets a password without looking at
+        // status, so a fresh link would quietly put a deactivated account back into service.
+        var context = new Context();
+        var invited = context.Given(Invited());
+        invited.Suspend("Left before accepting.", Now.AddHours(-2));
+
+        var result = await context.Handlers().Handle(
+            new ResendAdminInvitationCommand(invited.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(IdentityErrors.InvitationTargetInactive.Code, result.Error.Code);
+        Assert.Empty(context.IssuedTokens);
+    }
+
+    [Fact]
+    public async Task A_customer_cannot_be_sent_an_administrator_invitation()
+    {
+        var context = new Context();
+        var customer = context.Given(User.RegisterCustomer(
+            EmailAddress.Create("rana@example.jo").Value,
+            PhoneNumber.Create("0791234567").Value,
+            PersonName.Create("Rana Sharif").Value,
+            PasswordHash.FromHash("hash"),
+            Now.AddYears(-1)));
+
+        var result = await context.Handlers().Handle(
+            new ResendAdminInvitationCommand(customer.Id),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(IdentityErrors.UserNotFound.Code, result.Error.Code);
+        Assert.Empty(context.IssuedTokens);
     }
 
     [Fact]

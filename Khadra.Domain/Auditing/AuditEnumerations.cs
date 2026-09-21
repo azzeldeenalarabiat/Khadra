@@ -38,6 +38,11 @@ public sealed class AuditAction : Enumeration
     public static readonly AuditAction LookupRetired = new(22, "LookupRetired");
     public static readonly AuditAction LookupRestored = new(23, "LookupRestored");
 
+    // Reissuing an administrator's invitation mints a new credential for an account that can
+    // administer the platform, and retires the previous one. The invitation itself is already on the
+    // record (AdminInvited); this says somebody made a second key for the same door, and who.
+    public static readonly AuditAction AdminInvitationResent = new(24, "AdminInvitationResent");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }

@@ -15,6 +15,14 @@ export interface AdminUserListItem {
   readonly suspensionReason: string | null;
   /** Entries in the append-only trail attributed to them. */
   readonly auditedActions: number;
+  /**
+   * Whether their invitation is still open — nobody has chosen a password on the account.
+   *
+   * Not the negation of `isEmailVerified`: an invited administrator can prove their address
+   * through resend-verification and still hold no password, and that is the person who most needs
+   * the link sent again.
+   */
+  readonly invitationPending: boolean;
 }
 
 export interface InviteAdminResult {
@@ -22,6 +30,15 @@ export interface InviteAdminResult {
   readonly email: string;
   /** The token's own expiry, so the console never states a lifetime it guessed. */
   readonly expiresAt: string;
+  /**
+   * Whether the relay ACCEPTED the invitation email. The API has always sent this; the console
+   * used to drop it and say "Invitation sent" either way.
+   *
+   * False does not undo the invitation — the account and its token stand — but nobody else can
+   * find out: the row looks identical, there is no resend, and the unique index on the address
+   * means re-inviting answers 409 for ever. So the one person who can act on it is told.
+   */
+  readonly invitationEmailSent: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -42,6 +59,24 @@ export class AdminUsersService {
         this.http.post<InviteAdminResult>(
           this.base,
           { email, phone, fullName },
+          { headers: { 'X-XSRF-TOKEN': token } },
+        ),
+      ),
+    );
+  }
+
+  /**
+   * A second invitation email, with a fresh link. Every earlier link for that account dies.
+   *
+   * Unlike `invite`, this FAILS when the relay refuses the message (503): it exists to deliver
+   * one, and reporting success would send the administrator back to the same button.
+   */
+  resendInvitation(userId: string): Promise<InviteAdminResult> {
+    return this.withToken((token) =>
+      firstValueFrom(
+        this.http.post<InviteAdminResult>(
+          `${this.base}/${userId}/resend-invitation`,
+          {},
           { headers: { 'X-XSRF-TOKEN': token } },
         ),
       ),
