@@ -8,6 +8,12 @@
       "port": 7012
     },
     {
+      "name": "api-lan",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "Khadra.WebAPI", "--launch-profile", "https", "--", "--urls", "https://localhost:7012;http://0.0.0.0:5012"],
+      "port": 5012
+    },
+    {
       "name": "bff",
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "Khadra.Bff", "--launch-profile", "https"],
