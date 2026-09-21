@@ -476,10 +476,22 @@ Two things follow from the same gap. There is no `sid` claim on the access token
 tell which session is making the current request: the screen cannot mark "this device", and cannot
 offer "revoke all others" without also killing the caller's own session on its next refresh.
 
-**To close:** add the refresh family id as a `sid` claim in `JwtAccessTokenIssuer`, expose it on
-`ICurrentActor`, then flag the current row and add "revoke all others". If the owner wants immediate
-revocation, add an `AnyAsync(FamilyId == sid && RevokedAt == null)` check beside the security-stamp
-check in `OnTokenValidated` — that is a per-request query, so it is a deliberate trade, not a tidy-up.
+**Half closed, 2026-09-20.** The `sid` claim exists. `JwtAccessTokenIssuer` writes the refresh
+family id, `AuthTokenFactory` supplies it on both the sign-in and the rotation path (a replacement
+inherits its family, so the value is stable for the life of a session), `ICurrentActor.SessionId`
+reads it, and `GetMySessionsHandler` marks `SessionSummary.IsCurrent` from it. Both clients mark a
+row only when that is TRUE and infer nothing from its absence, because a token minted before the
+deploy carries no claim — a state that lasts one access token. `OnTokenValidated` does not look at
+the claim and must not start refusing requests over it.
+
+The customer app also sends a `User-Agent` of its own now (`Khadra (<os> <version>)`, from
+`deviceStamp`), so a row on Registered Devices names an operating system rather than the literal
+word "Khadra", which is what the screen used to render for every session this app created.
+
+**Still to close:** "revoke all others", which the claim now makes possible, and the immediacy of a
+revocation itself. If the owner wants immediate revocation, add an
+`AnyAsync(FamilyId == sid && RevokedAt == null)` check beside the security-stamp check in
+`OnTokenValidated` — that is a per-request query, so it is a deliberate trade, not a tidy-up.
 
 ### 25. Platform settings are read-only, and cannot be made editable yet
 
@@ -966,19 +978,24 @@ the command, and have the Employees screen mark that row `email not sent - resen
 
 ### 48. An administrator invitation whose email fails cannot be re-sent, ever
 
-`InviteAdminCommand` now reports delivery on `InviteAdminResult.InvitationEmailSent` instead of
-throwing out of an unhandled send (which answered 500 for an invitation that had in fact been
-created, so the obvious retry met 409 `auth.email_taken`). The console does not read the flag yet.
+**CLOSED 2026-09-20.** `ResendAdminInvitationCommand` and
+`POST /api/v1/admin/admin-users/{id}/resend-invitation` exist, and the Admin users screen offers the
+button on every row whose invitation is still open. The invalidate-then-issue pair that both kinds
+of invitation need now lives in one place, `InvitationReissuer`; the employee provisioner delegates
+to it.
 
-The deeper gap is that there is no way to try again. Dealer employees have
-`POST /dealers/me/employees/{id}/resend-invitation`; administrators have no equivalent. Once an
-invitation is created and its email refused, that address is spent: re-inviting hits the unique
-index, deactivating is not deleting, and the account cannot sign in to fix itself. The only routes
-back are waiting for the token to expire with nothing to re-trigger it, or editing the database.
+Four refusals, each with a test. An administrator who has CHOSEN A PASSWORD — read from
+`PasswordChangedAt`, not `IsEmailVerified`, because resend-verification gates on the address rather
+than the role, so an invited administrator can prove their mailbox and still hold no password, and
+that person is exactly who the button is for. A deactivated account, because `AcceptInvitation` does
+not look at status and a fresh link would quietly put it back into service. A user who is not an
+administrator. And a relay that refuses the message, which FAILS the command with 503
+`admin.invitation_email_not_sent` while the reissued link stands, so the next press can deliver it —
+the opposite of `AdminBootstrapper`, which retires a token it could not deliver because its only
+retry is the next boot. The reissue is audited as `AdminInvitationResent`, committed with the token.
 
-**To close:** a `ResendAdminInvitationCommand` mirroring the employee one (reissue the token, report
-delivery, audit it), and an Admin users screen that marks a row `email not sent` and offers the
-button. Until then, an administrator invited while mail is down is stuck.
+The console reads `InvitationEmailSent` now as well, and says plainly when an account was created
+and nothing was posted. Item 47 is the same gap on the EMPLOYEE side and is still open.
 
 ### 49. Arabic covers every template; some component copy is still English
 
@@ -3000,7 +3017,19 @@ which is why it was not done here.
 
 ### 101. The customer app does not yet read the new "account closed" facts
 
-**Status:** open · **Raised:** 2026-09-18
+**Status:** open, BOOKINGS HALF CLOSED 2026-09-21 · **Raised:** 2026-09-18
+
+**The bookings half is done.** `Booking` and `BookingListItem` parse `dealerRemoved`, and every
+screen that names an office — the bookings list, the booking detail, Home's next-booking card and
+the review form — goes through `BookingPresentation.dealerName`, which answers the app's own
+`bookingDealerRemoved` string when the flag is set. It was closed with the Booking Details redesign
+because that screen now leads with the office name: shipping it still printing "Dealer no longer on
+the platform" inside an Arabic card would have been this item in a larger font.
+
+**Still open:** `customerAccountClosed` on a booking, and the three dispute flags
+(`openedByAccountClosed`, `authorAccountClosed`, `resolvedByAccountClosed`), none of which the app
+parses. The customer never sees their own name as a party, so that one may turn out to be nothing to
+do; the dispute screens are not.
 
 Wave Two added a fact beside every name a booking or a dispute carries: `dealerRemoved`,
 `customerAccountClosed`, `openedByAccountClosed`, `authorAccountClosed`, `resolvedByAccountClosed`.
@@ -3421,3 +3450,64 @@ Left out of the approved fix because it is a different case from the one the own
 
 **To close:** a spec asserting that the fields `SECTIONS` renders are exactly the text keys
 `customerPageRequest` sends (every key but `hiddenSections`), so the two cannot drift silently.
+
+### 120. The platform writes English prose into a booking's status history
+
+**Status:** open · **Raised:** 2026-09-21
+
+Five transitions the platform makes on a timer record a sentence and no reason code:
+`"Payment window elapsed."`, `"Dealer did not respond."`, `"No-show window elapsed."`,
+`"Settlement window elapsed with no dispute."` and `"Dispute resolved."` (`Booking.cs`, around the
+`Transition` calls for Expired, NoShow and Completed). A reason a PERSON typed is their own words
+and is shown as typed, correctly. These are the platform's words, in English, on a permanent record
+that an Arabic-speaking customer reads on their own booking — the same class of problem as the
+rejection sentence that was fixed on 2026-09-08 by storing a code beside the text.
+
+The customer app now **omits** them: an entry whose actor is System or Admin and whose `reasonCode`
+is null shows its status and time and no sentence. Nothing is lost, because the status name says the
+same thing in the reader's language — but the row is still in the database, and the consoles print it.
+
+**To close:** pass a `reasonCode` on those five `Transition` calls (the domain events already carry
+the names — `PaymentWindowElapsed`, `DealerDidNotRespond`), publish them in the vocabulary
+`/app-config` serves, and word them in both clients. Then the app can stop dropping the line.
+
+### 121. The remaining aggregate-child relationships still carry the mapping that answers 500
+
+**Status:** open · **Raised:** 2026-09-21
+
+`DeleteBehavior.Restrict` on a required child collection is not a stricter setting, it is a broken
+one: the child's foreign key cannot be null, so removing the child from its parent's collection
+leaves EF nowhere to put it and `SaveChangesAsync` throws *"the association between entity types …
+has been severed"*. Two relationships had it and both were live 500s — removing a vehicle photo
+(`Vehicle.Images`) and un-saving a car (`CustomerShortlist._entries`). Both were changed to
+`ClientCascade` on 2026-09-21, with `RemovingAChildFromAnAggregateTests` pinning them and pinning
+that no constraint in the database cascades.
+
+Every other `HasMany` in the model is still `Restrict`, and that is safe only for as long as its
+aggregate never removes a child. One is already latent: `Dealer.AttachDocument` (`Dealer.cs`) calls
+`_documents.RemoveAll(...)`, and its only caller today runs on a brand-new dealer before `AddAsync`,
+so nothing is tracked and nothing throws. A "re-upload after clarification" handler that loads a
+tracked dealer would throw on the first save. (`User.AttachDocument` avoids the whole question by
+replacing in place — the better pattern where the row can be reused.)
+
+**To close:** either convert every aggregate-to-child collection to `ClientCascade` in one pass —
+same DDL, one migration, and the `IAppendOnly` guard in `KhadraDbContext` still refuses deletes on
+the append-only children — or add the assertion to `RemovingAChildFromAnAggregateTests` that every
+required child collection reachable from an aggregate is mapped `ClientCascade`, so the next one is
+caught by a failing test rather than by a customer.
+
+### 122. `SetPrimaryImage` marks a cover photo without moving it
+
+**Status:** open · **Raised:** 2026-09-21
+
+A dealer choosing a cover photo sets `IsPrimary` and leaves `Position` alone, so "the cover" and
+"the first photo" are two different facts that the readers have to keep agreeing about. They had
+already drifted: the search card picked the primary while the car's own page was ordered by position,
+so a dealer who promoted their third photograph saw one photo on the card and a different one when
+they tapped through. `CatalogueReader` now orders the car page primary-first (2026-09-21) and
+`CatalogueReaderTests` pins it, which makes the two agree — but by having each reader remember,
+rather than by the record being unambiguous.
+
+**To close:** decide whether "primary" is a flag or simply position 0. If it is position 0, make
+`SetPrimaryImage` move the photograph and reindex, drop the ordering from the readers, and the
+question cannot be got wrong again.
