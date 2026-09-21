@@ -652,6 +652,128 @@ public sealed class PaymentUseCaseTests
         Assert.Single(context.Recorded);
     }
 
+    /// <summary>
+    /// A delivery the platform has already applied is ACKNOWLEDGED, not refused.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every provider redelivers until it gets a 2xx, so a duplicate is the protocol working rather
+    /// than a fault. The receipt's unique index is what makes the effect happen once; losing that
+    /// insert means somebody else already did the work, and the only correct answer is success.
+    /// </para>
+    /// <para>
+    /// It answered 409 until 2026-09-21. Nothing was ever applied twice — the index saw to that — so
+    /// this was never a money bug, and that is exactly why it survived: the only symptom was a
+    /// provider retrying a delivery for days, and providers disable an endpoint that keeps failing.
+    /// The capture that never arrives afterwards is a real booking left unconfirmed.
+    /// </para>
+    /// <para>
+    /// The exception this catches is the TRANSLATED one. `UnitOfWork` turns SQLSTATE 23505 into it
+    /// and carries the constraint name, so a different unique index racing elsewhere in the same save
+    /// still escapes as the 409 it always was. That translation is Postgres-specific and cannot be
+    /// exercised on the SQLite the persistence tests use, which is why it is asserted here, at the
+    /// boundary where the decision is actually made.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task A_delivery_already_applied_is_acknowledged_rather_than_refused()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved(paymentWindow: TimeSpan.FromHours(24));
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(
+                TestPayments.Captured("sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now)));
+
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ => throw new UniqueConstraintConflictException(
+                "already recorded",
+                UniqueConstraintConflictException.ProviderEventReceiptConstraint,
+                new InvalidOperationException()));
+
+        var result = await context.Receive().Handle(
+            new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+        // Success: the provider stops retrying, which is the whole point.
+        Assert.True(result.IsSuccess);
+    }
+
+    /// <summary>
+    /// An ordinary redelivery is recognised BEFORE the capture is re-applied, so nothing is orphaned.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The index catch above is the guard and always will be, but on its own it let every redelivery
+    /// run the whole apply first: the payment's <c>already_captured</c> guard refused it, the refusal
+    /// routed to the orphan path, the orphan failed too — an Applied payment cannot be orphaned — and
+    /// the log recorded "captured 27 JOD is UNACCOUNTED FOR" about money sitting on that very row.
+    /// The data was never wrong; the transaction rolled back and the provider got its 204. The LOG
+    /// was wrong, and on a platform where somebody is meant to act on a missing-money line, a
+    /// fabricated one is expensive. A manual replay on 2026-09-21 produced it three times.
+    /// </para>
+    /// <para>
+    /// So the test asserts the absence of work rather than a status: the payment must never be asked
+    /// to accept or orphan anything. Asserting only <c>IsSuccess</c> would pass on the old code too.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task A_redelivery_is_recognised_before_anything_is_orphaned()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved(paymentWindow: TimeSpan.FromHours(24));
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(
+                TestPayments.Captured("sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now)));
+
+        context.Receipts.HasSeenAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var result = await context.Receive().Handle(
+            new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // Nothing was looked up, nothing was written, nothing was recorded a second time.
+        await context.Payments.DidNotReceive().GetByProviderReferenceAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        context.Receipts.DidNotReceive().Add(Arg.Any<ProviderEventReceipt>());
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        // And the payment is untouched: still awaiting its capture, not orphaned.
+        Assert.Same(PaymentStatus.Pending, payment.Status);
+    }
+
+    /// <summary>
+    /// A different unique index losing the same save is NOT a duplicate delivery.
+    /// </summary>
+    /// <remarks>
+    /// The catch is keyed on the constraint name precisely so it cannot swallow an unrelated race and
+    /// tell a provider that a capture was applied when it was not. Anything unrecognised escapes and
+    /// becomes the 409 it was before the translation existed.
+    /// </remarks>
+    [Fact]
+    public async Task A_unique_violation_on_a_different_index_is_not_mistaken_for_a_replay()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved(paymentWindow: TimeSpan.FromHours(24));
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(
+                TestPayments.Captured("sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now)));
+
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>())
+            .Returns<Task<int>>(_ => throw new UniqueConstraintConflictException(
+                "some other index",
+                "ix_payments_booking_id",
+                new InvalidOperationException()));
+
+        await Assert.ThrowsAsync<UniqueConstraintConflictException>(() =>
+            context.Receive().Handle(
+                new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None));
+    }
+
     [Fact]
     public async Task With_no_provider_the_sweep_does_nothing_and_says_so()
     {

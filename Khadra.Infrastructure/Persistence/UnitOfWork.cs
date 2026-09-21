@@ -53,6 +53,27 @@ internal sealed class UnitOfWork(KhadraDbContext context, IDomainEventDispatcher
                 postgres.ConstraintName,
                 exception);
         }
+        // 23505: a UNIQUE index refused the write because the row is already there. Translated for
+        // the same reason as the two above -- so a handler that EXPECTS to lose a particular race can
+        // recognise it by constraint name instead of unwrapping Npgsql, and so the ones that do not
+        // keep landing on the same generic 409 they always did.
+        //
+        // The webhook is why this exists. A provider redelivering an event it already sent hits the
+        // receipt's unique index; that violation used to escape untranslated and the API answered
+        // 409, which every provider reads as "retry". Nothing double-applied -- the index is what
+        // guarantees that -- but the delivery was refused for as long as the provider kept offering
+        // it, and a provider disables an endpoint that keeps failing. See
+        // `ReceiveProviderEventHandler`.
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation
+        } postgres)
+        {
+            throw new UniqueConstraintConflictException(
+                "A unique index refused this write; the row is already there.",
+                postgres.ConstraintName,
+                exception);
+        }
 
         if (domainEvents.Count == 0)
             return written;

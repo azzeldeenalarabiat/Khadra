@@ -20,6 +20,12 @@ internal sealed partial class ApiExceptionHandler(
         {
             BadHttpRequestException => (StatusCodes.Status400BadRequest, "The request is malformed.", "request.malformed"),
             ConcurrencyConflictException => (StatusCodes.Status409Conflict, "The record was changed by another request. Reload and try again.", "concurrency.conflict"),
+            // A unique index refused the write. Listed above `DbUpdateException` -- which it would
+            // otherwise never reach, being a sibling rather than a subclass -- and answering the same
+            // 409 it did when it was an anonymous DbUpdateException, so nothing that relies on that
+            // answer changes. A handler expecting a particular race catches it by constraint name
+            // before it ever gets here.
+            UniqueConstraintConflictException => (StatusCodes.Status409Conflict, "The request conflicts with existing data.", "data.conflict"),
             DbUpdateException => (StatusCodes.Status409Conflict, "The request conflicts with existing data.", "data.conflict"),
             // Not a server error: an upload ticket is spent once, so a second write at the same key is
             // refused rather than allowed to replace evidence somebody has already read. For a client

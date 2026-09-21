@@ -120,9 +120,49 @@ public sealed partial class ReceiveProviderEventHandler(
         if (parsed.IsFailure)
             return UnitResult.Failure(parsed.Error);
 
+        // A delivery already recorded is answered without running the handler over it again.
+        //
+        // NOT the guard -- the unique index below is, and it has to be, because a read here leaves a
+        // race open until the write. This is a fast path, and it was added for a reason the first
+        // draft could not have known: WITHOUT it, every redelivery ran the full apply, was refused by
+        // the payment's own `already_captured` guard, was routed to the orphan path, failed there too
+        // because an Applied payment cannot be orphaned, and logged
+        // "captured 27 JOD is UNACCOUNTED FOR" -- on money sitting safely on that very row. The data
+        // was always right; the transaction rolled back and the catch below answered 204. But a
+        // provider retrying after an outage would have filled the log with fabricated incidents about
+        // missing money, which on this platform is the most expensive kind of false alarm there is.
+        // A manual replay on 2026-09-21 produced exactly that.
+        if (await receipts.HasSeenAsync(provider.Name, parsed.Value.ProviderEventId, cancellationToken))
+        {
+            LogAlreadyApplied(logger, parsed.Value.ProviderEventId, parsed.Value.ProviderReference);
+            return UnitResult.Success<Error>();
+        }
+
         try
         {
             return await ApplyAsync(parsed.Value, cancellationToken);
+        }
+        catch (UniqueConstraintConflictException conflict) when (conflict.IsProviderEventReceipt)
+        {
+            // A delivery this platform has already applied.
+            //
+            // Two ways to arrive here, and both end the same way. The provider redelivered an event
+            // it already sent -- which they all do, because they retry until acknowledged -- or two
+            // deliveries of the same event raced and this one lost the insert. Either way the effect
+            // is applied exactly once, by whichever attempt won, and the index is what guarantees it.
+            //
+            // So this is SUCCESS, not a conflict. It answered 409 until 2026-09-21, and every
+            // provider reads a non-2xx as "retry": the same delivery came back for days, ran the
+            // whole handler each time, and providers disable an endpoint that keeps failing -- at
+            // which point the next REAL capture never arrives. Nothing was ever double-applied; the
+            // status code was the whole defect.
+            //
+            // Caught rather than ONLY pre-checked. The fast path above handles the ordinary
+            // redelivery; this handles the one it cannot — two deliveries of the same event racing,
+            // where both pass the read and the index refuses the loser. A read can never close that
+            // window, so the index is the guard and the read is only an optimisation.
+            LogAlreadyApplied(logger, parsed.Value.ProviderEventId, parsed.Value.ProviderReference);
+            return UnitResult.Success<Error>();
         }
         catch (ConcurrencyConflictException)
         {
@@ -329,6 +369,18 @@ public sealed partial class ReceiveProviderEventHandler(
         "Payment event {EventId} lost a concurrency race. Answering 5xx so the provider re-delivers "
         + "it into a clean context; nothing was written.")]
     private static partial void LogRaceLost(ILogger logger, string eventId);
+
+    /// <summary>
+    /// Information, not a warning: a provider redelivering until it is acknowledged is the protocol
+    /// working, not a fault. It is logged at all because the FIRST delivery is the interesting one
+    /// and this says which event the duplicate belonged to.
+    /// </summary>
+    [LoggerMessage(
+        2306,
+        LogLevel.Information,
+        "Payment event {EventId} for reference {Reference} was already applied. Acknowledged without "
+        + "re-applying it.")]
+    private static partial void LogAlreadyApplied(ILogger logger, string eventId, string reference);
 
     [LoggerMessage(
         2301,
