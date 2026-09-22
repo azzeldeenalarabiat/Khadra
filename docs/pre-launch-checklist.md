@@ -3769,15 +3769,29 @@ office that saves its page through an old process during a rolling deploy "saves
 the page customers see does not change. (An old CONSOLE TAB is not the risk — its save body is
 refused with 400 by the new API, and nothing is written; `CustomerPagePayloadTests` pins it.)
 
-**Procedure:**
+**Procedure** — the owner's seven steps, in the owner's order, with one preparation ahead of them.
+
+**Before step 1:** build and sign the Production APK at the version the API's
+`MobileApp:MinimumSupportedVersion` names, 1.1.0 (`MobileAppMinimumVersionTests` fails the suite if
+`pubspec.yaml` is below it), upload it wherever customers install from, and set `MobileApp:UpdateUrl`
+in production configuration to that address. From step 5 the API refuses every installed 1.0.0 app
+on every call (item 133), so every minute between step 5 and step 7 is a minute in which those
+customers have nothing that works and nothing newer to install. With the APK already built and
+uploaded, step 7 is a release, not a build.
+
+Releasing it BEFORE step 1 closes that gap entirely, and is safe: a 1.1.0 build talking to the
+current API calls no endpoint that API lacks, finds no minimum in its `/app-config`, and simply shows
+no office prose until step 5, because `ResolvedText.maybe` reads a plain string as nothing. The order
+below is the owner's; moving the release ahead of step 1 is a recommendation for the owner to take
+or leave.
 
 1. Stop every API instance. The console and the app can stay up; they fail their calls for the
    duration and retry.
-2. Take a backup.
-3. Apply the migration (`dotnet ef database update …`, or the bundle). It aborts, changing nothing,
-   if its script detector misreads Arabic, presentation forms or English in its self-test, and if
-   any legacy value would land on both sides, neither side, or altered.
-4. Run the verbatim check, after the migration and BEFORE the new API starts (the first save
+2. Take a database backup.
+3. Apply `20260922012458_BilingualDealerContent` (`dotnet ef database update …`, or the bundle). It
+   aborts, changing nothing, if its script detector misreads Arabic, presentation forms or English
+   in its self-test, and if any legacy value would land on both sides, neither side, or altered.
+4. Run the verification query, after the migration and BEFORE the new API starts (the first save
    changes the new columns, and the check no longer describes the copy):
 
    ```sql
@@ -3800,34 +3814,70 @@ refused with 400 by the new API, and nothing is written; `CustomerPagePayloadTes
    0. On the rehearsal copy with Arabic, English, mixed-script, presentation-form and digits-only
    values: 16, 16, 0. A legacy value that is blank copies as blank and counts as verbatim; the
    read side treats a stored blank as nothing written (`CatalogueReaderTests`).
-5. Start the new API. Then serve the new console. See item 133 for the customer app.
+5. Start the new API. It ships `MobileApp:MinimumSupportedVersion` 1.1.0, so from its first
+   request an installed 1.0.0 app is answered `426 app.update_required` (item 133). Its boot log
+   says so in a warning beginning `Customer app: builds older than 1.1.0 are REFUSED`; read that
+   line before going on.
+6. Deploy the new console. A tab still open on the old one is refused with 400 on a customer-page
+   save and writes nothing.
+7. Build and distribute the new Production APK — the release of the build prepared before step 1.
 
 **To close:** production migrated this way, and step 4 recorded.
 
 ### 133. Installed copies of the customer app cannot read the new gallery and car text
 
-**Status:** open, needs an owner decision before the production rollout · **Raised:** 2026-09-22
+**Status:** closed · **Closed:** 2026-09-22 — the API refuses any customer-app build older than the
+minimum it publishes, and that minimum is 1.1.0.
 
 The customer-facing reads now return an office's text as `{ "text", "language" }` where they used
-to return a plain string: a car's `description`, and the six `sections` of a gallery page. The app
-build in this change reads the new shape. An app ALREADY INSTALLED does not: it casts each field
-`as String?` (`lib/api/dtos.dart` before this change, lines 936 and 993), and a Dart cast of a map
-to a string throws a `TypeError`. Checked by running that parsing against the new JSON — it throws
-for every written section and every car with a description, and after the backfill that is every
-car.
+to return a plain string: a car's `description`, and the six `sections` of a gallery page. A 1.0.0
+build casts each field `as String?`, and a Dart cast of a map to a string throws — for every
+written section and, after the backfill, for every car. The owner chose to refuse old builds rather
+than keep a second copy of each field for them, and to build the refusal as a general mechanism for
+every future breaking change rather than a one-off for this one.
 
-So from the moment the API is deployed, an installed old build cannot open any car's page or most
-gallery pages, which is where booking starts. Nothing forces an update: the app has no
-minimum-version check and `/app-config` carries none.
+**The server half: `MobileAppVersionGate`.** It sits after CORS and rate limiting and BEFORE
+authentication, so a refused build never reaches a token check, a session or a handler. A request is
+the customer app when it carries `X-Khadra-App-Version` (sent by 1.1.0 onwards on every call to the
+API's own origin) or, without that header, a User-Agent beginning `Khadra (` — what the app has sent
+since d6fddef, and so what every build older than the header sends. An app request below
+`MobileApp:MinimumSupportedVersion`, or with a version that does not parse, or with no version at
+all, is answered 426 with the usual ProblemDetails plus `code: app.update_required`,
+`minimumSupportedVersion` and `updateUrl`, a title and detail in Arabic and English, and
+`Cache-Control: no-store`. Never gated: anything outside `/api` (health, OpenAPI, Scalar),
+`/api/v1/app-config` (so a refused build can still read the minimum), and any request not
+identified as the app — the console through the BFF, a browser, server-to-server calls. With no
+minimum configured nothing is gated at all. `MobileAppVersionGateTests` pins every one of those.
 
-**Options:**
+**The app half.** `/app-config` publishes `mobileApp: { minimumSupportedVersion, updateUrl }`. The
+app compares its installed version (`package_info_plus`) with that minimum at launch, and a 426
+carrying the code on any call mid-session does the same. Either one puts `UpdateRequiredScreen` in
+place of the router, not over it, so no route and no deep link can reach past it; it stays up for
+the life of the process. Arabic and English, with the language menu on it. It never ends the session
+and never reads a 426 as bad credentials: `SessionController.refresh` treats it like a network
+failure, and the stored token survives it (`update_gate_test.dart`, `update_gate_http_test.dart`).
 
-- **No real customers yet:** deploy the API and put the new build on every test device the same
-  day. Nothing else needed.
-- **Real customers have the app:** keep the plain string for old builds — `description` and
-  `sections.*` as the resolved text — and carry `{ text, language }` under new names the new build
-  reads. Additive, and the old field can go once no old build is left.
-- **Either way, before the next breaking change:** a minimum supported app version in
-  `/app-config`, so the server can tell an old build to update instead of breaking under it.
+Both halves order versions by Semantic Versioning 2.0.0 precedence — numbers as numbers, a
+prerelease below its release, build metadata ignored — and both run their tests against ONE vector
+file, `docs/contracts/app-version-vectors.json`, so they cannot come to disagree about which build is
+newer. `MobileAppMinimumVersionTests` fails the suite if a tracked `appsettings` file sets a minimum
+above `pubspec.yaml`'s version, or if the shipped minimum would let 1.0.0 back in.
 
-**To close:** the owner picks, and the picked option is done before the API ships.
+**What an installed 1.0.0 build does.** Checked on the emulator with a build of b30fcdb against the
+gated API. Every call is refused, and its error panels show the server's title, «حدّث تطبيق خضرا
+للمتابعة · Update the Khadra app to continue». Its sign-in screen shows the same, by the same path:
+that build shows the server's title for any code it does not know. One thing it does wrong that the server cannot fix: its
+launch-time token refresh is refused, and that build treats ANY refused refresh as a verdict, so it
+clears its own stored session. The server revokes nothing, but the customer signs in once after
+updating. 1.1.0 onwards does not do this.
+
+**Still not gated:**
+
+- Builds from before d6fddef (2026-09-21) send Dart's default User-Agent, which every Dart program
+  sends, so nothing tells them apart from other traffic. They break as this item first described.
+- A web build cannot set its own User-Agent, so an OLD web build is never identified. A new one sends
+  the header and is gated like a phone.
+
+**To raise the minimum** for a future breaking change: raise `pubspec.yaml`'s version, publish that
+build, and only then raise `MobileApp:MinimumSupportedVersion` to it — in configuration, no code
+change. Raising it before the build is available refuses every customer with nothing to update to.

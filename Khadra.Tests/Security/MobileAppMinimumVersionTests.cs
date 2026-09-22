@@ -61,6 +61,21 @@ public sealed partial class MobileAppMinimumVersionTests
             + "the app in this very repository would be told to update. Raise the app's version in the same change.");
     }
 
+    [Fact]
+    public void The_minimum_this_release_ships_with_keeps_the_installed_1_0_0_build_out()
+    {
+        // The reason the minimum exists today: 1.0.0 casts the bilingual office texts to strings and
+        // throws. Should someone lower the shipped minimum to let it back in, this says why not.
+        using var settings = JsonDocument.Parse(
+            File.ReadAllText(RepositoryRoot.File("Khadra.WebAPI", "appsettings.json")), Relaxed);
+        var configured = settings.RootElement.GetProperty("MobileApp").GetProperty("MinimumSupportedVersion").GetString();
+
+        Assert.True(AppVersion.TryParse(configured, out var minimum));
+        Assert.True(AppVersion.TryParse("1.0.0", out var installed));
+        Assert.True(installed < minimum,
+            "1.0.0 cannot read { text, language } and must stay refused until it is gone from phones.");
+    }
+
     [GeneratedRegex(@"^version:\s*(?<version>\S+)\s*$", RegexOptions.Multiline)]
     private static partial Regex PubspecVersion();
 }
