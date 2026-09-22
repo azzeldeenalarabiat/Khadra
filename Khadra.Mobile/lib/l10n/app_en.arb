@@ -729,5 +729,31 @@
   "sandboxPaymentsAttempt": "Test payment — no money moved.",
   "@sandboxPaymentsAttempt": {
     "description": "On one attempt, from the record's own isSandbox rather than the platform mode: a booking paid on a sandbox host stays a sandbox booking however the platform is configured when it is read later."
+  },
+
+  "updateRequiredTitle": "Update the Khadra app to continue",
+  "@updateRequiredTitle": {
+    "description": "The mandatory-update screen's heading, and the message for any call the API refused because this build is too old (426 app.update_required). Deliberately the same sentence the API's own refusal carries. Never a credentials message."
+  },
+  "updateRequiredBody": "This version of the app is no longer supported. Install the latest version to keep browsing cars and managing your bookings. Updating won't sign you out.",
+  "@updateRequiredBody": {
+    "description": "Under the heading. The last sentence is a promise the app keeps: an update-required refusal never ends the stored session."
+  },
+  "updateRequiredVersions": "Installed: {installed} · Required: {minimum} or later",
+  "@updateRequiredVersions": {
+    "description": "Both versions are the platform's and the server's own; shown only when both are known.",
+    "placeholders": {
+      "installed": { "type": "String" },
+      "minimum": { "type": "String" }
+    }
+  },
+  "updateRequiredAction": "Update now",
+  "@updateRequiredAction": {
+    "description": "Opens the download link the API publishes. Shown only when it publishes one."
+  },
+  "updateRequiredWhereFrom": "Get the latest version from wherever you downloaded Khadra.",
+  "@updateRequiredWhereFrom": {
+    "description": "Instead of the button, when the API has published no download link. The app invents none."
   }
+
 }

@@ -6,8 +6,12 @@ import 'package:timezone/timezone.dart' as tz;
 import '../api/dtos.dart';
 import '../api/khadra_api.dart';
 import 'api/api_client.dart';
+import 'api/app_version_interceptor.dart';
 import 'api/auth_interceptor.dart';
 import 'api/language_interceptor.dart';
+import 'config/app_environment.dart';
+import 'config/app_version.dart';
+import 'config/update_requirement.dart';
 import 'format/formats.dart';
 import 'session/session_controller.dart';
 import 'session/session_store.dart';
@@ -42,6 +46,20 @@ final sessionStoreProvider = Provider<SessionStore>(
 final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
   final dio = ApiClient.createDio();
   final store = ref.watch(sessionStoreProvider);
+
+  // FIRST, for both halves of what it does. On the way out it stamps every call
+  // with this build's version, the token rotation below included — a rotation
+  // without it would be refused as a build that predates the header. On the way
+  // back it is the first to see a 426, so the update screen goes up whatever the
+  // interceptors after it do with the error.
+  dio.interceptors.add(AppVersionInterceptor(
+    installedVersion: ref.read(installedAppVersionProvider),
+    apiBaseUrl: AppEnvironment.apiBaseUrl,
+    // The first refusal is kept: it is sticky for the life of the process, like
+    // the screen it raises.
+    onUpdateRequired: (requirement) =>
+        ref.read(serverUpdateRefusalProvider.notifier).state ??= requirement,
+  ));
 
   dio.interceptors.add(AuthInterceptor(
     store: store,
@@ -229,6 +247,52 @@ final entryChoiceProvider = StateNotifierProvider<EntryChoice, bool>(
 final appConfigProvider = FutureProvider<AppConfig>((ref) async {
   ref.keepAlive();
   return ref.watch(apiProvider).appConfig();
+});
+
+// ── Which build this is, and whether it may still be used ───────────────────────
+
+/// The version this build was installed as — `1.1.0+2`, as the platform reports
+/// it — or null when the platform would not say.
+///
+/// Read once in `main()` before the first frame and overridden there, the way the
+/// preferences are. Null is also what a test gets unless it says otherwise: the
+/// header is then left off and the server decides, which is the same rule a phone
+/// whose platform will not answer lives by.
+final installedAppVersionProvider = Provider<String?>((ref) => null);
+
+/// The API's refusal of this build (`426 app.update_required`), once one has
+/// arrived.
+///
+/// Set by [AppVersionInterceptor] and never cleared. Once the server has said this
+/// build is too old nothing this process does will make it newer, and a flag that
+/// could flip back would tear the whole navigator down and put it up again.
+final serverUpdateRefusalProvider =
+    StateProvider<UpdateRequirement?>((ref) => null);
+
+/// Whether this build must be updated before it can be used — null when it may
+/// run.
+///
+/// Two ways in, one answer. The server's refusal, whenever it arrives, which also
+/// catches a minimum raised while the app is open. Or the installed version below
+/// the minimum `/app-config` publishes, which catches it before a single call has
+/// been refused. When either version cannot be read the app defers to the server
+/// rather than guessing — the server refuses an unsupported build on every call
+/// regardless, so deferring costs one call and guessing could lock out a good
+/// build.
+final updateRequirementProvider = Provider<UpdateRequirement?>((ref) {
+  final refusal = ref.watch(serverUpdateRefusalProvider);
+  if (refusal != null) return refusal;
+
+  final installed = AppVersion.tryParse(ref.watch(installedAppVersionProvider));
+  final mobileApp = ref.watch(appConfigProvider).valueOrNull?.mobileApp;
+  final minimum = mobileApp?.minimumSupportedVersion;
+  if (installed == null || minimum == null || installed >= minimum) return null;
+
+  return UpdateRequirement(
+    installed: installed,
+    minimum: minimum,
+    updateUrl: mobileApp!.updateUrl,
+  );
 });
 
 /// What the platform will accept as a password, or null until it has said.

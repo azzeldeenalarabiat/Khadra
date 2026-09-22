@@ -153,7 +153,15 @@ class SessionController extends StateNotifier<SessionState> {
     } on ApiFailure catch (failure) {
       // Transport trouble says nothing about whether the session is valid. Ending
       // it here would sign people out every time they went through a tunnel.
-      if (failure.isTransport || failure.kind == ApiFailureKind.rateLimited) {
+      //
+      // Nor does an update being required: the server refused this BUILD, not
+      // these credentials. The token stays exactly where it is, the update screen
+      // goes up, and the customer opens the new build still signed in. Ending the
+      // session here is what a 1.0.0 build does, and the one thing about that build
+      // worth not repeating.
+      if (failure.isTransport ||
+          failure.kind == ApiFailureKind.rateLimited ||
+          failure.isUpdateRequired) {
         return false;
       }
 

@@ -26,7 +26,11 @@ class FakeApi extends KhadraApi {
   CustomerDocuments documents =
       const CustomerDocuments(documents: [], isComplete: true, missing: []);
 
-  static AppConfig fakeConfig() => AppConfig.fromJson(const {
+  /// The `mobileApp` section `/app-config` answers with, or null for an API that
+  /// predates it — which is also what every test that does not care gets.
+  Map<String, dynamic>? mobileApp;
+
+  static AppConfig fakeConfig({Map<String, dynamic>? mobileApp}) => AppConfig.fromJson({
         'timeZone': 'Asia/Amman',
         'currency': {'code': 'JOD', 'minorUnits': 3},
         'maxAdvanceBookingDays': 180,
@@ -38,6 +42,7 @@ class FakeApi extends KhadraApi {
           'allowedContentTypes': ['image/jpeg', 'image/png'],
         },
         'vocabularies': <String, dynamic>{},
+        if (mobileApp != null) 'mobileApp': mobileApp,
       });
 
   static AuthUser fakeUser({
@@ -64,7 +69,7 @@ class FakeApi extends KhadraApi {
       );
 
   @override
-  Future<AppConfig> appConfig() async => fakeConfig();
+  Future<AppConfig> appConfig() async => fakeConfig(mobileApp: mobileApp);
 
   /// The lookups, empty unless a test says otherwise.
   List<Lookup> cityLookups = const [];

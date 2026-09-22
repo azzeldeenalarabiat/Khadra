@@ -3367,6 +3367,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Test payment — no money moved.'**
   String get sandboxPaymentsAttempt;
+
+  /// The mandatory-update screen's heading, and the message for any call the API refused because this build is too old (426 app.update_required). Deliberately the same sentence the API's own refusal carries. Never a credentials message.
+  ///
+  /// In en, this message translates to:
+  /// **'Update the Khadra app to continue'**
+  String get updateRequiredTitle;
+
+  /// Under the heading. The last sentence is a promise the app keeps: an update-required refusal never ends the stored session.
+  ///
+  /// In en, this message translates to:
+  /// **'This version of the app is no longer supported. Install the latest version to keep browsing cars and managing your bookings. Updating won\'t sign you out.'**
+  String get updateRequiredBody;
+
+  /// Both versions are the platform's and the server's own; shown only when both are known.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed: {installed} · Required: {minimum} or later'**
+  String updateRequiredVersions(String installed, String minimum);
+
+  /// Opens the download link the API publishes. Shown only when it publishes one.
+  ///
+  /// In en, this message translates to:
+  /// **'Update now'**
+  String get updateRequiredAction;
+
+  /// Instead of the button, when the API has published no download link. The app invents none.
+  ///
+  /// In en, this message translates to:
+  /// **'Get the latest version from wherever you downloaded Khadra.'**
+  String get updateRequiredWhereFrom;
 }
 
 class _AppLocalizationsDelegate

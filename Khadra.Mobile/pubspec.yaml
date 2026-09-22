@@ -1,7 +1,11 @@
 name: khadra_mobile
 description: "Khadra — rent a car in Jordan from licensed rental offices."
 publish_to: 'none'
-version: 1.0.0+1
+# 1.1.0 is the first build that reads the office's own texts as { text, language } and
+# sends X-Khadra-App-Version. The API refuses anything older (MobileApp:MinimumSupportedVersion
+# in Khadra.WebAPI/appsettings.json), and MobileAppMinimumVersionTests fails if that minimum is
+# ever raised above this line — raise this first.
+version: 1.1.0+2
 
 environment:
   sdk: ^3.12.2
@@ -64,6 +68,10 @@ dependencies:
   mime: ^2.1.0
   path_provider: ^2.1.6
   open_filex: ^4.7.0
+  # The installed build's own version, sent on every request as X-Khadra-App-Version and compared
+  # with the minimum /app-config publishes. Read from the platform rather than typed into a
+  # constant, because a constant is a second copy of this file's `version:` that nobody bumps.
+  package_info_plus: ^10.2.1
 
 dev_dependencies:
   flutter_test:

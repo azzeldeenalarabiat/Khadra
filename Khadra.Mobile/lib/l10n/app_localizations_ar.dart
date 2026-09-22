@@ -2113,4 +2113,23 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get sandboxPaymentsAttempt => 'دفعة تجريبية — لم تنتقل أي أموال.';
+
+  @override
+  String get updateRequiredTitle => 'حدّث تطبيق خضرا للمتابعة';
+
+  @override
+  String get updateRequiredBody =>
+      'هذا الإصدار من التطبيق لم يعد مدعومًا. ثبّت أحدث إصدار لتواصل تصفّح السيارات وإدارة حجوزاتك. التحديث لن يسجّل خروجك.';
+
+  @override
+  String updateRequiredVersions(String installed, String minimum) {
+    return 'المثبّت: $installed · المطلوب: $minimum أو أحدث';
+  }
+
+  @override
+  String get updateRequiredAction => 'حدّث الآن';
+
+  @override
+  String get updateRequiredWhereFrom =>
+      'احصل على أحدث إصدار من المكان الذي نزّلت منه خضرا.';
 }

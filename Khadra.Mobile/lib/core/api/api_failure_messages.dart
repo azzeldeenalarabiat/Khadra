@@ -67,6 +67,10 @@ extension ApiFailureMessages on ApiFailure {
 
   String? _byCode(AppLocalizations l10n, AppConfig? config) => switch (code) {
         // ── Identity ─────────────────────────────────────────────────────────
+        // ── This build ───────────────────────────────────────────────────────
+        // Before every identity code on purpose: a sign-in refused because the
+        // BUILD is too old must never read as a wrong password.
+        'app.update_required' => l10n.updateRequiredTitle,
         'auth.invalid_credentials' => l10n.errorAuthInvalidCredentials,
         'auth.email_taken' => l10n.errorAuthEmailTaken,
         'auth.phone_taken' => l10n.errorAuthPhoneTaken,

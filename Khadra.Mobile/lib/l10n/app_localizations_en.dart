@@ -2048,4 +2048,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sandboxPaymentsAttempt => 'Test payment — no money moved.';
+
+  @override
+  String get updateRequiredTitle => 'Update the Khadra app to continue';
+
+  @override
+  String get updateRequiredBody =>
+      'This version of the app is no longer supported. Install the latest version to keep browsing cars and managing your bookings. Updating won\'t sign you out.';
+
+  @override
+  String updateRequiredVersions(String installed, String minimum) {
+    return 'Installed: $installed · Required: $minimum or later';
+  }
+
+  @override
+  String get updateRequiredAction => 'Update now';
+
+  @override
+  String get updateRequiredWhereFrom =>
+      'Get the latest version from wherever you downloaded Khadra.';
 }

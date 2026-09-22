@@ -11,6 +11,7 @@
 import 'dart:typed_data';
 
 import '../core/config/app_environment.dart';
+import '../core/config/app_version.dart';
 import '../core/format/booking_presentation.dart' show HasDealerLabel;
 
 int _int(dynamic value, [int fallback = 0]) => switch (value) {
@@ -120,6 +121,7 @@ class AppConfig {
     required this.password,
     required this.payments,
     required this.vocabularies,
+    this.mobileApp = MobileAppConfig.none,
   });
 
   /// The IANA zone every calendar answer on this platform is expressed in. The
@@ -150,6 +152,9 @@ class AppConfig {
   /// from "is any of this real". The test banner keys on this and only this.
   final PaymentsConfig payments;
 
+  /// Which builds of this app the API still serves. See [MobileAppConfig].
+  final MobileAppConfig mobileApp;
+
   final Vocabularies vocabularies;
 
   static AppConfig fromJson(Map<String, dynamic> json) => AppConfig(
@@ -171,6 +176,7 @@ class AppConfig {
         payments: PaymentsConfig.fromJson(json['payments']),
         vocabularies: Vocabularies.fromJson(
             json['vocabularies'] as Map<String, dynamic>? ?? const {}),
+        mobileApp: MobileAppConfig.fromJson(json['mobileApp']),
       );
 }
 
@@ -199,6 +205,41 @@ class PaymentsConfig {
   static PaymentsConfig fromJson(dynamic value) => PaymentsConfig(
         value is Map<String, dynamic> ? value['mode'] as String? ?? '' : '',
       );
+}
+
+/// Which builds of this app the API still serves, and where to get a newer one.
+///
+/// **Absent means "nothing is refused"**, deliberately, the way a missing
+/// `password` means "let the server judge": an API that predates this field is the
+/// one a 1.1.0 build meets if it is installed before the API is switched, and that
+/// build must work against it rather than lock itself out.
+///
+/// The minimum is compared with the installed version by [AppVersion] — never as
+/// text. When either side cannot be read, the app defers to the server, which
+/// refuses an unsupported build with 426 on every call regardless.
+class MobileAppConfig {
+  const MobileAppConfig({this.minimumSupportedVersion, this.updateUrl});
+
+  static const none = MobileAppConfig();
+
+  final AppVersion? minimumSupportedVersion;
+
+  /// Where the current build can be downloaded. Null when none has been
+  /// published — the update screen then says where to look instead of inventing
+  /// a link.
+  final Uri? updateUrl;
+
+  static MobileAppConfig fromJson(dynamic json) {
+    if (json is! Map<String, dynamic>) return none;
+    final link = Uri.tryParse(json['updateUrl'] as String? ?? '');
+    return MobileAppConfig(
+      minimumSupportedVersion:
+          AppVersion.tryParse(json['minimumSupportedVersion'] as String?),
+      updateUrl: link != null && (link.scheme == 'https' || link.scheme == 'http')
+          ? link
+          : null,
+    );
+  }
 }
 
 /// What the platform will accept as a password.

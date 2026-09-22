@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../config/update_requirement.dart';
+
 /// Why a request did not produce what was asked for.
 ///
 /// Built from RFC 9457 ProblemDetails, which every failing endpoint on this API
@@ -50,6 +52,15 @@ final class ApiFailure implements Exception {
       kind == ApiFailureKind.server;
 
   bool hasCode(String candidate) => code == candidate;
+
+  /// The API no longer serves this build (`426 app.update_required`).
+  ///
+  /// Not a verdict about the SESSION, and never to be read as one: the build is
+  /// too old, not the credentials. Nothing that sees it may sign anybody out or
+  /// say a password was wrong — the update screen is already going up.
+  bool get isUpdateRequired =>
+      kind == ApiFailureKind.updateRequired ||
+      hasCode(UpdateRequirement.updateRequiredCode);
 
   static ApiFailure from(Object error) {
     if (error is ApiFailure) return error;
@@ -123,6 +134,7 @@ final class ApiFailure implements Exception {
         403 => ApiFailureKind.forbidden,
         404 => ApiFailureKind.notFound,
         409 => ApiFailureKind.conflict,
+        426 => ApiFailureKind.updateRequired,
         429 => ApiFailureKind.rateLimited,
         >= 500 => ApiFailureKind.server,
         _ => ApiFailureKind.unknown,
@@ -139,6 +151,9 @@ enum ApiFailureKind {
   notFound,
   conflict,
   rateLimited,
+
+  /// 426: this build is older than the API serves. See [ApiFailure.isUpdateRequired].
+  updateRequired,
   server,
   offline,
   timeout,

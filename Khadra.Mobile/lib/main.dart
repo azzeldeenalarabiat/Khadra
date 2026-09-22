@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
+import 'core/config/update_requirement.dart';
 import 'core/providers.dart';
 import 'core/router.dart';
 import 'core/theme/khadra_theme.dart';
+import 'features/update/update_required_screen.dart';
 import 'l10n/app_localizations.dart';
 
 Future<void> main() async {
@@ -34,13 +37,40 @@ Future<void> main() async {
   }
 
   final preferences = await SharedPreferences.getInstance();
+  final installedVersion = await _installedVersion();
 
   runApp(
     ProviderScope(
-      overrides: [sharedPreferencesProvider.overrideWithValue(preferences)],
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(preferences),
+        installedAppVersionProvider.overrideWithValue(installedVersion),
+      ],
       child: const KhadraApp(),
     ),
   );
+}
+
+/// This build's version as the platform reports it — `1.1.0+2` — or null.
+///
+/// It goes on every request as `X-Khadra-App-Version`, and it is what the update
+/// screen compares with the minimum the API publishes. Read from the platform
+/// rather than typed into a constant, because a constant is a second copy of the
+/// pubspec's `version:` that nobody remembers to bump.
+///
+/// A failure here must not take the app down, and must not be papered over with a
+/// made-up version either: null sends no header, and the API refuses this phone
+/// like any build that predates the header — the update screen goes up, which is
+/// the honest answer for a build nobody can identify.
+Future<String?> _installedVersion() async {
+  try {
+    final info = await PackageInfo.fromPlatform();
+    final version = info.version.trim();
+    if (version.isEmpty) return null;
+    final build = info.buildNumber.trim();
+    return build.isEmpty ? version : '$version+$build';
+  } on Object {
+    return null;
+  }
 }
 
 class KhadraApp extends ConsumerStatefulWidget {
@@ -51,6 +81,12 @@ class KhadraApp extends ConsumerStatefulWidget {
 }
 
 class _KhadraAppState extends ConsumerState<KhadraApp> {
+  /// Set the first time an update is required, and never cleared for the life of
+  /// the process. Swapping the router out disposes every screen under it, and a
+  /// requirement that could flip back would put them all up again, half-loaded,
+  /// on a build the server has already refused.
+  UpdateRequirement? _blockedBy;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +103,7 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final locale = ref.watch(localeProvider);
+    final blockedBy = _blockedBy ??= ref.watch(updateRequirementProvider);
 
     return MaterialApp.router(
       // The name Android shows in the task switcher and the web tab, in the
@@ -112,7 +149,17 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
           data: media.copyWith(
             textScaler: media.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.4),
           ),
-          child: child ?? const SizedBox.shrink(),
+          // While this build is too old to use, the update screen stands in for
+          // the router itself — not a route on it — so no route and no deep link
+          // can reach past it: the router is not in the tree to receive one. Its
+          // own Navigator is for the language menu, whose popup needs an overlay.
+          child: blockedBy != null
+              ? Navigator(
+                  onGenerateRoute: (_) => MaterialPageRoute<void>(
+                    builder: (_) => UpdateRequiredScreen(requirement: blockedBy),
+                  ),
+                )
+              : child ?? const SizedBox.shrink(),
         );
       },
     );

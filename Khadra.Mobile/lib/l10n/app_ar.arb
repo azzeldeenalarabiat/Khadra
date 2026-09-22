@@ -664,5 +664,12 @@
   "errorShortlistVehicleNotFound": "لم تعد هذه السيارة معروضة، فلا يمكن حفظها.",
   "sandboxPaymentsTitle": "مدفوعات تجريبية",
   "sandboxPaymentsBody": "هذه نسخة تجريبية. لا تُخصم أي بطاقة ولا تنتقل أي أموال. أي حجز تؤكّده هنا ليس حجزًا حقيقيًا.",
-  "sandboxPaymentsAttempt": "دفعة تجريبية — لم تنتقل أي أموال."
+  "sandboxPaymentsAttempt": "دفعة تجريبية — لم تنتقل أي أموال.",
+
+  "updateRequiredTitle": "حدّث تطبيق خضرا للمتابعة",
+  "updateRequiredBody": "هذا الإصدار من التطبيق لم يعد مدعومًا. ثبّت أحدث إصدار لتواصل تصفّح السيارات وإدارة حجوزاتك. التحديث لن يسجّل خروجك.",
+  "updateRequiredVersions": "المثبّت: {installed} · المطلوب: {minimum} أو أحدث",
+  "updateRequiredAction": "حدّث الآن",
+  "updateRequiredWhereFrom": "احصل على أحدث إصدار من المكان الذي نزّلت منه خضرا."
+
 }
