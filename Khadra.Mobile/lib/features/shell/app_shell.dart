@@ -10,6 +10,8 @@ import '../../core/providers.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
+import '../../core/live/live_refresh.dart';
+import '../../core/live/live_surfaces.dart';
 import '../notifications/notification_providers.dart';
 
 /// The five tabs, the badge on the alerts one, and the guard on the way out.
@@ -22,7 +24,77 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> with WidgetsBindingObserver {
+  /// Held rather than read on demand, and assigned EAGERLY in `initState`.
+  ///
+  /// `ref` throws once the widget is disposed, and disposing is exactly when the heartbeat has to
+  /// be stopped — so a `late final` initialiser would be evaluated for the first time in `dispose`,
+  /// which is the one place it cannot run.
+  late final LiveRefresh _live;
+
+  @override
+  void initState() {
+    super.initState();
+    _live = ref.read(liveRefreshProvider);
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(visibleTabProvider.notifier).state = widget.shell.currentIndex;
+      // No `becameVisible()` here. The screens on the first tab load themselves the moment they are
+      // watched; firing trigger A on top of that asked for everything twice on every cold start.
+      registerCustomerSurfaces(ref);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Whoever registers, unregisters. The last one out stops the heartbeat, so a shell that is gone
+    // leaves no timer behind waking up to poll for a screen nobody is looking at.
+    for (final id in Surfaces.all) {
+      _live.unregister(id);
+    }
+    super.dispose();
+  }
+
+  /// The app going to and from the front, which is the only thing that may start or stop a poll.
+  ///
+  /// Anything but `resumed` stops every one of them. Not a battery nicety: each request runs
+  /// `AuthInterceptor.onRequest`, which rotates the refresh token whenever the access token is
+  /// stale — so an app left in the background would have rotated every few minutes for as long as
+  /// it sat there, and each rotation is a chance to hit pre-launch items 126 and 128 and sign
+  /// somebody out of a session they never left.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final resumed = state == AppLifecycleState.resumed;
+    ref.read(appResumedProvider.notifier).state = resumed;
+    ref.read(liveRefreshProvider).setResumed(resumed);
+  }
+
+  /// A tab became the one on screen.
+  ///
+  /// Hooked HERE rather than in `onDestinationSelected`, because a tap is not the only way a branch
+  /// changes: Android Back calls `goBranch(_homeTab)` a few lines below, a notification row and a
+  /// deep link both use `context.go`, and none of those passes through the bar's callback. The
+  /// index is the fact; the tap is one of several causes of it.
+  @override
+  void didUpdateWidget(AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final index = widget.shell.currentIndex;
+    if (index == oldWidget.shell.currentIndex) return;
+
+    // After the frame, not during it. Riverpod refuses a write from inside a widget life-cycle —
+    // two widgets listening to one provider could otherwise come out of the same build holding
+    // different states. A frame later is the same instant to the person holding the phone.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(visibleTabProvider.notifier).state = index;
+      // Trigger A, through the twenty-second floor — so flicking between tabs is not a burst of
+      // requests, and a tab left for a minute is current again by the time it is read.
+      ref.read(liveRefreshProvider).becameVisible();
+    });
+  }
+
   /// How long the first Back press counts for.
   ///
   /// The message announcing it is shown for the SAME duration, so what is on
@@ -124,11 +196,10 @@ class _AppShellState extends ConsumerState<AppShell> {
               // sheet they have got lost in.
               shell.goBranch(index, initialLocation: index == shell.currentIndex);
 
-              // The badge is a poll, so a deliberate visit is the moment to make it
-              // honest rather than up to a minute stale.
-              if (index == _alertsTab && signedIn) {
-                unawaited(ref.refresh(unreadNotificationCountProvider.future));
-              }
+              // The refresh that used to live here — "a deliberate visit is the moment to make the
+              // badge honest" — is now `didUpdateWidget` above, which sees every way a branch
+              // becomes current rather than only a tap. Tapping the tab you are already on is the
+              // one case that does NOT change the index, and it is a scroll-to-top, not a re-read.
             },
             destinations: [
               NavigationDestination(
@@ -178,9 +249,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 
 /// The order of the bar, named rather than left as numbers.
 ///
-/// These indices are the branch order in `router.dart` AND the destination order
-/// below, and two places read one of them: Back returns to Home, and a visit to
-/// Alerts refreshes its badge. Inserting Saved between Alerts and Profile is
-/// exactly the edit that silently moves a bare `2`.
-const int _homeTab = 0;
-const int _alertsTab = 2;
+/// These indices are the branch order in `router.dart`, the destination order below, AND which tab
+/// each live surface polls on — so they are written down ONCE, in `Tabs`, rather than here as well.
+/// Inserting Saved between Alerts and Profile is exactly the edit that silently moves a bare `2`,
+/// and it would have had to move it in two files.
+const int _homeTab = Tabs.home;

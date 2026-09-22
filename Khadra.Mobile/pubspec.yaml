@@ -70,6 +70,10 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
 
+  # Already in the tree through flutter_test; named here because `live_refresh_test` imports it
+  # directly, to drive the refresh heartbeat without spending real minutes on it.
+  fake_async: ^1.3.1
+
   # Launcher icons. BUILD-TIME ONLY -- neither of these ships in the APK.
   #
   # The icons are generated rather than hand-cut because there are ten of them

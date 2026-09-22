@@ -9,7 +9,6 @@ import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/theme/khadra_theme.dart';
 import 'package:khadra_mobile/features/catalogue/search_providers.dart';
 import 'package:khadra_mobile/features/catalogue/search_screen.dart';
-import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:khadra_mobile/l10n/app_localizations_ar.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -66,7 +65,6 @@ void main() {
       apiProvider.overrideWithValue(FakeApi()),
       sessionStoreProvider.overrideWithValue(FakeSessionStore(owned: false)),
       sharedPreferencesProvider.overrideWithValue(null),
-      unreadNotificationCountProvider.overrideWith((ref) => Stream.value(0)),
       searchFilterProvider.overrideWith((ref) => filter),
     ]);
     addTearDown(container.dispose);

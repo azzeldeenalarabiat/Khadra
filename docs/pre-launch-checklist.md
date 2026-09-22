@@ -3613,15 +3613,17 @@ defects, either of which alone produces the reported screen:
    matching on the value; `test/bookings_refresh_test.dart` fails without it.
 
 **What is NOT explained, and is why this stays open.** The 16-and-16 count has not been reproduced.
-Measured now: opening the screen costs **1 list + 1 tab-counts**; a rotation costs **1 more of
-each**; leaving the tab and returning costs **nothing**. All three are pinned by tests. Sixteen is
-exactly twice the eight tabs, so "eight per open" was the obvious shape and it is ruled out — nothing
-watches more than the selected tab. Re-measure on a device before closing this: if it does not
-recur, say so here and close it; if it does, it is a third defect and the first two did not cause it.
+Measured with this fix alone: opening the screen costs **1 list + 1 tab-counts**; a rotation costs
+**1 more of each**; leaving the tab and returning costs **nothing**. Sixteen is exactly twice the
+eight tabs, so "eight per open" was the obvious shape and it is ruled out — nothing watches more than
+the selected tab. Item 125 then changed two of those figures on purpose: a rotation now costs
+nothing, and a return re-reads once the twenty-second floor has passed. `bookings_refresh_test.dart`
+pins all three as they stand. Re-measure on a device before closing this: if it does not recur, say
+so here and close it; if it does, it is a third defect and the first two did not cause it.
 
 ### 125. A tab the customer returns to shows what it read the last time
 
-**Status:** open · **Raised:** 2026-09-22
+**Status:** FIXED 2026-09-22 — see `docs/refresh-policy.md` · **Raised:** 2026-09-22
 
 Found while measuring item 124. Leaving the Bookings tab and coming back re-reads **nothing** — not
 the list, not the tab counts. The tab shell keeps the screen mounted, so the `autoDispose` providers
@@ -3636,8 +3638,23 @@ was approved by opening the app — they have two hours to pay.
 
 Nothing here was made worse by the item 124 fix; the screen simply never re-read on re-entry.
 
-**To close:** one refresh policy for both clients — when a screen re-reads, how often, and when
-it stops — settled by the owner and held by tests.
+**Closed by** one refresh policy for both clients, settled by the owner on 2026-09-22 and written
+down in `docs/refresh-policy.md`: three tiers, four triggers, a twenty-second floor on re-entry, a
+poll only for the surface actually in front of somebody, and a full stop when the app is backgrounded
+or the console has been idle ten minutes. `live_refresh_test.dart` and `live-refresh.service.spec.ts`
+hold the numbers; `bookings_refresh_test.dart` holds this case specifically — returning inside the
+floor costs nothing, returning after it re-reads.
+
+The dealer half went with it: the console's queue now learns about a new booking from
+`GET /dealers/me/pulse` rather than from somebody pressing F5.
+
+**Two things this turned up on the way, both now fixed and both worth remembering.** The console's
+three `NavigationEnd` re-runs bumped a params signal rather than calling `reload()`, and Angular keeps
+a resource's value only while the request object is the same REFERENCE — so every screen change
+blanked the dealer's permissions, the rail and the bell for the length of a round trip. And a
+customer's token rotation was re-reading the bookings list, the counts and the landing card every few
+minutes, because the notifier watched the whole `SessionState` and that record has no value equality.
+Both are the same shape as item 124: a value quietly thrown away and fetched again.
 
 ### 126. A failed Keystore write leaves a consumed refresh token on disk
 

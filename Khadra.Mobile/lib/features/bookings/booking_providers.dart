@@ -47,9 +47,33 @@ class MyBookingsNotifier
 
   @override
   Future<PagedList<BookingListItem>> build(String tab) async {
-    final session = ref.watch(sessionProvider);
-    if (!session.isSignedIn) return const PagedList<BookingListItem>.empty();
+    // `select`, not the whole state. `SessionState` has no value equality, so every token rotation
+    // — one every few minutes — assigned a new object and re-ran this build, re-reading the list and
+    // the counts for a session that had not changed in any way a screen can see. Watching the one
+    // fact this cares about makes a rotation cost nothing.
+    final signedIn = ref.watch(sessionProvider.select((state) => state.isSignedIn));
+    if (!signedIn) return const PagedList<BookingListItem>.empty();
     return _fetch(tab, page: 1, existing: const []);
+  }
+
+  /// Re-reads the list WITHOUT taking it away if the read fails.
+  ///
+  /// `ref.invalidate` is the loud path: it drops the state, so a failed reload leaves the screen
+  /// showing an error instead of the rows the customer was reading. That is right for a
+  /// pull-to-refresh and wrong for a poll on a Jordanian mobile network, which will fail routinely.
+  ///
+  /// Returns whether the answer arrived, which is what the refresh policy measures its floor and its
+  /// backoff against.
+  Future<bool> refreshQuietly() async {
+    // A guest asks the server nothing. `build` above already answers empty for them, but a poll does
+    // not go through `build` — and `account_required_test` COUNTS calls rather than trusting that.
+    if (!ref.read(sessionProvider).isSignedIn) return true;
+    try {
+      state = AsyncData(await _fetch(arg, page: 1, existing: const []));
+      return true;
+    } on Object {
+      return false;
+    }
   }
 
   Future<void> loadMore() async {
@@ -87,12 +111,33 @@ final myBookingsProvider = AsyncNotifierProvider.autoDispose
 ///
 /// The database's answer, not a count of what one page happened to return: a tab
 /// showing "3" from a page of twenty would be wrong the moment there were more.
+/// A notifier rather than a `FutureProvider`, so it can be re-read WITHOUT being emptied.
+///
+/// A bare `FutureProvider` can only be invalidated, and invalidating drops the value — so a failed
+/// background poll would blank every tab count to nothing and put them back a minute later.
+class BookingTabCountsNotifier extends AutoDisposeAsyncNotifier<Map<String, int>> {
+  @override
+  Future<Map<String, int>> build() async {
+    final signedIn = ref.watch(sessionProvider.select((state) => state.isSignedIn));
+    if (!signedIn) return const {};
+    return ref.read(apiProvider).bookingTabCounts();
+  }
+
+  Future<bool> refreshQuietly() async {
+    if (!ref.read(sessionProvider).isSignedIn) return true;
+    try {
+      state = AsyncData(await ref.read(apiProvider).bookingTabCounts());
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+}
+
 final bookingTabCountsProvider =
-    FutureProvider.autoDispose<Map<String, int>>((ref) async {
-  final session = ref.watch(sessionProvider);
-  if (!session.isSignedIn) return const {};
-  return ref.watch(apiProvider).bookingTabCounts();
-});
+    AsyncNotifierProvider.autoDispose<BookingTabCountsNotifier, Map<String, int>>(
+  BookingTabCountsNotifier.new,
+);
 
 /// The one booking the landing surface shows, or null.
 ///
@@ -105,12 +150,31 @@ final bookingTabCountsProvider =
 /// booking was approved by opening the app, and since 2026-09-11 they have two
 /// hours to pay rather than a day. The first screen they land on is the only
 /// thing that can tell them in time.
+/// A notifier for the same reason the tab counts are one: it is polled, so it must be re-readable
+/// without being emptied. It is also the most time-critical surface in the app — see above.
+class NextBookingNotifier extends AutoDisposeAsyncNotifier<NextBooking?> {
+  @override
+  Future<NextBooking?> build() async {
+    final signedIn = ref.watch(sessionProvider.select((state) => state.isSignedIn));
+    if (!signedIn) return null;
+    return ref.read(apiProvider).nextBooking();
+  }
+
+  Future<bool> refreshQuietly() async {
+    if (!ref.read(sessionProvider).isSignedIn) return true;
+    try {
+      state = AsyncData(await ref.read(apiProvider).nextBooking());
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+}
+
 final nextBookingProvider =
-    FutureProvider.autoDispose<NextBooking?>((ref) async {
-  final session = ref.watch(sessionProvider);
-  if (!session.isSignedIn) return null;
-  return ref.watch(apiProvider).nextBooking();
-});
+    AsyncNotifierProvider.autoDispose<NextBookingNotifier, NextBooking?>(
+  NextBookingNotifier.new,
+);
 
 /// One booking in full.
 final bookingProvider =

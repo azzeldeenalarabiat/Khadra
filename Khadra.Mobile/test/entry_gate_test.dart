@@ -8,7 +8,6 @@ import 'package:khadra_mobile/core/router.dart';
 import 'package:khadra_mobile/features/auth/sign_in_screen.dart';
 import 'package:khadra_mobile/features/auth/verify_email_screen.dart';
 import 'package:khadra_mobile/features/shell/welcome_screen.dart';
-import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -61,9 +60,6 @@ void main() {
       apiProvider.overrideWithValue(api),
       sessionStoreProvider.overrideWithValue(FakeSessionStore()),
       sharedPreferencesProvider.overrideWithValue(preferences),
-      // The alerts badge polls for ever; it holds a pending timer past the end of
-      // every test and is not what any of these are about.
-      unreadNotificationCountProvider.overrideWith((ref) => Stream.value(0)),
     ]);
     addTearDown(container.dispose);
 

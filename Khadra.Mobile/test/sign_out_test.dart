@@ -7,7 +7,6 @@ import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/router.dart';
 import 'package:khadra_mobile/core/session/session_controller.dart';
-import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/features/profile/profile_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,10 +61,6 @@ void main() {
       apiProvider.overrideWithValue(api),
       sessionStoreProvider.overrideWithValue(store),
       sharedPreferencesProvider.overrideWithValue(preferences),
-      // The alerts badge polls on a one-minute loop for ever. Left alone it holds
-      // a pending timer past the end of every test; it is not what any of these
-      // are about.
-      unreadNotificationCountProvider.overrideWith((ref) => Stream.value(0)),
     ]);
     addTearDown(container.dispose);
 

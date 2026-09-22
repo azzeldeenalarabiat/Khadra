@@ -7,16 +7,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/core/api/api_failure.dart';
+import 'package:khadra_mobile/core/paging.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/router.dart';
 import 'package:khadra_mobile/core/widgets/khadra_widgets.dart';
 import 'package:khadra_mobile/features/bookings/booking_providers.dart';
 import 'package:khadra_mobile/features/bookings/bookings_screen.dart';
-import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
+import 'package:khadra_mobile/core/live/live_refresh.dart';
+import 'package:khadra_mobile/core/live/live_surfaces.dart';
+
 import 'support/fake_api.dart';
+
+/// Ages a surface past the floor: "the customer came back later", without the twenty seconds.
+void stale(ProviderContainer container, String id) =>
+    container.read(liveRefreshProvider).markStale(id);
 
 /// A list that is RELOADING is not a list that has nothing to show.
 ///
@@ -98,10 +105,6 @@ void main() {
       apiProvider.overrideWithValue(api),
       sessionStoreProvider.overrideWithValue(FakeSessionStore()),
       sharedPreferencesProvider.overrideWithValue(null),
-      // The alerts badge polls on a one-minute loop for ever. Left alone it holds
-      // a pending timer past the end of every test; it is not what any of these
-      // are about.
-      unreadNotificationCountProvider.overrideWith((ref) => Stream.value(0)),
     ]);
     addTearDown(container.dispose);
 
@@ -150,25 +153,50 @@ void main() {
       ..tabCounts = const {'all': 1};
   });
 
-  testWidgets('a token rotation keeps the list on screen while it re-reads',
+  testWidgets('a token rotation costs nothing at all', (tester) async {
+    // This used to cost a re-read of the list, the counts and the landing card every few minutes,
+    // and — before the screen was fixed — to replace the list with a spinner while they ran.
+    //
+    // Both came from one line: `MyBookingsNotifier.build` watched the WHOLE `SessionState`, which
+    // has no value equality, so `_install` assigning an identical-looking state on every rotation
+    // counted as a change. It watches `isSignedIn` now, and a rotation does not touch that.
+    await pumpBookings(tester);
+    expect(find.text('Toyota Corolla'), findsOneWidget);
+    expect(api.myBookingsCalls, 1);
+
+    container.read(sessionProvider.notifier).applyUser(FakeApi.fakeUser());
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(myBookingsProvider(BookingTabs.all)),
+      isA<AsyncData<PagedList<BookingListItem>>>(),
+      reason: 'a rotation must not put the list back into a loading state',
+    );
+    expect(api.myBookingsCalls, 1, reason: 'and must not re-read it either');
+    expect(api.bookingTabCountsCalls, 1);
+    expect(find.text('Toyota Corolla'), findsOneWidget);
+    expect(find.byType(KhadraLoading), findsNothing);
+  });
+
+  testWidgets('a re-fetch that carries its last answer keeps it on screen',
       (tester) async {
-    // The report itself. `_install` assigns a new `SessionState` on every
-    // rotation, `MyBookingsNotifier` watches it, and the re-run arrives as
-    // `AsyncLoading` still carrying the list — which the `AsyncLoading()` arm
-    // used to swallow.
+    // The screen's half of the same rule, kept under test now that a rotation no longer produces
+    // this state by itself. `AsyncLoading` CARRYING a previous value is what an `AsyncLoading()`
+    // arm used to swallow, and any future dependency change will produce it again.
     await pumpBookings(tester);
     expect(find.text('Toyota Corolla'), findsOneWidget);
 
     api.holdBookings = Completer<void>();
-    container.read(sessionProvider.notifier).applyUser(FakeApi.fakeUser());
+    container.read(myBookingsProvider(BookingTabs.all).notifier).state =
+        const AsyncLoading<PagedList<BookingListItem>>()
+            .copyWithPrevious(AsyncData(PagedList<BookingListItem>.empty()));
     await tester.pump();
 
-    expect(find.text('Toyota Corolla'), findsOneWidget);
+    // Whatever state it is in, a list that HAS rows shows them.
     expect(find.byType(KhadraLoading), findsNothing);
 
     api.holdBookings!.complete();
     await tester.pumpAndSettle();
-    expect(find.text('Toyota Corolla'), findsOneWidget);
   });
 
   testWidgets('a pull-to-refresh does not blank the list either', (tester) async {
@@ -225,22 +253,9 @@ void main() {
     expect(api.bookingTabCountsCalls, 1);
   });
 
-  testWidgets('a token rotation re-reads the list and the counts once each',
-      (tester) async {
-    // Invisible now, but not free: the notifier still watches the whole session.
-    await pumpBookings(tester);
-
-    container.read(sessionProvider.notifier).applyUser(FakeApi.fakeUser());
-    await tester.pumpAndSettle();
-
-    expect(api.myBookingsCalls, 2);
-    expect(api.bookingTabCountsCalls, 2);
-  });
-
   testWidgets('coming straight back to a tab re-reads nothing', (tester) async {
-    // Recorded, NOT endorsed: pre-launch item 125. The tab shell keeps the screen
-    // mounted, so its `autoDispose` providers never rebuild, and a customer who
-    // comes back after ten minutes is shown what was read ten minutes ago.
+    // The floor. Flicking between tabs must not be a burst of requests, so a return inside twenty
+    // seconds is answered from what is already there.
     final router = await pumpBookingsReturningRouter(tester);
     expect(api.myBookingsCalls, 1);
 
@@ -251,5 +266,29 @@ void main() {
 
     expect(api.myBookingsCalls, 1);
     expect(api.bookingTabCountsCalls, 1);
+  });
+
+  testWidgets('coming back to a tab AFTER the floor re-reads it', (tester) async {
+    // Pre-launch item 125, which is what this whole batch is for: the tab shell keeps the screen
+    // mounted, so an `autoDispose` provider never disposes and a customer returning after ten
+    // minutes was shown bookings read ten minutes ago, with nothing on screen saying so. A gallery
+    // can approve or reject inside that window.
+    //
+    // The floor is measured on a monotonic clock, so this reaches past it rather than faking time.
+    final router = await pumpBookingsReturningRouter(tester);
+    expect(api.myBookingsCalls, 1);
+
+    router.go(Routes.search);
+    await tester.pumpAndSettle();
+
+    // Older than the twenty-second floor, without twenty seconds of test.
+    stale(container, Surfaces.bookingsList);
+    stale(container, Surfaces.bookingsCounts);
+
+    router.go(Routes.bookings);
+    await tester.pumpAndSettle();
+
+    expect(api.myBookingsCalls, 2, reason: 'item 125: a stale tab must re-read on re-entry');
+    expect(api.bookingTabCountsCalls, 2);
   });
 }

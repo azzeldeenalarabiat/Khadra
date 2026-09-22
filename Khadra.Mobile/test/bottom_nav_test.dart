@@ -13,7 +13,6 @@ import 'package:khadra_mobile/core/theme/khadra_theme.dart';
 import 'package:khadra_mobile/features/auth/account_required.dart';
 import 'package:khadra_mobile/features/bookings/bookings_screen.dart';
 import 'package:khadra_mobile/features/catalogue/search_screen.dart';
-import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/features/shortlist/shortlist_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -74,7 +73,6 @@ void main() {
       sessionStoreProvider.overrideWithValue(FakeSessionStore()),
       sharedPreferencesProvider.overrideWithValue(preferences),
       isArabicProvider.overrideWithValue(locale.languageCode == 'ar'),
-      unreadNotificationCountProvider.overrideWith((ref) => Stream.value(0)),
     ]);
     addTearDown(container.dispose);
 

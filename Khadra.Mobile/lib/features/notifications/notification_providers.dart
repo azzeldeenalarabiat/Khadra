@@ -16,31 +16,41 @@ import '../../core/providers.dart';
 ///
 /// A minute is deliberately unhurried: the count is a nudge, not a countdown, and
 /// a phone on a Jordanian mobile network should not spend its battery on it.
-final unreadNotificationCountProvider = StreamProvider<int>((ref) async* {
-  final session = ref.watch(sessionProvider);
-  if (!session.isSignedIn) {
-    yield 0;
-    return;
+/// The badge on the alerts tab.
+///
+/// It used to own its own `while` loop and a one-minute `Future.delayed`, which had no idea whether
+/// anybody was looking at the phone — so a backgrounded app went on polling for as long as it sat
+/// there. That is worse than wasted battery: every request runs `AuthInterceptor.onRequest`, which
+/// rotates the refresh token when the access token is stale, so the app rotated every few minutes in
+/// the background and each rotation is a chance to hit pre-launch items 126 and 128 and sign the
+/// customer out of a session they never left.
+///
+/// `LiveRefresh` owns the schedule now, and stops it the moment the app is not `resumed`. The badge
+/// still polls on every tab while the app IS in front, because the bar it sits in is on every tab.
+class UnreadNotificationCountNotifier extends AsyncNotifier<int> {
+  @override
+  Future<int> build() async {
+    final signedIn = ref.watch(sessionProvider.select((state) => state.isSignedIn));
+    if (!signedIn) return 0;
+    return ref.read(apiProvider).unreadNotificationCount();
   }
 
-  final api = ref.watch(apiProvider);
-
-  // Set when this provider is torn down. Without it a poll parked on its minute
-  // would wake up after a sign-out and fire one last request carrying no token --
-  // refused by the server, and read by the interceptor as an expired session.
-  var disposed = false;
-  ref.onDispose(() => disposed = true);
-
-  while (!disposed) {
+  Future<bool> refreshQuietly() async {
+    if (!ref.read(sessionProvider).isSignedIn) return true;
     try {
-      yield await api.unreadNotificationCount();
+      state = AsyncData(await ref.read(apiProvider).unreadNotificationCount());
+      return true;
     } on Object {
-      // A failed poll is not worth an error state on a badge. The next one will
-      // either work or the screen itself will report the problem properly.
+      // A failed poll is not worth an error state on a badge. The number that was there stays.
+      return false;
     }
-    await Future<void>.delayed(const Duration(minutes: 1));
   }
-});
+}
+
+final unreadNotificationCountProvider =
+    AsyncNotifierProvider<UnreadNotificationCountNotifier, int>(
+  UnreadNotificationCountNotifier.new,
+);
 
 /// The alerts feed, a page at a time.
 ///

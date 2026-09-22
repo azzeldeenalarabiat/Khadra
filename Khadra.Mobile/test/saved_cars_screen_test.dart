@@ -6,7 +6,6 @@ import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/router.dart';
 import 'package:khadra_mobile/features/catalogue/vehicle_row.dart';
-import 'package:khadra_mobile/features/notifications/notification_providers.dart';
 import 'package:khadra_mobile/features/shortlist/shortlist_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -82,7 +81,6 @@ void main() {
       apiProvider.overrideWithValue(api),
       sessionStoreProvider.overrideWithValue(FakeSessionStore()),
       sharedPreferencesProvider.overrideWithValue(null),
-      unreadNotificationCountProvider.overrideWith((ref) => Stream.value(0)),
     ]);
     addTearDown(container.dispose);
 
