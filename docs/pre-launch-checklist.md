@@ -3684,3 +3684,19 @@ between, the 60-second grace lapses and the next rotation is a replay that revok
 
 **To close:** on a timeout from `/auth/refresh` specifically, one immediate retry of the same token,
 inside the grace. Not on any other failure, and not more than once.
+
+### 130. The dealer pulse watches three things, and only three
+
+**Status:** open by design · **Raised:** 2026-09-22
+
+`DealerQueueSignature` derives its token from booking status, whether each booking has lapsed, and
+the live-dispute flag. It is computed at read time, so there is no stored version for a writer to
+forget to bump — but it only sees what it looks at.
+
+Anything that starts changing a dealer's queue row WITHOUT changing one of those three will leave the
+console stale and certain it is not, which is the only failure mode of a pulse that matters. The list
+is written down in the record's own documentation for exactly that reason.
+
+**To close:** when the push channel lands, drive it from domain events after commit — that is a
+complete change source and makes the derived signature unnecessary. Until then, anyone adding a
+column the dealer's list renders adds it to `QueueSignatureAsync` in the same change.

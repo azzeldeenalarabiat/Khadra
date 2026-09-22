@@ -2,6 +2,7 @@ using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
+using Khadra.Domain.Disputes;
 using Khadra.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,6 +45,47 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
         var overdue = await mine.CountAsync(booking => booking.Status == pickedUp && booking.Period.End < now, cancellationToken);
 
         return new DealerBookingCounts(requestedCount, oldest, awaitingDeposit, confirmedCount, pickedUpCount, overdue);
+    }
+
+    public async Task<DealerQueueSignature> QueueSignatureAsync(Id dealerId, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var mine = context.Bookings.Where(booking => booking.DealerId == dealerId);
+
+        // ONE grouped round trip, over two indexed columns. It moves when a booking is created,
+        // approved, rejected, paid for, cancelled, picked up or returned -- every change this
+        // dealer's queue can show that the dealer did not make themselves, which is precisely the
+        // set they currently find out about by reloading the browser.
+        var byStatus = await mine
+            .GroupBy(booking => booking.Status)
+            .Select(group => new { group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        // And one more, because a LAPSE changes the queue without changing a row. Counting only the
+        // live ones is what makes this marker move when nothing was written at all -- without it a
+        // dealer would sit looking at a request that died twenty minutes ago, and the console would
+        // be certain it was up to date.
+        var live = await mine.Where(BookingLapse.HasNotLapsedAt(now)).CountAsync(cancellationToken);
+
+        // And the dispute flag, which is the one thing a row shows that moves WITHOUT its status
+        // moving: a customer opens a ticket, or an admin resolves one, and the row gains or loses its
+        // marker while reading Confirmed throughout. Counting by status alone would have missed it,
+        // and the dealer would have been certain the queue was current.
+        //
+        // The same predicate the list itself uses (see `BookingReader`), so the marker and the rows
+        // cannot disagree about what "live dispute" means.
+        var open = DisputeStatus.Open;
+        var underReview = DisputeStatus.UnderReview;
+        var disputed = await mine
+            .CountAsync(
+                booking => context.DisputeTickets.Any(ticket =>
+                    ticket.BookingId == booking.Id &&
+                    (ticket.Status == open || ticket.Status == underReview)),
+                cancellationToken);
+
+        return new DealerQueueSignature(
+            [.. byStatus.Select(entry => new DealerStatusCount(entry.Key.Name, entry.Count))],
+            live,
+            disputed);
     }
 
     public async Task<IReadOnlyList<UpcomingHandover>> UpcomingPickupsAsync(Id dealerId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)

@@ -23,6 +23,28 @@ public sealed class DealerConsoleController(ICurrentActor actor) : ApiController
         return FromResult(result);
     }
 
+    /// <summary>
+    /// Has this dealer's queue changed? Polled; deliberately cheap; carries no data.
+    /// </summary>
+    /// <remarks>
+    /// The console asks this every thirty seconds and re-reads the real endpoints only when the
+    /// token differs. Two indexed round trips, against the eight `GET /bookings/tab-counts` costs and
+    /// the composite `dashboard` costs — which is what makes asking often affordable.
+    ///
+    /// It is an invalidation signal and not a source of truth: bookings, counts, notifications and
+    /// the dashboard all keep coming from the endpoints they already came from. When the pulse
+    /// service arrives it pushes the same token and the console takes the same path, so a push
+    /// channel is a faster way to learn the same fact rather than a second way to learn a different
+    /// one.
+    /// </remarks>
+    [HttpGet("pulse")]
+    [ProducesResponseType<DealerPulseDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> Pulse(CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetDealerPulseQuery(actor.UserId!.Value), cancellationToken);
+        return FromResult(result);
+    }
+
     [HttpGet("reports")]
     [ProducesResponseType<DealerReportDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]

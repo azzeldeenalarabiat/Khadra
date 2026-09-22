@@ -22,6 +22,9 @@ public sealed record GetDealerDashboardQuery(Id UserId) : IQuery<Result<DealerDa
 /// <summary>Period: daily, weekly or monthly, always the CURRENT one in the reporting calendar.</summary>
 public sealed record GetDealerReportQuery(Id UserId, string Period) : IQuery<Result<DealerReportDto, Error>>;
 
+/// <summary>Has this dealer's queue changed? Nothing else. See <see cref="DealerPulseDto"/>.</summary>
+public sealed record GetDealerPulseQuery(Id UserId) : IQuery<Result<DealerPulseDto, Error>>;
+
 /// <summary>`MineOnly` narrows the dealership's trail to the caller's own actions (`?actor=me`).</summary>
 public sealed record ListDealerActivityQuery(Id UserId, int? Page, int? PageSize, bool MineOnly = false)
     : IQuery<Result<PagedResult<DealerActivityEntry>, Error>>;
@@ -49,6 +52,24 @@ public sealed record DealerDashboardDto(
     MoneyDto? RevenueThisMonth,
     decimal? OccupancyPercentLast30Days,
     IReadOnlyList<DealerActivityEntry> RecentActivity);
+
+/// <summary>
+/// One opaque string, and deliberately nothing else.
+/// </summary>
+/// <remarks>
+/// It is an INVALIDATION SIGNAL, not data. The console compares it with the one it last saw and
+/// re-reads the real endpoints when it differs; no screen renders it, and it carries no figure any
+/// screen could render. That is the point. A count arriving here as well as from
+/// `GET /bookings/tab-counts` would be two answers to one question, and the day they disagreed the
+/// dealer would have no way to tell which was true — so this is a token, not a number.
+///
+/// Opaque also means the server can change what it watches without the console knowing. Today it is
+/// the per-status counts plus how many have not lapsed; if a dealer's queue grows a new way to change
+/// tomorrow, only <see cref="IDealerBookingReader.QueueSignatureAsync"/> moves.
+///
+/// It is NOT a security boundary and NOT a cache validator: it says "something moved", never what.
+/// </remarks>
+public sealed record DealerPulseDto(string Bookings);
 
 public sealed record FleetStatusCountDto(string Status, int Count);
 
@@ -89,9 +110,22 @@ public sealed class DealerConsoleHandlers(
     IDealerConsoleSettings settings,
     IClock clock) :
     IRequestHandler<GetDealerDashboardQuery, Result<DealerDashboardDto, Error>>,
+    IRequestHandler<GetDealerPulseQuery, Result<DealerPulseDto, Error>>,
     IRequestHandler<GetDealerReportQuery, Result<DealerReportDto, Error>>,
     IRequestHandler<ListDealerActivityQuery, Result<PagedResult<DealerActivityEntry>, Error>>
 {
+    public async Task<Result<DealerPulseDto, Error>> Handle(GetDealerPulseQuery request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var member = await membership.ResolveAsync(request.UserId, cancellationToken);
+        if (member.IsFailure)
+            return member.Error;
+
+        var signature = await bookings.QueueSignatureAsync(member.Value.Dealer.Id, clock.UtcNow, cancellationToken);
+        return new DealerPulseDto(DealerPulse.TokenFor(signature));
+    }
+
     public async Task<Result<DealerDashboardDto, Error>> Handle(GetDealerDashboardQuery request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);

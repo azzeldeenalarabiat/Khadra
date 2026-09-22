@@ -66,9 +66,54 @@ public sealed record DealerActivityEntry(
     string? Reason,
     DateTimeOffset OccurredAt);
 
+/// <summary>One booking status and how many of this dealer's bookings are in it.</summary>
+public sealed record DealerStatusCount(string Status, int Count);
+
+/// <summary>
+/// The cheapest honest answer to "has anything in this dealer's queue changed?".
+/// </summary>
+/// <remarks>
+/// Deliberately NOT a set of figures for a screen to render. It exists to be compared with the last
+/// one, and nothing else: the console reloads its real readers when it differs and does nothing when
+/// it does not. Two numbers that mean the same thing, arriving by two routes, is how a queue and its
+/// badge start disagreeing — so the pulse never becomes a second answer to a question
+/// <see cref="CountsAsync"/> already answers.
+/// </remarks>
+/// <param name="ByStatus">
+/// Moves when a booking is created, approved, rejected, paid for, cancelled, picked up or returned.
+/// </param>
+/// <param name="Live">
+/// How many have not lapsed. This is what makes the signature move when NOTHING was written: a
+/// request past its decision deadline is over the instant the clock says so, while its row still
+/// reads Requested until the settlement sweep catches up.
+/// </param>
+/// <param name="Disputed">
+/// How many carry a live dispute — the one thing a row shows that moves without its STATUS moving.
+/// </param>
+/// <remarks>
+/// What this watches is what a dealer's queue can be wrong about, and the list is deliberately
+/// written down rather than assumed: booking status, lapse, and the dispute flag. Anything that
+/// starts changing a row without changing one of those three has to be added here, or the console
+/// will be stale and certain it is not — which is the only failure mode of a pulse that matters.
+/// </remarks>
+public sealed record DealerQueueSignature(
+    IReadOnlyList<DealerStatusCount> ByStatus,
+    int Live,
+    int Disputed);
+
 public interface IDealerBookingReader
 {
     Task<DealerBookingCounts> CountsAsync(Id dealerId, DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A change marker for this dealer's bookings, cheap enough to ask for every thirty seconds.
+    /// </summary>
+    /// <remarks>
+    /// Two indexed round trips, against the eight that <see cref="CountsAsync"/> costs and the
+    /// composite the dashboard costs. That difference is the whole reason this exists: the console
+    /// needs to know WHETHER to re-read far more often than it needs to re-read.
+    /// </remarks>
+    Task<DealerQueueSignature> QueueSignatureAsync(Id dealerId, DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Bookings the dealer has answered that start inside [from, to) -- Approved AND Confirmed.
