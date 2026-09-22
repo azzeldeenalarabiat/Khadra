@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using System.ComponentModel.DataAnnotations;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
@@ -185,7 +186,7 @@ public sealed record VehicleRequest(
     int Seats,
     [param: Required] string Transmission,
     [param: Required] string FuelType,
-    [param: StringLength(2000)] string? Description,
+    LocalizedTextDto? Description,
     [param: Required, StringLength(20)] string PlateNumber,
     decimal DailyRate,
     decimal SecurityDeposit,

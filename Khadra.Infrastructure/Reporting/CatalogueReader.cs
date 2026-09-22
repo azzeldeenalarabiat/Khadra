@@ -132,6 +132,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
     public async Task<CatalogueVehicle?> GetAsync(
         Id vehicleId,
         AvailabilityWindow? window,
+        Language language,
         CancellationToken cancellationToken = default)
     {
         // The SAME predicate as the list. A detail endpoint that were any more permissive would let
@@ -170,7 +171,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             vehicle.Details.Model,
             vehicle.Details.Year,
             vehicle.Details.Color,
-            vehicle.Details.Description,
+            ResolvedTextDto.From(vehicle.Details.Description.Resolve(language)),
             carType,
             vehicle.Details.Transmission.Name,
             vehicle.Details.FuelType.Name,
@@ -274,7 +275,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         return await WithRatingsAsync(items, cancellationToken);
     }
 
-    public async Task<PublicGalleryPage?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default)
+    public async Task<PublicGalleryPage?> GetGalleryAsync(Id dealerId, Language language, CancellationToken cancellationToken = default)
     {
         var dealer = await VisibleDealerAsync(dealerId, cancellationToken);
         if (dealer is null)
@@ -283,7 +284,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         var rating = await RatingFor(dealer.Id, cancellationToken);
         // The office's own words, filtered by the aggregate: hidden and never-written are both simply
         // absent, and nothing here decides that a second time.
-        var shown = dealer.VisiblePublicProfile();
+        var shown = dealer.VisiblePublicProfile(language);
 
         return new PublicGalleryPage(
             dealer.Id.Value,
@@ -299,12 +300,12 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             rating.Average,
             rating.Count,
             new GallerySections(
-                shown.About,
-                shown.RentalConditions,
-                shown.Insurance,
-                shown.PickupInstructions,
-                shown.DeliveryNotes,
-                shown.CustomerNotes));
+                ResolvedTextDto.From(shown.About),
+                ResolvedTextDto.From(shown.RentalConditions),
+                ResolvedTextDto.From(shown.Insurance),
+                ResolvedTextDto.From(shown.PickupInstructions),
+                ResolvedTextDto.From(shown.DeliveryNotes),
+                ResolvedTextDto.From(shown.CustomerNotes)));
     }
 
     public async Task<CatalogueFacets> FacetsAsync(CancellationToken cancellationToken = default)

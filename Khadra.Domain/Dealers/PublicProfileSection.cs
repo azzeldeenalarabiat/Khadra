@@ -45,5 +45,25 @@ public sealed class PublicProfileSection : Enumeration
             string.Equals(section.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     /// <summary>How the section is named in a request body and a response: camelCase.</summary>
+    /// <remarks>
+    /// The stem only. Every section now travels as TWO fields, one per language, so this is what
+    /// they share rather than what either is called — see <see cref="FieldName(Language)"/>.
+    /// It is still the name in `hidden_profile_sections`, which is per SECTION and not per language:
+    /// an office hides a section, not a translation of one.
+    /// </remarks>
     public string FieldName => char.ToLowerInvariant(Name[0]) + Name[1..];
+
+    /// <summary>
+    /// How one language's box is named on the wire: `rentalConditionsAr`, `rentalConditionsEn`.
+    /// </summary>
+    /// <remarks>
+    /// A validation error carries this so the console can put the message under the box that caused
+    /// it. With two boxes per section under one heading, naming only the section would tell an owner
+    /// that "rental conditions" is wrong and leave them to work out which of the two they broke.
+    /// </remarks>
+    public string FieldNameFor(Language language)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        return FieldName + (language == Language.Arabic ? "Ar" : "En");
+    }
 }

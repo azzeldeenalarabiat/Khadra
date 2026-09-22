@@ -99,7 +99,7 @@ public sealed class DealerProfileTests
         var cityId = Id.New();
         var dealer = context.Given(FiledUnder(Build.ApprovedDealer(ownerUserId: OwnerId), cityId));
         // Written on the customer page, which is its one writer now.
-        Assert.True(dealer.UpdatePublicProfile("Family-run since 2014.", PublicProfile.Empty()).IsSuccess);
+        Assert.True(dealer.UpdatePublicProfile(Build.En("Family-run since 2014."), PublicProfile.Empty()).IsSuccess);
 
         var result = await context.Handlers().Handle(
             KeepingLocation(dealer, OwnerId, dealer.BusinessName.Value, Week()),
@@ -107,7 +107,7 @@ public sealed class DealerProfileTests
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         // This form no longer carries it, so saving the form cannot overwrite it.
-        Assert.Equal("Family-run since 2014.", dealer.Description);
+        Assert.Equal("Family-run since 2014.", dealer.Description.En);
         Assert.Equal(31.95, dealer.Location.Latitude, 4);
         Assert.True(dealer.OperatingHours.For(DayOfWeek.Saturday).IsClosed);
         Assert.Equal(new TimeOnly(14, 0), dealer.OperatingHours.For(DayOfWeek.Friday).OpensAt);

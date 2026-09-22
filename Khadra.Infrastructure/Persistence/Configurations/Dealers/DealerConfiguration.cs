@@ -29,8 +29,15 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
             .HasMaxLength(OperatingHoursConverter.MaxLength)
             .IsRequired();
 
-        // The About text, held to the same length as every other section of the customer page.
-        entity.Property(dealer => dealer.Description).HasMaxLength(ProfileText.MaxLength);
+        // The About text, one column per language, each held to the same length as every other
+        // section of the customer page. `description` (the legacy single-language column)
+        // is deliberately unmapped and deliberately still present — see the migration that split it.
+        // The computed pair-view, ignored explicitly. See the note in VehicleConfiguration.
+        entity.Ignore(dealer => dealer.Description);
+        entity.Property(dealer => dealer.DescriptionAr)
+            .HasColumnName("description_ar").HasMaxLength(ProfileText.MaxLength);
+        entity.Property(dealer => dealer.DescriptionEn)
+            .HasColumnName("description_en").HasMaxLength(ProfileText.MaxLength);
         entity.Property(dealer => dealer.ReviewNote).HasMaxLength(1000);
         entity.Property(dealer => dealer.SuspensionReason).HasMaxLength(1000);
         entity.Property(dealer => dealer.LogoStorageKey).HasMaxLength(500);
@@ -86,22 +93,52 @@ internal sealed class DealerConfiguration : IEntityTypeConfiguration<Dealer>
         //
         // Every property mapped explicitly: they are get-only, and EF drops anything left to
         // convention without an error.
+        // Two ordinary columns per section, one per language, and NOT a nested owned type per
+        // section. That is the trap described twice above, taken deliberately the safe way: an owned
+        // type whose columns are all nullable materialises as null, and a section nobody has written
+        // in either language is exactly that — which is most sections on most pages. The pairs are
+        // read back through get-only computed `LocalizedText` properties, which EF leaves alone by
+        // convention for the same reason it drops anything not mapped explicitly.
+        //
+        // The legacy single-language columns (`rental_conditions` and the rest) are deliberately NOT
+        // mapped and deliberately still there. See the migration that split them.
         entity.OwnsOne(dealer => dealer.PublicProfile, profile =>
         {
-            profile.Property(value => value.RentalConditions)
-                .HasColumnName("rental_conditions")
+            profile.Ignore(value => value.RentalConditions);
+            profile.Ignore(value => value.Insurance);
+            profile.Ignore(value => value.PickupInstructions);
+            profile.Ignore(value => value.DeliveryNotes);
+            profile.Ignore(value => value.CustomerNotes);
+
+            profile.Property(value => value.RentalConditionsAr)
+                .HasColumnName("rental_conditions_ar")
                 .HasMaxLength(ProfileText.MaxLength);
-            profile.Property(value => value.Insurance)
-                .HasColumnName("insurance_summary")
+            profile.Property(value => value.RentalConditionsEn)
+                .HasColumnName("rental_conditions_en")
                 .HasMaxLength(ProfileText.MaxLength);
-            profile.Property(value => value.PickupInstructions)
-                .HasColumnName("pickup_instructions")
+            profile.Property(value => value.InsuranceAr)
+                .HasColumnName("insurance_summary_ar")
                 .HasMaxLength(ProfileText.MaxLength);
-            profile.Property(value => value.DeliveryNotes)
-                .HasColumnName("delivery_notes")
+            profile.Property(value => value.InsuranceEn)
+                .HasColumnName("insurance_summary_en")
                 .HasMaxLength(ProfileText.MaxLength);
-            profile.Property(value => value.CustomerNotes)
-                .HasColumnName("customer_notes")
+            profile.Property(value => value.PickupInstructionsAr)
+                .HasColumnName("pickup_instructions_ar")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.PickupInstructionsEn)
+                .HasColumnName("pickup_instructions_en")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.DeliveryNotesAr)
+                .HasColumnName("delivery_notes_ar")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.DeliveryNotesEn)
+                .HasColumnName("delivery_notes_en")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.CustomerNotesAr)
+                .HasColumnName("customer_notes_ar")
+                .HasMaxLength(ProfileText.MaxLength);
+            profile.Property(value => value.CustomerNotesEn)
+                .HasColumnName("customer_notes_en")
                 .HasMaxLength(ProfileText.MaxLength);
             profile.Property(value => value.HiddenSections)
                 .HasColumnName("hidden_profile_sections")

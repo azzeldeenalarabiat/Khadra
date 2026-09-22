@@ -41,13 +41,18 @@ public interface ICatalogueReader
     /// them. Distinguishing them would let anyone enumerate a competitor's unpublished inventory
     /// through an endpoint that needs no sign-in.
     /// </remarks>
+    /// <param name="language">
+    /// The reader's language, used ONLY to resolve the office's own writing. Nothing about which cars
+    /// are visible depends on it.
+    /// </param>
     Task<CatalogueVehicle?> GetAsync(
         Id vehicleId,
         AvailabilityWindow? window,
+        Language language,
         CancellationToken cancellationToken = default);
 
     /// <summary>A gallery's own page, or null if it is not one a customer may see.</summary>
-    Task<PublicGalleryPage?> GetGalleryAsync(Id dealerId, CancellationToken cancellationToken = default);
+    Task<PublicGalleryPage?> GetGalleryAsync(Id dealerId, Language language, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// The listings for a named set of cars, through the SAME visibility predicate as the search.
@@ -183,7 +188,7 @@ public sealed record CatalogueVehicle(
     string Model,
     int Year,
     string? Color,
-    string? Description,
+    ResolvedTextDto? Description,
     CatalogueCarType? CarType,
     string Transmission,
     string FuelType,
@@ -267,12 +272,12 @@ public sealed record GalleryAddress(string Area, string? Street);
 /// section exists but is hidden, because that flag would be the answer the silence is protecting.
 /// </remarks>
 public sealed record GallerySections(
-    string? About,
-    string? RentalConditions,
-    string? Insurance,
-    string? PickupInstructions,
-    string? DeliveryNotes,
-    string? CustomerNotes);
+    ResolvedTextDto? About,
+    ResolvedTextDto? RentalConditions,
+    ResolvedTextDto? Insurance,
+    ResolvedTextDto? PickupInstructions,
+    ResolvedTextDto? DeliveryNotes,
+    ResolvedTextDto? CustomerNotes);
 
 public sealed record GalleryDaySchedule(string Day, bool IsClosed, TimeOnly? Opens, TimeOnly? Closes);
 

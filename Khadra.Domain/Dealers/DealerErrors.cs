@@ -157,7 +157,7 @@ public static class DealerErrors
     /// A section of the customer page is longer than it may be. Refused rather than cut, and naming
     /// its field so the console can put the message under the box that caused it.
     /// </summary>
-    public static Error ProfileTextTooLong(PublicProfileSection section)
+    public static Error ProfileTextTooLong(PublicProfileSection section, Language language)
     {
         ArgumentNullException.ThrowIfNull(section);
         var message = $"This section cannot be longer than {ProfileText.MaxLength} characters.";
@@ -165,11 +165,11 @@ public static class DealerErrors
             "dealer.profile_text_too_long",
             message,
             ErrorKind.Validation,
-            new Dictionary<string, string[]> { [section.FieldName] = [message] });
+            new Dictionary<string, string[]> { [section.FieldNameFor(language)] = [message] });
     }
 
     /// <summary>A section of the customer page holds characters no screen can show honestly.</summary>
-    public static Error InvalidProfileText(PublicProfileSection section)
+    public static Error InvalidProfileText(PublicProfileSection section, Language language)
     {
         ArgumentNullException.ThrowIfNull(section);
         const string message = "This section contains characters that cannot be shown. Remove them and try again.";
@@ -177,7 +177,7 @@ public static class DealerErrors
             "dealer.invalid_profile_text",
             message,
             ErrorKind.Validation,
-            new Dictionary<string, string[]> { [section.FieldName] = [message] });
+            new Dictionary<string, string[]> { [section.FieldNameFor(language)] = [message] });
     }
 
     public static readonly Error UnknownProfileSection =

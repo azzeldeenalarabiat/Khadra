@@ -31,8 +31,18 @@ internal sealed class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
             details.Property(value => value.Year).HasColumnName("year").IsRequired();
             details.Property(value => value.Color).HasColumnName("color").HasMaxLength(40);
             details.Property(value => value.Seats).HasColumnName("seats").IsRequired();
-            details.Property(value => value.Description)
-                .HasColumnName("description").HasMaxLength(VehicleDetails.MaxDescriptionLength);
+            // One column per language, and the computed pair-view ignored EXPLICITLY. Without the
+            // `Ignore` EF finds a record struct it cannot store and refuses the whole model — and
+            // the mapping comments in `DealerConfiguration` are clear that convention is not to be
+            // trusted with a get-only property in either direction.
+            //
+            // `description` (the legacy single-language column) is deliberately unmapped and
+            // deliberately still present. See the migration that split it.
+            details.Ignore(value => value.Description);
+            details.Property(value => value.DescriptionAr)
+                .HasColumnName("description_ar").HasMaxLength(VehicleDetails.MaxDescriptionLength);
+            details.Property(value => value.DescriptionEn)
+                .HasColumnName("description_en").HasMaxLength(VehicleDetails.MaxDescriptionLength);
             details.Property(value => value.Transmission)
                 .HasColumnName("transmission")
                 .HasConversion(type => type.Name, name => Enumeration.FromName<TransmissionType>(name))

@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using Khadra.Application.Common;
@@ -79,7 +80,7 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
                     form.Longitude,
                     opensAt,
                     closesAt,
-                    form.Description,
+                    new LocalizedTextDto(form.DescriptionAr, form.DescriptionEn),
                     form.CityId is null ? null : Id.From(form.CityId.Value),
                     uploads,
                     form.AddressArea,
@@ -165,13 +166,29 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
 
     // ── The customer page (spec 4.1): what the office tells customers in its own words. ──
 
+    /// <summary>
+    /// Every section, in both languages, every time.
+    /// </summary>
+    /// <remarks>
+    /// **`Disallow` is a data-loss guard, not tidiness.** This is a FULL REPLACEMENT — a section left
+    /// out is a section cleared — and `System.Text.Json` ignores unknown members by default. So a
+    /// console tab opened before this change, saving its old body of six flat strings, would bind to
+    /// all-null here and the API would answer 200 having wiped every section of a live page. With
+    /// `Disallow` that request is a 400 and the owner reloads the console instead.
+    ///
+    /// It is the overwrite the owner forbade, arriving as a deployment accident rather than a bug.
+    /// </remarks>
+    /// <summary>A missing section is a section cleared — the full-replacement rule, spelled once.</summary>
+    private static LocalizedInput Input(LocalizedTextDto? text) => text?.ToInput() ?? LocalizedInput.Nothing;
+
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed record CustomerPageRequest(
-        [MaxLength(ProfileText.MaxLength)] string? About,
-        [MaxLength(ProfileText.MaxLength)] string? RentalConditions,
-        [MaxLength(ProfileText.MaxLength)] string? Insurance,
-        [MaxLength(ProfileText.MaxLength)] string? PickupInstructions,
-        [MaxLength(ProfileText.MaxLength)] string? DeliveryNotes,
-        [MaxLength(ProfileText.MaxLength)] string? CustomerNotes,
+        LocalizedTextDto? About,
+        LocalizedTextDto? RentalConditions,
+        LocalizedTextDto? Insurance,
+        LocalizedTextDto? PickupInstructions,
+        LocalizedTextDto? DeliveryNotes,
+        LocalizedTextDto? CustomerNotes,
         IReadOnlyList<string>? HiddenSections);
 
     /// <summary>
@@ -216,12 +233,12 @@ public sealed class DealersController(ICurrentActor actor) : ApiControllerBase
         var result = await Mediator.Send(
             new UpdateDealerCustomerPageCommand(
                 actor.UserId!.Value,
-                request.About,
-                request.RentalConditions,
-                request.Insurance,
-                request.PickupInstructions,
-                request.DeliveryNotes,
-                request.CustomerNotes,
+                Input(request.About),
+                Input(request.RentalConditions),
+                Input(request.Insurance),
+                Input(request.PickupInstructions),
+                Input(request.DeliveryNotes),
+                Input(request.CustomerNotes),
                 request.HiddenSections),
             cancellationToken);
         return FromResult(result);
@@ -443,8 +460,18 @@ public sealed class SubmitDealerForm
     [StringLength(200)]
     public string? AddressStreet { get; init; }
 
-    [StringLength(2000)]
-    public string? Description { get; init; }
+    /// <summary>
+    /// The About text, one field per language.
+    ///
+    /// Flat rather than nested because this form is multipart — it carries the three licence
+    /// documents — and a nested object in a multipart body binds badly. The pair is assembled into
+    /// one value before it leaves the controller.
+    /// </summary>
+    [StringLength(ProfileText.MaxLength)]
+    public string? DescriptionAr { get; init; }
+
+    [StringLength(ProfileText.MaxLength)]
+    public string? DescriptionEn { get; init; }
 
     public Guid? CityId { get; init; }
 

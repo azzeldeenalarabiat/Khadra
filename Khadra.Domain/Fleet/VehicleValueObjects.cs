@@ -77,8 +77,23 @@ public sealed class VehicleDetails : ValueObject
     public int Seats { get; }
     public TransmissionType Transmission { get; }
     public FuelType FuelType { get; }
-    // Spec 4.3: the dealer's own words about this car, shown on the listing.
-    public string? Description { get; }
+    // Spec 4.3: the dealer's own words about this car, shown on the listing. Two columns, one per
+    // language, read back through `Description`. Flat rather than a nested owned type for the reason
+    // `PublicProfile` gives: an owned type whose columns are all nullable materialises as null, and a
+    // car nobody has described is exactly that.
+    public string? DescriptionAr { get; }
+    public string? DescriptionEn { get; }
+
+    public LocalizedText Description => LocalizedText.From(DescriptionAr, DescriptionEn);
+
+#pragma warning disable CS8618 // EF materialises this value object by writing its backing fields,
+    // which is what it must do now that `Description` is a computed view rather than a column: the
+    // constructor below takes a `LocalizedText` EF cannot bind, so without a parameterless one it
+    // refuses the whole model. Same pattern as `MileagePolicy` further down this file.
+    private VehicleDetails()
+    {
+    }
+#pragma warning restore CS8618
 
     private VehicleDetails(
         string make,
@@ -88,7 +103,7 @@ public sealed class VehicleDetails : ValueObject
         int seats,
         TransmissionType transmission,
         FuelType fuelType,
-        string? description)
+        LocalizedText description)
     {
         Make = make;
         Model = model;
@@ -97,7 +112,8 @@ public sealed class VehicleDetails : ValueObject
         Seats = seats;
         Transmission = transmission;
         FuelType = fuelType;
-        Description = description;
+        DescriptionAr = description.Ar;
+        DescriptionEn = description.En;
     }
 
     // `currentYear` is passed in rather than read from the clock so the rule stays testable and the
@@ -111,7 +127,7 @@ public sealed class VehicleDetails : ValueObject
         FuelType fuelType,
         int currentYear,
         string? color = null,
-        string? description = null,
+        LocalizedInput? description = null,
         int? earliestModelYear = null)
     {
         ArgumentNullException.ThrowIfNull(transmission);
@@ -133,7 +149,10 @@ public sealed class VehicleDetails : ValueObject
         if (seats is < 1 or > 20)
             return FleetErrors.InvalidSeats;
 
-        if (description is not null && description.Trim().Length > MaxDescriptionLength)
+        // Each language held to the cap on its own, so a full Arabic description does not eat into
+        // what an office may write in English about the same car.
+        var written = description ?? LocalizedInput.Nothing;
+        if (Overlong(written.Ar) || Overlong(written.En))
             return FleetErrors.DescriptionTooLong;
 
         return new VehicleDetails(
@@ -144,8 +163,14 @@ public sealed class VehicleDetails : ValueObject
             seats,
             transmission,
             fuelType,
-            string.IsNullOrWhiteSpace(description) ? null : description.Trim());
+            LocalizedText.From(Tidy(written.Ar), Tidy(written.En)));
     }
+
+    private static bool Overlong(string? text) =>
+        text is not null && text.Trim().Length > MaxDescriptionLength;
+
+    private static string? Tidy(string? text) =>
+        string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
     protected override IEnumerable<object?> GetEqualityComponents()
     {
@@ -156,7 +181,8 @@ public sealed class VehicleDetails : ValueObject
         yield return Seats;
         yield return Transmission;
         yield return FuelType;
-        yield return Description;
+        yield return DescriptionAr;
+        yield return DescriptionEn;
     }
 
     public override string ToString() => $"{Year} {Make} {Model}";

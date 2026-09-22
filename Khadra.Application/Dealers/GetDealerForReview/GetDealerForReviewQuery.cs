@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
@@ -27,7 +28,7 @@ public sealed record DealerDocumentLinkDto(string Type, string ContentType, stri
 /// <summary>Everything the review screen needs to make the spec 3.1 decision.</summary>
 public sealed record DealerReviewDto(
     DealerProfileDto Dealer,
-    string? Description,
+    LocalizedTextDto Description,
     double Latitude,
     double Longitude,
     IReadOnlyList<DealerDocumentLinkDto> Documents,
@@ -119,7 +120,7 @@ public sealed class GetDealerForReviewHandler(
 
         return new DealerReviewDto(
             DealerProfileDto.From(dealer),
-            dealer.Description,
+            LocalizedTextDto.From(dealer.Description),
             dealer.Location.Latitude,
             dealer.Location.Longitude,
             documents,

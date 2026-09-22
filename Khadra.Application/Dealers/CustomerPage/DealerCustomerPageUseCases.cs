@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
@@ -31,12 +32,12 @@ public sealed record GetDealerCustomerPageQuery(Id UserId) : IQuery<Result<Deale
 /// </remarks>
 public sealed record UpdateDealerCustomerPageCommand(
     Id OwnerUserId,
-    string? About,
-    string? RentalConditions,
-    string? Insurance,
-    string? PickupInstructions,
-    string? DeliveryNotes,
-    string? CustomerNotes,
+    LocalizedInput About,
+    LocalizedInput RentalConditions,
+    LocalizedInput Insurance,
+    LocalizedInput PickupInstructions,
+    LocalizedInput DeliveryNotes,
+    LocalizedInput CustomerNotes,
     IReadOnlyList<string>? HiddenSections) : ICommand<Result<DealerCustomerPageDto, Error>>;
 
 /// <summary>
@@ -53,55 +54,75 @@ public sealed record UpdateDealerCustomerPageCommand(
 /// <para><see cref="DeliveryEnabled"/> is here because delivery notes are not shown while delivery is
 /// off, and an owner typing into a box that shows nothing deserves to be told why.</para>
 /// </remarks>
+/// <param name="Visible">
+/// BOTH audiences, always. Not one preview resolved for whoever happens to be reading: an owner
+/// editing from an English-locale browser must see what an Arabic customer will get, and the BFF
+/// forwards the browser's own `Accept-Language`, so a single preview would flip with the machine the
+/// owner signed in from.
+/// </param>
 public sealed record DealerCustomerPageDto(
-    string? About,
-    string? RentalConditions,
-    string? Insurance,
-    string? PickupInstructions,
-    string? DeliveryNotes,
-    string? CustomerNotes,
+    LocalizedTextDto About,
+    LocalizedTextDto RentalConditions,
+    LocalizedTextDto Insurance,
+    LocalizedTextDto PickupInstructions,
+    LocalizedTextDto DeliveryNotes,
+    LocalizedTextDto CustomerNotes,
     IReadOnlyList<string> HiddenSections,
     IReadOnlyList<string> Sections,
     int MaxTextLength,
     bool DeliveryEnabled,
-    VisibleCustomerPageDto Visible)
+    CustomerPagePreviewDto Visible)
 {
     public static DealerCustomerPageDto From(Dealer dealer)
     {
         ArgumentNullException.ThrowIfNull(dealer);
 
         var page = dealer.PublicProfile;
-        var shown = dealer.VisiblePublicProfile();
 
         return new DealerCustomerPageDto(
-            dealer.Description,
-            page.RentalConditions,
-            page.Insurance,
-            page.PickupInstructions,
-            page.DeliveryNotes,
-            page.CustomerNotes,
+            LocalizedTextDto.From(dealer.Description),
+            LocalizedTextDto.From(page.RentalConditions),
+            LocalizedTextDto.From(page.Insurance),
+            LocalizedTextDto.From(page.PickupInstructions),
+            LocalizedTextDto.From(page.DeliveryNotes),
+            LocalizedTextDto.From(page.CustomerNotes),
             [.. page.HiddenSections.OrderBy(section => section.Id).Select(section => section.Name)],
             [.. Enumeration.GetAll<PublicProfileSection>().Select(section => section.Name)],
             ProfileText.MaxLength,
             dealer.Delivery.IsEnabled,
-            new VisibleCustomerPageDto(
-                shown.About,
-                shown.RentalConditions,
-                shown.Insurance,
-                shown.PickupInstructions,
-                shown.DeliveryNotes,
-                shown.CustomerNotes));
+            new CustomerPagePreviewDto(
+                VisibleCustomerPageDto.From(dealer.VisiblePublicProfile(Language.Arabic)),
+                VisibleCustomerPageDto.From(dealer.VisiblePublicProfile(Language.English))));
     }
 }
 
+/// <summary>The page as each audience would see it, from the same call the public page makes.</summary>
+public sealed record CustomerPagePreviewDto(
+    VisibleCustomerPageDto Ar,
+    VisibleCustomerPageDto En);
+
 /// <summary>What a customer would see of the page. Null is "nothing to show", with no reason given.</summary>
 public sealed record VisibleCustomerPageDto(
-    string? About,
-    string? RentalConditions,
-    string? Insurance,
-    string? PickupInstructions,
-    string? DeliveryNotes,
-    string? CustomerNotes);
+    ResolvedTextDto? About,
+    ResolvedTextDto? RentalConditions,
+    ResolvedTextDto? Insurance,
+    ResolvedTextDto? PickupInstructions,
+    ResolvedTextDto? DeliveryNotes,
+    ResolvedTextDto? CustomerNotes)
+{
+    public static VisibleCustomerPageDto From(PublicProfileView view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+
+        return new VisibleCustomerPageDto(
+            ResolvedTextDto.From(view.About),
+            ResolvedTextDto.From(view.RentalConditions),
+            ResolvedTextDto.From(view.Insurance),
+            ResolvedTextDto.From(view.PickupInstructions),
+            ResolvedTextDto.From(view.DeliveryNotes),
+            ResolvedTextDto.From(view.CustomerNotes));
+    }
+}
 
 /// <summary>
 /// Length and characters, per field, so the console can put each message under the box that caused it.
@@ -117,18 +138,14 @@ public sealed class UpdateDealerCustomerPageCommandValidator : AbstractValidator
 
     public UpdateDealerCustomerPageCommandValidator()
     {
-        RuleFor(command => command.About).MaximumLength(ProfileText.MaxLength)
-            .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
-        RuleFor(command => command.RentalConditions).MaximumLength(ProfileText.MaxLength)
-            .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
-        RuleFor(command => command.Insurance).MaximumLength(ProfileText.MaxLength)
-            .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
-        RuleFor(command => command.PickupInstructions).MaximumLength(ProfileText.MaxLength)
-            .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
-        RuleFor(command => command.DeliveryNotes).MaximumLength(ProfileText.MaxLength)
-            .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
-        RuleFor(command => command.CustomerNotes).MaximumLength(ProfileText.MaxLength)
-            .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
+        // Both boxes of every section. The domain refuses the same two things and names the language
+        // when it does; these run first so a form with several faults reports all of them at once.
+        Section(command => command.About);
+        Section(command => command.RentalConditions);
+        Section(command => command.Insurance);
+        Section(command => command.PickupInstructions);
+        Section(command => command.DeliveryNotes);
+        Section(command => command.CustomerNotes);
 
         // No more names than there are sections, and none longer than one could be. Which names are
         // real is the domain's answer, and it refuses an unknown one rather than ignoring it.
@@ -136,6 +153,20 @@ public sealed class UpdateDealerCustomerPageCommandValidator : AbstractValidator
             .Must(names => names is null || names.Count <= Enumeration.GetAll<PublicProfileSection>().Count)
             .WithMessage("That is more sections than the page has.");
         RuleForEach(command => command.HiddenSections).NotEmpty().MaximumLength(40);
+    }
+
+    /// <summary>The same two rules on both boxes of one section.</summary>
+    private void Section(
+        System.Linq.Expressions.Expression<Func<UpdateDealerCustomerPageCommand, LocalizedInput>> section)
+    {
+        RuleFor(section).NotNull();
+        RuleFor(section).ChildRules(box =>
+        {
+            box.RuleFor(input => input.Ar).MaximumLength(ProfileText.MaxLength)
+                .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
+            box.RuleFor(input => input.En).MaximumLength(ProfileText.MaxLength)
+                .Must(ProfileText.HasOnlyAllowedCharacters).WithMessage(Unshowable);
+        });
     }
 }
 

@@ -52,7 +52,7 @@ public sealed class ShortlistUseCaseTests
         /// </remarks>
         public void Publish(Id vehicleId) =>
             Catalogue
-                .GetAsync(vehicleId, Arg.Any<AvailabilityWindow?>(), Arg.Any<CancellationToken>())
+                .GetAsync(vehicleId, Arg.Any<AvailabilityWindow?>(), Arg.Any<Language>(), Arg.Any<CancellationToken>())
                 .Returns(Visible(vehicleId));
 
         private static CatalogueVehicle Visible(Id vehicleId) => new(
@@ -188,7 +188,7 @@ public sealed class ShortlistUseCaseTests
 
         // The gallery withdraws it: the catalogue stops answering for that id.
         context.Catalogue
-            .GetAsync(car, Arg.Any<AvailabilityWindow?>(), Arg.Any<CancellationToken>())
+            .GetAsync(car, Arg.Any<AvailabilityWindow?>(), Arg.Any<Language>(), Arg.Any<CancellationToken>())
             .Returns((CatalogueVehicle?)null);
 
         var result = await context.Handlers()

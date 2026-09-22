@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
@@ -35,7 +36,7 @@ public sealed record SubmitDealerProfileCommand(
     double Longitude,
     TimeOnly OpensAt,
     TimeOnly ClosesAt,
-    string? Description,
+    LocalizedTextDto? Description,
     Id? CityId,
     IReadOnlyList<DealerDocumentUpload> Documents,
     string? AddressArea = null,
@@ -52,7 +53,10 @@ public sealed class SubmitDealerProfileCommandValidator : AbstractValidator<Subm
             .NotEmpty().MaximumLength(CommercialRegistrationNumber.MaxLength + 10);
         RuleFor(command => command.Latitude).InclusiveBetween(-90, 90);
         RuleFor(command => command.Longitude).InclusiveBetween(-180, 180);
-        RuleFor(command => command.Description).MaximumLength(2000);
+        RuleFor(command => command.Description!.Ar).MaximumLength(ProfileText.MaxLength)
+            .When(command => command.Description is not null);
+        RuleFor(command => command.Description!.En).MaximumLength(ProfileText.MaxLength)
+            .When(command => command.Description is not null);
         // Length only. Whether the pair forms a usable address is DealerAddress.Create's decision,
         // so the rule lives in one place and the error the owner sees is the domain's own wording.
         RuleFor(command => command.AddressArea).MaximumLength(DealerAddress.AreaMaxLength);
@@ -123,9 +127,17 @@ public sealed class SubmitDealerProfileHandler(
         // on every later edit: refused rather than cut, line endings normalised, control characters
         // refused. The registration door used to truncate at 2000 silently and accept anything else —
         // including U+0000, which PostgreSQL refuses outright, so the registration 500ed.
-        var about = ProfileText.Normalize(request.Description, PublicProfileSection.About);
-        if (about.IsFailure)
-            return about.Error;
+        var submitted = request.Description?.ToInput() ?? LocalizedInput.Nothing;
+
+        var aboutAr = ProfileText.Normalize(submitted.Ar, PublicProfileSection.About, Language.Arabic);
+        if (aboutAr.IsFailure)
+            return aboutAr.Error;
+
+        var aboutEn = ProfileText.Normalize(submitted.En, PublicProfileSection.About, Language.English);
+        if (aboutEn.IsFailure)
+            return aboutEn.Error;
+
+        var about = new LocalizedInput(aboutAr.Value, aboutEn.Value);
 
         var uploads = ResolveUploads(request.Documents);
         if (uploads.IsFailure)
@@ -149,7 +161,7 @@ public sealed class SubmitDealerProfileHandler(
             hours.Value,
             now,
             TimeSpan.FromHours(rules.AdminSlaHours),
-            about.Value,
+            about,
             request.CityId,
             address.Value);
 

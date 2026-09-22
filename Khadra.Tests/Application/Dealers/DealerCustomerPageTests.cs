@@ -50,12 +50,12 @@ public sealed class DealerCustomerPageTests
 
     private static UpdateDealerCustomerPageCommand Page(
         Id ownerUserId,
-        string? about = null,
-        string? rentalConditions = null,
-        string? insurance = null,
-        string? pickupInstructions = null,
-        string? deliveryNotes = null,
-        string? customerNotes = null,
+        LocalizedInput about = default,
+        LocalizedInput rentalConditions = default,
+        LocalizedInput insurance = default,
+        LocalizedInput pickupInstructions = default,
+        LocalizedInput deliveryNotes = default,
+        LocalizedInput customerNotes = default,
         IReadOnlyList<string>? hidden = null) =>
         new(ownerUserId, about, rentalConditions, insurance, pickupInstructions, deliveryNotes,
             customerNotes, hidden);
@@ -69,9 +69,9 @@ public sealed class DealerCustomerPageTests
         var result = await context.Handlers().Handle(
             Page(
                 OwnerId,
-                about: "Family-run since 2014.",
-                rentalConditions: "No smoking.",
-                insurance: "Comprehensive, 200 JOD excess.",
+                about: Build.En("Family-run since 2014."),
+                rentalConditions: Build.En("No smoking."),
+                insurance: Build.En("Comprehensive, 200 JOD excess."),
                 hidden: ["Insurance"]),
             CancellationToken.None);
 
@@ -79,13 +79,13 @@ public sealed class DealerCustomerPageTests
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
 
         // What the office wrote comes back whole, hidden or not: it is still theirs to show again.
-        Assert.Equal("Comprehensive, 200 JOD excess.", result.Value.Insurance);
+        Assert.Equal("Comprehensive, 200 JOD excess.", result.Value.Insurance.En);
         Assert.Equal(["Insurance"], result.Value.HiddenSections);
         // What a customer sees is the server's answer, not the console's.
-        Assert.Equal("Family-run since 2014.", result.Value.Visible.About);
-        Assert.Equal("No smoking.", result.Value.Visible.RentalConditions);
-        Assert.Null(result.Value.Visible.Insurance);
-        Assert.Equal("Family-run since 2014.", dealer.Description);
+        Assert.Equal("Family-run since 2014.", result.Value.Visible.En.About!.Text);
+        Assert.Equal("No smoking.", result.Value.Visible.En.RentalConditions!.Text);
+        Assert.Null(result.Value.Visible.En.Insurance);
+        Assert.Equal("Family-run since 2014.", dealer.Description.En);
     }
 
     [Fact]
@@ -115,18 +115,19 @@ public sealed class DealerCustomerPageTests
         var dealer = context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
 
         var off = await context.Handlers().Handle(
-            Page(OwnerId, deliveryNotes: "We deliver to the airport."), CancellationToken.None);
+            Page(OwnerId, deliveryNotes: Build.En("We deliver to the airport.")), CancellationToken.None);
 
         Assert.False(off.Value.DeliveryEnabled);
-        Assert.Equal("We deliver to the airport.", off.Value.DeliveryNotes);
-        Assert.Null(off.Value.Visible.DeliveryNotes);
+        Assert.Equal("We deliver to the airport.", off.Value.DeliveryNotes.En);
+        Assert.Null(off.Value.Visible.En.DeliveryNotes);
+        Assert.Null(off.Value.Visible.Ar.DeliveryNotes);
 
         Assert.True(dealer.EnableDelivery(10m, Money.Jod(5m), Build.Now).IsSuccess);
         var on = await context.Handlers().Handle(
             new GetDealerCustomerPageQuery(OwnerId), CancellationToken.None);
 
         Assert.True(on.Value.DeliveryEnabled);
-        Assert.Equal("We deliver to the airport.", on.Value.Visible.DeliveryNotes);
+        Assert.Equal("We deliver to the airport.", on.Value.Visible.En.DeliveryNotes!.Text);
     }
 
     [Fact]
@@ -135,15 +136,15 @@ public sealed class DealerCustomerPageTests
         var context = new Context();
         context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
         await context.Handlers().Handle(
-            Page(OwnerId, about: "About us.", insurance: "Comprehensive."), CancellationToken.None);
+            Page(OwnerId, about: Build.En("About us."), insurance: Build.En("Comprehensive.")), CancellationToken.None);
 
         var second = await context.Handlers().Handle(
-            Page(OwnerId, rentalConditions: "No smoking."), CancellationToken.None);
+            Page(OwnerId, rentalConditions: Build.En("No smoking.")), CancellationToken.None);
 
         Assert.True(second.IsSuccess);
-        Assert.Null(second.Value.About);
-        Assert.Null(second.Value.Insurance);
-        Assert.Equal("No smoking.", second.Value.RentalConditions);
+        Assert.True(second.Value.About.Ar is null && second.Value.About.En is null);
+        Assert.Null(second.Value.Insurance.En);
+        Assert.Equal("No smoking.", second.Value.RentalConditions.En);
     }
 
     [Fact]
@@ -153,18 +154,18 @@ public sealed class DealerCustomerPageTests
         // owner's to decide.
         var context = new Context();
         var dealer = context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
-        Assert.True(dealer.UpdatePublicProfile("About us.", PublicProfile.Empty()).IsSuccess);
+        Assert.True(dealer.UpdatePublicProfile(Build.En("About us."), PublicProfile.Empty()).IsSuccess);
         var staffId = context.GivenEmployeeOf(dealer);
 
         var read = await context.Handlers().Handle(
             new GetDealerCustomerPageQuery(staffId), CancellationToken.None);
         var written = await context.Handlers().Handle(
-            Page(staffId, about: "Mine now."), CancellationToken.None);
+            Page(staffId, about: Build.En("Mine now.")), CancellationToken.None);
 
         Assert.True(read.IsSuccess);
-        Assert.Equal("About us.", read.Value.About);
+        Assert.Equal("About us.", read.Value.About.En);
         Assert.Equal("dealer.owner_only", written.Error.Code);
-        Assert.Equal("About us.", dealer.Description);
+        Assert.Equal("About us.", dealer.Description.En);
     }
 
     [Fact]
@@ -174,10 +175,10 @@ public sealed class DealerCustomerPageTests
         var dealer = context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
 
         var result = await context.Handlers().Handle(
-            Page(OwnerId, about: "About us.", hidden: ["OpeningHours"]), CancellationToken.None);
+            Page(OwnerId, about: Build.En("About us."), hidden: ["OpeningHours"]), CancellationToken.None);
 
         Assert.Equal("dealer.unknown_profile_section", result.Error.Code);
-        Assert.Null(dealer.Description);
+        Assert.Null(dealer.Description.En);
         await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -188,10 +189,15 @@ public sealed class DealerCustomerPageTests
         context.Given(Build.ApprovedDealer(ownerUserId: OwnerId));
 
         var result = await context.Handlers().Handle(
-            Page(OwnerId, insurance: new string('x', ProfileText.MaxLength + 1)), CancellationToken.None);
+            Page(OwnerId, insurance: Build.En(new string('x', ProfileText.MaxLength + 1))), CancellationToken.None);
 
         Assert.Equal("dealer.profile_text_too_long", result.Error.Code);
-        Assert.True(result.Error.Details!.ContainsKey("insurance"));
+
+        // The BOX, not just the section. With two under one heading, "insurance is too long" leaves
+        // an owner to work out which of the two they broke — and the untouched one must not be
+        // blamed for it.
+        Assert.True(result.Error.Details!.ContainsKey("insuranceEn"));
+        Assert.False(result.Error.Details.ContainsKey("insuranceAr"));
     }
 
     [Fact]
@@ -201,11 +207,11 @@ public sealed class DealerCustomerPageTests
         context.Given(Build.Dealer(ownerUserId: OwnerId));
 
         var result = await context.Handlers().Handle(
-            Page(OwnerId, about: "Opening soon."), CancellationToken.None);
+            Page(OwnerId, about: Build.En("Opening soon.")), CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         // Nothing on it reaches a customer: the public page answers 404 for an office that cannot trade.
-        Assert.Equal("Opening soon.", result.Value.Visible.About);
+        Assert.Equal("Opening soon.", result.Value.Visible.En.About!.Text);
     }
 
     [Fact]

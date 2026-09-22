@@ -144,14 +144,18 @@ public sealed class CatalogueReaderTests : IDisposable
             dealer.CityId,
             DealerAddress.Create("Abdoun", "Zahran Street").Value).IsSuccess);
         Assert.True(dealer.EnableDelivery(10m, Money.Jod(5m), Build.Now).IsSuccess);
+        // Deliberately mixed: one section in both languages, one Arabic only, one English only, and
+        // two never written. That is the matrix the gallery page has to resolve, and it is asserted
+        // below against what the DOMAIN says each reader should get rather than against a hand-typed
+        // expectation — the same discipline the rest of this suite keeps about `IsBookable`.
         Assert.True(dealer.UpdatePublicProfile(
-            "Family-run since 2014.",
+            Build.Both("مكتب عائلي منذ 2014.", "Family-run since 2014."),
             PublicProfile.Create(
-                "No smoking.",
-                "Comprehensive, 200 JOD excess.",
-                null,
-                "We deliver to the airport.",
-                null,
+                Build.Both("ممنوع التدخين.", "No smoking."),
+                Build.En("Comprehensive, 200 JOD excess."),
+                LocalizedInput.Nothing,
+                Build.Ar("نوصل إلى المطار."),
+                LocalizedInput.Nothing,
                 ["Insurance"]).Value).IsSuccess);
 
         await using (var context = NewContext())
@@ -161,14 +165,22 @@ public sealed class CatalogueReaderTests : IDisposable
         }
 
         await using var reader = NewContext();
-        var page = await new CatalogueReader(reader).GetGalleryAsync(dealer.Id);
+        var page = await new CatalogueReader(reader).GetGalleryAsync(dealer.Id, Language.English);
 
         Assert.NotNull(page);
         Assert.Equal("Abdoun", page.Address!.Area);
         Assert.Equal("Zahran Street", page.Address.Street);
-        Assert.Equal("Family-run since 2014.", page.Sections.About);
-        Assert.Equal("No smoking.", page.Sections.RentalConditions);
-        Assert.Equal("We deliver to the airport.", page.Sections.DeliveryNotes);
+        // An ENGLISH reader, against the mixed page above. Each expectation is what
+        // `LocalizedText.Resolve` says it should be, which is the one definition of the rule.
+        Assert.Equal("Family-run since 2014.", page.Sections.About!.Text);
+        Assert.Equal(Language.English.Name, page.Sections.About!.Language);
+        Assert.Equal("No smoking.", page.Sections.RentalConditions!.Text);
+
+        // Written in Arabic only. An English reader is shown the office's own words rather than an
+        // empty heading, and the answer says which language they are in.
+        Assert.Equal("نوصل إلى المطار.", page.Sections.DeliveryNotes!.Text);
+        Assert.Equal(Language.Arabic.Name, page.Sections.DeliveryNotes!.Language);
+
         // Hidden and never written are both simply absent, and the page says nothing about which.
         Assert.Null(page.Sections.Insurance);
         Assert.Null(page.Sections.PickupInstructions);
@@ -392,11 +404,11 @@ public sealed class CatalogueReaderTests : IDisposable
         await using var reader = NewContext();
         var catalogue = new CatalogueReader(reader);
 
-        Assert.NotNull(await catalogue.GetAsync(listed.Id, window: null));
+        Assert.NotNull(await catalogue.GetAsync(listed.Id, window: null, Language.English));
         // Not "a car with status Draft" and not a 403: an anonymous caller must not be able to tell
         // an unpublished listing from an id that was never real.
-        Assert.Null(await catalogue.GetAsync(draft.Id, window: null));
-        Assert.Null(await catalogue.GetAsync(Id.New(), window: null));
+        Assert.Null(await catalogue.GetAsync(draft.Id, window: null, Language.English));
+        Assert.Null(await catalogue.GetAsync(Id.New(), window: null, Language.English));
     }
 
     [Fact]
@@ -415,7 +427,7 @@ public sealed class CatalogueReaderTests : IDisposable
         await using var reader = NewContext();
         var catalogue = new CatalogueReader(reader);
 
-        var page = await catalogue.GetGalleryAsync(trading.Id);
+        var page = await catalogue.GetGalleryAsync(trading.Id, Language.English);
         Assert.NotNull(page);
         Assert.Equal("Petra Rentals", page.BusinessName);
         // Reviews has a domain model and no table (checklist item 3). Null is the honest answer, and
@@ -423,7 +435,7 @@ public sealed class CatalogueReaderTests : IDisposable
         Assert.Null(page.AverageRating);
         Assert.Equal(0, page.ReviewCount);
 
-        Assert.Null(await catalogue.GetGalleryAsync(suspended.Id));
+        Assert.Null(await catalogue.GetGalleryAsync(suspended.Id, Language.English));
     }
 
     [Fact]
@@ -478,6 +490,78 @@ public sealed class CatalogueReaderTests : IDisposable
         Assert.Empty((await catalogue.SearchAsync(new CatalogueFilter(Text: "hilux"), Page)).Items);
         // A bare wildcard is a search for a percent sign, not a search for everything.
         Assert.Empty((await catalogue.SearchAsync(new CatalogueFilter(Text: "%"), Page)).Items);
+    }
+
+    /// <summary>
+    /// A BLANK in a text column is nothing written, however it got there.
+    /// </summary>
+    /// <remarks>
+    /// Nothing this code writes can store one — every write goes through `LocalizedText.From`, which
+    /// turns blank into null. But `BilingualDealerContent` copies the legacy columns verbatim, and an
+    /// old car form saved an emptied box as ''. Read through the pair's constructor, such a value came
+    /// back as WRITTEN: an English reader was sent `{ "text": "", "language": "en" }` instead of the
+    /// Arabic the office actually wrote, and a section written in neither language rendered as an
+    /// empty heading. The values are put straight into the columns here, the way the backfill leaves
+    /// them, because no domain method can produce them.
+    /// </remarks>
+    [Fact]
+    public async Task A_blank_left_in_a_column_by_the_backfill_reads_as_nothing_written()
+    {
+        var carType = CarType.Create("Sedan", "سيدان", 1, Build.Now).Value;
+        var dealer = Build.ApprovedDealer();
+        Assert.True(dealer.UpdatePublicProfile(
+            Build.Ar("مكتب عائلي منذ 2014."),
+            PublicProfile.Create(
+                Build.Ar("ممنوع التدخين."),
+                LocalizedInput.Nothing,
+                LocalizedInput.Nothing,
+                LocalizedInput.Nothing,
+                LocalizedInput.Nothing,
+                []).Value).IsSuccess);
+        var vehicle = Listed(dealer.Id, carType.Id);
+
+        await using (var context = NewContext())
+        {
+            context.CarTypes.Add(carType);
+            context.Dealers.Add(dealer);
+            context.Vehicles.Add(vehicle);
+            await context.SaveChangesAsync();
+
+            // What a legacy '' or '   ' becomes once copied: a blank beside real Arabic, and a
+            // section blank on both sides.
+            await context.Database.ExecuteSqlRawAsync(
+                "UPDATE dealers SET description_en = '   ', rental_conditions_en = '', " +
+                "insurance_summary_ar = '', insurance_summary_en = '  ' WHERE id = {0}",
+                dealer.Id.Value);
+            await context.Database.ExecuteSqlRawAsync(
+                "UPDATE vehicles SET description_ar = 'سيارة عائلية.', description_en = ' ' WHERE id = {0}",
+                vehicle.Id.Value);
+        }
+
+        await using var reader = NewContext();
+        var catalogue = new CatalogueReader(reader);
+        var gallery = await catalogue.GetGalleryAsync(dealer.Id, Language.English);
+        var car = await catalogue.GetAsync(vehicle.Id, window: null, Language.English);
+
+        Assert.NotNull(gallery);
+        Assert.NotNull(car);
+
+        // An English reader gets the Arabic the office wrote — the fallback reaches PAST the blank.
+        Assert.Equal("مكتب عائلي منذ 2014.", gallery.Sections.About!.Text);
+        Assert.Equal(Language.Arabic.Name, gallery.Sections.About.Language);
+        Assert.Equal("ممنوع التدخين.", gallery.Sections.RentalConditions!.Text);
+        Assert.Equal(Language.Arabic.Name, gallery.Sections.RentalConditions.Language);
+        Assert.Equal("سيارة عائلية.", car.Description!.Text);
+        Assert.Equal(Language.Arabic.Name, car.Description.Language);
+
+        // Blank on both sides is a section with nothing in it, which is no section at all.
+        Assert.Null(gallery.Sections.Insurance);
+
+        // And the owner's own copy says the English box is empty, not three spaces.
+        var stored = await reader.Dealers.SingleAsync(candidate => candidate.Id == dealer.Id);
+        Assert.Null(stored.Description.En);
+        Assert.Null(stored.PublicProfile.RentalConditions.En);
+        Assert.True(stored.PublicProfile.Insurance.IsEmpty);
     }
 }
 
@@ -538,7 +622,7 @@ public sealed class CatalogueBrandingUrlTests : IDisposable
         }
 
         await using var reader = new KhadraDbContext(_options);
-        var car = await new CatalogueReader(reader).GetAsync(vehicle.Id, window: null);
+        var car = await new CatalogueReader(reader).GetAsync(vehicle.Id, window: null, Language.English);
 
         Assert.NotNull(car);
         Assert.Equal(
@@ -578,7 +662,7 @@ public sealed class CatalogueBrandingUrlTests : IDisposable
         var expectedLogo = $"/api/v1/dealer-images/{logoKey}";
         var expectedCover = $"/api/v1/dealer-images/{coverKey}";
 
-        var gallery = await catalogue.GetGalleryAsync(dealer.Id);
+        var gallery = await catalogue.GetGalleryAsync(dealer.Id, Language.English);
         Assert.NotNull(gallery);
         Assert.Equal(expectedLogo, gallery.LogoUrl);
         Assert.Equal(expectedCover, gallery.CoverUrl);
@@ -605,7 +689,7 @@ public sealed class CatalogueBrandingUrlTests : IDisposable
         }
 
         await using var reader = new KhadraDbContext(_options);
-        var gallery = await new CatalogueReader(reader).GetGalleryAsync(dealer.Id);
+        var gallery = await new CatalogueReader(reader).GetGalleryAsync(dealer.Id, Language.English);
 
         Assert.NotNull(gallery);
         Assert.Null(gallery.LogoUrl);

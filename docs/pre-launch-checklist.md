@@ -3740,3 +3740,94 @@ is written down in the record's own documentation for exactly that reason.
 **To close:** when the push channel lands, drive it from domain events after commit — that is a
 complete change source and makes the derived signature unnecessary. Until then, anyone adding a
 column the dealer's list renders adds it to `QueueSignatureAsync` in the same change.
+
+### 131. Drop the seven retired legacy text columns
+
+**Status:** deferred on purpose · **Raised:** 2026-09-22
+
+`dealers.description`, `rental_conditions`, `insurance_summary`, `pickup_instructions`,
+`delivery_notes`, `customer_notes` and `vehicles.description` are retained after
+`BilingualDealerContent` for migration and audit only. Nothing reads or writes them, so from the
+first save after the migration they drift from what customers see — by design — and every day they
+stay they are a copy somebody may take for the current text.
+
+**To close:** a SEPARATE migration, reviewed on its own, once production has run on the new columns
+long enough to be trusted: re-run the verbatim check of item 132 against the rows nobody has saved
+since, take a backup, then drop. Never folded into another migration.
+
+### 132. The bilingual migration must be deployed stop-the-world: no old and new API at once
+
+**Status:** open until production has been migrated this way · **Raised:** 2026-09-22
+
+`20260922012458_BilingualDealerContent` copies each office's text out of seven legacy columns into
+fourteen new ones (`*_ar` / `*_en`) and from then on the new binary reads and writes ONLY the new
+ones. The legacy columns are kept, and commented as retired, for migration and audit.
+
+That makes an overlap dangerous in one direction only, and silently: an OLD API process still
+running after the migration keeps writing the legacy columns, and nothing reads them any more. An
+office that saves its page through an old process during a rolling deploy "saves", gets a 200, and
+the page customers see does not change. (An old CONSOLE TAB is not the risk — its save body is
+refused with 400 by the new API, and nothing is written; `CustomerPagePayloadTests` pins it.)
+
+**Procedure:**
+
+1. Stop every API instance. The console and the app can stay up; they fail their calls for the
+   duration and retry.
+2. Take a backup.
+3. Apply the migration (`dotnet ef database update …`, or the bundle). It aborts, changing nothing,
+   if its script detector misreads Arabic, presentation forms or English in its self-test, and if
+   any legacy value would land on both sides, neither side, or altered.
+4. Run the verbatim check, after the migration and BEFORE the new API starts (the first save
+   changes the new columns, and the check no longer describes the copy):
+
+   ```sql
+   with pairs(v, a, e) as (
+     select description, description_ar, description_en from dealers
+     union all select rental_conditions,   rental_conditions_ar,   rental_conditions_en   from dealers
+     union all select insurance_summary,   insurance_summary_ar,   insurance_summary_en   from dealers
+     union all select pickup_instructions, pickup_instructions_ar, pickup_instructions_en from dealers
+     union all select delivery_notes,      delivery_notes_ar,      delivery_notes_en      from dealers
+     union all select customer_notes,      customer_notes_ar,      customer_notes_en      from dealers
+     union all select description,         description_ar,         description_en         from vehicles)
+   select count(*) filter (where v is not null) as legacy,
+          count(*) filter (where v is not null and (a is null) <> (e is null)
+                             and coalesce(a, e) = v) as verbatim_on_one_side,
+          count(*) filter (where v is null and (a is not null or e is not null)) as invented
+   from pairs;
+   ```
+
+   It passes when `legacy = verbatim_on_one_side` and `invented = 0`. On the e2e database: 10, 10,
+   0. On the rehearsal copy with Arabic, English, mixed-script, presentation-form and digits-only
+   values: 16, 16, 0. A legacy value that is blank copies as blank and counts as verbatim; the
+   read side treats a stored blank as nothing written (`CatalogueReaderTests`).
+5. Start the new API. Then serve the new console. See item 133 for the customer app.
+
+**To close:** production migrated this way, and step 4 recorded.
+
+### 133. Installed copies of the customer app cannot read the new gallery and car text
+
+**Status:** open, needs an owner decision before the production rollout · **Raised:** 2026-09-22
+
+The customer-facing reads now return an office's text as `{ "text", "language" }` where they used
+to return a plain string: a car's `description`, and the six `sections` of a gallery page. The app
+build in this change reads the new shape. An app ALREADY INSTALLED does not: it casts each field
+`as String?` (`lib/api/dtos.dart` before this change, lines 936 and 993), and a Dart cast of a map
+to a string throws a `TypeError`. Checked by running that parsing against the new JSON — it throws
+for every written section and every car with a description, and after the backfill that is every
+car.
+
+So from the moment the API is deployed, an installed old build cannot open any car's page or most
+gallery pages, which is where booking starts. Nothing forces an update: the app has no
+minimum-version check and `/app-config` carries none.
+
+**Options:**
+
+- **No real customers yet:** deploy the API and put the new build on every test device the same
+  day. Nothing else needed.
+- **Real customers have the app:** keep the plain string for old builds — `description` and
+  `sections.*` as the resolved text — and carry `{ text, language }` under new names the new build
+  reads. Additive, and the old field can go once no old build is left.
+- **Either way, before the next breaking change:** a minimum supported app version in
+  `/app-config`, so the server can tell an old build to update instead of breaking under it.
+
+**To close:** the owner picks, and the picked option is done before the API ships.

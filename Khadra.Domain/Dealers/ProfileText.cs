@@ -27,7 +27,11 @@ public static class ProfileText
     /// <para>Refused when it holds a control character other than a line break or a tab: nothing a
     /// person types produces one, and nothing a screen draws renders it honestly.</para>
     /// </remarks>
-    public static Result<string?, Error> Normalize(string? value, PublicProfileSection section)
+    /// <param name="language">
+    /// Which box this came from. Carried only so a refusal can name it: with two boxes per section,
+    /// "rental conditions is too long" leaves an owner to guess which of the two to shorten.
+    /// </param>
+    public static Result<string?, Error> Normalize(string? value, PublicProfileSection section, Language language)
     {
         ArgumentNullException.ThrowIfNull(section);
 
@@ -40,10 +44,10 @@ public static class ProfileText
             .Trim();
 
         if (!HasOnlyAllowedCharacters(text))
-            return DealerErrors.InvalidProfileText(section);
+            return DealerErrors.InvalidProfileText(section, language);
 
         if (text.Length > MaxLength)
-            return DealerErrors.ProfileTextTooLong(section);
+            return DealerErrors.ProfileTextTooLong(section, language);
 
         return text;
     }

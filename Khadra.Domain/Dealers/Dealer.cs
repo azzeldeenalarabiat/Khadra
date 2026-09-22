@@ -22,7 +22,13 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     /// The office's About text, in its own words. Written at registration, and after that only by
     /// <see cref="UpdatePublicProfile"/> — one writer, so two console forms cannot overwrite each other.
     /// </summary>
-    public string? Description { get; private set; }
+    // Two columns, one per language, read back through `Description`. Flat for the same reason
+    // `PublicProfile` is: see the note there and in `DealerConfiguration`.
+    public string? DescriptionAr { get; private set; }
+    public string? DescriptionEn { get; private set; }
+
+    /// <summary>The office's own description of itself — the About section of its page.</summary>
+    public LocalizedText Description => LocalizedText.From(DescriptionAr, DescriptionEn);
 
     /// <summary>The rest of what the office writes for customers, and which of it is hidden.</summary>
     public PublicProfile PublicProfile { get; private set; } = null!;
@@ -81,7 +87,7 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
         OperatingHours operatingHours,
         DateTimeOffset now,
         TimeSpan reviewSla,
-        string? description = null,
+        LocalizedInput? description = null,
         Id? cityId = null,
         DealerAddress? address = null)
     {
@@ -101,7 +107,8 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
             OperatingHours = operatingHours,
             // Already held to ProfileText by the handler that takes the application form, so it is
             // stored as written rather than cut short here.
-            Description = description,
+            DescriptionAr = (description ?? LocalizedInput.Nothing).Ar,
+            DescriptionEn = (description ?? LocalizedInput.Nothing).En,
             PublicProfile = PublicProfile.Empty(),
             CityId = cityId,
             Address = address,
@@ -309,15 +316,20 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     /// before approval, and nothing here can reach a customer until the office may trade.
     /// </para>
     /// </remarks>
-    public UnitResult<Error> UpdatePublicProfile(string? about, PublicProfile profile)
+    public UnitResult<Error> UpdatePublicProfile(LocalizedInput about, PublicProfile profile)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        var text = ProfileText.Normalize(about, PublicProfileSection.About);
-        if (text.IsFailure)
-            return UnitResult.Failure(text.Error);
+        var arabic = ProfileText.Normalize(about.Ar, PublicProfileSection.About, Language.Arabic);
+        if (arabic.IsFailure)
+            return UnitResult.Failure(arabic.Error);
 
-        Description = text.Value;
+        var english = ProfileText.Normalize(about.En, PublicProfileSection.About, Language.English);
+        if (english.IsFailure)
+            return UnitResult.Failure(english.Error);
+
+        DescriptionAr = arabic.Value;
+        DescriptionEn = english.Value;
         PublicProfile = profile;
         return UnitResult.Success<Error>();
     }
@@ -332,16 +344,34 @@ public sealed class Dealer : AggregateRoot, ISoftDeletable
     /// not offering. The public page and the console's preview both read this, so the two cannot come
     /// to disagree about what a customer sees.
     /// </remarks>
-    public PublicProfileView VisiblePublicProfile() => new(
-        Shown(PublicProfileSection.About, Description),
-        Shown(PublicProfileSection.RentalConditions, PublicProfile.RentalConditions),
-        Shown(PublicProfileSection.Insurance, PublicProfile.Insurance),
-        Shown(PublicProfileSection.PickupInstructions, PublicProfile.PickupInstructions),
-        Delivery.IsEnabled ? Shown(PublicProfileSection.DeliveryNotes, PublicProfile.DeliveryNotes) : null,
-        Shown(PublicProfileSection.CustomerNotes, PublicProfile.CustomerNotes));
+    /// <param name="language">
+    /// The reader's language. It decides only WHICH of the office's words to show, never whether:
+    /// hiding and delivery-off are settled first, and a section written in one language only is
+    /// shown to both audiences in the language it was written in.
+    /// </param>
+    public PublicProfileView VisiblePublicProfile(Language language)
+    {
+        ArgumentNullException.ThrowIfNull(language);
 
-    private string? Shown(PublicProfileSection section, string? text) =>
-        PublicProfile.IsHidden(section) || string.IsNullOrWhiteSpace(text) ? null : text;
+        return new PublicProfileView(
+            Shown(PublicProfileSection.About, Description, language),
+            Shown(PublicProfileSection.RentalConditions, PublicProfile.RentalConditions, language),
+            Shown(PublicProfileSection.Insurance, PublicProfile.Insurance, language),
+            Shown(PublicProfileSection.PickupInstructions, PublicProfile.PickupInstructions, language),
+            Delivery.IsEnabled
+                ? Shown(PublicProfileSection.DeliveryNotes, PublicProfile.DeliveryNotes, language)
+                : null,
+            Shown(PublicProfileSection.CustomerNotes, PublicProfile.CustomerNotes, language));
+    }
+
+    /// <summary>
+    /// Hidden beats everything, then the fallback decides which language.
+    ///
+    /// The order matters: a hidden section must stay hidden from BOTH audiences, and resolving first
+    /// would have made "is there anything to show" depend on the reader's language.
+    /// </summary>
+    private ResolvedText? Shown(PublicProfileSection section, LocalizedText text, Language language) =>
+        PublicProfile.IsHidden(section) ? null : text.Resolve(language);
 
     /// <summary>Replaces the logo; returns the key it replaced so the caller can delete the old file after commit.</summary>
     public string? SetLogo(string storageKey)

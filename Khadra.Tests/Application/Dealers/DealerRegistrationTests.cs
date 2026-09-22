@@ -53,7 +53,7 @@ public sealed class DealerRegistrationTests
             35.4444,
             new TimeOnly(8, 0),
             new TimeOnly(20, 0),
-            "Tourist car hire in Petra.",
+            Build.EnDto("Tourist car hire in Petra."),
             null,
             [.. documentTypes.Select(Upload)]);
 
@@ -261,7 +261,7 @@ public sealed class DealerApplicationLocationTests
             35.9106,
             new TimeOnly(8, 0),
             new TimeOnly(20, 0),
-            "Tourist car hire.",
+            Build.EnDto("Tourist car hire."),
             cityId,
             [.. new[] { "CommercialRegistration", "VehicleRegistration", "OwnerIdentity" }.Select(Upload)],
             area,

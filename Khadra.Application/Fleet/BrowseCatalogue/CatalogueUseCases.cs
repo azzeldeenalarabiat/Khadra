@@ -36,11 +36,21 @@ public sealed record SearchCatalogueQuery(
     PageRequest Page) : IQuery<Result<PagedResult<CatalogueListing>, Error>>;
 
 /// <summary>One car's own page.</summary>
-public sealed record GetCatalogueVehicleQuery(Id VehicleId, DateTimeOffset? PickupAt, DateTimeOffset? ReturnAt)
+/// <param name="Language">
+/// The reader's language, filled by the controller from `Accept-Language`. A FIELD rather than a
+/// port the handler injects, so a test writes `Language.Arabic` and nothing below this line has to
+/// know an HTTP request exists.
+/// </param>
+public sealed record GetCatalogueVehicleQuery(
+    Id VehicleId,
+    DateTimeOffset? PickupAt,
+    DateTimeOffset? ReturnAt,
+    Language Language)
     : IQuery<Result<CatalogueVehicle, Error>>;
 
 /// <summary>A gallery's public page.</summary>
-public sealed record GetPublicGalleryQuery(Id DealerId) : IQuery<Result<PublicGalleryPage, Error>>;
+public sealed record GetPublicGalleryQuery(Id DealerId, Language Language)
+    : IQuery<Result<PublicGalleryPage, Error>>;
 
 /// <summary>The seat counts and car types the bookable catalogue holds, for building its filters.</summary>
 public sealed record GetCatalogueFacetsQuery : IQuery<Result<CatalogueFacets, Error>>;
@@ -217,7 +227,7 @@ public sealed class GetCatalogueVehicleHandler(
         if (window.IsFailure)
             return window.Error;
 
-        var vehicle = await catalogue.GetAsync(request.VehicleId, window.Value, cancellationToken);
+        var vehicle = await catalogue.GetAsync(request.VehicleId, window.Value, request.Language, cancellationToken);
         return vehicle is null ? FleetCatalogueErrors.VehicleNotFound : vehicle;
     }
 }
@@ -231,7 +241,7 @@ public sealed class GetPublicGalleryHandler(ICatalogueReader catalogue)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var gallery = await catalogue.GetGalleryAsync(request.DealerId, cancellationToken);
+        var gallery = await catalogue.GetGalleryAsync(request.DealerId, request.Language, cancellationToken);
         return gallery is null ? FleetCatalogueErrors.GalleryNotFound : gallery;
     }
 }

@@ -68,7 +68,9 @@ public sealed class ShortlistHandlers(
         //
         // No availability window is passed: a shortlist has no dates, and asking would only compute
         // an `IsAvailable` nothing reads.
-        var vehicle = await catalogue.GetAsync(request.VehicleId, null, cancellationToken);
+        // The language is immaterial here: this call only asks whether the car may be saved at all,
+        // and nothing of the office's writing is read from the answer.
+        var vehicle = await catalogue.GetAsync(request.VehicleId, null, Language.Default, cancellationToken);
         if (vehicle is null)
             return ShortlistErrors.VehicleNotAvailable;
 

@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
@@ -12,6 +13,28 @@ namespace Khadra.Tests.Support;
 internal static class Build
 {
     public static readonly DateTimeOffset Now = new(2026, 9, 3, 10, 0, 0, TimeSpan.Zero);
+
+    // ── Dealer-authored text, which is bilingual ────────────────────────────────────────────────
+    //
+    // Named rather than positional. `new LocalizedInput(a, b)` reads identically whichever way round
+    // the pair is, and a transposed pair — Arabic saved as English — is the one mistake here that no
+    // assertion downstream would catch.
+
+    /// <summary>English only, which is what most of this suite means by one string of text.</summary>
+    public static LocalizedInput En(string? text) => new(null, text);
+
+    /// <summary>Arabic only.</summary>
+    public static LocalizedInput Ar(string? text) => new(text, null);
+
+    /// <summary>Both, for the tests that are about the fallback itself.</summary>
+    public static LocalizedInput Both(string? ar, string? en) => new(ar, en);
+
+    /// <summary>The same three at the application boundary, where commands carry a DTO.</summary>
+    public static LocalizedTextDto EnDto(string? text) => new(null, text);
+
+    public static LocalizedTextDto ArDto(string? text) => new(text, null);
+
+    public static LocalizedTextDto BothDto(string? ar, string? en) => new(ar, en);
 
     // The admin review SLA a test dealer is registered under (spec 3.1 uses 48 hours).
     public static readonly TimeSpan ReviewSla = TimeSpan.FromHours(48);

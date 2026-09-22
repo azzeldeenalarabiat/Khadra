@@ -63,6 +63,7 @@ builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddScoped<ICurrentActor, HttpCurrentActor>();
+builder.Services.AddScoped<ICurrentLanguage, HttpCurrentLanguage>();
 builder.Services.AddScoped<IAuthorizationHandler, ApprovedDealerAuthorizationHandler>();
 // A denied authorization returns ProblemDetails with a stable code, not an empty 403.
 builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationResultHandler>();

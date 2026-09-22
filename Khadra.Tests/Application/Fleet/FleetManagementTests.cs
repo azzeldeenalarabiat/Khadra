@@ -96,7 +96,7 @@ public sealed class FleetManagementTests
         Seats: 5,
         Transmission: "Automatic",
         FuelType: "Petrol",
-        Description: "Clean, low mileage, ideal for city driving.",
+        Description: Build.EnDto("Clean, low mileage, ideal for city driving."),
         PlateNumber: plate,
         DailyRate: 32m,
         SecurityDeposit: 150m,
@@ -202,7 +202,7 @@ public sealed class FleetManagementTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Draft", result.Value.Status);
         Assert.False(result.Value.IsBookable);
-        Assert.Equal("Clean, low mileage, ideal for city driving.", result.Value.Description);
+        Assert.Equal("Clean, low mileage, ideal for city driving.", result.Value.Description.En);
         Assert.Equal(200, result.Value.Mileage.DailyLimitKm);
         Assert.True(result.Value.IsDeliveryEligible);
         Assert.Single(context.Added);

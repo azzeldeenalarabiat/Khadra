@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Dtos;
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Common;
@@ -32,7 +33,7 @@ public sealed record VehicleDetailsInput(
     int Seats,
     string Transmission,
     string FuelType,
-    string? Description,
+    LocalizedTextDto? Description,
     string PlateNumber,
     decimal DailyRate,
     decimal SecurityDeposit,
@@ -85,7 +86,10 @@ public sealed class VehicleDetailsInputValidator : AbstractValidator<VehicleDeta
         RuleFor(input => input.PlateNumber).NotEmpty().MaximumLength(30);
         RuleFor(input => input.DailyRate).GreaterThan(0m);
         RuleFor(input => input.SecurityDeposit).GreaterThanOrEqualTo(0m);
-        RuleFor(input => input.Description).MaximumLength(VehicleDetails.MaxDescriptionLength);
+        RuleFor(input => input.Description!.Ar).MaximumLength(VehicleDetails.MaxDescriptionLength)
+            .When(input => input.Description is not null);
+        RuleFor(input => input.Description!.En).MaximumLength(VehicleDetails.MaxDescriptionLength)
+            .When(input => input.Description is not null);
         RuleFor(input => input.Mileage.DailyLimitKm)
             .GreaterThan(0)
             .When(input => !input.Mileage.IsUnlimited)
@@ -356,7 +360,7 @@ public sealed class VehicleHandlers(
 
         var details = VehicleDetails.Create(
             input.Make, input.Model, input.Year, input.Seats, transmission, fuelType,
-            currentYear: DateTime.UtcNow.Year, input.Color, input.Description, earliestModelYear);
+            currentYear: DateTime.UtcNow.Year, input.Color, input.Description?.ToInput(), earliestModelYear);
         if (details.IsFailure)
             return details.Error;
 

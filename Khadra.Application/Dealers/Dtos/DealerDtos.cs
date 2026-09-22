@@ -38,7 +38,7 @@ public sealed record DealerProfileDto(
     // telling an Admin the application was complete while approval kept failing.
     IReadOnlyList<string> RequiredDocuments,
     // Spec 4.1: what the dealer page shows. Editable by the owner, read by everyone else.
-    string? Description,
+    LocalizedTextDto Description,
     double Latitude,
     double Longitude,
     IReadOnlyList<DayScheduleDto> OperatingHours,
@@ -77,7 +77,7 @@ public sealed record DealerProfileDto(
             [.. held.OrderBy(type => type.Id).Select(type => type.Name)],
             [.. DealerDocumentType.Required.Where(required => !held.Contains(required)).Select(type => type.Name)],
             [.. DealerDocumentType.Required.Select(type => type.Name)],
-            dealer.Description,
+            LocalizedTextDto.From(dealer.Description),
             dealer.Location.Latitude,
             dealer.Location.Longitude,
             [.. dealer.OperatingHours.Days.Select(DayScheduleDto.From)],

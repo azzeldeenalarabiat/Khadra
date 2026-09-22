@@ -1,3 +1,4 @@
+using Khadra.Application.Common.Ports;
 using Khadra.Application.Common;
 using Khadra.Application.Fleet.BrowseCatalogue;
 using Khadra.Application.Fleet.ReadModels;
@@ -33,7 +34,7 @@ namespace Khadra.WebAPI.Controllers;
 [AllowAnonymous]
 [EnableRateLimiting(RateLimitPolicies.Public)]
 [Route("api/v1")]
-public sealed class CatalogueController : ApiControllerBase
+public sealed class CatalogueController(ICurrentLanguage language) : ApiControllerBase
 {
     /// <summary>Cars a customer could book, newest listing first.</summary>
     /// <remarks>
@@ -99,8 +100,10 @@ public sealed class CatalogueController : ApiControllerBase
         CancellationToken cancellationToken)
     {
         NoStore();
+        VaryByLanguage();
         var result = await Mediator.Send(
-            new GetCatalogueVehicleQuery(Id.From(vehicleId), pickupAt, returnAt), cancellationToken);
+            new GetCatalogueVehicleQuery(Id.From(vehicleId), pickupAt, returnAt, language.Current),
+            cancellationToken);
         return FromResult(result);
     }
 
@@ -139,7 +142,9 @@ public sealed class CatalogueController : ApiControllerBase
     public async Task<ActionResult> Gallery(Guid dealerId, CancellationToken cancellationToken)
     {
         NoStore();
-        var result = await Mediator.Send(new GetPublicGalleryQuery(Id.From(dealerId)), cancellationToken);
+        VaryByLanguage();
+        var result = await Mediator.Send(
+            new GetPublicGalleryQuery(Id.From(dealerId), language.Current), cancellationToken);
         return FromResult(result);
     }
 
@@ -152,4 +157,14 @@ public sealed class CatalogueController : ApiControllerBase
     /// gets a refusal at the point of booking instead of at the point of looking.
     /// </remarks>
     private void NoStore() => Response.Headers.CacheControl = "no-store";
+
+    /// <summary>
+    /// Says that this answer depends on `Accept-Language`.
+    ///
+    /// Nothing caches these today — `no-store` above sees to that — but the two endpoints that
+    /// resolve an office's own words are exactly the ones where a cache keyed on the URL alone would
+    /// serve Arabic to an English reader. Declaring it now costs a header; discovering it later
+    /// costs a customer reading a rental condition in a language they do not have.
+    /// </summary>
+    private void VaryByLanguage() => Response.Headers.Vary = "Accept-Language";
 }
