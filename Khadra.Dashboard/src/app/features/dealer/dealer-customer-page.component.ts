@@ -10,7 +10,7 @@ import { RouterLink } from '@angular/router';
 import { I18nService } from '../../core/i18n/i18n.service';
 import {
   ProblemSnapshot,
-  fieldMessage,
+  fieldMessageFor,
   serverSentence,
   snapshotProblem,
 } from '../../core/i18n/problem';
@@ -19,11 +19,14 @@ import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { Language } from '../../core/i18n/language';
+import { CONTENT_LANGUAGES, boxErrorNames, boxKey } from '../../core/i18n/bilingual-content';
 import {
+  CustomerPageAudiencePreview,
   CustomerPageDraft,
   customerPageDirty,
   customerPageDraft,
-  customerPagePreview,
+  customerPagePreviews,
   customerPageRequest,
   customerPageRows,
   unknownCustomerPageSections,
@@ -151,21 +154,47 @@ export class DealerCustomerPageComponent {
     return !!page && customerPageDirty(page, this.texts(), this.hidden());
   });
 
-  protected readonly previewRows = computed(() => {
-    const page = this.page();
-    return page ? customerPagePreview(page, this.t) : [];
-  });
+  /**
+   * BOTH previews, side by side, and neither of them the console's own working-out.
+   *
+   * An owner needs to see what each audience gets — that is the whole point of writing two languages
+   * — and a single preview would have followed whatever `Accept-Language` their own browser sends,
+   * flipping between the two with no way to ask for the other.
+   */
+  protected readonly previews = computed<readonly CustomerPageAudiencePreview[]>(() =>
+    customerPagePreviews(this.page(), this.t),
+  );
 
   /** Whether a customer would see anything at all of what this office has written. */
-  protected readonly previewEmpty = computed(() => this.previewRows().length === 0);
+  protected readonly previewEmpty = computed(() =>
+    this.previews().every((preview) => preview.rows.length === 0),
+  );
+
+  /** The two boxes each section is edited through, in the order they are drawn. */
+  protected readonly languages = CONTENT_LANGUAGES;
+
+  protected boxKeyFor(field: string, language: Language): string {
+    return boxKey(field, language);
+  }
+
+  /** The heading over one box: the language, named in the reader's own language. */
+  protected languageLabel(language: Language): string {
+    return this.i18n.languageName(language);
+  }
 
   protected readonly failure = computed(() => {
     const error = this.resource.error() as { status?: number } | undefined;
     return error ? this.t('dealerCustomerPage.couldntLoadNothingChanged') : null;
   });
 
-  protected fieldError(field: string): string | null {
-    return fieldMessage(this.problem(), field, this.i18n.lang(), this.t);
+  /**
+   * What the server said about ONE box, under every name that box can arrive under.
+   *
+   * Keyed by the section's field and its language rather than by the draft key: the draft key is the
+   * console's own, and the names a refusal uses are the server's. See `boxErrorNames`.
+   */
+  protected boxError(field: string, language: Language): string | null {
+    return fieldMessageFor(this.problem(), boxErrorNames(field, language), this.i18n.lang(), this.t);
   }
 
   protected reset(page: CustomerPageView): void {

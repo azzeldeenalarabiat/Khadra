@@ -61,7 +61,7 @@ function profile(over: Partial<DealerProfile> = {}): DealerProfile {
     submittedDocuments: [],
     missingDocuments: [],
     requiredDocuments: [],
-    description: null,
+    description: { ar: null, en: null },
     latitude: 31.95,
     longitude: 35.91,
     cityId: AMMAN,

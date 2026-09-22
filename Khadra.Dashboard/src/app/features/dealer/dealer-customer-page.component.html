@@ -56,34 +56,55 @@
               </button>
             </div>
             <div class="sect-pad stack stack-10">
-              <div class="field">
-                <label [attr.for]="row.field">{{ row.hint }}</label>
-                <textarea
-                  [id]="row.field"
-                  class="input user-text"
-                  rows="4"
-                  [value]="text(row.field)"
-                  [disabled]="!canEdit()"
-                  [placeholder]="row.placeholder"
-                  (input)="setText(row.field, $event)"
-                ></textarea>
-                @if (tooLong(row.field)) {
-                  <div class="field-error">
-                    {{ t('dealerCustomerPage.tooLong', { count: maxLength() }) }}
-                  </div>
-                } @else if (fieldError(row.field); as e) {
-                  <div class="field-error">{{ e }}</div>
-                } @else {
-                  <div class="field-hint">
-                    {{
-                      t('dealerCustomerPage.charactersUsed', {
-                        used: used(row.field),
-                        count: maxLength(),
-                      })
-                    }}
-                  </div>
-                }
-              </div>
+              <div class="field-hint">{{ row.hint }}</div>
+
+              <!--
+                One box per language, each labelled in its own script.
+
+                `dir="auto"` on every box, because the direction of what an office types is a
+                property of the TEXT and not of the box it is in: an owner pasting an Arabic
+                paragraph into the English box must still be able to read it while they move it
+                across. The same reason `.user-text` isolates every dealer-typed value elsewhere in
+                this console.
+
+                Each box carries its own length counter and its own error, keyed the way the SERVER
+                names it — `rentalConditionsAr`, `rentalConditionsEn` — so a refusal lands under the
+                box that caused it rather than over a heading covering two.
+              -->
+              @for (language of languages; track language) {
+                <div class="field">
+                  <label [attr.for]="boxKeyFor(row.field, language)" [attr.lang]="language">
+                    {{ languageLabel(language) }}
+                  </label>
+                  <textarea
+                    [id]="boxKeyFor(row.field, language)"
+                    class="input user-text"
+                    rows="4"
+                    dir="auto"
+                    [attr.lang]="language"
+                    [value]="text(boxKeyFor(row.field, language))"
+                    [disabled]="!canEdit()"
+                    [placeholder]="row.placeholder"
+                    (input)="setText(boxKeyFor(row.field, language), $event)"
+                  ></textarea>
+                  @if (tooLong(boxKeyFor(row.field, language))) {
+                    <div class="field-error">
+                      {{ t('dealerCustomerPage.tooLong', { count: maxLength() }) }}
+                    </div>
+                  } @else if (boxError(row.field, language); as e) {
+                    <div class="field-error">{{ e }}</div>
+                  } @else {
+                    <div class="field-hint">
+                      {{
+                        t('dealerCustomerPage.charactersUsed', {
+                          used: used(boxKeyFor(row.field, language)),
+                          count: maxLength(),
+                        })
+                      }}
+                    </div>
+                  }
+                </div>
+              }
 
               @if (row.muted) {
                 <div class="note-box is-plain">
@@ -141,12 +162,47 @@
               {{ t('dealerCustomerPage.nothingShownYet') }}
             </div>
           } @else {
-            @for (shown of previewRows(); track shown.label) {
+            <!--
+              TWO previews, one per audience, both from the server's own answer.
+
+              Not one preview for whoever is reading: an owner has to see what an Arabic customer
+              gets AND what an English one gets, and the BFF forwards their own browser's
+              `Accept-Language`, so a single preview would have quietly followed the laptop they
+              signed in from.
+
+              A row whose text came back in the OTHER language is the fallback showing itself: the
+              office has not written that section in this language yet, and the customer is shown
+              what there is rather than an empty heading. It is marked so the owner can see the work
+              still to do, and each block is `dir="auto"` so a stand-in paragraph reads correctly.
+            -->
+            @for (preview of previews(); track preview.language) {
               <div class="stack stack-9">
-                <span class="k-label">{{ shown.label }}</span>
-                <div class="page-sub user-text">{{ shown.text }}</div>
+                <span class="k" [attr.lang]="preview.language">
+                  {{ languageLabel(preview.language) }}
+                </span>
+
+                @if (preview.rows.length === 0) {
+                  <div class="page-sub">{{ t('dealerCustomerPage.nothingShownYet') }}</div>
+                } @else {
+                  @for (shown of preview.rows; track shown.label) {
+                    <div class="stack stack-9">
+                      <span class="k-label">
+                        {{ shown.label }}
+                        @if (shown.isFallback) {
+                          <span class="badge s-warn">
+                            {{ t('dealerCustomerPage.shownIn', { language: languageLabel(shown.language) }) }}
+                          </span>
+                        }
+                      </span>
+                      <div class="page-sub user-text" dir="auto" [attr.lang]="shown.language">
+                        {{ shown.text }}
+                      </div>
+                    </div>
+                  }
+                }
               </div>
             }
+
             <div class="note-box is-plain">
               <kh-icon name="info" />
               {{ t('dealerCustomerPage.yourWordsNotKhadras') }}

@@ -1,4 +1,8 @@
 import { Money } from './fleet.api';
+import { LocalizedText, ResolvedText } from './localized.api';
+
+// Re-exported: these arrived here first and half the console imports them from this file.
+export type { LocalizedText, ResolvedText };
 
 /**
  * The dealer console's own endpoints (Khadra.Application/Dealers/Console, ManageEmployees,
@@ -188,17 +192,33 @@ export interface CustomerPageView extends CustomerPageText {
   readonly maxTextLength: number;
   /** Delivery notes are not shown while delivery is off, and the editor says so. */
   readonly deliveryEnabled: boolean;
-  readonly visible: CustomerPageText;
+  readonly visible: CustomerPagePreview;
 }
 
-/** The six texts, by their wire names. Null is "nothing written". */
+/** The six texts, by their wire names. */
 export interface CustomerPageText {
-  readonly about: string | null;
-  readonly rentalConditions: string | null;
-  readonly insurance: string | null;
-  readonly pickupInstructions: string | null;
-  readonly deliveryNotes: string | null;
-  readonly customerNotes: string | null;
+  readonly about: LocalizedText;
+  readonly rentalConditions: LocalizedText;
+  readonly insurance: LocalizedText;
+  readonly pickupInstructions: LocalizedText;
+  readonly deliveryNotes: LocalizedText;
+  readonly customerNotes: LocalizedText;
+}
+
+/** What a customer would see. Null is "nothing to show", with no reason given. */
+export interface VisibleCustomerPage {
+  readonly about: ResolvedText | null;
+  readonly rentalConditions: ResolvedText | null;
+  readonly insurance: ResolvedText | null;
+  readonly pickupInstructions: ResolvedText | null;
+  readonly deliveryNotes: ResolvedText | null;
+  readonly customerNotes: ResolvedText | null;
+}
+
+/** Both audiences, always — see `customerPagePreview`. */
+export interface CustomerPagePreview {
+  readonly ar: VisibleCustomerPage;
+  readonly en: VisibleCustomerPage;
 }
 
 /**

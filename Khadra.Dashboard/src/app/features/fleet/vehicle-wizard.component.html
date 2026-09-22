@@ -284,17 +284,34 @@
                   />
                 </div>
               }
+              <!--
+                One box per language. A customer browsing in Arabic reads the Arabic description, and
+                the server falls back to whichever is written when only one is, so neither box is
+                required. `dir="auto"` because the direction belongs to the text, not the box.
+              -->
               <div class="field span-2">
-                <label for="w-desc">{{ t('common.description') }}</label>
-                <textarea
-                  id="w-desc"
-                  class="input"
-                  rows="3"
-                  [placeholder]="t('vehicleWizard.whatTheCustomerShould')"
-                  [value]="form().description ?? ''"
-                  (input)="patch({ description: text($event) || null })"
-                ></textarea>
+                <label>{{ t('common.description') }}</label>
+                <div class="field-hint">{{ t('vehicleWizard.whatTheCustomerShould') }}</div>
               </div>
+              @for (language of languages; track language) {
+                <div class="field span-2">
+                  <label [attr.for]="descriptionId(language)" [attr.lang]="language">
+                    {{ descriptionLabel(language) }}
+                  </label>
+                  <textarea
+                    [id]="descriptionId(language)"
+                    class="input user-text"
+                    rows="3"
+                    dir="auto"
+                    [attr.lang]="language"
+                    [value]="descriptionText(language)"
+                    (input)="setDescription(language, $event)"
+                  ></textarea>
+                  @if (descriptionError(language); as message) {
+                    <div class="field-error">{{ message }}</div>
+                  }
+                </div>
+              }
             </div>
           }
           @case (4) {

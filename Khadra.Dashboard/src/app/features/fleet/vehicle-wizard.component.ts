@@ -25,9 +25,11 @@ import { Language } from '../../core/i18n/language';
 import {
   ProblemSnapshot,
   fieldMessage,
+  fieldMessageFor,
   serverSentence,
   snapshotProblem,
 } from '../../core/i18n/problem';
+import { CONTENT_LANGUAGES, boxErrorNames, boxKey } from '../../core/i18n/bilingual-content';
 import { MoneyPipe } from '../../shared/money.pipe';
 
 interface Step {
@@ -207,7 +209,7 @@ export class VehicleWizardComponent {
     seats: null,
     transmission: '',
     fuelType: '',
-    description: null,
+    description: { ar: null, en: null },
     plateNumber: '',
     dailyRate: null,
     securityDeposit: null,
@@ -410,6 +412,42 @@ export class VehicleWizardComponent {
 
   protected fieldError(name: string): string | null {
     return fieldMessage(this.fieldProblem(), name, this.i18n.lang(), this.t);
+  }
+
+  /** The two boxes the description is written in, in the order the wizard draws them. */
+  protected readonly languages = CONTENT_LANGUAGES;
+
+  protected descriptionText(language: Language): string {
+    return this.form().description[language] ?? '';
+  }
+
+  /** Empty is null — nothing written — which is what lets the other language stand in for it. */
+  protected setDescription(language: Language, event: Event): void {
+    const written = this.text(event);
+    this.patch({
+      description: {
+        ...this.form().description,
+        [language]: written.trim() === '' ? null : written,
+      },
+    });
+  }
+
+  protected descriptionId(language: Language): string {
+    return 'w-' + boxKey('description', language);
+  }
+
+  protected descriptionLabel(language: Language): string {
+    return this.i18n.languageName(language);
+  }
+
+  /** What the server said about ONE box, under every name that box can arrive under. */
+  protected descriptionError(language: Language): string | null {
+    return fieldMessageFor(
+      this.fieldProblem(),
+      boxErrorNames('description', language),
+      this.i18n.lang(),
+      this.t,
+    );
   }
 
   /** A transmission as the reader's language says it. A name this build has no word for is shown as sent. */

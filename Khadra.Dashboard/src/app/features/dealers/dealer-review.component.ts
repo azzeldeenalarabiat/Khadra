@@ -24,6 +24,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
 import { spellEnumName } from '../../core/i18n/status-key';
+import { writtenIn } from '../../core/i18n/bilingual-content';
 
 /**
  * What each `DealerDocumentType` is called on this screen. The server sends the type's NAME
@@ -214,7 +215,18 @@ export class DealerReviewComponent {
         k: this.t('dealerProfile.location'),
         v: this.formats.coordinates(review.latitude, review.longitude),
       },
-      { k: this.t('common.description'), v: review.description ?? '—' },
+      // About, one row per language the office actually wrote in, and NO fallback: an administrator
+      // reviewing an application needs to see that one language was filled in and the other was not.
+      // Nothing at all when neither is written, which the empty row below says plainly.
+      ...(writtenIn(review.description).length === 0
+        ? [{ k: this.t('common.description'), v: '—' }]
+        : writtenIn(review.description).map((written) => ({
+            k: this.t('common.descriptionIn', {
+              language: this.i18n.languageName(written.language),
+            }),
+            v: written.text,
+            userText: written.language,
+          }))),
       {
         k: this.t('dealerReview.submitted'),
         v: this.formats.dateTime(review.dealer.submittedAt),

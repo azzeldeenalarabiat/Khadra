@@ -127,6 +127,18 @@ export class I18nService {
     return this.isRtl() ? `⁨${spelled}⁩` : spelled;
   };
 
+  /**
+   * A language named in the READER's language: "Arabic" / "English" in the English console,
+   * «العربية» / «الإنجليزية» in the Arabic one.
+   *
+   * Used to head the two boxes of bilingual dealer text, and to say which language a fallback came
+   * back in. It is ordinary interface copy, so it follows the interface — unlike the language
+   * switcher, which names each language in itself because the person looking for it may not be
+   * able to read the screen they are on.
+   */
+  readonly languageName = (language: Language): string =>
+    this.t(language === 'ar' ? 'lookups.arabic' : 'lookups.english');
+
   /** BCP 47 tag for `Intl`. Western digits are pinned; see FormatService. */
   localeTag(): string {
     return this.language() === 'ar' ? 'ar-JO-u-nu-latn' : 'en-GB';

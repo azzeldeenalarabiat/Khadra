@@ -1,4 +1,5 @@
 import { TranslationKey } from '../i18n/en';
+import { Language } from '../i18n/language';
 import { IconName } from '../../shared/icon/icon-paths';
 
 /**
@@ -71,6 +72,16 @@ export interface KeyValue {
   readonly k: string;
   readonly v: string;
   readonly tone?: Tone;
+  /**
+   * Set when the value is somebody's OWN WORDS rather than a platform figure, naming the language
+   * they wrote in.
+   *
+   * A row renderer that honours it isolates the value and gives it that language, because a
+   * dealer-typed Arabic paragraph dropped into an otherwise-English row is reordered by bidi — the
+   * full stop migrates, and a Latin word inside it lands at the wrong end. Absent for everything the
+   * platform itself produced, which is most rows.
+   */
+  readonly userText?: Language;
 }
 
 export interface TimelineStep {

@@ -50,7 +50,17 @@
             @for (row of businessRows(); track row.k) {
               <div class="kv">
                 <div class="kv-key">{{ row.k }}</div>
-                <div class="kv-val">{{ row.v }}</div>
+                <!--
+                  A value the DEALER typed is isolated and given its own language; everything the
+                  platform produced is left as it was. Without it, an Arabic paragraph in this
+                  otherwise-English row is reordered by bidi and an administrator reviewing a licence
+                  reads it with the punctuation in the wrong place.
+                -->
+                @if (row.userText; as language) {
+                  <div class="kv-val user-text" dir="auto" [attr.lang]="language">{{ row.v }}</div>
+                } @else {
+                  <div class="kv-val">{{ row.v }}</div>
+                }
               </div>
             }
           </div>

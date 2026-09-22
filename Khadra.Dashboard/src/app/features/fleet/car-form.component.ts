@@ -22,9 +22,11 @@ import { Language } from '../../core/i18n/language';
 import {
   ProblemSnapshot,
   fieldMessage,
+  fieldMessageFor,
   serverSentence,
   snapshotProblem,
 } from '../../core/i18n/problem';
+import { CONTENT_LANGUAGES, boxErrorNames, boxKey } from '../../core/i18n/bilingual-content';
 
 /**
  * The API's transmission and fuel names, each beside the key that words it — the same two tables the
@@ -117,7 +119,7 @@ export class CarFormComponent {
     seats: 5,
     transmission: 'Automatic',
     fuelType: 'Petrol',
-    description: null,
+    description: { ar: null, en: null },
     plateNumber: '',
     dailyRate: 30,
     securityDeposit: 150,
@@ -161,6 +163,46 @@ export class CarFormComponent {
 
   protected text(event: Event): string {
     return (event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+  }
+
+  /** The two boxes the description is written in, in the order the form draws them. */
+  protected readonly languages = CONTENT_LANGUAGES;
+
+  protected descriptionText(language: Language): string {
+    return this.form().description[language] ?? '';
+  }
+
+  /**
+   * One box of the description. Empty is null — nothing written — which is the answer the other
+   * language is allowed to stand in for; an empty string would be text saying nothing.
+   */
+  protected setDescription(language: Language, event: Event): void {
+    const written = this.text(event);
+    this.form.update((current) => ({
+      ...current,
+      description: { ...current.description, [language]: written.trim() === '' ? null : written },
+    }));
+  }
+
+  protected descriptionId(language: Language): string {
+    return 'car-' + boxKey('description', language);
+  }
+
+  protected descriptionLabel(language: Language): string {
+    return this.i18n.languageName(language);
+  }
+
+  /** What the server said about ONE box, under every name that box can arrive under. */
+  protected descriptionError(language: Language): string | null {
+    const problem = this.problem();
+    return problem?.kind === 'request'
+      ? fieldMessageFor(
+          problem.snapshot,
+          boxErrorNames('description', language),
+          this.i18n.lang(),
+          this.t,
+        )
+      : null;
   }
 
   protected numeric(event: Event): number {

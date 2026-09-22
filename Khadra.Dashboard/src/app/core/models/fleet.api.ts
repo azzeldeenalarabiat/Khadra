@@ -1,3 +1,5 @@
+import { LocalizedText } from './localized.api';
+
 /**
  * The wire shape of the dealer fleet endpoints (spec 4.3).
  *
@@ -38,7 +40,8 @@ export interface Vehicle {
   readonly seats: number;
   readonly transmission: string;
   readonly fuelType: string;
-  readonly description: string | null;
+  /** One field in both languages, exactly as the office typed them. Null is "nothing written". */
+  readonly description: LocalizedText;
   readonly plateNumber: string;
   readonly dailyRate: Money;
   readonly securityDeposit: Money;
@@ -61,7 +64,8 @@ export interface VehicleRequest {
   readonly seats: number;
   readonly transmission: string;
   readonly fuelType: string;
-  readonly description: string | null;
+  /** One field in both languages, exactly as the office typed them. Null is "nothing written". */
+  readonly description: LocalizedText;
   readonly plateNumber: string;
   readonly dailyRate: number;
   readonly securityDeposit: number;

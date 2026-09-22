@@ -9,9 +9,11 @@ import { MapComponent } from '../../shared/map/map.component';
 import { TranslationKey } from '../../core/i18n/en';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Language } from '../../core/i18n/language';
+import { CONTENT_LANGUAGES, boxErrorNames, boxKey } from '../../core/i18n/bilingual-content';
 import {
   ProblemSnapshot,
   fieldMessage,
+  fieldMessageFor,
   serverSentence,
   snapshotProblem,
 } from '../../core/i18n/problem';
@@ -87,7 +89,14 @@ export class DealerApplyComponent {
 
   protected readonly businessName = signal('');
   protected readonly registrationNumber = signal('');
-  protected readonly description = signal('');
+  /**
+   * About, one box per language, keyed the way the SERVER names them.
+   *
+   * There was a single `description` here and the form stopped carrying one: a multipart body's
+   * unknown fields are dropped silently, so it was appended, ignored, and reported as submitted.
+   * Same trap as `UpdateProfileRequest`, and the reason the keys below are the wire names.
+   */
+  protected readonly description = signal<Readonly<Record<Language, string>>>({ ar: '', en: '' });
   protected readonly cityId = signal('');
   protected readonly latitude = signal('');
   protected readonly longitude = signal('');
@@ -109,6 +118,22 @@ export class DealerApplyComponent {
    */
   protected fieldProblem(field: string): string | null {
     return fieldMessage(this.problem(), field, this.i18n.lang(), this.t);
+  }
+
+  /**
+   * The same, for one box of About.
+   *
+   * This form has TWO layers that can refuse it and they name it differently: the multipart binder
+   * from the form field (`DescriptionAr`) and the command validator as a path (`description.Ar`).
+   * Asking for one of them would leave half the refusals unattached to a box.
+   */
+  protected aboutProblem(language: Language): string | null {
+    return fieldMessageFor(
+      this.problem(),
+      boxErrorNames('description', language),
+      this.i18n.lang(),
+      this.t,
+    );
   }
 
   protected readonly cities = computed(() => loaded(this.lookups.cities)() ?? []);
@@ -316,6 +341,32 @@ export class DealerApplyComponent {
     return this.files()[key]?.name ?? null;
   }
 
+  /** The two boxes About is written in, in the order the form draws them. */
+  protected readonly languages = CONTENT_LANGUAGES;
+
+  protected aboutText(language: Language): string {
+    return this.description()[language];
+  }
+
+  protected setAbout(language: Language, event: Event): void {
+    const value = this.fieldValue(event);
+    this.description.update((all) => ({ ...all, [language]: value }));
+  }
+
+  /**
+   * The multipart field name, and the name a refusal about it carries: `descriptionAr`.
+   *
+   * `boxKey` rather than a pair of literals, so the registration form and the customer page cannot
+   * disagree about what the API calls these.
+   */
+  protected aboutField(language: Language): string {
+    return boxKey('description', language);
+  }
+
+  protected aboutLabel(language: Language): string {
+    return this.i18n.languageName(language);
+  }
+
   protected async submit(): Promise<void> {
     if (!this.canSubmit()) return;
 
@@ -329,7 +380,11 @@ export class DealerApplyComponent {
     form.append('longitude', this.longitude());
     form.append('opensAt', this.opensAt());
     form.append('closesAt', this.closesAt());
-    if (this.description().trim()) form.append('description', this.description().trim());
+    // Only what was written. An empty box is nothing written, and the pair is assembled server-side.
+    for (const language of CONTENT_LANGUAGES) {
+      const written = this.aboutText(language).trim();
+      if (written) form.append(this.aboutField(language), written);
+    }
     if (this.cityId()) form.append('cityId', this.cityId());
     // What is in the fields, which is what the applicant confirmed -- not what the geocoder said.
     if (this.area().trim()) form.append('addressArea', this.area().trim());

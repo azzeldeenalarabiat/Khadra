@@ -158,16 +158,35 @@
         </div>
       </div>
 
+      <!--
+        The description in both languages: a customer browsing in Arabic reads the Arabic one, and
+        the server falls back to whichever is written when only one is. `dir="auto"` per box, because
+        the direction belongs to the text rather than to the box, and the message under each box is
+        looked up by the names the SERVER gives that box — see `boxErrorNames`.
+      -->
       <div class="field">
-        <label for="car-description">{{ t('common.description') }}</label>
-        <textarea
-          id="car-description"
-          class="input"
-          [value]="form().description ?? ''"
-          (input)="set('description', text($event))"
-          [placeholder]="t('carForm.whatACustomerShould')"
-        ></textarea>
+        <label>{{ t('common.description') }}</label>
+        <div class="field-hint">{{ t('carForm.whatACustomerShould') }}</div>
       </div>
+
+      @for (language of languages; track language) {
+        <div class="field">
+          <label [attr.for]="descriptionId(language)" [attr.lang]="language">
+            {{ descriptionLabel(language) }}
+          </label>
+          <textarea
+            [id]="descriptionId(language)"
+            class="input user-text"
+            dir="auto"
+            [attr.lang]="language"
+            [value]="descriptionText(language)"
+            (input)="setDescription(language, $event)"
+          ></textarea>
+          @if (descriptionError(language); as message) {
+            <div class="field-error">{{ message }}</div>
+          }
+        </div>
+      }
 
       <span class="sect-t">{{ t('carForm.priceAndPolicies') }}</span>
 

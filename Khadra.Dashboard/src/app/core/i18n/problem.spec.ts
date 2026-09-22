@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { TranslationKey } from './en';
-import { fieldMessage, problemMessage, serverSentence, snapshotProblem } from './problem';
+import {
+  fieldMessage,
+  fieldMessageFor,
+  problemMessage,
+  serverSentence,
+  snapshotProblem,
+} from './problem';
 import { MessageParams } from './language';
 
 /** Shows which key was chosen, so an assertion cannot pass on the English sentence by accident. */
@@ -148,5 +154,84 @@ describe('fieldMessage', () => {
   it('is null for a field the server did not mention', () => {
     expect(fieldMessage(invalid, 'description', 'en', t)).toBeNull();
     expect(fieldMessage(null, 'description', 'en', t)).toBeNull();
+  });
+});
+
+describe('a validation key is a path, not a flat name', () => {
+  /**
+   * FluentValidation prepends the parent property of every child validator, so where a field sits in
+   * the request decides how deep its key is. The fleet's `Make` arrives as `details.Make` — the car's
+   * fields travel inside `Details` on the command — and the console asks for `make`, which is the
+   * only name the screen has. It found nothing, so the fleet form's per-field messages never showed.
+   */
+  const nested = snapshotProblem({
+    status: 400,
+    error: {
+      errors: {
+        'details.Make': ['Make is required.'],
+        'details.Description.Ar': ['Arabic description is too long.'],
+        'about.En': ['English About is too long.'],
+        DescriptionAr: ['Arabic description is too long.'],
+      },
+    },
+  });
+
+  it('answers for a field wrapped in a parent it does not know about', () => {
+    expect(fieldMessage(nested, 'make', 'en', t)).toBe('Make is required.');
+    expect(fieldMessage(nested, 'description.ar', 'en', t)).toBe(
+      'Arabic description is too long.',
+    );
+  });
+
+  it('matches whole segments, never a substring of one', () => {
+    // `escription.ar` is not a field, and a substring match would have made it one.
+    expect(fieldMessage(nested, 'escription.ar', 'en', t)).toBeNull();
+    // A tail is a tail: the wrapper cannot be asked for on its own, and neither can a head of the
+    // path. Only what the key ENDS with.
+    expect(fieldMessage(nested, 'details', 'en', t)).toBeNull();
+    expect(fieldMessage(nested, 'details.Description', 'en', t)).toBeNull();
+  });
+
+  it('does not let a section answer for one of its languages', () => {
+    // `about` is a real key in its own right — the validator's `NotNull` on the whole section uses
+    // it — and it must not be satisfied by `about.En`, or a refusal about one box would be reported
+    // as a refusal about the section and shown under both.
+    expect(fieldMessage(nested, 'about', 'en', t)).toBeNull();
+    expect(fieldMessage(nested, 'about.en', 'en', t)).toBe('English About is too long.');
+  });
+
+  it('answers a one-segment question with any key that ends in it', () => {
+    // The price of tail matching, stated rather than discovered: `ar` is the last segment of
+    // `details.Description.Ar`, so asking for `ar` alone finds it. That is what makes `make` find
+    // `details.Make`, and no screen asks for a bare language tag — they ask through `boxErrorNames`,
+    // which always sends at least a field and a language.
+    expect(fieldMessage(nested, 'ar', 'en', t)).toBe('Arabic description is too long.');
+  });
+
+  it('will not answer for a longer path than the key has', () => {
+    expect(fieldMessage(nested, 'vehicle.about.En', 'en', t)).toBeNull();
+  });
+
+  it('tries several names for one box and takes the first that answers', () => {
+    // The dotted name and the flat one, in that order: the same refusal arrives under either
+    // depending on which layer produced it. See `boxErrorNames`.
+    expect(fieldMessageFor(nested, ['insurance.ar', 'insuranceAr'], 'en', t)).toBeNull();
+    expect(fieldMessageFor(nested, ['description.ar', 'descriptionAr'], 'en', t)).toBe(
+      'Arabic description is too long.',
+    );
+    // The flat spelling on its own, which is what the multipart binder on the application form uses.
+    const flatOnly = snapshotProblem({
+      status: 400,
+      error: { errors: { DescriptionAr: ['Too long.'] } },
+    });
+    expect(fieldMessageFor(flatOnly, ['description.ar', 'descriptionAr'], 'en', t)).toBe(
+      'Too long.',
+    );
+  });
+
+  it('is null when none of the names is mentioned', () => {
+    expect(fieldMessageFor(nested, ['pickupInstructions.ar', 'pickupInstructionsAr'], 'en', t))
+      .toBeNull();
+    expect(fieldMessageFor(null, ['about.en'], 'en', t)).toBeNull();
   });
 });

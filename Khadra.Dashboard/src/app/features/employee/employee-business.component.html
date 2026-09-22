@@ -56,9 +56,21 @@
               <span class="kv-key">{{ t('common.coordinates') }}</span>
               <span class="kv-val num">{{ fmt.coordinates(d.latitude, d.longitude) }}</span>
             </div>
-            @if (d.description) {
+            <!--
+              About, one row per language the office actually wrote in. No fallback: a member of
+              staff answering a customer's question needs to know which language the page says this
+              in, and a row that quietly showed the English under an Arabic heading would hide it.
+            -->
+            @for (written of writtenIn(d.description); track written.language) {
               <div class="kv">
-                <span class="kv-key">{{ t('employeeBusiness.about') }}</span><span class="kv-val"><span class="user-text">{{ d.description }}</span></span>
+                <span class="kv-key">{{
+                  t('common.descriptionIn', { language: languageName(written.language) })
+                }}</span
+                ><span class="kv-val"
+                  ><span class="user-text" dir="auto" [attr.lang]="written.language">{{
+                    written.text
+                  }}</span></span
+                >
               </div>
             }
             <!-- The platform stores a map point, not a postal address, and the dealership has no

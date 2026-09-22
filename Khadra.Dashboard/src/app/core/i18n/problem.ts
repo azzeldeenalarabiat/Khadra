@@ -152,19 +152,64 @@ export function problemMessage(
   return problem.traceId ? `${sentence} · ${t('problem.reference', { traceId: problem.traceId })}` : sentence;
 }
 
-/** The server's first message for one field, under the same language rule. Null when there is none. */
+/**
+ * The server's first message for one field, under the same language rule. Null when there is none.
+ *
+ * A validation key is a PATH, not a flat name, and which path depends on how deep in the request the
+ * field sits. FluentValidation prepends the parent property of every child validator, so the fleet's
+ * `Make` arrives as `details.Make` — the car's fields travel inside `Details` on the command — while
+ * the customer page's own fields arrive as `about.Ar`. Only the first letter is lowered on the way
+ * out (`ValidationBehavior.ToCamelCase`), so the comparison is case-insensitive.
+ *
+ * So a name is matched against the TAIL of each key's path as well as against the whole of it. That
+ * is the honest reading of a path — a screen knows the field, not the wrapper the command happens to
+ * carry it in — and it is what makes the fleet form's per-field messages appear at all: it asked for
+ * `make` against a key of `details.Make` and had been finding nothing.
+ */
 export function fieldMessage(
   problem: ProblemSnapshot | null,
   field: string,
   language: Language,
   t: (key: TranslationKey) => string,
 ): string | null {
+  return fieldMessageFor(problem, [field], language, t);
+}
+
+/**
+ * The same, for a field the server may name in more than one way.
+ *
+ * One box of bilingual text is the case: the same refusal arrives as `about.Ar` from the command
+ * validator, as `aboutAr` from the domain, and as `DescriptionAr` from the multipart binder on the
+ * application form — three layers, none of which the console chooses. Asking for one of those names
+ * would leave the message off the box two thirds of the time. See `boxErrorNames`.
+ *
+ * The names are tried in order, so the most specific one wins when a request somehow carries both.
+ */
+export function fieldMessageFor(
+  problem: ProblemSnapshot | null,
+  fields: readonly string[],
+  language: Language,
+  t: (key: TranslationKey) => string,
+): string | null {
   if (!problem?.errors) return null;
-  const wanted = field.toLowerCase();
-  const name = Object.keys(problem.errors).find((candidate) => candidate.toLowerCase() === wanted);
-  const message = name === undefined ? undefined : problem.errors[name]?.[0];
-  if (!message) return null;
-  return language === 'en' ? message : t('common.fieldRejected');
+  const keys = Object.keys(problem.errors);
+  for (const field of fields) {
+    const name = keys.find((candidate) => pathMatches(candidate, field));
+    const message = name === undefined ? undefined : problem.errors[name]?.[0];
+    if (message) return language === 'en' ? message : t('common.fieldRejected');
+  }
+  return null;
+}
+
+/** Whether a validation key's path ends with the field asked for. Segment-wise, not substring. */
+function pathMatches(key: string, field: string): boolean {
+  const from = (value: string) => value.toLowerCase().split('.');
+  const path = from(key);
+  const wanted = from(field);
+  if (wanted.length > path.length) return false;
+  // Whole segments, from the end: `details.Description.Ar` answers for `description.ar`, and
+  // `descriptionAr` — one segment — is only ever matched whole.
+  return wanted.every((segment, index) => path[path.length - wanted.length + index] === segment);
 }
 
 function isFieldErrors(value: unknown): value is Readonly<Record<string, readonly string[]>> {

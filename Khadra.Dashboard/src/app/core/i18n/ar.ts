@@ -398,6 +398,7 @@ export const AR = {
   'common.deposit': 'العربون',
   'common.depositHeld': 'العربون المحتجز',
   'common.description': 'الوصف',
+  'common.descriptionIn': 'الوصف ({language})',
   'common.disputed': 'محل نزاع',
   'common.documentsOnFile': 'الوثائق المحفوظة',
   'common.evidenceOptional': 'الأدلة (اختياري)',
@@ -902,6 +903,10 @@ export const AR = {
     'في صفحتك قسم لا يستطيع هذا الإصدار من لوحة التحكم عرضه، والحفظ الآن سيمحو ما كُتب فيه. أعد تحميل لوحة التحكم للحصول على الإصدار الحالي.',
   'dealerCustomerPage.asCustomersSeeIt': 'كما يراها العملاء',
   'dealerCustomerPage.previewIsSaved': 'هذا ما في صفحتك الآن، ويتبع ما تحفظه.',
+  // A noun phrase, deliberately. «معروض بالـ{language}» doubled the article — the language name
+  // already carries «ال», so it rendered «بالـالإنجليزية» — and a participle beside the heading has
+  // to agree with it, which «شروط الإيجار» (a non-human plural) does not with «معروض».
+  'dealerCustomerPage.shownIn': 'باللغة {language}',
   'dealerCustomerPage.nothingShownYet':
     'لم تكتب بعد شيئًا يراه العملاء. أما ساعات العمل والتوصيل والموقع والتقييم والسيارات فتظهر في صفحتك على كل حال.',
   'dealerCustomerPage.yourWordsNotKhadras': 'يُقال للعملاء إن هذه كلماتك أنت، لا كلمات خضرا.',

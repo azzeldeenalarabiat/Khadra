@@ -88,4 +88,35 @@ describe('translation dictionaries', () => {
 
     expect(offending).toEqual([]);
   });
+
+  it('never glue the Arabic article onto a placeholder', () => {
+    // «معروض بالـ{language}» rendered «بالـالإنجليزية»: the names that fill these placeholders — a
+    // language, a city, a status — arrive already carrying «ال», so an article typed in front of the
+    // brace is always a second one. Checked across every key, because the defect is invisible in the
+    // dictionary and only shows once a real name is dropped in.
+    const glued = /الـ?\{/; // «ال», optionally with a tatweel, then «{»
+    const offending = (Object.keys(AR) as (keyof typeof AR)[]).filter((key) => {
+      const message: Message = AR[key];
+      const forms = typeof message === 'string' ? [message] : Object.values(message);
+      return forms.some((form) => glued.test(form ?? ''));
+    });
+
+    expect(offending).toEqual([]);
+  });
+
+  it('name the fallback language in a phrase that reads whole in both', () => {
+    // The badge a customer-page preview shows when the office has not written a section in that
+    // language. Resolved with the real language names, as the screen resolves it.
+    const arabic = (AR['dealerCustomerPage.shownIn'] as string).replace(
+      '{language}',
+      AR['lookups.english'] as string,
+    );
+    const english = (EN['dealerCustomerPage.shownIn'] as string).replace(
+      '{language}',
+      EN['lookups.arabic'] as string,
+    );
+
+    expect(arabic).toBe('باللغة الإنجليزية');
+    expect(english).toBe('shown in Arabic');
+  });
 });

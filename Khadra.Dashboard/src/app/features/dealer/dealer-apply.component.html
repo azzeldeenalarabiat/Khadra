@@ -56,25 +56,47 @@
       }
     </div>
 
+    <!--
+      About, in both languages, because the customer app is used in both and a customer reading
+      Arabic should not be shown an English paragraph as the office's introduction.
+
+      Each box is optional on its own: an office writing only one is answered by the fallback, which
+      the server resolves. `dir="auto"` on every box, because the direction of what somebody types is
+      a property of the TEXT, not of the box — and the name in the `id` is the name the API validates,
+      so a refusal about `descriptionAr` lands under the Arabic box.
+
+      The `maxlength="2000"` that used to be here has gone with it. It was the domain's
+      `ProfileText.MaxLength` typed into a template, right by coincidence and silently wrong the day
+      it moved. This form has no endpoint that publishes the ceiling, so the server refuses what is
+      too long and the refusal now names which box.
+    -->
     <div class="field">
-      <label for="apply-description"
-        >{{ t('common.description') }}
+      <label>{{ t('common.description') }}
         <span class="field-hint">{{ t('dealerApply.optional') }}</span></label
       >
-      <textarea
-        id="apply-description"
-        class="input"
-        rows="3"
-        maxlength="2000"
-        [disabled]="busy()"
-        [value]="description()"
-        (input)="description.set(fieldValue($event))"
-      ></textarea>
-      @if (fieldProblem('description'); as e) {
-        <div class="field-error">{{ e }}</div>
-      }
       <div class="field-hint">{{ t('dealerApply.whatCustomersReadOn') }}</div>
     </div>
+
+    @for (language of languages; track language) {
+      <div class="field">
+        <label [attr.for]="'apply-' + aboutField(language)" [attr.lang]="language">
+          {{ aboutLabel(language) }}
+        </label>
+        <textarea
+          [id]="'apply-' + aboutField(language)"
+          class="input user-text"
+          rows="3"
+          dir="auto"
+          [attr.lang]="language"
+          [disabled]="busy()"
+          [value]="aboutText(language)"
+          (input)="setAbout(language, $event)"
+        ></textarea>
+        @if (aboutProblem(language); as e) {
+          <div class="field-error">{{ e }}</div>
+        }
+      </div>
+    }
   </section>
 
   <section class="sect sect-pad stack stack-14">

@@ -421,6 +421,8 @@ export const EN = {
   'common.deposit': 'Deposit',
   'common.depositHeld': 'Deposit held',
   'common.description': 'Description',
+  /** Heads one language of a bilingual value that is shown RAW, with no fallback. */
+  'common.descriptionIn': 'Description ({language})',
   'common.disputed': 'Disputed',
   'common.documentsOnFile': 'Documents on file',
   'common.evidenceOptional': 'Evidence (optional)',
@@ -880,6 +882,10 @@ export const EN = {
   'dealerCustomerPage.asCustomersSeeIt': 'As customers see it',
   'dealerCustomerPage.previewIsSaved':
     'This is what is on your page now. It follows when you save.',
+  // A preview row standing in from the other language: the office has not written this section in
+  // the language being previewed, so the customer is shown what there is rather than a heading with
+  // nothing under it. Worded as a fact about the TEXT, not as a warning about the office.
+  'dealerCustomerPage.shownIn': 'shown in {language}',
   'dealerCustomerPage.nothingShownYet':
     'You have not written anything customers can see yet. Your opening hours, delivery, location, rating and cars are on your page regardless.',
   'dealerCustomerPage.yourWordsNotKhadras':

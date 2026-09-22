@@ -5,6 +5,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { FormatService } from '../../core/i18n/format.service';
 import { snapshotProblem } from '../../core/i18n/problem';
+import { writtenIn } from '../../core/i18n/bilingual-content';
 
 interface OwnerOnlyRow {
   readonly label: string;
@@ -34,7 +35,12 @@ interface OwnerOnlyRow {
   imports: [IconComponent],
 })
 export class EmployeeBusinessComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
+  /** A language named in the reader's own language, for the About rows below. */
+  protected readonly languageName = this.i18n.languageName;
+  /** The languages the office actually wrote About in. Raw: staff read it, they do not get a fallback. */
+  protected readonly writtenIn = writtenIn;
   protected readonly statusLabel = inject(I18nService).statusLabel;
   private readonly service = inject(DealerConsoleService);
   protected readonly fmt = inject(FormatService);

@@ -1,3 +1,5 @@
+import { LocalizedText } from './localized.api';
+
 /**
  * The wire shape of the Admin dealer endpoints.
  *
@@ -78,7 +80,7 @@ export interface DealerProfile {
   /** Every type an approval requires (spec 3.1). The console counts these, it never assumes three. */
   readonly requiredDocuments: readonly string[];
   /** Spec 4.1: the dealer page. Editable by the owner. */
-  readonly description: string | null;
+  readonly description: LocalizedText;
   readonly latitude: number;
   readonly longitude: number;
   /** The curated city row this gallery is filed under, and the address in words. Both optional. */
@@ -145,7 +147,7 @@ export interface DealerReviewTimelineEntry {
 
 export interface DealerReview {
   readonly dealer: DealerProfile;
-  readonly description: string | null;
+  readonly description: LocalizedText;
   readonly latitude: number;
   readonly longitude: number;
   readonly documents: readonly DealerDocumentLink[];

@@ -1,10 +1,17 @@
 import { TranslationKey } from '../../core/i18n/en';
-import { MessageParams } from '../../core/i18n/language';
+import { Language, MessageParams } from '../../core/i18n/language';
+import { CONTENT_LANGUAGES, boxKey } from '../../core/i18n/bilingual-content';
 import {
   CustomerPageText,
   CustomerPageView,
+  LocalizedText,
+  ResolvedText,
   UpdateCustomerPageRequest,
+  VisibleCustomerPage,
 } from '../../core/models/dealer-console.api';
+
+/** Re-exported so a screen editing this content has ONE import site for all of it. */
+export { CONTENT_LANGUAGES, boxKey };
 
 /** Passed in rather than injected: these are pure functions, and their spec calls them directly. */
 export type Translate = (key: TranslationKey, params?: MessageParams) => string;
@@ -12,7 +19,6 @@ export type Translate = (key: TranslationKey, params?: MessageParams) => string;
 /** The draft an owner is typing, keyed by the wire name of each section. */
 export type CustomerPageDraft = Readonly<Record<string, string>>;
 
-/** One editable section, ready to render. */
 export interface CustomerPageRow {
   /** The section's name as the API stores and sends it. PascalCase, and a contract. */
   readonly name: string;
@@ -154,7 +160,12 @@ function sectionUi(name: string): SectionUi | undefined {
 export function customerPageDraft(page: CustomerPageView): CustomerPageDraft {
   const draft: Record<string, string> = {};
   for (const row of customerPageRows(page, (key) => key)) {
-    draft[row.field] = sectionText(page, row.field) ?? '';
+    for (const language of CONTENT_LANGUAGES) {
+      // The office's own words, NOT resolved. An office that has written only Arabic must find an
+      // empty English box, because that empty box is the work still to do — the server sends the
+      // raw pair for exactly this reason and the preview below is where the fallback shows up.
+      draft[boxKey(row.field, language)] = sectionText(page, row.field, language) ?? '';
+    }
   }
   return draft;
 }
@@ -170,18 +181,25 @@ export function customerPageRequest(
   draft: CustomerPageDraft,
   hidden: ReadonlySet<string>,
 ): UpdateCustomerPageRequest {
-  const written = (field: string): string | null => {
-    const value = (draft[field] ?? '').trim();
+  const box = (field: string, language: Language): string | null => {
+    const value = (draft[boxKey(field, language)] ?? '').trim();
+    // Null, not an empty string: "nothing written" and "written as nothing" are different answers,
+    // and the server treats them the same way only because this sends null.
     return value === '' ? null : value;
   };
 
+  const section = (field: string): LocalizedText => ({
+    ar: box(field, 'ar'),
+    en: box(field, 'en'),
+  });
+
   return {
-    about: written('about'),
-    rentalConditions: written('rentalConditions'),
-    insurance: written('insurance'),
-    pickupInstructions: written('pickupInstructions'),
-    deliveryNotes: written('deliveryNotes'),
-    customerNotes: written('customerNotes'),
+    about: section('about'),
+    rentalConditions: section('rentalConditions'),
+    insurance: section('insurance'),
+    pickupInstructions: section('pickupInstructions'),
+    deliveryNotes: section('deliveryNotes'),
+    customerNotes: section('customerNotes'),
     hiddenSections: [...hidden],
   };
 }
@@ -192,8 +210,12 @@ export function customerPageDirty(
   draft: CustomerPageDraft,
   hidden: ReadonlySet<string>,
 ): boolean {
-  const changed = customerPageRows(page, (key) => key).some(
-    (row) => (draft[row.field] ?? '').trim() !== (sectionText(page, row.field) ?? ''),
+  const changed = customerPageRows(page, (key) => key).some((row) =>
+    CONTENT_LANGUAGES.some(
+      (language) =>
+        (draft[boxKey(row.field, language)] ?? '').trim() !==
+        (sectionText(page, row.field, language) ?? ''),
+    ),
   );
   if (changed) return true;
 
@@ -210,16 +232,77 @@ export function customerPageDirty(
  * public page runs it; a second copy in a browser would agree with it right up until one of them
  * changed, and the one that would be wrong is the preview an owner trusts.
  */
+/**
+ * One preview per audience, so an owner sees BOTH and neither depends on their own browser.
+ *
+ * The server sends two, resolved by its own rule, and the BFF forwards whatever `Accept-Language`
+ * the owner's machine happens to send — so a single preview would have flipped between Arabic and
+ * English depending on which laptop they signed in from, silently, with no way to see the other one.
+ *
+ * Each row carries the language the text ACTUALLY came back in, which is how a fallback shows up
+ * here: an Arabic preview row tagged `en` is an office that has not written that section in Arabic
+ * yet, and the row says so rather than looking finished.
+ */
 export function customerPagePreview(
   page: CustomerPageView,
+  language: Language,
   t: Translate,
-): readonly { label: string; text: string }[] {
+): readonly CustomerPagePreviewRow[] {
+  const shown = language === 'ar' ? page.visible.ar : page.visible.en;
+
   return customerPageRows(page, t)
-    .map((row) => ({ label: row.label, text: sectionText(page.visible, row.field) }))
-    .filter((row): row is { label: string; text: string } => !!row.text);
+    .map((row) => ({ label: row.label, shown: resolvedText(shown, row.field) }))
+    .filter((row) => !!row.shown)
+    .map((row) => ({
+      label: row.label,
+      text: row.shown!.text,
+      language: row.shown!.language as Language,
+      isFallback: row.shown!.language !== language,
+    }));
 }
 
-/** One section's text out of a payload, by its wire name. */
-export function sectionText(source: CustomerPageText, field: string): string | null {
-  return (source as unknown as Record<string, string | null>)[field] ?? null;
+export interface CustomerPagePreviewRow {
+  readonly label: string;
+  readonly text: string;
+  /** The language the text is in, which is not always the one being previewed. */
+  readonly language: Language;
+  /** True when this is the other language standing in, so the row can say so. */
+  readonly isFallback: boolean;
+}
+
+/**
+ * One preview block: the audience it is for, and what that audience sees.
+ *
+ * Named here rather than written inline in the template, because a template's array literal infers
+ * `language` as `string` and the language is the one thing every row of the block is keyed by.
+ */
+export interface CustomerPageAudiencePreview {
+  readonly language: Language;
+  readonly rows: readonly CustomerPagePreviewRow[];
+}
+
+/** Both audiences, in the order the console draws them. */
+export function customerPagePreviews(
+  page: CustomerPageView | null,
+  t: Translate,
+): readonly CustomerPageAudiencePreview[] {
+  return CONTENT_LANGUAGES.map((language) => ({
+    language,
+    rows: page ? customerPagePreview(page, language, t) : [],
+  }));
+}
+
+/** One language of one section out of the owner's own copy, by wire name. */
+export function sectionText(
+  source: CustomerPageText,
+  field: string,
+  language: Language,
+): string | null {
+  const pair = (source as unknown as Record<string, LocalizedText | undefined>)[field];
+  return (language === 'ar' ? pair?.ar : pair?.en) ?? null;
+}
+
+/** One section out of a resolved preview, by wire name. */
+function resolvedText(source: VisibleCustomerPage, field: string): ResolvedText | null {
+  return (source as unknown as Record<string, ResolvedText | null>)[field] ?? null;
 }
