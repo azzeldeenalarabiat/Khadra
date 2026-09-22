@@ -15,8 +15,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// There is exactly one reader and one writer, and callers must read at SEND time
 /// rather than capture a token in a closure. A stale token captured a minute ago
 /// and presented after a rotation is precisely what replay detection is watching
-/// for: the server would revoke the whole family and sign the person out of every
-/// device for a bug in an interceptor.
+/// for: the server revokes that token's FAMILY, and a family starts at login — so
+/// it is this device's session that ends, mid-task and unexplained, for a bug in
+/// an interceptor. (Not every device: `RefreshTokensHandler` revokes by
+/// `FamilyId`, not by user.)
 class SessionStore {
   SessionStore({FlutterSecureStorage? secureStorage, SharedPreferences? preferences})
       // Private field, public parameter -- `this._preferences` would put an

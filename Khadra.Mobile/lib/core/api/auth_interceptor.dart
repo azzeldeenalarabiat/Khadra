@@ -10,9 +10,23 @@ import '../session/session_store.dart';
 /// **Single flight is the requirement, not an optimisation.** The API's refresh
 /// tokens rotate: presenting one consumes it and returns its replacement, and
 /// presenting a consumed one again is REPLAY — outside a 60-second grace, the
-/// server revokes the whole family and the person is signed out of every device.
-/// Six screens each refreshing on their own 401 is six presentations of the same
-/// token, and the sixth is well past the grace.
+/// server revokes that token's whole family. A family starts at login, so that is
+/// this device's session: the customer is signed out here, mid-task, with no
+/// explanation. Six screens each refreshing on their own 401 is six presentations
+/// of the same token, and the sixth is well past the grace.
+///
+/// **This is NOT a `QueuedInterceptor`, and must not become one again.** It was,
+/// and the queue deadlocked the whole app. Every request took its turn in one
+/// queue; `onRequest` held that turn while it awaited a rotation; and the rotation
+/// was itself a request, waiting for a turn that could not free until it finished.
+/// Neither ever moved, and because the queue was shared it was not one request
+/// that stalled but every request the app made from that moment on — roughly four
+/// minutes after each sign-in, for as long as the app stayed open.
+///
+/// The queue was buying ORDERING. What this actually needs is SINGLE FLIGHT, and
+/// [_refreshOnce] is what provides it: every caller that arrives while a rotation
+/// is running waits on the same completer, so one token is presented once however
+/// many requests noticed at once. `token_rotation_test` holds this down.
 ///
 /// The rules this follows, and why each one is here:
 ///
@@ -21,6 +35,10 @@ import '../session/session_store.dart';
 /// - **Refresh proactively** when the access token is nearly expired, so the 401
 ///   path is the exception. The reactive path stays anyway, because device clocks
 ///   lie and a proactive check trusts one.
+/// - **A 401 on a token that has already moved is stale, not expired.** It is
+///   retried with the current token and no rotation is spent. Without that check,
+///   a handful of requests sent just before a rotation each come back 401 just
+///   after it and each start another one.
 /// - **Retry the original request once.** A second 401 means the security stamp
 ///   moved — a password change, a suspension, a deletion — and no amount of
 ///   refreshing will help.
@@ -28,18 +46,20 @@ import '../session/session_store.dart';
 ///   is exactly what burns the family, so it ends the session and never retries.
 /// - **A timeout is not a verdict.** Only a definite answer signs anybody out; a
 ///   network failure leaves the token alone and surfaces as "offline".
-class AuthInterceptor extends QueuedInterceptor {
+class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required SessionStore store,
     required Future<bool> Function() refresh,
     required Future<void> Function() onSessionEnded,
+    required Future<Response<dynamic>> Function(RequestOptions) resend,
     // ignore_for_file: prefer_initializing_formals
     // The fields are private and the parameters are not; `this._store` would put an
     // underscore in the public constructor signature of the class every request on
     // this app passes through.
   })  : _store = store,
         _refresh = refresh,
-        _onSessionEnded = onSessionEnded;
+        _onSessionEnded = onSessionEnded,
+        _resend = resend;
 
   final SessionStore _store;
 
@@ -49,15 +69,30 @@ class AuthInterceptor extends QueuedInterceptor {
   /// Called when the session is definitively over, so the app can show the door.
   final Future<void> Function() _onSessionEnded;
 
+  /// Sends a request again, through this same client.
+  ///
+  /// Injected rather than built here, for the same reason `_refresh` is: the
+  /// interceptor is constructed before the `Dio` it belongs to is finished. It was
+  /// once a `Dio` of its own, made to dodge the queue — and a second client silently
+  /// carries none of the first's instance configuration, so the one request holding
+  /// a fourteen-day credential would have been the one skipping, say, a pinned
+  /// certificate. With the queue gone there is nothing left to dodge.
+  final Future<Response<dynamic>> Function(RequestOptions) _resend;
+
   Completer<bool>? _inFlight;
 
   /// Marks a request that must never carry a bearer token or trigger a refresh.
   ///
-  /// The refresh call itself is the obvious one: refreshing inside a refresh is an
-  /// infinite regress. Sign-in and registration are here because a 401 from them
-  /// means "wrong password", and treating that as an expired session would clear a
-  /// perfectly good stored token belonging to whoever was already signed in.
+  /// The refresh call itself is the obvious one, and here it is LOAD-BEARING rather
+  /// than tidy: without it the rotation enters [onRequest], finds the token stale,
+  /// calls [_refreshOnce], and awaits the completer it is itself about to complete.
+  /// Sign-in and registration are here because a 401 from them means "wrong
+  /// password", and treating that as an expired session would clear a perfectly
+  /// good stored token belonging to whoever was already signed in.
   static const anonymousExtra = 'khadra.anonymous';
+
+  /// Marks the one retry a request is allowed after a rotation.
+  static const retriedExtra = 'khadra.retried';
 
   static Options anonymous([Options? options]) {
     final base = options ?? Options();
@@ -66,6 +101,12 @@ class AuthInterceptor extends QueuedInterceptor {
 
   static bool _isAnonymous(RequestOptions options) =>
       options.extra[anonymousExtra] == true;
+
+  static bool _isRetry(RequestOptions options) =>
+      options.extra[retriedExtra] == true;
+
+  static String? _bearerOf(Map<String, dynamic> headers) =>
+      headers['Authorization'] as String?;
 
   @override
   Future<void> onRequest(
@@ -82,7 +123,10 @@ class AuthInterceptor extends QueuedInterceptor {
     // better answer than the app inventing one.
     final hasRefresh = await _store.readRefreshToken() != null;
 
-    if (hasRefresh && _store.accessTokenIsStale) {
+    // A retry is here BECAUSE a rotation just happened, so it already has the
+    // freshest token there is. Asking again would be a second rotation started
+    // from inside the handling of the first.
+    if (hasRefresh && !_isRetry(options) && _store.accessTokenIsStale) {
       await _refreshOnce();
     }
 
@@ -104,9 +148,8 @@ class AuthInterceptor extends QueuedInterceptor {
   ) async {
     final request = error.requestOptions;
     final isUnauthorized = error.response?.statusCode == 401;
-    final alreadyRetried = request.extra['khadra.retried'] == true;
 
-    if (!isUnauthorized || _isAnonymous(request) || alreadyRetried) {
+    if (!isUnauthorized || _isAnonymous(request) || _isRetry(request)) {
       handler.next(error);
       return;
     }
@@ -117,14 +160,24 @@ class AuthInterceptor extends QueuedInterceptor {
       return;
     }
 
-    final refreshed = await _refreshOnce();
-    if (!refreshed) {
+    // Did the token move while this request was in flight? Then this 401 is about
+    // a token the app has already replaced, and there is nothing to rotate: send
+    // it again with the current one. A handful of requests that went out just
+    // before a rotation all come back just after it, and without this each would
+    // spend a rotation of its own answering a question already answered.
+    final current = _store.accessToken;
+    final alreadyRotated =
+        current != null && _bearerOf(request.headers) != 'Bearer $current';
+
+    if (!alreadyRotated && !await _refreshOnce()) {
       handler.next(error);
       return;
     }
 
     try {
-      final retry = await _retry(request);
+      final retry = await _resend(request.copyWith(
+        extra: {...request.extra, retriedExtra: true},
+      ));
       handler.resolve(retry);
     } on DioException catch (retryError) {
       // A second 401 is the security stamp having moved under us. Nothing a token
@@ -161,23 +214,5 @@ class AuthInterceptor extends QueuedInterceptor {
     }());
 
     return completer.future;
-  }
-
-  Future<Response<dynamic>> _retry(RequestOptions request) {
-    final token = _store.accessToken;
-    return Dio(BaseOptions(
-      baseUrl: request.baseUrl,
-      connectTimeout: request.connectTimeout,
-      receiveTimeout: request.receiveTimeout,
-      sendTimeout: request.sendTimeout,
-    )).fetch<dynamic>(
-      request.copyWith(
-        headers: {
-          ...request.headers,
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
-        extra: {...request.extra, 'khadra.retried': true},
-      ),
-    );
   }
 }

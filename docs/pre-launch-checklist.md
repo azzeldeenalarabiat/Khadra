@@ -3566,7 +3566,8 @@ migration.
 
 ### 124. The customer app's bookings list never leaves its loading state
 
-**Status:** open · **Raised:** 2026-09-21 · **Owner decision:** deferred to the realtime/refresh batch
+**Status:** the spinner is FIXED (2026-09-22); the request COUNT is unexplained and stays open ·
+**Raised:** 2026-09-21 · **Owner decision:** deferred to the realtime/refresh batch
 
 Found during the manual sandbox payment lifecycle. Opening the customer app's bookings list shows a
 spinner that never resolves, while the API answers correctly and quickly.
@@ -3590,3 +3591,96 @@ the deposit, the countdown, the Pay button and the confirmed timeline.
 **To close:** it belongs with the next batch's realtime refresh and request deduplication. Whatever
 fixes the loop should also make this screen unable to present a loading state forever — a list that
 has data must show it, and a list that has failed must say so.
+
+**Root-caused 2026-09-22, and the diagnosis above is wrong in one place.** There were TWO independent
+defects, either of which alone produces the reported screen:
+
+1. **The token rotation deadlocked.** `AuthInterceptor` was a `QueuedInterceptor`: all requests share
+   one queue, `onRequest` held its turn while awaiting a rotation, and the rotation was itself a
+   request waiting for a turn that could not free. From roughly four minutes after each sign-in — the
+   access token's life less the sixty-second stale margin — the app made **no HTTP requests at all**.
+   Measured on the emulator against the real API, inside the stale window, bookings screen open, 30
+   seconds: **0 list, 0 tab-counts, 0 refreshes, 15 requests total across the whole session.** So
+   "requests repeat" was the opposite of what was happening. Fixed by dropping the queue and keeping
+   single-flight in the existing completer; `test/token_rotation_test.dart` reproduces the deadlock
+   against a real loopback socket and hangs without the fix.
+2. **A rotation blanked the list.** The note above says `AsyncLoading()` catches "a provider that is
+   perpetually re-fetching". That is not what Riverpod does. A pull-to-refresh leaves `AsyncData`
+   with `isLoading` set and never hit that arm; a re-run caused by a DEPENDENCY changing gives
+   `AsyncLoading` still carrying the previous value, and that arm swallowed it. The dependency is
+   `sessionProvider`, which `MyBookingsNotifier` watches — so every rotation, about every four
+   minutes, replaced the list with a full-screen spinner even when nothing was wrong. Fixed by
+   matching on the value; `test/bookings_refresh_test.dart` fails without it.
+
+**What is NOT explained, and is why this stays open.** The 16-and-16 count has not been reproduced.
+Measured now: opening the screen costs **1 list + 1 tab-counts**; a rotation costs **1 more of
+each**; leaving the tab and returning costs **nothing**. All three are pinned by tests. Sixteen is
+exactly twice the eight tabs, so "eight per open" was the obvious shape and it is ruled out — nothing
+watches more than the selected tab. Re-measure on a device before closing this: if it does not
+recur, say so here and close it; if it does, it is a third defect and the first two did not cause it.
+
+### 125. A tab the customer returns to shows what it read the last time
+
+**Status:** open · **Raised:** 2026-09-22
+
+Found while measuring item 124. Leaving the Bookings tab and coming back re-reads **nothing** — not
+the list, not the tab counts. The tab shell keeps the screen mounted, so the `autoDispose` providers
+never dispose and never rebuild. `test/bookings_refresh_test.dart` records this as a measurement
+rather than as correct behaviour.
+
+That is the opposite failure from the one reported, and the more serious one. A customer who opens
+Bookings, goes to browse for ten minutes and comes back is looking at bookings read ten minutes ago,
+with nothing on screen saying so. A gallery can approve or reject inside that window, and the whole
+point of the landing surface (see `nextBookingProvider`) is that a customer finds out their booking
+was approved by opening the app — they have two hours to pay.
+
+Nothing here was made worse by the item 124 fix; the screen simply never re-read on re-entry.
+
+**To close:** one refresh policy for both clients — when a screen re-reads, how often, and when
+it stops — settled by the owner and held by tests.
+
+### 126. A failed Keystore write leaves a consumed refresh token on disk
+
+**Status:** open · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review)
+
+`SessionStore.saveRefreshToken` goes through `_bounded`, which swallows a failure or a five-second
+silence by design, and `SessionController._install` proceeds regardless. If that write fails, disk
+still holds the token that was just CONSUMED by the rotation. The next rotation — roughly fourteen
+minutes later on a 15-minute access token, and on the next cold start — presents it, well outside
+the server's 60-second grace, and `RefreshTokensHandler` revokes the family. The customer is signed
+out of this device mid-task with no message, and nothing in the app knows why.
+
+**To close:** hold the current refresh token in memory in `SessionStore` alongside the access token,
+and have `readRefreshToken` prefer memory, reading disk only when memory is empty (a cold start).
+The disk-first WRITE ordering stays exactly as it is — it is what makes every crash window fail safe.
+As a second benefit, every authenticated request currently pays a bounded platform-channel read just
+to learn whether a refresh token exists; memory answers that for free.
+
+### 127. A document upload that meets a 401 tells the customer they are offline
+
+**Status:** open · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review)
+
+`FormData.finalize()` throws `StateError` on a second send, so a multipart body cannot be retried.
+`AuthInterceptor` retries any 401 once. An upload has a 120-second send timeout against a
+60-second stale margin, so a token that passes the proactive check and expires mid-transfer produces
+401 → rotate → retry → `StateError` → wrapped as `DioExceptionType.unknown` → `ApiFailure.offline`.
+The customer is told their connection failed, for an upload the server actually refused, while
+holding a perfectly good network.
+
+**To close:** when `request.data is FormData`, rotate but do not retry — `handler.next(error)`, so
+the screen re-sends with the new token and says something true if that fails too. Needs a test with
+a real multipart body, because the defect is in `finalize`, not in the interceptor's logic.
+
+### 128. A refresh that times out waits for the next request instead of retrying
+
+**Status:** open · **Raised:** 2026-09-22 (Fable advisor, during the item 124 review) · low priority
+
+`SessionController.refresh` correctly treats a transport failure as "not a verdict" and returns
+false without ending the session. But the rotation may well have REACHED the server and had its
+response lost, in which case the token is already consumed. `RefreshTokensHandler` is designed for
+exactly this — "its client retries and, inside the grace above, gets the winner's replacement" — and
+the client does not retry. It waits for the next stale request, and if the app is backgrounded in
+between, the 60-second grace lapses and the next rotation is a replay that revokes the family.
+
+**To close:** on a timeout from `/auth/refresh` specifically, one immediate retry of the same token,
+inside the grace. Not on any other failure, and not more than once.

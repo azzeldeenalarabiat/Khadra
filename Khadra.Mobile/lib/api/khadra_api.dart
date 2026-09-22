@@ -84,6 +84,13 @@ class KhadraApi {
         options: AuthInterceptor.anonymous(),
       )));
 
+  /// Rotates the token pair.
+  ///
+  /// `anonymous` is LOAD-BEARING here, not tidiness: `AuthInterceptor` calls this
+  /// from inside its own `onRequest`, and without the marker the rotation would
+  /// enter that same `onRequest`, find the token stale, and await the very
+  /// completer it is on its way to completing. `token_rotation_test` asserts this
+  /// request goes out carrying no bearer at all.
   Future<AuthTokens> refresh(String refreshToken) async =>
       AuthTokens.fromJson(_object(await _client.post<dynamic>(
         '/api/v1/auth/refresh',

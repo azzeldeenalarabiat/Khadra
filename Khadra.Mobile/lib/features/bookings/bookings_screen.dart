@@ -117,15 +117,33 @@ class _BookingsScreenState extends ConsumerState<BookingsScreen> {
           invalidateBookings(ref);
           await ref.read(myBookingsProvider(tab).future);
         },
+        // Data first, and a spinner only when there is genuinely nothing to show.
+        //
+        // `AsyncLoading()` used to be the first arm, and Riverpod reports the two
+        // kinds of re-fetch DIFFERENTLY. A pull-to-refresh, which invalidates,
+        // leaves the state `AsyncData` with `isLoading` set — that arm never saw
+        // it. A re-run caused by a DEPENDENCY changing gives `AsyncLoading` still
+        // carrying the previous value, and that arm swallowed it whole.
+        //
+        // The dependency here is `sessionProvider`, which `MyBookingsNotifier`
+        // watches — and a token rotation assigns a new `SessionState` roughly every
+        // four minutes. So the list a customer was reading turned into a spinner on
+        // a timer; and while the rotation was deadlocking, into a spinner that never
+        // came back. Neither was a loading bug. Both looked like one.
+        //
+        // Matching on the VALUE rather than on the state means the list survives
+        // both: RefreshIndicator already shows when a refresh is happening, and an
+        // error still replaces the list, because a list that failed to reload must
+        // not be read as current.
         child: switch (bookings) {
-          AsyncLoading() => const KhadraLoading(),
           AsyncError(:final error) => KhadraError(
               message: ApiFailure.from(error).messageFor(l10n),
               onRetry: () => ref.invalidate(myBookingsProvider(tab)),
             ),
-          AsyncData(:final value) when value.isEmpty =>
+          AsyncValue(valueOrNull: final value?) when value.isEmpty =>
             _empty(l10n, tab, counts),
-          AsyncData(:final value) when formats != null => ListView.separated(
+          AsyncValue(valueOrNull: final value?) when formats != null =>
+            ListView.separated(
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(
                   Space.lg, Space.lg, Space.lg, Space.bottomInset),

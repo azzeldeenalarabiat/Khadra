@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/api/khadra_api.dart';
@@ -162,16 +164,47 @@ class FakeApi extends KhadraApi {
         : fakeUser(name: fullName);
   }
 
+  /// What the list answers, whatever tab it was asked for. Empty unless a test
+  /// says otherwise.
+  Paged<BookingListItem> bookings =
+      const Paged(items: [], page: 1, pageSize: 20, totalCount: 0);
+
+  /// When set, `myBookings` waits on it instead of answering.
+  ///
+  /// It is how a test watches a fetch that is STILL RUNNING — which is the only
+  /// moment the bookings screen's loading question has a real answer, and the
+  /// moment a refresh used to blank the list.
+  Completer<void>? holdBookings;
+
+  /// When set, `myBookings` throws it. A reload that failed must replace the list
+  /// rather than leave stale rows looking current.
+  Object? bookingsFailure;
+
+  int myBookingsCalls = 0;
+
   @override
   Future<Paged<BookingListItem>> myBookings({
     String? tab,
     int page = 1,
     int pageSize = 20,
-  }) async =>
-      const Paged(items: [], page: 1, pageSize: 20, totalCount: 0);
+  }) async {
+    myBookingsCalls++;
+    final hold = holdBookings;
+    if (hold != null) await hold.future;
+    final failure = bookingsFailure;
+    if (failure != null) throw failure;
+    return bookings;
+  }
+
+  Map<String, int> tabCounts = const {};
+
+  int bookingTabCountsCalls = 0;
 
   @override
-  Future<Map<String, int>> bookingTabCounts() async => const {};
+  Future<Map<String, int>> bookingTabCounts() async {
+    bookingTabCountsCalls++;
+    return tabCounts;
+  }
 
   /// The one booking the detail endpoint answers with. Set by the detail tests.
   Booking? bookingById;

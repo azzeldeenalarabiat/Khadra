@@ -46,6 +46,10 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
     store: store,
     refresh: () => ref.read(sessionProvider.notifier).refresh(),
     onSessionEnded: () => ref.read(sessionProvider.notifier).endSession(),
+    // The retry goes out on THIS client, so it carries whatever is configured on
+    // it. A second `Dio` would not: its adapter, and anything else set on the
+    // instance rather than on the options, is its own.
+    resend: (options) => dio.fetch<dynamic>(options),
   ));
 
   return ApiClient(dio);
