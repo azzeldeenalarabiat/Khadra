@@ -201,12 +201,14 @@ class _VehicleBody extends ConsumerWidget {
 
             _AvailabilityLine(vehicle: vehicle, hasDates: filter.hasDates),
 
-            if (vehicle.description != null &&
-                vehicle.description!.trim().isNotEmpty) ...[
+            // What the office wrote about this car, in whichever language it wrote
+            // it in. `ResolvedText.maybe` has already dropped a blank one, so the
+            // null check is the whole test.
+            if (vehicle.description case final description?) ...[
               const SizedBox(height: Space.xl),
               KhadraSectionTitle(l10n.vehicleAbout),
-              UserText(
-                vehicle.description!,
+              UserText.resolved(
+                description,
                 style: const TextStyle(fontSize: 15, height: 1.55),
               ),
             ],

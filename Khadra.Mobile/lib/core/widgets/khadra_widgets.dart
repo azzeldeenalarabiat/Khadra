@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 // framework's and makes `TextDirection.rtl` stop resolving.
 import 'package:intl/intl.dart' show Bidi;
 
+import '../../api/dtos.dart' show ResolvedText;
 import '../../l10n/app_localizations.dart';
 import '../theme/khadra_theme.dart';
 
@@ -895,11 +896,31 @@ class LatinRun extends StatelessWidget {
 /// This is NOT for platform copy. Every string from the ARB files is written in
 /// the language it will be read in, and belongs in an ordinary [Text].
 class UserText extends StatelessWidget {
-  const UserText(this.text, {super.key, this.style, this.maxLines});
+  const UserText(this.text, {super.key, this.style, this.maxLines, this.language});
+
+  /// The same paragraph out of a [ResolvedText], carrying the language the SERVER
+  /// says the office wrote it in.
+  ///
+  /// The point of the named constructor is that the pair travels together: a
+  /// caller unpacking `.text` on its own would drop the language silently, and
+  /// nothing on screen would look wrong.
+  UserText.resolved(ResolvedText resolved, {super.key, this.style, this.maxLines})
+      : text = resolved.text,
+        language = resolved.language;
 
   final String text;
   final TextStyle? style;
   final int? maxLines;
+
+  /// `ar` or `en`, when the server said which language this is. Null for text
+  /// whose language nothing has claimed — a customer's own dispute statement.
+  ///
+  /// **Not used for direction**, which comes from the characters below and is the
+  /// more reliable of the two: an office may type Arabic into the English box, and
+  /// the paragraph still has to read correctly. It sets the text's LOCALE, so a
+  /// screen reader given an English fallback paragraph inside an Arabic app reads
+  /// it as English rather than sounding out Latin letters in Arabic.
+  final String? language;
 
   /// The direction [text] will be laid out in.
   ///
@@ -925,6 +946,11 @@ class UserText extends StatelessWidget {
       // which is the typed text's own — so this reads from the paragraph's leading
       // edge whichever way that paragraph runs, and needs no second branch.
       textAlign: TextAlign.start,
+      // The office's own claim about the language, for the reading voice. Font
+      // choice does not need it — Flutter's fallback is per GLYPH, so Arabic
+      // letters reach Noto Kufi Arabic whatever locale is set — and direction must
+      // not use it, for the reason on the field.
+      locale: language == null ? null : Locale(language!),
     );
   }
 }

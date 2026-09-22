@@ -45,6 +45,16 @@ void main() {
           {'day': day, 'isClosed': false, 'opens': '08:00', 'closes': '20:00'},
       ];
 
+  /// One section as the server sends it: the words, and which language they are in.
+  ///
+  /// The language is on the wire because the server shows what the office actually
+  /// wrote rather than an empty heading, so a section is sometimes the OTHER
+  /// language and nothing else in the response would say so. `en` by default here
+  /// because these fixtures are written in English; the fallback cases below pass
+  /// it explicitly, which is the whole point of them.
+  Map<String, dynamic> written(String text, {String language = 'en'}) =>
+      {'text': text, 'language': language};
+
   /// The JSON shape `GET /api/v1/galleries/{id}` answers with, so these tests fail
   /// if the contract moves rather than agreeing with a hand-built object.
   PublicGalleryPage page({
@@ -141,13 +151,13 @@ void main() {
   testWidgets('what the office wrote appears under its own name', (tester) async {
     final api = FakeApi()
       ..cityLookups = const [amman]
-      ..galleryPage = page(sections: const {
-        'about': 'A family office in Abdali since 1998.',
-        'rentalConditions': 'No smoking in any car.',
-        'insurance': 'Comprehensive cover.',
-        'pickupInstructions': 'Bring your original licence to the counter.',
-        'deliveryNotes': 'We deliver between 9am and 6pm.',
-        'customerNotes': 'Ask for Hani.',
+      ..galleryPage = page(sections: {
+        'about': written('A family office in Abdali since 1998.'),
+        'rentalConditions': written('No smoking in any car.'),
+        'insurance': written('Comprehensive cover.'),
+        'pickupInstructions': written('Bring your original licence to the counter.'),
+        'deliveryNotes': written('We deliver between 9am and 6pm.'),
+        'customerNotes': written('Ask for Hani.'),
       });
 
     await pumpPage(tester, api: api);
@@ -174,7 +184,8 @@ void main() {
     final api = FakeApi()
       ..cityLookups = const [amman]
       // Hidden and never-written arrive identically: as nothing.
-      ..galleryPage = page(sections: const {'about': 'A family office in Abdali.'});
+      ..galleryPage =
+          page(sections: {'about': written('A family office in Abdali.')});
 
     await pumpPage(tester, api: api);
     await scrollTo(tester, heading(en.galleryCars));
@@ -203,9 +214,9 @@ void main() {
       ..cityLookups = const [amman]
       // The server never sends notes about a service that is off; the page must
       // not have a second opinion about that.
-      ..galleryPage = page(delivers: false, sections: const {
+      ..galleryPage = page(delivers: false, sections: {
         'deliveryNotes': null,
-        'pickupInstructions': 'Collect from the counter.',
+        'pickupInstructions': written('Collect from the counter.'),
       });
 
     await pumpPage(tester, api: api);
@@ -247,7 +258,7 @@ void main() {
     final api = FakeApi()
       ..cityLookups = const [amman]
       ..galleryPage = page(sections: {
-        'about': List.filled(60, 'Cars for every road in Jordan.').join(' '),
+        'about': written(List.filled(60, 'Cars for every road in Jordan.').join(' ')),
       });
 
     await pumpPage(tester, api: api);
@@ -264,12 +275,69 @@ void main() {
       (tester) async {
     final api = FakeApi()
       ..cityLookups = const [amman]
-      ..galleryPage = page(sections: const {'about': 'Family run since 1998.'});
+      ..galleryPage =
+          page(sections: {'about': written('Family run since 1998.')});
 
     await pumpPage(tester, api: api);
 
     expect(find.text('Family run since 1998.'), findsOneWidget);
     expect(find.text(en.actionShowMore), findsNothing);
+  });
+
+  testWidgets('shows a section the office wrote in the OTHER language',
+      (tester) async {
+    // The fallback, from the customer's side. An office that wrote its conditions
+    // in English and nothing in Arabic is shown to an Arabic reader in English,
+    // because what the office wrote beats an empty heading — and the paragraph has
+    // to read left-to-right on a right-to-left page or its full stop migrates.
+    final api = FakeApi()
+      ..cityLookups = const [amman]
+      ..galleryPage = page(sections: {
+        'about': written('مكتب عائلي في العبدلي منذ 1998.', language: 'ar'),
+        'rentalConditions': written('No smoking in any car.', language: 'en'),
+      });
+
+    await pumpPage(tester, api: api, locale: const Locale('ar'));
+
+    // Each paragraph laid out in its OWN direction, on one Arabic page.
+    final arabic = tester.widget<Text>(
+      find.descendant(
+        of: find.byType(UserText),
+        matching: find.text('مكتب عائلي في العبدلي منذ 1998.'),
+      ),
+    );
+    expect(arabic.textDirection, TextDirection.rtl);
+    expect(arabic.locale, const Locale('ar'));
+
+    await scrollTo(tester, find.text('No smoking in any car.'));
+    final english = tester.widget<Text>(
+      find.descendant(
+        of: find.byType(UserText),
+        matching: find.text('No smoking in any car.'),
+      ),
+    );
+    expect(english.textDirection, TextDirection.ltr);
+    // And it says it is English, so a screen reader does not sound it out in
+    // Arabic. Nothing on the wire but this field could have told the app.
+    expect(english.locale, const Locale('en'));
+  });
+
+  testWidgets('a customer is never told a section is a fallback', (tester) async {
+    // The console shows its owner which sections still need the other language.
+    // A customer is not shown that: they are being told what the office says, and
+    // a badge about the office's unfinished translation work is not their business.
+    final api = FakeApi()
+      ..cityLookups = const [amman]
+      ..galleryPage = page(sections: {
+        'about': written('Family run since 1998.', language: 'en'),
+      });
+
+    await pumpPage(tester, api: api, locale: const Locale('ar'));
+
+    expect(find.text('Family run since 1998.'), findsOneWidget);
+    // No language name, no "shown in", no note of any kind beside it.
+    expect(find.textContaining('English'), findsNothing);
+    expect(find.textContaining('الإنجليزية'), findsNothing);
   });
 
   testWidgets('opening hours show today, and the whole week on request',

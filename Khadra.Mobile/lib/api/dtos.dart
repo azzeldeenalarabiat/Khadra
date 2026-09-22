@@ -900,11 +900,47 @@ class GalleryAddress {
       : null;
 }
 
+/// A piece of an office's own writing, and which language it turned out to be in.
+///
+/// **The language is not always the one this app asked for.** An office that has
+/// written a section in Arabic and not in English is shown to an English reader in
+/// Arabic, because what the office wrote beats an empty heading — that is the
+/// server's rule, applied once, and this field is how it says which way it went.
+///
+/// **It is not the direction.** [UserText] lays every one of these out from the
+/// characters themselves, which is both more reliable than a claim — an office may
+/// type Arabic into the English box — and already in place. The language is carried
+/// for the reading VOICE: a screen reader given an English paragraph inside an
+/// Arabic app would otherwise pronounce it as Arabic.
+class ResolvedText {
+  const ResolvedText(this.text, this.language);
+
+  final String text;
+
+  /// `ar` or `en`, as the server named it. Never assumed from the app's own.
+  final String language;
+
+  /// Null for anything with nothing to read: absent, not a string, or blank. A
+  /// section with nothing in it is not a section, and blank is the same as absent.
+  static ResolvedText? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final text = json['text'] as String?;
+    if (text == null || text.trim().isEmpty) return null;
+    // Falls back to English rather than to the app's current language: this is the
+    // OFFICE's claim about what it wrote, and guessing it from the reader would
+    // make an English paragraph claim to be Arabic on an Arabic phone.
+    final language = json['language'] as String?;
+    return ResolvedText(text, language == null || language.isEmpty ? 'en' : language);
+  }
+}
+
 /// What the office wrote for its customers, as the server decided a customer sees it.
 ///
 /// Null is "nothing to show" and says nothing about why: hidden, never written, and
 /// — for delivery notes — an office that does not deliver all arrive the same way.
 /// The app renders no heading for a null section and must never ask why it is null.
+///
+/// Each section carries the language it came back in; see [ResolvedText].
 class GallerySections {
   const GallerySections({
     required this.about,
@@ -915,27 +951,21 @@ class GallerySections {
     required this.customerNotes,
   });
 
-  final String? about;
-  final String? rentalConditions;
-  final String? insurance;
-  final String? pickupInstructions;
-  final String? deliveryNotes;
-  final String? customerNotes;
+  final ResolvedText? about;
+  final ResolvedText? rentalConditions;
+  final ResolvedText? insurance;
+  final ResolvedText? pickupInstructions;
+  final ResolvedText? deliveryNotes;
+  final ResolvedText? customerNotes;
 
   static GallerySections fromJson(Map<String, dynamic> json) => GallerySections(
-        about: _text(json['about']),
-        rentalConditions: _text(json['rentalConditions']),
-        insurance: _text(json['insurance']),
-        pickupInstructions: _text(json['pickupInstructions']),
-        deliveryNotes: _text(json['deliveryNotes']),
-        customerNotes: _text(json['customerNotes']),
+        about: ResolvedText.maybe(json['about']),
+        rentalConditions: ResolvedText.maybe(json['rentalConditions']),
+        insurance: ResolvedText.maybe(json['insurance']),
+        pickupInstructions: ResolvedText.maybe(json['pickupInstructions']),
+        deliveryNotes: ResolvedText.maybe(json['deliveryNotes']),
+        customerNotes: ResolvedText.maybe(json['customerNotes']),
       );
-
-  /// Blank is the same as absent: a section with nothing in it is not a section.
-  static String? _text(dynamic value) {
-    final text = value as String?;
-    return text == null || text.trim().isEmpty ? null : text;
-  }
 }
 
 class CatalogueVehicle {
@@ -965,7 +995,8 @@ class CatalogueVehicle {
   final String model;
   final int year;
   final String? color;
-  final String? description;
+  /// What the office wrote about this car, in the language it came back in.
+  final ResolvedText? description;
   final CatalogueCarType? carType;
   final String transmission;
   final String fuelType;
@@ -990,7 +1021,7 @@ class CatalogueVehicle {
         model: json['model'] as String? ?? '',
         year: _int(json['year']),
         color: json['color'] as String?,
-        description: json['description'] as String?,
+        description: ResolvedText.maybe(json['description']),
         carType: CatalogueCarType.maybe(json['carType']),
         transmission: json['transmission'] as String? ?? '',
         fuelType: json['fuelType'] as String? ?? '',

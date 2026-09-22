@@ -7,6 +7,7 @@ import '../api/dtos.dart';
 import '../api/khadra_api.dart';
 import 'api/api_client.dart';
 import 'api/auth_interceptor.dart';
+import 'api/language_interceptor.dart';
 import 'format/formats.dart';
 import 'session/session_controller.dart';
 import 'session/session_store.dart';
@@ -51,6 +52,12 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
     // instance rather than on the options, is its own.
     resend: (options) => dio.fetch<dynamic>(options),
   ));
+
+  // Which language to answer in, read at request time so the switch in Profile
+  // takes effect on the next call rather than on the next launch. `ref.read`, not
+  // `watch`: a language change must not rebuild the client and throw away the Dio
+  // that the interceptor above retries on.
+  dio.interceptors.add(LanguageInterceptor(() => ref.read(appLanguageProvider)));
 
   return ApiClient(dio);
 });
@@ -287,6 +294,21 @@ tz.Location _location(String name) {
     return tz.UTC;
   }
 }
+
+/// The language the app is CURRENTLY RENDERING, as a bare tag: `ar` or `en`.
+///
+/// One provider so that everything asking the question gets the same answer — the
+/// widgets picking a side of a bilingual lookup row, and the `Accept-Language`
+/// header that decides which side the server sends in the first place. The two
+/// disagreeing is what puts one English paragraph on an otherwise Arabic page.
+///
+/// **Not the device's locale.** `resolveKhadraLocale` has already applied the
+/// deliberate choice when there is one and clamped the device's to one of the two
+/// languages this app speaks, so a phone set to French reads `en` here — which is
+/// what the screen shows, and therefore what the server should answer in.
+final appLanguageProvider = Provider<String>(
+  (ref) => ref.watch(isArabicProvider) ? 'ar' : 'en',
+);
 
 /// Whether the app is currently showing Arabic. Used where a DTO carries both
 /// languages and the widget has to pick one.

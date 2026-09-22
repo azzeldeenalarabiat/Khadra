@@ -435,7 +435,7 @@ class _Action extends StatelessWidget {
 class _FoldedText extends StatefulWidget {
   const _FoldedText(this.text);
 
-  final String text;
+  final ResolvedText text;
 
   @override
   State<_FoldedText> createState() => _FoldedTextState();
@@ -485,11 +485,11 @@ class _FoldedTextState extends State<_FoldedText> {
 
     final painter = TextPainter(
       text: TextSpan(
-        text: widget.text,
+        text: widget.text.text,
         style: DefaultTextStyle.of(context).style.merge(_OfficeText.style),
       ),
       maxLines: _foldedLines,
-      textDirection: UserText.directionOf(widget.text),
+      textDirection: UserText.directionOf(widget.text.text),
       textScaler: MediaQuery.textScalerOf(context),
     )..layout(maxWidth: width);
 
@@ -504,19 +504,19 @@ class _OfficeText extends StatelessWidget {
   /// Public so the fold above can measure exactly what it will render.
   static const TextStyle style = TextStyle(fontSize: 15, height: 1.55);
 
-  final String text;
+  final ResolvedText text;
   final int? maxLines;
 
   @override
   Widget build(BuildContext context) =>
-      UserText(text, maxLines: maxLines, style: style);
+      UserText.resolved(text, maxLines: maxLines, style: style);
 }
 
 class _OfficeSection extends StatelessWidget {
   const _OfficeSection({required this.title, required this.text});
 
   final String title;
-  final String text;
+  final ResolvedText text;
 
   @override
   Widget build(BuildContext context) => Padding(
