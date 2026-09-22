@@ -409,3 +409,70 @@ the transport, or the replacement is written straight back into the same log.
 identity papers live in Supabase Storage and are not in the database. They belong in
 the same backup plan, because they are identity papers and losing them is not a
 performance event.
+
+---
+
+## 11. The customer app
+
+The Android app is not on a store. It is an APK built on the owner's machine, signed
+with Khadra's release key, and published as a GitHub release.
+
+| | |
+|---|---|
+| Package | `com.khadra.khadra_mobile` |
+| Talks to | `https://khadra.onrender.com`, passed at build time. There is deliberately no production address compiled in as a fallback (`AppEnvironment`) |
+| Signed with | Khadra's release key: `.keys/khadra-release.jks`, alias `khadra`, certificate SHA-256 `AD:62:F2:E9:3B:AB:9E:55:5E:B2:D6:5D:44:70:31:0A:68:42:1A:D5:D6:B7:46:37:7D:9E:2D:31:AF:28:EF:C4` |
+| Published at | `https://github.com/azzeldeenalarabiat/Khadra/releases/latest/download/khadra.apk`, which is `MobileApp:UpdateUrl` |
+
+### Building a release
+
+```bash
+cd Khadra.Mobile
+flutter build apk --release --dart-define=KHADRA_API_BASE_URL=https://khadra.onrender.com
+```
+
+The APK is `build/app/outputs/flutter-apk/app-release.apk`. Before publishing it:
+
+- `aapt dump badging` shows the version in `pubspec.yaml`. Never publish two different
+  APKs under one version.
+- `apksigner verify --print-certs` shows the release certificate above. An APK signed with
+  anything else cannot install over the copies on phones.
+
+### The key
+
+`Khadra.Mobile/android/key.properties`, gitignored, names the keystore and its password:
+
+```properties
+storeFile=../../.keys/khadra-release.jks
+storePassword=…
+keyAlias=khadra
+keyPassword=…
+```
+
+Without it a release build stops within seconds and says so. It never falls back to a
+debug key.
+
+**The key is the app's identity.** Android installs an update only when it is signed
+with the same key as the copy already installed, and no store holds a copy of this one.
+Lose it and no update can ever install over a customer's app: each would have to
+uninstall, losing their sign-in, and install what Android treats as a different app.
+Keep two copies of the keystore and its password away from this machine (pre-launch
+item 134). `.keys/` is inside the OneDrive-synced folder, which is a copy but not a
+deliberate backup.
+
+**Every 1.0.0 build was signed with one laptop's debug key** (certificate SHA-256
+`C2:1B:DD:5E:3C:08:BC:8D:83:2E:E3:F7:27:DF:6E:2C:F2:80:2A:0C:ED:07:3F:25:17:4A:3E:E2:F1:29:73:70`).
+1.1.0 is the first build signed with the release key, so a phone that has 1.0.0 must
+**uninstall it first**: Android refuses an update signed by a different key. Uninstalling
+loses the stored sign-in, and the customer signs in again. That happens once.
+
+### Publishing
+
+A GitHub release on this repository, marked **latest**, with the APK attached under the
+exact name **`khadra.apk`**: that is the file the stable
+`…/releases/latest/download/khadra.apk` address resolves to. Every release marked latest
+must carry it, or the address breaks.
+
+The build is published BEFORE any API that raises the minimum supported version is
+deployed. CLAUDE.md, "The customer app's contract", and
+[contracts/README.md](contracts/README.md) give the order.

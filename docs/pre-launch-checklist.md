@@ -3869,7 +3869,8 @@ gated API. Every call is refused, and its error panels show the server's title, 
 that build shows the server's title for any code it does not know. One thing it does wrong that the server cannot fix: its
 launch-time token refresh is refused, and that build treats ANY refused refresh as a verdict, so it
 clears its own stored session. The server revokes nothing, but the customer signs in once after
-updating. 1.1.0 onwards does not do this.
+updating. 1.1.0 onwards does not do this. (The uninstall 1.0.0 now needs, below, loses that session
+anyway.)
 
 **Still not gated:**
 
@@ -3878,6 +3879,40 @@ updating. 1.1.0 onwards does not do this.
 - A web build cannot set its own User-Agent, so an OLD web build is never identified. A new one sends
   the header and is gated like a phone.
 
-**To raise the minimum** for a future breaking change: raise `pubspec.yaml`'s version, publish that
-build, and only then raise `MobileApp:MinimumSupportedVersion` to it — in configuration, no code
-change. Raising it before the build is available refuses every customer with nothing to update to.
+**1.0.0 cannot be updated in place at all.** 1.1.0 is the first build signed with Khadra's release
+key rather than a laptop's debug key (item 134), and Android refuses an update signed by a different
+key. So a phone with 1.0.0 must uninstall it before installing 1.1.0, which loses its sign-in either
+way, and the release notes must say so.
+
+**To raise the minimum** for a future breaking change, follow CLAUDE.md, "The customer app's
+contract", and `docs/contracts/README.md`: in the repository, one change set raises `pubspec.yaml`'s
+version and `MobileApp:MinimumSupportedVersion` together; in production, that build is published
+before the API carrying the minimum is deployed. Raised first, it refuses every customer with nothing
+to update to.
+
+### 134. The release signing key exists only on one laptop
+
+**Status:** open · **Raised:** 2026-09-22
+
+From 1.1.0 the customer app is signed with Khadra's release key, `.keys/khadra-release.jks`, alias
+`khadra`, certificate SHA-256:
+
+`AD:62:F2:E9:3B:AB:9E:55:5E:B2:D6:5D:44:70:31:0A:68:42:1A:D5:D6:B7:46:37:7D:9E:2D:31:AF:28:EF:C4`
+
+Its password is in `Khadra.Mobile/android/key.properties`. Both are gitignored, and both exist only
+on the owner's machine — inside the OneDrive-synced folder, which is a copy, not a deliberate backup,
+and exposes the key to anyone who reaches that account.
+
+Android installs an update only when it is signed with the same key as the copy already installed,
+and the app is on no store that could re-sign it. Lose the key and no update can ever install over a
+customer's app: each would have to uninstall, losing their sign-in, and install what Android treats
+as a different app. It is the one credential in this system with no recovery path.
+
+Until 1.1.0, every build was signed with that laptop's Android debug key, which is why this item
+exists now: the switch was made on 2026-09-22, while only 1.0.0 test installs have to pay for it with
+one uninstall.
+
+**To close:** two copies of the keystore and its password away from this machine and OneDrive — the
+password in a password manager, the file on offline storage — and a restore tested once: a release
+built on another machine from those copies passes `apksigner verify --print-certs` with the
+fingerprint above.

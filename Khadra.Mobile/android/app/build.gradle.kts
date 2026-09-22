@@ -1,7 +1,20 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Release builds are signed with Khadra's own key, never with a debug key. The key and its passwords
+// stay out of git: android/key.properties (gitignored) names a keystore in the repository's gitignored
+// .keys/ folder. See docs/production.md, "The customer app".
+//
+// Every 1.0.0 build was signed with one laptop's debug key. An APK signed with a different key cannot
+// install over the copy on a phone, so a release build that quietly fell back to a debug key would
+// produce an app nobody could update. Without key.properties a release build fails instead.
+val releaseSigning: Properties? = rootProject.file("key.properties").takeIf { it.exists() }?.let { file ->
+    Properties().apply { file.inputStream().use { load(it) } }
 }
 
 android {
@@ -25,11 +38,33 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigning != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseSigning.getProperty("storeFile"))
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias")
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
+        }
+    }
+}
+
+// Refuses at the start of a release build, not after minutes of compiling, and names the fix.
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst {
+        if (releaseSigning == null) {
+            throw GradleException(
+                "A release build needs Khadra's release key, and android/key.properties is missing. " +
+                    "See docs/production.md, \"The customer app\". Never sign a release with a debug key: " +
+                    "it could not update the app on anybody's phone."
+            )
         }
     }
 }
