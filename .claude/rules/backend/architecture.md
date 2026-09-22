@@ -52,6 +52,7 @@ paths:
 - Errors are RFC 9457 ProblemDetails with `traceId` and a stable `code` (e.g. `auth.invalid_credentials`). No stack traces, no internal messages.
 - Lists are paginated (`?page=&pageSize=`) and return `PagedResult<T>`.
 - Every mutation endpoint on the BFF side requires antiforgery; every API endpoint requires authentication unless explicitly `[AllowAnonymous]` and rate limited.
+- A response or request the customer app reads is a contract with every build already installed. A breaking change to one — a field removed or renamed, a type or shape changed, a code or enum value renamed, an endpoint removed or moved, a request refused that used to be accepted — ships with `MobileApp:MinimumSupportedVersion` raised to a new `Khadra.Mobile/pubspec.yaml` version in the same change set, and that build is published BEFORE the API carrying the raised minimum is deployed. Prefer an additive change. See CLAUDE.md, "The customer app's contract", and `docs/contracts/README.md`.
 
 ## Style
 - Primary constructors, file-scoped namespaces, `sealed` by default, `readonly record struct` for small value types, `internal` for infrastructure implementations.

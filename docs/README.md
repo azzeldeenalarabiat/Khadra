@@ -26,6 +26,7 @@ This folder is the whole written record of the system. Start here.
 | [../CLAUDE.md](../CLAUDE.md) | The house rules. Not optional, and several were learned the hard way |
 | [architecture-bounded-contexts.md](architecture-bounded-contexts.md) | The context map and what is built in each |
 | [auth-and-sessions.md](auth-and-sessions.md) | Token lifetimes and the session contract, in reference form |
+| [contracts/README.md](contracts/README.md) | The customer app's contract with the API, and the order a breaking change must follow |
 | [testing.md](testing.md) | How this is tested, and what the suites currently say |
 | [security.md](security.md) | The security decisions, each with its reasoning |
 

@@ -11,6 +11,7 @@ Check against `CLAUDE.md` and `.claude/rules/**`:
 - Application: exceptions thrown for expected failures instead of `Result`, handlers touching `HttpContext`, missing validator, missing `SaveChangesAsync`, cross-context aggregate mutation.
 - Infrastructure: missing `DeleteBehavior.Restrict`, cross-context navigation properties, secrets in tracked config, hand-edited existing migration (always Critical).
 - API/BFF: wrong status codes, missing rate limit on anonymous endpoints, tokens exposed to the browser, missing antiforgery on BFF mutations.
+- Customer-app contract (always Critical): a breaking change to anything `Khadra.Mobile` reads or sends — a field removed or renamed, a type or shape changed, a code or enum value renamed, an endpoint removed or moved, a request newly refused — without `MobileApp:MinimumSupportedVersion` in `Khadra.WebAPI/appsettings.json` raised to a new MAJOR.MINOR.PATCH in `Khadra.Mobile/pubspec.yaml` in the same diff. Say in the finding that the new build must be published before the API carrying the minimum is deployed.
 - Tests: new aggregate behavior or handler without tests.
 - Frontend: violations of `.claude/rules/frontend/angular-dashboard.md`.
 

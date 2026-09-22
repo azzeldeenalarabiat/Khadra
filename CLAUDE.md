@@ -58,8 +58,18 @@ Car rental marketplace for Jordan: customers rent from licensed (green-plate) re
 
 Follow `.claude/rules/frontend/angular-dashboard.md`: standalone + OnPush, `.component.ts` + `.component.html` only (no per-component styles and no `style=` attributes), all calls through the BFF, logical CSS properties for RTL, currency code on every money value. The Admin console deliberately does NOT use PrimeNG: it is built to the bespoke Nocturne design system, and that exception is recorded in the rules file.
 
+## The customer app's contract (MUST) — settled by the owner, 2026-09-22
+
+Every response and request the customer app reads is a contract with every build already installed on a phone. An installed build cannot be patched, only refused, so:
+
+- **Any breaking mobile/API contract change ships with a raised minimum supported app version.** Breaking means anything an installed build would misread or fail on: a field removed or renamed, a type or shape changed (a string becoming `{ text, language }` was the first), a code or enum value it keys on renamed, an endpoint removed, moved or given a new meaning, a status it relies on changed, or a request it sends refused where it used to be accepted. An added optional field or a new endpoint is not breaking. Prefer that additive shape — the old field kept beside the new one — whenever it is honest; when it is not, this rule applies in full.
+- **In the repository, one change set carries all three:** the app reading the new contract, with `Khadra.Mobile/pubspec.yaml` raised to a new MAJOR.MINOR.PATCH (the `+build` number alone does not count: the comparison ignores it); the API serving it; and `MobileApp:MinimumSupportedVersion` in `Khadra.WebAPI/appsettings.json` raised to that version.
+- **In production, the compatible mobile build is published BEFORE the server minimum is raised.** Publish the build, confirm it works against the API that is live, and only then deploy the API carrying the raised minimum. Raised first, the minimum refuses every customer with nothing to update to.
+- `MobileAppMinimumVersionTests` fails if a tracked settings file sets the minimum above the app's own version; the publishing order has no test, and is this rule. The mechanism — `X-Khadra-App-Version`, `426 app.update_required`, `mobileApp` in `/app-config`, the app's update screen, and the version order in `docs/contracts/app-version-vectors.json` — is in `docs/contracts/README.md`.
+
 ## Forbidden actions
 
+- Never ship a change the installed customer app cannot read without the raised minimum and the publish-first order above.
 - Never hand-edit an existing file under `Persistence/Migrations/`; add a new migration.
 - Never commit secrets. `appsettings.Local.json`, `.env*` and `.keys/` are gitignored; tracked `appsettings*.json` hold empty placeholders.
 - Never touch the Payments context (money movement, commission, refunds) without explicit owner approval. It exists now; the rule did not lapse when it was built.
