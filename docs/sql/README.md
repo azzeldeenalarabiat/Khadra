@@ -16,11 +16,14 @@ Creates 26 tables plus that history table, the `btree_gist` extension, and the
 `bookings_one_hold_per_vehicle` exclusion constraint that stops two live bookings
 overlapping on one vehicle.
 
-The last regeneration (2026-09-20) added three migrations: `AddCustomerShortlist`,
-which brings `customer_shortlists` and `shortlist_entries` — the two tables that
-make script 2 below mandatory this time — `DealerPublicProfile`, which adds six
-columns to `dealers`, and `PenaltyReasonCode`, which adds no schema at all and only
-records itself.
+The last regeneration (2026-09-22) added two migrations and no tables:
+`ChildCollectionsDeleteTheirOrphans`, which re-creates two foreign keys as NO ACTION
+instead of RESTRICT, and `BilingualDealerContent`, which adds fourteen `*_ar` / `*_en`
+columns (script 5 below). That makes 25. A database built from this file was compared
+with one built by EF's own migrations: the schemas are identical, whitespace aside.
+The regeneration before (2026-09-20) added `AddCustomerShortlist`, which brought
+`customer_shortlists` and `shortlist_entries` and made script 2 mandatory,
+`DealerPublicProfile`, and `PenaltyReasonCode`.
 
 Regenerate after adding a migration:
 
@@ -99,3 +102,45 @@ API neither sees nor touches them.
 
 `khadra-schema.sql` above already contains it, for a database being created from
 scratch. This file is for the one that already exists.
+
+## 5. `2026-09-22-bilingual-dealer-content.sql`
+
+The two migrations after `PenaltyReasonCode`, for the production database that already
+exists, generated with:
+
+```bash
+dotnet ef migrations script 20260918201534_PenaltyReasonCode 20260922012458_BilingualDealerContent \
+  --idempotent --project Khadra.Infrastructure --startup-project Khadra.WebAPI \
+  --output docs/sql/2026-09-22-bilingual-dealer-content.sql
+```
+
+- **`ChildCollectionsDeleteTheirOrphans`** has been in the code since 2026-09-20, but
+  the last regeneration of script 1 stopped before it, so production may never have
+  had it. Harmless either way — two foreign keys go from RESTRICT to NO ACTION, and
+  both refuse — and each migration checks `__EFMigrationsHistory`, so this script
+  applies whichever of the two is missing and nothing else.
+- **`BilingualDealerContent` is NOT safe to apply ahead of the new build.** Unlike
+  script 4 it has to be applied with the API stopped: from the moment it runs, an older
+  API still writes the legacy columns and nothing reads them. Pre-launch item 132 and
+  [releases/2026-09-bilingual-and-app-gate.md](../releases/2026-09-bilingual-and-app-gate.md)
+  give the procedure.
+
+It checks itself. It aborts, committing none of `BilingualDealerContent`, if its
+script detector misreads Arabic, presentation forms or English, or if any legacy
+value would land on both sides, neither side, or altered. Run it **from the file**
+(`psql -v ON_ERROR_STOP=1 -f`) rather than pasted into the SQL editor: the detector's
+character ranges are literal Arabic, including U+FEFF, and a paste that normalises
+them fails the self-test. Safely — but it fails.
+
+Rehearsed on 2026-09-22 against copies of a seeded database in both states production
+can be in — before `ChildCollectionsDeleteTheirOrphans` and after it:
+
+```
+legacy | verbatim_on_one_side | invented        (item 132's verification query)
+  16   |          16          |    0            both states; a second run changes nothing
+```
+
+A copy whose detector was deliberately broken stopped with the self-test's own
+message, `psql` exit 3, no new columns, all 16 legacy values untouched.
+
+No table is added, so `supabase-lockdown.sql` does not need re-running for it.

@@ -3822,6 +3822,16 @@ or leave.
    save and writes nothing.
 7. Build and distribute the new Production APK — the release of the build prepared before step 1.
 
+**The exact commands for Render and Supabase**, with a check and a way back at every step, are in
+[releases/2026-09-bilingual-and-app-gate.md](releases/2026-09-bilingual-and-app-gate.md). Two things
+found while preparing it. The script that production applies,
+`docs/sql/2026-09-22-bilingual-dealer-content.sql`, carries **two** migrations: the last regeneration
+of `khadra-schema.sql` stopped before `ChildCollectionsDeleteTheirOrphans`, so production may never
+have had it. It is idempotent and applies whichever is missing. And Render deploys are zero-downtime
+by default, so "stop every API instance" means suspending the service — with the console suspended
+first and left down until the new API is live, because the console is the only thing that writes an
+office's texts, which makes an old API process harmless if one runs.
+
 **To close:** production migrated this way, and step 4 recorded.
 
 ### 133. Installed copies of the customer app cannot read the new gallery and car text

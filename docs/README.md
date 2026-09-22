@@ -37,6 +37,7 @@ This folder is the whole written record of the system. Start here.
 | [production.md](production.md) | Topology, services, environment, deployment order, recovery |
 | [deployment.md](deployment.md) | The per-setting reference: what each variable is and what breaks without it |
 | [sql/README.md](sql/README.md) | Applying the schema and checking the administrator |
+| [releases/](releases/) | A release being prepared, or already rolled out: what ships, the sequence, and the way back |
 
 **Before you promise anything to a user**
 

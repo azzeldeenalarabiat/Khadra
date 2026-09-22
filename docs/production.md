@@ -175,6 +175,7 @@ SQL editor** instead:
 |---|---|
 | [sql/khadra-schema.sql](sql/khadra-schema.sql) | A database that does not exist yet. Idempotent |
 | [sql/2026-09-10-dealer-address.sql](sql/2026-09-10-dealer-address.sql) | The address columns, for a database that already exists |
+| [sql/2026-09-22-bilingual-dealer-content.sql](sql/2026-09-22-bilingual-dealer-content.sql) | The bilingual office-text columns, and the foreign-key migration before them. Applied with the API **stopped** — see [releases/2026-09-bilingual-and-app-gate.md](releases/2026-09-bilingual-and-app-gate.md) |
 | [sql/supabase-lockdown.sql](sql/supabase-lockdown.sql) | Revokes PostgREST access from `anon`/`authenticated` |
 | [sql/verify-admin.sql](sql/verify-admin.sql) | Read-only: is there an administrator, and can they sign in? |
 
@@ -339,6 +340,13 @@ getting this backwards means a failed deploy, not a silent problem.
 5. **Deploy the BFF** (`khadra-bff`), if the console changed.
 
 Reversed, the new API would query columns that do not exist yet.
+
+**Some releases cannot be deployed this way.** Deploys are zero-downtime, so the old
+version serves until the new one is healthy — and where a migration moves what the old
+version writes, that overlap loses writes. Such a release is deployed stop-the-world, with
+the console suspended until the new API is live, and it gets its own runbook under
+[releases/](releases/). The first is
+[2026-09-bilingual-and-app-gate.md](releases/2026-09-bilingual-and-app-gate.md).
 
 ### Verifying afterwards
 
