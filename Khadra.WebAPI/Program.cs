@@ -597,6 +597,10 @@ await DocumentStoreStartupCheck.ReportAsync(app.Services);
 // configured; the point of the line is that nobody has to discover it from a customer.
 await PaymentsStartupCheck.ReportAsync(app.Services);
 
+// And which customer-app builds will be served, so a raised minimum is never discovered from a
+// phone showing its update screen.
+MobileAppStartupCheck.Report(app.Services);
+
 // Not in Development, and the reason is a device rather than a preference.
 //
 // A phone testing the customer app talks to this API over the local network, where there is no
@@ -614,6 +618,10 @@ app.UseCors();
 // name is in the request body, which nothing has read at this point.
 app.UseCredentialSubject();
 app.UseRateLimiter();
+// After CORS and the limiter, before authentication — see MobileAppVersionGate for why each of the
+// three matters. An old customer-app build must be told to update before it can reach a contract it
+// cannot read, and before a 401 sends it off to refresh a token.
+app.UseMiddleware<MobileAppVersionGate>();
 app.UseAuthentication();
 app.UseAuthorization();
 

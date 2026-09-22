@@ -1,0 +1,47 @@
+{
+  "_about": [
+    "How two customer-app versions are ordered: Semantic Versioning 2.0.0 precedence.",
+    "BOTH sides of the version gate are tested against this one file: the API",
+    "(Khadra.Application/Common/AppVersion.cs, Khadra.Tests AppVersionTests) and the app",
+    "(Khadra.Mobile/lib/core/config/app_version.dart, test/app_version_test.dart). The gate only",
+    "works if the server and the phone agree about which of two versions is newer, so a new case",
+    "goes HERE, never into one suite's own list.",
+    "ascending: each list is in strictly increasing order, every pair of it, not only neighbours.",
+    "equal: each pair compares equal (build metadata after '+' is ignored).",
+    "invalid: each string must refuse to parse."
+  ],
+  "ascending": [
+    ["0.9.9", "1.0.0", "1.0.1", "1.1.0", "1.1.1", "1.2.0", "1.9.0", "1.10.0", "2.0.0", "10.0.0"],
+    ["1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0"],
+    ["1.0.0-1", "1.0.0-2", "1.0.0-10", "1.0.0-a", "1.0.0"],
+    ["1.1.0-rc.1", "1.1.0", "1.1.1-alpha", "1.1.1"]
+  ],
+  "equal": [
+    ["1.1.0", "1.1.0+2"],
+    ["1.1.0+2", "1.1.0+build.99"],
+    ["1.1.0-rc.1+5", "1.1.0-rc.1"]
+  ],
+  "invalid": [
+    "",
+    "1",
+    "1.1",
+    "1.1.0.0",
+    "v1.1.0",
+    " 1.1.0",
+    "1.1.0 ",
+    "1.1.0\n",
+    "01.1.0",
+    "1.01.0",
+    "1.1.00",
+    "-1.0.0",
+    "1.1.x",
+    "1.1.0-",
+    "1.1.0-01",
+    "1.1.0-rc..1",
+    "1.1.0+",
+    "1.1.0+build..1",
+    "١.١.٠",
+    "1٠.0.0",
+    "9999999999.0.0"
+  ]
+}

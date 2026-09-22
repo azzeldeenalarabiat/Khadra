@@ -168,6 +168,16 @@ public static class DependencyInjection
             .Validate(options => options.MaxShortlistEntries is > 0,
                 "BusinessRules: MaxShortlistEntries must be set to a positive number of cars.")
             .ValidateOnStart();
+        services.AddOptions<MobileAppOptions>()
+            .Bind(configuration.GetSection(MobileAppOptions.SectionName))
+            // Refused at startup rather than read as "no minimum": a typo in the one setting that
+            // keeps old app builds off a contract they cannot read must not quietly switch it off.
+            .Validate(options => options.MinimumIsValid,
+                "MobileApp: MinimumSupportedVersion must be a Semantic Version release such as 1.1.0, or empty.")
+            .Validate(options => options.UpdateUrlIsValid,
+                "MobileApp: UpdateUrl must be an absolute http(s) address, or empty.")
+            .ValidateOnStart();
+        services.AddSingleton<IMobileAppPolicySettings, MobileAppPolicySettings>();
         services.AddOptions<PaymentOptions>()
             .Bind(configuration.GetSection(PaymentOptions.SectionName))
             .ValidateDataAnnotations()

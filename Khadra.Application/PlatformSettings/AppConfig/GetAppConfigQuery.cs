@@ -49,7 +49,9 @@ public sealed record AppConfigDto(
     PasswordPolicyDto Password,
     /// What kind of money this deployment is moving. Every client reads it before it shows a price.
     PaymentsConfigDto Payments,
-    VocabulariesDto Vocabularies);
+    VocabulariesDto Vocabularies,
+    /// The oldest customer-app build this API serves.
+    MobileAppConfigDto MobileApp);
 
 /// <summary>
 /// What kind of money this deployment moves, published so no screen has to guess.
@@ -80,6 +82,23 @@ public sealed record AppConfigDto(
 /// </para>
 /// </remarks>
 public sealed record PaymentsConfigDto(string Mode);
+
+/// <summary>
+/// Which customer-app builds this API still serves.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <see cref="MinimumSupportedVersion"/> is a Semantic Version release (<c>1.1.0</c>), or null when no
+/// build is refused. A build older than it is refused on every other endpoint with
+/// <c>426 app.update_required</c>; this endpoint stays open to it on purpose, so a build that knows
+/// about the minimum can read it and put up its own update screen instead of failing call by call.
+/// </para>
+/// <para>
+/// <see cref="UpdateUrl"/> is where the current build can be downloaded, or null when none has been
+/// published — the app then says to update from wherever it was installed, and invents no link.
+/// </para>
+/// </remarks>
+public sealed record MobileAppConfigDto(string? MinimumSupportedVersion, string? UpdateUrl);
 
 /// <summary>
 /// What makes a password acceptable here.
@@ -158,7 +177,8 @@ public sealed class GetAppConfigHandler(
     IBusinessRulesProvider businessRules,
     IDocumentPolicySettings documents,
     IAuthPolicySettings authPolicy,
-    IPaymentProvider payments)
+    IPaymentProvider payments,
+    IMobileAppPolicySettings mobileApp)
     : IRequestHandler<GetAppConfigQuery, Result<AppConfigDto, Error>>
 {
     public async Task<Result<AppConfigDto, Error>> Handle(
@@ -193,7 +213,10 @@ public sealed class GetAppConfigHandler(
                 [.. Enumeration.GetAll<FuelType>().Select(Vocabulary.Describe)],
                 [.. Enumeration.GetAll<PickupMethod>().Select(Vocabulary.Describe)],
                 [.. Enumeration.GetAll<BookingCancellationReason>().Select(Vocabulary.Describe)],
-                [.. Enumeration.GetAll<BookingRejectionReason>().Select(Vocabulary.Describe)]));
+                [.. Enumeration.GetAll<BookingRejectionReason>().Select(Vocabulary.Describe)]),
+            new MobileAppConfigDto(
+                mobileApp.MinimumSupportedVersion?.ToString(),
+                mobileApp.UpdateUrl?.AbsoluteUri));
     }
 }
 

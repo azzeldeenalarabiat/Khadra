@@ -1,3 +1,4 @@
+using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.PlatformSettings.AppConfig;
 using Khadra.Domain.Common;
@@ -21,7 +22,9 @@ public sealed class AppConfigTests
     private static GetAppConfigHandler Handler(
         int? minimumRenterAge = 21,
         int passwordMinimumLength = 8,
-        PaymentMode paymentMode = PaymentMode.None)
+        PaymentMode paymentMode = PaymentMode.None,
+        string? minimumAppVersion = null,
+        string? updateUrl = null)
     {
         var payments = Substitute.For<IPaymentProvider>();
         payments.Mode.Returns(paymentMode);
@@ -36,12 +39,18 @@ public sealed class AppConfigTests
         var authPolicy = Substitute.For<IAuthPolicySettings>();
         authPolicy.PasswordMinimumLength.Returns(passwordMinimumLength);
 
+        var mobileApp = Substitute.For<IMobileAppPolicySettings>();
+        mobileApp.MinimumSupportedVersion.Returns(
+            AppVersion.TryParse(minimumAppVersion, out var minimum) ? minimum : null);
+        mobileApp.UpdateUrl.Returns(updateUrl is null ? null : new Uri(updateUrl));
+
         return new GetAppConfigHandler(
             calendar,
             TestBusinessRules.Provider(minimumRenterAge: minimumRenterAge),
             documents,
             authPolicy,
-            payments);
+            payments,
+            mobileApp);
     }
 
     /// <summary>
@@ -231,5 +240,32 @@ public sealed class AppConfigTests
         // And the same expression really is the one that judges.
         var refused = PasswordPolicy.Validate(new string('a', 4) + "1", 4);
         Assert.True(refused.IsFailure);
+    }
+    /// <summary>
+    /// The oldest customer-app build this API serves, published where every build can read it.
+    /// </summary>
+    /// <remarks>
+    /// The same figure the server enforces with 426: a build that knows about it compares its own
+    /// version and puts up an update screen, instead of failing one call at a time.
+    /// </remarks>
+    [Fact]
+    public async Task It_publishes_the_minimum_app_version_and_where_to_update()
+    {
+        var config = (await Handler(minimumAppVersion: "1.1.0", updateUrl: "https://example.org/khadra.apk")
+            .Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        Assert.Equal("1.1.0", config.MobileApp.MinimumSupportedVersion);
+        Assert.Equal("https://example.org/khadra.apk", config.MobileApp.UpdateUrl);
+    }
+
+    [Fact]
+    public async Task No_minimum_is_published_as_null_and_so_is_no_link()
+    {
+        // Null, not an empty string or a made-up "0.0.0": "no build is refused" is a real state, and
+        // the app must not invent a download link the owner never published.
+        var config = (await Handler().Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        Assert.Null(config.MobileApp.MinimumSupportedVersion);
+        Assert.Null(config.MobileApp.UpdateUrl);
     }
 }
