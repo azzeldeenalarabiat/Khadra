@@ -1,8 +1,7 @@
 import { httpResource } from '@angular/common/http';
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
-import { filter, map, startWith } from 'rxjs';
+import { LiveRefreshService } from './live-refresh.service';
+import { liveResource } from './live-surface';
 import {
   ActivityFeed,
   AdminWorkload,
@@ -54,20 +53,11 @@ export class AdminDashboardService {
    * now. Re-reading them per screen is affordable precisely because this endpoint is two counts;
    * the composite it replaced never could have been asked at this cadence.
    */
-  private readonly navigation = toSignal(
-    inject(Router).events.pipe(
-      filter((event) => event instanceof NavigationEnd),
-      map((_, index) => index + 1),
-      startWith(0),
-    ),
-    { initialValue: 0 },
-  );
+  private readonly live = inject(LiveRefreshService);
 
-  readonly workload = httpResource<AdminWorkload>(() => {
-    // Read so the resource re-runs when it changes; the value itself is not part of the request.
-    this.navigation();
-    return this.isAdmin() ? '/api/v1/admin/workload' : undefined;
-  });
+  readonly workload = httpResource<AdminWorkload>(() =>
+    this.isAdmin() ? '/api/v1/admin/workload' : undefined,
+  );
 
   /**
    * Whether the dashboard SCREEN is the one on show.
@@ -90,6 +80,26 @@ export class AdminDashboardService {
     inject(DestroyRef).onDestroy(() => this.showing.set(false));
   }
 
+  constructor() {
+    // Two counts, and they badge the rail on every screen — so they re-read on route entry (past the
+    // floor) and poll on a minute. They used to re-run their params on navigation, which fetched
+    // them just as often but dropped the badge to nothing each time, because a params run replaces
+    // the request object and a resource keeps its value only while that reference holds.
+    const admin = () => this.isAdmin();
+    liveResource(this.live, this.workload, {
+      id: 'admin.workload',
+      tier: 'live',
+      pollSeconds: 60,
+      visible: admin,
+    });
+    liveResource(this.live, this.attentionQueue, {
+      id: 'admin.attentionQueue',
+      tier: 'live',
+      pollSeconds: 60,
+      visible: admin,
+    });
+  }
+
   private adminUrl(path: string): string | undefined {
     return this.isAdmin() && this.showing() ? `/api/v1/admin/dashboard/${path}` : undefined;
   }
@@ -107,10 +117,9 @@ export class AdminDashboardService {
    * single payload, so they cannot contradict each other. Re-read on navigation for the same reason
    * `workload` is: a badge advertising work that is already done is worse than no badge.
    */
-  readonly attentionQueue = httpResource<AttentionQueue>(() => {
-    this.navigation();
-    return this.isAdmin() ? '/api/v1/admin/dashboard/attention-queue' : undefined;
-  });
+  readonly attentionQueue = httpResource<AttentionQueue>(() =>
+    this.isAdmin() ? '/api/v1/admin/dashboard/attention-queue' : undefined,
+  );
   readonly bookingTrend = httpResource<BookingTrend>(() => this.adminUrl('booking-trend'));
   readonly activity = httpResource<ActivityFeed>(() => this.adminUrl('activity'));
 

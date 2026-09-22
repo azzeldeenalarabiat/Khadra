@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
@@ -6,7 +6,7 @@ import { Tone } from '../../core/models/console.models';
 import { BookingListItem } from '../../core/models/bookings.api';
 import { BookingTab, DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
-import { loaded } from '../../core/services/loaded';
+import { LiveRefreshService } from '../../core/services/live-refresh.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { BookingDecisions } from './booking-decisions';
 import { TranslationKey } from '../../core/i18n/en';
@@ -65,12 +65,19 @@ export class DealerBookingsComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly decisions = inject(BookingDecisions);
+  private readonly live = inject(LiveRefreshService);
 
   protected readonly list = this.service.list;
   protected readonly counts = this.service.counts;
-  /** Guarded: `value()` throws in the error state. */
-  private readonly listPage = loaded(this.list);
-  private readonly tabCounts = loaded(this.counts);
+  /**
+   * The last rows that ARRIVED, not the last request's outcome.
+   *
+   * `loaded()` answers null the moment a resource errors, which is right for a screen somebody is
+   * waiting on and wrong for one re-reading itself in the background. A failed poll would have
+   * emptied this queue and filled it again a poll later, under a dealer working through it.
+   */
+  private readonly listPage = this.service.retainedList;
+  private readonly tabCounts = this.service.retainedCounts;
   protected readonly tab = this.service.tab;
 
   /** The tabs in the reader's language. A `computed`, not a field: a field words them only once. */
@@ -91,7 +98,24 @@ export class DealerBookingsComponent {
       this.service.tab.set(known ? known.key : 'all');
       this.service.page.set(1);
     });
+
+    // This screen is the only one that needs the queue fresh, and the only one that draws all eight
+    // counts — so it is the only one that may pay for them. Nothing polls while somebody is looking
+    // at the fleet or the reports.
+    this.service.watchingTheQueue.set(true);
+    inject(DestroyRef).onDestroy(() => this.service.watchingTheQueue.set(false));
   }
+
+  /**
+   * When the rows on screen were last confirmed by the server, or null while they are current.
+   *
+   * Set after two failed quiet refreshes running. One is a hiccup worth nobody's attention; two
+   * means the screen should stop implying it is up to date, without throwing away the work the
+   * dealer can still see.
+   */
+  protected readonly staleSince = computed(
+    () => this.live.staleSince().get('dealer.bookings') ?? null,
+  );
 
   protected readonly rows = computed(() => this.listPage()?.items ?? []);
   protected readonly total = computed(() => this.listPage()?.totalCount ?? 0);
@@ -130,9 +154,10 @@ export class DealerBookingsComponent {
     if (page >= 1 && page <= this.totalPages()) this.service.page.set(page);
   }
 
+  /** Loud: somebody asked, or a decision just landed. Exempt from the floor. */
   protected reload(): void {
-    this.list.reload();
-    this.counts.reload();
+    this.service.refresh();
+    this.live.touch('dealer.counts');
   }
 
   protected open(booking: BookingListItem): void {

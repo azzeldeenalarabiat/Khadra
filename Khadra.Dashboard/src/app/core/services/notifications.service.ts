@@ -1,9 +1,9 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
-import { filter, firstValueFrom, map, startWith } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { NotificationFeed, NotificationItem } from '../models/notifications.api';
+import { LiveRefreshService } from './live-refresh.service';
+import { liveResource } from './live-surface';
 import { SessionService } from './session.service';
 import { I18nService } from '../i18n/i18n.service';
 
@@ -28,23 +28,33 @@ export class NotificationsService {
   /** Anyone signed in has a bell. What fills it differs by what raises rows, not by role. */
   private readonly signedIn = computed(() => !!this.session.user());
 
-  private readonly navigation = toSignal(
-    inject(Router).events.pipe(
-      filter((event) => event instanceof NavigationEnd),
-      map((_, index) => index + 1),
-      startWith(0),
-    ),
-    { initialValue: 0 },
-  );
+  private readonly live = inject(LiveRefreshService);
 
   readonly page = signal(1);
 
+  /**
+   * The bell, and the list behind it.
+   *
+   * It used to re-run its PARAMS on every completed navigation, which fetched twenty-five rows per
+   * screen change AND dropped the badge to null each time — a params run builds a new request
+   * object, and a resource only keeps its value while the reference holds. Now it polls on a minute
+   * and re-reads on route entry past the floor, through `reload()`, which keeps the number on screen
+   * while the new one is on its way.
+   */
   readonly feed = httpResource<NotificationFeed>(() => {
-    // Read so the resource re-runs on navigation; the value is not part of the request.
-    this.navigation();
     if (!this.signedIn()) return undefined;
     return { url: this.base, params: { page: this.page(), pageSize: 25 } };
   });
+
+  constructor() {
+    liveResource(this.live, this.feed, {
+      id: 'notifications',
+      tier: 'live',
+      pollSeconds: 60,
+      // The bell is on every screen, so it is always the surface in front of somebody.
+      visible: () => this.signedIn(),
+    });
+  }
 
   /** Null until the feed answers — a badge that guesses zero claims an empty inbox nobody checked. */
   readonly unreadCount = computed(() =>

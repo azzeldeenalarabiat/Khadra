@@ -3,6 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
+import { DealerPulseService } from '../../core/services/dealer-pulse.service';
 import { SessionService } from '../../core/services/session.service';
 import { accountRouteFor } from '../../core/guards/role.guards';
 import { Tone } from '../../core/models/console.models';
@@ -48,6 +49,16 @@ export class DealerGateComponent {
   private readonly console = inject(DealerConsoleService);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+
+  /**
+   * Injected so it EXISTS. It is `providedIn: 'root'` and nothing else asks for it, so without this
+   * line Angular never constructs it and the dealer console goes back to finding out about new
+   * bookings when somebody presses F5.
+   *
+   * Here rather than in the shell because this component wraps every dealer route and nothing else,
+   * which is exactly the lifetime the pulse should have: an admin never creates it.
+   */
+  private readonly pulse = inject(DealerPulseService);
 
   /**
    * Never `me.value()` directly: it THROWS in the error state, and this component wraps EVERY dealer

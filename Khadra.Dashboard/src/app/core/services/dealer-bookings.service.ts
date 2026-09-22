@@ -9,6 +9,8 @@ import {
   RenterDocuments,
 } from '../models/bookings.api';
 import { DealerConsoleService } from './dealer-console.service';
+import { LiveRefreshService } from './live-refresh.service';
+import { liveResource, retained } from './live-surface';
 
 /**
  * The dealer's bookings tab, as the API sees it (Khadra.Application/Bookings/ReadBookings).
@@ -65,9 +67,20 @@ export class DealerBookingsService {
   private readonly console = inject(DealerConsoleService);
   private readonly base = '/api/v1/bookings';
 
+  private readonly live = inject(LiveRefreshService);
+
   readonly tab = signal<BookingTab>('all');
   readonly page = signal(1);
   readonly pageSize = 20;
+
+  /**
+   * True while the dealer is actually looking at the queue.
+   *
+   * The whole policy hangs off this: `tab-counts` is eight COUNTs, and the list is a page of rows.
+   * Neither is a thing to be asking for every thirty seconds on a screen nobody is reading — and the
+   * screen that draws all eight counts is the only one that needs them fresh.
+   */
+  readonly watchingTheQueue = signal(false);
 
   readonly list = httpResource<PagedResult<BookingListItem>>(() => ({
     url: this.base,
@@ -75,6 +88,27 @@ export class DealerBookingsService {
   }));
 
   readonly counts = httpResource<TabCounts>(() => `${this.base}/tab-counts`);
+
+  /**
+   * The last rows that actually arrived, kept through a failed reload.
+   *
+   * See `retained`. A poll that fails must not empty a queue the dealer is working through.
+   */
+  readonly retainedList = retained(this.list);
+  readonly retainedCounts = retained(this.counts);
+
+  constructor() {
+    // No `pollSeconds` on either. The queue does not poll itself — the pulse does, and re-reads
+    // these only when it has something to say. Two indexed counts every thirty seconds instead of
+    // eight COUNTs plus a page of rows, and on a quiet afternoon the difference is everything the
+    // console asks for versus almost nothing.
+    //
+    // They stay registered so they still get trigger A (route entry, tab shown, back from idle)
+    // through the twenty-second floor, and so `touch()` has something to find.
+    const visible = () => this.watchingTheQueue();
+    liveResource(this.live, this.list, { id: 'dealer.bookings', tier: 'live', visible });
+    liveResource(this.live, this.counts, { id: 'dealer.counts', tier: 'live', visible });
+  }
 
   /** The booking a detail screen is showing; null keeps the resource idle. */
   readonly viewing = signal<string | null>(null);
@@ -169,10 +203,20 @@ export class DealerBookingsService {
     );
   }
 
-  /** After a decision: the row, the counts and the open detail all describe the same booking. */
+  /**
+   * After a decision: the row, the counts and the open detail all describe the same booking.
+   *
+   * This is trigger C, and also what the pulse — and later the push channel — drives. `touch()` for
+   * the two registered surfaces so the policy knows they were read (and stops a poll landing on top
+   * of this one); a plain `reload()` for the rest, which are not polled.
+   *
+   * Deliberately EXEMPT from the twenty-second floor. A dealer who approves a booking five seconds
+   * after a poll has to watch the row leave Pending — flooring a write would break the one part of
+   * this that already worked.
+   */
   refresh(): void {
-    this.list.reload();
-    this.counts.reload();
+    this.live.touch('dealer.bookings');
+    this.live.touch('dealer.counts');
     this.booking.reload();
     this.reputation.reload();
     this.customerRating.reload();

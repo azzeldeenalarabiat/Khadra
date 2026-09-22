@@ -1,9 +1,9 @@
 import { HttpClient, HttpParams, httpResource } from '@angular/common/http';
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router } from '@angular/router';
-import { filter, firstValueFrom, map, startWith } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
+import { LiveRefreshService } from './live-refresh.service';
+import { liveResource } from './live-surface';
 import {
   BrandingUpload,
   CustomerPageView,
@@ -58,6 +58,7 @@ export interface DealerPermissions {
 export class DealerConsoleService {
   private readonly http = inject(HttpClient);
   private readonly injector = inject(Injector);
+  private readonly live = inject(LiveRefreshService);
   private readonly base = '/api/v1/dealers/me';
 
   /**
@@ -80,30 +81,24 @@ export class DealerConsoleService {
   }
 
   /**
-   * Bumped on every completed navigation, the same way the rail's workload counts are.
+   * The dealership, and who is asking: every dealer screen reads it (locked state, permissions).
    *
-   * `me` used to be fetched once per shell, and everything now hangs off it: the rail, the gate,
-   * whether the reports request is sent at all, and which controls each screen renders. Fetched once
-   * meant an employee granted report access mid-shift went on being told it was not theirs, and a
-   * dealership suspended under a member of staff went on showing them controls that had stopped
-   * working — until some unrelated write happened to call `refreshMe`. One small request per screen
-   * change is the price of the rail telling the truth.
+   * Everything hangs off this: the rail, the gate, whether the reports request is sent at all, and
+   * which controls each screen renders. Fetched once per shell meant an employee granted report
+   * access mid-shift went on being told it was not theirs, and a suspended dealership went on
+   * showing staff controls that had stopped working.
+   *
+   * It used to fix that by reading a navigation counter here, which re-ran the PARAMS — and a params
+   * run builds a new request object, so the resource dropped its value and `permissions()` went null
+   * on every single click. The gate threw a skeleton over the console, the rail lost Team and
+   * Reports and put them back, the bell blanked. Local latency hid it; a real connection would not
+   * have.
+   *
+   * Now `LiveRefreshService` calls `reload()` on route entry, which keeps the request reference and
+   * therefore keeps the value — and puts a sixty-second floor under it, so clicking through eight
+   * booking tabs costs one re-read rather than eight.
    */
-  private readonly navigation = toSignal(
-    inject(Router).events.pipe(
-      filter((event) => event instanceof NavigationEnd),
-      map((_, index) => index + 1),
-      startWith(0),
-    ),
-    { initialValue: 0 },
-  );
-
-  /** The dealership, and who is asking: every dealer screen reads it (locked state, permissions). */
-  readonly me = httpResource<DealerProfile>(() => {
-    // Read so the resource re-runs on navigation; the value is not part of the request.
-    this.navigation();
-    return this.dealerUrl();
-  });
+  readonly me = httpResource<DealerProfile>(() => this.dealerUrl());
 
   /** Guarded: `value()` throws in the error state, so the permissions below never read it directly. */
   private readonly dealer = loaded(this.me);
@@ -207,6 +202,32 @@ export class DealerConsoleService {
   readonly customerPage = httpResource<CustomerPageView>(() =>
     this.dealerUrl('/public-profile'),
   );
+
+  constructor() {
+    // ON-DEMAND, which is not the same as "once per session" — which is what these were. An owner
+    // who changed the delivery fee on another device saw the old one for the rest of the day. They
+    // re-read on entering a screen, past a sixty-second floor, and never poll.
+    //
+    // `me` is here rather than in LIVE because it is permissions, not operations: it has to be right
+    // when a screen opens, and it does not change while somebody reads one.
+    const dealer = () => this.isDealer();
+    liveResource(this.live, this.me, { id: 'dealer.me', tier: 'on-demand', visible: dealer });
+    liveResource(this.live, this.dashboard, {
+      id: 'dealer.dashboard',
+      tier: 'on-demand',
+      visible: dealer,
+    });
+    liveResource(this.live, this.delivery, {
+      id: 'dealer.delivery',
+      tier: 'on-demand',
+      visible: dealer,
+    });
+    liveResource(this.live, this.customerPage, {
+      id: 'dealer.customerPage',
+      tier: 'on-demand',
+      visible: dealer,
+    });
+  }
 
   // ── Staff (spec 4.2) ──
 

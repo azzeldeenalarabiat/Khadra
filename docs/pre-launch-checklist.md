@@ -3685,6 +3685,29 @@ between, the 60-second grace lapses and the next rotation is a replay that revok
 **To close:** on a timeout from `/auth/refresh` specifically, one immediate retry of the same token,
 inside the grace. Not on any other failure, and not more than once.
 
+### 129. Console polling keeps an abandoned session alive past its idle timeout
+
+**Status:** handled in the client, open as a server question · **Raised:** 2026-09-22 (Fable advisor)
+
+`DistributedCacheTicketStore.RenewAsync` writes the BFF's session ticket to Redis with
+`SlidingExpiration = SessionIdleMinutes`, and `RetrieveAsync` reads it through `cache.GetAsync` on
+every cookie-authenticated request — and a Redis read SLIDES a sliding entry. `SlidingExpiration =
+false` on the cookie only stops the cookie being re-issued; it does not touch the ticket.
+
+So any background polling from the console keeps the session alive indefinitely, up to the eight-hour
+absolute cap. Before this work nothing polled and an unattended console died after thirty quiet
+minutes. That is a security property, and it would have been changed by accident.
+
+`LiveRefreshService` handles it from the client: polling stops after ten minutes without a
+`pointerdown`, `keydown` or `wheel`, comfortably under the thirty-minute timeout, and the first input
+resumes it. `live-refresh.service.spec.ts` pins it.
+
+**To close:** decide whether the server should also stop relying on "nobody polls" for its idle
+timeout. `IDistributedCache.Get` cannot be told not to slide, so it needs either a separate
+last-seen stamp that only real navigation updates, or an endpoint the poll can use that does not
+carry the session cookie at all. Client-side politeness is the right fix for today and the wrong
+thing to depend on for ever.
+
 ### 130. The dealer pulse watches three things, and only three
 
 **Status:** open by design · **Raised:** 2026-09-22
