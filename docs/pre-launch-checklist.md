@@ -4179,3 +4179,12 @@ inside the dialog, and word the note for both.
 as NotRequired and the unverified path (reason, audit, the customer's "recorded without your code")
 never runs. The full path was tested locally with it on. **To close:** the owner decides per
 environment, and the setting is set to match.
+
+### 155. A failed cities read makes a city search look like "Any city"
+
+**Status:** open · **Raised:** 2026-09-24 (Fable advisor review)
+
+When `/api/v1/cities` fails, `LookupsService.cityName()` answers an empty string, so a city-filtered
+search is headed "Any city" and the city selects offer only "Any city", with no error shown. The
+search itself still sends the city, so results are right; only the wording misleads. **To close:**
+show the city filter as unavailable while the lookup has failed, with a test.
