@@ -229,6 +229,48 @@ class FakeApi extends KhadraApi {
     return found;
   }
 
+  /// Every push registration this phone sent, in order: (token, language).
+  final List<(String, String)> pushRegistrations = [];
+  int pushRemovals = 0;
+  final List<String> languagesSet = [];
+
+  /// When set, the push calls fail the way the network does.
+  ApiFailure? pushFailure;
+
+  @override
+  Future<void> registerPushDevice({
+    required String token,
+    required String platform,
+    required String language,
+    String? appVersion,
+  }) async {
+    if (pushFailure != null) throw pushFailure!;
+    pushRegistrations.add((token, language));
+  }
+
+  @override
+  Future<void> removePushDevice() async {
+    if (pushFailure != null) throw pushFailure!;
+    pushRemovals++;
+  }
+
+  @override
+  Future<void> setLanguage(String language) async {
+    if (pushFailure != null) throw pushFailure!;
+    languagesSet.add(language);
+  }
+
+  /// What `handover-code` answers with, one per call; the last one repeats.
+  List<HandoverCodeGrant> handoverGrants = [];
+  int handoverCalls = 0;
+
+  @override
+  Future<HandoverCodeGrant> issueHandoverCode(String bookingId) async {
+    handoverCalls++;
+    if (handoverGrants.isEmpty) throw StateError("no handover code was staged for $bookingId");
+    return handoverGrants[(handoverCalls - 1).clamp(0, handoverGrants.length - 1)];
+  }
+
   /// What `deposit-checkout` answers with. Null fails the call loudly, like any unstaged endpoint.
   PaymentAttempt? checkoutAttempt;
   int checkoutCalls = 0;

@@ -8,9 +8,12 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'core/config/app_environment.dart';
 import 'core/config/update_requirement.dart';
+import 'core/live/live_refresh.dart';
+import 'core/live/live_surfaces.dart';
 import 'core/providers.dart';
 import 'core/router.dart';
 import 'core/theme/khadra_theme.dart';
+import 'features/bookings/booking_providers.dart';
 import 'features/update/update_required_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -102,11 +105,49 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
     // signed in, on every launch.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(sessionProvider.notifier).restore();
+      _startPush();
     });
+  }
+
+  /// Push notifications, for the life of the app. Off, silently, when this build has no
+  /// Firebase project behind it.
+  void _startPush() {
+    final push = ref.read(pushCoordinatorProvider)
+      // A tap opens the booking or dispute it is about, through the router's own guards.
+      ..navigate = (location) {
+        ref.read(routerProvider).push(location);
+      }
+      // A push in front refreshes what might be showing its booking, now rather than at the
+      // next poll. `touch` is the policy's own "something changed" trigger.
+      ..refresh = (data) {
+        final subject = data['subjectId'];
+        if (subject != null && data['kind'] != 'YourDisputeUpdated') {
+          ref.invalidate(bookingProvider(subject));
+        }
+        final live = ref.read(liveRefreshProvider);
+        for (final surface in Surfaces.all) {
+          live.touch(surface);
+        }
+      };
+    push.start();
   }
 
   @override
   Widget build(BuildContext context) {
+    // The phone is registered for push while, and only while, somebody is signed in, and
+    // re-registered in the language the app is showing. See PushCoordinator.
+    ref.listen(sessionProvider, (previous, next) {
+      final push = ref.read(pushCoordinatorProvider);
+      if (next.isSignedIn && previous?.isSignedIn != true) {
+        push.signedIn(ref.read(appLanguageProvider));
+      } else if (!next.isSignedIn && previous?.isSignedIn == true) {
+        push.sessionEnded();
+      }
+    });
+    ref.listen(appLanguageProvider, (_, language) {
+      ref.read(pushCoordinatorProvider).languageChanged(language);
+    });
+
     final router = ref.watch(routerProvider);
     final locale = ref.watch(localeProvider);
     final blockedBy = _blockedBy ??= ref.watch(updateRequirementProvider);

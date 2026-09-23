@@ -107,6 +107,36 @@ class KhadraApi {
   Future<AuthUser> me() async =>
       AuthUser.fromJson(_object(await _client.get<dynamic>('/api/v1/auth/me')));
 
+  /// Tells the platform which phone to wake for this session, and in which language.
+  ///
+  /// Tied to the SESSION on the server: signing out, or revoking this device from
+  /// another one, stops pushes to it even if this call is never undone. The token
+  /// travels in the body, never the path, because paths are written to access logs.
+  Future<void> registerPushDevice({
+    required String token,
+    required String platform,
+    required String language,
+    String? appVersion,
+  }) =>
+      _client.put<dynamic>(
+        '/api/v1/auth/sessions/current/push-device',
+        body: {
+          'token': token,
+          'platform': platform,
+          'language': language,
+          'appVersion': appVersion,
+        },
+      );
+
+  /// Stops pushes to this phone. Called before signing out; idempotent.
+  Future<void> removePushDevice() =>
+      _client.delete<dynamic>('/api/v1/auth/sessions/current/push-device');
+
+  /// Records the language this person reads Khadra in, for the emails and reminders
+  /// that reach them away from the app.
+  Future<void> setLanguage(String language) =>
+      _client.put<dynamic>('/api/v1/auth/me/language', body: {'language': language});
+
   Future<void> resendVerification(String email) => _client.post<dynamic>(
         '/api/v1/auth/resend-verification',
         body: {'email': email},
@@ -345,6 +375,14 @@ class KhadraApi {
       PaymentAttempt.maybe(_object(await _client.post<dynamic>(
         '/api/v1/bookings/$bookingId/deposit-checkout',
       )))!;
+
+  /// A fresh one-time code to show at the counter. The server decides whether it is
+  /// for the pickup or the return from the booking's own status, and asking again
+  /// replaces the previous code.
+  Future<HandoverCodeGrant> issueHandoverCode(String bookingId) async =>
+      HandoverCodeGrant.fromJson(_object(await _client.post<dynamic>(
+        '/api/v1/bookings/$bookingId/handover-code',
+      )));
 
   Future<Booking> reportNonDelivery(String bookingId, String details) async =>
       Booking.fromJson(_object(await _client.post<dynamic>(

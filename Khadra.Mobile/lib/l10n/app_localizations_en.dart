@@ -1616,6 +1616,82 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String notificationYourBookingConfirmed(String actor) {
+    return 'Your booking with $actor is confirmed';
+  }
+
+  @override
+  String notificationYourBookingCancelled(String actor) {
+    return 'Your booking with $actor was cancelled by Khadra';
+  }
+
+  @override
+  String notificationYourBookingPickedUp(String actor) {
+    return 'You collected the car from $actor';
+  }
+
+  @override
+  String notificationYourBookingReturned(String actor) {
+    return '$actor recorded the car as returned';
+  }
+
+  @override
+  String get notificationYourPaymentReminder =>
+      'Your deposit is still due — pay before the deadline';
+
+  @override
+  String notificationYourPickupReminder(String actor) {
+    return 'Your car at $actor is ready soon — have your handover code ready';
+  }
+
+  @override
+  String notificationYourReturnReminder(String actor) {
+    return 'Your car is due back at $actor soon';
+  }
+
+  @override
+  String get notificationYourDisputeUpdated =>
+      'There is an update on your dispute';
+
+  @override
+  String get handoverShowPickupCode => 'Show my pickup code';
+
+  @override
+  String get handoverShowReturnCode => 'Show my return code';
+
+  @override
+  String get handoverPickupTitle => 'Pickup code';
+
+  @override
+  String get handoverReturnTitle => 'Return code';
+
+  @override
+  String get handoverInstructions =>
+      'Show this to the rental office. They scan the code or type the six digits, and your booking updates by itself.';
+
+  @override
+  String handoverValidFor(String time) {
+    return 'Valid for $time';
+  }
+
+  @override
+  String get handoverExpired => 'This code has expired. Get a new one.';
+
+  @override
+  String get handoverNewCode => 'Get a new code';
+
+  @override
+  String get handoverPrivacy =>
+      'Only show it at the counter. Getting a new code stops this one working.';
+
+  @override
+  String get handoverRecorded => 'Handover recorded.';
+
+  @override
+  String get handoverNotAvailable =>
+      'There is no handover code for this booking right now.';
+
+  @override
   String notificationUnknown(String actor) {
     return '$actor updated something on your account';
   }

@@ -2720,6 +2720,120 @@ abstract class AppLocalizations {
   /// **'{actor} recorded that the car was not collected'**
   String notificationYourBookingMarkedNoShow(String actor);
 
+  /// No description provided for @notificationYourBookingConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your booking with {actor} is confirmed'**
+  String notificationYourBookingConfirmed(String actor);
+
+  /// No description provided for @notificationYourBookingCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Your booking with {actor} was cancelled by Khadra'**
+  String notificationYourBookingCancelled(String actor);
+
+  /// No description provided for @notificationYourBookingPickedUp.
+  ///
+  /// In en, this message translates to:
+  /// **'You collected the car from {actor}'**
+  String notificationYourBookingPickedUp(String actor);
+
+  /// No description provided for @notificationYourBookingReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor} recorded the car as returned'**
+  String notificationYourBookingReturned(String actor);
+
+  /// No description provided for @notificationYourPaymentReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit is still due — pay before the deadline'**
+  String get notificationYourPaymentReminder;
+
+  /// No description provided for @notificationYourPickupReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your car at {actor} is ready soon — have your handover code ready'**
+  String notificationYourPickupReminder(String actor);
+
+  /// No description provided for @notificationYourReturnReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your car is due back at {actor} soon'**
+  String notificationYourReturnReminder(String actor);
+
+  /// No description provided for @notificationYourDisputeUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'There is an update on your dispute'**
+  String get notificationYourDisputeUpdated;
+
+  /// No description provided for @handoverShowPickupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my pickup code'**
+  String get handoverShowPickupCode;
+
+  /// No description provided for @handoverShowReturnCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my return code'**
+  String get handoverShowReturnCode;
+
+  /// No description provided for @handoverPickupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup code'**
+  String get handoverPickupTitle;
+
+  /// No description provided for @handoverReturnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Return code'**
+  String get handoverReturnTitle;
+
+  /// No description provided for @handoverInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this to the rental office. They scan the code or type the six digits, and your booking updates by itself.'**
+  String get handoverInstructions;
+
+  /// No description provided for @handoverValidFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid for {time}'**
+  String handoverValidFor(String time);
+
+  /// No description provided for @handoverExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This code has expired. Get a new one.'**
+  String get handoverExpired;
+
+  /// No description provided for @handoverNewCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Get a new code'**
+  String get handoverNewCode;
+
+  /// No description provided for @handoverPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Only show it at the counter. Getting a new code stops this one working.'**
+  String get handoverPrivacy;
+
+  /// No description provided for @handoverRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Handover recorded.'**
+  String get handoverRecorded;
+
+  /// No description provided for @handoverNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no handover code for this booking right now.'**
+  String get handoverNotAvailable;
+
   /// A kind this version of the app does not know. Better than an empty row.
   ///
   /// In en, this message translates to:

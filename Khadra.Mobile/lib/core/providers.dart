@@ -15,6 +15,8 @@ import 'config/app_environment.dart';
 import 'config/app_version.dart';
 import 'config/update_requirement.dart';
 import 'format/formats.dart';
+import 'push/push_coordinator.dart';
+import 'push/push_messaging.dart';
 import 'session/session_controller.dart';
 import 'session/session_store.dart';
 
@@ -90,17 +92,32 @@ final StateNotifierProvider<SessionController, SessionState> sessionProvider =
   return SessionController(
     api: ref.watch(apiProvider),
     store: ref.watch(sessionStoreProvider),
+    beforeSignOut: () => ref.read(pushCoordinatorProvider).signingOut(),
   );
+});
+
+// ── Push notifications ─────────────────────────────────────────────────────────
+
+/// The push platform. Firebase in the app; a fake in tests.
+final pushMessagingProvider = Provider<PushMessaging>((ref) => FirebasePushMessaging());
+
+/// This phone's push registration, for the life of the app. See [PushCoordinator].
+final pushCoordinatorProvider = Provider<PushCoordinator>((ref) {
+  final coordinator = PushCoordinator(
+    messaging: ref.watch(pushMessagingProvider),
+    api: () => ref.read(apiProvider),
+    appVersion: ref.read(installedAppVersionProvider),
+  );
+  ref.onDispose(coordinator.dispose);
+  return coordinator;
 });
 
 // ── Language ───────────────────────────────────────────────────────────────────
 
-/// The chosen language, remembered on the device.
-///
-/// A per-device convenience rather than an account setting: this platform has no
-/// `PreferredLanguage` on a user yet (pre-launch checklist item 40), so a customer
-/// who signs in on a second phone starts in that phone's language. Recorded rather
-/// than pretended otherwise.
+/// The chosen language, remembered on the device AND sent to the account (PUT /auth/me/language) by the
+/// push coordinator, so emails and reminders sent while the customer is away follow the
+/// same choice. A customer who signs in on a second phone still starts in that phone's
+/// language until they choose; the account then follows whichever phone chose last.
 class LocaleController extends StateNotifier<Locale?> {
   LocaleController(this._preferences) : super(_read(_preferences));
 

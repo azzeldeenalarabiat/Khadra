@@ -193,6 +193,7 @@ extension ApiFailureMessages on ApiFailure {
         'payments.not_live' =>
           l10n.bookingPaymentNotAvailableBody,
         'payments.provider_refused' => l10n.errorPaymentRefused,
+        'handover.not_available' => l10n.handoverNotAvailable,
 
         _ => null,
       };

@@ -25,6 +25,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications schedules with java.time, which needs desugaring below API 26.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -103,4 +105,16 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+}
+
+// Push notifications. Each environment is its OWN Firebase project (owner, 2026-09-23): the
+// production app's file goes in src/production/, the staging app's in src/staging/, and neither may
+// ever be the other's. The plugin is applied only once a file exists, so a checkout without Firebase
+// still builds; the app then runs with push switched off and says so in its log.
+if (listOf("production", "staging").any { file("src/$it/google-services.json").exists() }) {
+    apply(plugin = "com.google.gms.google-services")
 }

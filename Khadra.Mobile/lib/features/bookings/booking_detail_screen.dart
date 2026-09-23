@@ -20,6 +20,7 @@ import '../auth/auth_form_widgets.dart';
 import 'booking_providers.dart';
 import 'booking_timeline.dart';
 import 'checkout_screen.dart';
+import 'handover_code_screen.dart';
 import 'cancel_booking_sheet.dart';
 
 /// One booking, in full.
@@ -549,6 +550,10 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
 
 /// What a customer may do with this booking right now.
 ///
+/// (The handover code is the one control gated on the STATUS rather than on a server
+/// flag: the server issues a code for exactly Confirmed and PickedUp and refuses any
+/// other, so the two cannot disagree for longer than a refresh.)
+///
 /// Every button here is gated on a SERVER flag — `cancellation.canCancel`,
 /// `canBeDisputed`, `canBeReviewed` — rather than on a status the app interprets.
 /// A control that finds out it cannot work by being refused has already wasted the
@@ -564,6 +569,7 @@ class _Actions extends ConsumerWidget {
       booking.cancellation.canCancel ||
       booking.canReportNonDelivery ||
       booking.status == 'Confirmed' ||
+      booking.status == 'PickedUp' ||
       booking.liveDisputeId != null ||
       booking.canBeDisputed ||
       booking.canBeReviewed;
@@ -572,6 +578,20 @@ class _Actions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final actions = <Widget>[];
+
+    // The handover code: what the customer shows at the counter to collect the car, and
+    // again to give it back. First, because at the counter it is the only thing that matters.
+    // Offered for exactly the two statuses the server issues a code for.
+    if (booking.status == 'Confirmed' || booking.status == 'PickedUp') {
+      actions.add(
+        FilledButton.icon(
+          key: const ValueKey('handover-code-button'),
+          onPressed: () => _showHandoverCode(context, ref),
+          icon: const Icon(Icons.qr_code_2, size: 20),
+          label: Text(booking.status == 'Confirmed' ? l10n.handoverShowPickupCode : l10n.handoverShowReturnCode),
+        ),
+      );
+    }
 
     if (booking.cancellation.canCancel) {
       actions.add(
@@ -672,6 +692,15 @@ class _Actions extends ConsumerWidget {
           ),
       ],
     );
+  }
+
+  Future<void> _showHandoverCode(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
+    final handedOver = await HandoverCodeScreen.open(context, bookingId: booking.bookingId, status: booking.status);
+    // Re-read whatever happened: the handover may have been recorded while the code was up.
+    if (context.mounted) invalidateBookings(ref, bookingId: booking.bookingId);
+    if (handedOver) showKhadraMessageOn(messenger, l10n.handoverRecorded);
   }
 
   Future<void> _cancel(BuildContext context, WidgetRef ref) async {
