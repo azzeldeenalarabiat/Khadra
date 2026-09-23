@@ -1,0 +1,50 @@
+@let list = photos();
+<div class="gallery" tabindex="0" (keydown)="key($event)" [attr.aria-label]="i18n.t('car.photos')" role="region">
+  @if (current(); as photo) {
+    <div class="gallery__stage" (pointerdown)="pointerDown($event)" (pointerup)="pointerUp($event)">
+      <button type="button" class="gallery__open" (click)="open()"
+        [attr.aria-label]="i18n.t('car.openGallery', { index: index() + 1, count: list.length })">
+        <img [src]="photo" [alt]="alt()" width="1280" height="800" fetchpriority="high" decoding="async" draggable="false" />
+      </button>
+      @if (list.length > 1) {
+        <button type="button" class="gallery__nav gallery__nav--prev" (click)="go(-1)" [attr.aria-label]="i18n.t('car.previousPhoto')">
+          <kh-icon [name]="i18n.isArabic() ? 'caret-right' : 'caret-left'" /></button>
+        <button type="button" class="gallery__nav gallery__nav--next" (click)="go(1)" [attr.aria-label]="i18n.t('car.nextPhoto')">
+          <kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" /></button>
+        <span class="gallery__count" aria-live="polite">{{ i18n.t('car.photo', { index: index() + 1, count: list.length }) }}</span>
+      }
+    </div>
+    @if (list.length > 1) {
+      <div class="gallery__thumbs">
+        @for (thumb of list; track thumb; let i = $index) {
+          <button type="button" class="gallery__thumb" [class.is-active]="i === index()" [attr.aria-current]="i === index()"
+            [attr.aria-label]="i18n.t('car.photo', { index: i + 1, count: list.length })" (click)="show(i)">
+            <img [src]="thumb" alt="" loading="lazy" decoding="async" width="160" height="100" />
+          </button>
+        }
+      </div>
+    }
+  } @else {
+    <div class="gallery__stage gallery__stage--empty"><kh-icon name="car" /><span>{{ i18n.t('car.noPhoto') }}</span></div>
+  }
+</div>
+
+<dialog #viewer class="viewer" (keydown)="key($event)" [attr.aria-label]="i18n.t('car.photos')">
+  @if (current(); as photo) {
+    <div class="viewer__stage" (pointerdown)="pointerDown($event)" (pointerup)="pointerUp($event)">
+      <img [src]="photo" [alt]="alt()" draggable="false" />
+    </div>
+    <div class="viewer__bar">
+      <span>{{ i18n.t('car.photo', { index: index() + 1, count: list.length }) }}</span>
+      <div class="row">
+        @if (list.length > 1) {
+          <button type="button" class="icon-btn" (click)="go(-1)" [attr.aria-label]="i18n.t('car.previousPhoto')">
+            <kh-icon [name]="i18n.isArabic() ? 'caret-right' : 'caret-left'" /></button>
+          <button type="button" class="icon-btn" (click)="go(1)" [attr.aria-label]="i18n.t('car.nextPhoto')">
+            <kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" /></button>
+        }
+        <button type="button" class="icon-btn" (click)="close()" [attr.aria-label]="i18n.t('common.close')"><kh-icon name="x" /></button>
+      </div>
+    </div>
+  }
+</dialog>

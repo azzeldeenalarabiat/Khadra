@@ -1,0 +1,33 @@
+<section class="card card--pad handover" aria-labelledby="handover-title">
+  <div class="dialog__head">
+    <h2 id="handover-title" class="card__title">{{ i18n.t(isReturn() ? 'handover.returnTitle' : 'handover.pickupTitle') }}</h2>
+    <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="closed.emit()"><kh-icon name="x" /></button>
+  </div>
+
+  @if (unavailable()) {
+    <div class="notice"><kh-icon name="info" /><p>{{ i18n.t('handover.unavailable') }}</p></div>
+  } @else if (problem(); as failure) {
+    <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ failure.title && i18n.language() === 'en' ? failure.title : i18n.t('problem.unknown') }}</p></div>
+    <button type="button" class="btn btn--secondary" (click)="issue()">{{ i18n.t('common.retry') }}</button>
+  } @else if (code(); as current) {
+    <p class="muted small">{{ i18n.t('handover.intro') }}</p>
+    <div class="handover__code" [class.is-expired]="remaining()?.over">
+      @if (qr(); as image) {
+        <img class="handover__qr" [src]="image" [alt]="i18n.t('handover.qrAlt')" width="220" height="220" />
+      }
+      <p class="handover__digits ltr" aria-live="polite">{{ digits() }}</p>
+      @if (remaining()?.over) {
+        <p class="field__error">{{ i18n.t('handover.expired') }}</p>
+      } @else {
+        <p class="faint small">{{ i18n.t('handover.expiresIn', { time: clock() }) }}</p>
+      }
+    </div>
+    <div class="row">
+      <button type="button" class="btn btn--secondary btn--sm" [disabled]="busy()" (click)="issue()">
+        <kh-icon name="arrow-counter-clockwise" />{{ i18n.t('handover.new') }}</button>
+      <span class="faint small">{{ i18n.t('handover.replaces') }}</span>
+    </div>
+  } @else {
+    <div aria-busy="true"><div class="skeleton gallery-skeleton handover__skeleton"></div></div>
+  }
+</section>

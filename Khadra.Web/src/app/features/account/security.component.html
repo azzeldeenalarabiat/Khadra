@@ -1,0 +1,63 @@
+<section class="card card--pad" aria-labelledby="password-title">
+  <h2 id="password-title" class="card__title">{{ i18n.t('account.changePassword') }}</h2>
+  <p class="muted small">{{ i18n.t('account.changePasswordNote') }}</p>
+  <form class="stack account__form" (submit)="changePassword($event)" novalidate>
+    <label class="field">
+      <span class="field__label">{{ i18n.t('auth.currentPassword') }}</span>
+      <input class="input ltr" type="password" name="current" autocomplete="current-password" required
+        [ngModel]="current()" (ngModelChange)="current.set($event)" />
+    </label>
+    <label class="field">
+      <span class="field__label">{{ i18n.t('auth.newPassword') }}</span>
+      <input class="input ltr" type="password" name="next" autocomplete="new-password" required
+        [ngModel]="next()" (ngModelChange)="next.set($event)" />
+      @if (passwordHint()) { <span class="field__hint">{{ passwordHint() }}</span> }
+    </label>
+    <label class="field">
+      <span class="field__label">{{ i18n.t('auth.confirmPassword') }}</span>
+      <input class="input ltr" type="password" name="confirm" autocomplete="new-password"
+        [ngModel]="confirm()" (ngModelChange)="confirm.set($event)" [attr.aria-invalid]="mismatch()" />
+      @if (mismatch()) { <span class="field__error">{{ i18n.t('auth.passwordsDiffer') }}</span> }
+    </label>
+    @if (message(); as text) {
+      <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
+    }
+    @if (changed()) {
+      <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('account.passwordChanged') }}</p></div>
+    }
+    <div><button type="submit" class="btn btn--primary" [disabled]="busy()">{{ i18n.t('account.changePassword') }}</button></div>
+  </form>
+</section>
+
+<section class="card card--pad" aria-labelledby="sessions-title">
+  <h2 id="sessions-title" class="card__title">{{ i18n.t('account.sessions') }}</h2>
+  <p class="muted small">{{ i18n.t('account.sessionsNote') }}</p>
+  @if (revoked()) {
+    <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('account.revoked') }}</p></div>
+  }
+  @if (sessionsProblem(); as failure) {
+    <kh-state-panel kind="error" [compact]="true" [problem]="failure" (action)="sessions.reload()" />
+  } @else if (sessions.value()) {
+    <ul class="session-list">
+      @for (session of active(); track session.familyId) {
+        <li>
+          <kh-icon [name]="session.userAgent?.startsWith('Khadra (') ? 'device-mobile' : 'desktop'" />
+          <div>
+            <p><strong class="ltr">{{ device(session) }}</strong>
+              @if (session.isCurrent) { <span class="badge badge--ok">{{ i18n.t('account.thisDevice') }}</span> }</p>
+            <p class="faint small">{{ i18n.t('account.signedIn', { date: format.date(session.signedInAt) }) }}
+              @if (session.lastUsedAt) { · {{ i18n.t('account.lastUsed', { date: format.dateTime(session.lastUsedAt) }) }} }</p>
+          </div>
+          @if (!session.isCurrent) {
+            <button type="button" class="btn btn--danger btn--sm" [disabled]="revoking() === session.familyId" (click)="revoke(session)">
+              {{ i18n.t('account.revoke') }}</button>
+          }
+        </li>
+      } @empty {
+        <li class="muted">{{ i18n.t('account.noSessions') }}</li>
+      }
+    </ul>
+  } @else {
+    <div class="skeleton skeleton--text"></div>
+  }
+</section>

@@ -1,0 +1,107 @@
+<div class="container page">
+  <div class="page-head">
+    <div>
+      <h1>{{ i18n.t('cars.title') }}</h1>
+      <p class="results-summary">
+        <span><kh-icon name="map-pin" /> {{ cityLabel() }}</span>
+        <span><kh-icon name="calendar-blank" /> {{ periodLabel() }}</span>
+        @if (results.value(); as page) {
+          <strong>{{ i18n.t(hasDates() ? 'cars.availableCount' : 'cars.resultCount', { count: page.totalCount }) }}</strong>
+        }
+      </p>
+    </div>
+  </div>
+
+  <kh-search-form [value]="formValue()" [compact]="true" (submitted)="submitForm($event)" />
+
+  <div class="results-layout">
+    <aside class="results-layout__filters hide-md" [attr.aria-label]="i18n.t('cars.filters')">
+      <div class="card card--pad">
+        <div class="filters__head">
+          <h2 class="card__title">{{ i18n.t('cars.filters') }}</h2>
+          @if (filterCount() > 0) {
+            <button type="button" class="link small" (click)="clearFilters()">{{ i18n.t('cars.clearFilters') }}</button>
+          }
+        </div>
+        <kh-car-filters [search]="search()" [facets]="facets.value() ?? null" (changed)="update($event)" />
+      </div>
+    </aside>
+
+    <section class="results-layout__main" aria-live="polite">
+      <div class="results-toolbar">
+        <button type="button" class="btn btn--secondary btn--sm show-md" (click)="openFilters()">
+          <kh-icon name="sliders-horizontal" />
+          {{ filterCount() > 0 ? i18n.t('cars.filtersCount', { count: filterCount() }) : i18n.t('cars.filters') }}
+        </button>
+        <label class="results-toolbar__sort">
+          <span class="field__label">{{ i18n.t('cars.sort') }}</span>
+          <select class="select" (change)="setSort($any($event.target).value)">
+            @for (sort of sorts; track sort) {
+              <option [value]="sort" [selected]="search().sort === sort">{{ i18n.t($any('cars.sort.' + sort)) }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      @if (refusal(); as sentence) {
+        <div class="notice notice--warn" role="alert"><kh-icon name="warning" /><p>{{ sentence }}</p></div>
+      } @else if (problem(); as failure) {
+        <kh-state-panel kind="error" [problem]="failure" (action)="results.reload()" />
+      } @else if (results.value(); as page) {
+        @if (page.items.length === 0) {
+          @if (filterCount() > 0 || hasDates() || search().city) {
+            <kh-state-panel icon="list-magnifying-glass" [title]="i18n.t('cars.emptyTitle')" [text]="i18n.t('cars.emptyText')"
+              [actionLabel]="filterCount() > 0 ? i18n.t('cars.clearFilters') : null" (action)="clearFilters()" />
+          } @else {
+            <kh-state-panel icon="car" [title]="i18n.t('cars.noListingsTitle')" [text]="i18n.t('cars.noListingsText')" />
+          }
+        } @else {
+          <div class="grid-cards grid-cards--results" [class.is-refreshing]="results.isLoading()">
+            @for (car of page.items; track car.vehicleId; let index = $index) {
+              <kh-car-card [car]="car" [carry]="carry()" [eager]="index < 3" />
+            }
+          </div>
+          @if (page.totalPages > 1) {
+            <nav class="pager" [attr.aria-label]="i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages })">
+              @if (page.hasPrevious) {
+                <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page - 1)" rel="prev">
+                  <kh-icon [name]="i18n.isArabic() ? 'caret-right' : 'caret-left'" />{{ i18n.t('cars.previous') }}</a>
+              }
+              <span class="faint small">{{ i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages }) }}</span>
+              @if (page.hasNext) {
+                <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page + 1)" rel="next">
+                  {{ i18n.t('cars.next') }}<kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" /></a>
+              }
+            </nav>
+          }
+        }
+      } @else {
+        <div class="grid-cards grid-cards--results" aria-busy="true">
+          @for (index of skeletons; track index) {
+            <div class="car-card"><div class="skeleton skeleton--media"></div>
+              <div class="car-card__body"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div></div>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</div>
+
+<dialog #filtersDialog class="sheet" [attr.aria-label]="i18n.t('cars.filters')" (click)="$event.target === $any(filtersDialog) && closeFilters()">
+  <div class="sheet__body">
+    <div class="sheet__head">
+      <h2 class="card__title">{{ i18n.t('cars.filters') }}</h2>
+      <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('filter.close')" (click)="closeFilters()"><kh-icon name="x" /></button>
+    </div>
+    <kh-car-filters [search]="search()" [facets]="facets.value() ?? null" (changed)="update($event)" />
+  </div>
+  <div class="sheet__foot">
+    @if (filterCount() > 0) {
+      <button type="button" class="btn btn--ghost" (click)="clearFilters()">{{ i18n.t('cars.clearFilters') }}</button>
+    }
+    <button type="button" class="btn btn--primary" (click)="closeFilters()">
+      {{ i18n.t('cars.showResults') }}
+      @if (results.value(); as page) { ({{ format.number(page.totalCount) }}) }
+    </button>
+  </div>
+</dialog>

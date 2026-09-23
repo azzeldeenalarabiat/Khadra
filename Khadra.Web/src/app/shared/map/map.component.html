@@ -1,0 +1,6 @@
+<div class="map" [class.map--pickable]="pickable()">
+  <div #canvas class="map__canvas" role="application" [attr.aria-label]="label() || i18n.t('office.location')"></div>
+  @if (!ready()) {
+    <div class="map__placeholder skeleton" aria-hidden="true"></div>
+  }
+</div>

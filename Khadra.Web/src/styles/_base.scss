@@ -1,0 +1,163 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: calc(var(--header-h) + var(--s-4));
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+kh-root,
+kh-site-shell {
+  display: contents;
+}
+
+// Arabic: no tracking (it breaks joined letterforms) and a little more line height for Kufi's tall glyphs.
+:lang(ar) {
+  letter-spacing: 0 !important;
+}
+:lang(ar) body {
+  line-height: 1.65;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(24px, 3.2vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+h2 {
+  font-size: clamp(19px, 2.2vw, 24px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 800;
+}
+h4 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  max-inline-size: 100%;
+  display: block;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+  border-radius: var(--r-pill);
+}
+
+.sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: var(--s-3);
+  inset-block-start: -100px;
+  z-index: 100;
+  background: var(--text);
+  color: var(--on-brand);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--r-pill);
+  &:focus {
+    inset-block-start: var(--s-3);
+  }
+}
+
+// Text a person typed or a Latin run inside Arabic: isolated so it cannot reorder the sentence around it.
+.user-text {
+  unicode-bidi: isolate;
+}
+.ltr {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+.faint {
+  color: var(--text-faint);
+}
+.small {
+  font-size: 13px;
+}
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+// Icons inherit colour and size from their text.
+kh-icon {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+  font-size: 1.15em;
+  .icon {
+    display: inline-flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

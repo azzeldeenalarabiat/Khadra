@@ -1,0 +1,151 @@
+@if (notFound()) {
+  <section class="container page page--narrow">
+    <kh-state-panel icon="storefront" [title]="i18n.t('notFound.title')" [text]="i18n.t('notFound.text')">
+      <div class="row-actions"><a class="btn btn--primary" [routerLink]="i18n.link('dealers')">{{ i18n.t('nav.offices') }}</a></div>
+    </kh-state-panel>
+  </section>
+} @else if (problem(); as failure) {
+  <section class="container page page--narrow"><kh-state-panel kind="error" [problem]="failure" (action)="office.reload()" /></section>
+} @else if (office.value(); as o) {
+  <div class="office-hero" [class.office-hero--cover]="!!o.coverUrl">
+    @if (o.coverUrl) {
+      <img class="office-hero__cover" [src]="o.coverUrl" alt="" fetchpriority="high" />
+    }
+  </div>
+  <div class="container page office-page">
+    <header class="office-head card card--pad">
+      <span class="office-head__logo">
+        @if (o.logoUrl) {
+          <img [src]="o.logoUrl" alt="" width="80" height="80" />
+        } @else {
+          <kh-icon name="storefront" />
+        }
+      </span>
+      <div class="office-head__body">
+        <h1 class="user-text">{{ o.businessName }}</h1>
+        <p class="muted row">
+          @if (city()) { <span><kh-icon name="map-pin" /> {{ city() }}</span> }
+          @if (o.address) { <span class="user-text">{{ o.address.area }}@if (o.address.street) {, {{ o.address.street }}}</span> }
+        </p>
+        <p class="row">
+          @if (o.averageRating !== null) {
+            <span class="rating"><kh-icon name="star-fill" />{{ format.number(o.averageRating, 1) }}</span>
+            <span class="faint small">{{ i18n.t('office.reviewCount', { count: o.reviewCount }) }}</span>
+          } @else {
+            <span class="faint small">{{ i18n.t('office.notRated') }}</span>
+          }
+          @if (o.delivery.isEnabled) {
+            <span class="badge badge--ok"><kh-icon name="truck" />{{ i18n.t('office.deliveryOfferedShort') }}</span>
+          }
+        </p>
+      </div>
+    </header>
+
+    <nav class="tabs office-tabs" [attr.aria-label]="i18n.t('office.title')">
+      <a href="#cars" class="is-active">{{ i18n.t('office.cars') }}</a>
+      @for (section of sections(); track section.id) {
+        <a [href]="'#' + section.id">{{ i18n.t(section.title) }}</a>
+      }
+      <a href="#hours">{{ i18n.t('office.hours') }}</a>
+      <a href="#location">{{ i18n.t('office.location') }}</a>
+      <a href="#reviews">{{ i18n.t('office.reviews') }}</a>
+    </nav>
+
+    <div class="office-page__layout">
+      <div class="office-page__main">
+        <section id="cars" aria-labelledby="cars-title">
+          <div class="section-head">
+            <h2 id="cars-title">{{ i18n.t('office.cars') }}</h2>
+            @if ((cars.value()?.totalCount ?? 0) > (cars.value()?.items?.length ?? 0)) {
+              <a [routerLink]="i18n.link('cars')" [queryParams]="{ dealer: o.dealerId }">{{ i18n.t('common.viewAll') }}</a>
+            }
+          </div>
+          @if (carsProblem(); as failure) {
+            <kh-state-panel kind="error" [compact]="true" [problem]="failure" (action)="cars.reload()" />
+          } @else if (cars.value(); as page) {
+            @if (page.items.length === 0) {
+              <kh-state-panel icon="car" [compact]="true" [title]="i18n.t('office.noCarsTitle')" [text]="i18n.t('office.noCarsText')" />
+            } @else {
+              <div class="grid-cards">
+                @for (car of page.items; track car.vehicleId) {
+                  <kh-car-card [car]="car" />
+                }
+              </div>
+            }
+          } @else {
+            <div class="grid-cards" aria-busy="true">
+              @for (index of skeletons; track index) {
+                <div class="car-card"><div class="skeleton skeleton--media"></div><div class="car-card__body"><div class="skeleton skeleton--title"></div></div></div>
+              }
+            </div>
+          }
+        </section>
+
+        @for (section of sections(); track section.id) {
+          <section class="card card--pad" [id]="section.id">
+            <h2 class="card__title">{{ i18n.t(section.title) }}</h2>
+            <kh-office-text [text]="section.text" />
+          </section>
+        }
+        @if (sections().length > 0) {
+          <p class="faint small">{{ i18n.t('car.officeOwnWords') }}</p>
+        }
+
+        <section class="card card--pad" id="reviews" aria-labelledby="reviews-title">
+          <h2 id="reviews-title" class="card__title">{{ i18n.t('office.reviews') }}</h2>
+          @if (reviews.value(); as page) {
+            @if (page.items.length === 0) {
+              <p class="muted">{{ i18n.t('office.noReviews') }}</p>
+            } @else {
+              <ul class="reviews">
+                @for (review of page.items; track review.reviewId) {
+                  <li>
+                    <p class="row"><span class="rating"><kh-icon name="star-fill" />{{ format.number(review.rating) }}</span>
+                      <span class="faint small">{{ format.date(review.createdAt) }}</span></p>
+                    @if (review.isHidden) {
+                      <p class="faint small">{{ i18n.t('office.reviewHidden') }}</p>
+                    } @else if (review.comment) {
+                      <p class="user-text" dir="auto">{{ review.comment }}</p>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          } @else if (reviews.error()) {
+            <kh-state-panel kind="error" [compact]="true" (action)="reviews.reload()" />
+          } @else {
+            <div class="skeleton skeleton--text"></div>
+          }
+        </section>
+      </div>
+
+      <aside class="office-page__aside">
+        <section class="card card--pad" id="hours" aria-labelledby="hours-title">
+          <h2 id="hours-title" class="card__title">{{ i18n.t('office.hours') }}</h2>
+          <kh-opening-hours [days]="o.operatingHours" />
+        </section>
+        <section class="card card--pad" aria-labelledby="delivery-title">
+          <h2 id="delivery-title" class="card__title">{{ i18n.t('office.delivery') }}</h2>
+          <p class="muted">
+            @if (o.delivery.isEnabled) {
+              {{ i18n.t('office.deliveryOffered', { radius: format.number(o.delivery.radiusKm), fee: format.money(o.delivery.fee) }) }}
+            } @else {
+              {{ i18n.t('office.deliveryNotOffered') }}
+            }
+          </p>
+        </section>
+        <section class="card card--pad" id="location" aria-labelledby="location-title">
+          <h2 id="location-title" class="card__title">{{ i18n.t('office.location') }}</h2>
+          <kh-map [latitude]="o.latitude" [longitude]="o.longitude" [radiusKm]="o.delivery.isEnabled ? o.delivery.radiusKm : null" [label]="o.businessName" />
+          @if (mapsUrl(); as url) {
+            <a class="link small" [href]="url" target="_blank" rel="noopener noreferrer">{{ i18n.t('office.openInMaps') }}</a>
+          }
+        </section>
+      </aside>
+    </div>
+  </div>
+} @else {
+  <div class="container page" aria-busy="true">
+    <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+  </div>
+}

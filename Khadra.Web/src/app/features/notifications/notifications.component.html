@@ -1,0 +1,43 @@
+<div class="container page page--medium">
+  <div class="page-head">
+    <div>
+      <h1>{{ i18n.t('notifications.title') }}</h1>
+      @if (unread() > 0) { <p>{{ i18n.t('notifications.unread', { count: unread() }) }}</p> }
+    </div>
+    @if (unread() > 0) {
+      <button type="button" class="btn btn--secondary btn--sm" (click)="markAll()">{{ i18n.t('notifications.markAll') }}</button>
+    }
+  </div>
+
+  @if (problem() && !loaded()) {
+    <kh-state-panel kind="error" [problem]="problem()" (action)="retry()" />
+  } @else if (loaded()) {
+    @if (items().length === 0) {
+      <kh-state-panel icon="bell" [title]="i18n.t('notifications.emptyTitle')" [text]="i18n.t('notifications.emptyText')" />
+    } @else {
+      <ul class="notification-list card">
+        @for (item of items(); track item.notificationId) {
+          <li>
+            <button type="button" class="notification" [class.is-unread]="!item.isRead" (click)="open(item)">
+              <span class="notification__dot" aria-hidden="true"></span>
+              <span class="notification__body">
+                <span class="notification__text">{{ text(item) }}</span>
+                <span class="faint small">
+                  @if (about(item)) { <span class="ltr-inline">{{ about(item) }}</span> · }
+                  {{ format.dateTime(item.occurredAt) }}</span>
+              </span>
+              @if (item.subjectId && item.kind !== 'YourDisputeUpdated') {
+                <kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" />
+              }
+            </button>
+          </li>
+        }
+      </ul>
+      @if (hasMore()) {
+        <div class="pager"><button type="button" class="btn btn--secondary btn--sm" [disabled]="loading()" (click)="more()">{{ i18n.t('notifications.more') }}</button></div>
+      }
+    }
+  } @else {
+    <div class="card card--pad" aria-busy="true"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div></div>
+  }
+</div>

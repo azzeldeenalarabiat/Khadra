@@ -1,0 +1,6 @@
+@if (session.isResolved()) {
+  <button type="button" class="save-btn" [class.is-saved]="saved()" [attr.aria-pressed]="saved()"
+    [disabled]="busy()" [attr.aria-label]="i18n.t(saved() ? 'car.unsave' : 'car.save')" (click)="toggle($event)">
+    <kh-icon [name]="saved() ? 'heart-fill' : 'heart'" />
+  </button>
+}

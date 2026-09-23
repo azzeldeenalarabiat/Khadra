@@ -1,0 +1,77 @@
+<div class="container page">
+  <div class="page-head"><h1>{{ i18n.t('bookings.title') }}</h1></div>
+
+  @if (next.value(); as upcoming) {
+    <a class="next-booking card" [routerLink]="i18n.link('bookings', upcoming.booking.bookingId)">
+      <span class="badge badge--dark">{{ nextLabel(upcoming.reason) }}</span>
+      <span class="next-booking__car"><span class="ltr">{{ upcoming.booking.vehicle?.make }} {{ upcoming.booking.vehicle?.model }}</span>
+        · <span class="user-text">{{ upcoming.booking.dealerName }}</span></span>
+      <span class="faint small">{{ format.dateTime(upcoming.booking.periodStart) }}</span>
+      <kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" />
+    </a>
+  }
+
+  <nav class="tabs" role="tablist" [attr.aria-label]="i18n.t('bookings.title')">
+    @for (item of tabs; track item) {
+      <a role="tab" [routerLink]="[]" [queryParams]="item === 'all' ? {} : { tab: item }" [attr.aria-selected]="tab() === item">
+        {{ tabLabel(item) }}
+        @if (counts.value()?.[item]; as count) { <span class="tabs__count">{{ format.number(count) }}</span> }
+      </a>
+    }
+  </nav>
+
+  @if (problem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="bookings.reload()" />
+  } @else if (bookings.value(); as page) {
+    @if (page.items.length === 0) {
+      @if (hasAny() && tab() !== 'all') {
+        <kh-state-panel icon="tray" [title]="i18n.t('bookings.emptyTabTitle')" [text]="i18n.t('bookings.emptyTabText')" />
+      } @else {
+        <kh-state-panel icon="calendar-blank" [title]="i18n.t('bookings.emptyTitle')" [text]="i18n.t('bookings.emptyText')">
+          <div class="row-actions"><a class="btn btn--primary" [routerLink]="i18n.link('cars')">{{ i18n.t('bookings.emptyAction') }}</a></div>
+        </kh-state-panel>
+      }
+    } @else {
+      <ul class="booking-list">
+        @for (item of page.items; track item.bookingId) {
+          <li>
+            <a class="booking-row card" [routerLink]="i18n.link('bookings', item.bookingId)">
+              <span class="booking-row__photo">
+                @if (item.vehicle?.coverImageUrl) { <img [src]="item.vehicle!.coverImageUrl" alt="" width="120" height="75" loading="lazy" /> }
+                @else { <kh-icon name="car" /> }
+              </span>
+              <span class="booking-row__body">
+                <span class="booking-row__title">
+                  @if (item.vehicle) { <span class="ltr">{{ item.vehicle.make }} {{ item.vehicle.model }} {{ item.vehicle.year }}</span> }
+                  <span class="badge {{ tone(item.status) }}">{{ status(item.status) }}</span>
+                  @if (item.hasLiveDispute) { <span class="badge badge--bad">{{ i18n.t('bookings.dispute') }}</span> }
+                </span>
+                <span class="faint small">{{ i18n.t('booking.reference') }} <span class="ltr">{{ item.reference }}</span> ·
+                  <span class="user-text">{{ item.dealerRemoved ? i18n.t('booking.officeRemoved') : item.dealerName }}</span></span>
+                <span class="small">{{ format.dateTime(item.periodStart) }} → {{ format.dateTime(item.periodEnd) }}
+                  · {{ i18n.t('booking.days', { count: item.days }) }}</span>
+              </span>
+              <span class="booking-row__price">{{ total(item) }}</span>
+            </a>
+          </li>
+        }
+      </ul>
+      @if (page.totalPages > 1) {
+        <nav class="pager" [attr.aria-label]="i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages })">
+          @if (page.hasPrevious) {
+            <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page - 1)">{{ i18n.t('cars.previous') }}</a>
+          }
+          <span class="faint small">{{ i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages }) }}</span>
+          @if (page.hasNext) {
+            <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page + 1)">{{ i18n.t('cars.next') }}</a>
+          }
+        </nav>
+      }
+    }
+  } @else {
+    <div class="stack" aria-busy="true">
+      <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+      <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+    </div>
+  }
+</div>

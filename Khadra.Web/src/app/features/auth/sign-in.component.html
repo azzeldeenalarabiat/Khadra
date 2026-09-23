@@ -1,0 +1,47 @@
+<section class="container page page--narrow auth">
+  <div class="card card--pad auth__card">
+    <h1>{{ i18n.t('signIn.title') }}</h1>
+    <p class="muted">{{ i18n.t('signIn.subtitle') }}</p>
+
+    @if (sessionEnded()) {
+      <div class="notice notice--warn" role="status"><kh-icon name="clock" /><p>{{ i18n.t('signIn.sessionEnded') }}</p></div>
+    }
+
+    <form class="stack" (submit)="submit($event)" novalidate>
+      <label class="field">
+        <span class="field__label">{{ i18n.t('auth.email') }}</span>
+        <input class="input ltr" type="email" name="email" autocomplete="email" inputmode="email" required
+          [ngModel]="email()" (ngModelChange)="email.set($event)" [attr.aria-invalid]="failure()?.kind === 'invalid-credentials'" />
+      </label>
+      <label class="field">
+        <span class="field__label">{{ i18n.t('auth.password') }}</span>
+        <span class="input-group">
+          <input class="input ltr" [type]="reveal() ? 'text' : 'password'" name="password" autocomplete="current-password" required
+            [ngModel]="password()" (ngModelChange)="password.set($event)" [attr.aria-invalid]="failure()?.kind === 'invalid-credentials'" />
+          <button type="button" class="input-group__btn" (click)="reveal.set(!reveal())" [attr.aria-pressed]="reveal()">
+            {{ i18n.t(reveal() ? 'auth.hide' : 'auth.show') }}</button>
+        </span>
+      </label>
+
+      @if (message(); as text) {
+        <div class="notice notice--bad" role="alert">
+          <kh-icon name="warning-circle" />
+          <div>
+            <p>{{ text }}</p>
+            @if (failure()?.kind === 'email-not-verified') {
+              <a class="link" [routerLink]="i18n.link('verify-email')" [queryParams]="{ email: email() }">{{ i18n.t('signIn.unverifiedAction') }}</a>
+            }
+          </div>
+        </div>
+      }
+
+      <button type="submit" class="btn btn--primary btn--block" [disabled]="busy()">{{ i18n.t('signIn.submit') }}</button>
+    </form>
+
+    <div class="auth__links">
+      <a class="link" [routerLink]="i18n.link('forgot-password')">{{ i18n.t('signIn.forgot') }}</a>
+      <span class="muted">{{ i18n.t('signIn.noAccount') }}
+        <a class="link" [routerLink]="i18n.link('register')" [queryParams]="{ returnUrl: returnUrl() }">{{ i18n.t('signIn.create') }}</a></span>
+    </div>
+  </div>
+</section>

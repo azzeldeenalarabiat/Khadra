@@ -1,0 +1,52 @@
+<section class="container page page--narrow auth">
+  <div class="card card--pad auth__card">
+    @switch (state()) {
+      @case ('working') {
+        <div class="state state--plain" aria-busy="true">
+          <span class="state__icon"><kh-icon name="clock" /></span>
+          <h1 class="state__title">{{ i18n.t('verify.working') }}</h1>
+        </div>
+      }
+      @case ('verified') {
+        <div class="state state--plain">
+          <span class="state__icon state__icon--ok"><kh-icon name="check-circle" /></span>
+          <h1 class="state__title">{{ i18n.t('verify.doneTitle') }}</h1>
+          <p class="state__text">{{ i18n.t('verify.doneText') }}</p>
+          <div class="row-actions">
+            <a class="btn btn--primary" [routerLink]="i18n.link('login')">{{ i18n.t('signIn.submit') }}</a>
+            <a class="btn btn--secondary" [routerLink]="i18n.link('cars')">{{ i18n.t('notFound.cars') }}</a>
+          </div>
+        </div>
+      }
+      @case ('failed') {
+        <div class="state state--plain state--error">
+          <span class="state__icon"><kh-icon name="warning-circle" /></span>
+          <h1 class="state__title">{{ i18n.t('verify.failedTitle') }}</h1>
+          <p class="state__text">{{ i18n.t('verify.failedText') }}</p>
+        </div>
+      }
+      @default {
+        <h1>{{ i18n.t('verify.title') }}</h1>
+      }
+    }
+
+    @if (state() !== 'verified' && state() !== 'working') {
+      <form class="stack auth__resend" (submit)="resend($event)" novalidate>
+        <h2 class="card__title">{{ i18n.t('verify.resendTitle') }}</h2>
+        <p class="muted">{{ i18n.t('verify.resendText') }}</p>
+        <label class="field">
+          <span class="field__label">{{ i18n.t('auth.email') }}</span>
+          <input class="input ltr" type="email" name="email" autocomplete="email" inputmode="email" required
+            [ngModel]="email()" (ngModelChange)="email.set($event)" />
+        </label>
+        @if (resent()) {
+          <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('verify.resent') }}</p></div>
+        }
+        @if (resendMessage(); as text) {
+          <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
+        }
+        <button type="submit" class="btn btn--primary btn--block" [disabled]="resendBusy()">{{ i18n.t('verify.resend') }}</button>
+      </form>
+    }
+  </div>
+</section>

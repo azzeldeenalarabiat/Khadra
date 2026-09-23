@@ -1,0 +1,44 @@
+@let c = car();
+<article class="car-card">
+  <a class="car-card__media" [routerLink]="link()" [queryParams]="carry()" tabindex="-1" aria-hidden="true">
+    @if (c.coverImageUrl) {
+      <img [src]="c.coverImageUrl" [alt]="''" [attr.loading]="eager() ? 'eager' : 'lazy'" decoding="async" width="640" height="400" />
+    } @else {
+      <span class="car-card__placeholder"><kh-icon name="car" /><span>{{ i18n.t('car.noPhoto') }}</span></span>
+    }
+  </a>
+  <div class="car-card__save"><kh-save-button [vehicleId]="c.vehicleId" /></div>
+  @if (c.isDeliveryAvailable) {
+    <span class="car-card__badge badge badge--ok"><kh-icon name="truck" />{{ i18n.t('car.delivery') }}</span>
+  }
+  <div class="car-card__body">
+    <h3 class="car-card__title">
+      <a [routerLink]="link()" [queryParams]="carry()"><span class="ltr">{{ c.make }} {{ c.model }}</span></a>
+    </h3>
+    <p class="car-card__sub faint">
+      <span class="ltr">{{ c.year }}</span>
+      @if (c.carType) {
+        · {{ i18n.isArabic() ? (c.carType.nameAr || c.carType.nameEn) : (c.carType.nameEn || c.carType.nameAr) }}
+      }
+    </p>
+    <ul class="car-card__facts">
+      <li><kh-icon name="steering-wheel" />{{ transmission() }}</li>
+      <li><kh-icon name="gas-pump" />{{ fuel() }}</li>
+      <li><kh-icon name="seat" />{{ i18n.t('car.seats', { count: c.seats }) }}</li>
+    </ul>
+    <div class="car-card__foot">
+      <div class="car-card__office">
+        <span class="user-text">{{ c.gallery.businessName }}</span>
+        @if (city()) {
+          <span class="faint"> · {{ city() }}</span>
+        }
+        @if (c.gallery.averageRating !== null) {
+          <span class="rating" [attr.aria-label]="i18n.t('car.officeRating', { rating: c.gallery.averageRating })">
+            <kh-icon name="star-fill" />{{ format.number(c.gallery.averageRating, 1) }}
+          </span>
+        }
+      </div>
+      <p class="car-card__price"><strong>{{ i18n.t('car.perDay', { amount: format.money(c.dailyRate) }) }}</strong></p>
+    </div>
+  </div>
+</article>

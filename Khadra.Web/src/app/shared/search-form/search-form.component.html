@@ -1,0 +1,60 @@
+<form class="search-card" [class.search-card--compact]="compact()" (submit)="submit($event)" novalidate
+  [attr.aria-label]="i18n.t('search.title')">
+  <div class="search-card__grid">
+    <label class="field search-card__city">
+      <span class="field__label">{{ i18n.t('search.city') }}</span>
+      <select class="select" name="city" [ngModel]="city()" (ngModelChange)="city.set($event)">
+        <option value="">{{ i18n.t('search.anyCity') }}</option>
+        @for (entry of lookups.activeCities(); track entry.id) {
+          <option [value]="entry.id">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
+        }
+      </select>
+    </label>
+
+    <fieldset class="search-card__when">
+      <legend class="sr-only">{{ i18n.t('search.pickupDate') }}</legend>
+      <label class="field">
+        <span class="field__label">{{ i18n.t('search.pickupDate') }}</span>
+        <input class="input" type="date" name="fromDate" [min]="bounds()?.min ?? ''" [max]="bounds()?.max ?? ''"
+          [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" [attr.aria-invalid]="problem() !== null" />
+      </label>
+      <label class="field">
+        <span class="field__label">{{ i18n.t('search.pickupTime') }}</span>
+        <input class="input" type="time" name="fromTime" step="900" [ngModel]="fromTime()" (ngModelChange)="fromTime.set($event)"
+          [attr.aria-invalid]="problem() !== null" />
+      </label>
+    </fieldset>
+
+    <fieldset class="search-card__when">
+      <legend class="sr-only">{{ i18n.t('search.returnDate') }}</legend>
+      <label class="field">
+        <span class="field__label">{{ i18n.t('search.returnDate') }}</span>
+        <input class="input" type="date" name="toDate" [min]="fromDate() || (bounds()?.min ?? '')" [max]="bounds()?.max ?? ''"
+          [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" [attr.aria-invalid]="problem() !== null" />
+      </label>
+      <label class="field">
+        <span class="field__label">{{ i18n.t('search.returnTime') }}</span>
+        <input class="input" type="time" name="toTime" step="900" [ngModel]="toTime()" (ngModelChange)="toTime.set($event)"
+          [attr.aria-invalid]="problem() !== null" />
+      </label>
+    </fieldset>
+
+    <label class="field search-card__text">
+      <span class="field__label">{{ i18n.t('search.text') }}</span>
+      <input class="input" type="search" name="q" maxlength="80" [placeholder]="i18n.t('search.textPlaceholder')"
+        [ngModel]="text()" (ngModelChange)="text.set($event)" />
+    </label>
+
+    <button type="submit" class="btn btn--primary search-card__submit">
+      <kh-icon name="magnifying-glass" />{{ i18n.t(submitLabel()) }}
+    </button>
+  </div>
+
+  @if (problem(); as issue) {
+    <p class="field__error" role="alert">
+      {{ i18n.t(issue === 'incomplete' ? 'search.datesIncomplete' : 'search.returnBeforePickup') }}
+    </p>
+  } @else if (!compact()) {
+    <p class="field__hint">{{ i18n.t('search.datesHint') }}</p>
+  }
+</form>

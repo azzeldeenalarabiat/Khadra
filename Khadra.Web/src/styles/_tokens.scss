@@ -1,0 +1,81 @@
+// The customer design handoff, as the app carries it in Khadra.Mobile/lib/core/theme/khadra_theme.dart
+// (the visual source of truth for customer surfaces, owner 2026-09-11) — NOT the console's tokens.
+// Nothing outside this file names a colour, a radius or a shadow.
+
+:root {
+  // Base
+  --bg: #f6f7f6;
+  --surface: #ffffff;
+  --text: #111827;
+  --text-muted: #4b5563;
+  --text-faint: #6b7280;
+  --divider: #eceeec;
+  --image-placeholder: #eef0ef;
+
+  // Brand: green for primary actions and status only, never as a page background.
+  --accent: #15803d;
+  --accent-bright: #16a34a;
+  --accent-100: #f0fdf4;
+  --accent-200: #dcfce7;
+  --accent-300: #bbf7d0;
+  --accent-900: #14532d;
+  --brand-deep: #0b3b20;
+  --price: #14532d;
+  --on-brand: #ffffff;
+
+  // Neutrals
+  --n-100: #f4f6f4;
+  --n-200: #e8eae9;
+  --n-300: #e2e5e3;
+  --n-400: #d1d5db;
+  --n-500: #9ca3af;
+  --n-600: #6b7280;
+  --n-700: #4b5563;
+  --n-800: #374151;
+  --n-900: #111827;
+
+  // Status
+  --ok: #15803d;
+  --ok-tint: #f0fdf4;
+  --warn: #b45309;
+  --warn-tint: #fffbeb;
+  --warn-border: #fde68a;
+  --bad: #dc2626;
+  --bad-strong: #991b1b;
+  --bad-tint: #fee2e2;
+  --bad-border: #fecaca;
+  --star: #f59e0b;
+  --scrim: rgb(17 24 39 / 45%);
+
+  // Radii by role (no fully round corners anywhere, as in the app)
+  --r-pill: 8px;
+  --r-chip: 10px;
+  --r-field: 12px;
+  --r-button: 13px;
+  --r-row: 14px;
+  --r-card: 16px;
+  --r-feature: 18px;
+  --r-sheet: 22px;
+
+  // One restrained shadow, as in the app; a second, softer lift for floating panels only.
+  --shadow-card: 0 1px 2px rgb(17 24 39 / 4%);
+  --shadow-float: 0 8px 28px rgb(17 24 39 / 10%);
+
+  // Spacing
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --container: 1200px;
+  --header-h: 64px;
+  --focus: 0 0 0 3px rgb(22 163 74 / 35%);
+
+  // Manrope has no Arabic glyphs, so Arabic always falls through to Noto Kufi Arabic, while digits and
+  // Latin stay in Manrope. The ORDER is the app's and is load-bearing: Kufi carries Latin too.
+  --font: 'Manrope', 'Noto Kufi Arabic', 'SF Arabic', 'Geeza Pro', 'Segoe UI', 'Noto Sans Arabic', Tahoma, system-ui, sans-serif;
+}

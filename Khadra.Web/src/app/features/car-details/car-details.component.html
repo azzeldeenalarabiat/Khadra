@@ -1,0 +1,204 @@
+@if (notFound()) {
+  <section class="container page page--narrow">
+    <kh-state-panel icon="car" [title]="i18n.t('car.notFoundTitle')" [text]="i18n.t('car.notFoundText')">
+      <div class="row-actions"><a class="btn btn--primary" [routerLink]="i18n.link('cars')">{{ i18n.t('notFound.cars') }}</a></div>
+    </kh-state-panel>
+  </section>
+} @else if (problem(); as failure) {
+  <section class="container page page--narrow">
+    <kh-state-panel kind="error" [problem]="failure" (action)="car.reload()" />
+  </section>
+} @else if (car.value(); as c) {
+  <div class="container page car-page">
+    <nav class="crumbs small" aria-label="breadcrumb">
+      <a [routerLink]="i18n.link('cars')">{{ i18n.t('nav.cars') }}</a>
+      <kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" />
+      <span aria-current="page" class="ltr">{{ c.make }} {{ c.model }}</span>
+    </nav>
+
+    <div class="car-page__layout">
+      <div class="car-page__main">
+        <kh-photo-gallery [photos]="c.imageUrls" [alt]="name()" />
+
+        <header class="car-page__head">
+          <div>
+            <h1><span class="ltr">{{ c.make }} {{ c.model }}</span> <span class="faint ltr car-page__year">{{ c.year }}</span></h1>
+            <p class="muted">
+              @if (carType()) { {{ carType() }} · }
+              <a class="link" [routerLink]="officeLink()"><span class="user-text">{{ c.gallery.businessName }}</span></a>
+              @if (city()) { · {{ city() }} }
+            </p>
+          </div>
+          <kh-save-button [vehicleId]="c.vehicleId" />
+        </header>
+
+        <section class="card card--pad" aria-labelledby="specs">
+          <h2 id="specs" class="card__title">{{ i18n.t('car.specs') }}</h2>
+          <dl class="facts">
+            <div class="fact"><kh-icon name="calendar-blank" /><div><dt>{{ i18n.t('car.year') }}</dt><dd class="ltr">{{ c.year }}</dd></div></div>
+            @if (carType()) {
+              <div class="fact"><kh-icon name="car-simple" /><div><dt>{{ i18n.t('car.type') }}</dt><dd>{{ carType() }}</dd></div></div>
+            }
+            <div class="fact"><kh-icon name="steering-wheel" /><div><dt>{{ i18n.t('car.transmission') }}</dt><dd>{{ transmission() }}</dd></div></div>
+            <div class="fact"><kh-icon name="gas-pump" /><div><dt>{{ i18n.t('car.fuel') }}</dt><dd>{{ fuel() }}</dd></div></div>
+            <div class="fact"><kh-icon name="seat" /><div><dt>{{ i18n.t('car.seatsLabel') }}</dt><dd>{{ format.number(c.seats) }}</dd></div></div>
+            @if (c.color) {
+              <div class="fact"><kh-icon name="image" /><div><dt>{{ i18n.t('car.colour') }}</dt><dd class="user-text">{{ c.color }}</dd></div></div>
+            }
+          </dl>
+        </section>
+
+        @if (c.description) {
+          <section class="card card--pad" aria-labelledby="about">
+            <h2 id="about" class="card__title">{{ i18n.t('car.about') }}</h2>
+            <kh-office-text [text]="c.description" />
+          </section>
+        }
+
+        <section class="card card--pad" aria-labelledby="policies">
+          <h2 id="policies" class="card__title">{{ i18n.t('car.rentalTerms') }}</h2>
+          <dl class="lines">
+            <div><dt>{{ i18n.t('car.mileage') }}</dt>
+              <dd>
+                @if (c.mileage.isUnlimited) {
+                  {{ i18n.t('car.mileageUnlimited') }}
+                } @else {
+                  {{ i18n.t('car.mileageLimited', { limit: format.number(c.mileage.dailyLimitKm ?? 0) }) }}
+                  @if (c.mileage.excessFeePerKm) {
+                    <span class="faint small d-block">{{ i18n.t('car.mileageExcess', { amount: format.money(c.mileage.excessFeePerKm) }) }}</span>
+                  }
+                }
+              </dd>
+            </div>
+            <div><dt>{{ i18n.t('car.fuelPolicy') }}</dt><dd>{{ fuelPolicy(c.fuelPolicy) }}</dd></div>
+            <div><dt>{{ i18n.t('car.securityDeposit') }}</dt>
+              <dd>{{ format.money(c.securityDeposit) }}<span class="faint small d-block">{{ i18n.t('car.securityDepositHelp') }}</span></dd></div>
+          </dl>
+        </section>
+
+        @if (office.value(); as page) {
+          @let sections = page.sections;
+          @if (sections.rentalConditions || sections.insurance || sections.pickupInstructions || (c.isDeliveryEligible && page.delivery.isEnabled && sections.deliveryNotes)) {
+            <section class="card card--pad" aria-labelledby="from-office">
+              <h2 id="from-office" class="card__title">{{ i18n.t('car.fromTheOffice') }}</h2>
+              <p class="faint small">{{ i18n.t('car.officeOwnWords') }}</p>
+              @if (sections.rentalConditions; as text) {
+                <h3 class="sub-title">{{ i18n.t('car.rentalTerms') }}</h3><kh-office-text [text]="text" />
+              }
+              @if (sections.insurance; as text) {
+                <h3 class="sub-title">{{ i18n.t('car.insurance') }}</h3><kh-office-text [text]="text" />
+              }
+              @if (sections.pickupInstructions; as text) {
+                <h3 class="sub-title">{{ i18n.t('car.pickupInstructions') }}</h3><kh-office-text [text]="text" />
+              }
+              @if (c.isDeliveryEligible && page.delivery.isEnabled && sections.deliveryNotes; as text) {
+                <h3 class="sub-title">{{ i18n.t('car.deliveryNotes') }}</h3><kh-office-text [text]="text" />
+              }
+            </section>
+          }
+        }
+
+        <section class="card card--pad office-strip" aria-labelledby="office">
+          <h2 id="office" class="card__title">{{ i18n.t('office.title') }}</h2>
+          <div class="office-strip__head">
+            <span class="office-card__logo">
+              @if (c.gallery.logoUrl) {
+                <img [src]="c.gallery.logoUrl" alt="" width="56" height="56" loading="lazy" />
+              } @else {
+                <kh-icon name="storefront" />
+              }
+            </span>
+            <div>
+              <a class="office-card__name user-text" [routerLink]="officeLink()">{{ c.gallery.businessName }}</a>
+              <p class="faint small">
+                @if (city()) { <kh-icon name="map-pin" /> {{ city() }} · }
+                @if (c.gallery.averageRating !== null) {
+                  <span class="rating"><kh-icon name="star-fill" />{{ format.number(c.gallery.averageRating, 1) }}</span>
+                  ({{ i18n.t('office.reviewCount', { count: c.gallery.reviewCount }) }})
+                } @else {
+                  {{ i18n.t('office.notRated') }}
+                }
+              </p>
+            </div>
+            <a class="btn btn--secondary btn--sm" [routerLink]="officeLink()">{{ i18n.t('office.view') }}</a>
+          </div>
+          <div class="office-strip__grid">
+            <div>
+              <h3 class="sub-title">{{ i18n.t('car.hours') }}</h3>
+              <kh-opening-hours [days]="c.gallery.operatingHours" />
+            </div>
+            <div>
+              <h3 class="sub-title">{{ i18n.t('office.delivery') }}</h3>
+              @if (!c.gallery.delivery.isEnabled) {
+                <p class="muted">{{ i18n.t('office.deliveryNotOffered') }}</p>
+              } @else if (!c.isDeliveryEligible) {
+                <p class="muted">{{ i18n.t('quote.deliveryNotForCar') }}</p>
+              } @else {
+                <p class="muted">{{ i18n.t('office.deliveryOffered', { radius: format.number(c.gallery.delivery.radiusKm), fee: format.money(c.gallery.delivery.fee) }) }}</p>
+              }
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="car-page__aside" [attr.aria-label]="i18n.t('quote.title')">
+        <div class="book-card card card--pad" id="book">
+          <p class="book-card__rate"><strong>{{ i18n.t('car.perDay', { amount: format.money(c.dailyRate) }) }}</strong></p>
+          <kh-search-form [value]="formValue()" [compact]="true" submitLabel="quote.check" (submitted)="choose($event)" />
+
+          @if (!period()) {
+            <p class="muted small">{{ i18n.t('quote.chooseDates') }}</p>
+          } @else if (quote.isLoading() && !quote.hasValue()) {
+            <div aria-busy="true"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div></div>
+          } @else if (quoteProblem(); as failure) {
+            <div class="notice notice--warn" role="alert"><kh-icon name="warning" /><p>{{ i18n.t('quote.failed') }}</p></div>
+          } @else if (quote.value(); as q) {
+            @if (!q.isAvailable) {
+              <div class="notice notice--bad" role="alert"><kh-icon name="x-circle" /><p>{{ i18n.t('quote.unavailable') }}</p></div>
+            } @else {
+              <p class="badge badge--ok"><kh-icon name="check-circle" />{{ i18n.t('car.availableForDates') }}</p>
+            }
+            <dl class="lines">
+              <div><dt>{{ format.money(q.pricing.dailyRate) }} × {{ i18n.t('quote.days', { count: q.pricing.days }) }}</dt><dd>{{ format.money(q.pricing.rentalTotal) }}</dd></div>
+              @if (q.pricing.deliveryFee.amount > 0) {
+                <div><dt>{{ i18n.t('quote.deliveryFee') }}</dt><dd>{{ format.money(q.pricing.deliveryFee) }}</dd></div>
+              }
+              <div class="lines__total"><dt>{{ i18n.t('quote.total') }}</dt><dd>{{ format.money(q.pricing.totalPrice) }}</dd></div>
+              <div><dt>{{ i18n.t('quote.deposit', { percent: percent(q.pricing.depositPercent) }) }}</dt><dd>{{ format.money(q.pricing.depositAmount) }}</dd></div>
+              <div><dt>{{ i18n.t('quote.balance') }}</dt><dd>{{ format.money(q.pricing.balanceDue) }}</dd></div>
+              <div><dt>{{ i18n.t('quote.securityDeposit') }}</dt><dd>{{ format.money(q.pricing.securityDeposit) }}</dd></div>
+            </dl>
+            <p class="faint small">{{ i18n.t('quote.calendarDays', { zone: q.timeZone }) }}</p>
+            <p class="faint small">{{ i18n.t('quote.payAfterApproval') }}</p>
+            @if (q.isAvailable) {
+              <a class="btn btn--primary btn--block" [routerLink]="i18n.link('book', c.vehicleId)" [queryParams]="bookingParams()">{{ i18n.t('quote.book') }}</a>
+            }
+          }
+        </div>
+      </aside>
+    </div>
+
+    <div class="sticky-cta show-md">
+      <div>
+        @if (quote.value(); as q) {
+          <strong>{{ format.money(q.pricing.totalPrice) }}</strong>
+          <span class="faint small d-block">{{ i18n.t('quote.days', { count: q.pricing.days }) }}</span>
+        } @else {
+          <strong>{{ i18n.t('car.perDay', { amount: format.money(c.dailyRate) }) }}</strong>
+        }
+      </div>
+      @if (quote.value()?.isAvailable) {
+        <a class="btn btn--primary" [routerLink]="i18n.link('book', c.vehicleId)" [queryParams]="bookingParams()">{{ i18n.t('quote.book') }}</a>
+      } @else {
+        <a class="btn btn--primary" href="#book">{{ period() ? i18n.t('quote.change') : i18n.t('quote.chooseDates') }}</a>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="container page car-page" aria-busy="true">
+    <div class="car-page__layout">
+      <div class="car-page__main"><div class="skeleton gallery-skeleton"></div><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+      <aside class="car-page__aside"><div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div></aside>
+    </div>
+  </div>
+}

@@ -1,0 +1,52 @@
+<div class="container page">
+  <div class="page-head">
+    <div>
+      <h1>{{ i18n.t('offices.title') }}</h1>
+      <p>{{ i18n.t('offices.subtitle') }}
+        @if (offices.value(); as page) { · <strong>{{ i18n.t('offices.count', { count: page.totalCount }) }}</strong> }
+      </p>
+    </div>
+    <label class="field page-head__filter">
+      <span class="field__label">{{ i18n.t('search.city') }}</span>
+      <select class="select" (change)="setCity($any($event.target).value)">
+        <option value="">{{ i18n.t('search.anyCity') }}</option>
+        @for (entry of lookups.activeCities(); track entry.id) {
+          <option [value]="entry.id" [selected]="entry.id === city()">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  @if (problem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="offices.reload()" />
+  } @else if (offices.value(); as page) {
+    @if (page.items.length === 0) {
+      <kh-state-panel icon="storefront" [title]="i18n.t('offices.emptyTitle')" [text]="i18n.t('offices.emptyText')" />
+    } @else {
+      <div class="grid-offices">
+        @for (office of page.items; track office.dealerId) {
+          <kh-office-card [office]="office" />
+        }
+      </div>
+      @if (page.totalPages > 1) {
+        <nav class="pager" [attr.aria-label]="i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages })">
+          @if (page.hasPrevious) {
+            <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page - 1)" rel="prev">
+              <kh-icon [name]="i18n.isArabic() ? 'caret-right' : 'caret-left'" />{{ i18n.t('cars.previous') }}</a>
+          }
+          <span class="faint small">{{ i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages }) }}</span>
+          @if (page.hasNext) {
+            <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page + 1)" rel="next">
+              {{ i18n.t('cars.next') }}<kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" /></a>
+          }
+        </nav>
+      }
+    }
+  } @else {
+    <div class="grid-offices" aria-busy="true">
+      @for (index of skeletons; track index) {
+        <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+      }
+    </div>
+  }
+</div>

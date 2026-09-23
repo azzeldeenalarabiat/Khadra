@@ -1,0 +1,115 @@
+<div class="container page page--medium book">
+  @if (carProblem(); as failure) {
+    <kh-state-panel [kind]="failure.status === 404 ? 'empty' : 'error'" icon="car" [problem]="failure.status === 404 ? null : failure"
+      [title]="failure.status === 404 ? i18n.t('car.notFoundTitle') : ''" [text]="failure.status === 404 ? i18n.t('car.notFoundText') : ''"
+      (action)="car.reload()" />
+  } @else if (car.value(); as c) {
+    <a class="crumbs small" [routerLink]="carLink()" [queryParams]="params()">
+      <kh-icon [name]="i18n.isArabic() ? 'arrow-right' : 'arrow-left'" /> {{ i18n.t('common.back') }}</a>
+    <h1>{{ i18n.t('book.title') }}</h1>
+
+    <div class="book-strip card card--pad">
+      <span class="book-strip__photo">
+        @if (c.imageUrls[0]) { <img [src]="c.imageUrls[0]" alt="" width="160" height="100" /> } @else { <kh-icon name="car" /> }
+      </span>
+      <div>
+        <p class="book-strip__name"><span class="ltr">{{ c.make }} {{ c.model }} {{ c.year }}</span></p>
+        <p class="muted small user-text">{{ c.gallery.businessName }}</p>
+      </div>
+    </div>
+
+    <section class="card card--pad" aria-labelledby="dates-title">
+      <h2 id="dates-title" class="card__title">{{ i18n.t('book.dates') }}</h2>
+      <kh-search-form [value]="formValue()" [compact]="true" submitLabel="quote.check" (submitted)="choose($event)" />
+    </section>
+
+    <section class="card card--pad" aria-labelledby="method-title">
+      <h2 id="method-title" class="card__title">{{ i18n.t('book.method') }}</h2>
+      <div class="choice" role="radiogroup" [attr.aria-labelledby]="'method-title'">
+        <button type="button" role="radio" class="choice__option" [attr.aria-checked]="method() === 'SelfPickup'" (click)="setMethod('SelfPickup')">
+          <kh-icon name="storefront" /><span>{{ i18n.t('quote.selfPickup') }}</span></button>
+        <button type="button" role="radio" class="choice__option" [attr.aria-checked]="method() === 'Delivery'" [disabled]="!deliveryOffered()"
+          (click)="setMethod('Delivery')">
+          <kh-icon name="truck" /><span>{{ i18n.t('quote.delivery') }}</span></button>
+      </div>
+      @if (!c.gallery.delivery.isEnabled) {
+        <p class="faint small">{{ i18n.t('quote.deliveryNotOffered') }}</p>
+      } @else if (!c.isDeliveryEligible) {
+        <p class="faint small">{{ i18n.t('quote.deliveryNotForCar') }}</p>
+      }
+      @if (method() === 'Delivery') {
+        <h3 class="sub-title">{{ i18n.t('book.deliveryWhere') }}</h3>
+        <p class="muted small">{{ i18n.t('book.deliveryPick') }}</p>
+        <kh-map [latitude]="c.gallery.latitude" [longitude]="c.gallery.longitude" [radiusKm]="c.gallery.delivery.radiusKm"
+          [pickable]="true" [picked]="point()" [label]="c.gallery.businessName" (pick)="point.set($event); problem.set(null)" />
+        @if (point()) {
+          <p class="badge badge--ok"><kh-icon name="map-pin" />{{ i18n.t('book.deliveryChosen') }}</p>
+        } @else {
+          <p class="field__hint">{{ i18n.t('book.deliveryRequired') }}</p>
+        }
+      }
+    </section>
+
+    <section class="card card--pad" aria-labelledby="price-title" aria-live="polite">
+      <h2 id="price-title" class="card__title">{{ i18n.t('book.price') }}</h2>
+      @if (!period()) {
+        <p class="muted">{{ i18n.t('book.chooseDates') }}</p>
+      } @else if (method() === 'Delivery' && !point()) {
+        <p class="muted">{{ i18n.t('book.deliveryRequired') }}</p>
+      } @else if (quoteProblem(); as failure) {
+        <div class="notice notice--warn" role="alert"><kh-icon name="warning" />
+          <p>{{ quoteRefusal() }}</p></div>
+      } @else if (quote.value(); as q) {
+        @if (!q.isAvailable) {
+          <div class="notice notice--bad" role="alert"><kh-icon name="x-circle" /><p>{{ i18n.t('book.unavailable') }}</p></div>
+        }
+        <dl class="lines">
+          <div><dt>{{ format.money(q.pricing.dailyRate) }} × {{ i18n.t('quote.days', { count: q.pricing.days }) }}</dt><dd>{{ format.money(q.pricing.rentalTotal) }}</dd></div>
+          @if (q.pricing.deliveryFee.amount > 0) {
+            <div><dt>{{ i18n.t('quote.deliveryFee') }}</dt><dd>{{ format.money(q.pricing.deliveryFee) }}</dd></div>
+          }
+          <div class="lines__total"><dt>{{ i18n.t('quote.total') }}</dt><dd>{{ format.money(q.pricing.totalPrice) }}</dd></div>
+          <div><dt>{{ i18n.t('quote.deposit', { percent: percent(q.pricing.depositPercent) }) }}</dt><dd>{{ format.money(q.pricing.depositAmount) }}</dd></div>
+          <div><dt>{{ i18n.t('quote.balance') }}</dt><dd>{{ format.money(q.pricing.balanceDue) }}</dd></div>
+          <div><dt>{{ i18n.t('quote.securityDeposit') }}</dt><dd>{{ format.money(q.pricing.securityDeposit) }}</dd></div>
+        </dl>
+        <p class="faint small">{{ i18n.t('quote.calendarDays', { zone: q.timeZone }) }}</p>
+
+        <h3 class="sub-title">{{ i18n.t('book.terms') }}</h3>
+        <ul class="terms">
+          <li>{{ i18n.t('book.termsPayAfterApproval') }}</li>
+          <li>{{ i18n.t('book.termsAnswer', { count: q.terms.answerWindowHours }) }}</li>
+          <li>{{ i18n.t('book.termsPayment', { count: q.terms.paymentWindowHours }) }}</li>
+          <li>{{ i18n.t('book.termsFreeCancel', { count: q.terms.freeCancellationWindowHours }) }}</li>
+          <li>{{ i18n.t('book.termsPenalty', { percent: percent(q.terms.customerCancellationPenaltyPercent) }) }}</li>
+        </ul>
+      } @else {
+        <div aria-busy="true"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div></div>
+      }
+    </section>
+
+    @if (emailUnverified()) {
+      <div class="notice notice--warn"><kh-icon name="warning" />
+        <div><p>{{ i18n.t('book.verifyEmail') }}</p>
+          <a class="link" [routerLink]="i18n.link('verify-email')" [queryParams]="{ email: session.user()?.email }">{{ i18n.t('book.verifyEmailAction') }}</a></div></div>
+    }
+    @if (documentsIncomplete()) {
+      <div class="notice notice--warn"><kh-icon name="identification-card" />
+        <div><p class="notice__title">{{ i18n.t('book.documentsTitle') }}</p><p>{{ i18n.t('book.documentsText') }}</p>
+          <a class="link" [routerLink]="i18n.link('profile', 'documents')">{{ i18n.t('book.documentsAction') }}</a></div></div>
+    }
+    @if (refusal(); as text) {
+      <div class="notice notice--bad" role="alert" id="book-refusal"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
+    }
+
+    <div class="book-submit">
+      @if (quote.value(); as q) {
+        <p><strong>{{ format.money(q.pricing.totalPrice) }}</strong> <span class="faint small">{{ i18n.t('quote.days', { count: q.pricing.days }) }}</span></p>
+      }
+      <button type="button" class="btn btn--primary" [disabled]="!canSubmit()" (click)="submit()">
+        {{ busy() ? i18n.t('book.sending') : i18n.t('book.submit') }}</button>
+    </div>
+  } @else {
+    <div class="card card--pad" aria-busy="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+  }
+</div>

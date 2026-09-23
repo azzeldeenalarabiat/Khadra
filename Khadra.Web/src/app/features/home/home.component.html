@@ -1,0 +1,88 @@
+<section class="hero">
+  <div class="container hero__inner">
+    <div class="hero__copy">
+      <h1>{{ i18n.t('home.title') }}</h1>
+      <p class="hero__sub">{{ i18n.t('home.subtitle') }}</p>
+    </div>
+    <kh-search-form (submitted)="search($event)" />
+    @if (types().length > 0) {
+      <nav class="chips hero__types" [attr.aria-label]="i18n.t('filter.type')">
+        @for (type of types(); track type.id) {
+          <a class="chip" [routerLink]="i18n.link('cars')" [queryParams]="{ type: type.id }">
+            {{ i18n.isArabic() ? (type.nameAr || type.nameEn) : (type.nameEn || type.nameAr) }}
+          </a>
+        }
+      </nav>
+    }
+  </div>
+</section>
+
+<div class="container">
+  <section class="section" aria-labelledby="home-cars">
+    <div class="section-head">
+      <h2 id="home-cars">{{ i18n.t('home.latestCars') }}</h2>
+      @if ((cars.value()?.totalCount ?? 0) > 0) {
+        <a [routerLink]="i18n.link('cars')">{{ i18n.t('common.viewAll') }}</a>
+      }
+    </div>
+    @if (cars.isLoading() && !cars.hasValue()) {
+      <div class="grid-cards" aria-busy="true">
+        @for (index of skeletons; track index) {
+          <div class="car-card"><div class="skeleton skeleton--media"></div>
+            <div class="car-card__body"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div></div>
+        }
+      </div>
+    } @else if (carsProblem(); as problem) {
+      <kh-state-panel kind="error" [problem]="problem" (action)="cars.reload()" />
+    } @else if (cars.value(); as page) {
+      @if (page.items.length === 0) {
+        <kh-state-panel icon="car" [title]="i18n.t('cars.noListingsTitle')" [text]="i18n.t('cars.noListingsText')" />
+      } @else {
+        <div class="grid-cards">
+          @for (car of page.items; track car.vehicleId; let first = $first) {
+            <kh-car-card [car]="car" [eager]="first" />
+          }
+        </div>
+      }
+    }
+  </section>
+
+  <section class="section" aria-labelledby="home-offices">
+    <div class="section-head">
+      <h2 id="home-offices">{{ i18n.t('home.offices') }}</h2>
+      @if ((offices.value()?.totalCount ?? 0) > 0) {
+        <a [routerLink]="i18n.link('dealers')">{{ i18n.t('common.viewAll') }}</a>
+      }
+    </div>
+    @if (offices.isLoading() && !offices.hasValue()) {
+      <div class="grid-offices" aria-busy="true">
+        @for (index of skeletons; track index) {
+          <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+        }
+      </div>
+    } @else if (officesProblem(); as problem) {
+      <kh-state-panel kind="error" [problem]="problem" (action)="offices.reload()" />
+    } @else if (offices.value(); as page) {
+      @if (page.items.length === 0) {
+        <kh-state-panel icon="storefront" [title]="i18n.t('offices.emptyTitle')" [text]="i18n.t('offices.emptyText')" />
+      } @else {
+        <div class="grid-offices">
+          @for (office of page.items; track office.dealerId) {
+            <kh-office-card [office]="office" />
+          }
+        </div>
+      }
+    }
+  </section>
+
+  <section class="section how" aria-labelledby="home-how">
+    <h2 id="home-how">{{ i18n.t('home.how.title') }}</h2>
+    <ol class="how__steps">
+      <li><span class="how__icon"><kh-icon name="magnifying-glass" /></span><h3>{{ i18n.t('home.how.find') }}</h3><p>{{ i18n.t('home.how.findText') }}</p></li>
+      <li><span class="how__icon"><kh-icon name="calendar-plus" /></span><h3>{{ i18n.t('home.how.request') }}</h3><p>{{ i18n.t('home.how.requestText') }}</p></li>
+      <li><span class="how__icon"><kh-icon name="check-circle" /></span><h3>{{ i18n.t('home.how.approve') }}</h3><p>{{ i18n.t('home.how.approveText') }}</p></li>
+      <li><span class="how__icon"><kh-icon name="credit-card" /></span><h3>{{ i18n.t('home.how.pay') }}</h3><p>{{ i18n.t('home.how.payText') }}</p></li>
+      <li><span class="how__icon"><kh-icon name="key" /></span><h3>{{ i18n.t('home.how.pickup') }}</h3><p>{{ i18n.t('home.how.pickupText') }}</p></li>
+    </ol>
+  </section>
+</div>

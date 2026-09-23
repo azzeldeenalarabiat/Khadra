@@ -1,0 +1,27 @@
+@let o = office();
+<a class="office-card card" [routerLink]="link()">
+  <span class="office-card__logo">
+    @if (o.logoUrl) {
+      <img [src]="o.logoUrl" alt="" width="56" height="56" loading="lazy" decoding="async" />
+    } @else {
+      <kh-icon name="storefront" />
+    }
+  </span>
+  <span class="office-card__body">
+    <span class="office-card__name user-text">{{ o.businessName }}</span>
+    @if (city()) {
+      <span class="faint small"><kh-icon name="map-pin" /> {{ city() }}</span>
+    }
+    <span class="office-card__meta">
+      <span class="badge">{{ i18n.t('office.carCount', { count: o.listedVehicleCount }) }}</span>
+      @if (o.delivery.isEnabled) {
+        <span class="badge badge--ok"><kh-icon name="truck" />{{ i18n.t('office.deliveryOfferedShort') }}</span>
+      }
+      @if (o.averageRating !== null) {
+        <span class="rating small"><kh-icon name="star-fill" />{{ format.number(o.averageRating, 1) }}
+          <span class="faint">({{ format.number(o.reviewCount) }})</span></span>
+      }
+    </span>
+  </span>
+  <kh-icon class="office-card__go" [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" />
+</a>

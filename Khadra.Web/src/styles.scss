@@ -1,0 +1,10 @@
+// Fonts are self-hosted from @fontsource and listed in angular.json (no third-party font host: the
+// CSP stays 'self'). Each weight is split by unicode range, so a page fetches only the scripts it prints.
+
+// Global and component-free, as the console is: components carry no styles of their own.
+@use 'styles/tokens';
+@use 'styles/base';
+@use 'styles/layout';
+@use 'styles/components';
+@use 'styles/pages';
+@use 'styles/bookings';

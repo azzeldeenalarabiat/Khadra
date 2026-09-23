@@ -1,0 +1,4 @@
+{
+  "/bff": { "target": "https://localhost:7244", "secure": false, "changeOrigin": true },
+  "/api": { "target": "https://localhost:7244", "secure": false, "changeOrigin": true }
+}

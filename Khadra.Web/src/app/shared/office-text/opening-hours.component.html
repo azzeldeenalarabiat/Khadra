@@ -1,0 +1,14 @@
+<dl class="lines hours">
+  @for (day of days(); track day.day) {
+    <div>
+      <dt>{{ format.weekday(day.day) }}</dt>
+      <dd>
+        @if (day.isClosed || !day.opens || !day.closes) {
+          <span class="faint">{{ i18n.t('office.closed') }}</span>
+        } @else {
+          <span class="ltr tabular">{{ format.clock(day.opens) }} – {{ format.clock(day.closes) }}</span>
+        }
+      </dd>
+    </div>
+  }
+</dl>

@@ -1,0 +1,83 @@
+<section class="container page page--narrow auth">
+  <div class="card card--pad auth__card">
+    @if (done(); as registered) {
+      <div class="state state--plain">
+        <span class="state__icon"><kh-icon name="check-circle" /></span>
+        <h1 class="state__title">{{ i18n.t('register.doneTitle') }}</h1>
+        @if (registered.verificationEmailSent) {
+          <p class="state__text">{{ i18n.t('register.doneText', { email: registered.email }) }}</p>
+        } @else {
+          <p class="state__text">{{ i18n.t('register.doneNotSent') }}</p>
+        }
+        <div class="row-actions">
+          <a class="btn btn--primary" [routerLink]="i18n.link('login')" [queryParams]="{ returnUrl: returnUrl() }">{{ i18n.t('signIn.submit') }}</a>
+          <a class="btn btn--secondary" [routerLink]="i18n.link('verify-email')" [queryParams]="{ email: registered.email }">{{ i18n.t('verify.resend') }}</a>
+        </div>
+      </div>
+    } @else {
+      <h1>{{ i18n.t('register.title') }}</h1>
+      <p class="muted">{{ i18n.t('register.subtitle') }}</p>
+
+      <form class="stack" (submit)="submit($event)" novalidate>
+        <label class="field">
+          <span class="field__label">{{ i18n.t('auth.fullName') }}</span>
+          <input class="input" name="fullName" autocomplete="name" maxlength="150" required
+            [ngModel]="fullName()" (ngModelChange)="fullName.set($event)" [attr.aria-invalid]="missing(fullName())" />
+          @if (missing(fullName())) { <span class="field__error">{{ i18n.t('auth.required') }}</span> }
+        </label>
+        <label class="field">
+          <span class="field__label">{{ i18n.t('auth.email') }}</span>
+          <input class="input ltr" type="email" name="email" autocomplete="email" inputmode="email" maxlength="256" required
+            [ngModel]="email()" (ngModelChange)="email.set($event)" [attr.aria-invalid]="missing(email())" />
+          @if (missing(email())) { <span class="field__error">{{ i18n.t('auth.required') }}</span> }
+        </label>
+        <label class="field">
+          <span class="field__label">{{ i18n.t('auth.phone') }}</span>
+          <input class="input ltr" type="tel" name="phone" autocomplete="tel" inputmode="tel" maxlength="32" required
+            [ngModel]="phone()" (ngModelChange)="phone.set($event)" [attr.aria-invalid]="missing(phone())" />
+          <span class="field__hint">{{ i18n.t('auth.phoneHint') }}</span>
+        </label>
+        @if (minimumAge() !== null) {
+          <label class="field">
+            <span class="field__label">{{ i18n.t('auth.dateOfBirth') }}</span>
+            <input class="input" type="date" name="dateOfBirth" autocomplete="bday" required [max]="latestBirthDate()"
+              [ngModel]="dateOfBirth()" (ngModelChange)="dateOfBirth.set($event)" [attr.aria-invalid]="missing(dateOfBirth())" />
+            <span class="field__hint">{{ i18n.t('auth.minimumAge', { age: minimumAge()! }) }}</span>
+          </label>
+        }
+        <label class="field">
+          <span class="field__label">{{ i18n.t('auth.password') }}</span>
+          <span class="input-group">
+            <input class="input ltr" [type]="reveal() ? 'text' : 'password'" name="password" autocomplete="new-password" required
+              [attr.minlength]="config()?.password?.minimumLength" [attr.maxlength]="config()?.password?.maximumLength"
+              [ngModel]="password()" (ngModelChange)="password.set($event)" [attr.aria-invalid]="missing(password())" />
+            <button type="button" class="input-group__btn" (click)="reveal.set(!reveal())" [attr.aria-pressed]="reveal()">
+              {{ i18n.t(reveal() ? 'auth.hide' : 'auth.show') }}</button>
+          </span>
+          @if (passwordHint()) { <span class="field__hint">{{ passwordHint() }}</span> }
+        </label>
+        <label class="field">
+          <span class="field__label">{{ i18n.t('auth.confirmPassword') }}</span>
+          <input class="input ltr" [type]="reveal() ? 'text' : 'password'" name="confirm" autocomplete="new-password"
+            [ngModel]="confirm()" (ngModelChange)="confirm.set($event)" [attr.aria-invalid]="mismatch()" />
+          @if (mismatch()) { <span class="field__error">{{ i18n.t('auth.passwordsDiffer') }}</span> }
+        </label>
+        <label class="check">
+          <input type="checkbox" name="foreign" [ngModel]="foreign()" (ngModelChange)="foreign.set($event)" />
+          <span>{{ i18n.t('auth.foreignNational') }}<span class="field__hint d-block">{{ i18n.t('auth.foreignNationalHelp') }}</span></span>
+        </label>
+
+        @if (message(); as text) {
+          <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
+        }
+
+        <button type="submit" class="btn btn--primary btn--block" [disabled]="busy()">{{ i18n.t('register.submit') }}</button>
+      </form>
+
+      <div class="auth__links">
+        <span class="muted">{{ i18n.t('register.haveAccount') }}
+          <a class="link" [routerLink]="i18n.link('login')" [queryParams]="{ returnUrl: returnUrl() }">{{ i18n.t('signIn.submit') }}</a></span>
+      </div>
+    }
+  </div>
+</section>

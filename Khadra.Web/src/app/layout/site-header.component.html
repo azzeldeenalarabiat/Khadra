@@ -1,0 +1,86 @@
+<header class="site-header">
+  <div class="container site-header__bar">
+    <a class="site-header__brand" [routerLink]="i18n.link()" [attr.aria-label]="i18n.t('brand.name')">
+      <img src="/brand/khadra-logo-64.png" width="40" height="40" alt="" />
+      <span class="site-header__wordmark">{{ i18n.t('brand.name') }}</span>
+    </a>
+
+    <nav class="site-header__nav" [attr.aria-label]="i18n.t('nav.primary')">
+      <a [routerLink]="i18n.link()" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">{{ i18n.t('nav.home') }}</a>
+      <a [routerLink]="i18n.link('cars')" routerLinkActive="is-active">{{ i18n.t('nav.cars') }}</a>
+      <a [routerLink]="i18n.link('dealers')" routerLinkActive="is-active">{{ i18n.t('nav.offices') }}</a>
+      @if (session.isSignedIn()) {
+        <a [routerLink]="i18n.link('bookings')" routerLinkActive="is-active">{{ i18n.t('nav.bookings') }}</a>
+        <a [routerLink]="i18n.link('saved')" routerLinkActive="is-active">{{ i18n.t('nav.saved') }}</a>
+      }
+    </nav>
+
+    <div class="site-header__actions">
+      <a class="btn btn--ghost btn--sm site-header__lang" [href]="otherLanguageUrl()" (click)="switchLanguage($event)"
+        [attr.hreflang]="i18n.isArabic() ? 'en' : 'ar'" [attr.lang]="i18n.isArabic() ? 'en' : 'ar'"
+        [attr.aria-label]="i18n.t('language.switchLabel')">
+        <kh-icon name="globe" />
+        <span>{{ i18n.t('language.switchTo') }}</span>
+      </a>
+
+      @switch (session.state().status) {
+        @case ('unknown') {
+          <span class="site-header__pending" aria-hidden="true"></span>
+        }
+        @case ('anonymous') {
+          <a class="btn btn--ghost btn--sm hide-sm" [routerLink]="i18n.link('login')">{{ i18n.t('nav.signIn') }}</a>
+          <a class="btn btn--primary btn--sm hide-sm" [routerLink]="i18n.link('register')">{{ i18n.t('nav.register') }}</a>
+        }
+        @case ('signed-in') {
+          <a class="icon-btn hide-sm" [routerLink]="i18n.link('notifications')"
+            [attr.aria-label]="i18n.t('nav.notifications') + (notifications.unread() > 0 ? ', ' + i18n.t('nav.unreadCount', { count: notifications.unread() }) : '')">
+            <kh-icon name="bell" />
+            @if (notifications.unread() > 0) {
+              <span class="icon-btn__badge" aria-hidden="true">{{ notifications.unread() > 99 ? '99+' : notifications.unread() }}</span>
+            }
+          </a>
+          <div class="menu hide-sm">
+            <button type="button" class="btn btn--ghost btn--sm" [attr.aria-expanded]="accountOpen()" aria-haspopup="true"
+              aria-controls="account-menu" (click)="accountOpen.set(!accountOpen())">
+              <kh-icon name="user" />
+              <span class="user-text">{{ session.user()?.fullName }}</span>
+              <kh-icon name="caret-down" />
+            </button>
+            @if (accountOpen()) {
+              <div class="menu__panel" id="account-menu" role="menu">
+                <a role="menuitem" [routerLink]="i18n.link('profile')">{{ i18n.t('nav.account') }}</a>
+                <a role="menuitem" [routerLink]="i18n.link('bookings')">{{ i18n.t('nav.bookings') }}</a>
+                <a role="menuitem" [routerLink]="i18n.link('saved')">{{ i18n.t('nav.saved') }}</a>
+                <a role="menuitem" [routerLink]="i18n.link('notifications')">{{ i18n.t('nav.notifications') }}</a>
+                <button type="button" role="menuitem" (click)="signOut()">{{ i18n.t('nav.signOut') }}</button>
+              </div>
+            }
+          </div>
+        }
+      }
+
+      <button type="button" class="icon-btn show-sm" [attr.aria-expanded]="menuOpen()" aria-controls="site-drawer"
+        [attr.aria-label]="i18n.t(menuOpen() ? 'nav.closeMenu' : 'nav.menu')" (click)="menuOpen.set(!menuOpen())">
+        <kh-icon [name]="menuOpen() ? 'x' : 'list'" />
+      </button>
+    </div>
+  </div>
+
+  @if (menuOpen()) {
+    <nav class="site-drawer" id="site-drawer" [attr.aria-label]="i18n.t('nav.menu')">
+      <a [routerLink]="i18n.link()">{{ i18n.t('nav.home') }}</a>
+      <a [routerLink]="i18n.link('cars')">{{ i18n.t('nav.cars') }}</a>
+      <a [routerLink]="i18n.link('dealers')">{{ i18n.t('nav.offices') }}</a>
+      @if (session.isSignedIn()) {
+        <a [routerLink]="i18n.link('bookings')">{{ i18n.t('nav.bookings') }}</a>
+        <a [routerLink]="i18n.link('saved')">{{ i18n.t('nav.saved') }}</a>
+        <a [routerLink]="i18n.link('notifications')">{{ i18n.t('nav.notifications') }}</a>
+        <a [routerLink]="i18n.link('profile')">{{ i18n.t('nav.account') }}</a>
+        <button type="button" (click)="signOut()">{{ i18n.t('nav.signOut') }}</button>
+      } @else if (session.state().status === 'anonymous') {
+        <a [routerLink]="i18n.link('login')">{{ i18n.t('nav.signIn') }}</a>
+        <a [routerLink]="i18n.link('register')">{{ i18n.t('nav.register') }}</a>
+      }
+    </nav>
+  }
+</header>

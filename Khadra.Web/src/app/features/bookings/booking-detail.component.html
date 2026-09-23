@@ -1,0 +1,274 @@
+<div class="container page page--medium booking">
+  <a class="crumbs small" [routerLink]="i18n.link('bookings')">
+    <kh-icon [name]="i18n.isArabic() ? 'arrow-right' : 'arrow-left'" /> {{ i18n.t('booking.backToList') }}</a>
+
+  @if (notFound()) {
+    <kh-state-panel icon="calendar-blank" [title]="i18n.t('booking.notFoundTitle')" [text]="i18n.t('booking.notFoundText')" />
+  } @else if (problem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="booking.reload()" />
+  } @else if (booking.value(); as b) {
+    <!-- What just happened -->
+    @if (justCreated() && b.status === 'Requested') {
+      <div class="notice notice--ok" role="status"><kh-icon name="check-circle" />
+        <div><p>{{ i18n.t('booking.created', { office: b.dealerName, deadline: format.dateTime(b.decisionDeadline) }) }}</p></div>
+        <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="dismissCreated()"><kh-icon name="x" /></button>
+      </div>
+    }
+    @if (cancelOutcome(); as outcome) {
+      <div class="notice notice--ok" role="status"><kh-icon name="check-circle" />
+        <p>{{ i18n.t(outcome === 'expired' ? 'cancel.expiredInstead' : 'cancel.done') }}</p></div>
+    }
+    @if (handoverRecorded()) {
+      <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('handover.recorded') }}</p></div>
+    }
+    @switch (checkout()) {
+      @case ('checking') { <div class="notice" role="status" aria-busy="true"><kh-icon name="clock" /><p>{{ i18n.t('booking.payReturned') }}</p></div> }
+      @case ('paid') { <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('booking.payConfirmed') }}</p></div> }
+      @case ('open') {
+        <div class="notice notice--warn" role="status"><kh-icon name="clock" />
+          <p>{{ i18n.t('booking.payStillOpen', { deadline: format.dateTime(b.paymentDeadline) }) }}</p></div>
+      }
+      @case ('ended') { <div class="notice notice--warn" role="status"><kh-icon name="warning" /><p>{{ i18n.t('booking.payEnded') }}</p></div> }
+    }
+
+    <!-- The car and where the booking stands -->
+    <header class="booking-head card card--pad">
+      <span class="booking-row__photo booking-head__photo">
+        @if (b.vehicle?.coverImageUrl) { <img [src]="b.vehicle!.coverImageUrl" alt="" width="160" height="100" /> } @else { <kh-icon name="car" /> }
+      </span>
+      <div class="booking-head__body">
+        <p class="row"><span class="badge {{ tone(b.status) }}">{{ status(b.status) }}</span>
+          <span class="faint small">{{ i18n.t('booking.reference') }} <span class="ltr">{{ b.reference }}</span></span></p>
+        <h1 class="booking-head__title">
+          @if (b.vehicle) { <span class="ltr">{{ b.vehicle.make }} {{ b.vehicle.model }} {{ b.vehicle.year }}</span> }
+        </h1>
+        <p class="muted user-text">{{ b.dealerRemoved ? i18n.t('booking.officeRemoved') : b.dealerName }}</p>
+      </div>
+    </header>
+
+    <section class="booking-state" aria-live="polite">
+      @switch (b.status) {
+        @case ('Requested') {
+          @if (b.isAwaitingDecision) {
+            <div class="notice notice--warn"><kh-icon name="clock" />
+              <div><p class="notice__title">{{ i18n.t('booking.awaitingDecisionTitle', { office: b.dealerName }) }}</p>
+                <p>{{ i18n.t('booking.awaitingDecisionText', { deadline: format.dateTime(b.decisionDeadline) }) }}</p>
+                <p class="small"><strong>{{ decisionLeft() }}</strong></p></div></div>
+          } @else {
+            <div class="notice"><kh-icon name="info" /><div><p class="notice__title">{{ i18n.t('booking.lapsedDecisionTitle') }}</p>
+              <p>{{ i18n.t('booking.lapsedDecisionText') }}</p></div></div>
+          }
+        }
+        @case ('Approved') {
+          @if (b.isAwaitingPayment) {
+            <div class="notice notice--warn pay-box"><kh-icon name="credit-card" />
+              <div>
+                <p class="notice__title">{{ i18n.t('booking.awaitingPaymentTitle', { amount: format.money(b.payment?.amountDue ?? b.pricing.depositAmount) }) }}</p>
+                <p>{{ i18n.t('booking.awaitingPaymentBy', { deadline: format.dateTime(b.paymentDeadline) }) }} · <strong>{{ paymentLeft() }}</strong></p>
+                @if (b.payment?.canPay) {
+                  <button type="button" class="btn btn--primary" [disabled]="paying()" (click)="pay(b)">
+                    {{ paying() ? i18n.t('booking.payOpening') : i18n.t('booking.pay') }}</button>
+                } @else if (b.payment?.unavailableReason === 'payments.provider_unavailable') {
+                  <p class="notice__title">{{ i18n.t('booking.paymentNotAvailableTitle') }}</p>
+                  <p>{{ i18n.t('booking.paymentNotAvailableText') }}</p>
+                } @else {
+                  <p>{{ i18n.t('booking.paymentWindowClosed') }}</p>
+                }
+                @if (problemMessage(payProblem()); as text) { <p class="field__error" role="alert">{{ text }}</p> }
+              </div>
+            </div>
+          } @else {
+            <div class="notice"><kh-icon name="info" /><div><p class="notice__title">{{ i18n.t('booking.lapsedPaymentTitle') }}</p>
+              <p>{{ i18n.t('booking.lapsedPaymentText') }}</p></div></div>
+          }
+        }
+        @case ('Confirmed') {
+          <div class="notice notice--ok"><kh-icon name="calendar-check" />
+            <div><p class="notice__title">{{ i18n.t('booking.confirmedTitle') }}</p>
+              <p>{{ i18n.t('booking.confirmedText', { when: format.dateTime(b.periodStart) }) }}</p></div></div>
+        }
+        @case ('PickedUp') {
+          <div class="notice notice--ok"><kh-icon name="key" />
+            <div><p class="notice__title">{{ i18n.t('booking.pickedUpTitle') }}</p>
+              <p>{{ i18n.t('booking.pickedUpText', { when: format.dateTime(b.periodEnd) }) }}</p></div></div>
+        }
+        @case ('Returned') {
+          <div class="notice"><kh-icon name="check-circle" /><p class="notice__title">{{ i18n.t('booking.stage.Returned') }}</p></div>
+        }
+        @case ('Completed') {
+          <div class="notice notice--ok"><kh-icon name="check-circle" /><p class="notice__title">{{ i18n.t('booking.completedTitle') }}</p></div>
+        }
+        @case ('Cancelled') {
+          <div class="notice"><kh-icon name="x-circle" />
+            <div><p class="notice__title">{{ i18n.t('booking.cancelledTitle') }}</p>
+              <p>{{ b.cancelledBy === 'Customer' ? i18n.t('booking.cancelledByYou') : i18n.t('booking.cancelledBy', { party: party(b.cancelledBy) }) }}
+                @if (endReason()) { · {{ endReason() }} }</p></div></div>
+        }
+        @case ('Rejected') {
+          <div class="notice notice--bad"><kh-icon name="x-circle" />
+            <div><p class="notice__title">{{ i18n.t('booking.rejectedTitle') }}</p>
+              @if (endReason()) { <p>{{ endReason() }}</p> }</div></div>
+        }
+        @case ('Expired') {
+          <div class="notice"><kh-icon name="clock" /><div><p class="notice__title">{{ i18n.t('booking.expiredTitle') }}</p>
+            <p>{{ i18n.t('booking.expiredText') }}</p></div></div>
+        }
+        @case ('NoShow') {
+          <div class="notice notice--bad"><kh-icon name="warning" /><p class="notice__title">{{ i18n.t('booking.noShowTitle') }}</p></div>
+        }
+      }
+
+      @if (b.penalty && !b.penalty.isNothingOwed) {
+        <div class="notice notice--warn"><kh-icon name="scales" />
+          <div>
+            <p>{{ b.penalty.isRange
+              ? i18n.t('booking.penaltyRange', { min: format.money(b.penalty.minAmount), max: format.money(b.penalty.maxAmount), party: party(b.penalty.attributedTo) })
+              : i18n.t('booking.penalty', { amount: format.money(b.penalty.maxAmount), party: party(b.penalty.attributedTo) }) }}</p>
+            <p class="small">{{ i18n.t('booking.penaltyNotCharged') }}</p>
+          </div></div>
+      }
+      @if (b.liveDisputeId) {
+        <div class="notice"><kh-icon name="gavel" /><p>{{ i18n.t('booking.disputeOpen') }}</p></div>
+      }
+    </section>
+
+    <!-- What the customer can do now -->
+    @if (canShowHandover() || b.cancellation.canCancel) {
+      <section class="card card--pad" aria-labelledby="actions-title">
+        <h2 id="actions-title" class="card__title">{{ i18n.t('booking.actions') }}</h2>
+        <div class="row">
+          @if (canShowHandover() && !handoverOpen()) {
+            <button type="button" class="btn btn--primary" (click)="handoverOpen.set(true); handoverRecorded.set(false)">
+              <kh-icon name="qr-code" />{{ i18n.t('handover.show') }}</button>
+          }
+          @if (b.cancellation.canCancel) {
+            <button type="button" class="btn btn--danger" (click)="openCancel()">{{ i18n.t('cancel.title') }}</button>
+          }
+        </div>
+      </section>
+    }
+    @if (handoverOpen()) {
+      <kh-handover-code [bookingId]="b.bookingId" [isReturn]="b.status === 'PickedUp'" (closed)="handoverOpen.set(false)" />
+    }
+
+    <!-- Progress -->
+    <section class="card card--pad" aria-labelledby="progress-title">
+      <h2 id="progress-title" class="card__title">{{ i18n.t('booking.progress') }}</h2>
+      <ol class="timeline">
+        @for (row of timeline(); track row.stage) {
+          <li class="timeline__item timeline__item--{{ row.state }}">
+            <span class="timeline__dot" aria-hidden="true"></span>
+            <span class="timeline__label">{{ row.label }}</span>
+            @if (row.at) { <span class="faint small">{{ format.dateTime(row.at) }}</span> }
+          </li>
+        }
+      </ol>
+    </section>
+
+    <!-- Money: the price frozen on the booking, never today's -->
+    <section class="card card--pad" aria-labelledby="payment-title">
+      <h2 id="payment-title" class="card__title">{{ i18n.t('booking.payment') }}</h2>
+      <dl class="lines">
+        <div><dt>{{ format.money(b.pricing.dailyRate) }} × {{ i18n.t('booking.days', { count: b.pricing.days }) }}</dt><dd>{{ format.money(b.pricing.rentalTotal) }}</dd></div>
+        @if (b.pricing.deliveryFee.amount > 0) {
+          <div><dt>{{ i18n.t('quote.deliveryFee') }}</dt><dd>{{ format.money(b.pricing.deliveryFee) }}</dd></div>
+        }
+        <div class="lines__total"><dt>{{ i18n.t('quote.total') }}</dt><dd>{{ format.money(b.pricing.totalPrice) }}</dd></div>
+        <div><dt>{{ i18n.t('quote.deposit', { percent: percent(b.pricing.depositPercent) }) }}</dt>
+          <dd>{{ format.money(b.pricing.depositAmount) }} @if (b.depositPaid) { <span class="badge badge--ok">{{ i18n.t('booking.depositPaid') }}</span> }</dd></div>
+        <div><dt>{{ i18n.t('quote.balance') }}</dt><dd>{{ format.money(b.pricing.balanceDue) }}</dd></div>
+        <div><dt>{{ i18n.t('quote.securityDeposit') }}</dt><dd>{{ format.money(b.pricing.securityDeposit) }}</dd></div>
+      </dl>
+      <p class="faint small">{{ i18n.t('booking.termsFrozen') }}</p>
+    </section>
+
+    <!-- Collection and return -->
+    <section class="card card--pad" aria-labelledby="handover-when-title">
+      <h2 id="handover-when-title" class="card__title">{{ i18n.t('booking.pickupReturn') }}</h2>
+      <dl class="lines">
+        <div><dt>{{ i18n.t('booking.pickup') }}</dt><dd>{{ format.dateTime(b.periodStart) }}</dd></div>
+        <div><dt>{{ i18n.t('booking.return') }}</dt><dd>{{ format.dateTime(b.periodEnd) }}</dd></div>
+        <div><dt>{{ i18n.t('booking.method') }}</dt><dd>{{ methodLabel(b.pickupMethod) }}</dd></div>
+        @if (b.deliveryLocation; as point) {
+          <div><dt>{{ i18n.t('booking.deliveryPoint') }}</dt>
+            <dd><a class="link" target="_blank" rel="noopener noreferrer"
+              [href]="'https://www.openstreetmap.org/?mlat=' + point.latitude + '&mlon=' + point.longitude + '#map=17/' + point.latitude + '/' + point.longitude">
+              {{ i18n.t('office.openInMaps') }}</a></dd></div>
+        }
+        @if (b.vehicle?.plateNumber) {
+          <div><dt>{{ i18n.t('booking.plate') }}</dt><dd class="ltr">{{ b.vehicle!.plateNumber }}</dd></div>
+        }
+      </dl>
+      @for (handover of b.handovers; track handover.recordedAt) {
+        <div class="handover-record">
+          <p class="notice__title">{{ i18n.t(handover.type === 'Return' ? 'booking.return' : 'booking.pickup') }}
+            <span class="faint small">{{ i18n.t('booking.recordedAt', { date: format.dateTime(handover.recordedAt) }) }}</span></p>
+          <p class="small muted">
+            @if (handover.odometerKm !== null) { {{ i18n.t('booking.odometer', { km: format.number(handover.odometerKm) }) }} · }
+            @if (handover.fuelLevel !== null) { {{ i18n.t('booking.fuelLevel', { percent: format.number(handover.fuelLevel) }) }} }
+            @if (handover.cashCollected) { · {{ i18n.t('booking.cash', { amount: format.money(handover.cashCollected) }) }} }
+          </p>
+          @if (handover.notes) { <p class="small user-text" dir="auto">{{ handover.notes }}</p> }
+        </div>
+      }
+    </section>
+
+    <!-- History -->
+    <section class="card card--pad" aria-labelledby="history-title">
+      <h2 id="history-title" class="card__title">{{ i18n.t('booking.history') }}</h2>
+      <ul class="history">
+        @for (change of b.history; track change.occurredAt + change.toStatus) {
+          <li>
+            <span>{{ status(change.toStatus) }} <span class="faint">· {{ i18n.t('booking.by', { party: party(change.actorParty) }) }}</span></span>
+            <span class="faint small">{{ format.dateTime(change.occurredAt) }}</span>
+            @if (reasonLabel(change.reasonCode)) { <span class="small muted">{{ reasonLabel(change.reasonCode) }}</span> }
+          </li>
+        }
+      </ul>
+    </section>
+
+    <!-- Cancellation -->
+    <dialog #cancelDialog class="dialog" [attr.aria-label]="i18n.t('cancel.title')">
+      <div class="dialog__body">
+        <div class="dialog__head">
+          <h2 class="card__title">{{ i18n.t('cancel.title') }}</h2>
+          <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="closeCancel()"><kh-icon name="x" /></button>
+        </div>
+        @if (b.cancellation.isFree) {
+          <div class="notice notice--ok"><kh-icon name="check-circle" /><p>{{ i18n.t('cancel.free') }}</p></div>
+        } @else {
+          <div class="notice notice--warn"><kh-icon name="warning" />
+            <p>{{ b.cancellation.penalty.isRange
+              ? i18n.t('cancel.penaltyRange', { min: format.money(b.cancellation.penalty.minAmount), max: format.money(b.cancellation.penalty.maxAmount) })
+              : i18n.t('cancel.penalty', { amount: format.money(b.cancellation.penalty.maxAmount) }) }}</p></div>
+        }
+        <fieldset class="field">
+          <legend class="field__label">{{ i18n.t('cancel.reason') }}</legend>
+          <div class="stack stack--sm">
+            @for (reason of cancelReasons(); track reason.name) {
+              <label class="check"><input type="radio" name="cancel-reason" [value]="reason.name" [checked]="cancelReason() === reason.name"
+                (change)="cancelReason.set(reason.name); cancelMissingReason.set(false)" />
+                <span>{{ i18n.isArabic() ? reason.labelAr : reason.labelEn }}</span></label>
+            }
+          </div>
+          @if (cancelMissingReason()) { <p class="field__error">{{ i18n.t('cancel.chooseReason') }}</p> }
+        </fieldset>
+        <label class="field">
+          <span class="field__label">{{ i18n.t('cancel.details') }}</span>
+          <textarea class="textarea" maxlength="500" [value]="cancelDetails()" (input)="cancelDetails.set($any($event.target).value)"></textarea>
+          <span class="field__hint">{{ i18n.t('cancel.detailsHint') }}</span>
+        </label>
+        @if (problemMessage(cancelProblem()); as text) { <p class="field__error" role="alert">{{ text }}</p> }
+        <div class="row dialog__actions">
+          <button type="button" class="btn btn--ghost" (click)="closeCancel()">{{ i18n.t('cancel.keep') }}</button>
+          <button type="button" class="btn btn--danger" [disabled]="cancelling()" (click)="confirmCancel(b)">{{ i18n.t('cancel.confirm') }}</button>
+        </div>
+      </div>
+    </dialog>
+  } @else {
+    <div class="stack" aria-busy="true">
+      <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+      <div class="card card--pad"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div></div>
+    </div>
+  }
+</div>

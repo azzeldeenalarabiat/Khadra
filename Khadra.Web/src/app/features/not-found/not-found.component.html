@@ -1,0 +1,11 @@
+<section class="container page page--narrow">
+  <div class="state">
+    <span class="state__icon"><kh-icon name="map-pin" /></span>
+    <h1 class="state__title">{{ i18n.t('notFound.title') }}</h1>
+    <p class="state__text">{{ i18n.t('notFound.text') }}</p>
+    <div class="row-actions">
+      <a class="btn btn--primary" [routerLink]="i18n.link()">{{ i18n.t('notFound.home') }}</a>
+      <a class="btn btn--secondary" [routerLink]="i18n.link('cars')">{{ i18n.t('notFound.cars') }}</a>
+    </div>
+  </div>
+</section>

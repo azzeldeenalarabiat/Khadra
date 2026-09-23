@@ -1,0 +1,22 @@
+<div class="container page account">
+  <div class="page-head">
+    <div>
+      <h1>{{ i18n.t('account.title') }}</h1>
+      <p class="user-text">{{ session.user()?.fullName }} · <span class="ltr">{{ session.user()?.email }}</span></p>
+    </div>
+  </div>
+  <div class="account__layout">
+    <nav class="account__nav" [attr.aria-label]="i18n.t('account.title')">
+      <a [routerLink]="i18n.link('profile')" routerLinkActive="is-active" [routerLinkActiveOptions]="{ exact: true }">
+        <kh-icon name="user" />{{ i18n.t('account.profile') }}</a>
+      <a [routerLink]="i18n.link('profile', 'documents')" routerLinkActive="is-active">
+        <kh-icon name="identification-card" />{{ i18n.t('account.documents') }}</a>
+      <a [routerLink]="i18n.link('profile', 'security')" routerLinkActive="is-active">
+        <kh-icon name="shield-check" />{{ i18n.t('account.security') }}</a>
+      <a [routerLink]="i18n.link('bookings')"><kh-icon name="calendar-check" />{{ i18n.t('nav.bookings') }}</a>
+      <a [routerLink]="i18n.link('saved')"><kh-icon name="heart" />{{ i18n.t('nav.saved') }}</a>
+      <a [routerLink]="i18n.link('notifications')"><kh-icon name="bell" />{{ i18n.t('nav.notifications') }}</a>
+    </nav>
+    <div class="account__main"><router-outlet /></div>
+  </div>
+</div>

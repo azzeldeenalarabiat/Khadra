@@ -1,0 +1,42 @@
+<div class="container page">
+  <div class="page-head"><h1>{{ i18n.t('saved.title') }}</h1></div>
+
+  @if (problem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="saved.reload()" />
+  } @else if (saved.value()) {
+    @if (rows().length === 0) {
+      <kh-state-panel icon="heart" [title]="i18n.t('saved.emptyTitle')" [text]="i18n.t('saved.emptyText')">
+        <div class="row-actions"><a class="btn btn--primary" [routerLink]="i18n.link('cars')">{{ i18n.t('notFound.cars') }}</a></div>
+      </kh-state-panel>
+    } @else {
+      <div class="grid-cards">
+        @for (row of rows(); track row.vehicleId) {
+          @if (row.listing; as listing) {
+            <kh-car-card [car]="listing" />
+          } @else {
+            <article class="car-card car-card--gone">
+              <div class="car-card__media"><span class="car-card__placeholder"><kh-icon name="car" /><span>{{ i18n.t('saved.unavailable') }}</span></span></div>
+              <div class="car-card__body">
+                @if (row.identity; as identity) {
+                  <h3 class="car-card__title"><span class="ltr">{{ identity.make }} {{ identity.model }} {{ identity.year }}</span></h3>
+                  <p class="faint small user-text">{{ identity.galleryName }}</p>
+                }
+                <p class="badge">{{ i18n.t('saved.unavailable') }}</p>
+                <p class="faint small">{{ i18n.t('saved.savedOn', { date: format.date(row.savedAt) }) }}</p>
+                <div class="car-card__foot">
+                  <button type="button" class="btn btn--secondary btn--sm" [disabled]="removing() === row.vehicleId" (click)="remove(row)">
+                    <kh-icon name="x" />{{ i18n.t('saved.remove') }}</button>
+                </div>
+              </div>
+            </article>
+          }
+        }
+      </div>
+    }
+  } @else {
+    <div class="grid-cards" aria-busy="true">
+      <div class="car-card"><div class="skeleton skeleton--media"></div><div class="car-card__body"><div class="skeleton skeleton--title"></div></div></div>
+      <div class="car-card"><div class="skeleton skeleton--media"></div><div class="car-card__body"><div class="skeleton skeleton--title"></div></div></div>
+    </div>
+  }
+</div>

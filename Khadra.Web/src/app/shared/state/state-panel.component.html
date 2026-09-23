@@ -1,0 +1,16 @@
+<div class="state" [class.state--compact]="compact()" [class.state--error]="kind() === 'error'" [attr.role]="kind() === 'error' ? 'alert' : null">
+  <span class="state__icon"><kh-icon [name]="shownIcon()" /></span>
+  @if (shownTitle()) {
+    <p class="state__title">{{ shownTitle() }}</p>
+  }
+  @if (shownText()) {
+    <p class="state__text">{{ shownText() }}</p>
+  }
+  <ng-content />
+  @if (shownAction(); as label) {
+    <button type="button" class="btn btn--secondary" (click)="action.emit()">{{ label }}</button>
+  }
+  @if (problem()?.traceId; as traceId) {
+    <p class="state__trace ltr">{{ i18n.t('state.traceId', { traceId }) }}</p>
+  }
+</div>

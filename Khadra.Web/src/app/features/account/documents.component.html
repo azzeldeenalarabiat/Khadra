@@ -1,0 +1,46 @@
+@if (loadProblem(); as failure) {
+  <kh-state-panel kind="error" [problem]="failure" (action)="documents.reload()" />
+} @else if (documents.value(); as value) {
+  <section class="card card--pad" aria-labelledby="documents-title">
+    <h2 id="documents-title" class="card__title">{{ i18n.t('documents.title') }}</h2>
+    <p class="muted small">{{ i18n.t('documents.intro') }}</p>
+    @if (value.isComplete) {
+      <div class="notice notice--ok"><kh-icon name="check-circle" /><p>{{ i18n.t('documents.complete') }}</p></div>
+    } @else {
+      <div class="notice notice--warn"><kh-icon name="identification-card" /><p>{{ i18n.t('documents.missing', { list: missingText() }) }}</p></div>
+    }
+    @if (limitsText()) { <p class="faint small">{{ limitsText() }}</p> }
+
+    <ul class="doc-list">
+      @for (slot of slots(); track slot.type) {
+        <li class="doc" [class.doc--rejected]="slot.document?.status === 'Rejected'">
+          <kh-icon [name]="slot.document ? 'file-text' : 'upload-simple'" />
+          <div class="doc__body">
+            <p class="doc__title">{{ typeLabel(slot.type) }}</p>
+            @if (slot.document; as doc) {
+              <p class="row"><span class="badge {{ statusTone(doc.status) }}">{{ statusLabel(doc.status) }}</span>
+                <span class="faint small">{{ i18n.t('documents.uploadedAt', { date: format.date(doc.uploadedAt) }) }}</span></p>
+              @if (doc.status === 'Rejected' && doc.reviewNote) {
+                <p class="field__error">{{ i18n.t('documents.rejectedReason', { reason: doc.reviewNote }) }}</p>
+              }
+            } @else {
+              <p class="faint small">{{ i18n.t('documents.notUploaded') }}</p>
+            }
+            @if (problems()[slot.type]; as text) { <p class="field__error" role="alert">{{ text }}</p> }
+          </div>
+          <div class="doc__actions">
+            @if (slot.document; as doc) {
+              <button type="button" class="btn btn--ghost btn--sm" (click)="view(doc)">{{ i18n.t('documents.view') }}</button>
+            }
+            <label class="btn btn--secondary btn--sm doc__upload" [class.is-busy]="uploading() === slot.type">
+              {{ uploading() === slot.type ? i18n.t('documents.uploading') : (slot.document ? i18n.t('documents.replace') : i18n.t('documents.upload')) }}
+              <input type="file" class="sr-only" [accept]="accept()" [disabled]="uploading() !== null" (change)="upload(slot.type, $event)" />
+            </label>
+          </div>
+        </li>
+      }
+    </ul>
+  </section>
+} @else {
+  <div class="card card--pad" aria-busy="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+}

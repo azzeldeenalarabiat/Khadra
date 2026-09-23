@@ -1,0 +1,18 @@
+<footer class="site-footer">
+  <div class="container site-footer__inner">
+    <div class="site-footer__brand">
+      <img src="/brand/khadra-logo-64.png" width="32" height="32" alt="" />
+      <div>
+        <p class="site-footer__name">{{ i18n.t('brand.name') }}</p>
+        <p class="muted">{{ i18n.t('brand.tagline') }}</p>
+      </div>
+    </div>
+    <nav class="site-footer__links" [attr.aria-label]="i18n.t('nav.primary')">
+      <a [routerLink]="i18n.link('cars')">{{ i18n.t('nav.cars') }}</a>
+      <a [routerLink]="i18n.link('dealers')">{{ i18n.t('nav.offices') }}</a>
+      <a [routerLink]="['/ar']" hreflang="ar" lang="ar">العربية</a>
+      <a [routerLink]="['/en']" hreflang="en" lang="en">English</a>
+    </nav>
+    <p class="muted site-footer__rights">{{ i18n.t('footer.rights', { year }) }}</p>
+  </div>
+</footer>

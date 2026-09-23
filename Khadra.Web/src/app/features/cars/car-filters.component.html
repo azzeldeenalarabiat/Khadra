@@ -1,0 +1,106 @@
+@let s = search();
+<div class="filters">
+  @if (types().length > 0) {
+    <label class="field">
+      <span class="field__label">{{ i18n.t('filter.type') }}</span>
+      <select class="select" [value]="s.type ?? ''" (change)="setText('type', $any($event.target).value)">
+        <option value="">{{ i18n.t('filter.allTypes') }}</option>
+        @for (type of types(); track type.id) {
+          <option [value]="type.id" [selected]="type.id === s.type">{{ typeName(type) }}</option>
+        }
+      </select>
+    </label>
+  }
+
+  @if ((facets()?.makes ?? []).length > 0) {
+    <label class="field">
+      <span class="field__label">{{ i18n.t('filter.make') }}</span>
+      <select class="select" (change)="setText('make', $any($event.target).value)">
+        <option value="">{{ i18n.t('filter.anyMake') }}</option>
+        @for (make of facets()!.makes; track make) {
+          <option [value]="make" [selected]="make.toLowerCase() === (s.make ?? '').toLowerCase()">{{ make }}</option>
+        }
+      </select>
+    </label>
+  }
+
+  <fieldset class="field">
+    <legend class="field__label">{{ i18n.t('filter.price') }}</legend>
+    <div class="filters__pair">
+      <label><span class="sr-only">{{ i18n.t('filter.priceFrom') }}</span>
+        <input class="input" type="number" inputmode="decimal" min="0" step="1" [placeholder]="i18n.t('filter.priceFrom')"
+          [value]="s.minPrice ?? ''" (change)="setNumber('minPrice', $any($event.target).value)" [attr.aria-invalid]="priceInverted()" /></label>
+      <label><span class="sr-only">{{ i18n.t('filter.priceTo') }}</span>
+        <input class="input" type="number" inputmode="decimal" min="0" step="1" [placeholder]="i18n.t('filter.priceTo')"
+          [value]="s.maxPrice ?? ''" (change)="setNumber('maxPrice', $any($event.target).value)" [attr.aria-invalid]="priceInverted()" /></label>
+    </div>
+    @if (priceInverted()) {
+      <p class="field__error">{{ i18n.t('filter.priceInverted') }}</p>
+    }
+  </fieldset>
+
+  @if (transmissions().length > 0) {
+    <fieldset class="field">
+      <legend class="field__label">{{ i18n.t('filter.transmission') }}</legend>
+      <div class="chips chips--wrap">
+        <button type="button" class="chip" [attr.aria-pressed]="!s.transmission" (click)="setText('transmission', '')">{{ i18n.t('filter.any') }}</button>
+        @for (entry of transmissions(); track entry.name) {
+          <button type="button" class="chip" [attr.aria-pressed]="s.transmission === entry.name"
+            (click)="setText('transmission', entry.name)">{{ label(entry) }}</button>
+        }
+      </div>
+    </fieldset>
+  }
+
+  @if (fuels().length > 0) {
+    <fieldset class="field">
+      <legend class="field__label">{{ i18n.t('filter.fuel') }}</legend>
+      <div class="chips chips--wrap">
+        <button type="button" class="chip" [attr.aria-pressed]="!s.fuel" (click)="setText('fuel', '')">{{ i18n.t('filter.any') }}</button>
+        @for (fuel of fuels(); track fuel.name) {
+          <button type="button" class="chip" [attr.aria-pressed]="s.fuel === fuel.name" (click)="setText('fuel', fuel.name)">{{ fuel.label }}</button>
+        }
+      </div>
+    </fieldset>
+  }
+
+  @if ((facets()?.seats ?? []).length > 1) {
+    <fieldset class="field">
+      <legend class="field__label">{{ i18n.t('filter.seats') }}</legend>
+      <div class="chips chips--wrap">
+        <button type="button" class="chip" [attr.aria-pressed]="s.seats === null" (click)="setNumber('seats', '')">{{ i18n.t('filter.any') }}</button>
+        @for (count of facets()!.seats; track count) {
+          <button type="button" class="chip" [attr.aria-pressed]="s.seats === count" (click)="setNumber('seats', '' + count)">
+            {{ i18n.t('filter.seatsAtLeast', { count }) }}</button>
+        }
+      </div>
+    </fieldset>
+  }
+
+  @if ((facets()?.years ?? []).length > 1) {
+    <fieldset class="field">
+      <legend class="field__label">{{ i18n.t('filter.year') }}</legend>
+      <div class="filters__pair">
+        <label><span class="sr-only">{{ i18n.t('filter.yearFrom') }}</span>
+          <select class="select" (change)="setNumber('minYear', $any($event.target).value)">
+            <option value="">{{ i18n.t('filter.yearFrom') }}</option>
+            @for (year of facets()!.years; track year) {
+              <option [value]="year" [selected]="s.minYear === year">{{ year }}</option>
+            }
+          </select></label>
+        <label><span class="sr-only">{{ i18n.t('filter.yearTo') }}</span>
+          <select class="select" (change)="setNumber('maxYear', $any($event.target).value)">
+            <option value="">{{ i18n.t('filter.yearTo') }}</option>
+            @for (year of facets()!.years; track year) {
+              <option [value]="year" [selected]="s.maxYear === year">{{ year }}</option>
+            }
+          </select></label>
+      </div>
+    </fieldset>
+  }
+
+  <label class="check">
+    <input type="checkbox" [checked]="s.delivery" (change)="setDelivery($any($event.target).checked)" />
+    <span>{{ i18n.t('filter.delivery') }}</span>
+  </label>
+</div>
