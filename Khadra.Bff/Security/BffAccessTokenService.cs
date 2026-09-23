@@ -1,13 +1,14 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Options;
 
 namespace Khadra.Bff.Security;
 
 // Returns a valid API access token for the current browser session, refreshing it server-side when it
 // is about to expire. Refreshes are single-flight per refresh token: the API's replay detection would
 // otherwise revoke the whole family when several proxied requests cross the threshold together.
-internal sealed class BffAccessTokenService(AuthApiClient authApiClient)
+internal sealed class BffAccessTokenService(AuthApiClient authApiClient, IOptions<BffSecuritySettings> settings)
 {
     private static readonly TimeSpan RefreshBeforeExpiry = TimeSpan.FromMinutes(1);
     private static readonly TimeSpan RefreshResultGrace = TimeSpan.FromSeconds(60);
@@ -44,6 +45,7 @@ internal sealed class BffAccessTokenService(AuthApiClient authApiClient)
         }
 
         StoreTokens(authentication.Properties, refreshed);
+        SessionLifetime.Extend(authentication.Properties, refreshed.RefreshTokenExpiresAt, settings.Value.SessionAbsoluteHours);
         await context.SignInAsync(BffConstants.CookieScheme, authentication.Principal, authentication.Properties);
         return refreshed.AccessToken;
     }

@@ -1,0 +1,98 @@
+{
+  "BffSecurity": {
+    "AllowedRoles": "Admin,DealerOwner,DealerEmployee",
+    "SessionAbsoluteHours": 8,
+    "SessionIdleMinutes": 30,
+    "Frontend": "Static"
+  },
+  "ReverseProxy": {
+    "Routes": {
+      "auth-register": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/register",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-register-dealer-owner": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/register-dealer-owner",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-verify-email": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/verify-email",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-resend-verification": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/resend-verification",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-forgot-password": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/forgot-password",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-reset-password": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/reset-password",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-accept-invitation": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/accept-invitation",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "app-config": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/app-config",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "api": {
+        "ClusterId": "webapi",
+        "Match": {
+          "Path": "/api/{**catch-all}"
+        }
+      }
+    }
+  }
+}

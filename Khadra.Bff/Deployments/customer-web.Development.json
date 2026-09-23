@@ -1,0 +1,13 @@
+{
+  "ReverseProxy": {
+    "Clusters": {
+      "web": {
+        "Destinations": {
+          "primary": {
+            "Address": "http://localhost:4400/"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "BffSecurity": {
+    "AllowedRoles": "Customer",
+    "SessionAbsoluteHours": 720,
+    "SessionIdleMinutes": 20160,
+    "SessionCookieName": "__Host-Khadra.Web.Session",
+    "AntiforgeryCookieName": "__Host-Khadra.Web.Antiforgery",
+    "XsrfCookieName": "KHADRA-WEB-XSRF",
+    "Frontend": "Proxy"
+  },
+  "ReverseProxy": {
+    "Routes": {
+      "auth-register": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/register",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-verify-email": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/verify-email",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-resend-verification": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/resend-verification",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-forgot-password": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/forgot-password",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "auth-reset-password": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/auth/reset-password",
+          "Methods": [
+            "POST"
+          ]
+        }
+      },
+      "app-config": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/app-config",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "lookup-cities": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/cities",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "lookup-car-types": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/car-types",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "catalogue-vehicles": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/vehicles",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "catalogue-facets": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/vehicles/facets",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "catalogue-vehicle": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/vehicles/{vehicleId:guid}",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "catalogue-quote": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/vehicles/{vehicleId:guid}/quote",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "galleries": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/galleries",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "gallery": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/galleries/{dealerId:guid}",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "gallery-reviews": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/galleries/{dealerId:guid}/reviews",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "vehicle-images": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/vehicle-images/{**path}",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "dealer-images": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/dealer-images/{**path}",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
+      "api": {
+        "ClusterId": "webapi",
+        "Match": {
+          "Path": "/api/{**catch-all}"
+        }
+      },
+      "pages": {
+        "ClusterId": "web",
+        "AuthorizationPolicy": "Anonymous",
+        "Order": 1000,
+        "Match": {
+          "Path": "/{**catch-all}",
+          "Methods": [
+            "GET",
+            "HEAD"
+          ]
+        }
+      }
+    },
+    "Clusters": {
+      "web": {
+        "Destinations": {
+          "primary": {
+            "Address": "http://khadra-web:4000/"
+          }
+        }
+      }
+    }
+  }
+}

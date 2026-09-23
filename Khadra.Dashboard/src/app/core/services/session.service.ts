@@ -21,6 +21,7 @@ export interface SessionUser {
 export type SignInFailure =
   | { readonly kind: 'invalid-credentials' }
   | { readonly kind: 'suspended' }
+  | { readonly kind: 'wrong-console' }
   | { readonly kind: 'email-not-verified' }
   | { readonly kind: 'rate-limited'; readonly retryAfterSeconds: number | null }
   | { readonly kind: 'unavailable' };
@@ -145,6 +146,8 @@ function classify(error: unknown): SignInFailure {
     // Both are 403; only the code separates them, and they need different words.
     if (code === 'auth.account_suspended') return { kind: 'suspended' };
     if (code === 'auth.email_not_verified') return { kind: 'email-not-verified' };
+    // A customer account: the BFF closed the session the API opened and refused it here.
+    if (code === 'bff.role_not_allowed') return { kind: 'wrong-console' };
     return { kind: 'unavailable' };
   }
 

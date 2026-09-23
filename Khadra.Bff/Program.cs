@@ -30,11 +30,51 @@ if (builder.Environment.IsDevelopment())
     builder.Configuration.AddUserSecrets<BffAssemblyMarker>(optional: true);
 builder.Configuration.AddEnvironmentVariables();
 
+// One codebase, two deployments: the staff console and the customer website. What differs between them
+// -- the route table, the roles allowed a session, cookie names, what serves the pages -- is a file per
+// deployment, loaded just above appsettings.Local.json so the environment still overrides it. A file
+// rather than a pile of overrides because configuration can add and replace routes but never remove
+// one: a customer BFF layered on the console's table would still forward register-dealer-owner.
+var deployment = builder.Configuration[$"{BffSecuritySettings.SectionName}:Deployment"] ?? BffRealm.ConsoleDeployment;
+if (!System.Text.RegularExpressions.Regex.IsMatch(deployment, "^[a-z][a-z0-9-]{1,31}$"))
+    throw new InvalidOperationException($"BffSecurity:Deployment '{deployment}' is not a deployment name.");
+var deploymentFile = Path.Combine("Deployments", $"{deployment}.json");
+if (!File.Exists(Path.Combine(builder.Environment.ContentRootPath, deploymentFile)))
+    throw new InvalidOperationException($"BffSecurity:Deployment is '{deployment}' but {deploymentFile} does not exist.");
+var localIndex = builder.Configuration.Sources.ToList().FindLastIndex(source =>
+    source is Microsoft.Extensions.Configuration.Json.JsonConfigurationSource json && json.Path == "appsettings.Local.json");
+builder.Configuration.Sources.Insert(localIndex, new Microsoft.Extensions.Configuration.Json.JsonConfigurationSource
+{
+    Path = Path.Combine("Deployments", $"{deployment}.{environmentName}.json"),
+    Optional = true,
+    ReloadOnChange = true,
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(builder.Environment.ContentRootPath),
+});
+builder.Configuration.Sources.Insert(localIndex, new Microsoft.Extensions.Configuration.Json.JsonConfigurationSource
+{
+    Path = deploymentFile,
+    Optional = false,
+    ReloadOnChange = true,
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(builder.Environment.ContentRootPath),
+});
+
 var securitySection = builder.Configuration.GetRequiredSection(BffSecuritySettings.SectionName);
 var security = securitySection.Get<BffSecuritySettings>()
     ?? throw new InvalidOperationException("BffSecurity configuration is required.");
 if (!Uri.TryCreate(security.ApiBaseUrl, UriKind.Absolute, out var apiBaseUri))
     throw new InvalidOperationException("BffSecurity:ApiBaseUrl must be an absolute URL.");
+var allowedRoles = security.AllowedRoleSet();
+if (allowedRoles.Count == 0)
+    throw new InvalidOperationException("BffSecurity:AllowedRoles names no role, so nobody could sign in.");
+var realm = BffRealm.For(security.Deployment);
+var proxiesFrontend = security.Frontend == "Proxy";
+if (proxiesFrontend && string.IsNullOrWhiteSpace(security.FrontendSharedSecret) && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        "BffSecurity:Frontend is Proxy but BffSecurity:FrontendSharedSecret is empty. The renderer is " +
+        "reachable on its own address, and without the secret it cannot tell a request this BFF forwarded " +
+        "from one that names its own client address.");
+}
 
 builder.Services.AddOptions<BffSecuritySettings>()
     .Bind(securitySection)
@@ -61,11 +101,11 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
 builder.Services.AddStackExchangeRedisCache(options =>
 {
     options.ConnectionMultiplexerFactory = () => Task.FromResult<IConnectionMultiplexer>(redis);
-    options.InstanceName = "khadra-bff:";
+    options.InstanceName = realm.CacheInstanceName;
 });
 builder.Services.AddDataProtection()
-    .SetApplicationName("Khadra.Bff")
-    .PersistKeysToStackExchangeRedis(redis, "khadra-bff:dataprotection-keys");
+    .SetApplicationName(realm.DataProtectionApplicationName)
+    .PersistKeysToStackExchangeRedis(redis, realm.KeyRingKey);
 
 builder.Services.AddSingleton<DistributedCacheTicketStore>();
 builder.Services.AddSingleton<IPostConfigureOptions<CookieAuthenticationOptions>, ConfigureSessionCookie>();
@@ -95,7 +135,7 @@ builder.Services
     })
     .AddCookie(BffConstants.CookieScheme, options =>
     {
-        options.Cookie.Name = BffConstants.SessionCookieName;
+        options.Cookie.Name = security.SessionCookieName;
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Lax;
@@ -105,6 +145,18 @@ builder.Services
         options.SlidingExpiration = false;
         options.Events = new CookieAuthenticationEvents
         {
+            // The role is checked at sign-in AND on every request. At sign-in alone, a session opened
+            // before AllowedRoles was narrowed -- or a ticket from another deployment, were the realms
+            // ever misconfigured to match -- would carry on being honoured.
+            OnValidatePrincipal = async context =>
+            {
+                var role = context.Principal?.FindFirstValue(ClaimTypes.Role);
+                if (role is null || !allowedRoles.Contains(role))
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(BffConstants.CookieScheme);
+                }
+            },
             OnRedirectToLogin = context =>
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -124,7 +176,7 @@ builder.Services.AddAntiforgery(options =>
     options.HeaderName = BffConstants.XsrfHeaderName;
     // Never read the token from a form body: multipart uploads are streamed to the API by YARP.
     options.SuppressReadingTokenFromFormBody = true;
-    options.Cookie.Name = BffConstants.AntiforgeryCookieName;
+    options.Cookie.Name = security.AntiforgeryCookieName;
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Strict;
@@ -137,6 +189,10 @@ builder.Services.AddReverseProxy()
     {
         var isAnonymousRoute = string.Equals(
             transformBuilder.Route?.AuthorizationPolicy, "Anonymous", StringComparison.OrdinalIgnoreCase);
+        var isFrontendRoute = string.Equals(
+            transformBuilder.Route?.ClusterId, BffConstants.FrontendClusterId, StringComparison.Ordinal);
+        if (isFrontendRoute && !isAnonymousRoute)
+            throw new InvalidOperationException("A route to the renderer must be Anonymous: pages are public, and the session never leaves this BFF.");
 
         transformBuilder.AddRequestTransform(async transform =>
         {
@@ -148,6 +204,15 @@ builder.Services.AddReverseProxy()
             var clientAddress = transform.HttpContext.Connection.RemoteIpAddress?.ToString();
             if (clientAddress is not null)
                 transform.ProxyRequest.Headers.TryAddWithoutValidation("X-Forwarded-For", clientAddress);
+
+            if (isFrontendRoute)
+            {
+                // The renderer believes the X-Forwarded-For above only with this beside it. Whatever the
+                // browser sent under the same name is replaced, never passed along.
+                transform.ProxyRequest.Headers.Remove(BffConstants.EdgeSecretHeaderName);
+                if (!string.IsNullOrEmpty(security.FrontendSharedSecret))
+                    transform.ProxyRequest.Headers.TryAddWithoutValidation(BffConstants.EdgeSecretHeaderName, security.FrontendSharedSecret);
+            }
 
             if (isAnonymousRoute)
                 return;
@@ -407,10 +472,9 @@ app.Use(async (context, next) =>
         context.Response.Headers["X-Content-Type-Options"] = "nosniff";
         context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
         context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self), payment=()";
-        // Tighten to nonce-based styles + Trusted Types once the dashboard's PrimeNG usage is known.
-        context.Response.Headers["Content-Security-Policy"] =
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; " +
-            "font-src 'self' data:; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+        // Per deployment (the website needs a map tile host the console does not). Tighten to
+        // nonce-based styles + Trusted Types once both frontends' needs are known.
+        context.Response.Headers["Content-Security-Policy"] = security.ContentSecurityPolicy;
         context.Response.Headers.Remove("Server");
         return Task.CompletedTask;
     });
@@ -430,34 +494,41 @@ app.UseHttpsRedirection();
 // Everything else IS content-hashed, which means its name changes whenever its bytes do, so it can
 // be cached hard and immutably. The pairing is the point: revalidate the index, never revalidate the
 // assets it names.
-app.UseStaticFiles(new StaticFileOptions
+//
+// Static only. The image is shared, so a customer-web BFF has the staff console's build in its
+// wwwroot too; serving it would publish the whole admin and dealer SPA on the customer host. In
+// Proxy mode every page, and every asset, comes from the renderer instead.
+if (!proxiesFrontend)
 {
-    OnPrepareResponse = context =>
+    app.UseStaticFiles(new StaticFileOptions
     {
-        var headers = context.Context.Response.GetTypedHeaders();
-        var path = context.File.Name;
+        OnPrepareResponse = context =>
+        {
+            var headers = context.Context.Response.GetTypedHeaders();
+            var path = context.File.Name;
 
-        if (path.Equals("index.html", StringComparison.OrdinalIgnoreCase))
-        {
-            headers.CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, MustRevalidate = true };
-        }
-        else
-        {
-            headers.CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue
+            if (path.Equals("index.html", StringComparison.OrdinalIgnoreCase))
             {
-                Public = true,
-                MaxAge = TimeSpan.FromDays(365),
-                Extensions = { new Microsoft.Net.Http.Headers.NameValueHeaderValue("immutable") },
-            };
-        }
-    },
-});
+                headers.CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, MustRevalidate = true };
+            }
+            else
+            {
+                headers.CacheControl = new Microsoft.Net.Http.Headers.CacheControlHeaderValue
+                {
+                    Public = true,
+                    MaxAge = TimeSpan.FromDays(365),
+                    Extensions = { new Microsoft.Net.Http.Headers.NameValueHeaderValue("immutable") },
+                };
+            }
+        },
+    });
+}
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/bff/antiforgery", (HttpContext context) =>
 {
-    var requestToken = IssueAntiforgeryCookie(context);
+    var requestToken = IssueAntiforgeryCookie(context, security);
     context.Response.Headers.CacheControl = "no-store";
     return Results.Ok(new { requestToken });
 }).AllowAnonymous();
@@ -472,6 +543,14 @@ app.MapPost("/bff/login", async (HttpContext context, IAntiforgery antiforgery, 
     var result = await api.LoginAsync(request.Email, request.Password, context.RequestAborted);
     if (result.Tokens is null)
         return ProblemFromApi(result);
+
+    // Refused BEFORE a session exists, and the refresh family the API just opened is closed again so a
+    // refused sign-in leaves nothing live behind it. Same answer whichever side the account belongs to.
+    if (!allowedRoles.Contains(result.Tokens.User.Role))
+    {
+        await api.LogoutAsync(result.Tokens.AccessToken, result.Tokens.RefreshToken, context.RequestAborted);
+        return Problem(StatusCodes.Status403Forbidden, "This account cannot sign in here.", "bff.role_not_allowed", null);
+    }
 
     await SignInAsync(context, result.Tokens, security);
     return Results.Ok(ToSessionUser(result.Tokens.User));
@@ -504,7 +583,7 @@ app.MapPost("/bff/logout", async (HttpContext context, IAntiforgery antiforgery,
 
     await context.SignOutAsync(BffConstants.CookieScheme);
     context.User = new ClaimsPrincipal(new ClaimsIdentity());
-    IssueAntiforgeryCookie(context);
+    IssueAntiforgeryCookie(context, security);
     return Results.NoContent();
 }).RequireAuthorization();
 
@@ -540,16 +619,22 @@ app.MapReverseProxy(proxyPipeline =>
     });
 }).RequireAuthorization();
 
-// Serves the built Angular dashboard from wwwroot in production; in development ng serve proxies here.
-// The SPA fallback serves index.html for every client-side route, and it does NOT go through the
-// static-file options above -- so the no-cache rule is repeated here or a deep link would still be
-// served from a stale copy.
-app.MapFallbackToFile("index.html", new StaticFileOptions
+// Static: serves the built Angular dashboard from wwwroot in production; in development ng serve
+// proxies here. The SPA fallback serves index.html for every client-side route, and it does NOT go
+// through the static-file options above -- so the no-cache rule is repeated here or a deep link would
+// still be served from a stale copy.
+//
+// Proxy: the deployment's route table ends in an anonymous catch-all to the renderer, which answers
+// every page -- including a real 404 for a path nothing knows, which a fallback file could not.
+if (!proxiesFrontend)
 {
-    OnPrepareResponse = context =>
-        context.Context.Response.GetTypedHeaders().CacheControl =
-            new Microsoft.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, MustRevalidate = true },
-}).AllowAnonymous();
+    app.MapFallbackToFile("index.html", new StaticFileOptions
+    {
+        OnPrepareResponse = context =>
+            context.Context.Response.GetTypedHeaders().CacheControl =
+                new Microsoft.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, MustRevalidate = true },
+    }).AllowAnonymous();
+}
 
 await app.RunAsync();
 
@@ -567,14 +652,13 @@ static async Task SignInAsync(HttpContext context, ApiAuthTokens tokens, BffSecu
     };
 
     var now = DateTimeOffset.UtcNow;
-    var absoluteExpiry = now.AddHours(security.SessionAbsoluteHours);
     var properties = new AuthenticationProperties
     {
         AllowRefresh = false,
         IsPersistent = true,
         IssuedUtc = now,
-        ExpiresUtc = tokens.RefreshTokenExpiresAt < absoluteExpiry ? tokens.RefreshTokenExpiresAt : absoluteExpiry
     };
+    SessionLifetime.Start(properties, now, tokens.RefreshTokenExpiresAt, security.SessionAbsoluteHours);
     BffAccessTokenService.StoreTokens(properties, tokens);
 
     var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, BffConstants.CookieScheme, ClaimTypes.Name, ClaimTypes.Role));
@@ -582,14 +666,14 @@ static async Task SignInAsync(HttpContext context, ApiAuthTokens tokens, BffSecu
 
     // Antiforgery tokens are bound to the identity; re-issue one for the now-authenticated principal.
     context.User = principal;
-    IssueAntiforgeryCookie(context);
+    IssueAntiforgeryCookie(context, security);
 }
 
-static string IssueAntiforgeryCookie(HttpContext context)
+static string IssueAntiforgeryCookie(HttpContext context, BffSecuritySettings security)
 {
     var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
     var tokens = antiforgery.GetAndStoreTokens(context);
-    context.Response.Cookies.Append(BffConstants.XsrfCookieName, tokens.RequestToken!, new CookieOptions
+    context.Response.Cookies.Append(security.XsrfCookieName, tokens.RequestToken!, new CookieOptions
     {
         HttpOnly = false,
         Secure = true,

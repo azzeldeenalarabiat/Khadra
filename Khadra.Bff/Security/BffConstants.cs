@@ -3,10 +3,14 @@ namespace Khadra.Bff.Security;
 internal static class BffConstants
 {
     public const string CookieScheme = "KhadraSession";
-    public const string SessionCookieName = "__Host-Khadra.Session";
-    public const string AntiforgeryCookieName = "__Host-Khadra.Antiforgery";
-    public const string XsrfCookieName = "XSRF-TOKEN";
+    // Cookie names are per deployment now: BffSecuritySettings.SessionCookieName and friends.
     public const string XsrfHeaderName = "X-XSRF-TOKEN";
+
+    /// <summary>The cluster that renders the customer website's pages (Frontend = Proxy).</summary>
+    public const string FrontendClusterId = "web";
+
+    /// <summary>Carries BffSecurity:FrontendSharedSecret to the renderer.</summary>
+    public const string EdgeSecretHeaderName = "X-Khadra-Edge";
 
     public const string AccessTokenName = "access_token";
     public const string RefreshTokenName = "refresh_token";

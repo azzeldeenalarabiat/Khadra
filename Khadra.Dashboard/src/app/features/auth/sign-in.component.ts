@@ -104,6 +104,13 @@ function describe(failure: SignInFailure): Notice {
         textKey: 'auth.signIn.suspended.text',
       };
 
+    case 'wrong-console':
+      return {
+        tone: 's-warn',
+        titleKey: 'auth.signIn.wrongConsole.title',
+        textKey: 'auth.signIn.wrongConsole.text',
+      };
+
     case 'email-not-verified':
       return {
         tone: 's-warn',

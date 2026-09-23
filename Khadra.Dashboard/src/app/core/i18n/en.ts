@@ -278,6 +278,8 @@ export const EN = {
   'auth.signIn.suspended.title': 'Your account has been suspended',
   'auth.signIn.suspended.text':
     'Contact support to have it reviewed. Resetting your password will not restore access.',
+  'auth.signIn.wrongConsole.title': 'This is the Khadra business console',
+  'auth.signIn.wrongConsole.text': 'Customer accounts sign in on the Khadra website or in the Khadra app.',
   'auth.signIn.unverified.title': 'Verify your email address first',
   'auth.signIn.unverified.text':
     'We sent a verification link when the account was created. Open it, then sign in.',

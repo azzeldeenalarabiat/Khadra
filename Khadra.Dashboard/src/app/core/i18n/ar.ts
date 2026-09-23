@@ -263,6 +263,8 @@ export const AR = {
   'auth.signIn.suspended.title': 'تم إيقاف حسابك',
   'auth.signIn.suspended.text':
     'تواصل مع الدعم لمراجعة الحساب. إعادة تعيين كلمة المرور لن تعيد إليك صلاحية الدخول.',
+  'auth.signIn.wrongConsole.title': 'هذه لوحة أعمال خضرا',
+  'auth.signIn.wrongConsole.text': 'يسجّل العملاء الدخول عبر موقع خضرا أو تطبيق خضرا.',
   'auth.signIn.unverified.title': 'أكّد عنوان بريدك الإلكتروني أولًا',
   'auth.signIn.unverified.text': 'أرسلنا رابط تأكيد عند إنشاء الحساب. افتحه، ثم سجّل الدخول.',
   'auth.signIn.unverified.action': 'إرسال رابط جديد',

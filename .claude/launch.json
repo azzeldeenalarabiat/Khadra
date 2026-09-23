@@ -4,27 +4,115 @@
     {
       "name": "api",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Khadra.WebAPI", "--launch-profile", "https"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Khadra.WebAPI",
+        "--launch-profile",
+        "https"
+      ],
       "port": 7012
     },
     {
       "name": "api-lan",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Khadra.WebAPI", "--launch-profile", "https", "--", "--urls", "https://localhost:7012;http://0.0.0.0:5012"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Khadra.WebAPI",
+        "--launch-profile",
+        "https",
+        "--",
+        "--urls",
+        "https://localhost:7012;http://0.0.0.0:5012"
+      ],
       "port": 5012
     },
     {
       "name": "bff",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "Khadra.Bff", "--launch-profile", "https"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Khadra.Bff",
+        "--launch-profile",
+        "https"
+      ],
       "port": 7243
     },
     {
       "name": "dashboard",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--prefix", "Khadra.Dashboard", "ng", "serve", "--host", "localhost", "--port", "4200"],
+      "runtimeArgs": [
+        "--prefix",
+        "Khadra.Dashboard",
+        "ng",
+        "serve",
+        "--host",
+        "localhost",
+        "--port",
+        "4200"
+      ],
       "port": 4200,
       "autoPort": true
+    },
+    {
+      "name": "web-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Khadra.WebAPI",
+        "--launch-profile",
+        "https",
+        "--",
+        "--urls",
+        "https://localhost:7112;http://localhost:5112"
+      ],
+      "port": 7112,
+      "env": {
+        "Email__Provider": "Smtp",
+        "Email__Host": "localhost",
+        "Email__Port": "1025",
+        "Email__UseStartTls": "false",
+        "Email__FromAddress": "no-reply@khadra.local",
+        "Documents__RootPath": "../../../../Khadra.WebAPI/App_Data/documents"
+      }
+    },
+    {
+      "name": "web-bff",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Khadra.Bff",
+        "--launch-profile",
+        "customer-web"
+      ],
+      "port": 7244,
+      "env": {
+        "BffSecurity__ApiBaseUrl": "https://localhost:7112/",
+        "ReverseProxy__Clusters__webapi__Destinations__primary__Address": "https://localhost:7112/"
+      }
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "--prefix",
+        "Khadra.Web",
+        "ng",
+        "serve",
+        "--host",
+        "localhost",
+        "--port",
+        "4400"
+      ],
+      "port": 4400,
+      "env": {
+        "KHADRA_API_URL": "http://localhost:5112",
+        "KHADRA_PUBLIC_BASE_URL": "http://localhost:4400"
+      }
     }
   ]
 }
