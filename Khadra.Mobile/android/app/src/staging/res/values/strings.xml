@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The STAGING build only. Overrides main/res/values/strings.xml for the `staging` flavor, so the
+        launcher, the app-info screen and the task switcher can never show "Khadra" for an app that
+        talks to the test API. "TEST" in Latin in both languages on purpose: it is the one word every
+        tester recognises, and it must survive a phone switched to Arabic.
+    -->
+    <string name="app_name">Khadra TEST</string>
+</resources>

@@ -3926,3 +3926,20 @@ one uninstall.
 password in a password manager, the file on offline storage — and a restore tested once: a release
 built on another machine from those copies passes `apksigner verify --print-certs` with the
 fingerprint above.
+
+### 135. After a failed payment attempt the app cannot say why it failed
+
+**Status:** open · **Raised:** 2026-09-23
+
+The customer app's in-app checkout (`CheckoutScreen`) learns an attempt's outcome by re-reading the
+booking. `PaymentAvailabilityDto.LiveAttempt` names only the attempt still in flight, so once an
+attempt is declined, lapses or fails at the provider the booking read carries `liveAttempt: null` and
+no `failureCode`. The app therefore says only what it knows — "that payment attempt ended without
+confirming your booking" — and never "declined", "expired" or "try another card".
+
+That is honest and it is enough for the sandbox. It is not enough for real cards: a customer whose
+bank declined them and a customer whose session lapsed need different next steps.
+
+**To close:** an additive, optional field on the customer's booking read (for example `lastAttempt`
+with its `status` and `failureCode`, owner approval needed as it is the Payments read model), and the
+app mapping those codes through `api_failure_messages.dart` — before the first real provider goes live.

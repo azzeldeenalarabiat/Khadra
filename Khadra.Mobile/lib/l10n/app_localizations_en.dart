@@ -2047,6 +2047,31 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is a test build. No card is charged and no money moves. Any booking you confirm here is not a real rental.';
 
   @override
+  String get environmentStagingRibbon => 'TEST BUILD · STAGING SERVER';
+
+  @override
+  String get environmentSandboxPayments => 'Sandbox payments';
+
+  @override
+  String get checkoutTitle => 'Payment';
+
+  @override
+  String get checkoutClose => 'Close the payment page';
+
+  @override
+  String get checkoutLoadFailed =>
+      'The payment page did not load. Check your connection and try again.';
+
+  @override
+  String checkoutStillOpen(String time) {
+    return 'Your payment is still open until $time. Tap “Pay the deposit” to continue it.';
+  }
+
+  @override
+  String get checkoutAttemptEnded =>
+      'That payment attempt ended without confirming your booking. You can try again while the payment window is open.';
+
+  @override
   String get sandboxPaymentsAttempt => 'Test payment — no money moved.';
 
   @override

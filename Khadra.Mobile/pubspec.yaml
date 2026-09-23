@@ -72,6 +72,11 @@ dependencies:
   # with the minimum /app-config publishes. Read from the platform rather than typed into a
   # constant, because a constant is a second copy of this file's `version:` that nobody bumps.
   package_info_plus: ^10.2.1
+  # The provider's checkout page, INSIDE the app. A customer handed to the external browser has
+  # left Khadra mid-payment, and coming back is a task switch they have to find on their own. The
+  # page is whatever URL the server minted for the attempt; the app reads nothing from it and
+  # learns the outcome from the booking, never from where the page navigates. See CheckoutScreen.
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   flutter_test:
@@ -96,6 +101,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+
+  # Which Khadra a build talks to when no --flavor is given. `production` is the customer app,
+  # unchanged: same applicationId, same name, and the API address still passed with
+  # --dart-define=KHADRA_API_BASE_URL. The other flavor is `staging` (--flavor staging), a separate
+  # "Khadra TEST" app bound to the staging API. See AppEnvironment and docs/production.md.
+  default-flavor: production
 
   assets:
     - assets/brand/

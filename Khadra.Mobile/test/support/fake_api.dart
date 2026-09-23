@@ -30,7 +30,10 @@ class FakeApi extends KhadraApi {
   /// predates it — which is also what every test that does not care gets.
   Map<String, dynamic>? mobileApp;
 
-  static AppConfig fakeConfig({Map<String, dynamic>? mobileApp}) => AppConfig.fromJson({
+  /// The `payments.mode` `/app-config` answers with, or null to leave the section out.
+  String? paymentsMode;
+
+  static AppConfig fakeConfig({Map<String, dynamic>? mobileApp, String? paymentsMode}) => AppConfig.fromJson({
         'timeZone': 'Asia/Amman',
         'currency': {'code': 'JOD', 'minorUnits': 3},
         'maxAdvanceBookingDays': 180,
@@ -43,6 +46,7 @@ class FakeApi extends KhadraApi {
         },
         'vocabularies': <String, dynamic>{},
         if (mobileApp != null) 'mobileApp': mobileApp,
+        if (paymentsMode != null) 'payments': {'mode': paymentsMode},
       });
 
   static AuthUser fakeUser({
@@ -69,7 +73,7 @@ class FakeApi extends KhadraApi {
       );
 
   @override
-  Future<AppConfig> appConfig() async => fakeConfig(mobileApp: mobileApp);
+  Future<AppConfig> appConfig() async => fakeConfig(mobileApp: mobileApp, paymentsMode: paymentsMode);
 
   /// The lookups, empty unless a test says otherwise.
   List<Lookup> cityLookups = const [];
@@ -214,11 +218,27 @@ class FakeApi extends KhadraApi {
   /// The one booking the detail endpoint answers with. Set by the detail tests.
   Booking? bookingById;
 
+  /// How many times the detail endpoint was read. The checkout screen's polling is counted by it.
+  int bookingReads = 0;
+
   @override
   Future<Booking> booking(String bookingId) async {
+    bookingReads++;
     final found = bookingById;
     if (found == null) throw StateError("no booking was staged for $bookingId");
     return found;
+  }
+
+  /// What `deposit-checkout` answers with. Null fails the call loudly, like any unstaged endpoint.
+  PaymentAttempt? checkoutAttempt;
+  int checkoutCalls = 0;
+
+  @override
+  Future<PaymentAttempt> openDepositCheckout(String bookingId) async {
+    checkoutCalls++;
+    final attempt = checkoutAttempt;
+    if (attempt == null) throw StateError('no checkout was staged for $bookingId');
+    return attempt;
   }
 
   @override

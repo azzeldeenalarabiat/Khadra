@@ -964,8 +964,21 @@ void showKhadraMessage(
   /// is counting — the Back-to-exit hint, which must not outlive the two seconds
   /// it is offering.
   Duration? duration,
+}) =>
+    showKhadraMessageOn(ScaffoldMessenger.of(context), message,
+        isError: isError, duration: duration);
+
+/// [showKhadraMessage] for a caller whose own context may be gone by the time it
+/// has something to say -- a widget that awaited a pushed route and a re-read,
+/// during which the screen can rebuild it away. Take the messenger first, say it
+/// later.
+void showKhadraMessageOn(
+  ScaffoldMessengerState messenger,
+  String message, {
+  bool isError = false,
+  Duration? duration,
 }) {
-  ScaffoldMessenger.of(context)
+  messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
       SnackBar(

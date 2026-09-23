@@ -3362,6 +3362,48 @@ abstract class AppLocalizations {
   /// **'This is a test build. No card is charged and no money moves. Any booking you confirm here is not a real rental.'**
   String get sandboxPaymentsBody;
 
+  /// The strip across the top of every screen of the staging build (--flavor staging), and only that build. A property of the binary, shown from the first frame. Never shown in the production app.
+  ///
+  /// In en, this message translates to:
+  /// **'TEST BUILD · STAGING SERVER'**
+  String get environmentStagingRibbon;
+
+  /// Appended to the staging strip only once /app-config reports payments.mode = Sandbox. The server's fact, never the build's.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox payments'**
+  String get environmentSandboxPayments;
+
+  /// Heading of the in-app page that hosts the provider's checkout. The page's own host is shown under it.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get checkoutTitle;
+
+  /// No description provided for @checkoutClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close the payment page'**
+  String get checkoutClose;
+
+  /// No description provided for @checkoutLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment page did not load. Check your connection and try again.'**
+  String get checkoutLoadFailed;
+
+  /// After the customer closed the payment page while the server still reports that attempt as live. The time is the attempt's own expiry. Closing cancels nothing, so this never says 'cancelled'.
+  ///
+  /// In en, this message translates to:
+  /// **'Your payment is still open until {time}. Tap “Pay the deposit” to continue it.'**
+  String checkoutStillOpen(String time);
+
+  /// The attempt the customer opened is no longer live and the booking still awaits a deposit. Deliberately not 'declined': the booking read does not say why an attempt ended.
+  ///
+  /// In en, this message translates to:
+  /// **'That payment attempt ended without confirming your booking. You can try again while the payment window is open.'**
+  String get checkoutAttemptEnded;
+
   /// On one attempt, from the record's own isSandbox rather than the platform mode: a booking paid on a sandbox host stays a sandbox booking however the platform is configured when it is read later.
   ///
   /// In en, this message translates to:

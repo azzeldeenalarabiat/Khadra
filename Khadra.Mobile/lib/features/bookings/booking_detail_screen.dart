@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +20,7 @@ import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'booking_providers.dart';
 import 'booking_timeline.dart';
+import 'checkout_screen.dart';
 import 'cancel_booking_sheet.dart';
 
 /// One booking, in full.
@@ -491,22 +493,23 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
       child: FilledButton.icon(
         onPressed: _opening ? null : _pay,
         icon: const Icon(Icons.credit_card, size: 18),
-        label: Text(l10n.bookingPayDeposit),
+        label: Text(_opening ? l10n.bookingPaymentOpening : l10n.bookingPayDeposit),
       ),
     );
   }
 
-  /// Opens a checkout and hands the customer to the provider.
+  /// Opens a checkout and takes the customer through it INSIDE the app.
   ///
   /// Repeating it is safe and is the intended way to recover: the server returns
   /// the session already in flight rather than opening a second one, so a
-  /// customer who closed the tab lands back on the same card form.
+  /// customer who closed the page — or whose app was killed mid-payment — lands
+  /// back on the same card form.
   Future<void> _pay() async {
     final l10n = AppLocalizations.of(context);
+    final bookingId = widget.booking.bookingId;
     setState(() => _opening = true);
     try {
-      final attempt =
-          await ref.read(apiProvider).openDepositCheckout(widget.booking.bookingId);
+      final attempt = await ref.read(apiProvider).openDepositCheckout(bookingId);
       if (!mounted) return;
 
       final url = attempt.checkoutUrl;
@@ -515,10 +518,33 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
         return;
       }
 
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      // Coming back from a provider confirms NOTHING -- only a signed webhook
-      // does -- so the screen re-reads the booking rather than assuming.
-      if (mounted) invalidateBookings(ref, bookingId: widget.booking.bookingId);
+      // The browser build has no WebView to host it in, so there — and only
+      // there — the page opens in a new tab as it always did.
+      if (kIsWeb) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        if (mounted) invalidateBookings(ref, bookingId: bookingId);
+        return;
+      }
+
+      final messenger = ScaffoldMessenger.of(context);
+      final container = ProviderScope.containerOf(context, listen: false);
+      final exit = await CheckoutScreen.open(context, bookingId: bookingId, attempt: attempt);
+      if (!mounted) return;
+
+      // Leaving the page confirms NOTHING -- only a signed webhook does -- so the
+      // screen re-reads the booking and shows whatever the server now says. From
+      // here this widget may be rebuilt away (a confirmed booking has no Pay
+      // button), so the rest runs on the container and the messenger taken above.
+      invalidateBookings(ref, bookingId: bookingId);
+      final Booking booking;
+      try {
+        booking = await container.read(bookingProvider(bookingId).future);
+      } on Object {
+        return; // The screen shows its own error for a read that failed.
+      }
+      final message = checkoutReturnMessage(
+          l10n, exit, booking, attempt, container.read(formatsProvider));
+      if (message != null) showKhadraMessageOn(messenger, message);
     } on ApiFailure catch (failure) {
       if (mounted) showKhadraMessage(context, failure.messageFor(l10n), isError: true);
     } finally {

@@ -38,6 +38,32 @@ android {
         versionName = flutter.versionName
     }
 
+    // Which Khadra this APK talks to. The flavor is the ONE selector: it picks the Android identity
+    // here and, through Flutter's `appFlavor`, the API address in AppEnvironment. See
+    // docs/production.md, "The customer app".
+    //
+    // `production` changes nothing about the app customers have: same applicationId, same name, same
+    // key, and the API address is still passed at build time. pubspec.yaml names it the default
+    // flavor, so the release command that predates flavors still builds exactly this.
+    //
+    // `staging` is a different application on the phone (".staging"), so a tester can hold both and
+    // neither can ever update over the other. Its name ("Khadra TEST") lives in src/staging/res.
+    //
+    // NO versionNameSuffix. The API compares the version the app reports against
+    // MobileApp:MinimumSupportedVersion, and "1.1.0-staging" is a PRERELEASE that ranks below 1.1.0
+    // — the staging build would be refused on every call with 426 and never get past the update
+    // screen.
+    flavorDimensions += "environment"
+    productFlavors {
+        create("production") {
+            dimension = "environment"
+        }
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+        }
+    }
+
     signingConfigs {
         if (releaseSigning != null) {
             create("release") {

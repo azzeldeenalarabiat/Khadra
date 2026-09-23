@@ -439,12 +439,48 @@ cd Khadra.Mobile
 flutter build apk --release --dart-define=KHADRA_API_BASE_URL=https://khadra.onrender.com
 ```
 
-The APK is `build/app/outputs/flutter-apk/app-release.apk`. Before publishing it:
+The command is unchanged since the app gained build flavors: `pubspec.yaml` names `production` the
+default flavor, so it builds the customer app — same package, same name, same key. What changed is
+the file name. The APK is `build/app/outputs/flutter-apk/app-production-release.apk` (it was
+`app-release.apk` before flavors; that file is no longer written). Passing `--flavor production`
+explicitly builds the identical APK. Before publishing it:
 
 - `aapt dump badging` shows the version in `pubspec.yaml`. Never publish two different
   APKs under one version.
 - `apksigner verify --print-certs` shows the release certificate above. An APK signed with
   anything else cannot install over the copies on phones.
+
+### The staging app ("Khadra TEST")
+
+A second APK from the same code, for testing against `https://khadra-staging.onrender.com` (which
+runs the SANDBOX payment provider). It is never published as `khadra.apk` and never marked latest.
+
+```bash
+cd Khadra.Mobile
+flutter build apk --release --flavor staging
+```
+
+The APK is `build/app/outputs/flutter-apk/app-staging-release.apk`.
+
+| | |
+|---|---|
+| Package | `com.khadra.khadra_mobile.staging` — a different app, so it installs beside the customer app and neither can update over the other |
+| Name | "Khadra TEST" / "خضرا TEST", on an amber launcher icon |
+| Talks to | `https://khadra-staging.onrender.com`, compiled in. It takes no `KHADRA_API_BASE_URL`: one naming any other address stops the app at launch, and the production flavor likewise refuses the staging address (`AppEnvironment`) |
+| In the app | An amber strip on every screen: "TEST BUILD · STAGING SERVER", plus "Sandbox payments" once `/app-config` reports `payments.mode = Sandbox` |
+| Version | The same `pubspec.yaml` version as production. Never add a `versionNameSuffix`: `1.1.0-staging` is a prerelease below `1.1.0`, and the API's minimum-version gate would refuse it |
+| Signed with | The same release key. Identity is package + key, so this is safe |
+
+The staging API's `MobileApp__UpdateUrl` should name a staging APK or be empty. Pointing it at the
+production `khadra.apk` sends a tester whose staging build is too old to the customer app instead.
+
+### Payment inside the app
+
+The deposit checkout opens in an in-app page (`CheckoutScreen`, a WebView) rather than the browser,
+for every provider. It loads the `checkoutUrl` the server minted and reads nothing back from it; it
+re-reads the booking while open and closes when the server stops reporting that attempt as the live
+one. Only the signed webhook confirms a payment, so nothing the page does can. The browser build of
+the app still opens a new tab, having no WebView.
 
 ### The key
 

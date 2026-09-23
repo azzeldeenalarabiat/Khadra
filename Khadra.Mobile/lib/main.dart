@@ -6,10 +6,12 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 
+import 'core/config/app_environment.dart';
 import 'core/config/update_requirement.dart';
 import 'core/providers.dart';
 import 'core/router.dart';
 import 'core/theme/khadra_theme.dart';
+import 'core/widgets/environment_ribbon.dart';
 import 'features/update/update_required_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -20,6 +22,11 @@ Future<void> main() async {
   // is in Amman and a date picker that opened before the zone database was ready
   // would run in the device's zone -- and price a different number of days.
   tz_data.initializeTimeZones();
+
+  // A staging build given a production address, or a production build given the
+  // staging one, stops HERE with a sentence naming the mistake -- before a single
+  // request is made to the wrong server.
+  AppEnvironment.verify();
 
   // On the web Flutter builds no accessibility tree until something asks for one:
   // it renders into a canvas, and the tree is expensive, so the engine waits for a
@@ -153,13 +160,18 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
           // the router itself — not a route on it — so no route and no deep link
           // can reach past it: the router is not in the tree to receive one. Its
           // own Navigator is for the language menu, whose popup needs an overlay.
-          child: blockedBy != null
-              ? Navigator(
-                  onGenerateRoute: (_) => MaterialPageRoute<void>(
-                    builder: (_) => UpdateRequiredScreen(requirement: blockedBy),
-                  ),
-                )
-              : child ?? const SizedBox.shrink(),
+          //
+          // The staging build's ribbon wraps BOTH, so even the update screen says
+          // which server refused it. In production it returns the child untouched.
+          child: EnvironmentRibbon(
+            child: blockedBy != null
+                ? Navigator(
+                    onGenerateRoute: (_) => MaterialPageRoute<void>(
+                      builder: (_) => UpdateRequiredScreen(requirement: blockedBy),
+                    ),
+                  )
+                : child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The STAGING launcher icon sits on amber instead of Khadra green, so the two apps side by side
+        on one home screen are told apart at a glance, before anyone reads a label. Only the adaptive
+        icon's background changes (mipmap-anydpi-v26); the logo itself is the same file.
+    -->
+    <color name="ic_launcher_background">#B45309</color>
+</resources>

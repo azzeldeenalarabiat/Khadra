@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -244,10 +246,28 @@ final entryChoiceProvider = StateNotifierProvider<EntryChoice, bool>(
 /// hard-code — the time zone the calendar runs in, the currency's decimals, the
 /// date picker's three bounds, the words on every filter chip. `keepAlive` because
 /// a screen without it cannot render a price or a date at all.
+///
+/// **A failed read is asked again**, every [appConfigRetry], until one succeeds.
+/// Held for the session means a FAILURE was held for the session too: a first
+/// launch that met a cold server (Render's free tier takes longer to wake than the
+/// receive timeout) kept that error until the app was killed, and every screen
+/// reading the config — the sandbox banner among them — went without it. A success
+/// is still read exactly once.
 final appConfigProvider = FutureProvider<AppConfig>((ref) async {
   ref.keepAlive();
-  return ref.watch(apiProvider).appConfig();
+  try {
+    return await ref.watch(apiProvider).appConfig();
+  } on Object {
+    final retry = Timer(appConfigRetry, ref.invalidateSelf);
+    ref.onDispose(retry.cancel);
+    rethrow;
+  }
 });
+
+/// How long after a failed `/app-config` read the app asks again. Mechanics, not a
+/// business rule: long enough not to hammer a server that is down, short enough
+/// that a customer who arrived during a cold start is not left without prices.
+const Duration appConfigRetry = Duration(seconds: 10);
 
 // ── Which build this is, and whether it may still be used ───────────────────────
 
