@@ -316,4 +316,37 @@ void main() {
 
     expect(find.textContaining('السيارة في الصيانة', findRichText: true), findsWidgets);
   });
+
+  // The handover code: offered for exactly the two statuses the server issues one for.
+  group('the handover code button', () {
+    for (final (status, label) in [
+      ('Confirmed', 'pickup'),
+      ('PickedUp', 'return'),
+    ]) {
+      screenTest('is there for a $status booking, for the $label', (tester) async {
+        await pump(tester, bookingOf(status: status, history: pathTo(status), depositPaid: true));
+        await tester.scrollUntilVisible(find.byKey(const ValueKey('handover-code-button')), 200,
+            scrollable: find.byType(Scrollable).first);
+        expect(
+          find.text(status == 'Confirmed' ? en.handoverShowPickupCode : en.handoverShowReturnCode),
+          findsOneWidget,
+        );
+      });
+    }
+
+    for (final status in ['Requested', 'Approved', 'Returned', 'Completed']) {
+      screenTest('is absent for a $status booking', (tester) async {
+        await pump(
+          tester,
+          bookingOf(
+            status: status,
+            history: pathTo(status),
+            isAwaitingDecision: status == 'Requested',
+            isAwaitingPayment: status == 'Approved',
+          ),
+        );
+        expect(find.byKey(const ValueKey('handover-code-button')), findsNothing);
+      });
+    }
+  });
 }

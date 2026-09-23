@@ -56,16 +56,26 @@ enum SessionEndReason { expired, suspended, signedOutElsewhere }
 ///   server sends, so a profile edit shows immediately rather than at the next
 ///   rotation.
 class SessionController extends StateNotifier<SessionState> {
-  SessionController({required KhadraApi api, required SessionStore store})
+  SessionController({
+    required KhadraApi api,
+    required SessionStore store,
+    Future<void> Function()? beforeSignOut,
+  })
       // Private fields, public parameters. See AuthInterceptor for the same choice.
       // ignore: prefer_initializing_formals
       : _api = api,
         // ignore: prefer_initializing_formals
         _store = store,
+        // ignore: prefer_initializing_formals
+        _beforeSignOut = beforeSignOut,
         super(const SessionState.unknown());
 
   final KhadraApi _api;
   final SessionStore _store;
+
+  /// Runs while the session is still valid, before the logout call: the push
+  /// registration for this phone is removed with the credentials that own it.
+  final Future<void> Function()? _beforeSignOut;
 
   /// Runs once at launch, before the first screen decides what to show.
   ///
@@ -189,6 +199,13 @@ class SessionController extends StateNotifier<SessionState> {
   Future<void> adoptTokens(AuthTokens tokens) => _install(tokens);
 
   Future<void> signOut({bool allDevices = false}) async {
+    // Never allowed to stop a sign-out: the hook is best effort by contract.
+    try {
+      await _beforeSignOut?.call();
+    } on Object {
+      // See above.
+    }
+
     final token = await _store.readRefreshToken();
     if (token != null) {
       try {

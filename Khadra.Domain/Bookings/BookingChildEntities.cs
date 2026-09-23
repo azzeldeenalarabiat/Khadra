@@ -83,6 +83,16 @@ public sealed class HandoverRecord : Entity
     public Money? CashCollected { get; private set; }
     public DateTimeOffset RecordedAt { get; private set; }
 
+    // How the dealer knew it was the customer. Null on handovers recorded before verification
+    // existed (2026-09-23); every handover since carries one. Unverified is flagged to the platform.
+    public HandoverVerification? Verification { get; private set; }
+    // The one-time code that proved it, by id. The code itself is never stored anywhere.
+    public Id? HandoverCodeId { get; private set; }
+    // The dealer's own words for why there was no code. Present exactly when Unverified.
+    public string? UnverifiedReason { get; private set; }
+
+    public bool IsUnverified => Verification == HandoverVerification.Unverified;
+
     public IReadOnlyCollection<string> PhotoStorageKeys => _photoStorageKeys.AsReadOnly();
 
     private HandoverRecord()
@@ -103,7 +113,8 @@ public sealed class HandoverRecord : Entity
         int? odometerKm = null,
         decimal? fuelLevel = null,
         string? notes = null,
-        Money? cashCollected = null)
+        Money? cashCollected = null,
+        HandoverProof? proof = null)
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(recordedBy);
@@ -125,7 +136,10 @@ public sealed class HandoverRecord : Entity
             FuelLevel = fuelLevel,
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             CashCollected = cashCollected,
-            RecordedAt = now
+            RecordedAt = now,
+            Verification = (proof ?? HandoverProof.NotRequired).Method,
+            HandoverCodeId = proof?.CodeId,
+            UnverifiedReason = proof?.Reason
         };
 
         foreach (var key in photoStorageKeys ?? [])

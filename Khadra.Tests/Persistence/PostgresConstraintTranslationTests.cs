@@ -35,6 +35,7 @@ namespace Khadra.Tests.Persistence;
 /// probe of localhost.
 /// </para>
 /// </remarks>
+[Collection(PostgresTestDatabase.Collection)]
 public sealed class PostgresConstraintTranslationTests : IAsyncLifetime, IDisposable
 {
     private const string Provider = "PGCHECK";

@@ -44,6 +44,9 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   LookupRenamed: 'auditLog.actionLookupRenamed',
   LookupRetired: 'auditLog.actionLookupRetired',
   LookupRestored: 'auditLog.actionLookupRestored',
+  HandoverVerified: 'auditLog.actionHandoverVerified',
+  HandoverUnverified: 'auditLog.actionHandoverUnverified',
+  HandoverCodeLocked: 'auditLog.actionHandoverCodeLocked',
 };
 
 /** The server's audit record types (`AuditEntityType`), worded the same way as the actions. */

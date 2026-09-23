@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +15,8 @@ import 'config/app_environment.dart';
 import 'config/app_version.dart';
 import 'config/update_requirement.dart';
 import 'format/formats.dart';
+import 'push/push_coordinator.dart';
+import 'push/push_messaging.dart';
 import 'session/session_controller.dart';
 import 'session/session_store.dart';
 
@@ -88,17 +92,32 @@ final StateNotifierProvider<SessionController, SessionState> sessionProvider =
   return SessionController(
     api: ref.watch(apiProvider),
     store: ref.watch(sessionStoreProvider),
+    beforeSignOut: () => ref.read(pushCoordinatorProvider).signingOut(),
   );
+});
+
+// ── Push notifications ─────────────────────────────────────────────────────────
+
+/// The push platform. Firebase in the app; a fake in tests.
+final pushMessagingProvider = Provider<PushMessaging>((ref) => FirebasePushMessaging());
+
+/// This phone's push registration, for the life of the app. See [PushCoordinator].
+final pushCoordinatorProvider = Provider<PushCoordinator>((ref) {
+  final coordinator = PushCoordinator(
+    messaging: ref.watch(pushMessagingProvider),
+    api: () => ref.read(apiProvider),
+    appVersion: ref.read(installedAppVersionProvider),
+  );
+  ref.onDispose(coordinator.dispose);
+  return coordinator;
 });
 
 // ── Language ───────────────────────────────────────────────────────────────────
 
-/// The chosen language, remembered on the device.
-///
-/// A per-device convenience rather than an account setting: this platform has no
-/// `PreferredLanguage` on a user yet (pre-launch checklist item 40), so a customer
-/// who signs in on a second phone starts in that phone's language. Recorded rather
-/// than pretended otherwise.
+/// The chosen language, remembered on the device AND sent to the account (PUT /auth/me/language) by the
+/// push coordinator, so emails and reminders sent while the customer is away follow the
+/// same choice. A customer who signs in on a second phone still starts in that phone's
+/// language until they choose; the account then follows whichever phone chose last.
 class LocaleController extends StateNotifier<Locale?> {
   LocaleController(this._preferences) : super(_read(_preferences));
 
@@ -244,10 +263,28 @@ final entryChoiceProvider = StateNotifierProvider<EntryChoice, bool>(
 /// hard-code — the time zone the calendar runs in, the currency's decimals, the
 /// date picker's three bounds, the words on every filter chip. `keepAlive` because
 /// a screen without it cannot render a price or a date at all.
+///
+/// **A failed read is asked again**, every [appConfigRetry], until one succeeds.
+/// Held for the session means a FAILURE was held for the session too: a first
+/// launch that met a cold server (Render's free tier takes longer to wake than the
+/// receive timeout) kept that error until the app was killed, and every screen
+/// reading the config — the sandbox banner among them — went without it. A success
+/// is still read exactly once.
 final appConfigProvider = FutureProvider<AppConfig>((ref) async {
   ref.keepAlive();
-  return ref.watch(apiProvider).appConfig();
+  try {
+    return await ref.watch(apiProvider).appConfig();
+  } on Object {
+    final retry = Timer(appConfigRetry, ref.invalidateSelf);
+    ref.onDispose(retry.cancel);
+    rethrow;
+  }
 });
+
+/// How long after a failed `/app-config` read the app asks again. Mechanics, not a
+/// business rule: long enough not to hammer a server that is down, short enough
+/// that a customer who arrived during a cold start is not left without prices.
+const Duration appConfigRetry = Duration(seconds: 10);
 
 // ── Which build this is, and whether it may still be used ───────────────────────
 
@@ -303,16 +340,6 @@ final updateRequirementProvider = Provider<UpdateRequirement?>((ref) {
 /// that null means "let the server judge", never "assume the old default".
 final passwordPolicyProvider = Provider<PasswordPolicy?>(
   (ref) => ref.watch(appConfigProvider).valueOrNull?.password,
-);
-
-/// Whether this build is talking to a server that takes no real money.
-///
-/// False until the config has arrived, and false for every value the app does not
-/// recognise. That asymmetry is the point: a banner missed on a test host is a
-/// nuisance, and a banner shown to a paying customer tells them their payment was
-/// fake. Silence is the safe direction, so silence is the default.
-final sandboxPaymentsProvider = Provider<bool>(
-  (ref) => ref.watch(appConfigProvider).valueOrNull?.payments.isSandbox ?? false,
 );
 
 final citiesProvider = FutureProvider<List<Lookup>>((ref) async {

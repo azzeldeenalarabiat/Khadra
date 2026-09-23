@@ -1678,6 +1678,80 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String notificationYourBookingConfirmed(String actor) {
+    return 'تم تأكيد حجزك مع $actor';
+  }
+
+  @override
+  String notificationYourBookingCancelled(String actor) {
+    return 'ألغت خضرا حجزك مع $actor';
+  }
+
+  @override
+  String notificationYourBookingPickedUp(String actor) {
+    return 'استلمت السيارة من $actor';
+  }
+
+  @override
+  String notificationYourBookingReturned(String actor) {
+    return 'سجّل $actor إعادة السيارة';
+  }
+
+  @override
+  String get notificationYourPaymentReminder =>
+      'العربون ما زال مستحقاً — ادفع قبل انتهاء المهلة';
+
+  @override
+  String notificationYourPickupReminder(String actor) {
+    return 'سيارتك لدى $actor جاهزة قريباً — جهّز رمز التسليم';
+  }
+
+  @override
+  String notificationYourReturnReminder(String actor) {
+    return 'موعد إعادة سيارتك إلى $actor قريب';
+  }
+
+  @override
+  String get notificationYourDisputeUpdated => 'هناك تحديث على النزاع الخاص بك';
+
+  @override
+  String get handoverShowPickupCode => 'أظهر رمز الاستلام';
+
+  @override
+  String get handoverShowReturnCode => 'أظهر رمز الإعادة';
+
+  @override
+  String get handoverPickupTitle => 'رمز الاستلام';
+
+  @override
+  String get handoverReturnTitle => 'رمز الإعادة';
+
+  @override
+  String get handoverInstructions =>
+      'أظهر هذا الرمز لمكتب التأجير. يمسحون الرمز أو يُدخلون الأرقام الستة، ويتحدّث حجزك تلقائياً.';
+
+  @override
+  String handoverValidFor(String time) {
+    return 'صالح لمدة $time';
+  }
+
+  @override
+  String get handoverExpired => 'انتهت صلاحية هذا الرمز. احصل على رمز جديد.';
+
+  @override
+  String get handoverNewCode => 'احصل على رمز جديد';
+
+  @override
+  String get handoverPrivacy =>
+      'لا تُظهره إلا عند المكتب. الحصول على رمز جديد يوقف هذا الرمز.';
+
+  @override
+  String get handoverRecorded => 'تم تسجيل التسليم.';
+
+  @override
+  String get handoverNotAvailable => 'لا يوجد رمز تسليم لهذا الحجز الآن.';
+
+  @override
   String notificationUnknown(String actor) {
     return 'حدّث $actor شيئاً في حسابك';
   }
@@ -2105,14 +2179,23 @@ class AppLocalizationsAr extends AppLocalizations {
       'لم تعد هذه السيارة معروضة، فلا يمكن حفظها.';
 
   @override
-  String get sandboxPaymentsTitle => 'مدفوعات تجريبية';
+  String get checkoutTitle => 'الدفع';
 
   @override
-  String get sandboxPaymentsBody =>
-      'هذه نسخة تجريبية. لا تُخصم أي بطاقة ولا تنتقل أي أموال. أي حجز تؤكّده هنا ليس حجزًا حقيقيًا.';
+  String get checkoutClose => 'إغلاق صفحة الدفع';
 
   @override
-  String get sandboxPaymentsAttempt => 'دفعة تجريبية — لم تنتقل أي أموال.';
+  String get checkoutLoadFailed =>
+      'لم تُحمَّل صفحة الدفع. تحقّق من اتصالك وحاول مرة أخرى.';
+
+  @override
+  String checkoutStillOpen(String time) {
+    return 'عملية الدفع ما زالت مفتوحة حتى $time. اضغط «ادفع العربون» لمتابعتها.';
+  }
+
+  @override
+  String get checkoutAttemptEnded =>
+      'انتهت محاولة الدفع هذه دون تأكيد حجزك. يمكنك المحاولة مرة أخرى ما دامت مهلة الدفع مفتوحة.';
 
   @override
   String get updateRequiredTitle => 'حدّث تطبيق خضرا للمتابعة';

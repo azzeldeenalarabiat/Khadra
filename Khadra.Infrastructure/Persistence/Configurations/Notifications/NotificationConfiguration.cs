@@ -22,6 +22,7 @@ internal sealed class NotificationConfiguration : IEntityTypeConfiguration<Notif
             .HasMaxLength(Notification.MaxActorNameLength)
             .IsRequired();
         entity.Property(notification => notification.OccurredAt).IsRequired();
+        entity.Property(notification => notification.DueAt);
         entity.Property(notification => notification.ReadAt);
         entity.Property(notification => notification.IsDeleted).IsRequired();
         entity.Property(notification => notification.DeletedAt);

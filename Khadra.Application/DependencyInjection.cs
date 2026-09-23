@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<Disputes.DisputeAuditor>();
         services.AddScoped<Disputes.DisputeViewComposer>();
         services.AddScoped<Notifications.DealerTeamNotifier>();
+        services.AddScoped<Bookings.Handover.HandoverVerifier>();
         services.AddScoped<AuthEmailDispatcher>();
         services.AddScoped<Bookings.BookingEmailDispatcher>();
 

@@ -303,7 +303,11 @@ public sealed record HandoverDto(
     string? Notes,
     MoneyDto? CashCollected,
     int PhotoCount,
-    DateTimeOffset RecordedAt)
+    DateTimeOffset RecordedAt,
+    // ADDITIVE (2026-09-23): how the handover was proved. "Code", "Unverified" or "NotRequired";
+    // null for handovers recorded before verification existed. An installed app ignores both.
+    string? Verification = null,
+    string? UnverifiedReason = null)
 {
     public static HandoverDto From(HandoverRecord handover)
     {
@@ -319,7 +323,9 @@ public sealed record HandoverDto(
             // A count, not the keys: handover photos are a private shared record between the two
             // parties (spec 5.6) and are served through their own signed path when that ships.
             handover.PhotoStorageKeys.Count,
-            handover.RecordedAt);
+            handover.RecordedAt,
+            handover.Verification?.Name,
+            handover.UnverifiedReason);
     }
 }
 

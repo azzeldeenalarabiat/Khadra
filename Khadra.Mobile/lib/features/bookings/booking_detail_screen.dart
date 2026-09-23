@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -14,11 +15,12 @@ import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
-import '../../core/widgets/sandbox_banner.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'booking_providers.dart';
 import 'booking_timeline.dart';
+import 'checkout_screen.dart';
+import 'handover_code_screen.dart';
 import 'cancel_booking_sheet.dart';
 
 /// One booking, in full.
@@ -443,11 +445,6 @@ class _PaymentDue extends StatelessWidget {
           tone: NoticeTone.warn,
           icon: Icons.payments_outlined,
         ),
-        // Before the button, not after it. This is the screen where a customer is
-        // about to act on a figure, so "no money moves" has to arrive before the
-        // decision rather than as a footnote under it. Renders nothing unless the
-        // server itself reported Sandbox.
-        const SandboxPaymentsBanner(padding: EdgeInsets.only(top: Space.md)),
         const SizedBox(height: Space.md),
         _PaymentAction(booking: booking),
       ],
@@ -491,22 +488,23 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
       child: FilledButton.icon(
         onPressed: _opening ? null : _pay,
         icon: const Icon(Icons.credit_card, size: 18),
-        label: Text(l10n.bookingPayDeposit),
+        label: Text(_opening ? l10n.bookingPaymentOpening : l10n.bookingPayDeposit),
       ),
     );
   }
 
-  /// Opens a checkout and hands the customer to the provider.
+  /// Opens a checkout and takes the customer through it INSIDE the app.
   ///
   /// Repeating it is safe and is the intended way to recover: the server returns
   /// the session already in flight rather than opening a second one, so a
-  /// customer who closed the tab lands back on the same card form.
+  /// customer who closed the page — or whose app was killed mid-payment — lands
+  /// back on the same card form.
   Future<void> _pay() async {
     final l10n = AppLocalizations.of(context);
+    final bookingId = widget.booking.bookingId;
     setState(() => _opening = true);
     try {
-      final attempt =
-          await ref.read(apiProvider).openDepositCheckout(widget.booking.bookingId);
+      final attempt = await ref.read(apiProvider).openDepositCheckout(bookingId);
       if (!mounted) return;
 
       final url = attempt.checkoutUrl;
@@ -515,10 +513,33 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
         return;
       }
 
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      // Coming back from a provider confirms NOTHING -- only a signed webhook
-      // does -- so the screen re-reads the booking rather than assuming.
-      if (mounted) invalidateBookings(ref, bookingId: widget.booking.bookingId);
+      // The browser build has no WebView to host it in, so there — and only
+      // there — the page opens in a new tab as it always did.
+      if (kIsWeb) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        if (mounted) invalidateBookings(ref, bookingId: bookingId);
+        return;
+      }
+
+      final messenger = ScaffoldMessenger.of(context);
+      final container = ProviderScope.containerOf(context, listen: false);
+      final exit = await CheckoutScreen.open(context, bookingId: bookingId, attempt: attempt);
+      if (!mounted) return;
+
+      // Leaving the page confirms NOTHING -- only a signed webhook does -- so the
+      // screen re-reads the booking and shows whatever the server now says. From
+      // here this widget may be rebuilt away (a confirmed booking has no Pay
+      // button), so the rest runs on the container and the messenger taken above.
+      invalidateBookings(ref, bookingId: bookingId);
+      final Booking booking;
+      try {
+        booking = await container.read(bookingProvider(bookingId).future);
+      } on Object {
+        return; // The screen shows its own error for a read that failed.
+      }
+      final message = checkoutReturnMessage(
+          l10n, exit, booking, attempt, container.read(formatsProvider));
+      if (message != null) showKhadraMessageOn(messenger, message);
     } on ApiFailure catch (failure) {
       if (mounted) showKhadraMessage(context, failure.messageFor(l10n), isError: true);
     } finally {
@@ -528,6 +549,10 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
 }
 
 /// What a customer may do with this booking right now.
+///
+/// (The handover code is the one control gated on the STATUS rather than on a server
+/// flag: the server issues a code for exactly Confirmed and PickedUp and refuses any
+/// other, so the two cannot disagree for longer than a refresh.)
 ///
 /// Every button here is gated on a SERVER flag — `cancellation.canCancel`,
 /// `canBeDisputed`, `canBeReviewed` — rather than on a status the app interprets.
@@ -544,6 +569,7 @@ class _Actions extends ConsumerWidget {
       booking.cancellation.canCancel ||
       booking.canReportNonDelivery ||
       booking.status == 'Confirmed' ||
+      booking.status == 'PickedUp' ||
       booking.liveDisputeId != null ||
       booking.canBeDisputed ||
       booking.canBeReviewed;
@@ -552,6 +578,20 @@ class _Actions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final actions = <Widget>[];
+
+    // The handover code: what the customer shows at the counter to collect the car, and
+    // again to give it back. First, because at the counter it is the only thing that matters.
+    // Offered for exactly the two statuses the server issues a code for.
+    if (booking.status == 'Confirmed' || booking.status == 'PickedUp') {
+      actions.add(
+        FilledButton.icon(
+          key: const ValueKey('handover-code-button'),
+          onPressed: () => _showHandoverCode(context, ref),
+          icon: const Icon(Icons.qr_code_2, size: 20),
+          label: Text(booking.status == 'Confirmed' ? l10n.handoverShowPickupCode : l10n.handoverShowReturnCode),
+        ),
+      );
+    }
 
     if (booking.cancellation.canCancel) {
       actions.add(
@@ -652,6 +692,15 @@ class _Actions extends ConsumerWidget {
           ),
       ],
     );
+  }
+
+  Future<void> _showHandoverCode(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
+    final handedOver = await HandoverCodeScreen.open(context, bookingId: booking.bookingId, status: booking.status);
+    // Re-read whatever happened: the handover may have been recorded while the code was up.
+    if (context.mounted) invalidateBookings(ref, bookingId: booking.bookingId);
+    if (handedOver) showKhadraMessageOn(messenger, l10n.handoverRecorded);
   }
 
   Future<void> _cancel(BuildContext context, WidgetRef ref) async {

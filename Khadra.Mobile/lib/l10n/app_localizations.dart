@@ -2720,6 +2720,120 @@ abstract class AppLocalizations {
   /// **'{actor} recorded that the car was not collected'**
   String notificationYourBookingMarkedNoShow(String actor);
 
+  /// No description provided for @notificationYourBookingConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Your booking with {actor} is confirmed'**
+  String notificationYourBookingConfirmed(String actor);
+
+  /// No description provided for @notificationYourBookingCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Your booking with {actor} was cancelled by Khadra'**
+  String notificationYourBookingCancelled(String actor);
+
+  /// No description provided for @notificationYourBookingPickedUp.
+  ///
+  /// In en, this message translates to:
+  /// **'You collected the car from {actor}'**
+  String notificationYourBookingPickedUp(String actor);
+
+  /// No description provided for @notificationYourBookingReturned.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor} recorded the car as returned'**
+  String notificationYourBookingReturned(String actor);
+
+  /// No description provided for @notificationYourPaymentReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit is still due — pay before the deadline'**
+  String get notificationYourPaymentReminder;
+
+  /// No description provided for @notificationYourPickupReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your car at {actor} is ready soon — have your handover code ready'**
+  String notificationYourPickupReminder(String actor);
+
+  /// No description provided for @notificationYourReturnReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Your car is due back at {actor} soon'**
+  String notificationYourReturnReminder(String actor);
+
+  /// No description provided for @notificationYourDisputeUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'There is an update on your dispute'**
+  String get notificationYourDisputeUpdated;
+
+  /// No description provided for @handoverShowPickupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my pickup code'**
+  String get handoverShowPickupCode;
+
+  /// No description provided for @handoverShowReturnCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Show my return code'**
+  String get handoverShowReturnCode;
+
+  /// No description provided for @handoverPickupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pickup code'**
+  String get handoverPickupTitle;
+
+  /// No description provided for @handoverReturnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Return code'**
+  String get handoverReturnTitle;
+
+  /// No description provided for @handoverInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Show this to the rental office. They scan the code or type the six digits, and your booking updates by itself.'**
+  String get handoverInstructions;
+
+  /// No description provided for @handoverValidFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid for {time}'**
+  String handoverValidFor(String time);
+
+  /// No description provided for @handoverExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'This code has expired. Get a new one.'**
+  String get handoverExpired;
+
+  /// No description provided for @handoverNewCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Get a new code'**
+  String get handoverNewCode;
+
+  /// No description provided for @handoverPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Only show it at the counter. Getting a new code stops this one working.'**
+  String get handoverPrivacy;
+
+  /// No description provided for @handoverRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Handover recorded.'**
+  String get handoverRecorded;
+
+  /// No description provided for @handoverNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'There is no handover code for this booking right now.'**
+  String get handoverNotAvailable;
+
   /// A kind this version of the app does not know. Better than an empty row.
   ///
   /// In en, this message translates to:
@@ -3350,23 +3464,35 @@ abstract class AppLocalizations {
   /// **'That car is no longer listed, so it cannot be saved.'**
   String get errorShortlistVehicleNotFound;
 
-  /// Shown only when /app-config reports payments.mode = Sandbox, which a Production server can never report: the API refuses to start on that provider outside a test host. It is the customer-facing half of the rule that a sandbox payment must never be mistakable for a real one.
+  /// Heading of the in-app page that hosts the provider's checkout. The page's own host is shown under it.
   ///
   /// In en, this message translates to:
-  /// **'Test payments'**
-  String get sandboxPaymentsTitle;
+  /// **'Payment'**
+  String get checkoutTitle;
 
-  /// No description provided for @sandboxPaymentsBody.
+  /// No description provided for @checkoutClose.
   ///
   /// In en, this message translates to:
-  /// **'This is a test build. No card is charged and no money moves. Any booking you confirm here is not a real rental.'**
-  String get sandboxPaymentsBody;
+  /// **'Close the payment page'**
+  String get checkoutClose;
 
-  /// On one attempt, from the record's own isSandbox rather than the platform mode: a booking paid on a sandbox host stays a sandbox booking however the platform is configured when it is read later.
+  /// No description provided for @checkoutLoadFailed.
   ///
   /// In en, this message translates to:
-  /// **'Test payment — no money moved.'**
-  String get sandboxPaymentsAttempt;
+  /// **'The payment page did not load. Check your connection and try again.'**
+  String get checkoutLoadFailed;
+
+  /// After the customer closed the payment page while the server still reports that attempt as live. The time is the attempt's own expiry. Closing cancels nothing, so this never says 'cancelled'.
+  ///
+  /// In en, this message translates to:
+  /// **'Your payment is still open until {time}. Tap “Pay the deposit” to continue it.'**
+  String checkoutStillOpen(String time);
+
+  /// The attempt the customer opened is no longer live and the booking still awaits a deposit. Deliberately not 'declined': the booking read does not say why an attempt ended.
+  ///
+  /// In en, this message translates to:
+  /// **'That payment attempt ended without confirming your booking. You can try again while the payment window is open.'**
+  String get checkoutAttemptEnded;
 
   /// The mandatory-update screen's heading, and the message for any call the API refused because this build is too old (426 app.update_required). Deliberately the same sentence the API's own refusal carries. Never a credentials message.
   ///

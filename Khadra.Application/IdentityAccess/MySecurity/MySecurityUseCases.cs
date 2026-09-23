@@ -58,6 +58,7 @@ public sealed class GetMySessionsHandler(
 public sealed class RevokeMySessionHandler(
     ISessionReader sessions,
     IRefreshTokenRepository refreshTokens,
+    IPushDeviceRepository pushDevices,
     IUnitOfWork unitOfWork,
     ICurrentActor actor,
     IClock clock)
@@ -77,7 +78,10 @@ public sealed class RevokeMySessionHandler(
         if (!await sessions.BelongsToUserAsync(userId, request.FamilyId, cancellationToken))
             return UnitResult.Failure(IdentityErrors.UserNotFound);
 
-        await refreshTokens.RevokeFamilyAsync(request.FamilyId, clock.UtcNow, cancellationToken);
+        var now = clock.UtcNow;
+        await refreshTokens.RevokeFamilyAsync(request.FamilyId, now, cancellationToken);
+        // The revoked phone stops being woken for this account too.
+        await pushDevices.RevokeForSessionAsync(userId, request.FamilyId, now, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
         return UnitResult.Success<Error>();
     }

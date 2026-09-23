@@ -1,4 +1,21 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show appFlavor;
+
+/// Which Khadra this build of the app belongs to.
+///
+/// Chosen by the build FLAVOR and nothing else — `flutter build apk --flavor staging` — which also
+/// chooses the Android application id and the launcher name, so the three cannot disagree. See
+/// `android/app/build.gradle.kts` and docs/production.md, "The customer app".
+enum KhadraBuild {
+  /// The customer app. Also every build that names no flavor (the web, `flutter test`), because
+  /// pubspec.yaml makes `production` the default.
+  production,
+
+  /// "Khadra TEST": a separate application bound to the staging API, which runs the sandbox
+  /// payment provider. Its launcher name says so ("Khadra TEST"); inside, it looks like the
+  /// customer app, by the owner's decision of 2026-09-23.
+  staging,
+}
 
 /// Where this build of the app finds the Khadra API.
 ///
@@ -9,24 +26,98 @@ import 'package:flutter/foundation.dart';
 /// through the BFF would add a hop and a CSRF surface to solve a problem it does
 /// not have. `docs/auth-and-sessions.md` draws the same line.
 ///
-/// The default is a DEVELOPMENT one and every real build must pass its own:
+/// **Production** is exactly what it was before flavors existed. The default is a
+/// DEVELOPMENT one and every real build must pass its own:
 ///
-///     flutter build apk --dart-define=KHADRA_API_BASE_URL=https://api.khadra.jo
+///     flutter build apk --release --dart-define=KHADRA_API_BASE_URL=https://khadra.onrender.com
 ///
 /// There is deliberately no production URL compiled in as a fallback. A release
 /// that forgot the flag should fail loudly against an address that does not
 /// resolve, rather than quietly talking to somebody's laptop.
+///
+/// **Staging** is the opposite, deliberately: its address IS compiled in, and it
+/// refuses to be pointed anywhere else. The whole value of that build is that a
+/// tester holding it knows which server they are testing, so there is no flag to
+/// forget and none to get wrong.
 abstract final class AppEnvironment {
   static const String _override = String.fromEnvironment('KHADRA_API_BASE_URL');
 
+  /// The staging API. The only address a staging build will talk to.
+  static const String stagingApiBaseUrl = 'https://khadra-staging.onrender.com';
+
+  /// This build, from its flavor. Resolved once; an unknown flavor is a build mistake and throws.
+  static final KhadraBuild build = buildFor(appFlavor);
+
+  /// Whether this is the "Khadra TEST" build.
+  ///
+  /// Never evidence of what the server does with money: that is the server's own `payments.mode`,
+  /// because whether money moves is a fact about the server, not about this binary.
+  static bool get isStaging => build == KhadraBuild.staging;
+
   /// The API root, without a trailing slash.
-  static String get apiBaseUrl {
-    if (_override.isNotEmpty) return _stripTrailingSlash(_override);
-    return _developmentDefault;
-  }
+  static final String apiBaseUrl = resolveApiBaseUrl(
+    build: build,
+    override: _override,
+    developmentDefault: _developmentDefault,
+  );
 
   /// Whether this build is talking to a developer machine rather than a real API.
-  static bool get isDevelopmentTarget => _override.isEmpty;
+  static bool get isDevelopmentTarget => !isStaging && _override.isEmpty;
+
+  /// Reads every setting above, so a build that is wrong stops at launch with a sentence saying
+  /// why, instead of on the first request with a `LateInitializationError`.
+  static void verify() {
+    if (apiBaseUrl.isEmpty) throw StateError('This build has no API address.');
+  }
+
+  /// The flavor name as Flutter hands it over, turned into a [KhadraBuild].
+  @visibleForTesting
+  static KhadraBuild buildFor(String? flavor) => switch (flavor) {
+        null || '' || 'production' => KhadraBuild.production,
+        'staging' => KhadraBuild.staging,
+        _ => throw StateError(
+            'Unknown build flavor "$flavor". This app is built as "production" or "staging".'),
+      };
+
+  /// Where a build of the given kind sends its requests. Pure, so both rules below are testable.
+  ///
+  /// - **Staging** always answers [stagingApiBaseUrl]. A `KHADRA_API_BASE_URL` that names anything
+  ///   else is refused rather than obeyed: a "Khadra TEST" app talking to production would make
+  ///   test bookings against real customers' data, and a staging build is only worth anything if its
+  ///   name is a promise about where it points.
+  /// - **Production** is unchanged — the define, or the development loopback — except that it
+  ///   refuses the STAGING host. The production application id must never be the one a tester's
+  ///   sandbox bookings are made with. That is why the staging hostname appears in the production
+  ///   binary as a string: it is a refusal, never a fallback.
+  @visibleForTesting
+  static String resolveApiBaseUrl({
+    required KhadraBuild build,
+    required String override,
+    required String developmentDefault,
+  }) {
+    final requested = override.isEmpty ? null : _stripTrailingSlash(override);
+
+    switch (build) {
+      case KhadraBuild.staging:
+        if (requested != null && requested != stagingApiBaseUrl) {
+          throw StateError(
+            'The staging build talks only to $stagingApiBaseUrl, and was given $requested. '
+            'Drop --dart-define=KHADRA_API_BASE_URL from a --flavor staging build.',
+          );
+        }
+        return stagingApiBaseUrl;
+
+      case KhadraBuild.production:
+        final url = requested ?? developmentDefault;
+        if (Uri.tryParse(url)?.host == Uri.parse(stagingApiBaseUrl).host) {
+          throw StateError(
+            'The production build was pointed at the staging API ($url). '
+            'Build the staging app instead: flutter build apk --release --flavor staging',
+          );
+        }
+        return url;
+    }
+  }
 
   /// Plain HTTP on purpose, and only in development.
   ///

@@ -593,6 +593,32 @@
   "@notificationYourBookingCompleted": { "placeholders": { "actor": { "type": "String" } } },
   "notificationYourBookingMarkedNoShow": "{actor} recorded that the car was not collected",
   "@notificationYourBookingMarkedNoShow": { "placeholders": { "actor": { "type": "String" } } },
+  "notificationYourBookingConfirmed": "Your booking with {actor} is confirmed",
+  "@notificationYourBookingConfirmed": { "placeholders": { "actor": { "type": "String" } } },
+  "notificationYourBookingCancelled": "Your booking with {actor} was cancelled by Khadra",
+  "@notificationYourBookingCancelled": { "placeholders": { "actor": { "type": "String" } } },
+  "notificationYourBookingPickedUp": "You collected the car from {actor}",
+  "@notificationYourBookingPickedUp": { "placeholders": { "actor": { "type": "String" } } },
+  "notificationYourBookingReturned": "{actor} recorded the car as returned",
+  "@notificationYourBookingReturned": { "placeholders": { "actor": { "type": "String" } } },
+  "notificationYourPaymentReminder": "Your deposit is still due — pay before the deadline",
+  "notificationYourPickupReminder": "Your car at {actor} is ready soon — have your handover code ready",
+  "@notificationYourPickupReminder": { "placeholders": { "actor": { "type": "String" } } },
+  "notificationYourReturnReminder": "Your car is due back at {actor} soon",
+  "@notificationYourReturnReminder": { "placeholders": { "actor": { "type": "String" } } },
+  "notificationYourDisputeUpdated": "There is an update on your dispute",
+  "handoverShowPickupCode": "Show my pickup code",
+  "handoverShowReturnCode": "Show my return code",
+  "handoverPickupTitle": "Pickup code",
+  "handoverReturnTitle": "Return code",
+  "handoverInstructions": "Show this to the rental office. They scan the code or type the six digits, and your booking updates by itself.",
+  "handoverValidFor": "Valid for {time}",
+  "@handoverValidFor": { "placeholders": { "time": { "type": "String" } } },
+  "handoverExpired": "This code has expired. Get a new one.",
+  "handoverNewCode": "Get a new code",
+  "handoverPrivacy": "Only show it at the counter. Getting a new code stops this one working.",
+  "handoverRecorded": "Handover recorded.",
+  "handoverNotAvailable": "There is no handover code for this booking right now.",
   "notificationUnknown": "{actor} updated something on your account",
   "@notificationUnknown": {
     "description": "A kind this version of the app does not know. Better than an empty row.",
@@ -721,14 +747,20 @@
   "@shortlistSavedOn": { "placeholders": { "date": { "type": "String" } } },
   "errorShortlistFull": "Your saved list is full. Remove a car before saving another.",
   "errorShortlistVehicleNotFound": "That car is no longer listed, so it cannot be saved.",
-  "sandboxPaymentsTitle": "Test payments",
-  "@sandboxPaymentsTitle": {
-    "description": "Shown only when /app-config reports payments.mode = Sandbox, which a Production server can never report: the API refuses to start on that provider outside a test host. It is the customer-facing half of the rule that a sandbox payment must never be mistakable for a real one."
+  "checkoutTitle": "Payment",
+  "@checkoutTitle": {
+    "description": "Heading of the in-app page that hosts the provider's checkout. The page's own host is shown under it."
   },
-  "sandboxPaymentsBody": "This is a test build. No card is charged and no money moves. Any booking you confirm here is not a real rental.",
-  "sandboxPaymentsAttempt": "Test payment — no money moved.",
-  "@sandboxPaymentsAttempt": {
-    "description": "On one attempt, from the record's own isSandbox rather than the platform mode: a booking paid on a sandbox host stays a sandbox booking however the platform is configured when it is read later."
+  "checkoutClose": "Close the payment page",
+  "checkoutLoadFailed": "The payment page did not load. Check your connection and try again.",
+  "checkoutStillOpen": "Your payment is still open until {time}. Tap “Pay the deposit” to continue it.",
+  "@checkoutStillOpen": {
+    "description": "After the customer closed the payment page while the server still reports that attempt as live. The time is the attempt's own expiry. Closing cancels nothing, so this never says 'cancelled'.",
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "checkoutAttemptEnded": "That payment attempt ended without confirming your booking. You can try again while the payment window is open.",
+  "@checkoutAttemptEnded": {
+    "description": "The attempt the customer opened is no longer live and the booking still awaits a deposit. Deliberately not 'declined': the booking read does not say why an attempt ended."
   },
 
   "updateRequiredTitle": "Update the Khadra app to continue",

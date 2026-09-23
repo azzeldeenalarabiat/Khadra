@@ -1474,6 +1474,43 @@ class PaymentAttempt {
       : null;
 }
 
+/// The code a customer shows at the counter to prove the booking is theirs.
+///
+/// Shown once and held nowhere else: the platform keeps only a keyed hash of it,
+/// and this object lives only as long as the screen that shows it.
+class HandoverCodeGrant {
+  const HandoverCodeGrant({
+    required this.type,
+    required this.code,
+    required this.qrPayload,
+    required this.expiresAt,
+  });
+
+  /// "Pickup" or "Return".
+  final String type;
+
+  /// Six digits.
+  final String code;
+
+  /// The same code for a scanner, with the booking reference.
+  final String qrPayload;
+
+  final DateTime expiresAt;
+
+  bool get isReturn => type == 'Return';
+
+  // Never print a live credential.
+  @override
+  String toString() => 'HandoverCodeGrant($type, expires $expiresAt)';
+
+  static HandoverCodeGrant fromJson(Map<String, dynamic> json) => HandoverCodeGrant(
+        type: json['type'] as String? ?? '',
+        code: json['code'] as String? ?? '',
+        qrPayload: json['qrPayload'] as String? ?? '',
+        expiresAt: _requiredDateTime(json['expiresAt']),
+      );
+}
+
 /// Whether the deposit can be paid right now, and what is in the way if not.
 ///
 /// Every field is the SERVER's judgement. The app cannot work this out: the

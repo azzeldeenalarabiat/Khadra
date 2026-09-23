@@ -3,11 +3,13 @@ using Khadra.Application.Bookings.CancelBooking;
 using Khadra.Application.Bookings.CreateBooking;
 using Khadra.Application.Bookings.DecideBooking;
 using Khadra.Application.Bookings.Dtos;
+using Khadra.Application.Bookings.Handover;
 using Khadra.Application.Bookings.ReadBookings;
 using Khadra.Application.Common;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Khadra.WebAPI.Controllers;
 
@@ -228,11 +230,20 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
         [Required, MaxLength(40)] string ReasonCode,
         [Required, MaxLength(500)] string Details);
 
+    /// <param name="HandoverCode">The customer's one-time code (typed PIN, or the QR scanned). Optional in the
+    /// request shape so the console that predates it keeps working while Handover:RequireVerification is off.</param>
+    /// <param name="UnverifiedReason">When the customer cannot show a code: why, in the dealer's words. Audited.</param>
     public sealed record HandoverRequest(
         [Range(0, int.MaxValue)] int? OdometerKm,
         [Range(0, 1)] decimal? FuelLevel,
         [MaxLength(1000)] string? Notes,
-        [Range(0, double.MaxValue)] decimal? CashCollected);
+        [Range(0, double.MaxValue)] decimal? CashCollected,
+        [MaxLength(200)] string? HandoverCode = null,
+        [MaxLength(500)] string? UnverifiedReason = null)
+    {
+        // The code is a live credential; request logging must never print it.
+        public override string ToString() => $"{nameof(HandoverRequest)} {{ HasCode = {!string.IsNullOrWhiteSpace(HandoverCode)} }}";
+    }
 
     /// <summary>Approves a request. The optional note reaches the customer through the booking's history.</summary>
     [Authorize(Policy = SecurityPolicies.ApprovedDealerStaff)]
@@ -260,6 +271,23 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
         return FromResult(result);
     }
 
+    /// <summary>
+    /// A fresh one-time code the CUSTOMER shows at the counter to prove the booking is theirs: for the
+    /// pickup while the booking is Confirmed, for the return while it is PickedUp. Asking again
+    /// replaces the previous code. Only the booking's own customer; anybody else gets 404.
+    /// </summary>
+    [Authorize(Policy = SecurityPolicies.Customer)]
+    [EnableRateLimiting(RateLimitPolicies.HandoverCode)]
+    [HttpPost("{bookingId:guid}/handover-code")]
+    [ProducesResponseType<HandoverCodeDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> IssueHandoverCode(Guid bookingId, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new IssueHandoverCodeCommand(Id.From(bookingId)), cancellationToken);
+        return FromResult(result);
+    }
+
     /// <summary>Records the handover to the customer. Not gated on trading: an approved rental is honoured.</summary>
     [Authorize(Policy = SecurityPolicies.DealerStaff)]
     [HttpPost("{bookingId:guid}/pickup")]
@@ -267,7 +295,8 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
     public async Task<ActionResult> RecordPickup(Guid bookingId, [FromBody] HandoverRequest request, CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
-            new RecordPickupCommand(actor.UserId!.Value, Id.From(bookingId), request.OdometerKm, request.FuelLevel, request.Notes, request.CashCollected),
+            new RecordPickupCommand(actor.UserId!.Value, Id.From(bookingId), request.OdometerKm, request.FuelLevel, request.Notes, request.CashCollected,
+                request.HandoverCode, request.UnverifiedReason),
             cancellationToken);
         return FromResult(result);
     }
@@ -279,7 +308,8 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
     public async Task<ActionResult> RecordReturn(Guid bookingId, [FromBody] HandoverRequest request, CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
-            new RecordReturnCommand(actor.UserId!.Value, Id.From(bookingId), request.OdometerKm, request.FuelLevel, request.Notes, request.CashCollected),
+            new RecordReturnCommand(actor.UserId!.Value, Id.From(bookingId), request.OdometerKm, request.FuelLevel, request.Notes, request.CashCollected,
+                request.HandoverCode, request.UnverifiedReason),
             cancellationToken);
         return FromResult(result);
     }

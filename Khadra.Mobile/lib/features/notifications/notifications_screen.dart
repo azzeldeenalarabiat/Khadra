@@ -215,9 +215,11 @@ class _NotificationRow extends ConsumerWidget {
     }
 
     // Every customer-facing kind is about a booking, and `subjectId` is that
-    // booking's id.
+    // booking's id — except a dispute update, whose subject is the TICKET.
     if (item.subjectId != null && context.mounted) {
-      context.push(Routes.booking(item.subjectId!));
+      context.push(item.kind == 'YourDisputeUpdated'
+          ? Routes.dispute(item.subjectId!)
+          : Routes.booking(item.subjectId!));
     }
   }
 
@@ -238,6 +240,20 @@ class _NotificationRow extends ConsumerWidget {
           l10n.notificationYourBookingCompleted(item.actorName),
         'YourBookingMarkedNoShow' =>
           l10n.notificationYourBookingMarkedNoShow(item.actorName),
+        'YourBookingConfirmed' =>
+          l10n.notificationYourBookingConfirmed(item.actorName),
+        'YourBookingCancelled' =>
+          l10n.notificationYourBookingCancelled(item.actorName),
+        'YourBookingPickedUp' =>
+          l10n.notificationYourBookingPickedUp(item.actorName),
+        'YourBookingReturned' =>
+          l10n.notificationYourBookingReturned(item.actorName),
+        'YourPaymentReminder' => l10n.notificationYourPaymentReminder,
+        'YourPickupReminder' =>
+          l10n.notificationYourPickupReminder(item.actorName),
+        'YourReturnReminder' =>
+          l10n.notificationYourReturnReminder(item.actorName),
+        'YourDisputeUpdated' => l10n.notificationYourDisputeUpdated,
         _ => l10n.notificationUnknown(item.actorName),
       };
 
@@ -247,6 +263,13 @@ class _NotificationRow extends ConsumerWidget {
         'YourBookingExpired' => Icons.timer_off_outlined,
         'YourBookingCompleted' => Icons.verified_outlined,
         'YourBookingMarkedNoShow' => Icons.person_off_outlined,
+        'YourBookingConfirmed' => Icons.verified_user_outlined,
+        'YourBookingCancelled' => Icons.event_busy_outlined,
+        'YourBookingPickedUp' => Icons.key_outlined,
+        'YourBookingReturned' => Icons.assignment_return_outlined,
+        'YourPaymentReminder' => Icons.payments_outlined,
+        'YourPickupReminder' || 'YourReturnReminder' => Icons.alarm_outlined,
+        'YourDisputeUpdated' => Icons.gavel_outlined,
         _ => Icons.notifications_none,
       };
 }

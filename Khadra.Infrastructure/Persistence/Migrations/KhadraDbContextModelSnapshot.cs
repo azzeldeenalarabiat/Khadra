@@ -343,6 +343,44 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.ToTable("bookings", (string)null);
                 });
 
+            modelBuilder.Entity("Khadra.Domain.Bookings.BookingReminder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("AnchorAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("anchor_at");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_booking_reminders");
+
+                    b.HasIndex("BookingId", "Kind", "AnchorAt")
+                        .IsUnique()
+                        .HasDatabaseName("ix_booking_reminders_booking_id_kind_anchor_at");
+
+                    b.ToTable("booking_reminders", (string)null);
+                });
+
             modelBuilder.Entity("Khadra.Domain.Bookings.BookingStatusChange", b =>
                 {
                     b.Property<Guid>("Id")
@@ -397,6 +435,66 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.ToTable("booking_status_changes", (string)null);
                 });
 
+            modelBuilder.Entity("Khadra.Domain.Bookings.HandoverCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("code_hash")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_attempts");
+
+                    b.Property<DateTimeOffset?>("SupersededAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("superseded_at");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid?>("UsedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("used_by_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_handover_codes");
+
+                    b.HasIndex("BookingId", "Type", "CreatedAt")
+                        .HasDatabaseName("ix_handover_codes_booking_id_type_created_at");
+
+                    b.ToTable("handover_codes", (string)null);
+                });
+
             modelBuilder.Entity("Khadra.Domain.Bookings.HandoverRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -411,6 +509,10 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasPrecision(4, 3)
                         .HasColumnType("numeric(4,3)")
                         .HasColumnName("fuel_level");
+
+                    b.Property<Guid?>("HandoverCodeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("handover_code_id");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(2000)
@@ -445,6 +547,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("type");
+
+                    b.Property<string>("UnverifiedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("unverified_reason");
+
+                    b.Property<string>("Verification")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("verification");
 
                     b.HasKey("Id")
                         .HasName("pk_booking_handovers");
@@ -992,6 +1104,75 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_documents", (string)null);
                 });
 
+            modelBuilder.Entity("Khadra.Domain.IdentityAccess.PushDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("app_version");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("language");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("platform");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid?>("SessionFamilyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("session_family_id");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("token");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_push_devices");
+
+                    b.HasIndex("SessionFamilyId")
+                        .HasDatabaseName("ix_push_devices_session_family_id");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("ix_push_devices_token");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_push_devices_user_id");
+
+                    b.ToTable("push_devices", (string)null);
+                });
+
             modelBuilder.Entity("Khadra.Domain.IdentityAccess.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1138,6 +1319,11 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("phone");
 
+                    b.Property<string>("PreferredLanguage")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("preferred_language");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1251,6 +1437,10 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
 
+                    b.Property<DateTimeOffset?>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -1298,6 +1488,67 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_notifications_recipient_user_id_occurred_at_id");
 
                     b.ToTable("notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Notifications.NotificationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("channel");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notification_deliveries");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_notification_deliveries_pending_due")
+                        .HasFilter("state = 'Pending'");
+
+                    b.HasIndex("NotificationId", "Channel")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notification_deliveries_notification_id_channel");
+
+                    b.ToTable("notification_deliveries", (string)null);
                 });
 
             modelBuilder.Entity("Khadra.Domain.Payments.Payment", b =>
@@ -2307,6 +2558,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Khadra.Domain.Bookings.BookingReminder", b =>
+                {
+                    b.HasOne("Khadra.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_booking_reminders_bookings_booking_id");
+                });
+
             modelBuilder.Entity("Khadra.Domain.Bookings.BookingStatusChange", b =>
                 {
                     b.HasOne("Khadra.Domain.Bookings.Booking", null)
@@ -2315,6 +2576,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_booking_status_changes_bookings_booking_id");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Bookings.HandoverCode", b =>
+                {
+                    b.HasOne("Khadra.Domain.Bookings.Booking", null)
+                        .WithMany()
+                        .HasForeignKey("BookingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_handover_codes_bookings_booking_id");
                 });
 
             modelBuilder.Entity("Khadra.Domain.Bookings.HandoverRecord", b =>
@@ -2949,6 +3220,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customer_documents_users_user_id");
                 });
 
+            modelBuilder.Entity("Khadra.Domain.IdentityAccess.PushDevice", b =>
+                {
+                    b.HasOne("Khadra.Domain.IdentityAccess.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_push_devices_users_user_id");
+                });
+
             modelBuilder.Entity("Khadra.Domain.IdentityAccess.RefreshToken", b =>
                 {
                     b.HasOne("Khadra.Domain.IdentityAccess.User", null)
@@ -2967,6 +3248,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_verification_tokens_users_user_id");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Notifications.NotificationDelivery", b =>
+                {
+                    b.HasOne("Khadra.Domain.Notifications.Notification", null)
+                        .WithMany()
+                        .HasForeignKey("NotificationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_notification_deliveries_notifications_notification_id");
                 });
 
             modelBuilder.Entity("Khadra.Domain.Payments.Payment", b =>

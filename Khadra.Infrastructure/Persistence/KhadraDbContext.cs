@@ -20,9 +20,12 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
 
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
     public DbSet<VerificationToken> VerificationTokens => Set<VerificationToken>();
     public DbSet<Dealer> Dealers => Set<Dealer>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingReminder> BookingReminders => Set<BookingReminder>();
+    public DbSet<HandoverCode> HandoverCodes => Set<HandoverCode>();
     public DbSet<DisputeTicket> DisputeTickets => Set<DisputeTicket>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
@@ -30,6 +33,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<CarType> CarTypes => Set<CarType>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<CustomerShortlist> Shortlists => Set<CustomerShortlist>();
     public DbSet<Payment> Payments => Set<Payment>();

@@ -531,6 +531,16 @@
                   })
                 }}</span>
               </div>
+              @if (h.verification === 'Unverified') {
+                <div class="banner s-warn">
+                  {{ t('handover.unverified') }}
+                  @if (h.unverifiedReason) {
+                    — {{ t('disputeDetail.quoted', { text: h.unverifiedReason }) }}
+                  }
+                </div>
+              } @else if (h.verification === 'Code') {
+                <div class="page-sub">{{ t('handover.verifiedByCode') }}</div>
+              }
               @if (h.notes) {
                 <!-- Typed at the counter: quoted as written, never translated. -->
                 <div class="page-sub">{{ t('disputeDetail.quoted', { text: h.notes }) }}</div>

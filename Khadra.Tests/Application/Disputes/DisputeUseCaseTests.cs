@@ -6,6 +6,7 @@ using Khadra.Application.Disputes;
 using Khadra.Application.Disputes.RaiseDispute;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.Disputes.ResolveDispute;
+using Khadra.Application.Notifications;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings;
@@ -16,6 +17,9 @@ using Khadra.Domain.Disputes;
 using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -93,8 +97,11 @@ public sealed class DisputeUseCaseTests
 
         public IPaymentRepository Payments { get; } = Substitute.For<IPaymentRepository>();
 
+        public INotifier Notifier { get; } = Substitute.For<INotifier>();
+
         public AdminDisputeHandlers Admin() => new(
-            Tickets, Bookings, Payments, Names, Composer(), new DisputeAuditor(AuditTrail, Actor, Clock), Actor, Clock, UnitOfWork);
+            Tickets, Bookings, Payments, Names, Composer(), new DisputeAuditor(AuditTrail, Actor, Clock),
+            new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()), Actor, Clock, UnitOfWork);
     }
 
     /// <summary>A booking the customer cancelled after paying: terminal, with the deposit held and a penalty assessed.</summary>
@@ -409,6 +416,13 @@ public sealed class DisputeUseCaseTests
         Assert.Same(AuditAction.DisputeAssigned, entry.Action);
         Assert.Equal("Open", entry.PreviousValue);
         Assert.Equal("UnderReview", entry.NewValue);
+
+        // The customer hears their dispute moved, and tapping it opens the TICKET.
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(n =>
+            n.Kind == NotificationKind.YourDisputeUpdated
+            && n.RecipientUserId == booking.CustomerId
+            && n.SubjectId == ticket.Id
+            && n.SubjectReference == booking.Reference.Value));
     }
 
     [Fact]

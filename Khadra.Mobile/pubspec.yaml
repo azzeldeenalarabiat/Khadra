@@ -5,7 +5,11 @@ publish_to: 'none'
 # sends X-Khadra-App-Version. The API refuses anything older (MobileApp:MinimumSupportedVersion
 # in Khadra.WebAPI/appsettings.json), and MobileAppMinimumVersionTests fails if that minimum is
 # ever raised above this line — raise this first.
-version: 1.1.0+2
+#
+# 1.2.0 shows the handover code and registers for push. Additive to the API, so the minimum stays
+# 1.1.0 until Handover:RequireVerification is switched on — which raises it to 1.2.0 in the same
+# step, AFTER this build is published (docs/production.md, "The customer app").
+version: 1.2.0+3
 
 environment:
   sdk: ^3.12.2
@@ -72,6 +76,19 @@ dependencies:
   # with the minimum /app-config publishes. Read from the platform rather than typed into a
   # constant, because a constant is a second copy of this file's `version:` that nobody bumps.
   package_info_plus: ^10.2.1
+  # The provider's checkout page, INSIDE the app. A customer handed to the external browser has
+  # left Khadra mid-payment, and coming back is a task switch they have to find on their own. The
+  # page is whatever URL the server minted for the attempt; the app reads nothing from it and
+  # learns the outcome from the booking, never from where the page navigates. See CheckoutScreen.
+  webview_flutter: ^4.14.1
+  # Push notifications (FCM). Each environment is its own Firebase project; a build with no
+  # google-services.json runs with push off (see PushMessaging). Foreground pushes are shown
+  # through flutter_local_notifications on the same "booking_updates" channel the server names.
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
+  flutter_local_notifications: ^18.0.1
+  # The handover code as a QR, for the rental office to scan. Drawn on the phone; no network.
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:
@@ -96,6 +113,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+
+  # Which Khadra a build talks to when no --flavor is given. `production` is the customer app,
+  # unchanged: same applicationId, same name, and the API address still passed with
+  # --dart-define=KHADRA_API_BASE_URL. The other flavor is `staging` (--flavor staging), a separate
+  # "Khadra TEST" app bound to the staging API. See AppEnvironment and docs/production.md.
+  default-flavor: production
 
   assets:
     - assets/brand/

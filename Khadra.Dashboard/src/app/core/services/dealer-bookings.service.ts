@@ -58,6 +58,10 @@ export interface HandoverInput {
   readonly fuelLevel: number | null;
   readonly notes: string | null;
   readonly cashCollected: number | null;
+  /** The customer's six-digit handover code, from their app. Never logged or stored here. */
+  readonly handoverCode: string | null;
+  /** When the customer cannot show a code: why. The handover is then recorded as unverified and audited. */
+  readonly unverifiedReason: string | null;
 }
 
 /** All server calls go through the BFF; the browser never holds an API token. */

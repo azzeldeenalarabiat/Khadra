@@ -107,6 +107,25 @@ every deploy), so **Production refuses to boot on either default**.
 | `KnownProxies__0..3` | The forwarded-header trust list (§7) |
 | `ForwardedHeaders__ForwardLimit` | `3` (§7) |
 
+### Push notifications, reminders and handovers
+
+| Variable | Value |
+|---|---|
+| `Push__Provider` | `Fcm` to wake customers' phones; `None` (the default) sends nothing and the boot log says `PUSH NOTIFICATIONS ARE NOT SENT` |
+| `Push__Fcm__ProjectId` | This environment's OWN Firebase project: `khadra-prod` in production, `khadra-staging` in staging. Never the other one |
+| `Push__Fcm__ServiceAccountJson` | The whole service-account key file of that project, pasted as one value. A **secret**: it signs as the Firebase project. Environment only |
+| `Reminders__PickupLeadMinutes` / `__ReturnLeadMinutes` / `__PaymentLeadMinutes` | 60 / 60 / 30 by default (owner, 2026-09-23). Leave unset unless the owner changes them |
+| `Handover__RequireVerification` | `false` until the 1.2.0 app is published; see "The handover code" in §11 |
+
+**Reminders fire only while the API is running.** A free Render instance sleeps after fifteen idle
+minutes; a reminder whose window passes while it sleeps is sent late if the moment is still ahead,
+and not at all once it has passed. The settlement pass has always had the same limitation. "Exactly
+one hour before" needs an always-on (paid) instance.
+
+Handover codes need no variable of their own: their key is derived from
+`Authentication__Jwt__SigningKey`. Rotating that key invalidates live codes, which last fifteen
+minutes; the customer asks for a new one.
+
 ### Optional
 
 | Variable | Effect if unset |
@@ -175,6 +194,7 @@ SQL editor** instead:
 |---|---|
 | [sql/khadra-schema.sql](sql/khadra-schema.sql) | A database that does not exist yet. Idempotent |
 | [sql/2026-09-10-dealer-address.sql](sql/2026-09-10-dealer-address.sql) | The address columns, for a database that already exists |
+| [sql/2026-09-23-push-reminders-handover.sql](sql/2026-09-23-push-reminders-handover.sql) | Push devices, the notification outbox, reminders and handover codes. Additive and idempotent; apply before deploying the API that needs it. Staging first |
 | [sql/2026-09-22-bilingual-dealer-content.sql](sql/2026-09-22-bilingual-dealer-content.sql) | The bilingual office-text columns, and the foreign-key migration before them. Applied with the API **stopped** — see [releases/2026-09-bilingual-and-app-gate.md](releases/2026-09-bilingual-and-app-gate.md) |
 | [sql/supabase-lockdown.sql](sql/supabase-lockdown.sql) | Revokes PostgREST access from `anon`/`authenticated` |
 | [sql/verify-admin.sql](sql/verify-admin.sql) | Read-only: is there an administrator, and can they sign in? |
@@ -439,12 +459,76 @@ cd Khadra.Mobile
 flutter build apk --release --dart-define=KHADRA_API_BASE_URL=https://khadra.onrender.com
 ```
 
-The APK is `build/app/outputs/flutter-apk/app-release.apk`. Before publishing it:
+The command is unchanged since the app gained build flavors: `pubspec.yaml` names `production` the
+default flavor, so it builds the customer app — same package, same name, same key. What changed is
+the file name. The APK is `build/app/outputs/flutter-apk/app-production-release.apk` (it was
+`app-release.apk` before flavors; that file is no longer written). Passing `--flavor production`
+explicitly builds the identical APK. Before publishing it:
 
 - `aapt dump badging` shows the version in `pubspec.yaml`. Never publish two different
   APKs under one version.
 - `apksigner verify --print-certs` shows the release certificate above. An APK signed with
   anything else cannot install over the copies on phones.
+
+### The staging app ("Khadra TEST")
+
+A second APK from the same code, for testing against `https://khadra-staging.onrender.com` (which
+runs the SANDBOX payment provider). It is never published as `khadra.apk` and never marked latest.
+
+```bash
+cd Khadra.Mobile
+flutter build apk --release --flavor staging
+```
+
+The APK is `build/app/outputs/flutter-apk/app-staging-release.apk`.
+
+| | |
+|---|---|
+| Package | `com.khadra.khadra_mobile.staging` — a different app, so it installs beside the customer app and neither can update over the other |
+| Name | "Khadra TEST" / "خضرا TEST" on the launcher, with the normal Khadra icon |
+| Talks to | `https://khadra-staging.onrender.com`, compiled in. It takes no `KHADRA_API_BASE_URL`: one naming any other address stops the app at launch, and the production flavor likewise refuses the staging address (`AppEnvironment`) |
+| In the app | Identical to the customer app — no strip, no sandbox wording (owner, 2026-09-23). The launcher name and package id are what mark it |
+| Version | The same `pubspec.yaml` version as production. Never add a `versionNameSuffix`: `1.1.0-staging` is a prerelease below `1.1.0`, and the API's minimum-version gate would refuse it |
+| Signed with | The same release key. Identity is package + key, so this is safe |
+
+The staging API's `MobileApp__UpdateUrl` should name a staging APK or be empty. Pointing it at the
+production `khadra.apk` sends a tester whose staging build is too old to the customer app instead.
+
+### Payment inside the app
+
+The deposit checkout opens in an in-app page (`CheckoutScreen`, a WebView) rather than the browser,
+for every provider. It loads the `checkoutUrl` the server minted and reads nothing back from it; it
+re-reads the booking while open and closes when the server stops reporting that attempt as the live
+one. Only the signed webhook confirms a payment, so nothing the page does can. The browser build of
+the app still opens a new tab, having no WebView.
+
+### Push notifications (Firebase)
+
+Two Firebase projects, never shared (owner, 2026-09-23):
+
+| | Firebase project | Android app registered in it | Its `google-services.json` goes in |
+|---|---|---|---|
+| Production | `khadra-prod` | `com.khadra.khadra_mobile` | `Khadra.Mobile/android/app/src/production/` |
+| Staging | `khadra-staging` | `com.khadra.khadra_mobile.staging` | `Khadra.Mobile/android/app/src/staging/` |
+
+`google-services.json` identifies the Firebase project to the app; it is not a secret and is
+committed. The service-account key is the secret, and it lives only in each API's environment
+(`Push__Fcm__ServiceAccountJson`). Because a token belongs to one project, the staging API cannot
+push to a production phone even by mistake: FCM refuses it and the device is revoked.
+
+Without the JSON file the app builds and runs with push off. The Google services Gradle plugin is
+applied only when one of the two files exists.
+
+### The handover code
+
+From 1.2.0 the app shows a one-time code (six digits and a QR) for the pickup and the return; the
+dealer console asks for it, or for a reason when the customer cannot show one ("unverified",
+audited and flagged to the admin). The order that keeps 1.1.0 customers able to collect cars:
+
+1. Deploy the API with `Handover__RequireVerification=false`. Nothing is required yet.
+2. Publish the 1.2.0 APK and confirm it against the live API.
+3. Only then set `Handover__RequireVerification=true` AND `MobileApp__MinimumSupportedVersion=1.2.0`,
+   together. A dealer can still record an unverified handover for anyone who cannot show a code.
 
 ### The key
 

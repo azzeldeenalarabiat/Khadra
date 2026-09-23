@@ -657,7 +657,8 @@ public sealed class Booking : AggregateRoot
         int? odometerKm = null,
         decimal? fuelLevel = null,
         string? notes = null,
-        Money? cashCollected = null)
+        Money? cashCollected = null,
+        HandoverProof? proof = null)
     {
         if (Status != BookingStatus.Confirmed)
             return BookingErrors.NotConfirmed;
@@ -666,7 +667,7 @@ public sealed class Booking : AggregateRoot
 
         var record = HandoverRecord.Create(
             Id, HandoverType.Pickup, recordedBy, recordedByUserId, now,
-            photoStorageKeys, odometerKm, fuelLevel, notes, cashCollected);
+            photoStorageKeys, odometerKm, fuelLevel, notes, cashCollected, proof);
         if (record.IsFailure)
             return record.Error;
 
@@ -685,7 +686,8 @@ public sealed class Booking : AggregateRoot
         int? odometerKm = null,
         decimal? fuelLevel = null,
         string? notes = null,
-        Money? cashCollected = null)
+        Money? cashCollected = null,
+        HandoverProof? proof = null)
     {
         if (Status != BookingStatus.PickedUp)
             return BookingErrors.NotPickedUp;
@@ -694,7 +696,7 @@ public sealed class Booking : AggregateRoot
 
         var record = HandoverRecord.Create(
             Id, HandoverType.Return, recordedBy, recordedByUserId, now,
-            photoStorageKeys, odometerKm, fuelLevel, notes, cashCollected);
+            photoStorageKeys, odometerKm, fuelLevel, notes, cashCollected, proof);
         if (record.IsFailure)
             return record.Error;
 

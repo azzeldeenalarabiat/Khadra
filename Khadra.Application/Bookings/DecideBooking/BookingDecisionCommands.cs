@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Bookings.Dtos;
+using Khadra.Application.Bookings.Handover;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Dealers;
@@ -28,13 +29,22 @@ public sealed record ApproveBookingCommand(Id ActorUserId, Id BookingId, string?
 public sealed record RejectBookingCommand(Id ActorUserId, Id BookingId, string ReasonCode, string Details)
     : ICommand<Result<BookingDto, Error>>;
 
+/// <param name="HandoverCode">The customer's one-time code, typed or scanned. Never logged.</param>
+/// <param name="UnverifiedReason">Why there is no code, when the customer could not show one.</param>
 public sealed record RecordPickupCommand(
     Id ActorUserId,
     Id BookingId,
     int? OdometerKm,
     decimal? FuelLevel,
     string? Notes,
-    decimal? CashCollected) : ICommand<Result<BookingDto, Error>>;
+    decimal? CashCollected,
+    string? HandoverCode = null,
+    string? UnverifiedReason = null) : ICommand<Result<BookingDto, Error>>
+{
+    // The code is a live credential for the next few minutes; a record prints every property.
+    public override string ToString() =>
+        $"RecordPickupCommand {{ BookingId = {BookingId}, HasCode = {!string.IsNullOrWhiteSpace(HandoverCode)}, Unverified = {!string.IsNullOrWhiteSpace(UnverifiedReason)} }}";
+}
 
 public sealed record RecordReturnCommand(
     Id ActorUserId,
@@ -42,7 +52,14 @@ public sealed record RecordReturnCommand(
     int? OdometerKm,
     decimal? FuelLevel,
     string? Notes,
-    decimal? CashCollected) : ICommand<Result<BookingDto, Error>>;
+    decimal? CashCollected,
+    string? HandoverCode = null,
+    string? UnverifiedReason = null) : ICommand<Result<BookingDto, Error>>
+{
+    // The code is a live credential for the next few minutes; a record prints every property.
+    public override string ToString() =>
+        $"RecordReturnCommand {{ BookingId = {BookingId}, HasCode = {!string.IsNullOrWhiteSpace(HandoverCode)}, Unverified = {!string.IsNullOrWhiteSpace(UnverifiedReason)} }}";
+}
 
 /// <summary>
 /// The closed set of reasons a gallery may decline a request.
@@ -103,6 +120,7 @@ public sealed class BookingDecisionHandlers(
     IBookingReader reader,
     DealerTeamNotifier team,
     BookingEmailDispatcher emails,
+    HandoverVerifier handovers,
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<ApproveBookingCommand, Result<BookingDto, Error>>,
@@ -127,7 +145,10 @@ public sealed class BookingDecisionHandlers(
             request.ActorUserId,
             NotificationKind.BookingApproved,
             cancellationToken,
-            NotificationKind.YourBookingApproved);
+            NotificationKind.YourBookingApproved,
+            // The deadline this approval set, frozen on the notification: a push that says "pay by"
+            // must state the booking's own deadline, not recompute one.
+            loaded.Value.PaymentDeadline);
 
         if (committed.IsFailure)
             return committed;
@@ -183,6 +204,17 @@ public sealed class BookingDecisionHandlers(
             return loaded.Error;
         var booking = loaded.Value;
 
+        // A booking that is not waiting to be collected answers with its own refusal FIRST, so a
+        // second press of the button says "already picked up", not "that code was used".
+        if (booking.Status != BookingStatus.Confirmed)
+            return booking.RecordPickup(BookingParty.Dealer, request.ActorUserId, clock.UtcNow).Error;
+
+        var previous = booking.Status.Name;
+        var proof = await handovers.ProveAsync(
+            booking, HandoverType.Pickup, request.HandoverCode, request.UnverifiedReason, request.ActorUserId, cancellationToken);
+        if (proof.IsFailure)
+            return proof.Error;
+
         var recorded = booking.RecordPickup(
             BookingParty.Dealer,
             request.ActorUserId,
@@ -190,11 +222,14 @@ public sealed class BookingDecisionHandlers(
             odometerKm: request.OdometerKm,
             fuelLevel: request.FuelLevel,
             notes: request.Notes,
-            cashCollected: Cash(request.CashCollected, booking));
+            cashCollected: Cash(request.CashCollected, booking),
+            proof: proof.Value);
         if (recorded.IsFailure)
             return recorded.Error;
 
-        return await CommitAsync(booking, request.ActorUserId, NotificationKind.BookingPickedUp, cancellationToken);
+        handovers.Audit(booking, HandoverType.Pickup, proof.Value, previous);
+        return await CommitAsync(
+            booking, request.ActorUserId, NotificationKind.BookingPickedUp, cancellationToken, NotificationKind.YourBookingPickedUp);
     }
 
     public async Task<Result<BookingDto, Error>> Handle(RecordReturnCommand request, CancellationToken cancellationToken)
@@ -206,6 +241,15 @@ public sealed class BookingDecisionHandlers(
             return loaded.Error;
         var booking = loaded.Value;
 
+        if (booking.Status != BookingStatus.PickedUp)
+            return booking.RecordReturn(BookingParty.Dealer, request.ActorUserId, clock.UtcNow).Error;
+
+        var previous = booking.Status.Name;
+        var proof = await handovers.ProveAsync(
+            booking, HandoverType.Return, request.HandoverCode, request.UnverifiedReason, request.ActorUserId, cancellationToken);
+        if (proof.IsFailure)
+            return proof.Error;
+
         var recorded = booking.RecordReturn(
             BookingParty.Dealer,
             request.ActorUserId,
@@ -213,11 +257,14 @@ public sealed class BookingDecisionHandlers(
             odometerKm: request.OdometerKm,
             fuelLevel: request.FuelLevel,
             notes: request.Notes,
-            cashCollected: Cash(request.CashCollected, booking));
+            cashCollected: Cash(request.CashCollected, booking),
+            proof: proof.Value);
         if (recorded.IsFailure)
             return recorded.Error;
 
-        return await CommitAsync(booking, request.ActorUserId, NotificationKind.BookingReturned, cancellationToken);
+        handovers.Audit(booking, HandoverType.Return, proof.Value, previous);
+        return await CommitAsync(
+            booking, request.ActorUserId, NotificationKind.BookingReturned, cancellationToken, NotificationKind.YourBookingReturned);
     }
 
     /// <summary>
@@ -274,18 +321,19 @@ public sealed class BookingDecisionHandlers(
     /// missing. Same reasoning the audit trail is built on.
     /// </summary>
     /// <param name="customerKind">
-    /// What the CUSTOMER is told, where there is anything to tell them. Null for the handovers: the
-    /// customer was standing at the counter when the car changed hands, and a notification about an
-    /// event they took part in is noise. It was pre-launch checklist item 60 that nothing told a
-    /// customer their booking had been answered at all — the dealer's decision reached them only by
-    /// email, and only if they had verified an address.
+    /// What the CUSTOMER is told. The handovers tell them too, since the handover code (2026-09-23):
+    /// the push is how the phone showing the code learns it has done its job and moves on to the
+    /// rental. It was pre-launch checklist item 60 that nothing told a customer their booking had
+    /// been answered at all — the dealer's decision reached them only by email, and only if they had
+    /// verified an address.
     /// </param>
     private async Task<Result<BookingDto, Error>> CommitAsync(
         Booking booking,
         Id actorUserId,
         NotificationKind kind,
         CancellationToken cancellationToken,
-        NotificationKind? customerKind = null)
+        NotificationKind? customerKind = null,
+        DateTimeOffset? customerDueAt = null)
     {
         var member = await membership.ResolveAsync(actorUserId, cancellationToken);
         if (member.IsSuccess)
@@ -307,7 +355,8 @@ public sealed class BookingDecisionHandlers(
                     customerKind,
                     clock.UtcNow,
                     booking.Id,
-                    booking.Reference.Value);
+                    booking.Reference.Value,
+                    customerDueAt);
             }
         }
 

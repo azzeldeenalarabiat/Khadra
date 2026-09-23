@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "72528496310",
+    "project_id": "khadra-staging",
+    "storage_bucket": "khadra-staging.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:72528496310:android:208f666f046fe7265fc817",
+        "android_client_info": {
+          "package_name": "com.khadra.khadra_mobile.staging"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9SWC6Ya_jcTa0VuN0QJEGbZuj0Tq-Ais"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

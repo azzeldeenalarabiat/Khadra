@@ -24,7 +24,11 @@ using Khadra.Domain.Shortlist.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Geocoding;
+using Khadra.Application.Bookings.Handover;
+using Khadra.Application.Bookings.Reminders;
+using Khadra.Application.Notifications.Delivery;
 using Khadra.Infrastructure.Notifications;
+using Khadra.Infrastructure.Notifications.Push;
 using Khadra.Infrastructure.Payments;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
@@ -60,7 +64,36 @@ public static class DependencyInjection
         // aggregate; this only decides how often to ask.
         services.AddHostedService<BookingSettlementService>();
 
+        AddPush(services, configuration);
+        services.AddHostedService<NotificationDispatchService>();
+
         return services;
+    }
+
+    /// <summary>
+    /// The push sender this process uses: FCM when configured, otherwise one that sends nothing and
+    /// says so at startup (PushStartupCheck), the way payments and email do.
+    /// </summary>
+    private static void AddPush(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddScoped<INotificationMessageComposer, NotificationMessageComposer>();
+
+        var provider = configuration[$"{PushOptions.SectionName}:Provider"]?.Trim();
+        if (string.Equals(provider, PushOptions.FcmProvider, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient(FcmPushSender.HttpClientName, client =>
+            {
+                client.BaseAddress = new Uri("https://fcm.googleapis.com/");
+                client.Timeout = TimeSpan.FromSeconds(15);
+            })
+            // Trace-level HttpClient logging prints headers verbatim, and this one is an access token.
+            .RedactLoggedHeaders(["Authorization"]);
+            services.AddSingleton<IPushSender, FcmPushSender>();
+        }
+        else
+        {
+            services.AddSingleton<IPushSender, UnconfiguredPushSender>();
+        }
     }
 
     private static void AddOptions(IServiceCollection services, IConfiguration configuration)
@@ -118,6 +151,35 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(SchedulingOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
+        services.AddOptions<PushOptions>()
+            .Bind(configuration.GetSection(PushOptions.SectionName))
+            // A name nothing implements must not quietly mean "no push": a typo would look exactly
+            // like a deliberate None, and nobody would notice until a customer missed a reminder.
+            .Validate(options => PushOptions.KnownProviders.Contains(options.Provider?.Trim() ?? string.Empty,
+                    StringComparer.OrdinalIgnoreCase),
+                $"Push: Provider must be one of {string.Join(", ", PushOptions.KnownProviders)}.")
+            .Validate(options => options.FcmIsComplete,
+                "Push: the Fcm provider requires Push:Fcm:ProjectId and a service-account key in "
+                + "Push:Fcm:ServiceAccountJson (set it in the environment, never in a tracked file).")
+            .ValidateOnStart();
+        services.AddOptions<HandoverOptions>()
+            .Bind(configuration.GetSection(HandoverOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IHandoverSettings, HandoverSettings>();
+        services.AddOptions<ReminderOptions>()
+            .Bind(configuration.GetSection(ReminderOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IReminderSettings, ReminderSettings>();
+        services.AddOptions<NotificationDeliveryOptions>()
+            .Bind(configuration.GetSection(NotificationDeliveryOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(options => options.LeaseOutlastsBatch,
+                $"Notifications:Delivery: LeaseSeconds must be at least BatchSize x {NotificationDeliveryOptions.WorstCaseSecondsPerRow}, "
+                + "or a second process can re-claim rows the first is still sending.")
+            .ValidateOnStart();
+        services.AddSingleton<INotificationDeliverySettings, NotificationDeliverySettings>();
         services.AddOptions<BusinessRulesOptions>()
             .Bind(configuration.GetSection(BusinessRulesOptions.SectionName))
             .ValidateDataAnnotations()
@@ -241,6 +303,7 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IPushDeviceRepository, PushDeviceRepository>();
         services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IDocumentAccessLog, DocumentAccessLog>();
@@ -251,6 +314,10 @@ public static class DependencyInjection
         // becomes a write, and no handler has to remember the lapse rule.
         services.AddScoped<BookingRepository>();
         services.AddScoped<IBookingRepository, SettlingBookingRepository>();
+        services.AddScoped<IBookingReminderRepository, BookingReminderRepository>();
+        services.AddScoped<IHandoverCodeRepository, HandoverCodeRepository>();
+        services.AddSingleton<IHandoverCodeService, HandoverCodeService>();
+        services.AddScoped<IReminderCandidateReader, ReminderCandidateReader>();
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();
@@ -258,6 +325,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IProviderEventReceiptRepository, ProviderEventReceiptRepository>();
         services.AddScoped<INotifier, Notifier>();
+        services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
 
         AddReporting(services);
     }

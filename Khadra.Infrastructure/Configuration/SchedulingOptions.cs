@@ -29,4 +29,17 @@ public sealed class SchedulingOptions
 
     [Range(5, 3600)]
     public int SettlementIntervalSeconds { get; init; } = 60;
+
+    /// <summary>
+    /// Whether the notification outbox is worked at all: push notifications and reminder emails.
+    /// </summary>
+    /// <remarks>
+    /// Defaults ON for the same reason settlement does. Off is for tests and one-off tools that host the
+    /// application and must not have a timer sending pushes underneath them.
+    /// </remarks>
+    public bool DispatchNotifications { get; init; } = true;
+
+    /// <summary>How often the outbox is worked. Seconds, because a customer is waiting on the push.</summary>
+    [Range(1, 600)]
+    public int NotificationDispatchIntervalSeconds { get; init; } = 5;
 }

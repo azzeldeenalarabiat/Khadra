@@ -30,7 +30,10 @@ class FakeApi extends KhadraApi {
   /// predates it — which is also what every test that does not care gets.
   Map<String, dynamic>? mobileApp;
 
-  static AppConfig fakeConfig({Map<String, dynamic>? mobileApp}) => AppConfig.fromJson({
+  /// The `payments.mode` `/app-config` answers with, or null to leave the section out.
+  String? paymentsMode;
+
+  static AppConfig fakeConfig({Map<String, dynamic>? mobileApp, String? paymentsMode}) => AppConfig.fromJson({
         'timeZone': 'Asia/Amman',
         'currency': {'code': 'JOD', 'minorUnits': 3},
         'maxAdvanceBookingDays': 180,
@@ -43,6 +46,7 @@ class FakeApi extends KhadraApi {
         },
         'vocabularies': <String, dynamic>{},
         if (mobileApp != null) 'mobileApp': mobileApp,
+        if (paymentsMode != null) 'payments': {'mode': paymentsMode},
       });
 
   static AuthUser fakeUser({
@@ -69,7 +73,7 @@ class FakeApi extends KhadraApi {
       );
 
   @override
-  Future<AppConfig> appConfig() async => fakeConfig(mobileApp: mobileApp);
+  Future<AppConfig> appConfig() async => fakeConfig(mobileApp: mobileApp, paymentsMode: paymentsMode);
 
   /// The lookups, empty unless a test says otherwise.
   List<Lookup> cityLookups = const [];
@@ -214,11 +218,69 @@ class FakeApi extends KhadraApi {
   /// The one booking the detail endpoint answers with. Set by the detail tests.
   Booking? bookingById;
 
+  /// How many times the detail endpoint was read. The checkout screen's polling is counted by it.
+  int bookingReads = 0;
+
   @override
   Future<Booking> booking(String bookingId) async {
+    bookingReads++;
     final found = bookingById;
     if (found == null) throw StateError("no booking was staged for $bookingId");
     return found;
+  }
+
+  /// Every push registration this phone sent, in order: (token, language).
+  final List<(String, String)> pushRegistrations = [];
+  int pushRemovals = 0;
+  final List<String> languagesSet = [];
+
+  /// When set, the push calls fail the way the network does.
+  ApiFailure? pushFailure;
+
+  @override
+  Future<void> registerPushDevice({
+    required String token,
+    required String platform,
+    required String language,
+    String? appVersion,
+  }) async {
+    if (pushFailure != null) throw pushFailure!;
+    pushRegistrations.add((token, language));
+  }
+
+  @override
+  Future<void> removePushDevice() async {
+    if (pushFailure != null) throw pushFailure!;
+    pushRemovals++;
+  }
+
+  @override
+  Future<void> setLanguage(String language) async {
+    if (pushFailure != null) throw pushFailure!;
+    languagesSet.add(language);
+  }
+
+  /// What `handover-code` answers with, one per call; the last one repeats.
+  List<HandoverCodeGrant> handoverGrants = [];
+  int handoverCalls = 0;
+
+  @override
+  Future<HandoverCodeGrant> issueHandoverCode(String bookingId) async {
+    handoverCalls++;
+    if (handoverGrants.isEmpty) throw StateError("no handover code was staged for $bookingId");
+    return handoverGrants[(handoverCalls - 1).clamp(0, handoverGrants.length - 1)];
+  }
+
+  /// What `deposit-checkout` answers with. Null fails the call loudly, like any unstaged endpoint.
+  PaymentAttempt? checkoutAttempt;
+  int checkoutCalls = 0;
+
+  @override
+  Future<PaymentAttempt> openDepositCheckout(String bookingId) async {
+    checkoutCalls++;
+    final attempt = checkoutAttempt;
+    if (attempt == null) throw StateError('no checkout was staged for $bookingId');
+    return attempt;
   }
 
   @override

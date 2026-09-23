@@ -132,9 +132,22 @@
                 <div class="stack stack-4">
                   <div class="row row-gap-8">
                     <span class="handover-title">{{ enumLabel('handoverType', h.type) }}</span>
+                    @if (h.verification === 'Unverified') {
+                      <span class="badge s-warn">{{ t('handover.unverifiedBadge') }}</span>
+                    }
                     <span class="page-sub push">{{ when(h.recordedAt) }}</span>
                   </div>
                   <div class="page-sub">{{ handoverFacts(h) }}</div>
+                  @if (h.verification === 'Unverified') {
+                    <div class="banner s-warn">
+                      {{ t('handover.unverifiedAdmin') }}
+                      @if (h.unverifiedReason) {
+                        <div class="queue-desc user-text">{{ h.unverifiedReason }}</div>
+                      }
+                    </div>
+                  } @else if (h.verification === 'Code') {
+                    <div class="page-sub">{{ t('handover.verifiedByCode') }}</div>
+                  }
                   @if (h.cashCollected; as cash) {
                     <div class="page-sub">
                       {{ t('adminBooking.cashCollectedAmount', { amount: money(cash) }) }}

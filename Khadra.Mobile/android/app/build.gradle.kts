@@ -25,6 +25,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications schedules with java.time, which needs desugaring below API 26.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -36,6 +38,32 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    // Which Khadra this APK talks to. The flavor is the ONE selector: it picks the Android identity
+    // here and, through Flutter's `appFlavor`, the API address in AppEnvironment. See
+    // docs/production.md, "The customer app".
+    //
+    // `production` changes nothing about the app customers have: same applicationId, same name, same
+    // key, and the API address is still passed at build time. pubspec.yaml names it the default
+    // flavor, so the release command that predates flavors still builds exactly this.
+    //
+    // `staging` is a different application on the phone (".staging"), so a tester can hold both and
+    // neither can ever update over the other. Its name ("Khadra TEST") lives in src/staging/res.
+    //
+    // NO versionNameSuffix. The API compares the version the app reports against
+    // MobileApp:MinimumSupportedVersion, and "1.1.0-staging" is a PRERELEASE that ranks below 1.1.0
+    // — the staging build would be refused on every call with 426 and never get past the update
+    // screen.
+    flavorDimensions += "environment"
+    productFlavors {
+        create("production") {
+            dimension = "environment"
+        }
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+        }
     }
 
     signingConfigs {
@@ -77,4 +105,16 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+}
+
+// Push notifications. Each environment is its OWN Firebase project (owner, 2026-09-23): the
+// production app's file goes in src/production/, the staging app's in src/staging/, and neither may
+// ever be the other's. The plugin is applied only once a file exists, so a checkout without Firebase
+// still builds; the app then runs with push switched off and says so in its log.
+if (listOf("production", "staging").any { file("src/$it/google-services.json").exists() }) {
+    apply(plugin = "com.google.gms.google-services")
 }
