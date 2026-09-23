@@ -241,6 +241,7 @@ public static class DependencyInjection
         services.AddScoped<IDomainEventDispatcher, DomainEventDispatcher>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IPushDeviceRepository, PushDeviceRepository>();
         services.AddScoped<IVerificationTokenRepository, VerificationTokenRepository>();
         services.AddScoped<IAuditTrail, AuditTrail>();
         services.AddScoped<IDocumentAccessLog, DocumentAccessLog>();

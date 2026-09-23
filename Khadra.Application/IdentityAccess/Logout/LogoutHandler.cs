@@ -9,6 +9,7 @@ namespace Khadra.Application.IdentityAccess.Logout;
 
 public sealed class LogoutHandler(
     IRefreshTokenRepository refreshTokens,
+    IPushDeviceRepository pushDevices,
     IOpaqueTokenService opaqueTokens,
     IClock clock)
     : IRequestHandler<LogoutCommand, UnitResult<Error>>
@@ -26,7 +27,12 @@ public sealed class LogoutHandler(
 
         var token = await refreshTokens.GetByHashAsync(opaqueTokens.Hash(request.RefreshToken), cancellationToken);
         if (token is not null && token.UserId == request.UserId)
+        {
             await refreshTokens.RevokeFamilyAsync(token.FamilyId, now, cancellationToken);
+            // The phone that signed out stops being woken for this account. Delivery also checks the
+            // session is live, so this is tidiness on top of a guard rather than the guard itself.
+            await pushDevices.RevokeForSessionAsync(request.UserId, token.FamilyId, now, cancellationToken);
+        }
 
         return UnitResult.Success<Error>();
     }

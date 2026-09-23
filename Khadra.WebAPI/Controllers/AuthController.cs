@@ -7,6 +7,7 @@ using Khadra.Application.IdentityAccess.ForgotPassword;
 using Khadra.Application.IdentityAccess.GetCurrentUser;
 using Khadra.Application.IdentityAccess.Login;
 using Khadra.Application.IdentityAccess.Logout;
+using Khadra.Application.IdentityAccess.PushDevices;
 using Khadra.Application.IdentityAccess.RefreshTokens;
 using Khadra.Application.IdentityAccess.RegisterCustomer;
 using Khadra.Application.IdentityAccess.RegisterDealerOwner;
@@ -188,7 +189,24 @@ public sealed class AuthController(ICurrentActor currentActor) : ApiControllerBa
         var result = await Mediator.Send(new GetCurrentUserQuery(currentActor.UserId!.Value), cancellationToken);
         return FromResult(result);
     }
+
+    /// <summary>
+    /// The language this person reads Khadra in: "ar" or "en". Emails and reminders sent while they
+    /// are away from the app follow it; until it is set they arrive in both languages.
+    /// </summary>
+    [Authorize]
+    [HttpPut("me/language")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> SetLanguage(SetLanguageRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var result = await Mediator.Send(new SetMyLanguageCommand(request.Language), cancellationToken);
+        return FromResult(result);
+    }
 }
+
+public sealed record SetLanguageRequest([param: Required, StringLength(2)] string Language);
 
 public sealed record RegisterRequest(
     [param: Required, StringLength(256)] string Email,

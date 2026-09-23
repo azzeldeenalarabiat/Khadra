@@ -9,6 +9,7 @@ using Khadra.Application.IdentityAccess.RefreshTokens;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Events;
+using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -232,8 +233,10 @@ public sealed class RefreshTokensHandlerTests
 
 public sealed class LogoutHandlerTests
 {
-    private static LogoutHandler Handler(AuthHandlerTestContext context) =>
-        new(context.RefreshTokens, context.OpaqueTokens, context.Clock);
+    private readonly IPushDeviceRepository pushDevices = Substitute.For<IPushDeviceRepository>();
+
+    private LogoutHandler Handler(AuthHandlerTestContext context) =>
+        new(context.RefreshTokens, pushDevices, context.OpaqueTokens, context.Clock);
 
     [Fact]
     public async Task Revokes_the_presented_family_when_it_belongs_to_the_caller()
@@ -247,6 +250,8 @@ public sealed class LogoutHandlerTests
 
         Assert.True(result.IsSuccess);
         await context.RefreshTokens.Received(1).RevokeFamilyAsync(token.FamilyId, Users.Now, Arg.Any<CancellationToken>());
+        // The phone that signed out is no longer woken for this account.
+        await pushDevices.Received(1).RevokeForSessionAsync(user.Id, token.FamilyId, Users.Now, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -263,6 +268,8 @@ public sealed class LogoutHandlerTests
         Assert.True(foreign.IsSuccess);
         Assert.True(unknown.IsSuccess);
         await context.RefreshTokens.DidNotReceive().RevokeFamilyAsync(Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        await pushDevices.DidNotReceive().RevokeForSessionAsync(
+            Arg.Any<Id>(), Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

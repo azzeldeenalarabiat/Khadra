@@ -20,6 +20,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
 
     public DbSet<User> Users => Set<User>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PushDevice> PushDevices => Set<PushDevice>();
     public DbSet<VerificationToken> VerificationTokens => Set<VerificationToken>();
     public DbSet<Dealer> Dealers => Set<Dealer>();
     public DbSet<Booking> Bookings => Set<Booking>();

@@ -1,3 +1,4 @@
+using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
@@ -38,6 +39,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         entity.Property(user => user.SuspensionReason).HasMaxLength(500);
         entity.Property(user => user.DateOfBirth);
         entity.Property(user => user.IsForeignNational).IsRequired();
+        // Nullable by design: null is "never said", which keeps the bilingual email.
+        entity.Property(user => user.PreferredLanguage)
+            .HasConversion(language => language!.Name, name => Enumeration.FromName<Language>(name))
+            .HasMaxLength(2);
         entity.Property(user => user.CreatedAt).IsRequired();
         entity.Property(user => user.IsDeleted).IsRequired();
 

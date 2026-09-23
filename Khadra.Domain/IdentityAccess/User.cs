@@ -31,6 +31,18 @@ public sealed class User : AggregateRoot, ISoftDeletable
     // Spec 5.1: a foreign renter presents a passport, and possibly an international driving permit
     // once that requirement is decided (spec 2.2, still open).
     public bool IsForeignNational { get; private set; }
+
+    /// <summary>
+    /// The language this person reads Khadra in, or null when they have never said.
+    /// </summary>
+    /// <remarks>
+    /// Set by the customer app on sign-in and whenever the language is switched in Profile, so it is
+    /// the choice the person actually made rather than a guess from a header. Read by anything that
+    /// speaks to them when they are not in front of the app — an email, a reminder. Null is a real
+    /// answer and keeps today's behaviour: the email goes out in both languages. Pre-launch item 40.
+    /// </remarks>
+    public Language? PreferredLanguage { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
     public bool IsDeleted { get; private set; }
     public DateTimeOffset? DeletedAt { get; private set; }
@@ -282,6 +294,13 @@ public sealed class User : AggregateRoot, ISoftDeletable
 
         Name = name;
         Phone = phone;
+    }
+
+    /// <summary>Records the language this person chose to read Khadra in.</summary>
+    public void ChoosePreferredLanguage(Language language)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        PreferredLanguage = language;
     }
 
     public void RecordSuccessfulLogin(DateTimeOffset now) => LastLoginAt = now;
