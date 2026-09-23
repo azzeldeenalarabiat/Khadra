@@ -2105,19 +2105,6 @@ class AppLocalizationsAr extends AppLocalizations {
       'لم تعد هذه السيارة معروضة، فلا يمكن حفظها.';
 
   @override
-  String get sandboxPaymentsTitle => 'مدفوعات تجريبية';
-
-  @override
-  String get sandboxPaymentsBody =>
-      'هذه نسخة تجريبية. لا تُخصم أي بطاقة ولا تنتقل أي أموال. أي حجز تؤكّده هنا ليس حجزًا حقيقيًا.';
-
-  @override
-  String get environmentStagingRibbon => 'نسخة تجريبية TEST · خادم الاختبار';
-
-  @override
-  String get environmentSandboxPayments => 'مدفوعات تجريبية';
-
-  @override
   String get checkoutTitle => 'الدفع';
 
   @override
@@ -2135,9 +2122,6 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get checkoutAttemptEnded =>
       'انتهت محاولة الدفع هذه دون تأكيد حجزك. يمكنك المحاولة مرة أخرى ما دامت مهلة الدفع مفتوحة.';
-
-  @override
-  String get sandboxPaymentsAttempt => 'دفعة تجريبية — لم تنتقل أي أموال.';
 
   @override
   String get updateRequiredTitle => 'حدّث تطبيق خضرا للمتابعة';

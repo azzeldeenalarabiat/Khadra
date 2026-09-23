@@ -9,7 +9,7 @@ import 'support/fake_api.dart';
 /// `/app-config` is read once and held — but a FAILED read must not be held.
 ///
 /// Found on the staging build: the first launch met a cold Render instance, the read timed out,
-/// and the error sat in the provider until the app was killed. The sandbox banner, the prices and
+/// and the error sat in the provider until the app was killed. The payments mode, the prices and
 /// the date picker's bounds all went without their configuration for the whole session.
 class _FlakyConfigApi extends FakeApi {
   int calls = 0;
@@ -47,7 +47,7 @@ void main() {
       async.elapse(appConfigRetry);
       async.flushMicrotasks();
       expect(api.calls, 3);
-      expect(container.read(sandboxPaymentsProvider), isTrue);
+      expect(container.read(appConfigProvider).value!.payments.isSandbox, isTrue);
     });
   });
 

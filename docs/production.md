@@ -465,9 +465,9 @@ The APK is `build/app/outputs/flutter-apk/app-staging-release.apk`.
 | | |
 |---|---|
 | Package | `com.khadra.khadra_mobile.staging` — a different app, so it installs beside the customer app and neither can update over the other |
-| Name | "Khadra TEST" / "خضرا TEST", on an amber launcher icon |
+| Name | "Khadra TEST" / "خضرا TEST" on the launcher, with the normal Khadra icon |
 | Talks to | `https://khadra-staging.onrender.com`, compiled in. It takes no `KHADRA_API_BASE_URL`: one naming any other address stops the app at launch, and the production flavor likewise refuses the staging address (`AppEnvironment`) |
-| In the app | An amber strip on every screen: "TEST BUILD · STAGING SERVER", plus "Sandbox payments" once `/app-config` reports `payments.mode = Sandbox` |
+| In the app | Identical to the customer app — no strip, no sandbox wording (owner, 2026-09-23). The launcher name and package id are what mark it |
 | Version | The same `pubspec.yaml` version as production. Never add a `versionNameSuffix`: `1.1.0-staging` is a prerelease below `1.1.0`, and the API's minimum-version gate would refuse it |
 | Signed with | The same release key. Identity is package + key, so this is safe |
 

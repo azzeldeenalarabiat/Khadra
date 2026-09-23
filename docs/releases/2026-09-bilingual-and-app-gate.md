@@ -1,10 +1,12 @@
 # Release 2026-09 — bilingual office texts, and the app version gate
 
-**Status: prepared, not deployed.** Production is untouched until the owner approves the
-rollout. Everything below is the package: what ships, what to check first, the exact
-sequence, and how to get back.
+**Status: deployed and verified (owner, 2026-09-23).** Production API and BFF run `d9a3237`
+(tag `v1.1.0`); GitHub release `v1.1.0` is marked latest. Confirmed from outside on 2026-09-23:
+`/app-config` publishes `mobileApp.minimumSupportedVersion = 1.1.0` and `payments.mode = None`,
+and a request stamped `X-Khadra-App-Version: 1.0.0+1` is refused with `426`. The package below is
+kept as the record of how it went out and how to get back.
 
-Production runs `a6cc71a` (`origin/main`). This release is every commit after it.
+Before this release production ran `a6cc71a`. This release is every commit after it, up to `d9a3237`.
 
 ---
 

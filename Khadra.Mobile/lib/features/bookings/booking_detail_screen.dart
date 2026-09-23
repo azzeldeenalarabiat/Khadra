@@ -15,7 +15,6 @@ import '../../core/providers.dart';
 import '../../core/router.dart';
 import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
-import '../../core/widgets/sandbox_banner.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import 'booking_providers.dart';
@@ -445,11 +444,6 @@ class _PaymentDue extends StatelessWidget {
           tone: NoticeTone.warn,
           icon: Icons.payments_outlined,
         ),
-        // Before the button, not after it. This is the screen where a customer is
-        // about to act on a figure, so "no money moves" has to arrive before the
-        // decision rather than as a footnote under it. Renders nothing unless the
-        // server itself reported Sandbox.
-        const SandboxPaymentsBanner(padding: EdgeInsets.only(top: Space.md)),
         const SizedBox(height: Space.md),
         _PaymentAction(booking: booking),
       ],

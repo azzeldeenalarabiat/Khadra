@@ -12,7 +12,8 @@ enum KhadraBuild {
   production,
 
   /// "Khadra TEST": a separate application bound to the staging API, which runs the sandbox
-  /// payment provider. It says so on every screen (see `EnvironmentRibbon`).
+  /// payment provider. Its launcher name says so ("Khadra TEST"); inside, it looks like the
+  /// customer app, by the owner's decision of 2026-09-23.
   staging,
 }
 
@@ -47,10 +48,10 @@ abstract final class AppEnvironment {
   /// This build, from its flavor. Resolved once; an unknown flavor is a build mistake and throws.
   static final KhadraBuild build = buildFor(appFlavor);
 
-  /// Whether this is the "Khadra TEST" build. What the ribbon over every screen keys on.
+  /// Whether this is the "Khadra TEST" build.
   ///
-  /// NOT what the sandbox payment banner keys on: that is the server's own `payments.mode`, because
-  /// whether money moves is a fact about the server, and a build flag is not evidence of it.
+  /// Never evidence of what the server does with money: that is the server's own `payments.mode`,
+  /// because whether money moves is a fact about the server, not about this binary.
   static bool get isStaging => build == KhadraBuild.staging;
 
   /// The API root, without a trailing slash.
@@ -81,8 +82,8 @@ abstract final class AppEnvironment {
   /// Where a build of the given kind sends its requests. Pure, so both rules below are testable.
   ///
   /// - **Staging** always answers [stagingApiBaseUrl]. A `KHADRA_API_BASE_URL` that names anything
-  ///   else is refused rather than obeyed: a "Khadra TEST" app talking to production would put the
-  ///   test banner over real customers' data, and a staging build is only worth anything if its
+  ///   else is refused rather than obeyed: a "Khadra TEST" app talking to production would make
+  ///   test bookings against real customers' data, and a staging build is only worth anything if its
   ///   name is a promise about where it points.
   /// - **Production** is unchanged — the define, or the development loopback — except that it
   ///   refuses the STAGING host. The production application id must never be the one a tester's

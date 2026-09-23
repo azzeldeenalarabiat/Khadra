@@ -2040,19 +2040,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'That car is no longer listed, so it cannot be saved.';
 
   @override
-  String get sandboxPaymentsTitle => 'Test payments';
-
-  @override
-  String get sandboxPaymentsBody =>
-      'This is a test build. No card is charged and no money moves. Any booking you confirm here is not a real rental.';
-
-  @override
-  String get environmentStagingRibbon => 'TEST BUILD · STAGING SERVER';
-
-  @override
-  String get environmentSandboxPayments => 'Sandbox payments';
-
-  @override
   String get checkoutTitle => 'Payment';
 
   @override
@@ -2070,9 +2057,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get checkoutAttemptEnded =>
       'That payment attempt ended without confirming your booking. You can try again while the payment window is open.';
-
-  @override
-  String get sandboxPaymentsAttempt => 'Test payment — no money moved.';
 
   @override
   String get updateRequiredTitle => 'Update the Khadra app to continue';

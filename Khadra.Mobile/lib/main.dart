@@ -11,7 +11,6 @@ import 'core/config/update_requirement.dart';
 import 'core/providers.dart';
 import 'core/router.dart';
 import 'core/theme/khadra_theme.dart';
-import 'core/widgets/environment_ribbon.dart';
 import 'features/update/update_required_screen.dart';
 import 'l10n/app_localizations.dart';
 
@@ -160,18 +159,13 @@ class _KhadraAppState extends ConsumerState<KhadraApp> {
           // the router itself — not a route on it — so no route and no deep link
           // can reach past it: the router is not in the tree to receive one. Its
           // own Navigator is for the language menu, whose popup needs an overlay.
-          //
-          // The staging build's ribbon wraps BOTH, so even the update screen says
-          // which server refused it. In production it returns the child untouched.
-          child: EnvironmentRibbon(
-            child: blockedBy != null
-                ? Navigator(
-                    onGenerateRoute: (_) => MaterialPageRoute<void>(
-                      builder: (_) => UpdateRequiredScreen(requirement: blockedBy),
-                    ),
-                  )
-                : child ?? const SizedBox.shrink(),
-          ),
+          child: blockedBy != null
+              ? Navigator(
+                  onGenerateRoute: (_) => MaterialPageRoute<void>(
+                    builder: (_) => UpdateRequiredScreen(requirement: blockedBy),
+                  ),
+                )
+              : child ?? const SizedBox.shrink(),
         );
       },
     );
