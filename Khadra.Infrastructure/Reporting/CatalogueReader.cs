@@ -98,12 +98,38 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             // CA1304/CA1311 want a culture on ToLower. There is none to give: this is an expression
             // tree that .NET never executes — EF turns it into SQL LOWER(). ToLowerInvariant, which
             // the analyzer would accept, is precisely the call that does not translate.
-#pragma warning disable CA1304, CA1311
+#pragma warning disable CA1304, CA1311, CA1862
             query = query.Where(vehicle =>
                 EF.Functions.Like(vehicle.Details.Make.ToLower(), pattern, @"\") ||
                 EF.Functions.Like(vehicle.Details.Model.ToLower(), pattern, @"\"));
-#pragma warning restore CA1304, CA1311
+#pragma warning restore CA1304, CA1311, CA1862
         }
+
+        if (!string.IsNullOrWhiteSpace(filter.FuelType))
+        {
+            // As with transmission: an unknown name matches nothing, and a query string never throws.
+            var fuelType = Enumeration.GetAll<FuelType>()
+                .FirstOrDefault(type => string.Equals(type.Name, filter.FuelType, StringComparison.OrdinalIgnoreCase));
+            if (fuelType is null)
+                return PagedResult.Empty<CatalogueListing>(page.Page, page.PageSize);
+
+            query = query.Where(vehicle => vehicle.Details.FuelType == fuelType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Make))
+        {
+            var make = filter.Make.Trim().ToLowerInvariant();
+            // See the text search above for why this is ToLower inside an expression tree.
+#pragma warning disable CA1304, CA1311, CA1862
+            query = query.Where(vehicle => vehicle.Details.Make.ToLower() == make);
+#pragma warning restore CA1304, CA1311, CA1862
+        }
+
+        if (filter.MinYear is { } minYear)
+            query = query.Where(vehicle => vehicle.Details.Year >= minYear);
+
+        if (filter.MaxYear is { } maxYear)
+            query = query.Where(vehicle => vehicle.Details.Year <= maxYear);
 
         if (filter.Window is not null)
             query = FreeDuring(query, filter.Window);
@@ -115,11 +141,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         if (totalCount == 0)
             return PagedResult.Empty<CatalogueListing>(page.Page, page.PageSize);
 
-        var items = await query
-            // Newest listing first. Id breaks the tie because CreatedAt is not unique, and a
-            // non-total order lets a page boundary drop a car or show it twice.
-            .OrderByDescending(vehicle => vehicle.CreatedAt)
-            .ThenByDescending(vehicle => vehicle.Id)
+        var items = await Ordered(query, filter.Sort ?? CatalogueSort.Newest)
             .Skip(page.Skip)
             .Take(page.PageSize)
             .Select(ToListing())
@@ -327,7 +349,157 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        return new CatalogueFacets(seats, [.. carTypeIds.Select(id => id.Value).Order()]);
+        // Makes are free text an office typed, so "Toyota" and "toyota" are one make: grouped without
+        // case, shown in the spelling that appears most (then alphabetically, so it is stable).
+        var makes = await bookable
+            .Select(vehicle => vehicle.Details.Make)
+            .ToListAsync(cancellationToken);
+        var makeChoices = makes
+            .Where(make => !string.IsNullOrWhiteSpace(make))
+            .Select(make => make.Trim())
+            .GroupBy(make => make, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .GroupBy(spelling => spelling, StringComparer.Ordinal)
+                .OrderByDescending(spelling => spelling.Count())
+                .ThenBy(spelling => spelling.Key, StringComparer.Ordinal)
+                .First().Key)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var fuelTypes = await bookable
+            .Select(vehicle => vehicle.Details.FuelType)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var years = await bookable
+            .Select(vehicle => vehicle.Details.Year)
+            .Distinct()
+            .OrderByDescending(year => year)
+            .ToListAsync(cancellationToken);
+
+        return new CatalogueFacets(
+            seats,
+            [.. carTypeIds.Select(id => id.Value).Order()],
+            makeChoices,
+            [.. fuelTypes.OrderBy(type => type.Id).Select(type => type.Name)],
+            years);
+    }
+
+    public async Task<PagedResult<PublicGalleryCard>> ListGalleriesAsync(
+        Id? cityId,
+        PageRequest page,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+
+        var approved = DealerVerificationStatus.Approved;
+        var visible = context.Dealers
+            .AsNoTracking()
+            .Where(dealer => dealer.VerificationStatus == approved && !dealer.IsSuspended);
+        if (cityId is { } city)
+            visible = visible.Where(dealer => dealer.CityId == city);
+
+        var totalCount = await visible.CountAsync(cancellationToken);
+        if (totalCount == 0)
+            return PagedResult.Empty<PublicGalleryCard>(page.Page, page.PageSize);
+
+        // The count is the search's own predicate, so the card and the office's page agree. Ordered
+        // by what an office offers, then by name, then by id so the order is total.
+        //
+        // Ordered in memory: the business name sits behind a value converter EF cannot sort by. The
+        // set is every licensed office that may trade — hundreds at the very most, three columns each —
+        // so reading it whole is cheaper than a second spelling of the name in SQL would be to keep right.
+        var bookable = Bookable();
+        var all = await visible
+            .Select(dealer => new
+            {
+                dealer.Id,
+                dealer.BusinessName,
+                Listed = bookable.Count(vehicle => vehicle.DealerId == dealer.Id),
+            })
+            .ToListAsync(cancellationToken);
+        var rows = all
+            .OrderByDescending(row => row.Listed)
+            .ThenBy(row => row.BusinessName.Value, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(row => row.Id.Value)
+            .Skip(page.Skip)
+            .Take(page.PageSize)
+            .ToList();
+
+        var ids = rows.Select(row => row.Id).ToList();
+        var dealers = await context.Dealers
+            .AsNoTracking()
+            .Where(dealer => ids.Contains(dealer.Id))
+            .ToDictionaryAsync(dealer => dealer.Id, cancellationToken);
+        var ratings = await RatingsFor(ids, cancellationToken);
+
+        var cards = rows
+            .Where(row => dealers.ContainsKey(row.Id))
+            .Select(row =>
+            {
+                var dealer = dealers[row.Id];
+                ratings.TryGetValue(row.Id.Value, out var rating);
+                return new PublicGalleryCard(
+                    dealer.Id.Value,
+                    dealer.BusinessName.Value,
+                    dealer.CityId?.Value,
+                    Branding(dealer.Id, dealer.LogoStorageKey),
+                    Branding(dealer.Id, dealer.CoverStorageKey),
+                    DeliveryOf(dealer),
+                    rating.Count == 0 ? null : rating.Average,
+                    rating.Count,
+                    row.Listed);
+            })
+            .ToList();
+
+        return new PagedResult<PublicGalleryCard>(cards, page.Page, page.PageSize, totalCount);
+    }
+
+    /// <summary>
+    /// A search in the order the customer chose, always ending in newest listing then id.
+    /// </summary>
+    private static IOrderedQueryable<Vehicle> Ordered(IQueryable<Vehicle> query, CatalogueSort sort)
+    {
+        IOrderedQueryable<Vehicle> ordered;
+        if (sort == CatalogueSort.PriceLowToHigh)
+            ordered = query.OrderBy(vehicle => vehicle.DailyRate.Amount).ThenByDescending(vehicle => vehicle.CreatedAt);
+        else if (sort == CatalogueSort.PriceHighToLow)
+            ordered = query.OrderByDescending(vehicle => vehicle.DailyRate.Amount).ThenByDescending(vehicle => vehicle.CreatedAt);
+        else if (sort == CatalogueSort.YearNewest)
+            ordered = query.OrderByDescending(vehicle => vehicle.Details.Year).ThenByDescending(vehicle => vehicle.CreatedAt);
+        else
+            ordered = query.OrderByDescending(vehicle => vehicle.CreatedAt);
+
+        // Id breaks the tie because nothing above is unique, and a non-total order lets a page
+        // boundary drop a car or show it twice.
+        return ordered.ThenByDescending(vehicle => vehicle.Id);
+    }
+
+    /// <summary>Average and count per gallery, from one grouped query. Absent means nobody rated it.</summary>
+    private async Task<Dictionary<Guid, (decimal Average, int Count)>> RatingsFor(
+        List<Id> dealerIds,
+        CancellationToken cancellationToken)
+    {
+        if (dealerIds.Count == 0)
+            return [];
+
+        var ratings = await context.Reviews
+            .AsNoTracking()
+            .Where(review =>
+                review.Direction == ReviewDirection.CustomerRatesDealer &&
+                dealerIds.Contains(review.SubjectId))
+            .GroupBy(review => review.SubjectId)
+            .Select(group => new
+            {
+                DealerId = group.Key,
+                Average = group.Average(review => (decimal)review.Rating.Value),
+                Count = group.Count()
+            })
+            .ToListAsync(cancellationToken);
+
+        return ratings.ToDictionary(
+            row => row.DealerId.Value,
+            row => (Math.Round(row.Average, 1, MidpointRounding.AwayFromZero), row.Count));
     }
 
     /// <summary>

@@ -33,7 +33,17 @@ public sealed record SearchCatalogueQuery(
     string? Text,
     DateTimeOffset? PickupAt,
     DateTimeOffset? ReturnAt,
-    PageRequest Page) : IQuery<Result<PagedResult<CatalogueListing>, Error>>;
+    PageRequest Page,
+    // Added for the customer website (2026-09-23), all optional so the app's requests mean what they did.
+    string? FuelType = null,
+    string? Make = null,
+    int? MinYear = null,
+    int? MaxYear = null,
+    string? Sort = null) : IQuery<Result<PagedResult<CatalogueListing>, Error>>;
+
+/// <summary>The rental offices a customer may be shown, optionally in one city.</summary>
+public sealed record ListPublicGalleriesQuery(Guid? CityId, PageRequest Page)
+    : IQuery<Result<PagedResult<PublicGalleryCard>, Error>>;
 
 /// <summary>One car's own page.</summary>
 /// <param name="Language">
@@ -121,6 +131,24 @@ public sealed class SearchCatalogueHandler(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // An order nobody offered is a client bug, not a browse: refused, the way half a period is,
+        // rather than quietly answered in some other order the customer did not ask for.
+        CatalogueSort? sort = null;
+        if (!string.IsNullOrWhiteSpace(request.Sort))
+        {
+            sort = Enumeration.GetAll<CatalogueSort>()
+                .FirstOrDefault(candidate => string.Equals(candidate.Name, request.Sort, StringComparison.OrdinalIgnoreCase));
+            if (sort is null)
+            {
+                return Error.Validation(
+                    "catalogue.unknown_sort",
+                    "Sort by Newest, PriceLowToHigh, PriceHighToLow or YearNewest.");
+            }
+        }
+
+        if (request.MinYear is { } minYear && request.MaxYear is { } maxYear && minYear > maxYear)
+            return Error.Validation("catalogue.inverted_years", "The earliest year is after the latest one.");
+
         var window = await BuildWindowAsync(
             request.PickupAt, request.ReturnAt, businessRules, calendar, clock, cancellationToken);
         if (window.IsFailure)
@@ -136,7 +164,12 @@ public sealed class SearchCatalogueHandler(
             request.MinSeats,
             request.DeliveryOnly,
             request.Text,
-            window.Value);
+            window.Value,
+            request.FuelType,
+            request.Make,
+            request.MinYear,
+            request.MaxYear,
+            sort);
 
         return await catalogue.SearchAsync(filter, request.Page, cancellationToken);
     }
@@ -243,6 +276,20 @@ public sealed class GetPublicGalleryHandler(ICatalogueReader catalogue)
 
         var gallery = await catalogue.GetGalleryAsync(request.DealerId, request.Language, cancellationToken);
         return gallery is null ? FleetCatalogueErrors.GalleryNotFound : gallery;
+    }
+}
+
+public sealed class ListPublicGalleriesHandler(ICatalogueReader catalogue)
+    : IRequestHandler<ListPublicGalleriesQuery, Result<PagedResult<PublicGalleryCard>, Error>>
+{
+    public async Task<Result<PagedResult<PublicGalleryCard>, Error>> Handle(
+        ListPublicGalleriesQuery request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return await catalogue.ListGalleriesAsync(
+            request.CityId is { } city ? Id.From(city) : null, request.Page, cancellationToken);
     }
 }
 

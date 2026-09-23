@@ -33,17 +33,26 @@ namespace Khadra.Infrastructure.Notifications;
 /// invitation to click the second after the first has consumed it, and to read the failure as the
 /// platform being broken.
 /// </para>
+/// <para>
+/// <b>Where the link goes depends on who it is for</b> (2026-09-23). A customer's verification and
+/// reset links go to the customer website (<see cref="AppOptions.CustomerAppBaseUrl"/>), whose
+/// <c>/verify-email</c> and <c>/reset-password</c> redeem them; staff links, and every invitation, go
+/// to the console (<see cref="AppOptions.ClientBaseUrl"/>). While the customer setting is empty a
+/// customer's links go to the console as they always have — its pages redeem a customer's token too —
+/// so nothing changes until the website is live and the setting is filled.
+/// </para>
 /// </remarks>
 internal sealed class AuthEmailComposer(IOptions<AppOptions> options) : IAuthEmailComposer
 {
     private readonly string _clientBaseUrl = options.Value.ClientBaseUrl.TrimEnd('/');
+    private readonly string _customerBaseUrl = options.Value.CustomerAppBaseUrl.TrimEnd('/');
 
     public EmailMessage EmailVerification(User user, string rawToken)
     {
         ArgumentNullException.ThrowIfNull(user);
         return Compose(
             user,
-            Link("verify-email", rawToken),
+            AccountLink(user, "verify-email", rawToken),
             subject: "أكِّد بريدك الإلكتروني · Verify your Khadra email address",
             arabicBody: "أكِّد بريدك الإلكتروني لتبدأ استخدام خضرا.",
             arabicAction: "تأكيد البريد الإلكتروني",
@@ -58,7 +67,7 @@ internal sealed class AuthEmailComposer(IOptions<AppOptions> options) : IAuthEma
         ArgumentNullException.ThrowIfNull(user);
         return Compose(
             user,
-            Link("reset-password", rawToken),
+            AccountLink(user, "reset-password", rawToken),
             subject: "إعادة تعيين كلمة المرور · Reset your Khadra password",
             arabicBody: "وصلنا طلب لإعادة تعيين كلمة المرور الخاصة بك.",
             arabicAction: "اختر كلمة مرور جديدة",
@@ -178,4 +187,10 @@ internal sealed class AuthEmailComposer(IOptions<AppOptions> options) : IAuthEma
 
     private string Link(string route, string rawToken) =>
         $"{_clientBaseUrl}/{route}?token={Uri.EscapeDataString(rawToken)}";
+
+    /// <summary>A link about the reader's OWN account: to the website for a customer, when there is one.</summary>
+    private string AccountLink(User user, string route, string rawToken) =>
+        user.Role == UserRole.Customer && _customerBaseUrl.Length > 0
+            ? $"{_customerBaseUrl}/{route}?token={Uri.EscapeDataString(rawToken)}"
+            : Link(route, rawToken);
 }

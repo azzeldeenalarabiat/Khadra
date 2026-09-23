@@ -141,3 +141,60 @@ public sealed class AuthEmailComposerTests
         return count;
     }
 }
+
+/// <summary>
+/// Where the links in account emails point, now that customers have a website of their own
+/// (2026-09-23): a customer's verification and reset links go there, staff links never do, and nothing
+/// changes while the customer website's address is not set.
+/// </summary>
+public sealed class AuthEmailLinkTargetTests
+{
+    private const string Console = "https://console.khadra.test";
+    private const string Website = "https://www.khadra.test";
+
+    private static AuthEmailComposer Composer(string customerAppBaseUrl) =>
+        new(Options.Create(new AppOptions { ClientBaseUrl = Console + "/", CustomerAppBaseUrl = customerAppBaseUrl }));
+
+    private static Khadra.Domain.IdentityAccess.User DealerOwner() =>
+        Khadra.Domain.IdentityAccess.User.RegisterDealerOwner(
+            Khadra.Domain.IdentityAccess.EmailAddress.Create("owner@example.jo").Value,
+            Khadra.Domain.IdentityAccess.PhoneNumber.Create("0791234568").Value,
+            Khadra.Domain.IdentityAccess.PersonName.Create("Omar Haddad").Value,
+            Khadra.Domain.IdentityAccess.PasswordHash.FromHash("hash"),
+            Build.Now);
+
+    [Fact]
+    public void A_customers_verification_and_reset_links_go_to_the_website()
+    {
+        var composer = Composer(Website + "/");
+
+        var verify = composer.EmailVerification(Build.Customer(), "tok-1");
+        var reset = composer.PasswordReset(Build.Customer(), "tok-2");
+
+        Assert.Contains($"{Website}/verify-email?token=tok-1", verify.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains($"{Website}/reset-password?token=tok-2", reset.TextBody, StringComparison.Ordinal);
+        // The console, where a customer would meet a sign-in that refuses them, appears nowhere.
+        Assert.DoesNotContain(Console, verify.HtmlBody + verify.TextBody + reset.HtmlBody + reset.TextBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Staff_links_stay_on_the_console_whatever_the_website_is()
+    {
+        var composer = Composer(Website);
+
+        var verify = composer.EmailVerification(DealerOwner(), "tok-1");
+        var invitation = composer.EmployeeInvitation(Build.Customer(), "Petra Rentals", "tok-3");
+
+        Assert.Contains($"{Console}/verify-email?token=tok-1", verify.HtmlBody, StringComparison.Ordinal);
+        Assert.Contains($"{Console}/accept-invitation?token=tok-3", invitation.HtmlBody, StringComparison.Ordinal);
+        Assert.DoesNotContain(Website, verify.HtmlBody + invitation.HtmlBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Until_the_website_is_set_a_customer_is_sent_where_they_always_were()
+    {
+        var verify = Composer(string.Empty).EmailVerification(Build.Customer(), "tok-1");
+
+        Assert.Contains($"{Console}/verify-email?token=tok-1", verify.HtmlBody, StringComparison.Ordinal);
+    }
+}

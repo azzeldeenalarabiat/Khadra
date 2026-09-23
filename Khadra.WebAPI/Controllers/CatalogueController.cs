@@ -58,13 +58,19 @@ public sealed class CatalogueController(ICurrentLanguage language) : ApiControll
         [FromQuery] DateTimeOffset? returnAt,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
+        [FromQuery] string? fuelType,
+        [FromQuery] string? make,
+        [FromQuery] int? minYear,
+        [FromQuery] int? maxYear,
+        [FromQuery] string? sort,
         CancellationToken cancellationToken)
     {
         NoStore();
         var result = await Mediator.Send(
             new SearchCatalogueQuery(
                 cityId, carTypeId, dealerId, minDailyRate, maxDailyRate, transmission, minSeats,
-                deliveryOnly, text, pickupAt, returnAt, PageRequest.From(page, pageSize)),
+                deliveryOnly, text, pickupAt, returnAt, PageRequest.From(page, pageSize),
+                fuelType, make, minYear, maxYear, sort),
             cancellationToken);
         return FromResult(result);
     }

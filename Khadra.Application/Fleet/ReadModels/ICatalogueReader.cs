@@ -89,6 +89,20 @@ public interface ICatalogueReader
     /// choice impossible to take back.
     /// </remarks>
     Task<CatalogueFacets> FacetsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The rental offices a customer may be shown, most cars listed first.
+    /// </summary>
+    /// <remarks>
+    /// "May be shown" is the same test the gallery's own page applies (approved, not suspended), and
+    /// the car count is <c>Bookable()</c> — the search's own predicate — so the number on an office's
+    /// card is exactly the number of cars its page lists. Two predicates would drift, and the drift
+    /// would be an office advertising cars nobody can open.
+    /// </remarks>
+    Task<PagedResult<PublicGalleryCard>> ListGalleriesAsync(
+        Id? cityId,
+        PageRequest page,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>The values the bookable catalogue contains.</summary>
@@ -96,8 +110,53 @@ public interface ICatalogueReader
 /// Seat counts ascending, and car type ids without names: the names are the lookup's, in both
 /// languages. An app offers a type only when it appears in both — so a type with no bookable car
 /// offers no chip, and neither does one an administrator has retired.
+///
+/// Makes, fuel types and years were added for the customer website's filters (2026-09-23). Added
+/// fields, not changed ones: an installed app reads the two it knew and ignores the rest. Makes are as
+/// the offices typed them, one entry per spelling-insensitive make; fuel types are the API names the
+/// `/app-config` vocabulary labels; years are newest first.
 /// </remarks>
-public sealed record CatalogueFacets(IReadOnlyList<int> Seats, IReadOnlyList<Guid> CarTypeIds);
+public sealed record CatalogueFacets(
+    IReadOnlyList<int> Seats,
+    IReadOnlyList<Guid> CarTypeIds,
+    IReadOnlyList<string> Makes,
+    IReadOnlyList<string> FuelTypes,
+    IReadOnlyList<int> Years);
+
+/// <summary>
+/// How a search is ordered. Newest listing first unless the customer chose otherwise.
+/// </summary>
+/// <remarks>
+/// Every order ends in the same tie-break (newest listing, then id), because a non-total order lets a
+/// page boundary drop a car or show it twice. Price orders compare the daily rate as stored; the
+/// platform prices in one currency, so there is no conversion to get wrong.
+/// </remarks>
+public sealed class CatalogueSort : Enumeration
+{
+    public static readonly CatalogueSort Newest = new(1, "Newest");
+    public static readonly CatalogueSort PriceLowToHigh = new(2, "PriceLowToHigh");
+    public static readonly CatalogueSort PriceHighToLow = new(3, "PriceHighToLow");
+    public static readonly CatalogueSort YearNewest = new(4, "YearNewest");
+
+    private CatalogueSort(int id, string name) : base(id, name)
+    {
+    }
+}
+
+/// <summary>A rental office as a directory card: who, where, whether it delivers, how many cars.</summary>
+/// <remarks>
+/// Carries none of the office's own writing — that is its page's, and some of it may be hidden.
+/// </remarks>
+public sealed record PublicGalleryCard(
+    Guid DealerId,
+    string BusinessName,
+    Guid? CityId,
+    string? LogoUrl,
+    string? CoverUrl,
+    GalleryDelivery Delivery,
+    decimal? AverageRating,
+    int ReviewCount,
+    int ListedVehicleCount);
 
 /// <summary>
 /// How a customer narrowed the search.
@@ -119,7 +178,14 @@ public sealed record CatalogueFilter(
     // plain strings on an owned type, so `Contains` translates on both Postgres and the SQLite the
     // persistence tests run against.
     string? Text = null,
-    AvailabilityWindow? Window = null);
+    AvailabilityWindow? Window = null,
+    // By API name, like Transmission; an unknown name matches nothing rather than everything.
+    string? FuelType = null,
+    // The whole make, case-insensitively — a choice from the facets, not a search term.
+    string? Make = null,
+    int? MinYear = null,
+    int? MaxYear = null,
+    CatalogueSort? Sort = null);
 
 /// <summary>
 /// The dates a customer asked about, and everything needed to judge them.
