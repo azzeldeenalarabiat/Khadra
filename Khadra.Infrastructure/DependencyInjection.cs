@@ -175,6 +175,9 @@ public static class DependencyInjection
         services.AddOptions<NotificationDeliveryOptions>()
             .Bind(configuration.GetSection(NotificationDeliveryOptions.SectionName))
             .ValidateDataAnnotations()
+            .Validate(options => options.LeaseOutlastsBatch,
+                $"Notifications:Delivery: LeaseSeconds must be at least BatchSize x {NotificationDeliveryOptions.WorstCaseSecondsPerRow}, "
+                + "or a second process can re-claim rows the first is still sending.")
             .ValidateOnStart();
         services.AddSingleton<INotificationDeliverySettings, NotificationDeliverySettings>();
         services.AddOptions<BusinessRulesOptions>()

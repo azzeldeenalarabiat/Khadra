@@ -85,11 +85,21 @@ public sealed class NotificationDeliveryOptions
     public const string SectionName = "Notifications:Delivery";
 
     [Range(1, 500)]
-    public int BatchSize { get; init; } = 25;
+    public int BatchSize { get; init; } = 10;
 
-    /// <summary>Long enough for a batch of pushes and emails to finish; short enough that a crash is retried soon.</summary>
+    /// <summary>
+    /// How long a claimed row is held. It must outlast the slowest batch — every row timing out on a
+    /// degraded transport — or a second process re-claims rows the first is still sending and
+    /// customers get the email twice. Startup refuses less than <see cref="WorstCaseSecondsPerRow"/>
+    /// per row in the batch.
+    /// </summary>
     [Range(10, 3600)]
-    public int LeaseSeconds { get; init; } = 120;
+    public int LeaseSeconds { get; init; } = 300;
+
+    /// <summary>A row's worst case: a push to two phones or one email, each up to its 15-second timeout.</summary>
+    public const int WorstCaseSecondsPerRow = 30;
+
+    public bool LeaseOutlastsBatch => LeaseSeconds >= BatchSize * WorstCaseSecondsPerRow;
 
     [Range(1, 50)]
     public int MaxAttempts { get; init; } = 6;

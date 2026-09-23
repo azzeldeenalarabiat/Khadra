@@ -41,6 +41,12 @@ public static class PostgresTestDatabase
 {
     public const string VariableName = "KHADRA_TEST_POSTGRES";
 
+    /// <summary>
+    /// Every class that migrates the scratch database runs in this one collection: two migrating a
+    /// fresh database at once race on __EFMigrationsHistory and both fail.
+    /// </summary>
+    public const string Collection = "postgres-scratch-database";
+
     /// <summary>The configured connection string, or null when nobody asked for these tests.</summary>
     public static string? ConnectionString
     {

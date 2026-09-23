@@ -39,6 +39,13 @@ public static class RateLimitPolicies
     /// </remarks>
     public const string Geocode = "geocode";
 
+    /// <summary>Issuing handover codes: each one is a row, and each replaces the last.</summary>
+    /// <remarks>
+    /// Keyed on the BOOKING (from the route): a customer standing at a counter asks a few times at
+    /// most, and nobody has a reason to mint a code a second.
+    /// </remarks>
+    public const string HandoverCode = "handover-code";
+
     /// <summary>
     /// The anonymous catalogue: browsing, one listing, a quote, a gallery page, and the two lookups
     /// the filter chips need.

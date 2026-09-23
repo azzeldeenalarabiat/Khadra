@@ -63,20 +63,22 @@ internal sealed partial class BookingSettlementService(
     {
         try
         {
-            using var scope = scopes.CreateScope();
-            var mediator = scope.ServiceProvider.GetRequiredService<ISender>();
-            await mediator.Send(new SettleDueBookingsCommand(), cancellationToken);
+            // A scope — and so a DbContext — PER COMMAND. Settlement swallows a concurrency conflict
+            // on one booking and moves on, which leaves that booking tracked with a stale token; in a
+            // shared context every later save in the pass would re-issue it and fail, and one dealer
+            // clicking at the wrong instant would cancel a minute of payments and reminders.
+            await SendAsync(new SettleDueBookingsCommand(), cancellationToken);
 
             // Payments after bookings, and in the same pass rather than on a timer of their own.
             // The order matters: expiring an unpaid booking is what makes its open checkout pointless,
             // and sweeping in that order closes the attempt on the same tick rather than the next.
             // A second timer would buy nothing and give two schedules to reason about.
-            await mediator.Send(new SettlePaymentsCommand(), cancellationToken);
+            await SendAsync(new SettlePaymentsCommand(), cancellationToken);
 
             // Reminders LAST, after both sweeps: a booking whose payment window has just closed is
             // expired above, so it is never reminded to pay for something that is already gone. The
             // reminders only stage notifications; the outbox dispatcher sends them within seconds.
-            await mediator.Send(new SendDueRemindersCommand(), cancellationToken);
+            await SendAsync(new SendDueRemindersCommand(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -88,6 +90,12 @@ internal sealed partial class BookingSettlementService(
         {
             LogPassFailed(logger, exception);
         }
+    }
+
+    private async Task SendAsync<TResponse>(IRequest<TResponse> command, CancellationToken cancellationToken)
+    {
+        using var scope = scopes.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<ISender>().Send(command, cancellationToken);
     }
 
     [LoggerMessage(

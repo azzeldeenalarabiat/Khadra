@@ -308,8 +308,9 @@ export class BookingDecisions {
       fuelLevel: number(FUEL, this.t('dealerDecide.fuelLabel')),
       cashCollected: number(CASH, cashLabel),
       notes: values['notes']?.trim() || null,
-      // Digits only: a code read aloud or pasted arrives with spaces, and the server compares exactly.
-      handoverCode: values[CODE]?.replace(/\D/g, '') || null,
+      // Sent as entered: typed digits (spaces are fine) or the whole QR payload from a scanner. The
+      // server reads both, and checks a scanned code belongs to THIS booking.
+      handoverCode: values[CODE]?.trim() || null,
       unverifiedReason: values[UNVERIFIED]?.trim() || null,
     };
   }

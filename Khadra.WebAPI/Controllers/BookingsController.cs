@@ -9,6 +9,7 @@ using Khadra.Application.Common;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Khadra.WebAPI.Controllers;
 
@@ -276,6 +277,7 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
     /// replaces the previous code. Only the booking's own customer; anybody else gets 404.
     /// </summary>
     [Authorize(Policy = SecurityPolicies.Customer)]
+    [EnableRateLimiting(RateLimitPolicies.HandoverCode)]
     [HttpPost("{bookingId:guid}/handover-code")]
     [ProducesResponseType<HandoverCodeDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

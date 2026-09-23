@@ -99,7 +99,8 @@ public sealed class PushWordingAndFcmTests
 
     [Theory]
     [InlineData(HttpStatusCode.NotFound, "UNREGISTERED", true)]
-    [InlineData(HttpStatusCode.BadRequest, "INVALID_ARGUMENT", true)]
+    // A malformed message answers the same code as a bad token; it must never revoke phones.
+    [InlineData(HttpStatusCode.BadRequest, "INVALID_ARGUMENT", false)]
     [InlineData(HttpStatusCode.Forbidden, "SENDER_ID_MISMATCH", true)]
     [InlineData(HttpStatusCode.TooManyRequests, "QUOTA_EXCEEDED", false)]
     [InlineData(HttpStatusCode.ServiceUnavailable, "UNAVAILABLE", false)]

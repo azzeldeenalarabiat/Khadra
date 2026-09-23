@@ -333,6 +333,7 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   BookingMarkedNoShow: 'warning-circle',
   HandoverVerified: 'key',
   HandoverUnverified: 'warning',
+  HandoverCodeLocked: 'warning',
 };
 
 // The sentence is composed here rather than on the server, so the wording (and one day the language)
@@ -359,6 +360,7 @@ const ACTIVITY_VERBS: Readonly<Record<string, TranslationKey>> = {
   BookingMarkedNoShow: 'activity.bookingNoShow',
   HandoverVerified: 'activity.handoverVerified',
   HandoverUnverified: 'activity.handoverUnverified',
+  HandoverCodeLocked: 'activity.handoverCodeLocked',
 };
 
 export interface ActivityRow {

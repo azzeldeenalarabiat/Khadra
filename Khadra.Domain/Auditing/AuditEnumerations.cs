@@ -48,6 +48,8 @@ public sealed class AuditAction : Enumeration
     // what the platform reviews.
     public static readonly AuditAction HandoverVerified = new(25, "HandoverVerified");
     public static readonly AuditAction HandoverUnverified = new(26, "HandoverUnverified");
+    // Enough wrong codes were typed for one booking to lock the customer's code.
+    public static readonly AuditAction HandoverCodeLocked = new(27, "HandoverCodeLocked");
 
     private AuditAction(int id, string name) : base(id, name)
     {

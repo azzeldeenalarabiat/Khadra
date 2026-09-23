@@ -30,8 +30,8 @@ namespace Khadra.Infrastructure.Notifications.Push;
 /// the app reads to open the right screen when it is tapped.
 /// </para>
 /// <para>
-/// <b>Errors.</b> FCM's <c>UNREGISTERED</c> (404) and an invalid token (400 <c>INVALID_ARGUMENT</c>)
-/// mean the install is gone: the device is revoked and never tried again. A token from ANOTHER project
+/// <b>Errors.</b> FCM's <c>UNREGISTERED</c> (404) means the install is gone: the device is revoked
+/// and never tried again. A token from ANOTHER project
 /// is reported as <c>SENDER_ID_MISMATCH</c> (403) and treated the same, which is what keeps staging and
 /// production apart even if a token strayed. Everything else — 429, 5xx, a timeout, a failed token
 /// exchange — is transient and retried by the outbox.
@@ -101,10 +101,14 @@ internal sealed partial class FcmPushSender(
         }
     }
 
+    /// <remarks>
+    /// NOT a bare <c>400 INVALID_ARGUMENT</c>: FCM answers that for a malformed MESSAGE as well as for
+    /// a bad token, and treating it as a dead token would let one composer regression revoke every
+    /// customer's phone in a single pass. It is retried instead, and fails loudly in the outbox.
+    /// </remarks>
     internal static bool IsDeadToken(HttpStatusCode code, string? status) =>
         status is "UNREGISTERED" or "SENDER_ID_MISMATCH"
-        || (code == HttpStatusCode.NotFound)
-        || (code == HttpStatusCode.BadRequest && status == "INVALID_ARGUMENT");
+        || code == HttpStatusCode.NotFound;
 
     internal static object Envelope(PushMessage message) => new
     {

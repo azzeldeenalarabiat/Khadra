@@ -120,21 +120,35 @@ public sealed class HandoverVerifier(
         ArgumentNullException.ThrowIfNull(booking);
         ArgumentNullException.ThrowIfNull(type);
 
-        var code = presentedCode?.Trim();
-        if (!string.IsNullOrEmpty(code))
+        var presented = Presented(presentedCode, booking);
+        if (presented is not null)
         {
             var current = await codes.GetCurrentAsync(booking.Id, type, cancellationToken);
             if (current is null)
                 return HandoverErrors.CodeInvalid;
 
+            var lockedBefore = current.FailedAttempts >= settings.MaxFailedAttempts;
             var verified = current.Verify(
-                service.Matches(current.CodeHash, booking.Id, type, code),
+                presented.Value.ForThisBooking && service.Matches(current.CodeHash, booking.Id, type, presented.Value.Code),
                 settings.MaxFailedAttempts,
                 actorUserId,
                 clock.UtcNow);
             if (verified.IsFailure)
             {
-                // Commit the failed attempt now; the handover itself is not going ahead.
+                // The guess that used up the budget leaves a trace: somebody at this dealership typed
+                // enough wrong codes for this booking to lock the customer's code.
+                if (!lockedBefore && current.FailedAttempts >= settings.MaxFailedAttempts)
+                {
+                    audit.Record(
+                        AuditAction.HandoverCodeLocked,
+                        AuditEntityType.Booking,
+                        booking.Id,
+                        booking.Reference.Value,
+                        booking.Status.Name,
+                        $"{type.Name} code locked after {current.FailedAttempts} wrong tries");
+                }
+
+                // Commit the failed attempt (and any audit entry) now; the handover is not going ahead.
                 await unitOfWork.SaveChangesAsync(cancellationToken);
                 return verified.Error;
             }
@@ -148,6 +162,33 @@ public sealed class HandoverVerifier(
         return settings.RequireVerification
             ? HandoverErrors.CodeRequired
             : HandoverProof.NotRequired;
+    }
+
+    /// <summary>
+    /// What the dealer entered, as the six digits to check and whether it was aimed at this booking.
+    /// </summary>
+    /// <remarks>
+    /// Two shapes arrive: the digits, typed, and the whole QR payload, scanned —
+    /// <c>khadra-handover:v1:{reference}:{code}</c>, which a keyboard-wedge scanner types into the same
+    /// field. A payload for ANOTHER booking is a wrong guess and counts as one. Spaces and dashes in
+    /// typed digits are ignored, because a code read aloud arrives with them.
+    /// </remarks>
+    private static (string Code, bool ForThisBooking)? Presented(string? raw, Booking booking)
+    {
+        var value = raw?.Trim();
+        if (string.IsNullOrEmpty(value))
+            return null;
+
+        const string prefix = "khadra-handover:";
+        if (value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = value.Split(':');
+            return parts.Length == 4 && parts[1] == "v1"
+                ? (parts[3], string.Equals(parts[2], booking.Reference.Value, StringComparison.OrdinalIgnoreCase))
+                : (value, false);
+        }
+
+        return (new string([.. value.Where(char.IsAsciiDigit)]), true);
     }
 
     /// <summary>

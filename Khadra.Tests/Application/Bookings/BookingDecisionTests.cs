@@ -394,6 +394,64 @@ public sealed class BookingDecisionTests
     }
 
     [Fact]
+    public async Task A_scanned_QR_proves_the_handover_like_the_typed_digits()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Pickup);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null,
+                HandoverCode: $"khadra-handover:v1:{booking.Reference.Value}:{code}"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.NotNull(row.UsedAt);
+    }
+
+    [Fact]
+    public async Task Typed_digits_with_spaces_are_read_as_the_code()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, _) = context.GivenCodeFor(booking, HandoverType.Pickup);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: $" {code[..3]} {code[3..]} "), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+    }
+
+    [Fact]
+    public async Task A_QR_for_another_booking_counts_as_a_wrong_guess()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Pickup);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null,
+                HandoverCode: $"khadra-handover:v1:KH-OTHER-1:{code}"), CancellationToken.None);
+
+        Assert.Equal("handover.code_invalid", result.Error.Code);
+        Assert.Equal(1, row.FailedAttempts);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+    }
+
+    [Fact]
+    public async Task The_guess_that_locks_the_code_is_audited_once()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, _) = context.GivenCodeFor(booking, HandoverType.Pickup);
+        var wrong = code == "000000" ? "000001" : "000000";
+
+        for (var i = 0; i < 7; i++)
+            await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: wrong), CancellationToken.None);
+
+        context.AuditTrail.Received(1).Record(Arg.Is<AuditEntry>(e => e.Action == AuditAction.HandoverCodeLocked && e.EntityId == booking.Id));
+    }
+
+    [Fact]
     public async Task An_expired_code_is_refused()
     {
         var context = new Context();

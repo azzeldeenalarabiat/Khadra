@@ -163,6 +163,22 @@ void main() {
     });
   });
 
+  test('a sign-in restored before push has started still registers once it has', () async {
+    api = FakeApi();
+    messaging = FakePushMessaging();
+    push = PushCoordinator(messaging: messaging, api: () => api, appVersion: '1.2.0+3');
+
+    // The cold-start race: the session resolves from disk first.
+    final signingIn = push.signedIn('ar');
+    await settle();
+    expect(api.pushRegistrations, isEmpty);
+
+    await push.start();
+    await signingIn;
+
+    expect(api.pushRegistrations, [('token-1', 'ar')]);
+  });
+
   group('signing out', () {
     test('removes the registration from the server and forgets the token on the phone', () async {
       await start();

@@ -187,6 +187,12 @@ builder.Services.AddRateLimiter(options =>
     // Browsing is chatty and shared: a customer scrolling results and opening cars makes many reads,
     // and a whole mobile network arrives from one address. Read-only public prices, so the ceiling
     // is there to stop a scraper, not to ration customers.
+    // Handover codes: per booking, from the route. Twenty in ten minutes is far more than a counter
+    // needs and far less than anything that would bloat the table.
+    options.AddPolicy(RateLimitPolicies.HandoverCode, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            $"handover:{context.Request.RouteValues["bookingId"]}",
+            _ => FixedWindow(20, TimeSpan.FromMinutes(10))));
     options.AddPolicy(RateLimitPolicies.Public, context =>
         RateLimitPartition.GetFixedWindowLimiter(ClientAddress(context), _ => FixedWindow(1200, TimeSpan.FromMinutes(1), queueLimit: 20)));
     // Private documents a signed-in person has already been authorised for. A handover screen opens

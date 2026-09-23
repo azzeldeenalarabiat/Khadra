@@ -50,6 +50,11 @@ class PushCoordinator {
   final String? _appVersion;
 
   bool _available = false;
+
+  /// Completes once [start] has found out whether push is available. The session can be
+  /// restored from disk before that — a cold start races the two — and a sign-in that
+  /// arrived first must wait for the answer rather than conclude push is off.
+  final Completer<void> _started = Completer<void>();
   bool _signedIn = false;
   String _language = 'en';
   String? _registeredToken;
@@ -65,7 +70,12 @@ class PushCoordinator {
 
   /// Starts listening. Safe to call when Firebase is not configured: push is then off.
   Future<void> start() async {
-    _available = await _messaging.initialize();
+    if (_started.isCompleted) return;
+    try {
+      _available = await _messaging.initialize();
+    } finally {
+      _started.complete();
+    }
     if (!_available) return;
 
     _subscriptions
@@ -88,7 +98,8 @@ class PushCoordinator {
     _language = language;
     // The account learns the language even when push is off: reminder emails read it.
     await _quietly(() => _api().setLanguage(language));
-    if (!_available) return;
+    await _started.future;
+    if (!_available || !_signedIn) return;
     if (!await _messaging.requestPermission()) return;
     final token = await _messaging.token();
     if (token != null) await _register(token);
@@ -107,7 +118,7 @@ class PushCoordinator {
   /// About to sign out: stop pushes to this phone for this account.
   Future<void> signingOut() async {
     _signedIn = false;
-    if (!_available) return;
+    if (!_started.isCompleted || !_available) return;
     await _quietly(() => _api().removePushDevice());
     _registeredToken = null;
     try {
