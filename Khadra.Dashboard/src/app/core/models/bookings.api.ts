@@ -197,6 +197,10 @@ export interface Handover {
   readonly cashCollected: Money | null;
   readonly photoCount: number;
   readonly recordedAt: string;
+  /** How the handover was proved; null on handovers recorded before verification existed. */
+  readonly verification?: 'Code' | 'Unverified' | 'NotRequired' | null;
+  /** The dealer's own words, present exactly when unverified. Shown as typed, never translated. */
+  readonly unverifiedReason?: string | null;
 }
 
 export interface BookingStatusChange {

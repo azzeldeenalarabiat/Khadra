@@ -331,6 +331,8 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   BookingCancelledByAdmin: 'calendar-blank',
   BookingExpired: 'calendar-blank',
   BookingMarkedNoShow: 'warning-circle',
+  HandoverVerified: 'key',
+  HandoverUnverified: 'warning',
 };
 
 // The sentence is composed here rather than on the server, so the wording (and one day the language)
@@ -355,6 +357,8 @@ const ACTIVITY_VERBS: Readonly<Record<string, TranslationKey>> = {
   BookingCancelledByAdmin: 'activity.bookingCancelled',
   BookingExpired: 'activity.bookingExpired',
   BookingMarkedNoShow: 'activity.bookingNoShow',
+  HandoverVerified: 'activity.handoverVerified',
+  HandoverUnverified: 'activity.handoverUnverified',
 };
 
 export interface ActivityRow {

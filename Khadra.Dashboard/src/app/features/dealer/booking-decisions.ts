@@ -6,6 +6,9 @@ import { I18nService } from '../../core/i18n/i18n.service';
 
 /** The three handover figures, by the stable name the dialog returns them under. */
 const ODOMETER = 'odometerKm';
+/** The customer's one-time handover code, and the reason when there is none. See recordPickup. */
+const CODE = 'handoverCode';
+const UNVERIFIED = 'unverifiedReason';
 const FUEL = 'fuelLevel';
 const CASH = 'cashCollected';
 
@@ -142,6 +145,20 @@ export class BookingDecisions {
         body: this.t('dealerDecide.pickup.body', { reference }),
         fields: [
           {
+            name: CODE,
+            label: this.t('dealerDecide.codeLabel'),
+            type: 'text',
+            optional: true,
+            placeholder: this.t('dealerDecide.codePlaceholder'),
+          },
+          {
+            name: UNVERIFIED,
+            label: this.t('dealerDecide.unverifiedLabel'),
+            type: 'text',
+            optional: true,
+            placeholder: this.t('dealerDecide.unverifiedPlaceholder'),
+          },
+          {
             name: ODOMETER,
             label: this.t('dealerDecide.odometerLabel'),
             type: 'text',
@@ -170,7 +187,7 @@ export class BookingDecisions {
             placeholder: this.t('dealerDecide.pickup.notesPlaceholder'),
           },
         ],
-        note: this.t('dealerDecide.pickup.note'),
+        note: `${this.t('dealerDecide.codeNote')} ${this.t('dealerDecide.pickup.note')}`,
         confirm: this.t('dealerDecide.pickup.confirm'),
         result: {
           title: this.t('dealerDecide.pickup.doneTitle'),
@@ -205,6 +222,20 @@ export class BookingDecisions {
         body: this.t('dealerDecide.return.body', { reference }),
         fields: [
           {
+            name: CODE,
+            label: this.t('dealerDecide.codeLabel'),
+            type: 'text',
+            optional: true,
+            placeholder: this.t('dealerDecide.codePlaceholder'),
+          },
+          {
+            name: UNVERIFIED,
+            label: this.t('dealerDecide.unverifiedLabel'),
+            type: 'text',
+            optional: true,
+            placeholder: this.t('dealerDecide.unverifiedPlaceholder'),
+          },
+          {
             name: ODOMETER,
             label: this.t('dealerDecide.odometerLabel'),
             type: 'text',
@@ -233,7 +264,7 @@ export class BookingDecisions {
             placeholder: this.t('dealerDecide.return.notesPlaceholder'),
           },
         ],
-        note: this.t('dealerDecide.return.note'),
+        note: `${this.t('dealerDecide.codeNote')} ${this.t('dealerDecide.return.note')}`,
         confirm: this.t('dealerDecide.return.confirm'),
         result: {
           title: this.t('dealerDecide.return.doneTitle'),
@@ -277,6 +308,9 @@ export class BookingDecisions {
       fuelLevel: number(FUEL, this.t('dealerDecide.fuelLabel')),
       cashCollected: number(CASH, cashLabel),
       notes: values['notes']?.trim() || null,
+      // Digits only: a code read aloud or pasted arrives with spaces, and the server compares exactly.
+      handoverCode: values[CODE]?.replace(/\D/g, '') || null,
+      unverifiedReason: values[UNVERIFIED]?.trim() || null,
     };
   }
 }
