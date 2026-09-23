@@ -24,6 +24,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<VerificationToken> VerificationTokens => Set<VerificationToken>();
     public DbSet<Dealer> Dealers => Set<Dealer>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingReminder> BookingReminders => Set<BookingReminder>();
     public DbSet<DisputeTicket> DisputeTickets => Set<DisputeTicket>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();

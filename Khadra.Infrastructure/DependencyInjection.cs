@@ -24,6 +24,7 @@ using Khadra.Domain.Shortlist.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.Geocoding;
+using Khadra.Application.Bookings.Reminders;
 using Khadra.Application.Notifications.Delivery;
 using Khadra.Infrastructure.Notifications;
 using Khadra.Infrastructure.Notifications.Push;
@@ -160,6 +161,11 @@ public static class DependencyInjection
                 "Push: the Fcm provider requires Push:Fcm:ProjectId and a service-account key in "
                 + "Push:Fcm:ServiceAccountJson (set it in the environment, never in a tracked file).")
             .ValidateOnStart();
+        services.AddOptions<ReminderOptions>()
+            .Bind(configuration.GetSection(ReminderOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IReminderSettings, ReminderSettings>();
         services.AddOptions<NotificationDeliveryOptions>()
             .Bind(configuration.GetSection(NotificationDeliveryOptions.SectionName))
             .ValidateDataAnnotations()
@@ -299,6 +305,8 @@ public static class DependencyInjection
         // becomes a write, and no handler has to remember the lapse rule.
         services.AddScoped<BookingRepository>();
         services.AddScoped<IBookingRepository, SettlingBookingRepository>();
+        services.AddScoped<IBookingReminderRepository, BookingReminderRepository>();
+        services.AddScoped<IReminderCandidateReader, ReminderCandidateReader>();
         services.AddScoped<IDisputeTicketRepository, DisputeTicketRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IReviewRepository, ReviewRepository>();

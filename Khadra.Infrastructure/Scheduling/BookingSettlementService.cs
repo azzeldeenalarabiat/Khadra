@@ -1,3 +1,4 @@
+using Khadra.Application.Bookings.Reminders;
 using Khadra.Application.Bookings.SettleBookings;
 using Khadra.Application.Payments.SettlePayments;
 using Khadra.Infrastructure.Configuration;
@@ -71,6 +72,11 @@ internal sealed partial class BookingSettlementService(
             // and sweeping in that order closes the attempt on the same tick rather than the next.
             // A second timer would buy nothing and give two schedules to reason about.
             await mediator.Send(new SettlePaymentsCommand(), cancellationToken);
+
+            // Reminders LAST, after both sweeps: a booking whose payment window has just closed is
+            // expired above, so it is never reminded to pay for something that is already gone. The
+            // reminders only stage notifications; the outbox dispatcher sends them within seconds.
+            await mediator.Send(new SendDueRemindersCommand(), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

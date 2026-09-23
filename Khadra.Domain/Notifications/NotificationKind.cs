@@ -77,6 +77,13 @@ public sealed class NotificationKind : Enumeration
     // reference is the booking's, which is what the customer recognises.
     public static readonly NotificationKind YourDisputeUpdated = new(24, "YourDisputeUpdated", PushOnly);
 
+    // Reminders (SendDueRemindersHandler, in the settlement pass). Push AND email: these are the
+    // messages a customer must act on while away from the app, and a phone left on silent should not
+    // cost them a car. Each carries its anchor in DueAt, so the time it states is the booking's own.
+    public static readonly NotificationKind YourPaymentReminder = new(25, "YourPaymentReminder", PushAndEmail);
+    public static readonly NotificationKind YourPickupReminder = new(26, "YourPickupReminder", PushAndEmail);
+    public static readonly NotificationKind YourReturnReminder = new(27, "YourReturnReminder", PushAndEmail);
+
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");
