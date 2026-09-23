@@ -77,7 +77,7 @@ export class SessionService {
       return { ok: true };
     } catch (error) {
       this.xsrf.reset();
-      return { ok: false, failure: classify(error) };
+      return { ok: false, failure: classifySignInFailure(error) };
     }
   }
 
@@ -106,7 +106,8 @@ export class SessionService {
   }
 }
 
-function classify(error: unknown): SignInFailure {
+/** What a refused sign-in means to the visitor, from the BFF's answer. Exported for its tests. */
+export function classifySignInFailure(error: unknown): SignInFailure {
   if (!(error instanceof HttpErrorResponse)) return { kind: 'unavailable' };
   const code: string | undefined = error.error?.code;
   if (error.status === 401) return { kind: 'invalid-credentials' };

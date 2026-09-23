@@ -542,7 +542,7 @@ app.MapPost("/bff/login", async (HttpContext context, IAntiforgery antiforgery, 
 
     var result = await api.LoginAsync(request.Email, request.Password, context.RequestAborted);
     if (result.Tokens is null)
-        return ProblemFromApi(result);
+        return ProblemFromApi(context, result);
 
     // Refused BEFORE a session exists, and the refresh family the API just opened is closed again so a
     // refused sign-in leaves nothing live behind it. Same answer whichever side the account belongs to.
@@ -566,7 +566,7 @@ app.MapPost("/bff/change-password", async (HttpContext context, IAntiforgery ant
     var accessToken = await tokens.GetAccessTokenAsync(context, context.RequestAborted);
     var result = await api.ChangePasswordAsync(accessToken, request.CurrentPassword, request.NewPassword, context.RequestAborted);
     if (result.Tokens is null)
-        return ProblemFromApi(result);
+        return ProblemFromApi(context, result);
 
     await SignInAsync(context, result.Tokens, security);
     return Results.Ok(ToSessionUser(result.Tokens.User));
@@ -684,8 +684,10 @@ static string IssueAntiforgeryCookie(HttpContext context, BffSecuritySettings se
     return tokens.RequestToken!;
 }
 
-static IResult ProblemFromApi(AuthApiResult result)
+static IResult ProblemFromApi(HttpContext context, AuthApiResult result)
 {
+    // A refusal from the login limiter says how long to wait; the browser must hear it too.
+    result.CopyRetryAfterTo(context.Response);
     var status = (int)result.StatusCode;
     var title = result.Problem?.Title ?? "The request was rejected.";
     var code = result.Problem?.Code ?? "api.rejected";

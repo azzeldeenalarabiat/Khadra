@@ -71,7 +71,25 @@ internal sealed partial class AuthApiClient(
             // Non-JSON error body (e.g. a proxy page); fall through with a generic problem.
         }
 
-        return new AuthApiResult(null, response.StatusCode, problem);
+        return new AuthApiResult(null, response.StatusCode, problem, RetryAfterOf(response));
+    }
+
+    /// <summary>
+    /// How long the API asked the caller to wait, whichever form it used. Kept so the BFF can pass it on:
+    /// without it a browser refused by the login limiter can only say "wait a little", when the API
+    /// knows the answer to the second.
+    /// </summary>
+    internal static TimeSpan? RetryAfterOf(HttpResponseMessage response)
+    {
+        var header = response.Headers.RetryAfter;
+        if (header?.Delta is { } delta)
+            return delta;
+        if (header?.Date is { } date)
+        {
+            var wait = date - DateTimeOffset.UtcNow;
+            return wait > TimeSpan.Zero ? wait : TimeSpan.Zero;
+        }
+        return null;
     }
 
     /// <summary>
@@ -104,7 +122,24 @@ internal sealed partial class AuthApiClient(
     private static partial void LogLogoutFailed(ILogger logger, int statusCode);
 }
 
-internal sealed record AuthApiResult(ApiAuthTokens? Tokens, HttpStatusCode StatusCode, ApiProblem? Problem);
+internal sealed record AuthApiResult(
+    ApiAuthTokens? Tokens,
+    HttpStatusCode StatusCode,
+    ApiProblem? Problem,
+    TimeSpan? RetryAfter = null)
+{
+    /// <summary>
+    /// Relays the API's Retry-After onto the BFF's own answer, in whole seconds and never below one,
+    /// the form the API itself sends.
+    /// </summary>
+    public void CopyRetryAfterTo(HttpResponse response)
+    {
+        if (RetryAfter is not { } wait)
+            return;
+        var seconds = Math.Max(1, (int)Math.Ceiling(wait.TotalSeconds));
+        response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+}
 
 internal sealed record ApiAuthTokens(
     string AccessToken,
