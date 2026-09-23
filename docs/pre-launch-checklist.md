@@ -1885,7 +1885,12 @@ item 44 describes is still unbuilt, and is now missing from two consoles and an 
 
 ### 73. Push notifications do not exist
 
-**Status:** open · **Raised:** 2026-09-08 · **Makes worse:** items 59, 69
+**Status:** open — BUILT 2026-09-23, not yet live · **Raised:** 2026-09-08 · **Makes worse:** items 59, 69
+
+**2026-09-23:** FCM push is built end to end (push devices tied to sessions, a transactional outbox,
+an FCM HTTP v1 sender, the app's registration lifecycle) and reminders go out by push and email.
+The item comes off when production has `Push__Provider=Fcm` with the `khadra-prod` project and a
+real phone has received an approval push. Android only: iOS (APNs) is item 138.
 
 The app has an in-app notification feed backed by `GET /api/v1/notifications`, which it polls. There
 is no push channel, so a customer learns their booking was approved only by opening the app.
@@ -3943,3 +3948,32 @@ bank declined them and a customer whose session lapsed need different next steps
 **To close:** an additive, optional field on the customer's booking read (for example `lastAttempt`
 with its `status` and `failureCode`, owner approval needed as it is the Payments read model), and the
 app mapping those codes through `api_failure_messages.dart` — before the first real provider goes live.
+
+### 136. Reminders are only as punctual as the API is awake
+
+**Status:** open · **Raised:** 2026-09-23
+
+Pickup, return and payment reminders are sent by the settlement pass, which runs inside the API.
+On a free Render instance the API sleeps after fifteen idle minutes, and while it sleeps nothing is
+sent: a reminder is sent late if the moment is still ahead when it wakes, and never once the moment
+has passed. The settlement pass (expiries, no-shows, completion) has the same exposure.
+
+**To close:** an always-on instance for the production API, or an external scheduler that wakes it.
+
+### 137. Handover verification is built but not yet required
+
+**Status:** open · **Raised:** 2026-09-23
+
+`Handover:RequireVerification` is false, so a dealer can still record a pickup or return with no code
+and no reason, exactly as before — because an installed 1.1.0 app cannot show a code.
+
+**To close:** publish the 1.2.0 APK, then set `Handover__RequireVerification=true` and
+`MobileApp__MinimumSupportedVersion=1.2.0` together (docs/production.md, "The handover code").
+
+### 138. Push notifications are Android only
+
+**Status:** open · **Raised:** 2026-09-23
+
+The server sends APNs-compatible messages, but the iOS app is not registered with Firebase (no
+`GoogleService-Info.plist`, no APNs key) and `PushMessaging` initialises only on Android. Close it
+with the first iOS release.

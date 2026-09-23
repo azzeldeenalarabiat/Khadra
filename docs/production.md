@@ -107,6 +107,25 @@ every deploy), so **Production refuses to boot on either default**.
 | `KnownProxies__0..3` | The forwarded-header trust list (§7) |
 | `ForwardedHeaders__ForwardLimit` | `3` (§7) |
 
+### Push notifications, reminders and handovers
+
+| Variable | Value |
+|---|---|
+| `Push__Provider` | `Fcm` to wake customers' phones; `None` (the default) sends nothing and the boot log says `PUSH NOTIFICATIONS ARE NOT SENT` |
+| `Push__Fcm__ProjectId` | This environment's OWN Firebase project: `khadra-prod` in production, `khadra-staging` in staging. Never the other one |
+| `Push__Fcm__ServiceAccountJson` | The whole service-account key file of that project, pasted as one value. A **secret**: it signs as the Firebase project. Environment only |
+| `Reminders__PickupLeadMinutes` / `__ReturnLeadMinutes` / `__PaymentLeadMinutes` | 60 / 60 / 30 by default (owner, 2026-09-23). Leave unset unless the owner changes them |
+| `Handover__RequireVerification` | `false` until the 1.2.0 app is published; see "The handover code" in §11 |
+
+**Reminders fire only while the API is running.** A free Render instance sleeps after fifteen idle
+minutes; a reminder whose window passes while it sleeps is sent late if the moment is still ahead,
+and not at all once it has passed. The settlement pass has always had the same limitation. "Exactly
+one hour before" needs an always-on (paid) instance.
+
+Handover codes need no variable of their own: their key is derived from
+`Authentication__Jwt__SigningKey`. Rotating that key invalidates live codes, which last fifteen
+minutes; the customer asks for a new one.
+
 ### Optional
 
 | Variable | Effect if unset |
@@ -175,6 +194,7 @@ SQL editor** instead:
 |---|---|
 | [sql/khadra-schema.sql](sql/khadra-schema.sql) | A database that does not exist yet. Idempotent |
 | [sql/2026-09-10-dealer-address.sql](sql/2026-09-10-dealer-address.sql) | The address columns, for a database that already exists |
+| [sql/2026-09-23-push-reminders-handover.sql](sql/2026-09-23-push-reminders-handover.sql) | Push devices, the notification outbox, reminders and handover codes. Additive and idempotent; apply before deploying the API that needs it. Staging first |
 | [sql/2026-09-22-bilingual-dealer-content.sql](sql/2026-09-22-bilingual-dealer-content.sql) | The bilingual office-text columns, and the foreign-key migration before them. Applied with the API **stopped** — see [releases/2026-09-bilingual-and-app-gate.md](releases/2026-09-bilingual-and-app-gate.md) |
 | [sql/supabase-lockdown.sql](sql/supabase-lockdown.sql) | Revokes PostgREST access from `anon`/`authenticated` |
 | [sql/verify-admin.sql](sql/verify-admin.sql) | Read-only: is there an administrator, and can they sign in? |
@@ -481,6 +501,34 @@ for every provider. It loads the `checkoutUrl` the server minted and reads nothi
 re-reads the booking while open and closes when the server stops reporting that attempt as the live
 one. Only the signed webhook confirms a payment, so nothing the page does can. The browser build of
 the app still opens a new tab, having no WebView.
+
+### Push notifications (Firebase)
+
+Two Firebase projects, never shared (owner, 2026-09-23):
+
+| | Firebase project | Android app registered in it | Its `google-services.json` goes in |
+|---|---|---|---|
+| Production | `khadra-prod` | `com.khadra.khadra_mobile` | `Khadra.Mobile/android/app/src/production/` |
+| Staging | `khadra-staging` | `com.khadra.khadra_mobile.staging` | `Khadra.Mobile/android/app/src/staging/` |
+
+`google-services.json` identifies the Firebase project to the app; it is not a secret and is
+committed. The service-account key is the secret, and it lives only in each API's environment
+(`Push__Fcm__ServiceAccountJson`). Because a token belongs to one project, the staging API cannot
+push to a production phone even by mistake: FCM refuses it and the device is revoked.
+
+Without the JSON file the app builds and runs with push off. The Google services Gradle plugin is
+applied only when one of the two files exists.
+
+### The handover code
+
+From 1.2.0 the app shows a one-time code (six digits and a QR) for the pickup and the return; the
+dealer console asks for it, or for a reason when the customer cannot show one ("unverified",
+audited and flagged to the admin). The order that keeps 1.1.0 customers able to collect cars:
+
+1. Deploy the API with `Handover__RequireVerification=false`. Nothing is required yet.
+2. Publish the 1.2.0 APK and confirm it against the live API.
+3. Only then set `Handover__RequireVerification=true` AND `MobileApp__MinimumSupportedVersion=1.2.0`,
+   together. A dealer can still record an unverified handover for anyone who cannot show a code.
 
 ### The key
 
