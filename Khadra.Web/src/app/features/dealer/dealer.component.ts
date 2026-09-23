@@ -1,4 +1,3 @@
-import { httpResource } from '@angular/common/http';
 import { isPlatformBrowser } from '@angular/common';
 import { ChangeDetectionStrategy, Component, PLATFORM_ID, computed, effect, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
@@ -19,6 +18,7 @@ import { MapComponent } from '../../shared/map/map.component';
 import { OfficeTextComponent } from '../../shared/office-text/office-text.component';
 import { OpeningHoursComponent } from '../../shared/office-text/opening-hours.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { httpData } from '../../core/http/http-data';
 
 /** Cars shown on an office's page before "view all in the search". Layout, not a business rule. */
 const OFFICE_CARS = 12;
@@ -52,15 +52,15 @@ export class DealerComponent {
   readonly slug = input<string>('');
   protected readonly dealerId = computed(() => idFromSlug(this.slug()));
 
-  protected readonly office = httpResource<PublicGalleryPage>(() => {
+  protected readonly office = httpData<PublicGalleryPage>(() => {
     const id = this.dealerId();
     return id ? `/api/v1/galleries/${id}` : undefined;
   });
-  protected readonly cars = httpResource<Paged<CatalogueListing>>(() => {
+  protected readonly cars = httpData<Paged<CatalogueListing>>(() => {
     const id = this.dealerId();
     return id ? { url: '/api/v1/vehicles', params: { dealerId: id, page: 1, pageSize: OFFICE_CARS } } : undefined;
   });
-  protected readonly reviews = httpResource<Paged<GalleryReview>>(() => {
+  protected readonly reviews = httpData<Paged<GalleryReview>>(() => {
     const id = this.dealerId();
     return id && this.isBrowser ? { url: `/api/v1/galleries/${id}/reviews`, params: { page: 1, pageSize: 10 } } : undefined;
   });

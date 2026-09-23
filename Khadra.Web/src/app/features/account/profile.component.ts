@@ -1,4 +1,4 @@
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -11,6 +11,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { SessionService } from '../../core/session/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { httpData } from '../../core/http/http-data';
 
 /** Name and mobile number, as the rental office sees them on a booking. The email is not editable. */
 @Component({
@@ -26,7 +27,7 @@ export class ProfileComponent {
   private readonly session = inject(SessionService);
   private readonly appConfig = inject(AppConfigService);
 
-  protected readonly me = httpResource<AccountUser>(() => '/api/v1/auth/me');
+  protected readonly me = httpData<AccountUser>(() => '/api/v1/auth/me');
   protected readonly loadProblem = computed(() => (this.me.error() ? snapshotProblem(this.me.error()) : null));
 
   protected readonly fullName = signal('');

@@ -1,4 +1,4 @@
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
@@ -11,6 +11,7 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { httpData } from '../../core/http/http-data';
 
 /**
  * The password, and every phone and browser signed in with this account — the app's sessions
@@ -30,7 +31,7 @@ export class SecurityComponent {
   private readonly xsrf = inject(XsrfService);
   private readonly appConfig = inject(AppConfigService);
 
-  protected readonly sessions = httpResource<AccountSessions>(() => '/api/v1/auth/sessions');
+  protected readonly sessions = httpData<AccountSessions>(() => '/api/v1/auth/sessions');
   protected readonly sessionsProblem = computed(() => (this.sessions.error() ? snapshotProblem(this.sessions.error()) : null));
   protected readonly active = computed(() =>
     (this.sessions.value()?.sessions ?? [])

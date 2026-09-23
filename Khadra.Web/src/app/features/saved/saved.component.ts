@@ -1,4 +1,4 @@
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -11,6 +11,7 @@ import { SeoService } from '../../core/seo/seo.service';
 import { CarCardComponent } from '../../shared/car-card/car-card.component';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { httpData } from '../../core/http/http-data';
 
 interface SavedVehicle {
   readonly vehicleId: string;
@@ -37,7 +38,7 @@ export class SavedComponent {
   private readonly http = inject(HttpClient);
   private readonly shortlist = inject(ShortlistService);
 
-  protected readonly saved = httpResource<SavedVehicle[]>(() => '/api/v1/customers/me/shortlist');
+  protected readonly saved = httpData<SavedVehicle[]>(() => '/api/v1/customers/me/shortlist');
   protected readonly problem = computed(() => (this.saved.error() ? snapshotProblem(this.saved.error()) : null));
   protected readonly removing = signal<string | null>(null);
   /** Rows the customer just removed here, or with a heart on this page. */

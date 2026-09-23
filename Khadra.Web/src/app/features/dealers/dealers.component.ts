@@ -1,4 +1,3 @@
-import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -11,6 +10,8 @@ import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { OfficeCardComponent } from '../../shared/office-card/office-card.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { httpData } from '../../core/http/http-data';
+import { injectResponseStatus } from '../../core/http/server-context';
 
 const PAGE_SIZE = 18;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,7 +38,7 @@ export class DealersComponent {
     return Number.isInteger(value) && value > 1 ? value : 1;
   });
 
-  protected readonly offices = httpResource<Paged<PublicGalleryCard>>(() => ({
+  protected readonly offices = httpData<Paged<PublicGalleryCard>>(() => ({
     url: '/api/v1/galleries',
     params: { page: this.page(), pageSize: PAGE_SIZE, ...(this.city() ? { cityId: this.city()! } : {}) },
   }));
@@ -46,6 +47,10 @@ export class DealersComponent {
 
   constructor() {
     const seo = inject(SeoService);
+    const setStatus = injectResponseStatus();
+    effect(() => {
+      if (this.problem()) setStatus(503);
+    });
     effect(() => {
       const city = this.city();
       seo.set({

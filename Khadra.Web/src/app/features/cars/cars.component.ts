@@ -1,4 +1,3 @@
-import { httpResource } from '@angular/common/http';
 import { isPlatformServer } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -27,6 +26,8 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { SearchFormComponent, SearchFormValue } from '../../shared/search-form/search-form.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { CarFiltersComponent } from './car-filters.component';
+import { httpData } from '../../core/http/http-data';
+import { injectResponseStatus } from '../../core/http/server-context';
 import {
   CAR_SORTS,
   CarSearch,
@@ -68,13 +69,13 @@ export class CarsComponent {
 
   private readonly filtersDialog = viewChild<ElementRef<HTMLDialogElement>>('filtersDialog');
 
-  protected readonly results = httpResource<Paged<CatalogueListing>>(() => {
+  protected readonly results = httpData<Paged<CatalogueListing>>(() => {
     const search = this.search();
     if (this.isServer && search.from) return undefined;
     const params = searchToApi(search, this.format.timeZone());
     return params ? { url: '/api/v1/vehicles', params } : undefined;
   });
-  protected readonly facets = httpResource<CatalogueFacets>(() => '/api/v1/vehicles/facets');
+  protected readonly facets = httpData<CatalogueFacets>(() => '/api/v1/vehicles/facets');
 
   protected readonly problem = computed(() => (this.results.error() ? snapshotProblem(this.results.error()) : null));
 
@@ -130,6 +131,13 @@ export class CarsComponent {
 
   constructor() {
     const seo = inject(SeoService);
+    // A search the API refused is answered in words and is the visitor's own question; any other
+    // failure is an outage, and a crawler must not take the error panel for the page.
+    const setStatus = injectResponseStatus();
+    effect(() => {
+      const problem = this.problem();
+      if (problem && problem.status !== 400) setStatus(503);
+    });
     effect(() => {
       const search = this.search();
       const city = this.lookups.cityName(search.city);

@@ -1,4 +1,3 @@
-import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Money } from '../../core/api/common.api';
@@ -9,6 +8,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { httpData } from '../../core/http/http-data';
 
 /** `GET /api/v1/disputes/{id}` — only the fields this page shows. */
 interface Dispute {
@@ -56,7 +56,7 @@ export class DisputeComponent {
   protected readonly format = inject(FormatService);
 
   readonly ticketId = input<string>('');
-  protected readonly dispute = httpResource<Dispute>(() => {
+  protected readonly dispute = httpData<Dispute>(() => {
     const id = this.ticketId();
     return /^[0-9a-f-]{36}$/i.test(id) ? `/api/v1/disputes/${id}` : undefined;
   });

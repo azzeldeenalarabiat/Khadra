@@ -1,4 +1,3 @@
-import { httpResource } from '@angular/common/http';
 import { isPlatformBrowser } from '@angular/common';
 import { ChangeDetectionStrategy, Component, PLATFORM_ID, computed, effect, inject, input } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -23,6 +22,7 @@ import { SaveButtonComponent } from '../../shared/save-button/save-button.compon
 import { SearchFormComponent, SearchFormValue } from '../../shared/search-form/search-form.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { EMPTY_SEARCH, parseSearch, searchToParams } from '../cars/car-search';
+import { httpData } from '../../core/http/http-data';
 
 /**
  * One car. The page is the car, its office, and what the office wrote about renting from it; the price
@@ -64,17 +64,17 @@ export class CarDetailsComponent {
     return search.from && search.to ? { from: search.from, to: search.to } : null;
   });
 
-  protected readonly car = httpResource<CatalogueVehicle>(() => {
+  protected readonly car = httpData<CatalogueVehicle>(() => {
     const id = this.vehicleId();
     return id ? `/api/v1/vehicles/${id}` : undefined;
   });
 
-  protected readonly office = httpResource<PublicGalleryPage>(() => {
+  protected readonly office = httpData<PublicGalleryPage>(() => {
     const car = this.car.value();
     return car ? `/api/v1/galleries/${car.gallery.dealerId}` : undefined;
   });
 
-  protected readonly quote = httpResource<RentalQuote>(() => {
+  protected readonly quote = httpData<RentalQuote>(() => {
     const id = this.vehicleId();
     const period = this.period();
     const zone = this.format.timeZone();

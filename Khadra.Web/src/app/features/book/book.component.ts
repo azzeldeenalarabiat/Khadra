@@ -1,4 +1,4 @@
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -21,6 +21,7 @@ import { MapComponent, MapPoint } from '../../shared/map/map.component';
 import { SearchFormComponent, SearchFormValue } from '../../shared/search-form/search-form.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { EMPTY_SEARCH, parseSearch, searchToParams } from '../cars/car-search';
+import { httpData } from '../../core/http/http-data';
 
 /**
  * Requesting a car. Everything the customer agrees to is the server's: the quote prices it (days,
@@ -64,13 +65,13 @@ export class BookComponent {
   protected readonly method = signal<'SelfPickup' | 'Delivery'>('SelfPickup');
   protected readonly point = signal<MapPoint | null>(null);
 
-  protected readonly car = httpResource<CatalogueVehicle>(() => {
+  protected readonly car = httpData<CatalogueVehicle>(() => {
     const id = this.vehicleId();
     return /^[0-9a-f-]{36}$/i.test(id) ? `/api/v1/vehicles/${id}` : undefined;
   });
-  protected readonly documents = httpResource<CustomerDocuments>(() => '/api/v1/customers/me/documents');
+  protected readonly documents = httpData<CustomerDocuments>(() => '/api/v1/customers/me/documents');
 
-  protected readonly quote = httpResource<RentalQuote>(() => {
+  protected readonly quote = httpData<RentalQuote>(() => {
     const car = this.car.value();
     const when = this.instants();
     if (!car || !when) return undefined;

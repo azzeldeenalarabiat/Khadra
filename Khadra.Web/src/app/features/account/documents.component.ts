@@ -1,4 +1,4 @@
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
@@ -11,6 +11,7 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { httpData } from '../../core/http/http-data';
 
 /** The order documents are listed in. Which of the identity documents applies is the server's call. */
 const ORDER = ['DrivingLicenceFront', 'DrivingLicenceBack', 'NationalId', 'Passport'];
@@ -39,7 +40,7 @@ export class DocumentsComponent {
   private readonly appConfig = inject(AppConfigService);
   private readonly document = inject(DOCUMENT);
 
-  protected readonly documents = httpResource<CustomerDocuments>(() => '/api/v1/customers/me/documents');
+  protected readonly documents = httpData<CustomerDocuments>(() => '/api/v1/customers/me/documents');
   protected readonly loadProblem = computed(() => (this.documents.error() ? snapshotProblem(this.documents.error()) : null));
 
   protected readonly limits = computed(() => this.appConfig.config()?.documents ?? null);

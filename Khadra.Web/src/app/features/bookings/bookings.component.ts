@@ -1,4 +1,3 @@
-import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -12,6 +11,7 @@ import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { statusLabel, statusTone } from './booking-presentation';
+import { httpData } from '../../core/http/http-data';
 
 const PAGE_SIZE = 10;
 
@@ -40,9 +40,9 @@ export class BookingsComponent {
     return Number.isInteger(value) && value > 1 ? value : 1;
   });
 
-  protected readonly counts = httpResource<Record<string, number>>(() => '/api/v1/bookings/tab-counts');
-  protected readonly next = httpResource<NextBooking | null>(() => '/api/v1/bookings/next');
-  protected readonly bookings = httpResource<Paged<BookingListItem>>(() => ({
+  protected readonly counts = httpData<Record<string, number>>(() => '/api/v1/bookings/tab-counts');
+  protected readonly next = httpData<NextBooking | null>(() => '/api/v1/bookings/next');
+  protected readonly bookings = httpData<Paged<BookingListItem>>(() => ({
     url: '/api/v1/bookings',
     params: { tab: this.tab(), page: this.page(), pageSize: PAGE_SIZE },
   }));

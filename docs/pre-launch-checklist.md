@@ -4108,13 +4108,17 @@ column EF can translate, once either shows up in a profile.
 
 ### 149. A page whose API call fails during server rendering shows its loading state
 
-**Status:** open · **Raised:** 2026-09-24
+**Status:** closed · **Closed:** 2026-09-24 — a failed read renders its error panel on the server, and a page whose primary read failed answers 503.
 
-When the renderer's own call fails (seen against staging, whose API has no `GET /galleries` yet),
-the server-rendered HTML carries the section's skeleton instead of its error panel, and the page
-answers 200; the browser then retries and shows the real state. A crawler visiting at that moment
-indexes a skeleton. **To close:** render the error state and a 503 on the server when a page's
-primary read fails, as the car and office pages already do for their own record.
+When the renderer's own call failed (seen against staging, whose API has no `GET /galleries` yet),
+the server sent the section's skeleton with a 200. The cause was Angular's `resource.value()`, which
+THROWS once a resource has failed: a computed or template expression reading it aborted the render
+half-way. Every page now reads through `httpData` (`Khadra.Web/src/app/core/http/http-data.ts`), whose
+`value()` answers undefined on failure, so the error panel is what gets drawn. The home page (its
+cars), `/cars` (any failure except a 400 the API explained in words) and `/dealers` set 503, as the
+car and office pages already did for their record; a secondary section that fails (the home page's
+offices on today's staging) shows its own error panel inside a 200 page. Verified against an
+unreachable API, against staging and against a healthy local API.
 
 ### 150. The website needs this branch's API on staging before it can be deployed there
 

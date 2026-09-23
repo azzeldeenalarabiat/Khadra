@@ -1,4 +1,3 @@
-import { httpResource } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CatalogueFacets, CatalogueListing, PublicGalleryCard } from '../../core/api/catalogue.api';
@@ -14,6 +13,8 @@ import { OfficeCardComponent } from '../../shared/office-card/office-card.compon
 import { SearchFormComponent, SearchFormValue } from '../../shared/search-form/search-form.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { EMPTY_SEARCH, searchToParams } from '../cars/car-search';
+import { httpData } from '../../core/http/http-data';
+import { injectResponseStatus } from '../../core/http/server-context';
 
 /** How many cars and offices the home page shows before "view all". Layout, not a business rule. */
 const HOME_CARS = 8;
@@ -35,15 +36,15 @@ export class HomeComponent {
   protected readonly lookups = inject(LookupsService);
   private readonly router = inject(Router);
 
-  protected readonly cars = httpResource<Paged<CatalogueListing>>(() => ({
+  protected readonly cars = httpData<Paged<CatalogueListing>>(() => ({
     url: '/api/v1/vehicles',
     params: { page: 1, pageSize: HOME_CARS },
   }));
-  protected readonly offices = httpResource<Paged<PublicGalleryCard>>(() => ({
+  protected readonly offices = httpData<Paged<PublicGalleryCard>>(() => ({
     url: '/api/v1/galleries',
     params: { page: 1, pageSize: HOME_OFFICES },
   }));
-  protected readonly facets = httpResource<CatalogueFacets>(() => '/api/v1/vehicles/facets');
+  protected readonly facets = httpData<CatalogueFacets>(() => '/api/v1/vehicles/facets');
 
   protected readonly carsProblem = computed(() => (this.cars.error() ? snapshotProblem(this.cars.error()) : null));
   protected readonly officesProblem = computed(() => (this.offices.error() ? snapshotProblem(this.offices.error()) : null));
@@ -57,6 +58,11 @@ export class HomeComponent {
   protected readonly skeletons = Array.from({ length: 4 }, (_, index) => index);
 
   constructor() {
+    // The cars are what this page is for: without them it is an outage, not a page to index.
+    const setStatus = injectResponseStatus();
+    effect(() => {
+      if (this.carsProblem()) setStatus(503);
+    });
     inject(SeoService).set({
       title: this.i18n.t('seo.home.title'),
       description: this.i18n.t('seo.home.description'),

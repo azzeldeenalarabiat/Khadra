@@ -1,4 +1,4 @@
-import { HttpClient, httpResource } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -29,6 +29,7 @@ import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { LIFECYCLE, countdownText, partyLabel, stageLabel, statusLabel, statusTone } from './booking-presentation';
 import { countdownParts } from './countdown';
 import { HandoverCodeComponent } from './handover-code.component';
+import { httpData } from '../../core/http/http-data';
 
 /** How often an open booking is re-read while the page is visible (docs/refresh-policy.md: 60s). */
 const LIVE_REFRESH_MS = 60_000;
@@ -69,7 +70,7 @@ export class BookingDetailComponent {
   private readonly query = toSignal(inject(ActivatedRoute).queryParamMap);
   protected readonly justCreated = computed(() => this.query()?.get('created') === '1');
 
-  protected readonly booking = httpResource<Booking>(() => {
+  protected readonly booking = httpData<Booking>(() => {
     const id = this.bookingId();
     return /^[0-9a-f-]{36}$/i.test(id) ? `/api/v1/bookings/${id}` : undefined;
   });
