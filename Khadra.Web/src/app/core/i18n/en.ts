@@ -458,6 +458,7 @@ export const EN = {
   'booking.completedTitle': 'This rental is finished',
   'booking.confirmedTitle': 'Your booking is confirmed',
   'booking.confirmedText': 'Collect the car at {when}. Bring your driving licence and the ID you uploaded.',
+  'booking.refreshFailed': 'Could not refresh this booking just now. This is what we last knew; we will try again.',
   'booking.confirmedDeliveryText': 'The office delivers the car at {when} to the point you chose. Have your driving licence and the ID you uploaded ready.',
   'booking.pickedUpTitle': 'The car is with you',
   'booking.pickedUpText': 'Return it by {when}.',

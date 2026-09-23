@@ -10,6 +10,7 @@ import {
   inject,
   input,
   signal,
+  linkedSignal,
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -79,9 +80,25 @@ export class BookingDetailComponent {
     () => !/^[0-9a-f-]{36}$/i.test(this.bookingId()) || this.problem()?.status === 404 || this.problem()?.status === 403,
   );
 
+  /**
+   * The booking as last read. A refresh that fails keeps the page on what it last knew instead of
+   * replacing it with the error panel: with a handover code on screen, that replacement destroyed the
+   * code panel, and the next good refresh remounted it — issuing a NEW code while the office was typing
+   * the old one. Only a booking that is gone (404/403) or a different booking clears it.
+   */
+  protected readonly view = linkedSignal<{ id: string; value: Booking | undefined; gone: boolean }, Booking | undefined>({
+    source: () => ({ id: this.bookingId(), value: this.booking.value(), gone: this.notFound() }),
+    computation: (source, previous) =>
+      source.value ?? (source.gone || previous?.source.id !== source.id ? undefined : previous?.value),
+  });
+  /** The whole-page error: only when there is nothing to show. */
+  protected readonly pageProblem = computed(() => (this.view() ? null : this.problem()));
+  /** A refresh failed while the page still shows the booking as last read. */
+  protected readonly refreshFailed = computed(() => !!this.view() && this.problem() !== null && !this.notFound());
+
   private readonly now = signal(Date.now());
-  protected readonly decisionLeft = computed(() => countdownText(this.t, countdownParts(this.booking.value()?.decisionDeadline, this.now())));
-  protected readonly paymentLeft = computed(() => countdownText(this.t, countdownParts(this.booking.value()?.paymentDeadline, this.now())));
+  protected readonly decisionLeft = computed(() => countdownText(this.t, countdownParts(this.view()?.decisionDeadline, this.now())));
+  protected readonly paymentLeft = computed(() => countdownText(this.t, countdownParts(this.view()?.paymentDeadline, this.now())));
 
   /**
    * The lifecycle as far as this booking has gone. A live booking shows every stage, done up to its
@@ -89,7 +106,7 @@ export class BookingDetailComponent {
    * the stages it reached and then the one it ended at.
    */
   protected readonly timeline = computed(() => {
-    const booking = this.booking.value();
+    const booking = this.view();
     if (!booking) return [];
     const reachedAt = new Map(booking.history.map((change) => [change.toStatus, change.occurredAt] as const));
     const at = (stage: string) => (stage === 'Requested' ? (booking.requestedAt ?? booking.createdAt) : (reachedAt.get(stage) ?? null));
@@ -113,13 +130,13 @@ export class BookingDetailComponent {
 
   /** Why it ended, when it ended early: the reason recorded on the change into its final status. */
   protected readonly endReason = computed(() => {
-    const booking = this.booking.value();
+    const booking = this.view();
     if (!booking) return '';
     const change = [...booking.history].reverse().find((entry) => entry.toStatus === booking.status);
     return this.reasonLabel(change?.reasonCode ?? booking.cancellationReasonCode);
   });
 
-  protected readonly canShowHandover = computed(() => ['Confirmed', 'PickedUp'].includes(this.booking.value()?.status ?? ''));
+  protected readonly canShowHandover = computed(() => ['Confirmed', 'PickedUp'].includes(this.view()?.status ?? ''));
   protected readonly handoverOpen = signal(false);
   protected readonly handoverRecorded = signal(false);
 
@@ -149,7 +166,7 @@ export class BookingDetailComponent {
     const destroy = inject(DestroyRef);
     const clock = setInterval(() => this.now.set(Date.now()), 30_000);
     const live = setInterval(() => {
-      const booking = this.booking.value();
+      const booking = this.view();
       if (booking && !booking.isTerminal && this.document.visibilityState === 'visible' && !this.checkout() && !this.handoverOpen()) this.booking.reload();
     }, LIVE_REFRESH_MS);
     const handoverWatch = setInterval(() => {
@@ -163,13 +180,13 @@ export class BookingDetailComponent {
     });
 
     effect(() => {
-      const booking = this.booking.value();
+      const booking = this.view();
       if (booking) this.seo.set({ title: this.t('seo.booking.title', { reference: booking.reference }), noindex: true });
     });
 
     // Back from the provider's checkout: the address says nothing reliable, so ask the server.
     effect(() => {
-      const booking = this.booking.value();
+      const booking = this.view();
       if (!booking || this.checkout() !== null) return;
       const started = this.readCheckoutMarker(booking.bookingId);
       if (started) this.watchCheckout(booking.bookingId, started);
@@ -178,7 +195,7 @@ export class BookingDetailComponent {
     // The handover panel closes itself once the office has recorded the handover.
     let lastStatus: string | null = null;
     effect(() => {
-      const status = this.booking.value()?.status ?? null;
+      const status = this.view()?.status ?? null;
       if (lastStatus && status && status !== lastStatus && this.handoverOpen()) {
         // Any change ends the code's purpose; only the two handover transitions mean one was recorded.
         // A booking cancelled while the code was on screen must not read "Handover recorded."
@@ -251,7 +268,7 @@ export class BookingDetailComponent {
     this.checkoutStartedAt = Date.now();
     this.checkoutPaymentId = paymentId;
     const tick = () => {
-      const booking = this.booking.value();
+      const booking = this.view();
       const settled = this.checkoutSettled(booking);
       if (settled) {
         this.checkout.set(settled);

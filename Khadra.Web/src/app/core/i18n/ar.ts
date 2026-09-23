@@ -537,6 +537,7 @@ export const AR: Record<TranslationKey, Message> = {
   'booking.completedTitle': 'انتهى هذا الإيجار',
   'booking.confirmedTitle': 'حجزك مؤكد',
   'booking.confirmedText': 'استلم السيارة في {when}. أحضر رخصة القيادة والهوية التي رفعتها.',
+  'booking.refreshFailed': 'تعذّر تحديث هذا الحجز الآن. هذا آخر ما نعرفه، وسنعيد المحاولة.',
   'booking.confirmedDeliveryText': 'يوصل المكتب السيارة في {when} إلى النقطة التي اخترتها. جهّز رخصة القيادة والهوية التي رفعتها.',
   'booking.pickedUpTitle': 'السيارة معك',
   'booking.pickedUpText': 'أعِدها قبل {when}.',

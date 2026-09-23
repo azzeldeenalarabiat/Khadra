@@ -4,9 +4,12 @@
 
   @if (notFound()) {
     <kh-state-panel icon="calendar-blank" [title]="i18n.t('booking.notFoundTitle')" [text]="i18n.t('booking.notFoundText')" />
-  } @else if (problem(); as failure) {
+  } @else if (pageProblem(); as failure) {
     <kh-state-panel kind="error" [problem]="failure" (action)="booking.reload()" />
-  } @else if (booking.value(); as b) {
+  } @else if (view(); as b) {
+    @if (refreshFailed()) {
+      <div class="notice" role="status"><kh-icon name="info" /><p>{{ i18n.t('booking.refreshFailed') }}</p></div>
+    }
     <!-- What just happened -->
     @if (justCreated() && b.status === 'Requested') {
       <div class="notice notice--ok" role="status"><kh-icon name="check-circle" />
