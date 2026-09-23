@@ -1,0 +1,63 @@
+<div class="container page page--medium booking">
+  @if (notFound()) {
+    <kh-state-panel icon="gavel" [title]="i18n.t('dispute.notFoundTitle')" [text]="i18n.t('dispute.notFoundText')" />
+  } @else if (problem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="dispute.reload()" />
+  } @else if (dispute.value(); as d) {
+    <a class="crumbs small" [routerLink]="i18n.link('bookings', d.bookingId)">
+      <kh-icon [name]="i18n.isArabic() ? 'arrow-right' : 'arrow-left'" /> {{ i18n.t('dispute.onBooking', { reference: d.booking.reference }) }}</a>
+
+    <header class="card card--pad">
+      <p class="row"><span class="badge {{ tone(d.status) }}">{{ status(d.status) }}</span>
+        <span class="faint small">{{ i18n.t('dispute.openedBy', { party: party(d.openedByParty), date: format.dateTime(d.openedAt) }) }}</span></p>
+      <h1 class="booking-head__title">{{ i18n.t('dispute.title') }}</h1>
+      @if (d.isLive) {
+        <p class="muted">{{ i18n.t('dispute.answerBy', { deadline: format.dateTime(d.slaDeadline) }) }}</p>
+      } @else if (d.closedAt) {
+        <p class="muted">{{ i18n.t('dispute.closedAt', { date: format.dateTime(d.closedAt) }) }}</p>
+      }
+    </header>
+
+    <section class="card card--pad" aria-labelledby="reason-title">
+      <h2 id="reason-title" class="card__title">{{ i18n.t('dispute.reason') }}</h2>
+      <p class="prose user-text" dir="auto">{{ d.reason }}</p>
+    </section>
+
+    <section class="card card--pad" aria-labelledby="statements-title">
+      <h2 id="statements-title" class="card__title">{{ i18n.t('dispute.statements') }}</h2>
+      <ul class="history">
+        @for (statement of d.statements; track statement.statementId) {
+          <li>
+            <span><strong>{{ party(statement.party) }}</strong> <span class="faint small">· {{ format.dateTime(statement.createdAt) }}</span></span>
+            <span class="prose user-text" dir="auto">{{ statement.body }}</span>
+          </li>
+        } @empty {
+          <li class="muted">{{ i18n.t('dispute.noStatements') }}</li>
+        }
+      </ul>
+    </section>
+
+    @if (d.resolution; as r) {
+      <section class="card card--pad" aria-labelledby="resolution-title">
+        <h2 id="resolution-title" class="card__title">{{ i18n.t('dispute.resolution') }}</h2>
+        @if (r.waivesEverything) {
+          <p>{{ i18n.t('dispute.waived') }}</p>
+        } @else {
+          <dl class="lines">
+            <div><dt>{{ i18n.t('dispute.refund') }}</dt><dd>{{ format.money(r.refundToCustomer) }}</dd></div>
+            @if (r.dealerCharge) {
+              <div><dt>{{ i18n.t('dispute.dealerCharge') }}</dt><dd>{{ format.money(r.dealerCharge) }}</dd></div>
+            }
+          </dl>
+        }
+        @if (r.note) { <p class="prose user-text" dir="auto">{{ r.note }}</p> }
+      </section>
+    }
+
+    @if (d.isLive) {
+      <div class="notice"><kh-icon name="info" /><p>{{ i18n.t('dispute.inApp') }}</p></div>
+    }
+  } @else {
+    <div class="card card--pad" aria-busy="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+  }
+</div>

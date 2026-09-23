@@ -128,7 +128,8 @@
           </div></div>
       }
       @if (b.liveDisputeId) {
-        <div class="notice"><kh-icon name="gavel" /><p>{{ i18n.t('booking.disputeOpen') }}</p></div>
+        <div class="notice"><kh-icon name="gavel" /><div><p>{{ i18n.t('booking.disputeOpen') }}</p>
+          <a class="link" [routerLink]="i18n.link('disputes', b.liveDisputeId)">{{ i18n.t('dispute.view') }}</a></div></div>
       }
     </section>
 
@@ -139,7 +140,7 @@
         <div class="row">
           @if (canShowHandover() && !handoverOpen()) {
             <button type="button" class="btn btn--primary" (click)="handoverOpen.set(true); handoverRecorded.set(false)">
-              <kh-icon name="qr-code" />{{ i18n.t('handover.show') }}</button>
+              <kh-icon name="qr-code" />{{ i18n.t(b.status === 'PickedUp' ? 'handover.showReturn' : 'handover.showPickup') }}</button>
           }
           @if (b.cancellation.canCancel) {
             <button type="button" class="btn btn--danger" (click)="openCancel()">{{ i18n.t('cancel.title') }}</button>
@@ -148,7 +149,7 @@
       </section>
     }
     @if (handoverOpen()) {
-      <kh-handover-code [bookingId]="b.bookingId" [isReturn]="b.status === 'PickedUp'" (closed)="handoverOpen.set(false)" />
+      <kh-handover-code [bookingId]="b.bookingId" (closed)="handoverOpen.set(false)" />
     }
 
     <!-- Progress -->
@@ -208,6 +209,12 @@
             @if (handover.fuelLevel !== null) { {{ i18n.t('booking.fuelLevel', { percent: format.number(handover.fuelLevel) }) }} }
             @if (handover.cashCollected) { · {{ i18n.t('booking.cash', { amount: format.money(handover.cashCollected) }) }} }
           </p>
+          @if (verificationLabel(handover.verification); as label) {
+            <p class="small"><span class="badge" [class.badge--ok]="handover.verification === 'Code'" [class.badge--warn]="handover.verification === 'Unverified'">{{ label }}</span></p>
+          }
+          @if (handover.verification === 'Unverified' && handover.unverifiedReason) {
+            <p class="small muted user-text" dir="auto">{{ i18n.t('handover.unverifiedReason', { reason: handover.unverifiedReason }) }}</p>
+          }
           @if (handover.notes) { <p class="small user-text" dir="auto">{{ handover.notes }}</p> }
         </div>
       }

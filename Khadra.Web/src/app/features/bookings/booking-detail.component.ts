@@ -32,6 +32,8 @@ import { HandoverCodeComponent } from './handover-code.component';
 
 /** How often an open booking is re-read while the page is visible (docs/refresh-policy.md: 60s). */
 const LIVE_REFRESH_MS = 60_000;
+/** While a handover code is on screen the office may record the handover at any moment (the app: 5s). */
+const HANDOVER_WATCH_MS = 5_000;
 /** After returning from checkout: quickly for a minute, then every ten seconds, as the app does. */
 const CHECKOUT_FAST_MS = 3_000;
 const CHECKOUT_FAST_FOR_MS = 60_000;
@@ -147,11 +149,15 @@ export class BookingDetailComponent {
     const clock = setInterval(() => this.now.set(Date.now()), 30_000);
     const live = setInterval(() => {
       const booking = this.booking.value();
-      if (booking && !booking.isTerminal && this.document.visibilityState === 'visible' && !this.checkout()) this.booking.reload();
+      if (booking && !booking.isTerminal && this.document.visibilityState === 'visible' && !this.checkout() && !this.handoverOpen()) this.booking.reload();
     }, LIVE_REFRESH_MS);
+    const handoverWatch = setInterval(() => {
+      if (this.handoverOpen() && !this.booking.isLoading()) this.booking.reload();
+    }, HANDOVER_WATCH_MS);
     destroy.onDestroy(() => {
       clearInterval(clock);
       clearInterval(live);
+      clearInterval(handoverWatch);
       if (this.checkoutTimer) clearTimeout(this.checkoutTimer);
     });
 
@@ -192,6 +198,13 @@ export class BookingDetailComponent {
 
   protected party(party: string | null): string {
     return partyLabel(this.t, party);
+  }
+
+  /** How a recorded handover was proved (Code, Unverified, NotRequired); nothing for older records. */
+  protected verificationLabel(verification: string | null | undefined): string {
+    return verification === 'Code' || verification === 'Unverified' || verification === 'NotRequired'
+      ? this.t(`handover.verified.${verification}` as TranslationKey)
+      : '';
   }
 
   protected methodLabel(method: string): string {

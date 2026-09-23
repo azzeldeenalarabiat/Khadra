@@ -26,7 +26,7 @@
                   @if (about(item)) { <span class="ltr-inline">{{ about(item) }}</span> · }
                   {{ format.dateTime(item.occurredAt) }}</span>
               </span>
-              @if (item.subjectId && item.kind !== 'YourDisputeUpdated') {
+              @if (item.subjectId) {
                 <kh-icon [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" />
               }
             </button>

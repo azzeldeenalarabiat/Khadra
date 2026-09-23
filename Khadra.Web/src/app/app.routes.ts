@@ -68,6 +68,11 @@ const pages: Routes = [
     loadComponent: () => import('./features/bookings/booking-detail.component').then((m) => m.BookingDetailComponent),
   },
   {
+    path: 'disputes/:ticketId',
+    canActivate: [signedInGuard],
+    loadComponent: () => import('./features/disputes/dispute.component').then((m) => m.DisputeComponent),
+  },
+  {
     path: 'saved',
     canActivate: [signedInGuard],
     loadComponent: () => import('./features/saved/saved.component').then((m) => m.SavedComponent),

@@ -4043,18 +4043,22 @@ website once it is live; production stays on `Payments:Provider=None` and its re
 with the real provider. The sandbox checkout has not been driven end to end through the website
 (the shared development database is on `None`, and moving it to `Sandbox` would pin it there for good).
 
-### 144. Handover codes and the newer notification kinds need the push/handover branch
+### 144. The website's handover codes have not been verified by an office end to end
 
-**Status:** open · **Raised:** 2026-09-23
+**Status:** open · **Raised:** 2026-09-23 · **Updated:** 2026-09-24
 
-The booking page's "Show handover code" panel is written against `POST /bookings/{id}/handover-code`
-and its `HandoverCodeDto` as they exist on `feature/push-reminders-handover`, which is not merged. On
-a server without the endpoint the panel says plainly that codes are not available. The notification
-kinds that branch adds (cancelled, picked up, returned, the three reminders, dispute updates) are
-worded already and show as a generic update until they arrive.
+`feature/push-reminders-handover` (5d34fef) is merged into `feature/customer-website`. The booking
+page shows "Show my pickup code" while Confirmed and "Show my return code" while PickedUp; the panel
+takes `POST /bookings/{id}/handover-code`, shows the six digits and a QR of `qrPayload`, counts
+down to the server's `expiresAt`, greys out when it passes, and "Get a new code" replaces it (the
+server supersedes the old one). While it is open the page re-reads the booking every five seconds
+and closes the panel with "Handover recorded." when the status moves on. Each recorded handover
+shows how it was proved (`verification`: Code / Unverified with the office's reason / NotRequired).
+Notifications word every customer kind the platform sends and open the booking, or — for a dispute
+update — the new read-only `/disputes/{id}` page.
 
-**To close:** after that branch merges, bring it into `feature/customer-website`, and drive a pickup
-and a return with a code from the website against a dealer console that verifies it.
+**To close:** an office verifies a pickup code and a return code shown by the website (and one
+unverified handover with a reason) on staging, with the customer page watching.
 
 ### 145. A mistyped car or office URL is corrected with a canonical tag, not a 301
 
@@ -4101,3 +4105,24 @@ the platform's size; neither will stay cheap if the catalogue grows by orders of
 
 **To close:** group makes in SQL (`GroupBy(make.ToLower())` with a count), and order offices by a
 column EF can translate, once either shows up in a profile.
+
+### 149. A page whose API call fails during server rendering shows its loading state
+
+**Status:** open · **Raised:** 2026-09-24
+
+When the renderer's own call fails (seen against staging, whose API has no `GET /galleries` yet),
+the server-rendered HTML carries the section's skeleton instead of its error panel, and the page
+answers 200; the browser then retries and shows the real state. A crawler visiting at that moment
+indexes a skeleton. **To close:** render the error state and a 503 on the server when a page's
+primary read fails, as the car and office pages already do for their own record.
+
+### 150. The website needs this branch's API on staging before it can be deployed there
+
+**Status:** open · **Raised:** 2026-09-24
+
+Probed read-only on 2026-09-24: staging's API has no `GET /api/v1/galleries` (answers 401) and its
+facets carry no makes, fuel types or years. Against it the website renders its home and car pages
+from real staging data, but the office directory, the office sitemap and the new filters cannot
+work. Staging's `payments.mode` is Sandbox and its app minimum is 1.1.0. **To close:** deploy this
+branch's API (with its four migrations: push devices, notification outbox, reminders, handover
+codes) to staging before the website, in the order in `docs/deployment.md`.

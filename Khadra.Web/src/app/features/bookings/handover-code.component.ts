@@ -2,19 +2,22 @@ import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { HandoverCode } from '../../core/api/bookings.api';
+import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
+import { problemText } from '../../core/http/problem-text';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { clockCountdown, countdownParts } from './countdown';
 
 /**
- * The code a customer shows at the counter so the office can verify, before the keys change hands,
- * that this booking is theirs: six digits and the same thing as a QR code, with the time it stops
- * working. A new code cancels the old one (the server's rule). The code is a live credential, so it is
- * never stored — not in the address, not in the browser — and it is dropped when the panel closes.
+ * The code a customer shows at the counter (`POST /bookings/{id}/handover-code`): six digits and the
+ * same thing as a QR, and how long it stays valid. Which handover it proves — pickup while Confirmed,
+ * return while PickedUp — is the SERVER's decision; the panel only titles itself from the answer.
  *
- * The endpoint belongs to the handover-code work; on a server without it the panel says so plainly
- * rather than showing a broken button.
+ * Asking again replaces the code and the previous one stops working (the server's rule). The office
+ * scans or types it and records the handover; the booking page watches the booking while this panel is
+ * open and closes it the moment the status moves on — the customer presses nothing. The code is a live
+ * credential: it is never stored, not in the address and not in the browser, and dropped on close.
  */
 @Component({
   selector: 'kh-handover-code',
@@ -25,21 +28,24 @@ import { clockCountdown, countdownParts } from './countdown';
 export class HandoverCodeComponent {
   protected readonly i18n = inject(I18nService);
   private readonly http = inject(HttpClient);
+  private readonly appConfig = inject(AppConfigService);
 
   readonly bookingId = input.required<string>();
-  readonly isReturn = input(false);
   readonly closed = output<void>();
 
   protected readonly code = signal<HandoverCode | null>(null);
   protected readonly qr = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly problem = signal<ProblemSnapshot | null>(null);
-  protected readonly unavailable = computed(() => {
+
+  /** `handover.not_available`: the booking is no longer at a handover (it moved on, or ended). */
+  protected readonly notAvailable = computed(() => this.problem()?.code === 'handover.not_available');
+  protected readonly problemMessage = computed(() => {
     const problem = this.problem();
-    // A 404 with no platform code is the route itself missing, not this booking.
-    return problem !== null && problem.status === 404 && !problem.code;
+    return problem ? problemText(problem, this.i18n.t.bind(this.i18n), this.i18n.language(), this.appConfig.config()) : null;
   });
 
+  protected readonly isReturn = computed(() => this.code()?.type === 'Return');
   private readonly now = signal(Date.now());
   protected readonly remaining = computed(() => countdownParts(this.code()?.expiresAt, this.now()));
   protected readonly clock = computed(() => {

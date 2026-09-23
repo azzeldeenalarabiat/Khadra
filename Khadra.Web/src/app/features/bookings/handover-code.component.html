@@ -4,10 +4,10 @@
     <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="closed.emit()"><kh-icon name="x" /></button>
   </div>
 
-  @if (unavailable()) {
-    <div class="notice"><kh-icon name="info" /><p>{{ i18n.t('handover.unavailable') }}</p></div>
-  } @else if (problem(); as failure) {
-    <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ failure.title && i18n.language() === 'en' ? failure.title : i18n.t('problem.unknown') }}</p></div>
+  @if (notAvailable()) {
+    <div class="notice"><kh-icon name="info" /><p>{{ i18n.t('handover.notAvailable') }}</p></div>
+  } @else if (problemMessage(); as text) {
+    <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
     <button type="button" class="btn btn--secondary" (click)="issue()">{{ i18n.t('common.retry') }}</button>
   } @else if (code(); as current) {
     <p class="muted small">{{ i18n.t('handover.intro') }}</p>
@@ -16,17 +16,15 @@
         <img class="handover__qr" [src]="image" [alt]="i18n.t('handover.qrAlt')" width="220" height="220" />
       }
       <p class="handover__digits ltr" aria-live="polite">{{ digits() }}</p>
-      @if (remaining()?.over) {
-        <p class="field__error">{{ i18n.t('handover.expired') }}</p>
-      } @else {
-        <p class="faint small">{{ i18n.t('handover.expiresIn', { time: clock() }) }}</p>
-      }
     </div>
-    <div class="row">
-      <button type="button" class="btn btn--secondary btn--sm" [disabled]="busy()" (click)="issue()">
-        <kh-icon name="arrow-counter-clockwise" />{{ i18n.t('handover.new') }}</button>
-      <span class="faint small">{{ i18n.t('handover.replaces') }}</span>
-    </div>
+    @if (remaining()?.over) {
+      <p class="field__error" role="status">{{ i18n.t('handover.expired') }}</p>
+    } @else {
+      <p class="faint small handover__valid">{{ i18n.t('handover.validFor', { time: clock() }) }}</p>
+    }
+    <button type="button" class="btn btn--secondary btn--sm" [class.btn--primary]="remaining()?.over" [disabled]="busy()" (click)="issue()">
+      <kh-icon name="arrow-counter-clockwise" />{{ i18n.t('handover.new') }}</button>
+    <p class="faint small">{{ i18n.t('handover.privacy') }}</p>
   } @else {
     <div aria-busy="true"><div class="skeleton gallery-skeleton handover__skeleton"></div></div>
   }

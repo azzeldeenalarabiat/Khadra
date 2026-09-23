@@ -506,9 +506,13 @@ $md: 1023px;
   align-items: flex-start;
   gap: var(--s-3);
 }
-// Angular drops the space between the two spans; the year keeps its distance by margin instead.
-.car-page__year {
-  margin-inline-start: 0.3em;
+// Angular drops the space between the name and the year. A gap keeps them apart whichever side the
+// year lands on: a margin cannot, because the year is an isolated left-to-right run inside Arabic.
+.car-page__head h1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.3em;
 }
 .book-card {
   display: flex;

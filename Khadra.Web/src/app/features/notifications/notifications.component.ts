@@ -10,10 +10,14 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { notificationTarget } from './notification-target';
 
 const PAGE_SIZE = 20;
 
-/** Kinds the site has words for. A kind a newer server sends reads as a generic update, never blank. */
+/**
+ * The customer kinds the platform sends (NotificationKind, the Your* entries). A kind a newer server
+ * sends reads as a generic update, never blank.
+ */
 const KNOWN_KINDS = new Set([
   'YourBookingApproved',
   'YourBookingRejected',
@@ -24,17 +28,15 @@ const KNOWN_KINDS = new Set([
   'YourBookingCancelled',
   'YourBookingPickedUp',
   'YourBookingReturned',
-  'YourDepositDue',
   'YourPaymentReminder',
   'YourPickupReminder',
   'YourReturnReminder',
   'YourDisputeUpdated',
-  'YourRefundIssued',
 ]);
 
 /**
  * The customer's notifications, from the backend — the same feed the app shows. Opening one marks it
- * read and goes to what it is about: its booking, or the booking a dispute concerns.
+ * read and goes to what it is about: its booking, or — for a dispute update — the dispute.
  */
 @Component({
   selector: 'kh-notifications',
@@ -110,11 +112,10 @@ export class NotificationsComponent {
         .then(() => this.badge.refresh())
         .catch(() => undefined);
     }
-    // A dispute's subject is the dispute; this site shows disputes on their booking, so that is where
-    // a booking-level notification goes, and a dispute update stays here until dispute pages exist.
-    if (item.subjectId && item.kind !== 'YourDisputeUpdated') {
-      void this.router.navigate(this.i18n.link('bookings', item.subjectId));
-    }
+    // Every customer kind is about a booking, whose id is the subject — except a dispute update,
+    // whose subject is the dispute ticket (as in the app).
+    const target = notificationTarget(item.kind, item.subjectId);
+    if (target) void this.router.navigate(this.i18n.link(...target));
   }
 
   protected async markAll(): Promise<void> {

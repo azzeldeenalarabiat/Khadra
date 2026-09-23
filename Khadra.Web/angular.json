@@ -55,7 +55,9 @@
             },
             "allowedCommonJsDependencies": [
               "leaflet",
-              "qrcode"
+              "qrcode",
+              "dijkstrajs",
+              "pngjs"
             ]
           },
           "configurations": {

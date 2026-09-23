@@ -108,6 +108,10 @@ export interface Handover {
   readonly cashCollected: Money | null;
   readonly photoCount: number;
   readonly recordedAt: string;
+  /** How the handover was proved: "Code", "Unverified" or "NotRequired"; absent on older records. */
+  readonly verification?: string | null;
+  /** The office's reason, when it recorded the handover without the customer's code. */
+  readonly unverifiedReason?: string | null;
 }
 
 export interface BookingStatusChange {

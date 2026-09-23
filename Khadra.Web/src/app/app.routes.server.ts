@@ -22,6 +22,7 @@ export const PRIVATE_PAGES = [
   'bookings/**',
   'saved',
   'notifications',
+  'disputes/**',
   'profile',
   'profile/**',
 ] as const;
@@ -40,6 +41,7 @@ const BUILT_PRIVATE_PAGES: readonly (typeof PRIVATE_PAGES)[number][] = [
   'bookings/**',
   'saved',
   'notifications',
+  'disputes/**',
 ];
 
 export const serverRoutes: ServerRoute[] = [
