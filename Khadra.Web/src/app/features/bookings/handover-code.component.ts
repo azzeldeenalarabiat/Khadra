@@ -1,5 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { HandoverCode } from '../../core/api/bookings.api';
 import { AppConfigService } from '../../core/config/app-config.service';
@@ -25,12 +25,17 @@ import { clockCountdown, countdownParts } from './countdown';
   imports: [IconComponent],
   templateUrl: './handover-code.component.html',
 })
-export class HandoverCodeComponent {
+export class HandoverCodeComponent implements OnInit {
   protected readonly i18n = inject(I18nService);
   private readonly http = inject(HttpClient);
   private readonly appConfig = inject(AppConfigService);
 
   readonly bookingId = input.required<string>();
+  /**
+   * The handover the booking page expects, from the booking's status. Only titles the panel until the
+   * server answers (or when it fails); the code the server issues says which handover it proves.
+   */
+  readonly expected = input<'Pickup' | 'Return' | null>(null);
   readonly closed = output<void>();
 
   protected readonly code = signal<HandoverCode | null>(null);
@@ -45,7 +50,7 @@ export class HandoverCodeComponent {
     return problem ? problemText(problem, this.i18n.t.bind(this.i18n), this.i18n.language(), this.appConfig.config()) : null;
   });
 
-  protected readonly isReturn = computed(() => this.code()?.type === 'Return');
+  protected readonly isReturn = computed(() => (this.code()?.type ?? this.expected()) === 'Return');
   private readonly now = signal(Date.now());
   protected readonly remaining = computed(() => countdownParts(this.code()?.expiresAt, this.now()));
   protected readonly clock = computed(() => {
@@ -60,6 +65,11 @@ export class HandoverCodeComponent {
   constructor() {
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
+  // Not in the constructor: a required input has no value there, and reading it threw — which the
+  // catch below reported as "Khadra is not answering", on every first open of the panel.
+  ngOnInit(): void {
     void this.issue();
   }
 

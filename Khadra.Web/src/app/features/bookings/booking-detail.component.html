@@ -85,7 +85,7 @@
         @case ('Confirmed') {
           <div class="notice notice--ok"><kh-icon name="calendar-check" />
             <div><p class="notice__title">{{ i18n.t('booking.confirmedTitle') }}</p>
-              <p>{{ i18n.t('booking.confirmedText', { when: format.dateTime(b.periodStart) }) }}</p></div></div>
+              <p>{{ i18n.t(b.pickupMethod === 'Delivery' ? 'booking.confirmedDeliveryText' : 'booking.confirmedText', { when: format.dateTime(b.periodStart) }) }}</p></div></div>
         }
         @case ('PickedUp') {
           <div class="notice notice--ok"><kh-icon name="key" />
@@ -134,7 +134,7 @@
     </section>
 
     <!-- What the customer can do now -->
-    @if (canShowHandover() || b.cancellation.canCancel) {
+    @if ((canShowHandover() && !handoverOpen()) || b.cancellation.canCancel) {
       <section class="card card--pad" aria-labelledby="actions-title">
         <h2 id="actions-title" class="card__title">{{ i18n.t('booking.actions') }}</h2>
         <div class="row">
@@ -149,7 +149,7 @@
       </section>
     }
     @if (handoverOpen()) {
-      <kh-handover-code [bookingId]="b.bookingId" (closed)="handoverOpen.set(false)" />
+      <kh-handover-code [bookingId]="b.bookingId" [expected]="b.status === 'PickedUp' ? 'Return' : 'Pickup'" (closed)="handoverOpen.set(false)" />
     }
 
     <!-- Progress -->
