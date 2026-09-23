@@ -3926,3 +3926,127 @@ one uninstall.
 password in a password manager, the file on offline storage — and a restore tested once: a release
 built on another machine from those copies passes `apksigner verify --print-certs` with the
 fingerprint above.
+
+---
+
+## Customer website (`Khadra.Web`, branch `feature/customer-website`, 2026-09-23)
+
+Numbered from 140 so they cannot collide with 135–138, which live on the unmerged
+`feature/push-reminders-handover` branch.
+
+### 140. The public website needs always-on, privately networked hosting — LAUNCH BLOCKER
+
+**Status:** open · **Raised:** 2026-09-23
+
+The website is three services on one path: the customer BFF (`Khadra.Bff` with
+`BffSecurity__Deployment=customer-web`), the renderer (`Khadra.Web`, Node), and the API. On Render's
+free plan each sleeps after about fifteen minutes and takes up to a minute to wake, so the first
+visitor — and every crawler visit to a cold site — waits on up to three cold starts in a row, and a
+crawler that times out drops the page. A free service also cannot receive private traffic, so the
+renderer reaches the API over the public internet and the API sees ONE address for every visitor:
+the per-address rate limit (`Public`, 1200/min, capped by the 600/min global limit) becomes one
+bucket shared by all of them, which a crawl alone can exhaust.
+
+**To close:** the customer BFF, the renderer and the API on always-on plans in one region, with the
+renderer calling the API over the private network (`KHADRA_API_URL=http://khadra:8080`), the
+renderer's address in the API's `KnownProxies`, and `KHADRA_EDGE_SECRET` set on the renderer to the
+customer BFF's `BffSecurity__FrontendSharedSecret`. Owner decision (2026-09-23): not before launch;
+production hosting is not to be changed without asking.
+
+### 141. Car photos are served at full size on every page
+
+**Status:** open · **Raised:** 2026-09-23
+
+There is one size of every vehicle and gallery image — the file the office uploaded — and a results
+page of twelve cards downloads twelve originals. It is acceptable at today's handful of cars and it
+will not be at launch: it is the largest item in a page's weight and the usual cause of a poor
+Largest Contentful Paint. Owner decision (2026-09-23): keep as a pre-launch optimisation.
+
+**To close:** width variants made at upload (or an image-resizing edge in front of the public host),
+exposed as an ADDED `thumbnailUrl` beside `coverImageUrl` so installed apps are unaffected, and
+`srcset` on the website's cards and gallery.
+
+### 142. The customer email links still point at the console until `App:CustomerAppBaseUrl` is set
+
+**Status:** open · **Raised:** 2026-09-23
+
+`AuthEmailComposer` now sends a customer's verification and reset links, and `BookingEmailComposer`
+its booking links, to `App:CustomerAppBaseUrl` when it is set; empty, customers keep getting the
+console's `/verify-email` and `/reset-password`, exactly as before. The website redirects a
+language-less `/verify-email?token=…`, `/reset-password?token=…` and `/bookings/{id}` to the
+reader's language, so one host serves the emails and, later, the app links of item 91.
+
+**To close, in this order:** deploy the customer BFF and the renderer on staging; confirm
+`/verify-email` and `/reset-password` redeem a real token there; only then set
+`App__CustomerAppBaseUrl` on the staging API. Production waits for its own customer domain. Never set
+it to the console.
+
+### 143. The payment return address must follow the website on staging
+
+**Status:** open · **Raised:** 2026-09-23
+
+A provider sends the customer back to `{Payments:ReturnUrlBase or App:ClientBaseUrl}/bookings/{id}`.
+The website's `/bookings/{id}` re-reads the booking and never trusts the redirect, so it is ready to
+be that address. Owner decision (2026-09-23): point staging's `Payments__ReturnUrlBase` at the staging
+website once it is live; production stays on `Payments:Provider=None` and its return address is set
+with the real provider. The sandbox checkout has not been driven end to end through the website
+(the shared development database is on `None`, and moving it to `Sandbox` would pin it there for good).
+
+### 144. Handover codes and the newer notification kinds need the push/handover branch
+
+**Status:** open · **Raised:** 2026-09-23
+
+The booking page's "Show handover code" panel is written against `POST /bookings/{id}/handover-code`
+and its `HandoverCodeDto` as they exist on `feature/push-reminders-handover`, which is not merged. On
+a server without the endpoint the panel says plainly that codes are not available. The notification
+kinds that branch adds (cancelled, picked up, returned, the three reminders, dispute updates) are
+worded already and show as a generic update until they arrive.
+
+**To close:** after that branch merges, bring it into `feature/customer-website`, and drive a pickup
+and a return with a code from the website against a dealer console that verifies it.
+
+### 145. A mistyped car or office URL is corrected with a canonical tag, not a 301
+
+**Status:** open · **Raised:** 2026-09-23
+
+`/cars/{words}-{id}` is found by its id whatever the words say; the page renders with a canonical tag
+naming the current words and the browser replaces the address. A crawler therefore sees a 200 with a
+canonical rather than a permanent redirect. Search engines honour the canonical, but a 301 is the
+stronger signal.
+
+**To close:** a server-side check in the renderer that answers 301 when the words differ, once the
+renderer can make that one extra API read cheaply (item 140).
+
+### 146. Disputes have no pages on the website
+
+**Status:** open · **Raised:** 2026-09-23
+
+The booking page says when a dispute is open, and the notifications list shows dispute updates, but a
+customer opens, reads and answers a dispute only in the app for now. A dispute notification on the
+website stays on the notifications page instead of linking to a page that does not exist.
+
+### 147. The website has not been driven through dealer approval, payment and handover
+
+**Status:** open · **Raised:** 2026-09-23
+
+Tested end to end on 2026-09-23 against the development API and database, through the screens:
+registration, the verification email (Mailpit), sign-in refused before verification, sign-in, profile,
+sessions, document upload, a self-pickup request, a delivery request priced with the office's fee, a
+second request for booked dates refused, cancellation, saved cars, the search, the car and office
+pages, both languages, desktop and phone. NOT driven, because each needs an office account's
+sign-in: approval, the Approved page with its payment countdown (and its "payments not available"
+notice on `None`), Confirmed, the handover code, pickup and return. The test booking KH-MME4NGSB
+(Toyota Supra, Al-Nadeem Rentals, 26–29 Sept) is waiting for that approval on the development
+database.
+
+### 148. Two public catalogue reads load more rows than they return
+
+**Status:** open · **Raised:** 2026-09-23
+
+`CatalogueReader.FacetsAsync` reads every bookable car's make into memory to merge spellings, and
+`ListGalleriesAsync` reads every trading office (twice: to order them, then to build the page's cards),
+because the business name sits behind a converter SQL cannot sort by. Both are correct and bounded by
+the platform's size; neither will stay cheap if the catalogue grows by orders of magnitude.
+
+**To close:** group makes in SQL (`GroupBy(make.ToLower())` with a count), and order offices by a
+column EF can translate, once either shows up in a profile.

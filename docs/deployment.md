@@ -344,3 +344,41 @@ fail with a message that reads like a typo.
 
 Build off the server. Angular needs Node and roughly 2 GB; a small instance will
 run out of memory mid-build.
+
+---
+
+## Customer website — how it deploys (NOT deployed yet, 2026-09-23)
+
+Nothing below exists on Render yet, and `render.yaml` does not declare it: production hosting is not
+changed without the owner's say-so. This is what staging needs when the owner asks for it.
+
+Two new services, one public host:
+
+| Service | Image | Role |
+|---|---|---|
+| customer BFF | `Khadra.Bff/Dockerfile` (the same image as the console; in Proxy mode it never serves the console build in its `wwwroot`) | Owns the public host, the customer session, `/bff/*` and `/api/*`; forwards every other path to the renderer |
+| renderer | `Khadra.Web/Dockerfile` | Renders the pages (Angular SSR on Node); calls the API directly for public data |
+
+Customer BFF environment:
+
+- `BffSecurity__Deployment=customer-web` — selects `Khadra.Bff/Deployments/customer-web.json`
+  (customer-only sessions, its own cookies, its own Redis namespace and key ring, the anonymous
+  catalogue routes, the catch-all to the renderer).
+- `BffSecurity__ApiBaseUrl` and `ReverseProxy__Clusters__webapi__Destinations__primary__Address` —
+  the API, as for the console.
+- `ReverseProxy__Clusters__web__Destinations__primary__Address` — the renderer, e.g.
+  `http://khadra-web:4000/`.
+- `BffSecurity__FrontendSharedSecret` — a random secret; the same value goes to the renderer as
+  `KHADRA_EDGE_SECRET`. The BFF refuses to start in Proxy mode without it outside Development.
+- `BffSecurity__RedisConnection` — may be the console's Redis: the deployments' keys cannot collide.
+- `KnownProxies__0…` — the edge in front, as for the console.
+
+Renderer environment: `KHADRA_API_URL` (private address when there is one), `KHADRA_PUBLIC_BASE_URL`
+(the public origin — canonical URLs and the sitemap are built from it), `KHADRA_EDGE_SECRET`,
+`NG_ALLOWED_HOSTS` (the host name the BFF forwards to, e.g. `khadra-web`).
+
+API, once the website is live on that environment (pre-launch items 142 and 143, in that order):
+`App__CustomerAppBaseUrl` = the public origin, and on staging `Payments__ReturnUrlBase` = the same.
+
+Before launch: always-on plans and private networking for the BFF, the renderer and the API
+(pre-launch item 140).
