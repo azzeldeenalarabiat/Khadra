@@ -40,6 +40,14 @@ public sealed class Notification : AggregateRoot, ISoftDeletable
     public Id? ActorUserId { get; private set; }
     public string ActorName { get; private set; } = null!;
     public DateTimeOffset OccurredAt { get; private set; }
+
+    /// <summary>
+    /// The moment the notification is ABOUT, when there is one: the deposit deadline on an approval,
+    /// the pickup or return time on a reminder. Frozen from the booking when the notification is
+    /// raised, so a push composed later — or retried — states the time the customer was actually
+    /// given, never one recomputed from settings that may have changed since.
+    /// </summary>
+    public DateTimeOffset? DueAt { get; private set; }
     public DateTimeOffset? ReadAt { get; private set; }
 
     public bool IsDeleted { get; private set; }
@@ -62,7 +70,8 @@ public sealed class Notification : AggregateRoot, ISoftDeletable
         DateTimeOffset occurredAt,
         Id? subjectId = null,
         string? subjectReference = null,
-        Id? actorUserId = null)
+        Id? actorUserId = null,
+        DateTimeOffset? dueAt = null)
     {
         ArgumentNullException.ThrowIfNull(kind);
 
@@ -80,6 +89,7 @@ public sealed class Notification : AggregateRoot, ISoftDeletable
             ActorUserId = actorUserId,
             ActorName = actorName.Trim()[..Math.Min(actorName.Trim().Length, MaxActorNameLength)],
             OccurredAt = occurredAt,
+            DueAt = dueAt,
             IsDeleted = false
         };
     }

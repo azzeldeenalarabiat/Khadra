@@ -127,7 +127,10 @@ public sealed class BookingDecisionHandlers(
             request.ActorUserId,
             NotificationKind.BookingApproved,
             cancellationToken,
-            NotificationKind.YourBookingApproved);
+            NotificationKind.YourBookingApproved,
+            // The deadline this approval set, frozen on the notification: a push that says "pay by"
+            // must state the booking's own deadline, not recompute one.
+            loaded.Value.PaymentDeadline);
 
         if (committed.IsFailure)
             return committed;
@@ -285,7 +288,8 @@ public sealed class BookingDecisionHandlers(
         Id actorUserId,
         NotificationKind kind,
         CancellationToken cancellationToken,
-        NotificationKind? customerKind = null)
+        NotificationKind? customerKind = null,
+        DateTimeOffset? customerDueAt = null)
     {
         var member = await membership.ResolveAsync(actorUserId, cancellationToken);
         if (member.IsSuccess)
@@ -307,7 +311,8 @@ public sealed class BookingDecisionHandlers(
                     customerKind,
                     clock.UtcNow,
                     booking.Id,
-                    booking.Reference.Value);
+                    booking.Reference.Value,
+                    customerDueAt);
             }
         }
 

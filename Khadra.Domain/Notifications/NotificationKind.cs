@@ -16,6 +16,17 @@ namespace Khadra.Domain.Notifications;
 // alert that never comes.
 public sealed class NotificationKind : Enumeration
 {
+    // Declared FIRST: static fields initialise in order, and every kind below reads these.
+    //
+    // Which channels a kind is delivered on besides the in-app list. Only the customer's own kinds
+    // wake a phone: staff work in the console, which they have open, and a push for every colleague's
+    // click would train them to ignore the ones that matter. Email is reserved for kinds a customer
+    // must act on while away from the app (the reminders), because an inbox that fills with every
+    // status change stops being read.
+    private static readonly NotificationChannel[] None = [];
+    private static readonly NotificationChannel[] PushOnly = [NotificationChannel.Push];
+    private static readonly NotificationChannel[] PushAndEmail = [NotificationChannel.Push, NotificationChannel.Email];
+
     // A customer asked for one of the dealership's cars (CreateBookingHandler). The only kind here
     // raised by someone OUTSIDE the dealership, which is why its row carries no actor: see
     // DealerTeamNotifier.NotifyTeamOfCustomerActionAsync for why a customer is never named on it.
@@ -45,17 +56,17 @@ public sealed class NotificationKind : Enumeration
     // The recipient is the customer, and the actor name is the GALLERY's business name rather than a
     // member of its staff: which employee pressed the button is the dealership's internal business,
     // and the customer already sees the gallery on the booking.
-    public static readonly NotificationKind YourBookingApproved = new(16, "YourBookingApproved");
-    public static readonly NotificationKind YourBookingRejected = new(17, "YourBookingRejected");
-    public static readonly NotificationKind YourBookingExpired = new(18, "YourBookingExpired");
-    public static readonly NotificationKind YourBookingCompleted = new(19, "YourBookingCompleted");
-    public static readonly NotificationKind YourBookingMarkedNoShow = new(20, "YourBookingMarkedNoShow");
+    public static readonly NotificationKind YourBookingApproved = new(16, "YourBookingApproved", PushOnly);
+    public static readonly NotificationKind YourBookingRejected = new(17, "YourBookingRejected", PushOnly);
+    public static readonly NotificationKind YourBookingExpired = new(18, "YourBookingExpired", PushOnly);
+    public static readonly NotificationKind YourBookingCompleted = new(19, "YourBookingCompleted", PushOnly);
+    public static readonly NotificationKind YourBookingMarkedNoShow = new(20, "YourBookingMarkedNoShow", PushOnly);
 
     // The deposit cleared and the rental is on (ReceiveProviderEventHandler). The gallery learns it
     // has a committed customer; the customer learns their money arrived. Both are raised inside the
     // same transaction as the capture, so a notification can never claim a payment that rolled back.
     public static readonly NotificationKind BookingConfirmed = new(21, "BookingConfirmed");
-    public static readonly NotificationKind YourBookingConfirmed = new(22, "YourBookingConfirmed");
+    public static readonly NotificationKind YourBookingConfirmed = new(22, "YourBookingConfirmed", PushOnly);
 
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
@@ -79,7 +90,19 @@ public sealed class NotificationKind : Enumeration
     //   YourRefundIssued  — the platform can RECORD a refund but cannot send one without a provider,
     //                       so telling a customer their money is on its way would not be true yet.
 
-    private NotificationKind(int id, string name) : base(id, name)
+    private readonly NotificationChannel[] _channels;
+
+    private NotificationKind(int id, string name, NotificationChannel[]? channels = null) : base(id, name)
     {
+        _channels = channels ?? None;
     }
+
+    /// <summary>
+    /// The channels this kind is delivered on outside the app. Empty for staff kinds.
+    /// </summary>
+    /// <remarks>
+    /// A METHOD, deliberately: a smart enum carrying a collection of other smart enums as a PROPERTY is
+    /// walked by the JSON writer, which is how <c>Language.Other</c> once turned a public page into a 500.
+    /// </remarks>
+    public IReadOnlyList<NotificationChannel> DeliveredOn() => _channels;
 }

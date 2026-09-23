@@ -31,6 +31,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<CarType> CarTypes => Set<CarType>();
     public DbSet<City> Cities => Set<City>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<CustomerShortlist> Shortlists => Set<CustomerShortlist>();
     public DbSet<Payment> Payments => Set<Payment>();

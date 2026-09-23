@@ -597,6 +597,9 @@ await DocumentStoreStartupCheck.ReportAsync(app.Services);
 // configured; the point of the line is that nobody has to discover it from a customer.
 await PaymentsStartupCheck.ReportAsync(app.Services);
 
+// And whether a customer's phone can be woken for a booking update or a reminder.
+PushStartupCheck.Report(app.Services);
+
 // And which customer-app builds will be served, so a raised minimum is never discovered from a
 // phone showing its update screen.
 MobileAppStartupCheck.Report(app.Services);

@@ -138,7 +138,8 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         NotificationKind kind,
         DateTimeOffset now,
         Id? subjectId = null,
-        string? subjectReference = null)
+        string? subjectReference = null,
+        DateTimeOffset? dueAt = null)
     {
         ArgumentNullException.ThrowIfNull(kind);
 
@@ -151,7 +152,8 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
             string.IsNullOrWhiteSpace(galleryName) ? UnknownGalleryName : galleryName.Trim(),
             now,
             subjectId,
-            subjectReference));
+            subjectReference,
+            dueAt: dueAt));
 
         return Task.CompletedTask;
     }
