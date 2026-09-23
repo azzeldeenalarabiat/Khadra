@@ -8,6 +8,8 @@ using Khadra.Domain.Auditing;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Application.Notifications;
+using Khadra.Domain.Notifications;
 using MediatR;
 
 namespace Khadra.Application.Bookings.AdminBookings;
@@ -64,6 +66,7 @@ public sealed class AdminBookingCommandHandlers(
     IBookingRepository bookings,
     IBookingReader reader,
     AdminActionRecorder audit,
+    DealerTeamNotifier team,
     ICurrentActor actor,
     IUnitOfWork unitOfWork,
     IClock clock) :
@@ -79,6 +82,7 @@ public sealed class AdminBookingCommandHandlers(
             (booking, now) => booking.Cancel(BookingParty.Admin, actor.UserId, request.Reason, now),
             AuditAction.BookingCancelledByAdmin,
             request.Reason,
+            NotificationKind.YourBookingCancelled,
             cancellationToken);
     }
 
@@ -95,6 +99,7 @@ public sealed class AdminBookingCommandHandlers(
                 : booking.ExpireUnanswered(now, actor.UserId),
             AuditAction.BookingExpired,
             reason: null,
+            NotificationKind.YourBookingExpired,
             cancellationToken);
     }
 
@@ -106,6 +111,7 @@ public sealed class AdminBookingCommandHandlers(
             (booking, now) => booking.MarkNoShow(now, actor.UserId),
             AuditAction.BookingMarkedNoShow,
             reason: null,
+            NotificationKind.YourBookingMarkedNoShow,
             cancellationToken);
     }
 
@@ -123,6 +129,7 @@ public sealed class AdminBookingCommandHandlers(
         Func<Booking, DateTimeOffset, UnitResult<Error>> act,
         AuditAction action,
         string? reason,
+        NotificationKind customerKind,
         CancellationToken cancellationToken)
     {
         var booking = await bookings.GetByIdAsync(bookingId, cancellationToken);
@@ -143,9 +150,19 @@ public sealed class AdminBookingCommandHandlers(
             booking.Status.Name,
             reason);
 
+        // The customer hears what happened to their booking, in the same transaction as the action —
+        // the same rule as the audit entry above. Named by the gallery, as every customer row is.
+        var context = await reader.ContextAsync(booking.Id, cancellationToken);
+        await team.NotifyCustomerAsync(
+            booking.CustomerId,
+            context.DealerName,
+            customerKind,
+            clock.UtcNow,
+            booking.Id,
+            booking.Reference.Value);
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var context = await reader.ContextAsync(booking.Id, cancellationToken);
         return BookingDto.From(booking, context, clock.UtcNow);
     }
 }

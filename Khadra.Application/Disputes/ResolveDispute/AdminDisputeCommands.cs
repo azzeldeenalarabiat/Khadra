@@ -10,6 +10,8 @@ using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Payments.Repositories;
+using Khadra.Application.Notifications;
+using Khadra.Domain.Notifications;
 using MediatR;
 
 namespace Khadra.Application.Disputes.ResolveDispute;
@@ -71,6 +73,7 @@ public sealed class AdminDisputeHandlers(
     IDisputeAdminReader reader,
     DisputeViewComposer composer,
     DisputeAuditor auditor,
+    DealerTeamNotifier team,
     ICurrentActor actor,
     IClock clock,
     IUnitOfWork unitOfWork) :
@@ -133,6 +136,7 @@ public sealed class AdminDisputeHandlers(
             return assigned.Error;
 
         auditor.Record(ticket, booking, AuditAction.DisputeAssigned, previous, ticket.Status.Name);
+        await TellCustomerAsync(ticket, booking);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await composer.ComposeAsync(ticket, booking, cancellationToken);
@@ -204,6 +208,7 @@ public sealed class AdminDisputeHandlers(
             previous,
             DisputeAuditor.Describe(resolution.Value),
             resolution.Value.Note);
+        await TellCustomerAsync(ticket, booking);
 
         // ONE SaveChangesAsync, deliberately not IUnitOfWork.ExecuteInTransactionAsync despite the
         // architecture rule for multi-aggregate writes. Both aggregates and the audit entry are
@@ -244,4 +249,18 @@ public sealed class AdminDisputeHandlers(
         var requested = payment.RequestRefund(amount, ticketId, now);
         return requested.IsSuccess ? UnitResult.Success<Error>() : UnitResult.Failure(requested.Error);
     }
+
+    /// <summary>The booking's customer hears that the platform moved their dispute on. Staged, not saved.</summary>
+    /// <remarks>
+    /// The subject is the TICKET, so tapping the push opens the dispute. Named "Khadra": the platform
+    /// decided this, not the gallery. Nothing about the outcome travels in the push — the app shows it.
+    /// </remarks>
+    private Task TellCustomerAsync(DisputeTicket ticket, Domain.Bookings.Booking booking) =>
+        team.NotifyCustomerAsync(
+            booking.CustomerId,
+            "Khadra",
+            NotificationKind.YourDisputeUpdated,
+            clock.UtcNow,
+            ticket.Id,
+            booking.Reference.Value);
 }

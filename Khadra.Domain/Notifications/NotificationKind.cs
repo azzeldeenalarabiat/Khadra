@@ -68,6 +68,15 @@ public sealed class NotificationKind : Enumeration
     public static readonly NotificationKind BookingConfirmed = new(21, "BookingConfirmed");
     public static readonly NotificationKind YourBookingConfirmed = new(22, "YourBookingConfirmed", PushOnly);
 
+    // The platform cancelled the customer's booking (AdminBookingCommandHandlers). A customer who
+    // cancels their own is not told what they just did; a gallery cannot cancel, it rejects.
+    public static readonly NotificationKind YourBookingCancelled = new(23, "YourBookingCancelled", PushOnly);
+
+    // An administrator picked up or decided the dispute on the customer's booking
+    // (AdminDisputeHandlers). Its subject is the TICKET, so tapping it opens the dispute; the
+    // reference is the booking's, which is what the customer recognises.
+    public static readonly NotificationKind YourDisputeUpdated = new(24, "YourDisputeUpdated", PushOnly);
+
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");
@@ -79,9 +88,9 @@ public sealed class NotificationKind : Enumeration
     //                       to receive it, and the invitation itself goes by email.
     //   StaffDeactivated  — deactivating rotates the security stamp and ends every session that
     //                       instant (spec 4.2), so the row could never be seen by its recipient.
-    //   BookingCancelledByAdmin, DisputeOpened, DisputeResolved — real and worth adding, and their
-    //                       handlers exist; they are simply not wired yet. Add the kind WITH its
-    //                       producer, never before it.
+    //   BookingCancelledByAdmin, DisputeOpened, DisputeResolved — for the DEALER team: real and
+    //                       worth adding, and their handlers exist; not wired yet. The customer's
+    //                       side of both now is (YourBookingCancelled, YourDisputeUpdated).
     //   YourDepositDue    — the customer IS told their booking was approved, and YourBookingApproved
     //                       is that message. A separate "pay now" alert would still be a promise of a
     //                       payment the platform cannot take: Payments ships with no provider

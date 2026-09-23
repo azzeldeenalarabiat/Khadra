@@ -2,12 +2,16 @@ using Khadra.Application.Auditing;
 using Khadra.Application.Bookings.AdminBookings;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Notifications;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications;
+using Khadra.Domain.Notifications.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -55,13 +59,22 @@ public sealed class AdminBookingActionTests
 
         public void At(DateTimeOffset now) => Clock.UtcNow = now;
 
-        public AdminBookingCommandHandlers Handlers() => new(
+        public INotifier Notifier { get; } = Substitute.For<INotifier>();
+
+        public List<Notification> Told { get; } = [];
+
+        public AdminBookingCommandHandlers Handlers()
+        {
+            Notifier.When(n => n.Raise(Arg.Any<Notification>())).Do(call => Told.Add(call.Arg<Notification>()));
+            return new(
             Bookings,
             Reader,
             new AdminActionRecorder(AuditTrail, Actor, Clock),
+            new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()),
             Actor,
             UnitOfWork,
             Clock);
+        }
     }
 
     [Fact]
@@ -82,6 +95,13 @@ public sealed class AdminBookingActionTests
         Assert.Same(BookingParty.Admin, booking.CancelledBy);
         Assert.NotNull(booking.Penalty);
         Assert.True(booking.Penalty!.IsNothingOwed);
+
+        // And the customer is told, named by the gallery, in the same save.
+        var told = Assert.Single(context.Told);
+        Assert.Same(NotificationKind.YourBookingCancelled, told.Kind);
+        Assert.Equal(booking.CustomerId, told.RecipientUserId);
+        Assert.Equal("Petra Rentals", told.ActorName);
+        Assert.Equal(booking.Id, told.SubjectId);
     }
 
     [Fact]
