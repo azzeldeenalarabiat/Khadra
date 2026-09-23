@@ -84,6 +84,12 @@ public sealed class NotificationKind : Enumeration
     public static readonly NotificationKind YourPickupReminder = new(26, "YourPickupReminder", PushAndEmail);
     public static readonly NotificationKind YourReturnReminder = new(27, "YourReturnReminder", PushAndEmail);
 
+    // The car changed hands (BookingDecisionHandlers). Since the handover code, this is how the
+    // customer's phone learns the code it is showing has done its job: the push lands, the booking
+    // re-reads, and the code screen gives way to the rental.
+    public static readonly NotificationKind YourBookingPickedUp = new(28, "YourBookingPickedUp", PushOnly);
+    public static readonly NotificationKind YourBookingReturned = new(29, "YourBookingReturned", PushOnly);
+
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");

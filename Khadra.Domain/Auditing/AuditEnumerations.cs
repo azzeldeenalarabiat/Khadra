@@ -43,6 +43,12 @@ public sealed class AuditAction : Enumeration
     // record (AdminInvited); this says somebody made a second key for the same door, and who.
     public static readonly AuditAction AdminInvitationResent = new(24, "AdminInvitationResent");
 
+    // The car changed hands. Recorded by dealer staff, proved by the customer's one-time code or,
+    // when there was none, recorded as unverified with the dealer's reason. The unverified ones are
+    // what the platform reviews.
+    public static readonly AuditAction HandoverVerified = new(25, "HandoverVerified");
+    public static readonly AuditAction HandoverUnverified = new(26, "HandoverUnverified");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }

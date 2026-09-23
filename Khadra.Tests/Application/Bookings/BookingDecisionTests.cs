@@ -1,4 +1,6 @@
+using Khadra.Application.Auditing;
 using Khadra.Application.Bookings;
+using Khadra.Application.Bookings.Handover;
 using Khadra.Application.Bookings.DecideBooking;
 using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
@@ -6,6 +8,8 @@ using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers;
 using Khadra.Application.Notifications;
+using Khadra.Domain.Auditing;
+using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
@@ -13,9 +17,13 @@ using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Infrastructure.Configuration;
+using Khadra.Infrastructure.Security;
 using Khadra.Tests.Support;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Khadra.Tests.Application.Bookings;
@@ -98,15 +106,35 @@ public sealed class BookingDecisionTests
             return employee;
         }
 
-        public BookingDecisionHandlers Handlers() =>
-            new(
+        public IHandoverCodeRepository HandoverCodes { get; } = Substitute.For<IHandoverCodeRepository>();
+        public IHandoverSettings HandoverSettings { get; } = Substitute.For<IHandoverSettings>();
+        public IAuditTrail AuditTrail { get; } = Substitute.For<IAuditTrail>();
+        public ICurrentActor Actor { get; } = Substitute.For<ICurrentActor>();
+        public HandoverCodeService CodeService { get; } = new(Options.Create(new JwtOptions { SigningKey = new string('k', 48) }));
+
+        public BookingDecisionHandlers Handlers()
+        {
+            HandoverSettings.MaxFailedAttempts.Returns(5);
+            HandoverSettings.CodeLifetime.Returns(TimeSpan.FromMinutes(15));
+            return new(
                 Bookings,
                 new DealerMembershipResolver(Dealers),
                 Reader,
                 new DealerTeamNotifier(Notifier, Users),
                 new BookingEmailDispatcher(Users, Composer, Sender, EmailLog),
+                new HandoverVerifier(HandoverCodes, CodeService, HandoverSettings, new AdminActionRecorder(AuditTrail, Actor, Clock), UnitOfWork, Clock),
                 Clock,
                 UnitOfWork);
+        }
+
+        /// <summary>A code the customer has just been shown, and the stored row it lives as.</summary>
+        public (string Code, HandoverCode Row) GivenCodeFor(Booking booking, HandoverType type)
+        {
+            var code = CodeService.Generate();
+            var row = HandoverCode.Issue(booking.Id, type, CodeService.Hash(booking.Id, type, code), Clock.UtcNow, TimeSpan.FromMinutes(15));
+            HandoverCodes.GetCurrentAsync(booking.Id, type, Arg.Any<CancellationToken>()).Returns(row);
+            return (code, row);
+        }
     }
 
     [Fact]
@@ -272,6 +300,177 @@ public sealed class BookingDecisionTests
         Assert.Same(BookingStatus.PickedUp, booking.Status);
         Assert.Equal(EmployeeId, booking.Handovers.Single().RecordedByUserId);
         Assert.Single(result.Value.Handovers);
+    }
+
+    // ── Handover verification ──────────────────────────────────────────────────────────────────
+
+    private static Booking ConfirmedFor(Context context)
+    {
+        var booking = Build.Booking(dealerId: context.Dealer.Id);
+        booking.Approve(OwnerId, Build.Now);
+        booking.ConfirmDepositPaid(Id.New(), Build.Now);
+        booking.ClearDomainEvents();
+        context.Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
+        context.Clock.UtcNow = booking.Period.Start.AddMinutes(-10);
+        return booking;
+    }
+
+    [Fact]
+    public async Task The_customers_code_proves_the_pickup_is_spent_audited_and_the_customer_is_told()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Pickup);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: code), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Same(BookingStatus.PickedUp, booking.Status);
+        var handover = booking.Handovers.Single();
+        Assert.Same(HandoverVerification.Code, handover.Verification);
+        Assert.Equal(row.Id, handover.HandoverCodeId);
+        Assert.NotNull(row.UsedAt);
+        Assert.Equal(OwnerId, row.UsedByUserId);
+        context.AuditTrail.Received(1).Record(Arg.Is<AuditEntry>(e => e.Action == AuditAction.HandoverVerified && e.EntityId == booking.Id));
+        context.Notifier.Received().Raise(Arg.Is<Notification>(n => n.Kind == NotificationKind.YourBookingPickedUp && n.RecipientUserId == booking.CustomerId));
+        Assert.Equal("Code", result.Value.Handovers.Single().Verification);
+    }
+
+    [Fact]
+    public async Task A_wrong_code_is_refused_and_the_failure_is_committed_before_the_answer()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Pickup);
+        var wrong = code == "000000" ? "000001" : "000000";
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: wrong), CancellationToken.None);
+
+        Assert.Equal("handover.code_invalid", result.Error.Code);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+        Assert.Equal(1, row.FailedAttempts);
+        Assert.Null(row.UsedAt);
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Five_wrong_codes_lock_it_and_even_the_right_one_then_fails()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Pickup);
+        var wrong = code == "000000" ? "000001" : "000000";
+
+        for (var i = 0; i < 5; i++)
+            await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: wrong), CancellationToken.None);
+        var right = await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: code), CancellationToken.None);
+
+        Assert.Equal("handover.code_locked", right.Error.Code);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+    }
+
+    [Fact]
+    public async Task A_code_opens_only_its_own_booking_and_only_its_own_handover()
+    {
+        var context = new Context();
+        var mine = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(mine, HandoverType.Pickup);
+
+        Assert.True(context.CodeService.Matches(row.CodeHash, mine.Id, HandoverType.Pickup, code));
+        Assert.False(context.CodeService.Matches(row.CodeHash, Id.New(), HandoverType.Pickup, code));
+        Assert.False(context.CodeService.Matches(row.CodeHash, mine.Id, HandoverType.Return, code));
+
+        // Presented on another booking of the same dealership, it is refused there.
+        var other = ConfirmedFor(context);
+        context.HandoverCodes.GetCurrentAsync(other.Id, HandoverType.Pickup, Arg.Any<CancellationToken>())
+            .Returns(HandoverCode.Issue(other.Id, HandoverType.Pickup, context.CodeService.Hash(other.Id, HandoverType.Pickup, "999999"), context.Clock.UtcNow, TimeSpan.FromMinutes(15)));
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, other.Id, null, null, null, null, HandoverCode: code == "999999" ? "999998" : code), CancellationToken.None);
+
+        Assert.Equal("handover.code_invalid", result.Error.Code);
+        Assert.Same(BookingStatus.Confirmed, other.Status);
+    }
+
+    [Fact]
+    public async Task An_expired_code_is_refused()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, _) = context.GivenCodeFor(booking, HandoverType.Pickup);
+        context.Clock.UtcNow = context.Clock.UtcNow.AddMinutes(16);
+
+        var result = await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: code), CancellationToken.None);
+
+        Assert.Equal("handover.code_expired", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task Pressing_it_twice_says_already_picked_up_not_code_used()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, _) = context.GivenCodeFor(booking, HandoverType.Pickup);
+
+        await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: code), CancellationToken.None);
+        var again = await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: code), CancellationToken.None);
+
+        Assert.Equal("booking.not_confirmed", again.Error.Code);
+        Assert.Single(booking.Handovers);
+    }
+
+    [Fact]
+    public async Task Without_a_code_the_dealer_can_record_it_unverified_with_a_reason_and_it_is_audited()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        context.HandoverSettings.RequireVerification.Returns(true);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, UnverifiedReason: "Customer's phone battery was dead; ID checked."), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var handover = booking.Handovers.Single();
+        Assert.True(handover.IsUnverified);
+        Assert.Equal("Customer's phone battery was dead; ID checked.", handover.UnverifiedReason);
+        context.AuditTrail.Received(1).Record(Arg.Is<AuditEntry>(e => e.Action == AuditAction.HandoverUnverified && e.Reason == "Customer's phone battery was dead; ID checked."));
+    }
+
+    [Fact]
+    public async Task When_verification_is_required_nothing_at_all_is_refused_and_a_token_reason_too()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        context.HandoverSettings.RequireVerification.Returns(true);
+
+        var nothing = await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null), CancellationToken.None);
+        var tooShort = await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, UnverifiedReason: "ok"), CancellationToken.None);
+
+        Assert.Equal("handover.code_required", nothing.Error.Code);
+        Assert.Equal("handover.reason_required", tooShort.Error.Code);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+    }
+
+    [Fact]
+    public async Task While_verification_is_not_required_the_old_console_still_works_and_nothing_is_audited()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+
+        var result = await context.Handlers().Handle(new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(HandoverVerification.NotRequired, booking.Handovers.Single().Verification);
+        context.AuditTrail.DidNotReceive().Record(Arg.Any<AuditEntry>());
+    }
+
+    [Fact]
+    public void The_code_never_appears_in_a_commands_text()
+    {
+        var text = new RecordReturnCommand(OwnerId, Id.New(), null, null, null, null, HandoverCode: "482913").ToString();
+
+        Assert.DoesNotContain("482913", text, StringComparison.Ordinal);
     }
 
     // ── The approval email ────────────────────────────────────────────────────────────────────

@@ -215,6 +215,12 @@ internal sealed class HandoverRecordConfiguration : IEntityTypeConfiguration<Han
         entity.Property(handover => handover.Notes).HasMaxLength(2000);
         entity.Property(handover => handover.FuelLevel).HasPrecision(4, 3);
         entity.Property(handover => handover.RecordedAt).IsRequired();
+        // Nullable: handovers recorded before verification existed carry none.
+        entity.Property(handover => handover.Verification)
+            .HasConversion(method => method!.Name, name => Enumeration.FromName<HandoverVerification>(name))
+            .HasMaxLength(20);
+        ConfigureId(entity.Property(handover => handover.HandoverCodeId));
+        entity.Property(handover => handover.UnverifiedReason).HasMaxLength(HandoverProof.MaxReasonLength);
 
         entity.OwnsOne(handover => handover.CashCollected, money =>
         {
