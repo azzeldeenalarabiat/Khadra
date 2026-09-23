@@ -6,10 +6,13 @@
 
   @if (notAvailable()) {
     <div class="notice"><kh-icon name="info" /><p>{{ i18n.t('handover.notAvailable') }}</p></div>
-  } @else if (problemMessage(); as text) {
-    <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
+  } @else if (problemMessage() && !code()) {
+    <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ problemMessage() }}</p></div>
     <button type="button" class="btn btn--secondary" (click)="issue()">{{ i18n.t('common.retry') }}</button>
   } @else if (code(); as current) {
+    @if (problemMessage(); as text) {
+      <div class="notice notice--bad" role="alert"><kh-icon name="warning-circle" /><p>{{ text }}</p></div>
+    }
     <p class="muted small">{{ i18n.t('handover.intro') }}</p>
     <div class="handover__code" [class.is-expired]="remaining()?.over">
       @if (qr(); as image) {

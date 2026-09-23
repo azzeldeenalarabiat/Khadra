@@ -84,9 +84,15 @@ export class HandoverCodeComponent implements OnInit {
       const QRCode = await import('qrcode');
       this.qr.set(await QRCode.toDataURL(code.qrPayload, { margin: 1, width: 440, errorCorrectionLevel: 'M' }));
     } catch (error) {
-      this.code.set(null);
-      this.qr.set(null);
-      this.problem.set(snapshotProblem(error));
+      const problem = snapshotProblem(error);
+      // A refused request for a NEW code leaves the one on screen working: the server replaces a code
+      // only when it issues the next. Dropping it would hide a valid code behind "too many attempts".
+      // Only a booking that is no longer at a handover takes the code away.
+      if (problem.code === 'handover.not_available') {
+        this.code.set(null);
+        this.qr.set(null);
+      }
+      this.problem.set(problem);
     } finally {
       this.busy.set(false);
     }

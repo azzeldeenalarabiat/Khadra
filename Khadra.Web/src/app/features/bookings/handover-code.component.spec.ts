@@ -74,4 +74,30 @@ describe('HandoverCodeComponent', () => {
 
     expect(title(fixture.nativeElement)).not.toBe(pickupTitle);
   });
+
+  // Found at the counter: the customer pressed "new code" once too often, the limiter said 429, and
+  // the panel threw away the code on screen, which the server had NOT replaced and still accepted.
+  it('keeps the working code on screen when a new one is refused', async () => {
+    const fixture = await open('Return');
+    http.expectOne(URL).flush({ type: 'Return', code: '426988', qrPayload: 'khadra-handover:v1:KH-X:426988', expiresAt: new Date(Date.now() + 120_000).toISOString() });
+    await settle(fixture);
+
+    const again = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.handover button.btn--sm')!;
+    again.click();
+    await settle(fixture);
+    http.expectOne(URL).flush({ code: 'rate_limited' }, { status: 429, statusText: 'Too Many Requests' });
+    await settle(fixture);
+
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('426 988');
+    expect(element.querySelector('[role=alert]')).not.toBeNull();
+  });
+
+  it('takes the code away once the booking is no longer at a handover', async () => {
+    const fixture = await open('Return');
+    http.expectOne(URL).flush({ code: 'handover.not_available' }, { status: 409, statusText: 'Conflict' });
+    await settle(fixture);
+
+    expect(fixture.nativeElement.querySelector('.handover__digits')).toBeNull();
+  });
 });
