@@ -745,6 +745,7 @@ export const AR: Record<TranslationKey, Message> = {
   'dispute.refund': 'المسترد لك',
   'dispute.dealerCharge': 'المحمّل على مكتب التأجير',
   'dispute.waived': 'لا شيء مستحق على أي طرف.',
+  'dispute.recordedNotPaid': 'هذه هي التسوية التي سجّلتها خضرا. المبالغ المعروضة ليست دفعة وصلتك بالفعل.',
   'dispute.closedAt': 'أُغلق {date}',
   'dispute.inApp': 'لإضافة إفادة أو سحب النزاع، استخدم تطبيق خضرا.',
   'dispute.view': 'عرض النزاع',

@@ -617,6 +617,7 @@ export const EN = {
   'dispute.refund': 'Refunded to you',
   'dispute.dealerCharge': 'Charged to the rental office',
   'dispute.waived': 'Nothing is owed by either side.',
+  'dispute.recordedNotPaid': 'This is the settlement Khadra recorded. Amounts shown are not a payment that has already been made to you.',
   'dispute.closedAt': 'Closed {date}',
   'dispute.inApp': 'To add a statement or withdraw the dispute, use the Khadra app.',
   'dispute.view': 'View the dispute',

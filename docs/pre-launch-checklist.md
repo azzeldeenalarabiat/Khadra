@@ -4126,3 +4126,16 @@ from real staging data, but the office directory, the office sitemap and the new
 work. Staging's `payments.mode` is Sandbox and its app minimum is 1.1.0. **To close:** deploy this
 branch's API (with its four migrations: push devices, notification outbox, reminders, handover
 codes) to staging before the website, in the order in `docs/deployment.md`.
+
+### 151. A customer's dispute payload carries more than a customer should hold
+
+**Status:** open · **Raised:** 2026-09-24
+
+`GET /api/v1/disputes/{id}` answers a customer with the admin-facing `DisputeDto`: the assigned
+administrator's id and name, `OpenedByUserId`, each statement's `AuthorUserId` and `AuthorName` (for a
+dealer statement, a staff member's personal name — the dealership's internal business), and the
+platform's own split (`RetainedByPlatform`, `TransferredToDealer`). The website's dispute page renders
+none of these, but they reach the browser. It is the installed app's existing contract, so nothing is
+removed. **To close:** an additive redaction in the dispute view for non-admin callers — the gallery's
+name in `AuthorName` for a dealer statement, null admin ids and names, and no platform split — with a
+test per party.

@@ -179,8 +179,12 @@ export class BookingDetailComponent {
     effect(() => {
       const status = this.booking.value()?.status ?? null;
       if (lastStatus && status && status !== lastStatus && this.handoverOpen()) {
+        // Any change ends the code's purpose; only the two handover transitions mean one was recorded.
+        // A booking cancelled while the code was on screen must not read "Handover recorded."
         this.handoverOpen.set(false);
-        this.handoverRecorded.set(true);
+        this.handoverRecorded.set(
+          (lastStatus === 'Confirmed' && status === 'PickedUp') || (lastStatus === 'PickedUp' && status === 'Returned'),
+        );
       }
       lastStatus = status;
     });
