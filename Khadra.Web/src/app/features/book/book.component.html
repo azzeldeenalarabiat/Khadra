@@ -20,7 +20,7 @@
 
     <section class="card card--pad" aria-labelledby="dates-title">
       <h2 id="dates-title" class="card__title">{{ i18n.t('book.dates') }}</h2>
-      <kh-search-form [value]="formValue()" [compact]="true" submitLabel="quote.check" (submitted)="choose($event)" />
+      <kh-search-form [value]="formValue()" [compact]="true" [datesOnly]="true" submitLabel="quote.check" (submitted)="choose($event)" />
     </section>
 
     <section class="card card--pad" aria-labelledby="method-title">

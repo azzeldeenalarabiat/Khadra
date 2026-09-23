@@ -1,15 +1,17 @@
-<form class="search-card" [class.search-card--compact]="compact()" (submit)="submit($event)" novalidate
+<form class="search-card" [class.search-card--compact]="compact()" [class.search-card--dates]="datesOnly()" (submit)="submit($event)" novalidate
   [attr.aria-label]="i18n.t('search.title')">
   <div class="search-card__grid">
-    <label class="field search-card__city">
-      <span class="field__label">{{ i18n.t('search.city') }}</span>
-      <select class="select" name="city" [ngModel]="city()" (ngModelChange)="city.set($event)">
-        <option value="">{{ i18n.t('search.anyCity') }}</option>
-        @for (entry of lookups.activeCities(); track entry.id) {
-          <option [value]="entry.id">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
-        }
-      </select>
-    </label>
+    @if (!datesOnly()) {
+      <label class="field search-card__city">
+        <span class="field__label">{{ i18n.t('search.city') }}</span>
+        <select class="select" name="city" [ngModel]="city()" (ngModelChange)="city.set($event)">
+          <option value="">{{ i18n.t('search.anyCity') }}</option>
+          @for (entry of lookups.activeCities(); track entry.id) {
+            <option [value]="entry.id">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
+          }
+        </select>
+      </label>
+    }
 
     <fieldset class="search-card__when">
       <legend class="sr-only">{{ i18n.t('search.pickupDate') }}</legend>
@@ -39,11 +41,13 @@
       </label>
     </fieldset>
 
-    <label class="field search-card__text">
-      <span class="field__label">{{ i18n.t('search.text') }}</span>
-      <input class="input" type="search" name="q" maxlength="80" [placeholder]="i18n.t('search.textPlaceholder')"
-        [ngModel]="text()" (ngModelChange)="text.set($event)" />
-    </label>
+    @if (!datesOnly()) {
+      <label class="field search-card__text">
+        <span class="field__label">{{ i18n.t('search.text') }}</span>
+        <input class="input" type="search" name="q" maxlength="80" [placeholder]="i18n.t('search.textPlaceholder')"
+          [ngModel]="text()" (ngModelChange)="text.set($event)" />
+      </label>
+    }
 
     <button type="submit" class="btn btn--primary search-card__submit">
       <kh-icon name="magnifying-glass" />{{ i18n.t(submitLabel()) }}

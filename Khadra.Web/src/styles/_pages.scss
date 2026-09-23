@@ -103,12 +103,18 @@ $md: 1023px;
   box-shadow: none;
   padding: 0;
 }
-.book-card .search-card__grid {
+.book-card .search-card .search-card__grid {
   grid-template-columns: 1fr;
 }
-.book-card .search-card__city,
-.book-card .search-card__text {
-  display: none;
+// Dates only (a page about one car): the two date pairs and the button.
+.search-card--dates .search-card__grid {
+  grid-template-columns: 1fr 1fr auto;
+  @media (max-width: $md) {
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: $sm) {
+    grid-template-columns: 1fr;
+  }
 }
 
 // ── Car cards ───────────────────────────────────────────────────────────────
@@ -478,7 +484,7 @@ $md: 1023px;
 .car-page__layout,
 .office-page__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: var(--s-5);
   align-items: start;
   @media (max-width: $md) {
@@ -767,9 +773,6 @@ $md: 1023px;
   z-index: 10;
   background: var(--bg);
   margin-block: var(--s-4);
-}
-.office-page__layout {
-  grid-template-columns: minmax(0, 1fr) 340px;
 }
 .reviews {
   list-style: none;

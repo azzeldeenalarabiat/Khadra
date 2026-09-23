@@ -144,7 +144,7 @@
       <aside class="car-page__aside" [attr.aria-label]="i18n.t('quote.title')">
         <div class="book-card card card--pad" id="book">
           <p class="book-card__rate"><strong>{{ i18n.t('car.perDay', { amount: format.money(c.dailyRate) }) }}</strong></p>
-          <kh-search-form [value]="formValue()" [compact]="true" submitLabel="quote.check" (submitted)="choose($event)" />
+          <kh-search-form [value]="formValue()" [compact]="true" [datesOnly]="true" submitLabel="quote.check" (submitted)="choose($event)" />
 
           @if (!period()) {
             <p class="muted small">{{ i18n.t('quote.chooseDates') }}</p>

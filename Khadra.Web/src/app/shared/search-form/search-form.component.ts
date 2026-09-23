@@ -35,6 +35,11 @@ export class SearchFormComponent {
 
   readonly value = input<SearchFormValue>({ city: null, from: null, to: null, text: null });
   readonly compact = input(false);
+  /**
+   * Only the dates, for a page about one car: a city or a brand means nothing there. The value still
+   * carries whatever city and text it was given, so they survive a change of dates.
+   */
+  readonly datesOnly = input(false);
   /** The button's words: 'search.submit' on a search, 'quote.check' beside a car. */
   readonly submitLabel = input<'search.submit' | 'quote.check'>('search.submit');
   readonly submitted = output<SearchFormValue>();
