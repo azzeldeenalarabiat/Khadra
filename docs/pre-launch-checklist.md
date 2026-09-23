@@ -4082,17 +4082,17 @@ website stays on the notifications page instead of linking to a page that does n
 
 ### 147. The website has not been driven through dealer approval, payment and handover
 
-**Status:** open · **Raised:** 2026-09-23
+**Status:** closed · **Closed:** 2026-09-24 — driven end to end through the screens, with an Al-Nadeem employee and owner in the console.
 
-Tested end to end on 2026-09-23 against the development API and database, through the screens:
-registration, the verification email (Mailpit), sign-in refused before verification, sign-in, profile,
-sessions, document upload, a self-pickup request, a delivery request priced with the office's fee, a
-second request for booked dates refused, cancellation, saved cars, the search, the car and office
-pages, both languages, desktop and phone. NOT driven, because each needs an office account's
-sign-in: approval, the Approved page with its payment countdown (and its "payments not available"
-notice on `None`), Confirmed, the handover code, pickup and return. The test booking KH-MME4NGSB
-(Toyota Supra, Al-Nadeem Rentals, 26–29 Sept) is waiting for that approval on the development
-database.
+On a copy of the development database, with Sandbox payments: approval (by an employee), the payment
+countdown, a declined then a captured Sandbox payment, Confirmed, a paid cancellation inside the free
+window, the pickup code and QR, pickup verified by PIN (employee), an unverified pickup with its
+reason (employee), return verified by the scanned QR payload (owner), return by PIN (owner), and the
+refusals: wrong code, a QR naming another booking, a superseded code inside its lifetime, an expired
+code, five wrong guesses locking the code, no code and no reason, a reason under ten characters, and
+the per-booking limit on new codes. Every page updated itself after each handover, and every step's
+notification arrived and opened its booking. English and Arabic, desktop and phone. Five website bugs
+found on the way were fixed in the same pass.
 
 ### 148. Two public catalogue reads load more rows than they return
 
@@ -4125,11 +4125,18 @@ unreachable API, against staging and against a healthy local API.
 **Status:** open · **Raised:** 2026-09-24
 
 Probed read-only on 2026-09-24: staging's API has no `GET /api/v1/galleries` (answers 401) and its
-facets carry no makes, fuel types or years. Against it the website renders its home and car pages
-from real staging data, but the office directory, the office sitemap and the new filters cannot
-work. Staging's `payments.mode` is Sandbox and its app minimum is 1.1.0. **To close:** deploy this
-branch's API (with its four migrations: push devices, notification outbox, reminders, handover
-codes) to staging before the website, in the order in `docs/deployment.md`.
+facets carry no makes, fuel types or years. Staging's `payments.mode` is Sandbox and its app minimum
+is 1.1.0. **To close, in this order** (`docs/deployment.md`):
+
+1. Deploy this branch's API to staging. It carries the four migrations of the push work
+   (`PushDevicesAndPreferredLanguage`, `NotificationDeliveryOutbox`, `BookingReminders`,
+   `HandoverCodes`), `GET /api/v1/galleries`, the catalogue's make / fuel / year filters, sort and
+   facets, the handover-code endpoint, and email links that open the website.
+2. Set on the staging API: `App__CustomerAppBaseUrl` and `Payments__ReturnUrlBase` to the website's
+   staging address (only once it exists), and `Payments__SandboxConsoleBaseUrl` to the staging API's
+   own https address. `Handover__RequireVerification` is the owner's decision (item 154).
+3. Deploy the customer BFF (`BffSecurity__Deployment=customer-web`, its own Redis realm) and the
+   renderer (`KHADRA_API_URL`, `KHADRA_PUBLIC_BASE_URL`, `KHADRA_EDGE_SECRET` shared with the BFF).
 
 ### 151. A customer's dispute payload carries more than a customer should hold
 
@@ -4143,3 +4150,32 @@ none of these, but they reach the browser. It is the installed app's existing co
 removed. **To close:** an additive redaction in the dispute view for non-admin callers — the gallery's
 name in `AuthorName` for a dealer statement, null admin ids and names, and no platform split — with a
 test per party.
+
+### 152. A free cancellation says "costs you nothing" while the deposit stays held
+
+**Status:** open · **Raised:** 2026-09-24 · **Owner decision:** item 77
+
+Driven on 2026-09-24: a customer who cancels a paid booking inside the free window is told
+"Cancelling now costs you nothing", and afterwards the booking reads "Deposit … Paid" with nothing
+about the money. No refund is issued (item 77: cancellation does not refund, by an open owner
+decision). Nothing is charged as a penalty, so the sentence is literally true, but a customer will
+read it as "I get my deposit back". **To close:** the owner answers decision 3; then either the
+refund happens, or the website and app say what becomes of the deposit.
+
+### 153. The console's handover refusals are easy to miss on a narrow screen
+
+**Status:** open · **Raised:** 2026-09-24
+
+A wrong, expired or locked code is refused with a clear sentence, but as a toast, which on a narrow
+console window sits behind the still-open handover dialog. The dialog's note also says the code is
+"in their Khadra app"; website customers have it on the website too. **To close:** show the refusal
+inside the dialog, and word the note for both.
+
+### 154. Whether staging and production require the handover code
+
+**Status:** open · **Raised:** 2026-09-24 · **Owner decision**
+
+`Handover:RequireVerification` is false in tracked settings, so a handover without a code is recorded
+as NotRequired and the unverified path (reason, audit, the customer's "recorded without your code")
+never runs. The full path was tested locally with it on. **To close:** the owner decides per
+environment, and the setting is set to match.
