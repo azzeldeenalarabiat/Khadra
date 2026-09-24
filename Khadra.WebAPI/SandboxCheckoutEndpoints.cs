@@ -161,6 +161,13 @@ internal static class SandboxCheckoutEndpoints
         var expired = now >= payment.ExpiresAt;
         var status = WebUtility.HtmlEncode(payment.Status.Name);
         var expiry = payment.ExpiresAt.ToString("u", CultureInfo.InvariantCulture);
+        // The refunds this payment owes, so a tester can see what a refund event would act on. A
+        // refund event settles or fails the one the sweep has SENT; a Requested one waits for the
+        // sweep's next tick.
+        var refunds = payment.Refunds.Count == 0
+            ? "none"
+            : string.Join("<br>", payment.Refunds.Select(refund => WebUtility.HtmlEncode(
+                $"{refund.Reason.Name}: {refund.Amount.Amount.ToString("0.000", CultureInfo.InvariantCulture)} {refund.Amount.CurrencyCode}, {refund.Status.Name}")));
 
         return $$"""
             <!doctype html>
@@ -185,6 +192,7 @@ internal static class SandboxCheckoutEndpoints
               <dt>Amount</dt><dd>{{amount}} {{currency}}</dd>
               <dt>Attempt</dt><dd>{{status}}</dd>
               <dt>Session expires</dt><dd>{{expiry}}{{(expired ? " (expired)" : "")}}</dd>
+              <dt>Refunds</dt><dd>{{refunds}}</dd>
             </dl>
             <label for="amount">Amount to pay (edit to test a mismatch)</label>
             <input id="amount" type="text" inputmode="decimal" value="{{amount}}">
@@ -192,12 +200,15 @@ internal static class SandboxCheckoutEndpoints
             <input id="evt" type="text" value="">
             <button class="pay"     onclick="go('captured')">Pay</button>
             <button class="decline" onclick="go('failed','card_declined')">Decline</button>
+            <button class="pay"     onclick="go('refund_settled')">Refund settled</button>
+            <button class="decline" onclick="go('refund_failed','refund_declined')">Refund failed</button>
             <button class="again"   onclick="send()">Deliver the last one again</button>
             <div id="out">Ready.</div>
             </div><script>
             const out = document.getElementById('out');
             const evt = document.getElementById('evt');
-            evt.value = 'evt_' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+            const freshId = () => 'evt_' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+            evt.value = freshId();
             let last = null;
 
             async function go(kind, failureCode) {
@@ -215,6 +226,8 @@ internal static class SandboxCheckoutEndpoints
               if (!signed.ok) { out.textContent = 'Could not sign: ' + signed.status; return; }
               last = await signed.json();
               await send();
+              // A new action is a new delivery. Replaying is what "Deliver the last one again" is for.
+              evt.value = freshId();
             }
 
             // The real webhook, on the real route, with the real signature header. Same origin, so

@@ -1994,6 +1994,54 @@ abstract class AppLocalizations {
   /// **'The rental office will see this.'**
   String get cancelDetailsHint;
 
+  /// No description provided for @cancelFreeRefundNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Free cancellation. Your deposit will be refunded in full to your original payment method. We will initiate the refund immediately, but your bank may take additional time to show it.'**
+  String get cancelFreeRefundNotice;
+
+  /// No description provided for @bookingRefundInitiated.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund initiated'**
+  String get bookingRefundInitiated;
+
+  /// No description provided for @bookingRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get bookingRefunded;
+
+  /// No description provided for @bookingRefundDelayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund delayed'**
+  String get bookingRefundDelayed;
+
+  /// No description provided for @bookingRefundInitiatedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is being refunded in full to your original payment method. We started the refund on {date}; your bank may take additional time to show it.'**
+  String bookingRefundInitiatedText(String amount, String date);
+
+  /// No description provided for @bookingRefundedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} was refunded to your original payment method on {date}. Your bank may take additional time to show it.'**
+  String bookingRefundedText(String amount, String date);
+
+  /// No description provided for @bookingRefundDelayedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is still owed to you. The refund is taking longer than usual, and we are retrying it automatically.'**
+  String bookingRefundDelayedText(String amount);
+
+  /// No description provided for @notificationYourDepositRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor}: your deposit has been refunded'**
+  String notificationYourDepositRefunded(String actor);
+
   /// No description provided for @cancelFreeNotice.
   ///
   /// In en, this message translates to:

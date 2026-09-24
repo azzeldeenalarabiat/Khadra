@@ -1,4 +1,5 @@
 using Khadra.Application.Common;
+using Khadra.Application.Common.Dtos;
 using Khadra.Application.Payments.Dtos;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -83,7 +84,26 @@ public sealed record BookingContext(
     /// booking screens compose it: an admin looking at a rental has no Pay button, and computing the
     /// verdict for them would be a query per booking for an answer nothing renders.
     /// </remarks>
-    PaymentAvailabilityDto? Payment = null);
+    PaymentAvailabilityDto? Payment = null,
+    /// <summary>
+    /// The refund of this booking's deposit that a free cancellation recorded, or null when there is
+    /// none. Composed for every reader of one booking — customer, gallery and admin all need to see
+    /// that the deposit is going back.
+    /// </summary>
+    DepositRefundDto? DepositRefund = null);
+
+/// <summary>
+/// Where the deposit's refund is (owner, 2026-09-24): the refund's own status, never a verdict a
+/// client has to re-derive. <c>Requested</c> and <c>Sent</c> both read as "refund initiated" to a
+/// customer; <c>Settled</c> is "refunded"; <c>Failed</c> is still owed and being re-sent.
+/// </summary>
+public sealed record DepositRefundDto(
+    string Status,
+    MoneyDto Amount,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset? SentAt,
+    DateTimeOffset? SettledAt,
+    DateTimeOffset? FailedAt);
 
 public sealed record VehicleLabel(
     Guid VehicleId,

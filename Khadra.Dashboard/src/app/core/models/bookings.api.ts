@@ -134,6 +134,30 @@ export interface Booking {
   readonly customerAccountClosed: boolean;
   readonly handovers: readonly Handover[];
   readonly history: readonly BookingStatusChange[];
+  /**
+   * The deposit a customer's free cancellation returned to them (owner, 2026-09-24), with the
+   * refund's own status. Null when there is none; absent on an older API.
+   */
+  readonly depositRefund?: DepositRefund | null;
+}
+
+/** Requested and Sent: the refund is on its way. Settled: refunded. Failed: still owed, being retried. */
+export interface DepositRefund {
+  readonly status: 'Requested' | 'Sent' | 'Settled' | 'Failed' | string;
+  readonly amount: Money;
+  readonly requestedAt: string;
+  readonly sentAt: string | null;
+  readonly settledAt: string | null;
+  readonly failedAt: string | null;
+}
+
+/** The i18n key naming where a deposit refund is, shared by the dealer and admin booking screens. */
+export function depositRefundKey(refund: DepositRefund): 'booking.depositRefunded' | 'booking.depositRefundDelayed' | 'booking.depositRefundInitiated' {
+  return refund.status === 'Settled'
+    ? 'booking.depositRefunded'
+    : refund.status === 'Failed'
+      ? 'booking.depositRefundDelayed'
+      : 'booking.depositRefundInitiated';
 }
 
 export interface BookingPricing {

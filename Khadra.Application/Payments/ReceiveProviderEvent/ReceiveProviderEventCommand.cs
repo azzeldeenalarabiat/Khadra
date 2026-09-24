@@ -195,7 +195,7 @@ public sealed partial class ReceiveProviderEventHandler(
         {
             ProviderEventKind.Captured => await CaptureAsync(payment, notification, now, cancellationToken),
             ProviderEventKind.Failed => Fail(payment, notification, now),
-            ProviderEventKind.RefundSettled => SettleRefund(payment, now),
+            ProviderEventKind.RefundSettled => await SettleRefundAsync(payment, now, cancellationToken),
             ProviderEventKind.RefundFailed => FailRefund(payment, notification, now),
             _ => ProviderEventOutcome.Ignored
         };
@@ -293,13 +293,44 @@ public sealed partial class ReceiveProviderEventHandler(
         return failed.IsSuccess ? ProviderEventOutcome.Acted : ProviderEventOutcome.Ignored;
     }
 
-    private static ProviderEventOutcome SettleRefund(Payment payment, DateTimeOffset now)
+    /// <summary>
+    /// A refund this platform sent has reached the customer.
+    /// </summary>
+    /// <remarks>
+    /// A free cancellation's refund also tells the customer (owner, 2026-09-24), staged in this same
+    /// save so the message can never describe a settlement that rolled back, and sent once: a
+    /// replayed delivery is refused at the receipt before reaching here, and a second, different
+    /// delivery finds no refund still Sent.
+    /// </remarks>
+    private async Task<ProviderEventOutcome> SettleRefundAsync(
+        Payment payment,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         var outstanding = payment.Refunds.FirstOrDefault(refund => refund.Status == RefundStatus.Sent);
         if (outstanding is null)
             return ProviderEventOutcome.Ignored;
 
         outstanding.MarkSettled(now);
+
+        if (outstanding.Reason == RefundReason.FreeCancellation)
+        {
+            // The gallery is only the actor's name on the notice; a gallery that has since left the
+            // platform must not cost the customer the news that their money is back.
+            var booking = await bookings.GetByIdAsync(payment.BookingId, cancellationToken);
+            if (booking is not null)
+            {
+                var dealer = await dealers.GetByIdAsync(booking.DealerId, cancellationToken);
+                await team.NotifyCustomerAsync(
+                    booking.CustomerId,
+                    dealer?.BusinessName.Value ?? string.Empty,
+                    NotificationKind.YourDepositRefunded,
+                    now,
+                    booking.Id,
+                    booking.Reference.Value);
+            }
+        }
+
         return ProviderEventOutcome.Acted;
     }
 

@@ -1318,18 +1318,60 @@ class CancellationPreview {
     required this.canCancel,
     required this.isFree,
     required this.penalty,
+    this.willRefundDeposit = false,
   });
 
   final bool canCancel;
   final bool isFree;
   final PenaltyAssessment? penalty;
 
+  /// Cancelling now returns the PAID deposit in full to the original payment
+  /// method (owner, 2026-09-24). The server's answer, from the same rule the
+  /// cancellation applies. Absent from an older API, where it reads false.
+  final bool willRefundDeposit;
+
   static CancellationPreview fromJson(Map<String, dynamic>? json) =>
       CancellationPreview(
         canCancel: json?['canCancel'] as bool? ?? false,
         isFree: json?['isFree'] as bool? ?? true,
         penalty: PenaltyAssessment.maybe(json?['penalty']),
+        willRefundDeposit: json?['willRefundDeposit'] as bool? ?? false,
       );
+}
+
+/// Where the deposit a free cancellation returned is (owner, 2026-09-24).
+///
+/// The refund's own status: Requested and Sent both mean the refund has been
+/// initiated; Settled means refunded; Failed means it is still owed and the
+/// server is retrying it.
+class DepositRefund {
+  const DepositRefund({
+    required this.status,
+    required this.amount,
+    required this.requestedAt,
+    required this.settledAt,
+  });
+
+  final String status;
+  final Money amount;
+  final DateTime requestedAt;
+  final DateTime? settledAt;
+
+  bool get isRefunded => status == 'Settled';
+  bool get isDelayed => status == 'Failed';
+
+  static DepositRefund? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final amount = Money.maybe(json['amount']);
+    final requestedAt = _dateTime(json['requestedAt']);
+    if (amount == null || requestedAt == null) return null;
+    return DepositRefund(
+      status: json['status'] as String? ?? 'Requested',
+      amount: amount,
+      requestedAt: requestedAt,
+      settledAt: _dateTime(json['settledAt']),
+    );
+  }
 }
 
 class VehicleLabel {
@@ -1591,6 +1633,7 @@ class Booking implements HasDealerLabel {
     required this.dealerCityId,
     required this.handovers,
     required this.history,
+    this.depositRefund,
   });
 
   final String bookingId;
@@ -1661,6 +1704,9 @@ class Booking implements HasDealerLabel {
   final List<Handover> handovers;
   final List<BookingStatusChange> history;
 
+  /// The deposit a free cancellation returned, or null. Absent from an older API.
+  final DepositRefund? depositRefund;
+
   bool get isDelivery => pickupMethod == 'Delivery';
 
   static Booking fromJson(Map<String, dynamic> json) => Booking(
@@ -1716,6 +1762,7 @@ class Booking implements HasDealerLabel {
             .whereType<Map<String, dynamic>>()
             .map(BookingStatusChange.fromJson)
             .toList(),
+        depositRefund: DepositRefund.maybe(json['depositRefund']),
       );
 }
 

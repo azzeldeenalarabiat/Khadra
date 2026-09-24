@@ -18,7 +18,7 @@ const PAGE_SIZE = 20;
  * The customer kinds the platform sends (NotificationKind, the Your* entries). A kind a newer server
  * sends reads as a generic update, never blank.
  */
-const KNOWN_KINDS = new Set([
+export const KNOWN_KINDS: ReadonlySet<string> = new Set([
   'YourBookingApproved',
   'YourBookingRejected',
   'YourBookingExpired',
@@ -32,6 +32,7 @@ const KNOWN_KINDS = new Set([
   'YourPickupReminder',
   'YourReturnReminder',
   'YourDisputeUpdated',
+  'YourDepositRefunded',
 ]);
 
 /**

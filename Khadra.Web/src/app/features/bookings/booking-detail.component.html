@@ -26,7 +26,12 @@
     }
     @switch (checkout()) {
       @case ('checking') { <div class="notice" role="status" aria-busy="true"><kh-icon name="clock" /><p>{{ i18n.t('booking.payReturned') }}</p></div> }
-      @case ('paid') { <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('booking.payConfirmed') }}</p></div> }
+      @case ('paid') {
+        <!-- "The booking is confirmed" is true only while it is: after a cancellation it would contradict the page. -->
+        @if (b.status === 'Confirmed') {
+          <div class="notice notice--ok" role="status"><kh-icon name="check-circle" /><p>{{ i18n.t('booking.payConfirmed') }}</p></div>
+        }
+      }
       @case ('open') {
         <div class="notice notice--warn" role="status"><kh-icon name="clock" />
           <p>{{ i18n.t('booking.payStillOpen', { deadline: format.dateTime(b.paymentDeadline) }) }}</p></div>
@@ -105,7 +110,10 @@
           <div class="notice"><kh-icon name="x-circle" />
             <div><p class="notice__title">{{ i18n.t('booking.cancelledTitle') }}</p>
               <p>{{ b.cancelledBy === 'Customer' ? i18n.t('booking.cancelledByYou') : i18n.t('booking.cancelledBy', { party: party(b.cancelledBy) }) }}
-                @if (endReason()) { · {{ endReason() }} }</p></div></div>
+                @if (endReason()) { · {{ endReason() }} }</p>
+              @if (b.depositRefund; as refund) {
+                <p>{{ refundText(refund) }}</p>
+              }</div></div>
         }
         @case ('Rejected') {
           <div class="notice notice--bad"><kh-icon name="x-circle" />
@@ -179,7 +187,12 @@
         }
         <div class="lines__total"><dt>{{ i18n.t('quote.total') }}</dt><dd>{{ format.money(b.pricing.totalPrice) }}</dd></div>
         <div><dt>{{ i18n.t('quote.deposit', { percent: percent(b.pricing.depositPercent) }) }}</dt>
-          <dd>{{ format.money(b.pricing.depositAmount) }} @if (b.depositPaid) { <span class="badge badge--ok">{{ i18n.t('booking.depositPaid') }}</span> }</dd></div>
+          <dd>{{ format.money(b.pricing.depositAmount) }}
+            @if (b.depositRefund; as refund) {
+              <span class="badge {{ refundTone(refund) }}">{{ refundLabel(refund) }}</span>
+            } @else if (b.depositPaid) {
+              <span class="badge badge--ok">{{ i18n.t('booking.depositPaid') }}</span>
+            }</dd></div>
         <div><dt>{{ i18n.t('quote.balance') }}</dt><dd>{{ format.money(b.pricing.balanceDue) }}</dd></div>
         <div><dt>{{ i18n.t('quote.securityDeposit') }}</dt><dd>{{ format.money(b.pricing.securityDeposit) }}</dd></div>
       </dl>
@@ -244,7 +257,9 @@
           <h2 class="card__title">{{ i18n.t('cancel.title') }}</h2>
           <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="closeCancel()"><kh-icon name="x" /></button>
         </div>
-        @if (b.cancellation.isFree) {
+        @if (b.cancellation.willRefundDeposit) {
+          <div class="notice notice--ok"><kh-icon name="check-circle" /><p>{{ i18n.t('cancel.freeRefund') }}</p></div>
+        } @else if (b.cancellation.isFree) {
           <div class="notice notice--ok"><kh-icon name="check-circle" /><p>{{ i18n.t('cancel.free') }}</p></div>
         } @else {
           <div class="notice notice--warn"><kh-icon name="warning" />

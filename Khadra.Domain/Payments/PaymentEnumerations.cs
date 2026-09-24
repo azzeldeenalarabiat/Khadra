@@ -56,6 +56,13 @@ public sealed class RefundReason : Enumeration
     /// <summary>An admin resolved a dispute and the disposition returns money to the customer.</summary>
     public static readonly RefundReason DisputeResolution = new(2, "DisputeResolution");
 
+    /// <summary>
+    /// The customer cancelled a PAID booking inside its free-cancellation window, so the whole deposit
+    /// goes back to the card it came from (owner, 2026-09-24). Nobody decides it: it is recorded in the
+    /// same transaction as the cancellation, and the sweep sends it.
+    /// </summary>
+    public static readonly RefundReason FreeCancellation = new(3, "FreeCancellation");
+
     private RefundReason(int id, string name) : base(id, name)
     {
     }

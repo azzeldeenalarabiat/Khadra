@@ -1177,6 +1177,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cancelDetailsHint => 'The rental office will see this.';
 
   @override
+  String get cancelFreeRefundNotice =>
+      'Free cancellation. Your deposit will be refunded in full to your original payment method. We will initiate the refund immediately, but your bank may take additional time to show it.';
+
+  @override
+  String get bookingRefundInitiated => 'Refund initiated';
+
+  @override
+  String get bookingRefunded => 'Refunded';
+
+  @override
+  String get bookingRefundDelayed => 'Refund delayed';
+
+  @override
+  String bookingRefundInitiatedText(String amount, String date) {
+    return 'Your deposit of $amount is being refunded in full to your original payment method. We started the refund on $date; your bank may take additional time to show it.';
+  }
+
+  @override
+  String bookingRefundedText(String amount, String date) {
+    return 'Your deposit of $amount was refunded to your original payment method on $date. Your bank may take additional time to show it.';
+  }
+
+  @override
+  String bookingRefundDelayedText(String amount) {
+    return 'Your deposit of $amount is still owed to you. The refund is taking longer than usual, and we are retrying it automatically.';
+  }
+
+  @override
+  String notificationYourDepositRefunded(String actor) {
+    return '$actor: your deposit has been refunded';
+  }
+
+  @override
   String get cancelFreeNotice => 'Cancelling now costs you nothing.';
 
   @override

@@ -275,4 +275,61 @@ public sealed class PaymentPersistenceTests : IDisposable
         // A reference means nothing outside the provider that issued it.
         Assert.Null(await repository.GetByProviderReferenceAsync("AnotherProvider", "sess_1"));
     }
+
+    [Fact]
+    public async Task A_free_cancellation_refund_round_trips_its_reason_and_status()
+    {
+        var payment = Pending(Id.New());
+        Assert.True(payment.Apply(Money.Jod(18m), Now, Now).IsSuccess);
+        var refund = payment.RefundForFreeCancellation(Now.AddMinutes(2)).Value;
+        refund.MarkFailed("refund_declined", Now.AddMinutes(3));
+
+        await using (var context = NewContext())
+        {
+            context.Payments.Add(payment);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stored = await new PaymentRepository(reader).GetByIdAsync(payment.Id);
+
+        var storedRefund = Assert.Single(stored!.Refunds);
+        Assert.Same(RefundReason.FreeCancellation, storedRefund.Reason);
+        Assert.Same(RefundStatus.Failed, storedRefund.Status);
+        Assert.Equal("refund_declined", storedRefund.FailureCode);
+        Assert.Equal(Money.Jod(18m), storedRefund.Amount);
+        Assert.Equal(Now.AddMinutes(2), storedRefund.RequestedAt);
+        // Still owed: the idempotent call returns this row rather than a second one.
+        Assert.Same(storedRefund, stored.RefundForFreeCancellation(Now.AddMinutes(4)).Value);
+    }
+
+    /// <summary>
+    /// The production order: the payment is LOADED (its captured amount tracked), refunded, and saved.
+    /// The refund must own its own amount, not the payment's tracked instance.
+    /// </summary>
+    [Fact]
+    public async Task A_free_cancellation_refund_on_a_loaded_payment_saves_and_reloads_whole()
+    {
+        var payment = Pending(Id.New());
+        Assert.True(payment.Apply(Money.Jod(18m), Now, Now).IsSuccess);
+        await using (var context = NewContext())
+        {
+            context.Payments.Add(payment);
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = NewContext())
+        {
+            var loaded = await new PaymentRepository(context).GetByIdAsync(payment.Id);
+            Assert.True(loaded!.RefundForFreeCancellation(Now.AddMinutes(1)).IsSuccess);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stored = await new PaymentRepository(reader).GetByIdAsync(payment.Id);
+        Assert.Equal(Money.Jod(18m), stored!.AmountCaptured);
+        var refund = Assert.Single(stored.Refunds);
+        Assert.Equal(Money.Jod(18m), refund.Amount);
+        Assert.Same(RefundReason.FreeCancellation, refund.Reason);
+    }
 }

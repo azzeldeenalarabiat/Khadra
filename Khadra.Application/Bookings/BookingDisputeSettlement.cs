@@ -23,13 +23,20 @@ public static class BookingDisputeSettlement
     /// Read from the booking's frozen pricing, never from current settings. And a booking cancelled
     /// before its deposit was ever paid holds nothing: the disposition then has to be all zeros, and
     /// DepositDisposition.Create will insist on exactly that.
+    ///
+    /// Nor does a booking whose deposit goes back because the customer cancelled it inside the free
+    /// window (owner, 2026-09-24): it stays disputable for the settlement window, and without this a
+    /// resolution could split money already on its way back. Judged by the booking's own rule, never
+    /// by the refund's status — a refused refund is still owed and still being re-sent, so reading
+    /// "captured minus refunded" (which does not count a failed refund) would offer that deposit to a
+    /// dispute a second time. See pre-launch item 78.
     /// </summary>
     public static Money DepositHeldFor(Booking booking)
     {
         ArgumentNullException.ThrowIfNull(booking);
 
         var currency = booking.Pricing.CurrencyCode;
-        return booking.DepositPaymentId is null
+        return booking.DepositPaymentId is null || booking.ReturnsDepositOnCancellation
             ? Money.ZeroIn(currency)
             : Money.Create(booking.Pricing.DepositAmount.Amount, currency);
     }

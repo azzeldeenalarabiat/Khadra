@@ -283,14 +283,54 @@ public sealed class Payment : AggregateRoot
         if (amount.IsZero)
             throw new DomainException("A refund of nothing cannot be requested.");
 
+        return AddRefund(amount, RefundReason.DisputeResolution, disputeTicketId, now);
+    }
+
+    /// <summary>
+    /// Returns the whole deposit because the customer cancelled inside the free-cancellation window
+    /// (owner, 2026-09-24).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Idempotent on the refund, not on the call.</b> A second call returns the refund the first one
+    /// recorded, whatever has become of it since — Requested, Sent, Settled or Failed. A Failed one is
+    /// still owed and the sweep re-sends it under its own id; minting a second row would be a second
+    /// instruction for one deposit.
+    /// </para>
+    /// <para>
+    /// <b>The full capture, never "what is left".</b> No refund can exist on a payment before its
+    /// booking is cancelled (a dispute needs a finished booking), so anything already refunded here
+    /// would be a bug, and quietly refunding the remainder would hide it. The shared guard refuses it.
+    /// </para>
+    /// </remarks>
+    public Result<Refund, Error> RefundForFreeCancellation(DateTimeOffset now)
+    {
+        if (Status != PaymentStatus.Applied)
+            return PaymentErrors.NotLive;
+
+        if (FreeCancellationRefund is { } existing)
+            return existing;
+
+        return AddRefund(AmountCaptured!, RefundReason.FreeCancellation, disputeTicketId: null, now);
+    }
+
+    /// <summary>The one way money is promised back on an applied payment: never beyond what was taken.</summary>
+    private Result<Refund, Error> AddRefund(Money amount, RefundReason reason, Id? disputeTicketId, DateTimeOffset now)
+    {
         var wouldBe = RefundedTotal.Add(amount);
         if (wouldBe.IsGreaterThan(AmountCaptured!))
             return PaymentErrors.RefundExceedsCapture;
 
-        var refund = Refund.Request(Id, amount, RefundReason.DisputeResolution, disputeTicketId, now);
+        // A fresh Money, never the payment's own tracked instance: EF tracks owned values by
+        // reference, and one instance owned by two rows is the pattern the architecture rules forbid.
+        var refund = Refund.Request(Id, Money.Create(amount.Amount, amount.CurrencyCode), reason, disputeTicketId, now);
         _refunds.Add(refund);
         return refund;
     }
+
+    /// <summary>The refund a free cancellation recorded, if there is one.</summary>
+    public Refund? FreeCancellationRefund =>
+        _refunds.FirstOrDefault(refund => refund.Reason == RefundReason.FreeCancellation);
 
     /// <summary>Whether this attempt is still one a customer could pay through, at this instant.</summary>
     public bool IsUsable(DateTimeOffset now) => Status.IsLive && now < ExpiresAt;

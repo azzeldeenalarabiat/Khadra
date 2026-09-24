@@ -140,7 +140,12 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
             const SizedBox(height: Space.lg),
 
             // The consequence, from the server, before the tap rather than after.
-            if (preview.isFree)
+            if (preview.willRefundDeposit)
+              KhadraNotice(
+                title: l10n.cancelFreeRefundNotice,
+                tone: NoticeTone.accent,
+              )
+            else if (preview.isFree)
               KhadraNotice(
                 title: l10n.cancelFreeNotice,
                 tone: NoticeTone.accent,

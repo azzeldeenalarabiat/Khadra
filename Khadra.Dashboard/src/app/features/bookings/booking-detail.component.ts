@@ -7,6 +7,7 @@ import {
   BookingStatus,
   Handover,
   PenaltyAssessment,
+  depositRefundKey,
 } from '../../core/models/bookings.api';
 import { enumKey } from '../../core/i18n/status-key';
 import { KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
@@ -104,6 +105,15 @@ export class AdminBookingDetailComponent {
         }),
         v: this.money(pricing.depositAmount),
       },
+      // A free cancellation's refund, where one exists: the admin sees the same status the customer does.
+      ...(booking.depositRefund
+        ? [
+            {
+              k: this.t('adminBooking.depositRefund'),
+              v: this.t(depositRefundKey(booking.depositRefund), { amount: this.money(booking.depositRefund.amount) }),
+            },
+          ]
+        : []),
       { k: this.t('myBooking.balanceDue'), v: this.money(pricing.balanceDue) },
       { k: this.t('vehicleDetail.securityDeposit'), v: this.money(pricing.securityDeposit) },
       {

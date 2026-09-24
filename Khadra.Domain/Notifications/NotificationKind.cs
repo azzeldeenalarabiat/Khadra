@@ -90,6 +90,12 @@ public sealed class NotificationKind : Enumeration
     public static readonly NotificationKind YourBookingPickedUp = new(28, "YourBookingPickedUp", PushOnly);
     public static readonly NotificationKind YourBookingReturned = new(29, "YourBookingReturned", PushOnly);
 
+    // The provider says the deposit a free cancellation returned has been refunded (owner, 2026-09-24;
+    // ReceiveProviderEventHandlers). Sent on SETTLEMENT, never on the request: "your money is on its
+    // way" is already on the booking the moment it is cancelled, and a notification is for the news
+    // the customer is waiting for. By email too, because a refund is a record people keep.
+    public static readonly NotificationKind YourDepositRefunded = new(30, "YourDepositRefunded", PushAndEmail);
+
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");
@@ -109,8 +115,9 @@ public sealed class NotificationKind : Enumeration
     //                       payment the platform cannot take: Payments ships with no provider
     //                       configured, so every checkout is refused with payments.provider_unavailable.
     //                       Add it when a provider exists, not before.
-    //   YourRefundIssued  — the platform can RECORD a refund but cannot send one without a provider,
-    //                       so telling a customer their money is on its way would not be true yet.
+    //   YourRefundIssued  — superseded on 2026-09-24 by YourDepositRefunded, which is sent only when a
+    //                       provider SETTLES the refund, so it is never a promise the platform cannot
+    //                       keep. Refunds from a dispute or an orphaned capture still send nothing.
 
     private readonly NotificationChannel[] _channels;
 

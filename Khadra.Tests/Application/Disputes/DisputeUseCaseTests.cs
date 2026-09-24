@@ -328,6 +328,39 @@ public sealed class DisputeUseCaseTests
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
+    /// <summary>
+    /// A paid booking the customer cancelled inside the free window has already sent its deposit back
+    /// (owner, 2026-09-24). It is still disputable, but a resolution may move none of that money:
+    /// any refund is refused, and the all-zero resolution records no refund at all.
+    /// </summary>
+    [Fact]
+    public async Task A_free_cancelled_paid_booking_leaves_a_dispute_nothing_to_split()
+    {
+        var context = new Context();
+        var booking = Build.Booking(now: Build.Now, customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        booking.Approve(Id.New(), Build.Now.AddMinutes(10));
+        booking.ConfirmDepositPaid(Id.New(), Build.Now.AddMinutes(20));
+        Assert.True(booking.Cancel(BookingParty.Customer, CustomerId, "Plans changed.", Build.Now.AddMinutes(30)).IsSuccess);
+        Assert.True(booking.ReturnsDepositOnCancellation);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        var held = booking.Pricing.DepositAmount.Amount;
+
+        var refused = await context.Admin().Handle(
+            new ResolveDisputeCommand(context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(1))).Id, held, 0m, 0m, null, "Refund in full."),
+            CancellationToken.None);
+        Assert.Equal("dispute.disposition_unbalanced", refused.Error.Code);
+
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(1)));
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, 0m, 0m, 0m, null, "The deposit already went back with the free cancellation."),
+            CancellationToken.None);
+
+        Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
+        Assert.Equal(0m, ticket.Resolution!.Deposit.DepositHeld.Amount);
+        await context.Payments.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+    }
+
     [Fact]
     public async Task A_split_that_does_not_add_up_to_the_deposit_is_refused_and_nothing_is_written()
     {

@@ -12,6 +12,8 @@ using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.Payments;
+using Khadra.Domain.Payments.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -34,6 +36,7 @@ public sealed class CancelBookingTests
         public IBookingRepository Bookings { get; } = Substitute.For<IBookingRepository>();
         public IBookingReader Reader { get; } = Substitute.For<IBookingReader>();
         public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
+        public IPaymentRepository Payments { get; } = Substitute.For<IPaymentRepository>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public INotifier Notifier { get; } = Substitute.For<INotifier>();
         public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
@@ -62,11 +65,26 @@ public sealed class CancelBookingTests
         public Booking GivenApproved() =>
             Given(Build.ApprovedBooking(customerId: CustomerId, dealerId: Dealer.Id));
 
-        public Booking GivenConfirmed() =>
-            Given(Build.ConfirmedBooking(customerId: CustomerId, dealerId: Dealer.Id));
+        /// <summary>
+        /// Confirmed the only way production confirms: against a real payment that captured the
+        /// booking's deposit, which the repository then answers for.
+        /// </summary>
+        public Booking GivenConfirmed() => GivenConfirmed(out _);
+
+        public Booking GivenConfirmed(out Payment payment)
+        {
+            var booking = Build.ApprovedBooking(Clock.UtcNow, customerId: CustomerId, dealerId: Dealer.Id);
+            var deposit = Money.Create(booking.Pricing.DepositAmount.Amount, booking.Pricing.CurrencyCode);
+            payment = Payment.Open(booking.Id, CustomerId, deposit, "TestProvider", Clock.UtcNow.AddMinutes(30), Clock.UtcNow);
+            payment.AttachProviderSession("sess_" + booking.Reference.Value, "https://provider.test/checkout");
+            Assert.True(payment.Apply(Money.Create(deposit.Amount, deposit.CurrencyCode), Clock.UtcNow, Clock.UtcNow).IsSuccess);
+            booking.ConfirmDepositPaid(payment.Id, Clock.UtcNow);
+            Payments.GetByIdAsync(payment.Id, Arg.Any<CancellationToken>()).Returns(payment);
+            return Given(booking);
+        }
 
         public CancelBookingHandlers Handlers() =>
-            new(Bookings, Reader, Dealers, new DealerTeamNotifier(Notifier, Users), Clock, UnitOfWork);
+            new(Bookings, Reader, Dealers, Payments, new DealerTeamNotifier(Notifier, Users), Clock, UnitOfWork);
 
         public Task<Result<BookingDto, Error>> Cancel(
             Id bookingId,
@@ -264,6 +282,120 @@ public sealed class CancelBookingTests
 
         Assert.False(preview.CanCancel);
         Assert.Equal("booking.cannot_cancel", result.Error.Code);
+    }
+
+    // ── The paid free cancellation (owner, 2026-09-24) ────────────────────────────────────────────
+
+    [Fact]
+    public async Task A_paid_booking_cancelled_inside_the_free_window_records_a_full_refund_in_the_same_save()
+    {
+        var context = new Context();
+        var booking = context.GivenConfirmed(out var payment);
+        var saves = 0;
+        var refundsAtSave = -1;
+        context.UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            saves++;
+            refundsAtSave = payment.Refunds.Count;
+            return 1;
+        });
+
+        var result = await context.Cancel(booking.Id);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Same(BookingStatus.Cancelled, booking.Status);
+        Assert.True(booking.ReturnsDepositOnCancellation);
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.FreeCancellation, refund.Reason);
+        Assert.Same(RefundStatus.Requested, refund.Status);
+        Assert.Equal(payment.AmountCaptured, refund.Amount);
+        // ONE save, and the refund was already on the payment when it ran: the cancellation and the
+        // money it owes back commit together or not at all.
+        Assert.Equal(1, saves);
+        Assert.Equal(1, refundsAtSave);
+    }
+
+    [Fact]
+    public async Task An_unpaid_booking_cancelled_for_free_records_no_refund()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+
+        var result = await context.Cancel(booking.Id);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.True(result.Value.Penalty!.IsNothingOwed);
+        Assert.False(booking.ReturnsDepositOnCancellation);
+        await context.Payments.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+    }
+
+    /// <summary>Outside the window the existing policy stands: assessed, not charged, and nothing refunded.</summary>
+    [Fact]
+    public async Task A_paid_booking_cancelled_after_the_free_window_is_not_refunded()
+    {
+        var context = new Context();
+        var booking = context.GivenConfirmed(out var payment);
+        context.Clock.UtcNow = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+
+        var result = await context.Cancel(booking.Id);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.False(booking.ReturnsDepositOnCancellation);
+        Assert.Empty(payment.Refunds);
+        Assert.False(result.Value.Penalty!.IsNothingOwed);
+    }
+
+    /// <summary>
+    /// A retry is recognised and answered, and adds nothing: a refund is created only by the
+    /// cancellation that owes it, never by tapping cancel again.
+    /// </summary>
+    [Fact]
+    public async Task Cancelling_again_does_not_create_a_second_refund()
+    {
+        var context = new Context();
+        var booking = context.GivenConfirmed(out var payment);
+
+        await context.Cancel(booking.Id);
+        var again = await context.Cancel(booking.Id);
+        var third = await context.Cancel(booking.Id);
+
+        Assert.True(again.IsSuccess);
+        Assert.True(third.IsSuccess);
+        Assert.Single(payment.Refunds);
+    }
+
+    /// <summary>
+    /// A paid booking whose payment cannot be found is a programming error, and the cancellation must
+    /// not commit without the refund it owes: money held with nothing saying it is owed back.
+    /// </summary>
+    [Fact]
+    public async Task A_paid_booking_whose_payment_is_missing_is_not_cancelled_without_its_refund()
+    {
+        var context = new Context();
+        var booking = context.Given(Build.ConfirmedBooking(context.Clock.UtcNow, customerId: CustomerId, dealerId: context.Dealer.Id));
+
+        await Assert.ThrowsAsync<DomainException>(() => context.Cancel(booking.Id));
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void The_promise_on_the_sheet_is_the_refund_the_cancellation_records()
+    {
+        var context = new Context();
+        var paid = context.GivenConfirmed();
+        var now = context.Clock.UtcNow;
+
+        Assert.True(paid.CancellationWouldReturnDeposit(BookingParty.Customer, now));
+        Assert.True(Khadra.Application.Bookings.Dtos.CancellationPreviewDto.From(
+            paid.PreviewCancellation(BookingParty.Customer, now),
+            paid.CancellationWouldReturnDeposit(BookingParty.Customer, now)).WillRefundDeposit);
+        // The owner's rule names the customer: a gallery or an admin cancelling in that hour does not
+        // trigger it (an open owner question, recorded in the pre-launch checklist).
+        Assert.False(paid.CancellationWouldReturnDeposit(BookingParty.Dealer, now));
+        Assert.False(paid.CancellationWouldReturnDeposit(BookingParty.Admin, now));
+        // Past the window, and with nothing paid, there is nothing to promise.
+        Assert.False(paid.CancellationWouldReturnDeposit(BookingParty.Customer, paid.FreeCancellationDeadline!.Value.AddMinutes(1)));
+        Assert.False(context.GivenApproved().CancellationWouldReturnDeposit(BookingParty.Customer, now));
     }
 
     [Fact]

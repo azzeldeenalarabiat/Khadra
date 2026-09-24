@@ -4,11 +4,13 @@ using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Notifications;
+using Khadra.Application.Payments;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Notifications;
+using Khadra.Domain.Payments.Repositories;
 using MediatR;
 
 namespace Khadra.Application.Bookings.CancelBooking;
@@ -73,6 +75,7 @@ public sealed class CancelBookingHandlers(
     IBookingRepository bookings,
     IBookingReader reader,
     IDealerRepository dealers,
+    IPaymentRepository payments,
     DealerTeamNotifier team,
     IClock clock,
     IUnitOfWork unitOfWork) :
@@ -123,6 +126,16 @@ public sealed class CancelBookingHandlers(
         var cancelled = booking.Cancel(BookingParty.Customer, request.CustomerUserId, request.Details, now, reasonCode);
         if (cancelled.IsFailure)
             return cancelled.Error;
+
+        // A paid booking cancelled inside its free window returns the whole deposit (owner,
+        // 2026-09-24), recorded in THIS save so the cancellation and the refund it owes commit
+        // together or not at all. The retry branch above deliberately does not do this: a refund is
+        // only ever created by the cancellation that owes it, never by tapping cancel again.
+        if (booking.ReturnsDepositOnCancellation)
+        {
+            var payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
+            DepositRefundSettlement.RefundForFreeCancellation(booking, payment, now);
+        }
 
         await NotifyGalleryAsync(booking, NotificationKind.BookingCancelledByCustomer, now, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);

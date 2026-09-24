@@ -254,6 +254,8 @@ class _NotificationRow extends ConsumerWidget {
         'YourReturnReminder' =>
           l10n.notificationYourReturnReminder(item.actorName),
         'YourDisputeUpdated' => l10n.notificationYourDisputeUpdated,
+        'YourDepositRefunded' =>
+          l10n.notificationYourDepositRefunded(item.actorName),
         _ => l10n.notificationUnknown(item.actorName),
       };
 
@@ -270,6 +272,7 @@ class _NotificationRow extends ConsumerWidget {
         'YourPaymentReminder' => Icons.payments_outlined,
         'YourPickupReminder' || 'YourReturnReminder' => Icons.alarm_outlined,
         'YourDisputeUpdated' => Icons.gavel_outlined,
+        'YourDepositRefunded' => Icons.currency_exchange_outlined,
         _ => Icons.notifications_none,
       };
 }

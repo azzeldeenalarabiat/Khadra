@@ -1013,9 +1013,30 @@ class _Price extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(formats.money(pricing.depositAmount)),
+                    // A free cancellation's refund replaces "Paid": after a
+                    // paid free cancellation the customer must never see only
+                    // that the deposit was paid (owner, 2026-09-24).
+                    if (booking.depositRefund case final refund?) ...[
+                      const SizedBox(width: Space.sm),
+                      KhadraBadge(
+                        label: refund.isRefunded
+                            ? l10n.bookingRefunded
+                            : refund.isDelayed
+                                ? l10n.bookingRefundDelayed
+                                : l10n.bookingRefundInitiated,
+                        colour: refund.isRefunded
+                            ? KhadraColors.ok
+                            : refund.isDelayed
+                                ? KhadraColors.bad
+                                : KhadraColors.warn,
+                        icon: refund.isRefunded
+                            ? Icons.check_rounded
+                            : Icons.schedule_rounded,
+                      ),
+                    ]
                     // Whether it is already paid is a FACT on the booking, not
                     // a guess from the status.
-                    if (booking.depositPaid) ...[
+                    else if (booking.depositPaid) ...[
                       const SizedBox(width: Space.sm),
                       KhadraBadge(
                         label: l10n.bookingDepositPaidNote,
@@ -1026,6 +1047,23 @@ class _Price extends StatelessWidget {
                   ],
                 ),
               ),
+              if (booking.depositRefund case final refund?) ...[
+                const SizedBox(height: 2),
+                // What the badge means, in a sentence: initiated (and when),
+                // refunded (and when), or still owed and being retried.
+                Text(
+                  refund.isRefunded
+                      ? l10n.bookingRefundedText(formats.money(refund.amount),
+                          formats.dateTime(refund.settledAt ?? refund.requestedAt))
+                      : refund.isDelayed
+                          ? l10n.bookingRefundDelayedText(formats.money(refund.amount))
+                          : l10n.bookingRefundInitiatedText(
+                              formats.money(refund.amount), formats.dateTime(refund.requestedAt)),
+                  style: const TextStyle(
+                      color: KhadraColors.neutral600, fontSize: 12, height: 1.45),
+                ),
+                const SizedBox(height: Space.sm),
+              ],
               KhadraDetailRow(
                 label: l10n.bookBalanceAtPickup,
                 value: Text(formats.money(pricing.balanceDue)),

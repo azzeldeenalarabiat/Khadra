@@ -420,6 +420,10 @@ export const EN = {
   'common.decisionRecordedNoFunds':
     "Decision recorded — no funds moved. Money only moves once the platform's payment module is live.",
   'common.delivery': 'Delivery',
+  'booking.depositRefundInitiated': 'Refund of {amount} to the customer initiated (free cancellation)',
+  'booking.depositRefunded': '{amount} refunded to the customer (free cancellation)',
+  'booking.depositRefundDelayed': 'Refund of {amount} to the customer delayed — still owed, retrying',
+  'adminBooking.depositRefund': 'Deposit refund',
   'common.deposit': 'Deposit',
   'common.depositHeld': 'Deposit held',
   'common.description': 'Description',

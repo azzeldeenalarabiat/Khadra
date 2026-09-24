@@ -153,7 +153,13 @@ export interface Booking {
   readonly canBeDisputed: boolean;
   readonly isAwaitingDecision: boolean;
   readonly isAwaitingPayment: boolean;
-  readonly cancellation: { readonly canCancel: boolean; readonly isFree: boolean; readonly penalty: PenaltyAssessment };
+  readonly cancellation: {
+    readonly canCancel: boolean;
+    readonly isFree: boolean;
+    readonly penalty: PenaltyAssessment;
+    /** Cancelling now returns the PAID deposit in full to the original payment method. Absent on an older API. */
+    readonly willRefundDeposit?: boolean;
+  };
   readonly liveDisputeId: string | null;
   readonly payment: PaymentAvailability | null;
   readonly canReportNonDelivery: boolean;
@@ -166,6 +172,21 @@ export interface Booking {
   readonly dealerCityId: string | null;
   readonly handovers: readonly Handover[];
   readonly history: readonly BookingStatusChange[];
+  /** The deposit a free cancellation returned, with the refund's own status. Absent on an older API. */
+  readonly depositRefund?: DepositRefund | null;
+}
+
+/**
+ * Where the deposit's refund is. `Requested` and `Sent` both mean "refund initiated" to a customer;
+ * `Settled` is refunded; `Failed` is still owed and being retried by the server.
+ */
+export interface DepositRefund {
+  readonly status: 'Requested' | 'Sent' | 'Settled' | 'Failed' | string;
+  readonly amount: Money;
+  readonly requestedAt: string;
+  readonly sentAt: string | null;
+  readonly settledAt: string | null;
+  readonly failedAt: string | null;
 }
 
 /** `POST /bookings/{id}/handover-code`. */

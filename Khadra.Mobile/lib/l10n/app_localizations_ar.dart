@@ -1239,6 +1239,39 @@ class AppLocalizationsAr extends AppLocalizations {
   String get cancelDetailsHint => 'سيطّلع عليه مكتب التأجير.';
 
   @override
+  String get cancelFreeRefundNotice =>
+      'الإلغاء مجاني. سيتم استرداد مبلغ العربون بالكامل إلى وسيلة الدفع الأصلية. سنبدأ عملية الاسترداد فورًا، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+
+  @override
+  String get bookingRefundInitiated => 'بدأ الاسترداد';
+
+  @override
+  String get bookingRefunded => 'تم الاسترداد';
+
+  @override
+  String get bookingRefundDelayed => 'تأخر الاسترداد';
+
+  @override
+  String bookingRefundInitiatedText(String amount, String date) {
+    return 'يجري استرداد عربونك البالغ $amount بالكامل إلى وسيلة الدفع الأصلية. بدأنا عملية الاسترداد في $date، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String bookingRefundedText(String amount, String date) {
+    return 'تم استرداد عربونك البالغ $amount إلى وسيلة الدفع الأصلية في $date. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String bookingRefundDelayedText(String amount) {
+    return 'ما زال عربونك البالغ $amount مستحقًا لك. يستغرق الاسترداد وقتًا أطول من المعتاد، ونعيد المحاولة تلقائيًا.';
+  }
+
+  @override
+  String notificationYourDepositRefunded(String actor) {
+    return '$actor: تم استرداد عربونك';
+  }
+
+  @override
   String get cancelFreeNotice => 'الإلغاء الآن لا يكلّفك شيئاً.';
 
   @override

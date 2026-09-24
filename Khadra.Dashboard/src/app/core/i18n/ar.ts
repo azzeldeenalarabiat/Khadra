@@ -397,6 +397,10 @@ export const AR = {
   'common.decisionRecordedNoFunds':
     'سُجِّل القرار — ولم يُحوَّل أي مبلغ. لا تتحرك الأموال إلا بعد تفعيل وحدة المدفوعات في المنصة.',
   'common.delivery': 'التوصيل',
+  'booking.depositRefundInitiated': 'بدأ استرداد {amount} للعميل (إلغاء مجاني)',
+  'booking.depositRefunded': 'تم استرداد {amount} للعميل (إلغاء مجاني)',
+  'booking.depositRefundDelayed': 'تأخر استرداد {amount} للعميل — ما زال مستحقًا، وتجري إعادة المحاولة',
+  'adminBooking.depositRefund': 'استرداد العربون',
   'common.deposit': 'العربون',
   'common.depositHeld': 'العربون المحتجز',
   'common.description': 'الوصف',

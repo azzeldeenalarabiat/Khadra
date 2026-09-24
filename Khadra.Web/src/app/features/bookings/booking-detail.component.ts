@@ -16,7 +16,7 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { Booking, PaymentAttempt } from '../../core/api/bookings.api';
+import { Booking, DepositRefund, PaymentAttempt } from '../../core/api/bookings.api';
 import { vocabularyLabel } from '../../core/api/app-config.api';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
@@ -52,6 +52,11 @@ const CHECKOUT_KEY = 'kh.checkout.';
  * the page never trusts the redirect: it re-reads the booking until the server says the payment
  * settled one way or the other.
  */
+/** Requested and Sent read alike to a customer (the server has started it); Failed is still owed. */
+export function refundStage(refund: DepositRefund): 'initiated' | 'done' | 'delayed' {
+  return refund.status === 'Settled' ? 'done' : refund.status === 'Failed' ? 'delayed' : 'initiated';
+}
+
 @Component({
   selector: 'kh-booking-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -209,6 +214,28 @@ export class BookingDetailComponent {
   }
 
   private readonly seo = inject(SeoService);
+
+  /** The deposit's refund in the customer's words: initiated, refunded, or delayed and still owed. */
+  protected refundLabel(refund: DepositRefund): string {
+    return this.t(refundStage(refund) === 'done' ? 'booking.refunded' : refundStage(refund) === 'delayed' ? 'booking.refundDelayed' : 'booking.refundInitiated');
+  }
+
+  protected refundTone(refund: DepositRefund): string {
+    const stage = refundStage(refund);
+    return stage === 'done' ? 'badge--ok' : stage === 'delayed' ? 'badge--bad' : 'badge--warn';
+  }
+
+  protected refundText(refund: DepositRefund): string {
+    const amount = this.format.money(refund.amount);
+    switch (refundStage(refund)) {
+      case 'done':
+        return this.t('booking.refundedText', { amount, date: this.format.dateTime(refund.settledAt ?? refund.requestedAt) });
+      case 'delayed':
+        return this.t('booking.refundDelayedText', { amount });
+      default:
+        return this.t('booking.refundInitiatedText', { amount, date: this.format.dateTime(refund.requestedAt) });
+    }
+  }
 
   protected status(status: string): string {
     return statusLabel(this.t, status);

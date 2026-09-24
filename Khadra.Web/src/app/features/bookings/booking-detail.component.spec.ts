@@ -4,7 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BookingDetailComponent } from './booking-detail.component';
+import { BookingDetailComponent, refundStage } from './booking-detail.component';
 
 const ID = '01a0d095-c204-7f23-b0b3-1be7852e4b23';
 const BOOKING_URL = `/api/v1/bookings/${ID}`;
@@ -152,5 +152,73 @@ describe('BookingDetailComponent, with the handover code on screen', () => {
 
     expect(element().textContent).not.toContain('123 456');
     expect(element().querySelector('.handover')).toBeNull();
+  });
+});
+
+describe('BookingDetailComponent, a paid booking cancelled inside the free window', () => {
+  let http: HttpTestingController;
+
+  async function render(depositRefund: unknown) {
+    TestBed.configureTestingModule({
+      imports: [BookingDetailComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(BookingDetailComponent);
+    fixture.componentRef.setInput('bookingId', ID);
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    await settle();
+    http
+      .match((request) => request.url === BOOKING_URL)
+      .forEach((read) => read.flush({ ...CONFIRMED, status: 'Cancelled', cancelledBy: 'Customer', finishedAt: '2026-09-23T23:40:00+00:00', depositRefund }));
+    await settle();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  const refund = (status: string) => ({
+    status,
+    amount: { amount: 40, currency: 'JOD' },
+    requestedAt: '2026-09-23T23:40:00+00:00',
+    sentAt: status === 'Requested' ? null : '2026-09-23T23:41:00+00:00',
+    settledAt: status === 'Settled' ? '2026-09-23T23:45:00+00:00' : null,
+    failedAt: status === 'Failed' ? '2026-09-23T23:42:00+00:00' : null,
+  });
+
+  // The owner's rule: after a free paid cancellation the customer must never see only "Deposit Paid". Rendered
+  // in Arabic, the site's default language.
+  it('says the refund was initiated, never only that the deposit was paid', async () => {
+    const page = await render(refund('Sent'));
+    const text = page.textContent ?? '';
+
+    expect(text).toContain('بدأ الاسترداد');
+    expect(text).toContain('بالكامل إلى وسيلة الدفع الأصلية');
+    expect(text).not.toContain('مدفوع');
+  });
+
+  it('says it was refunded once the provider settles it', async () => {
+    const text = (await render(refund('Settled'))).textContent ?? '';
+
+    expect(text).toContain('تم الاسترداد');
+    expect(text).toContain('تم استرداد عربونك');
+  });
+
+  it('says a refused refund is still owed and being retried', async () => {
+    const text = (await render(refund('Failed'))).textContent ?? '';
+
+    expect(text).toContain('تأخر الاسترداد');
+    expect(text).toContain('مستحقًا لك');
+  });
+});
+
+describe('refundStage', () => {
+  it('reads requested and sent alike, settled as done, and failed as delayed', () => {
+    const at = (status: string) => refundStage({ status, amount: { amount: 40, currency: 'JOD' }, requestedAt: '', sentAt: null, settledAt: null, failedAt: null });
+    expect(at('Requested')).toBe('initiated');
+    expect(at('Sent')).toBe('initiated');
+    expect(at('Settled')).toBe('done');
+    expect(at('Failed')).toBe('delayed');
   });
 });

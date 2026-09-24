@@ -113,7 +113,12 @@ public sealed record BookingDto(
     /// <summary>True exactly when the customer's account no longer resolves: it was closed.</summary>
     bool CustomerAccountClosed,
     IReadOnlyList<HandoverDto> Handovers,
-    IReadOnlyList<BookingStatusChangeDto> History)
+    IReadOnlyList<BookingStatusChangeDto> History,
+    /// <summary>
+    /// The deposit's refund when a free cancellation returned it, or null. Added 2026-09-24, last so
+    /// that no installed client's reading of the fields before it changes.
+    /// </summary>
+    DepositRefundDto? DepositRefund = null)
 {
     public static BookingDto From(Booking booking, BookingContext context, DateTimeOffset now)
     {
@@ -155,7 +160,9 @@ public sealed record BookingDto(
             booking.CanBeDisputed(now),
             booking.IsAwaitingDecision(now),
             booking.IsAwaitingPayment(now),
-            CancellationPreviewDto.From(booking.PreviewCancellation(BookingParty.Customer, now)),
+            CancellationPreviewDto.From(
+                booking.PreviewCancellation(BookingParty.Customer, now),
+                booking.CancellationWouldReturnDeposit(BookingParty.Customer, now)),
             context.LiveDisputeId,
             context.Payment,
             booking.CanReportNonDelivery(now),
@@ -169,7 +176,8 @@ public sealed record BookingDto(
             context.CustomerName,
             context.CustomerAccountClosed,
             booking.Handovers.OrderBy(handover => handover.RecordedAt).Select(HandoverDto.From).ToList(),
-            booking.StatusHistory.OrderBy(change => change.OccurredAt).Select(BookingStatusChangeDto.From).ToList());
+            booking.StatusHistory.OrderBy(change => change.OccurredAt).Select(BookingStatusChangeDto.From).ToList(),
+            context.DepositRefund);
     }
 }
 
@@ -366,14 +374,20 @@ public sealed record BookingStatusChangeDto(
 /// <see cref="Penalty"/>. Neither is derivable on a client: the first needs the server's clock
 /// against two frozen deadlines, the second a percentage applied to money.
 /// </remarks>
-public sealed record CancellationPreviewDto(bool CanCancel, bool IsFree, PenaltyAssessmentDto Penalty)
+/// <param name="WillRefundDeposit">
+/// True when cancelling now returns the PAID deposit in full to the original payment method (owner,
+/// 2026-09-24), from the same rule the cancellation itself applies, so the promise on the sheet and
+/// the refund recorded cannot disagree. False on a free cancellation with nothing paid.
+/// </param>
+public sealed record CancellationPreviewDto(bool CanCancel, bool IsFree, PenaltyAssessmentDto Penalty, bool WillRefundDeposit = false)
 {
-    public static CancellationPreviewDto From(CancellationPreview preview)
+    public static CancellationPreviewDto From(CancellationPreview preview, bool willRefundDeposit = false)
     {
         ArgumentNullException.ThrowIfNull(preview);
         return new CancellationPreviewDto(
             preview.CanCancel,
             preview.IsFree,
-            PenaltyAssessmentDto.From(preview.Penalty)!);
+            PenaltyAssessmentDto.From(preview.Penalty)!,
+            willRefundDeposit);
     }
 }

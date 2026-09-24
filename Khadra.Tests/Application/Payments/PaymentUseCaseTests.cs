@@ -888,4 +888,152 @@ public sealed class PaymentUseCaseTests
         Assert.Equal(1, report.Value.RefundsFailed);
         Assert.Same(RefundStatus.Failed, Assert.Single(payment.Refunds).Status);
     }
+
+    // ---------------------------------------------------------------- the free cancellation's refund (owner, 2026-09-24)
+
+    /// <summary>A paid, confirmed booking, cancelled by its customer inside the window, with its refund recorded.</summary>
+    private static (Booking Booking, Payment Payment) FreelyCancelled(Context context)
+    {
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        Assert.True(payment.Apply(Money.Jod(booking.Pricing.DepositAmount.Amount), Now, Now).IsSuccess);
+        Assert.True(booking.ConfirmDepositPaid(payment.Id, Now).IsSuccess);
+        Assert.True(booking.Cancel(BookingParty.Customer, CustomerId, null, Now).IsSuccess);
+        DepositRefundSettlement.RefundForFreeCancellation(booking, payment, Now);
+        context.GivenReference(payment);
+        context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([payment]);
+        return (booking, payment);
+    }
+
+    private static ProviderEvent RefundEvent(ProviderEventKind kind, string eventId, string? failureCode = null) =>
+        new(eventId, "sess_1", kind, null, failureCode, Now);
+
+    private static void Deliver(Context context, ProviderEvent notification) =>
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(notification));
+
+    private static Task<UnitResult<Error>> Receive(Context context) =>
+        context.Receive().Handle(new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+    [Fact]
+    public async Task The_sweep_sends_a_free_cancellation_refund_under_its_own_id()
+    {
+        var context = new Context();
+        var (_, payment) = FreelyCancelled(context);
+        var refund = payment.FreeCancellationRefund!;
+
+        var report = await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.Equal(1, report.Value.RefundsSent);
+        Assert.Same(RefundStatus.Sent, refund.Status);
+        // The refund's own id is the idempotency key, and it goes against the ORIGINAL payment's reference.
+        await context.Provider.Received(1).RefundAsync(
+            Arg.Is<RefundRequest>(request =>
+                request.RefundId == refund.Id &&
+                request.PaymentProviderReference == "sess_1" &&
+                request.Amount == payment.AmountCaptured),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_settled_free_cancellation_refund_tells_the_customer_once()
+    {
+        var context = new Context();
+        var (booking, payment) = FreelyCancelled(context);
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Deliver(context, RefundEvent(ProviderEventKind.RefundSettled, "evt_refund_1"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(RefundStatus.Settled, payment.FreeCancellationRefund!.Status);
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.RecipientUserId == booking.CustomerId &&
+            notification.Kind == NotificationKind.YourDepositRefunded &&
+            notification.SubjectReference == booking.Reference.Value));
+
+        // A second, different delivery for the same refund finds nothing still sent, and says nothing.
+        context.Notifier.ClearReceivedCalls();
+        Deliver(context, RefundEvent(ProviderEventKind.RefundSettled, "evt_refund_2"));
+        Assert.True((await Receive(context)).IsSuccess);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+        Assert.Same(ProviderEventOutcome.Ignored, context.Recorded.Last().Outcome);
+    }
+
+    /// <summary>The same delivery again is refused at the receipt, before the refund is touched.</summary>
+    [Fact]
+    public async Task A_replayed_refund_event_is_acknowledged_without_acting_again()
+    {
+        var context = new Context();
+        FreelyCancelled(context);
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+        context.Receipts.HasSeenAsync(TestPayments.TestProviderName, "evt_refund_1", Arg.Any<CancellationToken>()).Returns(true);
+        context.UnitOfWork.ClearReceivedCalls();
+
+        Deliver(context, RefundEvent(ProviderEventKind.RefundSettled, "evt_refund_1"));
+        var result = await Receive(context);
+
+        Assert.True(result.IsSuccess);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>A refused refund is still owed: it reads Failed, and the next sweep sends it again under the same id.</summary>
+    [Fact]
+    public async Task A_refused_free_cancellation_refund_is_sent_again_by_the_next_sweep()
+    {
+        var context = new Context();
+        var (_, payment) = FreelyCancelled(context);
+        var refund = payment.FreeCancellationRefund!;
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Deliver(context, RefundEvent(ProviderEventKind.RefundFailed, "evt_refund_1", "refund_declined"));
+        await Receive(context);
+        Assert.Same(RefundStatus.Failed, refund.Status);
+        Assert.Equal("refund_declined", refund.FailureCode);
+        context.Notifier.DidNotReceive().Raise(Arg.Is<Notification>(n => n.Kind == NotificationKind.YourDepositRefunded));
+
+        context.Provider.ClearReceivedCalls();
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.Same(RefundStatus.Sent, refund.Status);
+        Assert.Single(payment.Refunds);
+        await context.Provider.Received(1).RefundAsync(
+            Arg.Is<RefundRequest>(request => request.RefundId == refund.Id), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// A late capture for the payment that already paid is refused as already captured: it cannot be
+    /// orphaned, so it creates no second refund beside the free cancellation's.
+    /// </summary>
+    [Fact]
+    public async Task A_late_capture_for_the_paid_attempt_creates_no_second_refund()
+    {
+        var context = new Context();
+        var (booking, payment) = FreelyCancelled(context);
+
+        Deliver(context, TestPayments.Captured("sess_1", Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "evt_late"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Single(payment.Refunds);
+        Assert.Same(PaymentStatus.Applied, payment.Status);
+    }
+
+    /// <summary>A gallery that has since left the platform does not cost the customer the news that their money is back.</summary>
+    [Fact]
+    public async Task A_settled_refund_still_tells_the_customer_when_the_gallery_is_gone()
+    {
+        var context = new Context();
+        var (booking, _) = FreelyCancelled(context);
+        context.Dealers.GetByIdAsync(booking.DealerId, Arg.Any<CancellationToken>()).Returns((Dealer?)null);
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Deliver(context, RefundEvent(ProviderEventKind.RefundSettled, "evt_refund_gone"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.RecipientUserId == booking.CustomerId &&
+            notification.Kind == NotificationKind.YourDepositRefunded));
+    }
 }

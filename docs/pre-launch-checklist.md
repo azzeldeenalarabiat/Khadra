@@ -2081,37 +2081,33 @@ this item rather than defects today.
 
 ### 77. Cancellation does not refund, and that is the owner's decision to make
 
-**Status:** open · **Raised:** 2026-09-08 · **Owner decision:** number 3 in the architecture doc
+**Status:** partly closed · **Updated:** 2026-09-24 — the owner decided the customer's free cancellation of a paid booking.
 
-Two refund triggers are wired: an orphaned capture (automatic) and an admin's dispute resolution. A
-customer who cancels inside their free window, or a booking that ends with no ticket at all, gets no
-automatic refund — their deposit sits held.
+**Decided (owner, 2026-09-24):** a customer who has PAID the deposit and cancels inside the
+free-cancellation window gets the WHOLE deposit refunded automatically to the original payment method,
+with no admin. The cancel handler records the refund (`RefundReason.FreeCancellation`) through
+`DepositRefundSettlement` in the same save as the cancellation; the payment sweep sends it within a
+minute under the refund's own id; a provider refusal leaves it owed and re-sent. The customer is told
+when the provider settles it (`YourDepositRefunded`, push and email).
 
-That is not an oversight. Owner decision 3 is genuinely open: spec 3.3's "no ticket, no penalty" reads
-as refund, and "the deposit is forfeited" reads as retain, and the two contradict. There is also a
-mechanical hazard: `CanBeDisputed` keeps a Cancelled or NoShow booking disputable for the whole
-post-return settlement window, while `BookingDisputeSettlement.DepositHeldFor` assumes the full deposit
-is still held whenever `DepositPaymentId` is set. An early refund would let a later resolution split
-money that had already gone.
-
-**To close:** the owner answers decision 3. If the answer is "refund", it belongs in the settlement job
-after the dispute window closes, not at the moment of cancellation.
+**Still open:** everything else decision 3 covers — a customer cancelling after the window, a booking
+that ends with no ticket at all, a no-show, and (item 156) a gallery or admin cancelling a paid booking
+inside the window, which today assesses nothing and leaves the deposit held.
 
 ### 78. `DepositHeldFor` will need to read what is left, not what was taken
 
-**Status:** open · **Raised:** 2026-09-08 · **Not yet wrong**
+**Status:** closed for the free cancellation · **Updated:** 2026-09-24 — by the booking's rule, not by "captured minus refunded".
 
-`BookingDisputeSettlement.DepositHeldFor` returns the booking's frozen deposit whenever a payment id is
-set, and a `DepositDisposition` must balance to exactly that. Correct today: a ticket resolves once, and
-the only refunds that exist before a resolution are on ORPHANED payments, which never confirmed a
-booking and so never set a payment id.
+The first refund of an APPLIED payment arrived with the free cancellation (item 77). `DepositHeldFor`
+now reads zero for a booking whose deposit that cancellation returned
+(`Booking.ReturnsDepositOnCancellation`), and `DepositHeldOnFreeCancellationTests` pins it.
 
-It stops being correct the moment anything else refunds an APPLIED payment — item 77's cancellation
-refund is the obvious candidate. Then the deposit still held is `captured - refunded`, which Payments
-knows and Bookings does not.
-
-**To close:** when item 77 is answered, make `DepositHeldFor` read the applied payment's captured total
-less its outstanding and settled refunds, and give it a test with a partly-refunded deposit.
+The formula this item used to propose — captured less outstanding and settled refunds — was wrong and
+is not what was built: `Payment.RefundedTotal` does not count a FAILED refund, so a refund the provider
+refused would make the deposit read as fully held again, a dispute could split it, and the sweep would
+still be re-sending the refund: two instructions for one deposit. A deposit a free cancellation owes
+back is not held, whatever the provider has said so far. **Reopen** if any other refund of an applied
+payment is added (a decision on the rest of item 77), with a partly-refunded test.
 
 ### 79. A stale attempt whose provider says it WAS captured needs a human
 
@@ -4153,14 +4149,16 @@ test per party.
 
 ### 152. A free cancellation says "costs you nothing" while the deposit stays held
 
-**Status:** open · **Raised:** 2026-09-24 · **Owner decision:** item 77
+**Status:** closed · **Closed:** 2026-09-24 — the paid free cancellation now refunds the deposit, and every screen says so.
 
-Driven on 2026-09-24: a customer who cancels a paid booking inside the free window is told
-"Cancelling now costs you nothing", and afterwards the booking reads "Deposit … Paid" with nothing
-about the money. No refund is issued (item 77: cancellation does not refund, by an open owner
-decision). Nothing is charged as a penalty, so the sentence is literally true, but a customer will
-read it as "I get my deposit back". **To close:** the owner answers decision 3; then either the
-refund happens, or the website and app say what becomes of the deposit.
+The owner decided (item 77) that the deposit goes back in full. The cancel sheet on the website and in
+the app now says, when the server's `cancellation.willRefundDeposit` is true: "Free cancellation. Your
+deposit will be refunded in full to your original payment method. We will initiate the refund
+immediately, but your bank may take additional time to show it." (and the owner's Arabic). After the
+cancellation the booking shows the refund's own state — initiated, refunded, or delayed and still owed —
+instead of "Deposit paid", on the website, the app, the dealer console and the admin console
+(`BookingDto.depositRefund`). An unpaid free cancellation keeps "Cancelling now costs you nothing",
+which is true.
 
 ### 153. The console's handover refusals are easy to miss on a narrow screen
 
@@ -4188,3 +4186,57 @@ When `/api/v1/cities` fails, `LookupsService.cityName()` answers an empty string
 search is headed "Any city" and the city selects offer only "Any city", with no error shown. The
 search itself still sends the city, so results are right; only the wording misleads. **To close:**
 show the city filter as unavailable while the lookup has failed, with a test.
+
+### 156. A gallery or admin cancelling a PAID booking inside the free window refunds nothing
+
+**Status:** open · **Raised:** 2026-09-24 · **Owner decision**
+
+`AssessCancellation` treats the free window as free for EITHER party, so a gallery that cancels a paid
+booking within that hour is assessed nothing — and, because the owner's refund rule names the
+customer, the customer's deposit stays held with no refund. The customer is worse off than if they had
+cancelled themselves. **To close:** the owner decides whether any cancellation of a paid booking inside
+the window (by the gallery, or by an admin) also refunds in full; if so, widen
+`Booking.ReturnsDepositOnCancellation` and its tests, and nothing else changes.
+
+### 157. A refund the provider keeps refusing is re-sent every minute, for ever
+
+**Status:** open · **Raised:** 2026-09-24
+
+The payment sweep re-sends every Failed refund on every tick and logs an error each time. That predates
+the free-cancellation refund, but now every paid free cancellation produces a refund, so one a provider
+permanently refuses (a closed card, a provider rule) becomes a log flood and an unbounded retry.
+**To close:** back off (a growing interval, a cap), surface refunds refused more than N times on the
+admin's payments screen for a human, and test both, before a real provider is connected.
+
+### 158. The gallery's screens still show commission and payout on a free-cancelled paid booking
+
+**Status:** open · **Raised:** 2026-09-24
+
+The dealer console's money panel lists the frozen platform commission and the net payout for every
+booking, including a cancelled one whose deposit a free cancellation refunded, where the platform
+takes nothing and pays nothing. The deposit row now says the deposit went back to the customer; the two
+rows below it are still the booking's frozen figures. **To close:** hide or zero commission and payout
+for a cancelled booking (the Payments ledger decides what a cancelled booking actually earned), with a
+test per status.
+
+### 159. A real adapter's refund events must name the refund they settle
+
+**Status:** open · **Raised:** 2026-09-24 (Fable advisor review) · **Belongs with item 76**
+
+`ProviderEvent` carries no refund reference, so `RefundSettled` / `RefundFailed` settle "the first Sent
+refund" of the payment. That is safe today — at most one refund of a payment is ever Sent, which the
+free cancellation's guards and `DepositHeldFor` reading zero make true — but a real provider, a future
+partial dispute refund and a re-sent one together could settle the wrong row. **To close, with the
+real adapter:** the adapter puts the refund's provider reference on the event, and the handler matches
+on it, with a test that two refunds on one payment settle independently.
+
+### 160. The refund promise on the sheet can be a minute older than the tap
+
+**Status:** open · **Raised:** 2026-09-24 · **Owner decision**
+
+`cancellation.willRefundDeposit` is computed when the booking is read. A customer who opens the sheet
+inside the free window and taps after it closes is assessed the penalty and refunded nothing, against
+a sheet that promised the deposit back; the response then shows the truth. The penalty preview has
+always had the same race. **To close, if the owner wants it:** the client sends what it was promised
+(for example `expectFree: true`) and the server answers 409 when `CancellationWouldReturnDeposit` is
+no longer true, so the customer is asked again rather than surprised.

@@ -3,6 +3,7 @@ using Khadra.Application.Common;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Payments;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Reporting;
 using Khadra.Tests.Support;
@@ -347,5 +348,69 @@ public sealed class BookingReaderTests : IDisposable
         await write.SaveChangesAsync();
 
         return (dealer, customer, booking);
+    }
+
+    /// <summary>
+    /// The deposit a free cancellation returned (owner, 2026-09-24) reaches every reader of the
+    /// booking with the refund's own status, and follows it as the provider answers.
+    /// </summary>
+    [Fact]
+    public async Task A_free_cancellations_refund_is_read_with_its_status_and_follows_it()
+    {
+        var booking = Build.ApprovedBooking(Build.Now, dealerId: _dealerId);
+        var deposit = Money.Create(booking.Pricing.DepositAmount.Amount, booking.Pricing.CurrencyCode);
+        var payment = Payment.Open(booking.Id, booking.CustomerId, deposit, "TestProvider", Build.Now.AddMinutes(30), Build.Now);
+        payment.AttachProviderSession("sess_reader", "https://provider.test/sess_reader");
+        Assert.True(payment.Apply(Money.Create(deposit.Amount, deposit.CurrencyCode), Build.Now, Build.Now).IsSuccess);
+        Assert.True(booking.ConfirmDepositPaid(payment.Id, Build.Now).IsSuccess);
+        Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, null, Build.Now).IsSuccess);
+        var refund = payment.RefundForFreeCancellation(Build.Now).Value;
+
+        await using (var write = NewContext())
+        {
+            write.Bookings.Add(booking);
+            write.Payments.Add(payment);
+            await write.SaveChangesAsync();
+        }
+
+        await using (var read = NewContext())
+        {
+            var context = await new BookingReader(read).ContextAsync(booking.Id);
+            Assert.NotNull(context.DepositRefund);
+            Assert.Equal("Requested", context.DepositRefund.Status);
+            Assert.Equal(deposit.Amount, context.DepositRefund.Amount.Amount);
+            Assert.Equal(deposit.CurrencyCode, context.DepositRefund.Amount.Currency);
+            Assert.Null(context.DepositRefund.SettledAt);
+        }
+
+        await using (var write = NewContext())
+        {
+            var stored = await write.Payments.Include(p => p.Refunds).SingleAsync(p => p.Id == payment.Id);
+            stored.FreeCancellationRefund!.MarkSent("rf_reader", Build.Now.AddMinutes(1));
+            stored.FreeCancellationRefund!.MarkSettled(Build.Now.AddMinutes(5));
+            await write.SaveChangesAsync();
+        }
+
+        await using (var read = NewContext())
+        {
+            var context = await new BookingReader(read).ContextAsync(booking.Id);
+            Assert.Equal("Settled", context.DepositRefund!.Status);
+            Assert.Equal(Build.Now.AddMinutes(5), context.DepositRefund.SettledAt);
+        }
+    }
+
+    /// <summary>A booking with nothing refunded carries no refund, rather than an empty one.</summary>
+    [Fact]
+    public async Task A_booking_with_no_refund_reads_none()
+    {
+        var booking = Build.ConfirmedBooking(Build.Now, dealerId: _dealerId);
+        await using (var write = NewContext())
+        {
+            write.Bookings.Add(booking);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = NewContext();
+        Assert.Null((await new BookingReader(read).ContextAsync(booking.Id)).DepositRefund);
     }
 }

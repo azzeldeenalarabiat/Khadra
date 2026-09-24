@@ -79,6 +79,9 @@ internal sealed class NotificationMessageComposer(
         ["YourReturnReminder"] = new(
             "Return soon", "Booking {ref} is due back at {actor} at {due}.",
             "موعد الإعادة قريب", "موعد إعادة سيارة الحجز {ref} إلى {actor} الساعة {due}."),
+        ["YourDepositRefunded"] = new(
+            "Deposit refunded", "Booking {ref} with {actor}: your deposit has been refunded to your original payment method. Your bank may take some time to show it.",
+            "تم استرداد العربون", "الحجز {ref} مع {actor}: تم استرداد العربون إلى وسيلة الدفع الأصلية. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك."),
         ["YourDisputeUpdated"] = new(
             "Dispute updated", "There is an update on the dispute for booking {ref}.",
             "تحديث على النزاع", "هناك تحديث على النزاع الخاص بالحجز {ref}."),

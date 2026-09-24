@@ -165,9 +165,13 @@ between the two would mean money captured, booking unconfirmed, and the car rele
 
 **Refunds are RECORDED when owed and SENT afterwards**, by the payment sweep that runs beside the
 booking settlement pass. Two triggers exist: an orphaned capture (automatic, in the capture's own
-transaction) and an admin's dispute resolution returning money to the customer. Cancellation refunds are
-deliberately NOT wired — owner decision 3 is open, and `BookingDisputeSettlement.DepositHeldFor` assumes
-the full deposit is still held while a booking is disputable.
+transaction), an admin's dispute resolution returning money to the customer, and — since the owner's
+decision of 2026-09-24 — a customer's own cancellation of a PAID booking inside the free-cancellation
+window, which refunds the whole deposit. That one is recorded by the cancel handler through
+`DepositRefundSettlement` (the Payments-owned seam, twin of `BookingDepositSettlement`) in the same
+save as the cancellation, and `BookingDisputeSettlement.DepositHeldFor` reads zero for such a booking,
+so a later dispute cannot split money already on its way back. Every other cancellation refund is still
+undecided (decision 3).
 
 **What is not built, and why.** No `DealerLedger`, no payout rail, no dealer charge: at the confirmed
 20% commission and 20% deposit the two are equal, so the platform never pays a dealer and never holds

@@ -351,6 +351,43 @@ public sealed class Booking : AggregateRoot
         !HasLapsed(now);
 
     /// <summary>
+    /// Whether this booking's deposit goes back to the customer in full because they cancelled it
+    /// inside the free-cancellation window after paying (owner, 2026-09-24).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Read from the penalty reason FROZEN when the booking was cancelled, never recomputed from the
+    /// deadline: a later clock would call "not free" a cancellation that was. Only the customer's own
+    /// cancellation qualifies — the owner's rule names them — so a gallery or an admin cancelling in
+    /// that hour does not, and neither does a non-delivery report (its reason is not the free window).
+    /// </para>
+    /// <para>
+    /// True from the moment of cancellation, whatever the provider has said about the refund since:
+    /// a refused refund is still owed, and the sweep keeps sending it. That is why a dispute reads this
+    /// and not the refund's status — see <c>BookingDisputeSettlement.DepositHeldFor</c>.
+    /// </para>
+    /// </remarks>
+    public bool ReturnsDepositOnCancellation =>
+        Status == BookingStatus.Cancelled &&
+        CancelledBy == BookingParty.Customer &&
+        DepositPaymentId is not null &&
+        Penalty?.ReasonCode == PenaltyReason.CancelledInFreeWindow;
+
+    /// <summary>
+    /// Whether cancelling right now, as the named party, would return the paid deposit in full. The
+    /// same rule as <see cref="ReturnsDepositOnCancellation"/>, asked before the fact, so the promise on
+    /// the confirmation sheet and the refund the cancellation records cannot disagree.
+    /// </summary>
+    public bool CancellationWouldReturnDeposit(BookingParty cancelledBy, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(cancelledBy);
+        return cancelledBy == BookingParty.Customer &&
+               DepositPaymentId is not null &&
+               CanBeCancelled(now) &&
+               AssessCancellation(cancelledBy, now).ReasonCode == PenaltyReason.CancelledInFreeWindow;
+    }
+
+    /// <summary>
     /// What cancelling right now would cost the named party, without cancelling.
     /// </summary>
     /// <remarks>

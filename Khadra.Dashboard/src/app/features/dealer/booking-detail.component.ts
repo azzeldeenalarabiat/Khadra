@@ -10,7 +10,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone, toneClass } from '../../core/models/console.models';
-import { Booking, PenaltyAssessment } from '../../core/models/bookings.api';
+import { Booking, PenaltyAssessment, depositRefundKey } from '../../core/models/bookings.api';
 import { enumKey } from '../../core/i18n/status-key';
 import { DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
@@ -542,13 +542,22 @@ export class DealerBookingDetailComponent {
                 v: money(b.pricing.balanceDue),
               },
             ]
-          : [
-              {
-                k: this.t('common.deposit'),
-                v: this.t('dealerBooking.heldPendingSettlementSee'),
-                dim: true,
-              },
-            ]),
+          : b.depositRefund
+            ? [
+                {
+                  // The customer cancelled inside the free window after paying: the whole deposit
+                  // went back to them, so nothing of it is held for anyone to settle.
+                  k: this.t('common.deposit'),
+                  v: this.t(depositRefundKey(b.depositRefund), { amount: money(b.depositRefund.amount) }),
+                },
+              ]
+            : [
+                {
+                  k: this.t('common.deposit'),
+                  v: this.t('dealerBooking.heldPendingSettlementSee'),
+                  dim: true,
+                },
+              ]),
       {
         k: this.t('dealerBooking.platformCommissionFrozen', {
           percent: this.format.percent(b.terms.commissionPercent),
