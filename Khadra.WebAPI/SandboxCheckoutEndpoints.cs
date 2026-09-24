@@ -83,10 +83,18 @@ internal static class SandboxCheckoutEndpoints
     /// touches no database and there is still no <c>sandbox_sessions</c> table. An unknown reference
     /// answers 404 with no detail: the reference is the capability, and confirming which ones exist
     /// would make guessing worthwhile.
+    /// <para>
+    /// <b>Where it sends the customer afterwards</b> is <see cref="IPaymentSettings.ReturnUrlFor"/>
+    /// for the payment's booking — the very URL <c>OpenCheckout</c> handed the provider in
+    /// <see cref="CheckoutRequest.ReturnUrl"/>, and where a real hosted checkout would drop the
+    /// customer. Recomputed from the row rather than carried in the checkout link, because this page
+    /// is anonymous: a return address read from the query string would make it an open redirect.
+    /// </para>
     /// </remarks>
-    private static async Task<IResult> ShowAsync(
+    internal static async Task<IResult> ShowAsync(
         string reference,
         [FromServices] IPaymentRepository payments,
+        [FromServices] IPaymentSettings settings,
         [FromServices] IClock clock,
         CancellationToken cancellationToken)
     {
@@ -96,7 +104,7 @@ internal static class SandboxCheckoutEndpoints
         if (payment is null) return Results.NotFound();
 
         return Results.Content(
-            Page(payment, clock.UtcNow),
+            Page(payment, clock.UtcNow, settings.ReturnUrlFor(payment.BookingId)),
             "text/html; charset=utf-8");
     }
 
@@ -149,13 +157,27 @@ internal static class SandboxCheckoutEndpoints
     /// One self-contained page. No framework, no build step, and nothing that outlives the sandbox.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Plain HTML in a string, which is not how anything else in this platform renders and is right
     /// here: it is deleted with the class the day a real adapter lands, and giving it a place in the
     /// Angular console or the Flutter app would mean maintaining it under their rules — i18n, design
     /// tokens, no-literals — for a page only a developer ever sees.
+    /// </para>
+    /// <para>
+    /// <b>Every outcome button returns the customer to <paramref name="returnUrl"/></b> once the
+    /// webhook has ACCEPTED the delivery (any 2xx, including the 204 of a duplicate), the way a hosted
+    /// checkout hands the browser back when it is done. Not before: a delivery the webhook refused
+    /// stays on screen with its answer, because leaving would hide the one thing a tester needs to
+    /// read. And not for "Deliver the last one again", which exists to be pressed repeatedly here.
+    /// The pause before leaving is there so the answer can be seen; "Stay on this page" cancels it for
+    /// a tester who wants to replay. The address is written into a link, never into the script, so
+    /// the only encoding it needs is HTML's.
+    /// </para>
     /// </remarks>
-    private static string Page(Payment payment, DateTimeOffset now)
+    internal static string Page(Payment payment, DateTimeOffset now, Uri returnUrl)
     {
+        ArgumentNullException.ThrowIfNull(returnUrl);
+        var back = WebUtility.HtmlEncode(returnUrl.AbsoluteUri);
         var amount = payment.Amount.Amount.ToString("0.000", CultureInfo.InvariantCulture);
         var currency = WebUtility.HtmlEncode(payment.Amount.CurrencyCode);
         var expired = now >= payment.ExpiresAt;
@@ -204,12 +226,28 @@ internal static class SandboxCheckoutEndpoints
             <button class="decline" onclick="go('refund_failed','refund_declined')">Refund failed</button>
             <button class="again"   onclick="send()">Deliver the last one again</button>
             <div id="out">Ready.</div>
+            <p id="leaving" hidden>Returning to the booking&hellip; <button class="again" onclick="stay()">Stay on this page</button></p>
+            <p><a id="back" href="{{back}}">Back to the booking</a></p>
             </div><script>
             const out = document.getElementById('out');
             const evt = document.getElementById('evt');
+            const leaving = document.getElementById('leaving');
+            const back = document.getElementById('back').href;
             const freshId = () => 'evt_' + Math.random().toString(16).slice(2) + Date.now().toString(16);
             evt.value = freshId();
             let last = null;
+            let pending = null;
+
+            // A hosted checkout hands the browser back when it is done; so does this one.
+            function returnToBooking() {
+              leaving.hidden = false;
+              pending = setTimeout(() => location.replace(back), 1500);
+            }
+
+            function stay() {
+              clearTimeout(pending);
+              leaving.hidden = true;
+            }
 
             async function go(kind, failureCode) {
               const body = {
@@ -225,15 +263,17 @@ internal static class SandboxCheckoutEndpoints
               });
               if (!signed.ok) { out.textContent = 'Could not sign: ' + signed.status; return; }
               last = await signed.json();
-              await send();
+              const accepted = await send();
               // A new action is a new delivery. Replaying is what "Deliver the last one again" is for.
               evt.value = freshId();
+              // Only once the webhook has taken it. A refusal stays on screen to be read.
+              if (accepted) returnToBooking();
             }
 
             // The real webhook, on the real route, with the real signature header. Same origin, so
-            // the API never calls itself.
+            // the API never calls itself. Answers whether the webhook accepted the delivery.
             async function send() {
-              if (!last) { out.textContent = 'Nothing to deliver yet.'; return; }
+              if (!last) { out.textContent = 'Nothing to deliver yet.'; return false; }
               const response = await fetch('/api/v1/payments/webhooks/SANDBOX', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json', [last.header]: last.signature },
@@ -243,6 +283,7 @@ internal static class SandboxCheckoutEndpoints
               out.textContent = 'Webhook answered ' + response.status
                 + (text ? '\n' + text : '\n(no body)')
                 + '\n\nDelivered:\n' + last.body;
+              return response.ok;
             }
             </script></body></html>
             """;
