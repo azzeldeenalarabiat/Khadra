@@ -23,6 +23,12 @@ namespace Khadra.Application.Fleet.ReadModels;
 /// number, the stored status, the commercial registration and the suspension reason — fields a
 /// dealer or an administrator may see and an anonymous caller may not. Sharing the type would mean
 /// the next field added for a console screen leaks through a public endpoint, silently.
+///
+/// EVERY RATING THIS PORT RETURNS IS A PLACEHOLDER: null and 0. A gallery's rating is the Reviews
+/// context's to define, through <c>IGalleryReviewReader.SummariseAsync</c> at the clock's now, and the
+/// handlers write it on with <c>CatalogueRatings</c>. This reader once averaged the reviews table
+/// itself and counted reviews still inside their blind window; a second definition is how that
+/// happened, so there is no longer one here.
 /// </remarks>
 public interface ICatalogueReader
 {
@@ -98,12 +104,33 @@ public interface ICatalogueReader
     /// the car count is <c>Bookable()</c> — the search's own predicate — so the number on an office's
     /// card is exactly the number of cars its page lists. Two predicates would drift, and the drift
     /// would be an office advertising cars nobody can open.
+    ///
+    /// The total is the number of offices that match EVERY part of the filter, name included, so a
+    /// pager never promises pages the name search then empties.
     /// </remarks>
     Task<PagedResult<PublicGalleryCard>> ListGalleriesAsync(
-        Id? cityId,
+        GalleryDirectoryFilter filter,
         PageRequest page,
         CancellationToken cancellationToken = default);
 }
+
+/// <summary>How a customer narrowed the office directory. Every field is optional.</summary>
+/// <remarks>
+/// Mirrors <see cref="CatalogueFilter"/>'s names for the same ideas, so a client builds both query
+/// strings from one vocabulary.
+/// </remarks>
+/// <param name="Text">
+/// Part of the business name, without case. Matched literally: `%` and `_` are characters a name may
+/// contain, not wildcards. Blank or whitespace is no filter at all.
+/// </param>
+/// <param name="DeliveryOnly">
+/// Offices that have delivery switched on. The office's switch only — unlike the car search, there is
+/// no car here to be eligible — and exactly the flag the card's <c>Delivery.IsEnabled</c> shows.
+/// </param>
+public sealed record GalleryDirectoryFilter(
+    Id? CityId = null,
+    string? Text = null,
+    bool DeliveryOnly = false);
 
 /// <summary>The values the bookable catalogue contains.</summary>
 /// <remarks>
@@ -115,13 +142,36 @@ public interface ICatalogueReader
 /// fields, not changed ones: an installed app reads the two it knew and ignores the rest. Makes are as
 /// the offices typed them, one entry per spelling-insensitive make; fuel types are the API names the
 /// `/app-config` vocabulary labels; years are newest first.
+///
+/// <see cref="CarTypes"/> was added for the website's category tiles (2026-09-24): the same types as
+/// <see cref="CarTypeIds"/>, each with how many cars it lists and a photograph to show for it.
+/// <see cref="CarTypeIds"/> stays exactly as it was, beside it, because installed apps read it.
 /// </remarks>
 public sealed record CatalogueFacets(
     IReadOnlyList<int> Seats,
     IReadOnlyList<Guid> CarTypeIds,
     IReadOnlyList<string> Makes,
     IReadOnlyList<string> FuelTypes,
-    IReadOnlyList<int> Years);
+    IReadOnlyList<int> Years,
+    IReadOnlyList<CarTypeFacet> CarTypes);
+
+/// <summary>One car type the bookable catalogue holds, with its count and a cover.</summary>
+/// <remarks>
+/// Ordered by <see cref="CarTypeId"/>, as <see cref="CatalogueFacets.CarTypeIds"/> is. That order is
+/// only there to be deterministic and means nothing; a client that wants the lookup's display order
+/// takes it from the lookup.
+/// </remarks>
+/// <param name="ListedVehicleCount">
+/// Exactly what a search narrowed to this type reports as its total: counted from the same
+/// <c>Bookable()</c> predicate, so a tile never promises cars its page cannot show.
+/// </param>
+/// <param name="CoverImageUrl">
+/// The cover photo of this type's NEWEST listed car that has one — the car a customer would see first
+/// on the type's page — in the same URL shape as <see cref="CatalogueListing.CoverImageUrl"/>. Null
+/// when no listed car of this type has a cover; the client renders its placeholder, never an invented
+/// image.
+/// </param>
+public sealed record CarTypeFacet(Guid CarTypeId, int ListedVehicleCount, string? CoverImageUrl);
 
 /// <summary>
 /// How a search is ordered. Newest listing first unless the customer chose otherwise.
@@ -234,8 +284,9 @@ public sealed record CatalogueListing(
 /// per-car score is not a feature that is merely unbuilt, it is a thing this domain does not model.
 /// A renter comparing two Corollas is really choosing between two offices, which is what this says.
 ///
-/// Null and zero until Reviews has a table (pre-launch checklist item 3). The fields exist now so the
-/// card has a rendering path that lights up the day the data does, without an app change.
+/// Null and zero for an office nobody has rated. The reader leaves them so for EVERY office; the
+/// handler fills them from the Reviews context's published summary (see <c>CatalogueRatings</c>), so
+/// a review still inside its blind window moves nothing here.
 /// </remarks>
 public sealed record CatalogueGalleryLabel(
     Guid DealerId,
@@ -296,8 +347,9 @@ public sealed record PublicGallery(
     string? CoverUrl,
     IReadOnlyList<GalleryDaySchedule> OperatingHours,
     GalleryDelivery Delivery,
-    // Reviews has a domain model and no persistence (pre-launch checklist item 3). Null and 0 are
-    // the honest values; omitting the fields would make a client invent its own placeholder.
+    // The office's PUBLISHED rating, written on by the handler from the Reviews context (see
+    // CatalogueRatings). Null and 0 for an office nobody has rated -- the honest values; omitting the
+    // fields would make a client invent its own placeholder.
     decimal? AverageRating,
     int ReviewCount);
 

@@ -1,6 +1,7 @@
 using Khadra.Application.Common.Dtos;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Fleet.ReadModels;
+using Khadra.Application.Reviews.ReadModels;
 using Khadra.Application.Shortlist;
 using Khadra.Application.Shortlist.ReadModels;
 using Khadra.Domain.Common;
@@ -90,6 +91,7 @@ public sealed class ShortlistUseCaseTests
             new(Shortlists,
                 Catalogue,
                 Reader,
+                Substitute.For<IGalleryReviewReader>(),
                 TestBusinessRules.Provider(maxShortlistEntries: maxEntries),
                 new TestClock(Now),
                 UnitOfWork);

@@ -93,7 +93,10 @@ internal sealed class DealerAdminReader(KhadraDbContext context) : IDealerAdminR
                 // navigation property from Dealer to Vehicle and there deliberately never will be.
                 // The vehicles' own soft-delete filter removes deleted listings from this count.
                 context.Vehicles.Count(vehicle => vehicle.DealerId == dealer.Id),
-                // Reviews have no table yet, so there is nothing to average. Null, never 0.0.
+                // Not computed for this list yet, so null, never 0.0. Reviews DO have a table now; when
+                // this is filled, take it from IGalleryReviewReader.SummariseAsync, which honours the
+                // blind window, rather than averaging context.Reviews here -- the catalogue's own copy
+                // of that average counted unpublished reviews until 2026-09-24.
                 null,
                 0))
             .ToListAsync(cancellationToken);

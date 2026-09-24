@@ -75,11 +75,15 @@ public sealed class CatalogueController(ICurrentLanguage language) : ApiControll
         return FromResult(result);
     }
 
-    /// <summary>The seat counts and car types the bookable catalogue holds.</summary>
+    /// <summary>The seat counts, car types, makes, fuel types and years the bookable catalogue holds.</summary>
     /// <remarks>
     /// The customer's filters are built from this rather than from a list typed into the app: a seat
     /// choice no car has matches nothing, and a category with no car in it is a chip that leads to an
     /// empty page. Not narrowed by any filter, so choosing one never takes the others away.
+    ///
+    /// `carTypes` (added 2026-09-24, beside the unchanged `carTypeIds`) gives each type the number of
+    /// cars a search narrowed to it would total, and the cover photo of its newest listed car that has
+    /// one, or null.
     /// </remarks>
     [HttpGet("vehicles/facets")]
     [ProducesResponseType<CatalogueFacets>(StatusCodes.Status200OK)]

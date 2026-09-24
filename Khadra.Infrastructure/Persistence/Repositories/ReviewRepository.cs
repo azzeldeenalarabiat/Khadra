@@ -57,6 +57,11 @@ internal sealed class ReviewRepository(KhadraDbContext context) : IReviewReposit
     /// Aggregated in SQL rather than by loading the rows: a gallery with two thousand reviews would
     /// otherwise materialise all of them to produce one number, on a query the catalogue runs for
     /// every card on the screen.
+    ///
+    /// NOT FOR ANYTHING PUBLIC. This counts every review, including those still inside their blind
+    /// window (<c>Review.VisibleFrom</c>), so a number read from it can give away a rating nobody is
+    /// allowed to read yet. A customer-facing rating comes from
+    /// <c>IGalleryReviewReader.SummariseAsync</c>, which is judged at an instant.
     /// </remarks>
     public async Task<(double Average, int Count)> GetRatingSummaryAsync(
         Id subjectId,

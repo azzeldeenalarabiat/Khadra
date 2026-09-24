@@ -1,6 +1,7 @@
 using Khadra.Application.Common;
 using Khadra.Application.Fleet.BrowseCatalogue;
 using Khadra.Application.Fleet.ReadModels;
+using Khadra.Application.Reviews.ReadModels;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -15,8 +16,16 @@ public sealed class SearchCatalogueOrderingTests
 {
     private readonly ICatalogueReader _catalogue = Substitute.For<ICatalogueReader>();
 
+    public SearchCatalogueOrderingTests() =>
+        _catalogue.SearchAsync(Arg.Any<CatalogueFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
+            .Returns(PagedResult.Empty<CatalogueListing>(1, 20));
+
     private SearchCatalogueHandler Handler() => new(
-        _catalogue, TestBusinessRules.Provider(), TestBusinessRules.Calendar(), new TestClock(Build.Now));
+        _catalogue,
+        Substitute.For<IGalleryReviewReader>(),
+        TestBusinessRules.Provider(),
+        TestBusinessRules.Calendar(),
+        new TestClock(Build.Now));
 
     private static SearchCatalogueQuery Query(string? sort = null, int? minYear = null, int? maxYear = null) =>
         new(null, null, null, null, null, null, null, false, null, null, null, PageRequest.From(1, 20),

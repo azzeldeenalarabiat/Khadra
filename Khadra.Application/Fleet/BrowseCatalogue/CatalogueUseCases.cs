@@ -4,6 +4,7 @@ using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Fleet.ReadModels;
+using Khadra.Application.Reviews.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
@@ -42,7 +43,21 @@ public sealed record SearchCatalogueQuery(
     string? Sort = null) : IQuery<Result<PagedResult<CatalogueListing>, Error>>;
 
 /// <summary>The rental offices a customer may be shown, optionally in one city.</summary>
-public sealed record ListPublicGalleriesQuery(Guid? CityId, PageRequest Page)
+/// <remarks>
+/// <c>Text</c> and <c>DeliveryOnly</c> were added for the customer website's office search
+/// (2026-09-24), optional and defaulted, so a request without them means what it always did. They are
+/// named as the car search names its own, so one client vocabulary serves both lists.
+/// </remarks>
+/// <param name="Text">Part of the office's business name, matched without case. Blank means no filter.</param>
+/// <param name="DeliveryOnly">
+/// Only offices that have delivery switched on — the same flag the card's delivery badge reads, so a
+/// filtered list never shows a card that says it does not deliver.
+/// </param>
+public sealed record ListPublicGalleriesQuery(
+    Guid? CityId,
+    PageRequest Page,
+    string? Text = null,
+    bool DeliveryOnly = false)
     : IQuery<Result<PagedResult<PublicGalleryCard>, Error>>;
 
 /// <summary>One car's own page.</summary>
@@ -120,6 +135,7 @@ public sealed record QuoteTerms(
 
 public sealed class SearchCatalogueHandler(
     ICatalogueReader catalogue,
+    IGalleryReviewReader reviews,
     IBusinessRulesProvider businessRules,
     IReportingCalendar calendar,
     IClock clock)
@@ -171,7 +187,13 @@ public sealed class SearchCatalogueHandler(
             request.MaxYear,
             sort);
 
-        return await catalogue.SearchAsync(filter, request.Page, cancellationToken);
+        var page = await catalogue.SearchAsync(filter, request.Page, cancellationToken);
+
+        // The rating is the review context's answer, judged at now, never the catalogue's — see
+        // CatalogueRatings. Awaited after the search, not beside it: both readers share one DbContext.
+        var ratings = await CatalogueRatings.ForAsync(
+            reviews, page.Items.Select(item => item.Gallery.DealerId), clock.UtcNow, cancellationToken);
+        return page with { Items = [.. page.Items.Select(item => CatalogueRatings.Apply(item, ratings))] };
     }
 
     /// <summary>
@@ -244,6 +266,7 @@ public sealed class SearchCatalogueHandler(
 
 public sealed class GetCatalogueVehicleHandler(
     ICatalogueReader catalogue,
+    IGalleryReviewReader reviews,
     IBusinessRulesProvider businessRules,
     IReportingCalendar calendar,
     IClock clock)
@@ -261,11 +284,20 @@ public sealed class GetCatalogueVehicleHandler(
             return window.Error;
 
         var vehicle = await catalogue.GetAsync(request.VehicleId, window.Value, request.Language, cancellationToken);
-        return vehicle is null ? FleetCatalogueErrors.VehicleNotFound : vehicle;
+        if (vehicle is null)
+            return FleetCatalogueErrors.VehicleNotFound;
+
+        // The embedded gallery's rating, from the one definition that honours the blind window.
+        var ratings = await CatalogueRatings.ForAsync(
+            reviews, [vehicle.Gallery.DealerId], clock.UtcNow, cancellationToken);
+        return CatalogueRatings.Apply(vehicle, ratings);
     }
 }
 
-public sealed class GetPublicGalleryHandler(ICatalogueReader catalogue)
+public sealed class GetPublicGalleryHandler(
+    ICatalogueReader catalogue,
+    IGalleryReviewReader reviews,
+    IClock clock)
     : IRequestHandler<GetPublicGalleryQuery, Result<PublicGalleryPage, Error>>
 {
     public async Task<Result<PublicGalleryPage, Error>> Handle(
@@ -275,11 +307,21 @@ public sealed class GetPublicGalleryHandler(ICatalogueReader catalogue)
         ArgumentNullException.ThrowIfNull(request);
 
         var gallery = await catalogue.GetGalleryAsync(request.DealerId, request.Language, cancellationToken);
-        return gallery is null ? FleetCatalogueErrors.GalleryNotFound : gallery;
+        if (gallery is null)
+            return FleetCatalogueErrors.GalleryNotFound;
+
+        // Through the same blind-window test the page's review list applies, so the count in the
+        // header and the reviews listed underneath it cannot disagree.
+        var ratings = await CatalogueRatings.ForAsync(
+            reviews, [gallery.DealerId], clock.UtcNow, cancellationToken);
+        return CatalogueRatings.Apply(gallery, ratings);
     }
 }
 
-public sealed class ListPublicGalleriesHandler(ICatalogueReader catalogue)
+public sealed class ListPublicGalleriesHandler(
+    ICatalogueReader catalogue,
+    IGalleryReviewReader reviews,
+    IClock clock)
     : IRequestHandler<ListPublicGalleriesQuery, Result<PagedResult<PublicGalleryCard>, Error>>
 {
     public async Task<Result<PagedResult<PublicGalleryCard>, Error>> Handle(
@@ -288,8 +330,15 @@ public sealed class ListPublicGalleriesHandler(ICatalogueReader catalogue)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return await catalogue.ListGalleriesAsync(
-            request.CityId is { } city ? Id.From(city) : null, request.Page, cancellationToken);
+        var filter = new GalleryDirectoryFilter(
+            request.CityId is { } city ? Id.From(city) : null,
+            request.Text,
+            request.DeliveryOnly);
+        var page = await catalogue.ListGalleriesAsync(filter, request.Page, cancellationToken);
+
+        var ratings = await CatalogueRatings.ForAsync(
+            reviews, page.Items.Select(card => card.DealerId), clock.UtcNow, cancellationToken);
+        return page with { Items = [.. page.Items.Select(card => CatalogueRatings.Apply(card, ratings))] };
     }
 }
 

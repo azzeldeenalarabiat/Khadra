@@ -1,7 +1,9 @@
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Fleet.BrowseCatalogue;
 using Khadra.Application.Fleet.ReadModels;
+using Khadra.Application.Reviews.ReadModels;
 using Khadra.Application.Shortlist.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Shortlist;
@@ -44,6 +46,7 @@ public sealed class ShortlistHandlers(
     IShortlistRepository shortlists,
     ICatalogueReader catalogue,
     IShortlistReader reader,
+    IGalleryReviewReader reviews,
     IBusinessRulesProvider rules,
     IClock clock,
     IUnitOfWork unitOfWork) :
@@ -117,8 +120,24 @@ public sealed class ShortlistHandlers(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        var saved = await reader.ListAsync(request.CustomerId, cancellationToken);
+
+        // A still-listed car carries its gallery's rating, and that rating is the review context's
+        // published one, judged at now -- the catalogue reader no longer computes it, because its own
+        // copy counted reviews still inside their blind window. Read after the list, never beside it:
+        // the readers share one DbContext.
+        var ratings = await CatalogueRatings.ForAsync(
+            reviews,
+            saved.Where(entry => entry.Listing is not null).Select(entry => entry.Listing!.Gallery.DealerId),
+            clock.UtcNow,
+            cancellationToken);
+
         return Result.Success<IReadOnlyList<SavedVehicle>, Error>(
-            await reader.ListAsync(request.CustomerId, cancellationToken));
+        [
+            .. saved.Select(entry => entry.Listing is null
+                ? entry
+                : entry with { Listing = CatalogueRatings.Apply(entry.Listing, ratings) }),
+        ]);
     }
 
     public async Task<Result<IReadOnlySet<Id>, Error>> Handle(

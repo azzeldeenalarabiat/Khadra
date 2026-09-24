@@ -4246,3 +4246,16 @@ a sheet that promised the deposit back; the response then shows the truth. The p
 always had the same race. **To close, if the owner wants it:** the client sends what it was promised
 (for example `expectFree: true`) and the server answers 409 when `CancellationWouldReturnDeposit` is
 no longer true, so the customer is asked again rather than surprised.
+
+### 161. An office's name has no Arabic form
+
+**Status:** open · **Raised:** 2026-09-24 · **Owner decision**
+
+`BusinessName` is one string, entered once at registration, so every Arabic page — the directory, the
+home page's office cards, a car's office line — shows an office by the name it typed, usually in Latin
+letters. The directory's new name search (`GET /galleries?text=`) matches that one string, so an
+Arabic speaker searching in Arabic finds an office only if it registered its name in Arabic. Everything
+else an office writes for customers is already bilingual (`ResolvedText`); its name is the exception.
+**To close, if the owner wants it:** a second, optional Arabic name on the dealer, entered in the
+dealer console, resolved per `Accept-Language` like the office's texts, and searched alongside the
+first. It is a schema change and a contract addition, so it is decided before it is built.

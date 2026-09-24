@@ -1,4 +1,5 @@
 using Khadra.Application.Common;
+using Khadra.Application.Fleet.BrowseCatalogue;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -430,10 +431,14 @@ public sealed class CatalogueReaderTests : IDisposable
         var page = await catalogue.GetGalleryAsync(trading.Id, Language.English);
         Assert.NotNull(page);
         Assert.Equal("Petra Rentals", page.BusinessName);
-        // Reviews has a domain model and no table (checklist item 3). Null is the honest answer, and
-        // a client that sees it must say "no ratings yet" rather than invent a score.
-        Assert.Null(page.AverageRating);
-        Assert.Equal(0, page.ReviewCount);
+
+        // An office nobody has rated, through the handler that composes the published rating: null is
+        // the honest answer, and a client that sees it must say "no ratings yet" rather than invent a
+        // score. (The reader alone always says null; CatalogueRatingsTests covers a rated office.)
+        var composed = await new GetPublicGalleryHandler(catalogue, new GalleryReviewReader(reader), new TestClock(Build.Now))
+            .Handle(new GetPublicGalleryQuery(trading.Id, Language.English), CancellationToken.None);
+        Assert.Null(composed.Value.AverageRating);
+        Assert.Equal(0, composed.Value.ReviewCount);
 
         Assert.Null(await catalogue.GetGalleryAsync(suspended.Id, Language.English));
     }

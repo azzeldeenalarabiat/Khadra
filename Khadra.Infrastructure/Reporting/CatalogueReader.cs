@@ -6,7 +6,6 @@ using Khadra.Application.Fleet.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
-using Khadra.Domain.Reviews;
 using Khadra.Infrastructure.Persistence;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
@@ -147,8 +146,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             .Select(ToListing())
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<CatalogueListing>(
-            await WithRatingsAsync(items, cancellationToken), page.Page, page.PageSize, totalCount);
+        return new PagedResult<CatalogueListing>(items, page.Page, page.PageSize, totalCount);
     }
 
     public async Task<CatalogueVehicle?> GetAsync(
@@ -232,9 +230,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
     /// <remarks>
     /// Two callers build this shape -- the paged search and <c>ListByIdsAsync</c>, which a saved
     /// list reads through -- and a second copy would drift the first time a field was added to one
-    /// of them. The rating is deliberately left null and 0 here: it is filled in afterwards by ONE
-    /// grouped query over every gallery on the page, because correlating it per row would make a
-    /// twenty-card page do twenty extra aggregates.
+    /// of them. The rating is deliberately left null and 0 here, and this reader never fills it: the
+    /// handler does, from the Reviews context's published summary (see <c>CatalogueRatings</c>). This
+    /// reader's own average once counted reviews still inside their blind window.
     ///
     /// A METHOD returning the expression rather than a static field, because it closes over the
     /// DbContext; EF inlines a locally-bound expression the same way it inlines a literal one.
@@ -268,9 +266,7 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                     dealer.LogoStorageKey == null
                         ? null
                         : DealerProfileDto.PublicImagePath + "/" + dealer.LogoStorageKey,
-                    // Filled in by `WithRatingsAsync`, from ONE grouped query over every gallery in
-                    // the result. Correlating it here would make a twenty-card page do twenty extra
-                    // aggregates; SQL can average them all at once.
+                    // A placeholder: the handler writes the published rating on (CatalogueRatings).
                     null,
                     0))
                 .First());
@@ -289,12 +285,10 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         // `Bookable()`, exactly as the search uses it. An id that is a draft, hidden, in
         // maintenance, soft-deleted, or belongs to a gallery that may not trade simply does not
         // come back -- and the caller cannot tell which, which is the point.
-        var items = await Bookable()
+        return await Bookable()
             .Where(vehicle => wanted.Contains(vehicle.Id))
             .Select(ToListing())
             .ToListAsync(cancellationToken);
-
-        return await WithRatingsAsync(items, cancellationToken);
     }
 
     public async Task<PublicGalleryPage?> GetGalleryAsync(Id dealerId, Language language, CancellationToken cancellationToken = default)
@@ -303,7 +297,6 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         if (dealer is null)
             return null;
 
-        var rating = await RatingFor(dealer.Id, cancellationToken);
         // The office's own words, filtered by the aggregate: hidden and never-written are both simply
         // absent, and nothing here decides that a second time.
         var shown = dealer.VisiblePublicProfile(language);
@@ -319,8 +312,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             Branding(dealer.Id, dealer.CoverStorageKey),
             Schedule(dealer),
             DeliveryOf(dealer),
-            rating.Average,
-            rating.Count,
+            // Placeholders: the handler writes the published rating on (CatalogueRatings).
+            null,
+            0,
             new GallerySections(
                 ResolvedTextDto.From(shown.About),
                 ResolvedTextDto.From(shown.RentalConditions),
@@ -377,31 +371,72 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             .OrderByDescending(year => year)
             .ToListAsync(cancellationToken);
 
+        // Per type, how many cars it lists. Grouped over `bookable` itself, so this count and the
+        // total a search narrowed to the type reports are one predicate and cannot disagree.
+        var typeCounts = await bookable
+            .GroupBy(vehicle => vehicle.CarTypeId)
+            .Select(group => new { CarTypeId = group.Key, Count = group.Count() })
+            .ToListAsync(cancellationToken);
+
+        // And one cover per type: the primary photo of its newest listed car that HAS one, in the
+        // order the search calls Newest (created DESC, id DESC) so the tile shows the car its page
+        // opens on. A newer car without a primary is skipped rather than blanking the tile.
+        //
+        // A correlated FirstOrDefault per type, in the shape ToListing() already uses for a car's
+        // cover, because that shape translates on both Postgres and the SQLite the tests run on. One
+        // round trip for every type, not one per type.
+        var covers = await bookable
+            .Select(vehicle => vehicle.CarTypeId)
+            .Distinct()
+            .Select(carTypeId => new
+            {
+                CarTypeId = carTypeId,
+                Cover = bookable
+                    .Where(vehicle => vehicle.CarTypeId == carTypeId && vehicle.Images.Any(image => image.IsPrimary))
+                    .OrderByDescending(vehicle => vehicle.CreatedAt)
+                    .ThenByDescending(vehicle => vehicle.Id)
+                    .Select(vehicle => vehicle.Images
+                        .Where(image => image.IsPrimary)
+                        .Select(image => VehicleImageDto.PublicPath + "/" + image.StorageKey)
+                        .FirstOrDefault())
+                    .FirstOrDefault(),
+            })
+            .ToListAsync(cancellationToken);
+        var coverByType = covers.ToDictionary(row => row.CarTypeId.Value, row => row.Cover);
+
         return new CatalogueFacets(
             seats,
             [.. carTypeIds.Select(id => id.Value).Order()],
             makeChoices,
             [.. fuelTypes.OrderBy(type => type.Id).Select(type => type.Name)],
-            years);
+            years,
+            // Ordered as CarTypeIds is, by id: deterministic, and meaningless by design.
+            [.. typeCounts
+                .OrderBy(row => row.CarTypeId.Value)
+                .Select(row => new CarTypeFacet(
+                    row.CarTypeId.Value,
+                    row.Count,
+                    coverByType.GetValueOrDefault(row.CarTypeId.Value)))]);
     }
 
     public async Task<PagedResult<PublicGalleryCard>> ListGalleriesAsync(
-        Id? cityId,
+        GalleryDirectoryFilter filter,
         PageRequest page,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(filter);
         ArgumentNullException.ThrowIfNull(page);
 
         var approved = DealerVerificationStatus.Approved;
         var visible = context.Dealers
             .AsNoTracking()
             .Where(dealer => dealer.VerificationStatus == approved && !dealer.IsSuspended);
-        if (cityId is { } city)
+        if (filter.CityId is { } city)
             visible = visible.Where(dealer => dealer.CityId == city);
-
-        var totalCount = await visible.CountAsync(cancellationToken);
-        if (totalCount == 0)
-            return PagedResult.Empty<PublicGalleryCard>(page.Page, page.PageSize);
+        // The office's switch alone, which is what the card's delivery badge shows. The car search's
+        // DeliveryOnly also asks the CAR, and there is no car here to ask.
+        if (filter.DeliveryOnly)
+            visible = visible.Where(dealer => dealer.Delivery.IsEnabled);
 
         // The count is the search's own predicate, so the card and the office's page agree. Ordered
         // by what an office offers, then by name, then by id so the order is total.
@@ -418,10 +453,31 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                 Listed = bookable.Count(vehicle => vehicle.DealerId == dealer.Id),
             })
             .ToListAsync(cancellationToken);
-        var rows = all
+
+        // The name search is in memory for the same reason the order is: the converted name does not
+        // translate. And an ordinal Contains rather than a LIKE, so `%` and `_` are the characters a
+        // customer typed rather than wildcards — there is no pattern language here to escape.
+        var matching = all.AsEnumerable();
+        if (!string.IsNullOrWhiteSpace(filter.Text))
+        {
+            var term = filter.Text.Trim();
+            matching = matching.Where(row => row.BusinessName.Value.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var ordered = matching
             .OrderByDescending(row => row.Listed)
             .ThenBy(row => row.BusinessName.Value, StringComparer.OrdinalIgnoreCase)
             .ThenBy(row => row.Id.Value)
+            .ToList();
+
+        // Counted from the FILTERED set, after the name search. A count taken in SQL before it would
+        // report every office in the city and page over a handful, promising pages that come back
+        // empty.
+        var totalCount = ordered.Count;
+        if (totalCount == 0)
+            return PagedResult.Empty<PublicGalleryCard>(page.Page, page.PageSize);
+
+        var rows = ordered
             .Skip(page.Skip)
             .Take(page.PageSize)
             .ToList();
@@ -431,14 +487,12 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             .AsNoTracking()
             .Where(dealer => ids.Contains(dealer.Id))
             .ToDictionaryAsync(dealer => dealer.Id, cancellationToken);
-        var ratings = await RatingsFor(ids, cancellationToken);
 
         var cards = rows
             .Where(row => dealers.ContainsKey(row.Id))
             .Select(row =>
             {
                 var dealer = dealers[row.Id];
-                ratings.TryGetValue(row.Id.Value, out var rating);
                 return new PublicGalleryCard(
                     dealer.Id.Value,
                     dealer.BusinessName.Value,
@@ -446,8 +500,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                     Branding(dealer.Id, dealer.LogoStorageKey),
                     Branding(dealer.Id, dealer.CoverStorageKey),
                     DeliveryOf(dealer),
-                    rating.Count == 0 ? null : rating.Average,
-                    rating.Count,
+                    // Placeholders: the handler writes the published rating on (CatalogueRatings).
+                    null,
+                    0,
                     row.Listed);
             })
             .ToList();
@@ -473,33 +528,6 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         // Id breaks the tie because nothing above is unique, and a non-total order lets a page
         // boundary drop a car or show it twice.
         return ordered.ThenByDescending(vehicle => vehicle.Id);
-    }
-
-    /// <summary>Average and count per gallery, from one grouped query. Absent means nobody rated it.</summary>
-    private async Task<Dictionary<Guid, (decimal Average, int Count)>> RatingsFor(
-        List<Id> dealerIds,
-        CancellationToken cancellationToken)
-    {
-        if (dealerIds.Count == 0)
-            return [];
-
-        var ratings = await context.Reviews
-            .AsNoTracking()
-            .Where(review =>
-                review.Direction == ReviewDirection.CustomerRatesDealer &&
-                dealerIds.Contains(review.SubjectId))
-            .GroupBy(review => review.SubjectId)
-            .Select(group => new
-            {
-                DealerId = group.Key,
-                Average = group.Average(review => (decimal)review.Rating.Value),
-                Count = group.Count()
-            })
-            .ToListAsync(cancellationToken);
-
-        return ratings.ToDictionary(
-            row => row.DealerId.Value,
-            row => (Math.Round(row.Average, 1, MidpointRounding.AwayFromZero), row.Count));
     }
 
     /// <summary>
@@ -548,9 +576,6 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         if (dealer is null)
             return null;
 
-        // Null and 0 until somebody rates them -- a real state, and different from a zero-star score.
-        var rating = await RatingFor(dealer.Id, cancellationToken);
-
         return new PublicGallery(
             dealer.Id.Value,
             dealer.BusinessName.Value,
@@ -561,8 +586,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             Branding(dealer.Id, dealer.CoverStorageKey),
             Schedule(dealer),
             DeliveryOf(dealer),
-            rating.Average,
-            rating.Count);
+            // Placeholders: the handler writes the published rating on (CatalogueRatings).
+            null,
+            0);
     }
 
     /// <summary>
@@ -599,89 +625,6 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
 
     private static GalleryDelivery DeliveryOf(Dealer dealer) =>
         new(dealer.Delivery.IsEnabled, dealer.Delivery.RadiusKm, MoneyDto.FromOptional(dealer.Delivery.Fee));
-
-    /// <summary>
-    /// Fills the rating on every card of a page from one grouped query.
-    /// </summary>
-    /// <remarks>
-    /// The projection above cannot do this itself without a correlated aggregate per row, which is
-    /// the N+1 that turns a twenty-result page into twenty-one round trips on the endpoint a customer
-    /// hits most.
-    ///
-    /// A gallery nobody has rated is simply absent from the grouped result and keeps the null the
-    /// projection gave it. Null is the honest score: zero is a real rating on a one-to-five scale and
-    /// would render an unrated gallery as the worst on the platform.
-    ///
-    /// Hidden reviews are counted. Moderation removes abusive TEXT and never the score (spec 3.2,
-    /// 4.1), or reporting a comment would be a way to erase the rating attached to it.
-    /// </remarks>
-    private async Task<List<CatalogueListing>> WithRatingsAsync(
-        List<CatalogueListing> listings,
-        CancellationToken cancellationToken)
-    {
-        // A List<Id>, not a List<Guid>: SubjectId goes through the Id value converter, and comparing
-        // its unwrapped .Value against a Guid list is an expression EF cannot translate at all.
-        var dealerIds = listings
-            .Select(listing => Id.From(listing.Gallery.DealerId))
-            .Distinct()
-            .ToList();
-
-        if (dealerIds.Count == 0)
-            return listings;
-
-        var ratings = await context.Reviews
-            .AsNoTracking()
-            .Where(review =>
-                review.Direction == ReviewDirection.CustomerRatesDealer &&
-                dealerIds.Contains(review.SubjectId))
-            .GroupBy(review => review.SubjectId)
-            .Select(group => new
-            {
-                DealerId = group.Key,
-                Average = group.Average(review => (decimal)review.Rating.Value),
-                Count = group.Count()
-            })
-            .ToListAsync(cancellationToken);
-
-        if (ratings.Count == 0)
-            return listings;
-
-        var byDealer = ratings.ToDictionary(row => row.DealerId.Value);
-
-        return [.. listings.Select(listing =>
-            byDealer.TryGetValue(listing.Gallery.DealerId, out var rating)
-                ? listing with
-                {
-                    Gallery = listing.Gallery with
-                    {
-                        // Rounded here rather than on the client: a rating is shown to one decimal,
-                        // and rounding is a decision about a number, which is the server's to make.
-                        AverageRating = Math.Round(rating.Average, 1, MidpointRounding.AwayFromZero),
-                        ReviewCount = rating.Count
-                    }
-                }
-                : listing)];
-    }
-
-    /// <summary>One gallery's rating, for its own page.</summary>
-    private async Task<(decimal? Average, int Count)> RatingFor(Id dealerId, CancellationToken cancellationToken)
-    {
-        // Two aggregates rather than one GroupBy(_ => 1) with both in the projection: that shape
-        // translates on Postgres and NOT on the SQLite the persistence tests run against, so it would
-        // ship a gallery page that only ever fails in production.
-        var rated = context.Reviews
-            .AsNoTracking()
-            .Where(review =>
-                review.SubjectId == dealerId &&
-                review.Direction == ReviewDirection.CustomerRatesDealer);
-
-        var count = await rated.CountAsync(cancellationToken);
-        if (count == 0)
-            return (null, 0);
-
-        var average = await rated.AverageAsync(review => (decimal)review.Rating.Value, cancellationToken);
-        return (Math.Round(average, 1, MidpointRounding.AwayFromZero), count);
-    }
 
     /// <summary>
     /// The public URL for a gallery logo or cover.

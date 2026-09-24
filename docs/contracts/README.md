@@ -141,3 +141,10 @@ minimum is ignored by the app, which then defers to the server.
 
 A minimum raised before step 1 refuses every customer with nothing to update to. That order has no
 test: it is the rule.
+
+## Additive changes on record
+
+Changes that needed no raised minimum, because no installed build reads or sends anything different:
+
+- **Additive (2026-09-24):** `GET /api/v1/vehicles/facets` gained `carTypes` — `{ carTypeId, listedVehicleCount, coverImageUrl }` per type, `coverImageUrl` nullable — beside `carTypeIds`, which is unchanged and still read by installed apps.
+- **Additive (2026-09-24):** `GET /api/v1/galleries` accepts two optional query parameters, `text` (part of the office name, case-insensitive) and `deliveryOnly` (default `false`); a request without them is answered exactly as before.
