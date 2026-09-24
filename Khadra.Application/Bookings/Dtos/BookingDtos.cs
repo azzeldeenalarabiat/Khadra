@@ -149,7 +149,10 @@ public sealed record BookingDto(
                 ? null
                 : new GeoPointDto(booking.DeliveryLocation.Latitude, booking.DeliveryLocation.Longitude),
             booking.PaymentOption.Name,
-            BookingPricingDto.From(booking.Pricing),
+            // BalanceDue is served as what is STILL owed: the frozen cash balance until a payment
+            // lands, then the total less what was paid online. Installed apps print this field as
+            // "pay at handover", and a customer who paid in full must not be told to bring cash.
+            BookingPricingDto.From(booking.Pricing) with { BalanceDue = MoneyDto.From(booking.RemainingBalance) },
             BookingTermsDto.From(booking.Terms),
             MoneyDto.From(booking.Pricing.CommissionAmount),
             PenaltyAssessmentDto.From(booking.Penalty),

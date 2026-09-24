@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
+using Khadra.Domain.Payments;
 
 namespace Khadra.Application.Bookings;
 
@@ -71,6 +72,24 @@ public static class BookingDepositSettlement
             throw new DomainException("Confirming a deposit requires the payment that paid it.");
 
         return booking.ConfirmDepositPaid(paymentId, now);
+    }
+
+    /// <summary>
+    /// A captured payment confirms the booking and records what it put towards it (fees excluded).
+    /// </summary>
+    /// <remarks>
+    /// Only a purpose that CAN confirm does: a deposit or the full amount. Anything else (a later
+    /// remaining-balance payment, not offered yet) has nothing to confirm and is refused, which the
+    /// caller turns into an orphan and a refund rather than a silent Applied row.
+    /// </remarks>
+    public static UnitResult<Error> Confirm(Booking booking, Payment payment, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        ArgumentNullException.ThrowIfNull(payment);
+        if (!payment.Purpose.Confirms)
+            return UnitResult.Failure(BookingErrors.NotAwaitingPayment);
+
+        return booking.ConfirmPayment(payment.Id, payment.AppliedToBooking, now);
     }
 
     /// <summary>

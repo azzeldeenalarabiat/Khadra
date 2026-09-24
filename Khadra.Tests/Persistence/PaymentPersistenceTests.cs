@@ -105,6 +105,44 @@ public sealed class PaymentPersistenceTests : IDisposable
     /// that already carries another payment's id.
     /// </remarks>
     [Fact]
+    public async Task A_full_payment_round_trips_its_purpose_and_its_fee()
+    {
+        var bookingId = Id.New();
+        var payment = Payment.Open(
+            bookingId, Id.New(), Money.Jod(253.75m), "TestProvider", Now.AddMinutes(30), Now,
+            PaymentPurpose.FullPayment, Money.Jod(3.75m));
+
+        await using (var context = NewContext())
+        {
+            context.Payments.Add(payment);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stored = await reader.Payments.SingleAsync(row => row.Id == payment.Id);
+        Assert.Same(PaymentPurpose.FullPayment, stored.Purpose);
+        Assert.Equal(Money.Jod(3.75m), stored.ProcessingFee);
+        Assert.Equal(Money.Jod(250m), stored.AppliedToBooking);
+    }
+
+    [Fact]
+    public async Task An_attempt_opened_without_a_purpose_is_stored_as_a_deposit_with_no_fee()
+    {
+        var payment = Pending(Id.New());
+
+        await using (var context = NewContext())
+        {
+            context.Payments.Add(payment);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stored = await reader.Payments.SingleAsync(row => row.Id == payment.Id);
+        Assert.Same(PaymentPurpose.Deposit, stored.Purpose);
+        Assert.Equal(0m, stored.ProcessingFee.Amount);
+    }
+
+    [Fact]
     public async Task The_database_refuses_a_second_live_attempt_on_one_booking()
     {
         var bookingId = Id.New();

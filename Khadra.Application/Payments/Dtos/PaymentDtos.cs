@@ -39,7 +39,11 @@ public sealed record PaymentDto(
     /// says what this host is doing now; this says what was true when this particular attempt was
     /// opened, and the two can differ — which is the whole point of the marker outliving the setting.
     /// </remarks>
-    bool IsSandbox)
+    bool IsSandbox,
+    /// <summary>What the attempt is for: "Deposit" or "FullPayment". Added 2026-09-24.</summary>
+    string Purpose,
+    /// <summary>The processing fee inside <see cref="Amount"/>; zero unless the fee is on. Added 2026-09-24.</summary>
+    MoneyDto ProcessingFee)
 {
     public static PaymentDto From(Payment payment)
     {
@@ -53,7 +57,9 @@ public sealed record PaymentDto(
             payment.ExpiresAt,
             payment.FailureCode,
             payment.CreatedAt,
-            payment.IsSandbox);
+            payment.IsSandbox,
+            payment.Purpose.Name,
+            MoneyDto.From(payment.ProcessingFee));
     }
 }
 
@@ -78,4 +84,54 @@ public sealed record PaymentAvailabilityDto(
     MoneyDto? AmountDue,
     DateTimeOffset? PayBy,
     /// <summary>The attempt already in flight, if the customer has one open.</summary>
+    PaymentDto? LiveAttempt,
+    /// <summary>
+    /// The ways this booking can be paid right now, each fully worked out by the server (deposit, then
+    /// full amount). Empty when it cannot be paid. Added 2026-09-24: a client renders these figures and
+    /// never computes one.
+    /// </summary>
+    IReadOnlyList<PaymentOptionDto>? Options = null);
+
+/// <summary>One way of paying, with every figure the choice screen shows.</summary>
+/// <param name="Purpose">"Deposit" or "FullPayment" — what the checkout is opened with.</param>
+/// <param name="SelectedPaymentAmount">What this payment puts towards the booking.</param>
+/// <param name="ProcessingFee">The optional card-processing fee on top; zero for a deposit or when off.</param>
+/// <param name="TotalChargedNow">What the card is charged: amount + fee. The Pay button's figure.</param>
+/// <param name="RemainingBalanceAfter">What is still owed on the booking once this succeeds.</param>
+public sealed record PaymentOptionDto(
+    string Purpose,
+    MoneyDto SelectedPaymentAmount,
+    MoneyDto ProcessingFee,
+    MoneyDto TotalChargedNow,
+    MoneyDto RemainingBalanceAfter)
+{
+    public static PaymentOptionDto From(PaymentChoice choice)
+    {
+        ArgumentNullException.ThrowIfNull(choice);
+        return new PaymentOptionDto(
+            choice.Purpose.Name,
+            MoneyDto.From(choice.BookingAmount),
+            MoneyDto.From(choice.ProcessingFee),
+            MoneyDto.From(choice.ChargedNow),
+            MoneyDto.From(choice.RemainingAfter));
+    }
+}
+
+/// <summary>
+/// Everything the payment screen needs about an approved booking's money, in one answer: the booking's
+/// own figures, what has been paid, and both ways of paying the rest.
+/// </summary>
+public sealed record PaymentOptionsDto(
+    Guid BookingId,
+    bool CanPay,
+    string? UnavailableReason,
+    DateTimeOffset? PayBy,
+    MoneyDto RentalSubtotal,
+    MoneyDto DeliveryFee,
+    MoneyDto BookingTotal,
+    MoneyDto RequiredDeposit,
+    MoneyDto FullPayableAmount,
+    MoneyDto AmountPaid,
+    MoneyDto RemainingBalance,
+    IReadOnlyList<PaymentOptionDto> Options,
     PaymentDto? LiveAttempt);

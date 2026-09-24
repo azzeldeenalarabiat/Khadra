@@ -5,7 +5,7 @@ using Khadra.Domain.Payments.Events;
 namespace Khadra.Domain.Payments;
 
 /// <summary>
-/// One checkout attempt for one booking's deposit, and whatever had to go back.
+/// One checkout attempt for one booking — its deposit or its full amount — and whatever had to go back.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -35,8 +35,27 @@ public sealed class Payment : AggregateRoot
     public Id BookingId { get; private set; }
     public Id CustomerId { get; private set; }
 
-    /// <summary>What this attempt asked the customer for -- the booking's frozen deposit.</summary>
+    /// <summary>
+    /// EXACTLY what the provider is asked to capture: the booking amount this payment covers, plus any
+    /// processing fee. The capture check compares against this and nothing else.
+    /// </summary>
     public Money Amount { get; private set; } = null!;
+
+    /// <summary>What this attempt is for. Deposit on every row made before 2026-09-24.</summary>
+    public PaymentPurpose Purpose { get; private set; } = PaymentPurpose.Deposit;
+
+    // Stored as a bare figure in the payment's own currency: a second currency column for one row can
+    // only ever agree with the first, or be wrong.
+    private decimal _processingFee;
+
+    /// <summary>
+    /// The part of <see cref="Amount"/> that is an online-payment processing fee (zero unless the fee
+    /// is enabled and applies to this purpose). Never commission, never rental, never tax.
+    /// </summary>
+    public Money ProcessingFee => Money.Create(_processingFee, Amount.CurrencyCode);
+
+    /// <summary>What this payment puts towards the booking itself: <see cref="Amount"/> less the fee.</summary>
+    public Money AppliedToBooking => Amount.Subtract(ProcessingFee);
 
     public PaymentStatus Status { get; private set; } = null!;
 
@@ -137,13 +156,18 @@ public sealed class Payment : AggregateRoot
     /// row's own id is the idempotency key sent to the provider, so a crash between the two leaves
     /// something to resume from rather than a charge nobody can trace.
     /// </summary>
+    /// <param name="amount">The whole charge: booking amount plus <paramref name="processingFee"/>.</param>
+    /// <param name="purpose">What it is for. Deposit when omitted, as every attempt was before 2026-09-24.</param>
+    /// <param name="processingFee">The fee inside <paramref name="amount"/>. Zero when omitted.</param>
     public static Payment Open(
         Id bookingId,
         Id customerId,
         Money amount,
         string provider,
         DateTimeOffset expiresAt,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        PaymentPurpose? purpose = null,
+        Money? processingFee = null)
     {
         ArgumentNullException.ThrowIfNull(amount);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -153,12 +177,19 @@ public sealed class Payment : AggregateRoot
             throw new DomainException("A payment for nothing cannot be opened.");
         if (expiresAt <= now)
             throw new DomainException("A payment attempt cannot expire before it opens.");
+        var fee = processingFee ?? Money.ZeroIn(amount.CurrencyCode);
+        if (!string.Equals(fee.CurrencyCode, amount.CurrencyCode, StringComparison.Ordinal))
+            throw new DomainException("A processing fee must be in the payment's own currency.");
+        if (fee.Amount >= amount.Amount)
+            throw new DomainException("A processing fee cannot be the whole payment.");
 
         return new Payment(Id.New())
         {
             BookingId = bookingId,
             CustomerId = customerId,
             Amount = amount,
+            Purpose = purpose ?? PaymentPurpose.Deposit,
+            _processingFee = fee.Amount,
             Provider = provider,
             Status = PaymentStatus.Initiated,
             ExpiresAt = expiresAt,

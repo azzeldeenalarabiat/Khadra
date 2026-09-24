@@ -13,6 +13,34 @@ namespace Khadra.Domain.Payments;
 /// event id is already recorded, so the provider's retry is refused as a replay, and the row sits
 /// there with a customer's money and no booking behind it, forever.
 /// </remarks>
+/// <summary>What a payment is FOR. Chosen by the customer when they pay, never when they request.</summary>
+/// <remarks>
+/// <para>
+/// <see cref="Deposit"/> is the mandatory minimum (the booking's frozen deposit) and
+/// <see cref="FullPayment"/> the whole booking total online (owner, 2026-09-24). Either one confirms
+/// an approved booking. <see cref="RemainingBalance"/> — paying what is left after a deposit, online,
+/// after confirmation — is part of the model so a later release needs no migration, and NO customer
+/// flow opens one yet (owner, 2026-09-24): the checkout refuses it.
+/// </para>
+/// <para>
+/// Refunds are not a purpose. They are outgoing money hanging off the payment they return
+/// (<see cref="Refund"/>), with their own lifecycle and their own idempotency.
+/// </para>
+/// </remarks>
+public sealed class PaymentPurpose : Enumeration
+{
+    public static readonly PaymentPurpose Deposit = new(1, "Deposit");
+    public static readonly PaymentPurpose FullPayment = new(2, "FullPayment");
+    public static readonly PaymentPurpose RemainingBalance = new(3, "RemainingBalance");
+
+    private PaymentPurpose(int id, string name) : base(id, name)
+    {
+    }
+
+    /// <summary>Whether a capture for this purpose can confirm an approved booking.</summary>
+    public bool Confirms => this == Deposit || this == FullPayment;
+}
+
 public sealed class PaymentStatus : Enumeration
 {
     /// <summary>Our row exists; the provider has not been asked yet, or did not answer.</summary>

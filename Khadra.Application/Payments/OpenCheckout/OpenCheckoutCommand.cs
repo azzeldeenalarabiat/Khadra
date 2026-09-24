@@ -14,13 +14,15 @@ using MediatR;
 namespace Khadra.Application.Payments.OpenCheckout;
 
 /// <summary>
-/// The customer wants to pay the deposit on their own approved booking.
+/// The customer wants to pay their own approved booking: its deposit, or its full amount.
 /// </summary>
 /// <remarks>
-/// Keyed on the BOOKING, never on an amount: a request that named its own figure would be a request
-/// to choose what a rental costs. The amount comes from the booking's frozen pricing.
+/// Keyed on the BOOKING and a PURPOSE, never on an amount: a request that named its own figure would
+/// be a request to choose what a rental costs. The amount comes from the booking's frozen pricing and
+/// the fee policy, through <see cref="PaymentChoices"/>. The name predates the full-payment option;
+/// a missing purpose is the deposit, which is all an installed app built before it can ask for.
 /// </remarks>
-public sealed record OpenDepositCheckoutCommand(Id CustomerUserId, Id BookingId)
+public sealed record OpenDepositCheckoutCommand(Id CustomerUserId, Id BookingId, PaymentPurpose? Purpose = null)
     : ICommand<Result<PaymentDto, Error>>;
 
 /// <summary>
@@ -65,6 +67,7 @@ public sealed class OpenDepositCheckoutHandler(
     IUserRepository users,
     IPaymentProvider provider,
     IPaymentSettings settings,
+    IBusinessRulesProvider businessRules,
     IClock clock,
     IUnitOfWork unitOfWork) : IRequestHandler<OpenDepositCheckoutCommand, Result<PaymentDto, Error>>
 {
@@ -90,21 +93,31 @@ public sealed class OpenDepositCheckoutHandler(
         if (due.IsFailure)
             return due.Error;
 
+        var purpose = request.Purpose ?? PaymentPurpose.Deposit;
+        var choice = PaymentChoices.Choose(
+            booking, purpose, PaymentChoices.PolicyFrom(await businessRules.GetAsync(cancellationToken)));
+        if (choice.IsFailure)
+            return choice.Error;
+
         var live = await payments.GetLiveForBookingAsync(request.BookingId, cancellationToken);
         if (live is not null)
         {
-            // Usable and already carrying a session: hand back the same one. Two sessions for one
-            // booking is how a customer pays twice.
-            if (live.IsUsable(now) && live.Status == PaymentStatus.Pending)
+            // The same choice, still usable and already carrying a session: hand back the same one.
+            // Two sessions for one booking is how a customer pays twice.
+            var sameChoice = live.Purpose == purpose && live.Amount == choice.Value.ChargedNow;
+            if (sameChoice && live.IsUsable(now) && live.Status == PaymentStatus.Pending)
                 return PaymentDto.From(live);
 
-            // Usable but never got an answer from the provider: resume it, with the SAME key, so the
+            // Same choice, usable, never answered by the provider: resume it with the SAME key, so the
             // provider returns the session it already made rather than making a second.
-            if (live.IsUsable(now) && live.Status == PaymentStatus.Initiated)
-                return await AskProviderAsync(live, booking, due.Value, cancellationToken);
+            if (sameChoice && live.IsUsable(now) && live.Status == PaymentStatus.Initiated)
+                return await AskProviderAsync(live, booking, live.Amount, cancellationToken);
 
-            // Past its own expiry. Retire it in the same save as the replacement, so there is never a
-            // moment with two live attempts for the partial unique index to refuse.
+            // Past its own expiry, or the customer switched between deposit and full payment. Retire
+            // it in the same save as the replacement, so there is never a moment with two live
+            // attempts for the partial unique index to refuse. A late capture on the retired session
+            // is still safe: it either confirms the booking (the customer paid there after all) or,
+            // with the booking already confirmed, is orphaned and refunded.
             var superseded = live.Fail("superseded", now);
             if (superseded.IsFailure)
                 return superseded.Error;
@@ -117,14 +130,16 @@ public sealed class OpenDepositCheckoutHandler(
         var payment = Payment.Open(
             booking.Id,
             booking.CustomerId,
-            due.Value,
+            choice.Value.ChargedNow,
             provider.Name,
             expiresAt,
-            now);
+            now,
+            purpose,
+            choice.Value.ProcessingFee);
         payments.Add(payment);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await AskProviderAsync(payment, booking, due.Value, cancellationToken);
+        return await AskProviderAsync(payment, booking, payment.Amount, cancellationToken);
     }
 
     /// <summary>

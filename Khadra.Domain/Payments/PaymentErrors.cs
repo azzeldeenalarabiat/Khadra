@@ -4,6 +4,10 @@ namespace Khadra.Domain.Payments;
 
 public static class PaymentErrors
 {
+    /// <summary>The customer asked to pay for something this release does not offer.</summary>
+    public static readonly Error PurposeUnavailable =
+        Error.Validation("payments.purpose_unavailable", "That way of paying is not offered for this booking.");
+
     /// <summary>
     /// No payment provider is configured, so no money can be taken.
     /// </summary>

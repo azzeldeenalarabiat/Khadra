@@ -111,4 +111,27 @@ public sealed class BusinessRulesOptions
     // that refuses every save with no explanation.
     [Range(1, 500)]
     public int? MaxShortlistEntries { get; init; }
+
+    // The optional card-processing fee on paying the FULL amount online. Off by default; see
+    // ProcessingFeeOptions. Owner, 2026-09-24: never enabled in Production until a real provider
+    // confirms the fee may be charged.
+    public ProcessingFeeOptions ProcessingFee { get; init; } = new();
+}
+
+public sealed class ProcessingFeeOptions
+{
+    public bool Enabled { get; init; }
+
+    // A percent of the basis below, e.g. 1.5. Validated only when Enabled: a figure under study may sit
+    // here while the fee is off.
+    [Range(0, 100)]
+    public decimal Percent { get; init; }
+
+    // "FullAmount" (the whole full payment) or "AboveDeposit" (only what the customer chose to pay
+    // above the mandatory deposit). Configurable until the provider's rule is known.
+    public string Basis { get; init; } = "FullAmount";
+
+    // Whether the fee is returned with the payment it was charged on. True for the sandbox and the
+    // current architecture; a real provider's contract may say otherwise.
+    public bool Refundable { get; init; } = true;
 }

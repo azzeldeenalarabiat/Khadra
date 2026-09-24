@@ -192,6 +192,11 @@ public static class DependencyInjection
             .Validate(options => Enumeration.GetAll<Khadra.Domain.Bookings.CommissionBasis>()
                     .Any(basis => string.Equals(basis.Name, options.CommissionBasis, StringComparison.Ordinal)),
                 "BusinessRules: CommissionBasis must be OneDay or RentalTotal.")
+            .Validate(options => Enumeration.GetAll<Khadra.Domain.Payments.ProcessingFeeBasis>()
+                    .Any(basis => string.Equals(basis.Name, options.ProcessingFee.Basis, StringComparison.Ordinal)),
+                "BusinessRules: ProcessingFee.Basis must be FullAmount or AboveDeposit.")
+            .Validate(options => !options.ProcessingFee.Enabled || options.ProcessingFee.Percent > 0m,
+                "BusinessRules: an enabled ProcessingFee needs a Percent above zero.")
             // Absence is a misconfiguration, not a default. Without this a deleted key binds to null,
             // the provider would have to invent a number, and a car would go straight back out with
             // no time to be cleaned. Zero remains a legitimate, deliberate value.

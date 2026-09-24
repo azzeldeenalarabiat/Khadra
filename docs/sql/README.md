@@ -167,3 +167,11 @@ backfilled amount equalled the old computation, and the half-way cases were chec
 against .NET's half-to-even rounding (1.2505 → 1.250, 1.2515 → 1.252).
 
 No table is added, so `supabase-lockdown.sql` does not need re-running for it.
+
+## 7. `2026-09-24-payment-options.sql`
+
+Additive: `payments.purpose` (default `'Deposit'`), `payments.processing_fee` (default 0) and
+`bookings.online_paid` (default 0), for the two ways of paying an approved booking — the deposit or
+the full amount. The one write sets `online_paid` to the frozen deposit on every booking a payment
+already confirmed, since the deposit was the only way to confirm until this release. Apply after
+script 6 and before deploying the API; run its catch-up section once more after the deploy.

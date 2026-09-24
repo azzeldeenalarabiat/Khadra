@@ -30,6 +30,13 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
         ConfigureId(entity.Property(booking => booking.DealerId));
         ConfigureId(entity.Property(booking => booking.VehicleId));
         ConfigureId(entity.Property(booking => booking.DepositPaymentId));
+        // What the customer has paid online towards the booking (2026-09-24), in its own currency.
+        // A plain column rather than JSON: it gets summed, and read by the handover and dispute rules.
+        entity.Property<decimal>("_onlinePaid")
+            .HasColumnName("online_paid")
+            .HasPrecision(18, 3)
+            .HasDefaultValue(0m)
+            .IsRequired();
         ConfigureId(entity.Property(booking => booking.ActedByUserId));
         ConfigureId(entity.Property(booking => booking.ExtendedFromBookingId));
 

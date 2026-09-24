@@ -41,6 +41,15 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         });
 
         ConfigureEnumeration(entity.Property(payment => payment.Status), 20);
+        // What the payment is for, and the fee inside its amount (2026-09-24). Every earlier row was a
+        // deposit with no fee, which is exactly what the column defaults say.
+        ConfigureEnumeration(entity.Property(payment => payment.Purpose), 20);
+        entity.Property(payment => payment.Purpose).HasDefaultValueSql("'Deposit'");
+        entity.Property<decimal>("_processingFee")
+            .HasColumnName("processing_fee")
+            .HasPrecision(18, 3)
+            .HasDefaultValue(0m)
+            .IsRequired();
         entity.Property(payment => payment.Provider).HasMaxLength(30).IsRequired();
         entity.Property(payment => payment.ProviderReference).HasMaxLength(200);
         entity.Property(payment => payment.CheckoutUrl).HasMaxLength(2000);

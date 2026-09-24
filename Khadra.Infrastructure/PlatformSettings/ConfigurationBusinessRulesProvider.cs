@@ -33,6 +33,11 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
             current.NonDeliveryGraceMinutes!.Value,
             current.ReviewWindowDays!.Value,
             current.EarliestVehicleModelYear,
-            current.MaxShortlistEntries!.Value));
+            current.MaxShortlistEntries!.Value,
+            new ProcessingFeeRules(
+                current.ProcessingFee.Enabled,
+                current.ProcessingFee.Percent,
+                current.ProcessingFee.Basis,
+                current.ProcessingFee.Refundable)));
     }
 }

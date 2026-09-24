@@ -244,7 +244,7 @@ public sealed partial class ReceiveProviderEventHandler(
         // Deliberately NOT gated on the payment deadline. The money has moved; refusing it now would
         // mean keeping it. The deadline is enforced where a checkout opens -- see
         // BookingDepositSettlement.DepositDue and pre-launch item 62.
-        var confirmed = BookingDepositSettlement.Confirm(booking, payment.Id, now);
+        var confirmed = BookingDepositSettlement.Confirm(booking, payment, now);
         if (confirmed.IsFailure)
         {
             Orphan(payment, captured, notification.OccurredAt, BookingDepositSettlement.OrphanReasonFor(booking, payment.Id), now);

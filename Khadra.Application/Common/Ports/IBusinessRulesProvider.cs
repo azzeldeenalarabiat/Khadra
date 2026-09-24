@@ -120,7 +120,16 @@ public sealed record BusinessRules(
     // SETTLED at 100 by the owner on 2026-09-11, replacing the 50 that was proposed when the context
     // was built. The app never holds a copy: the refusal carries the figure and the screen repeats
     // what it was told.
-    int MaxShortlistEntries);
+    int MaxShortlistEntries,
+    // The optional card-processing fee on paying the FULL amount online (owner, 2026-09-24). Off unless
+    // configured, and never to be switched on in Production until a real provider confirms it may be
+    // charged. Null (a test that does not care) reads as off.
+    ProcessingFeeRules? ProcessingFee = null);
+
+/// <summary>The processing-fee configuration, as plain values; see <see cref="BusinessRules.ProcessingFee"/>.</summary>
+/// <param name="Basis">"FullAmount" or "AboveDeposit".</param>
+/// <param name="Refundable">Whether the fee goes back with the payment it was charged on.</param>
+public sealed record ProcessingFeeRules(bool Enabled, decimal Percent, string Basis, bool Refundable);
 
 public interface IBusinessRulesProvider
 {

@@ -50,6 +50,7 @@ public sealed class PaymentUseCaseTests
         public TestClock Clock { get; } = new(Now);
         public IPaymentProvider Provider { get; set; } = TestPayments.Working();
         public IPaymentSettings Settings { get; } = TestPayments.Settings();
+        public IBusinessRulesProvider Rules { get; set; } = TestBusinessRules.Provider();
 
         public List<Payment> Added { get; } = [];
         public List<ProviderEventReceipt> Recorded { get; } = [];
@@ -90,7 +91,7 @@ public sealed class PaymentUseCaseTests
                 .Returns(payment);
 
         public OpenDepositCheckoutHandler Open() =>
-            new(Bookings, Payments, Users, Provider, Settings, Clock, UnitOfWork);
+            new(Bookings, Payments, Users, Provider, Settings, Rules, Clock, UnitOfWork);
 
         public ReceiveProviderEventHandler Receive() =>
             new(
@@ -1035,5 +1036,181 @@ public sealed class PaymentUseCaseTests
         context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
             notification.RecipientUserId == booking.CustomerId &&
             notification.Kind == NotificationKind.YourDepositRefunded));
+    }
+
+    // ---------------------------------------------------------------- deposit or full payment (2026-09-24)
+
+    private static IBusinessRulesProvider RulesWithFee(decimal percent, string basis = "FullAmount")
+    {
+        var rules = Substitute.For<IBusinessRulesProvider>();
+        rules.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(TestBusinessRules.Values() with { ProcessingFee = new ProcessingFeeRules(true, percent, basis, true) });
+        return rules;
+    }
+
+    private static Payment PendingFull(Booking booking, Money charged, Money? fee = null)
+    {
+        var payment = Payment.Open(
+            booking.Id, booking.CustomerId, charged, TestPayments.TestProviderName, Now.AddMinutes(30), Now,
+            PaymentPurpose.FullPayment, fee);
+        payment.AttachProviderSession("sess_1", "https://provider.test/sess_1");
+        return payment;
+    }
+
+    [Fact]
+    public async Task Choosing_full_payment_opens_a_checkout_for_the_whole_booking()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+
+        var result = await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var payment = Assert.Single(context.Added);
+        Assert.Same(PaymentPurpose.FullPayment, payment.Purpose);
+        Assert.Equal(booking.Pricing.TotalPrice.Amount, payment.Amount.Amount);
+        Assert.Equal("FullPayment", result.Value.Purpose);
+        // The provider was asked for exactly the row's amount, never a figure from the request.
+        await context.Provider.Received(1).CreateCheckoutAsync(
+            Arg.Is<CheckoutRequest>(request => request.Amount == payment.Amount), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task With_the_fee_on_the_full_payment_charges_it_on_top_and_the_deposit_does_not()
+    {
+        var context = new Context { Rules = RulesWithFee(1.5m) };
+        var booking = context.GivenApproved();
+
+        await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
+        var full = Assert.Single(context.Added);
+
+        var total = booking.Pricing.TotalPrice.Amount;
+        var fee = Math.Round(total * 1.5m / 100m, 3, MidpointRounding.ToEven);
+        Assert.Equal(fee, full.ProcessingFee.Amount);
+        Assert.Equal(total + fee, full.Amount.Amount);
+        Assert.Equal(total, full.AppliedToBooking.Amount);
+
+        var depositContext = new Context { Rules = RulesWithFee(1.5m) };
+        var depositBooking = depositContext.GivenApproved();
+        await depositContext.Open().Handle(new OpenDepositCheckoutCommand(CustomerId, depositBooking.Id), CancellationToken.None);
+        Assert.Equal(0m, Assert.Single(depositContext.Added).ProcessingFee.Amount);
+    }
+
+    [Fact]
+    public async Task Switching_between_deposit_and_full_payment_retires_the_open_checkout()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        await context.Open().Handle(new OpenDepositCheckoutCommand(CustomerId, booking.Id), CancellationToken.None);
+        var deposit = context.Added[0];
+        context.GivenLive(deposit);
+
+        var full = await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
+
+        Assert.True(full.IsSuccess);
+        Assert.Same(PaymentStatus.Failed, deposit.Status);
+        Assert.Equal("superseded", deposit.FailureCode);
+        Assert.Equal(2, context.Added.Count);
+        Assert.Same(PaymentPurpose.FullPayment, context.Added[1].Purpose);
+    }
+
+    [Fact]
+    public async Task The_remaining_balance_cannot_be_paid_online_in_this_release()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+
+        var result = await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.RemainingBalance), CancellationToken.None);
+
+        Assert.Equal("payments.purpose_unavailable", result.Error.Code);
+        Assert.Empty(context.Added);
+    }
+
+    [Fact]
+    public async Task A_full_payment_capture_confirms_the_booking_and_leaves_nothing_owed()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var total = Money.Jod(booking.Pricing.TotalPrice.Amount);
+        var payment = PendingFull(booking, total);
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(TestPayments.Captured("sess_1", total, Now)));
+
+        var result = await context.Receive().Handle(
+            new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+        Assert.Equal(total, booking.OnlinePaid);
+        Assert.Equal(0m, booking.RemainingBalance.Amount);
+        Assert.Same(PaymentStatus.Applied, payment.Status);
+    }
+
+    [Fact]
+    public async Task A_capture_with_a_fee_records_only_the_booking_part_as_paid()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var total = booking.Pricing.TotalPrice.Amount;
+        var charged = Money.Jod(total + 1.35m);
+        var payment = PendingFull(booking, charged, Money.Jod(1.35m));
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(TestPayments.Captured("sess_1", charged, Now)));
+
+        await context.Receive().Handle(new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+        Assert.Equal(total, booking.OnlinePaid.Amount);
+        Assert.Equal(0m, booking.RemainingBalance.Amount);
+    }
+
+    [Fact]
+    public async Task A_full_payment_that_arrives_after_the_deposit_confirmed_is_orphaned_and_refunded_whole()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        booking.ConfirmDepositPaid(Id.New(), Now);
+        var total = Money.Jod(booking.Pricing.TotalPrice.Amount);
+        var late = PendingFull(booking, total);
+        context.GivenReference(late);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(TestPayments.Captured("sess_1", total, Now)));
+
+        await context.Receive().Handle(new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+        Assert.Same(PaymentStatus.Orphaned, late.Status);
+        Assert.Equal("AlreadyPaidByAnotherAttempt", late.OrphanReason);
+        Assert.Equal(total, Assert.Single(late.Refunds).Amount);
+        // The booking still records only the deposit that confirmed it.
+        Assert.Equal(booking.Pricing.DepositAmount.Amount, booking.OnlinePaid.Amount);
+    }
+
+    [Fact]
+    public async Task A_declined_full_payment_leaves_the_booking_approved_and_payable()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        var payment = PendingFull(booking, Money.Jod(booking.Pricing.TotalPrice.Amount));
+        context.GivenReference(payment);
+        context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
+            .Returns(Result.Success<ProviderEvent, Error>(TestPayments.Failed("sess_1", Now)));
+
+        await context.Receive().Handle(new ReceiveProviderEventCommand("{}", new Dictionary<string, string>()), CancellationToken.None);
+
+        Assert.Same(PaymentStatus.Failed, payment.Status);
+        Assert.Same(BookingStatus.Approved, booking.Status);
+        Assert.True(booking.IsAwaitingPayment(Now));
+        // And the customer may try again, with either option.
+        var retry = await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
+        Assert.True(retry.IsSuccess);
     }
 }

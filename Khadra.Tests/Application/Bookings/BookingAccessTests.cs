@@ -132,7 +132,7 @@ public sealed class ReadBookingsTests
         _bookings,
         _reader,
         new BookingPartyResolver(_dealers),
-        new BookingPaymentAvailability(TestPayments.NoProvider(), Substitute.For<IPaymentRepository>(), _clock),
+        new BookingPaymentAvailability(TestPayments.NoProvider(), Substitute.For<IPaymentRepository>(), TestBusinessRules.Provider(), _clock),
         _clock);
 
     private ListMyBookingsHandler List() => new(_reader, new DealerMembershipResolver(_dealers));

@@ -196,6 +196,7 @@ SQL editor** instead:
 | [sql/2026-09-10-dealer-address.sql](sql/2026-09-10-dealer-address.sql) | The address columns, for a database that already exists |
 | [sql/2026-09-23-push-reminders-handover.sql](sql/2026-09-23-push-reminders-handover.sql) | Push devices, the notification outbox, reminders and handover codes. Additive and idempotent; apply before deploying the API that needs it. Staging first |
 | [sql/2026-09-24-frozen-commission.sql](sql/2026-09-24-frozen-commission.sql) | Freezes each existing booking's commission onto it (schema-neutral, writes rows). Part 1 before deploying the API that needs it, Part 2 once more after. Idempotent. Staging first |
+| [sql/2026-09-24-payment-options.sql](sql/2026-09-24-payment-options.sql) | Payment purpose and processing fee on payments, amount paid online on bookings. Additive and idempotent, after the frozen-commission script; catch-up section after the deploy. Staging first |
 | [sql/2026-09-22-bilingual-dealer-content.sql](sql/2026-09-22-bilingual-dealer-content.sql) | The bilingual office-text columns, and the foreign-key migration before them. Applied with the API **stopped** — see [releases/2026-09-bilingual-and-app-gate.md](releases/2026-09-bilingual-and-app-gate.md) |
 | [sql/supabase-lockdown.sql](sql/supabase-lockdown.sql) | Revokes PostgREST access from `anon`/`authenticated` |
 | [sql/verify-admin.sql](sql/verify-admin.sql) | Read-only: is there an administrator, and can they sign in? |

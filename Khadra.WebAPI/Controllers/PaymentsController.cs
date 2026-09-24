@@ -25,6 +25,9 @@ namespace Khadra.WebAPI.Controllers;
 /// because with no secret there is no way to tell a provider from anyone else who found the URL.
 /// </para>
 /// </remarks>
+/// <summary>The customer's choice of how to pay: "Deposit" or "FullPayment".</summary>
+public sealed record OpenCheckoutRequest(string? Purpose);
+
 [ApiController]
 [Route("api/v1")]
 public sealed class PaymentsController(ICurrentActor actor) : ApiControllerBase

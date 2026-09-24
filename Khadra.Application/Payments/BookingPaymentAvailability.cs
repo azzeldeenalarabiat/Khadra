@@ -29,6 +29,7 @@ namespace Khadra.Application.Payments;
 public sealed class BookingPaymentAvailability(
     IPaymentProvider provider,
     IPaymentRepository payments,
+    IBusinessRulesProvider businessRules,
     IClock clock)
 {
     public async Task<PaymentAvailabilityDto> ForAsync(Booking booking, CancellationToken cancellationToken = default)
@@ -46,7 +47,12 @@ public sealed class BookingPaymentAvailability(
         var attempt = live is null ? null : PaymentDto.From(live);
 
         if (due.IsFailure)
-            return new PaymentAvailabilityDto(false, due.Error.Code, null, booking.PaymentDeadline, attempt);
+            return new PaymentAvailabilityDto(false, due.Error.Code, null, booking.PaymentDeadline, attempt, []);
+
+        // Both ways of paying, worked out here and only here. Sent even when the platform cannot take
+        // cards yet: the customer is owed the figures, as with the amount below.
+        var fee = PaymentChoices.PolicyFrom(await businessRules.GetAsync(cancellationToken));
+        var options = PaymentChoices.For(booking, fee).Select(PaymentOptionDto.From).ToList();
 
         if (!provider.IsConfigured)
         {
@@ -58,9 +64,35 @@ public sealed class BookingPaymentAvailability(
                 Domain.Payments.PaymentErrors.ProviderUnavailable.Code,
                 amount,
                 booking.PaymentDeadline,
-                attempt);
+                attempt,
+                options);
         }
 
-        return new PaymentAvailabilityDto(true, null, amount, booking.PaymentDeadline, attempt);
+        return new PaymentAvailabilityDto(true, null, amount, booking.PaymentDeadline, attempt, options);
+    }
+
+    /// <summary>The whole payment picture for one booking: its figures, what is paid, and both options.</summary>
+    public async Task<PaymentOptionsDto> OptionsAsync(Booking booking, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+
+        var availability = await ForAsync(booking, cancellationToken);
+        var currency = booking.Pricing.CurrencyCode;
+        MoneyDto Of(decimal amount) => MoneyDto.From(Domain.Common.Money.Create(amount, currency));
+
+        return new PaymentOptionsDto(
+            booking.Id.Value,
+            availability.CanPay,
+            availability.UnavailableReason,
+            availability.PayBy,
+            Of(booking.Pricing.RentalTotal.Amount),
+            Of(booking.Pricing.DeliveryFee.Amount),
+            Of(booking.Pricing.TotalPrice.Amount),
+            Of(booking.Pricing.DepositAmount.Amount),
+            Of(booking.Pricing.TotalPrice.Amount),
+            Of(booking.OnlinePaid.Amount),
+            Of(booking.RemainingBalance.Amount),
+            availability.Options ?? [],
+            availability.LiveAttempt);
     }
 }

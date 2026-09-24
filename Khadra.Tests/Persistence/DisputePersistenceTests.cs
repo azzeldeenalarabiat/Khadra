@@ -124,6 +124,24 @@ public sealed class DisputePersistenceTests : IDisposable
     }
 
     [Fact]
+    public async Task Booking_round_trips_what_was_paid_online()
+    {
+        var booking = Build.ApprovedBooking();
+        booking.ConfirmPayment(Id.New(), Money.Create(booking.Pricing.TotalPrice.Amount, booking.Pricing.CurrencyCode), Build.Now);
+
+        await using (var context = NewContext())
+        {
+            context.Bookings.Add(booking);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var stored = await reader.Bookings.SingleAsync(b => b.Id == booking.Id);
+        Assert.Equal(booking.Pricing.TotalPrice.Amount, stored.OnlinePaid.Amount);
+        Assert.Equal(0m, stored.RemainingBalance.Amount);
+    }
+
+    [Fact]
     public async Task Booking_round_trips_its_frozen_terms_and_pricing()
     {
         // Every Percentage persisted as an empty JSON object, because Percentage.Value is get-only and

@@ -2227,3 +2227,44 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924155530_PaymentPurposeAndOnlinePaid') THEN
+    ALTER TABLE payments ADD processing_fee numeric(18,3) NOT NULL DEFAULT 0.0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924155530_PaymentPurposeAndOnlinePaid') THEN
+    ALTER TABLE payments ADD purpose character varying(20) NOT NULL DEFAULT ('Deposit');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924155530_PaymentPurposeAndOnlinePaid') THEN
+    ALTER TABLE bookings ADD online_paid numeric(18,3) NOT NULL DEFAULT 0.0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924155530_PaymentPurposeAndOnlinePaid') THEN
+    UPDATE bookings
+    SET online_paid = (pricing -> 'DepositAmount' ->> 'Amount')::numeric(18, 3)
+    WHERE deposit_payment_id IS NOT NULL AND online_paid = 0;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924155530_PaymentPurposeAndOnlinePaid') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260924155530_PaymentPurposeAndOnlinePaid', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

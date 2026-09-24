@@ -58,7 +58,35 @@ public sealed class Booking : AggregateRoot
     public BookingStatus Status { get; private set; } = null!;
 
     // Set once the deposit clears; also the idempotency key for a retried gateway webhook.
+    /// <summary>
+    /// The payment that CONFIRMED this booking — its deposit, or its full amount. The name predates the
+    /// full-payment option (2026-09-24) and is kept because the column and its idempotency are unchanged.
+    /// </summary>
     public Id? DepositPaymentId { get; private set; }
+
+    // What the customer has paid online towards this booking, in its own currency. A bare figure, like
+    // a payment's fee: the currency is the booking's and a second column could only disagree with it.
+    private decimal _onlinePaid;
+
+    /// <summary>
+    /// What the customer has paid ONLINE towards the booking (processing fees excluded): zero until a
+    /// payment confirms it, then the deposit or the full total.
+    /// </summary>
+    /// <remarks>
+    /// It lives on the booking, not only in the payment rows, because three of the booking's own rules
+    /// read it: the cash still owed at handover, the amount at stake in a dispute, and the refund a
+    /// cancellation returns.
+    /// </remarks>
+    public Money OnlinePaid => Money.Create(_onlinePaid, Pricing.CurrencyCode);
+
+    /// <summary>
+    /// What is still owed on the booking itself: its total less what was paid online. On a deposit-only
+    /// booking that is the cash the office collects at handover; on a fully paid one it is nothing.
+    /// </summary>
+    public Money RemainingBalance =>
+        OnlinePaid.IsZero
+            ? Money.Create(Pricing.BalanceDue.Amount, Pricing.CurrencyCode)
+            : Money.Create(Math.Max(0m, Pricing.TotalPrice.Amount - _onlinePaid), Pricing.CurrencyCode);
     // The dealer owner or employee who approved or rejected (spec 4.2 accountability).
     public Id? ActedByUserId { get; private set; }
     public BookingParty? CancelledBy { get; private set; }
@@ -428,19 +456,44 @@ public sealed class Booking : AggregateRoot
         return now < finishedAt.Value.Add(Terms.PostReturnSettlementWindow);
     }
 
-    // Idempotent: payment gateways retry their webhooks, and a retry must not fail or double-charge.
-    public UnitResult<Error> ConfirmDepositPaid(Id depositPaymentId, DateTimeOffset now)
+    /// <summary>The deposit was paid. Shorthand for <see cref="ConfirmPayment"/> with the frozen deposit.</summary>
+    public UnitResult<Error> ConfirmDepositPaid(Id depositPaymentId, DateTimeOffset now) =>
+        ConfirmPayment(depositPaymentId, Money.Create(Pricing.DepositAmount.Amount, Pricing.CurrencyCode), now);
+
+    /// <summary>
+    /// A payment of at least the deposit cleared: the booking is confirmed and records what was paid.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Idempotent: payment gateways retry their webhooks, and a retry must not fail or double-charge.
+    /// </para>
+    /// <para>
+    /// <paramref name="appliedToBooking"/> is what the payment put towards the booking, fees excluded.
+    /// Anything from the deposit up to the whole total confirms — the deposit is the minimum, not the
+    /// only amount — and anything outside that range is a programming error upstream, because the
+    /// checkout only ever opens one of the two.
+    /// </para>
+    /// </remarks>
+    public UnitResult<Error> ConfirmPayment(Id depositPaymentId, Money appliedToBooking, DateTimeOffset now)
     {
+        ArgumentNullException.ThrowIfNull(appliedToBooking);
         if (depositPaymentId.IsEmpty)
-            throw new DomainException("A deposit confirmation requires a payment.");
+            throw new DomainException("A payment confirmation requires a payment.");
         // Idempotent regardless of status: a webhook retried after the car was collected must
         // still be a success, not a refusal that makes a gateway keep retrying.
         if (DepositPaymentId == depositPaymentId)
             return UnitResult.Success<Error>();
         if (Status != BookingStatus.Approved)
             return UnitResult.Failure(BookingErrors.NotAwaitingPayment);
+        if (!string.Equals(appliedToBooking.CurrencyCode, Pricing.CurrencyCode, StringComparison.Ordinal) ||
+            appliedToBooking.Amount < Pricing.DepositAmount.Amount ||
+            appliedToBooking.Amount > Pricing.TotalPrice.Amount)
+        {
+            throw new DomainException("A confirming payment must cover at least the deposit and at most the booking total.");
+        }
 
         DepositPaymentId = depositPaymentId;
+        _onlinePaid = appliedToBooking.Amount;
         // The free-cancellation window starts at PAYMENT, not at approval. Spec 5.5 measures it
         // from approval because under the old order payment came first, so approval was the moment
         // of commitment. It is not any more: a customer who pays near the end of the payment window

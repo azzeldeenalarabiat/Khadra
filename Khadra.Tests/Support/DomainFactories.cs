@@ -288,10 +288,11 @@ internal static class Build
         PickupMethod? pickupMethod = null,
         BookingTerms? terms = null,
         Id? customerId = null,
-        Id? dealerId = null)
+        Id? dealerId = null,
+        BookingPricing? pricing = null)
     {
         var moment = now ?? Now;
-        var booking = Booking(moment, pickupMethod: pickupMethod, terms: terms, customerId: customerId, dealerId: dealerId);
+        var booking = Booking(moment, pickupMethod: pickupMethod, terms: terms, customerId: customerId, dealerId: dealerId, pricing: pricing);
         booking.Approve(Id.New(), moment);
         booking.ClearDomainEvents();
         return booking;

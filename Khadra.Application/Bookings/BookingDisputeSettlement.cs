@@ -31,6 +31,12 @@ public static class BookingDisputeSettlement
     /// "captured minus refunded" (which does not count a failed refund) would offer that deposit to a
     /// dispute a second time. See pre-launch item 78.
     /// </summary>
+    /// <remarks>
+    /// The DEPOSIT, however much was paid online. A customer who paid the full amount has put the
+    /// office's rental revenue on the platform too, and that part is never at stake in a dispute
+    /// (owner, 2026-09-24): it is the office's once the rental happens and the customer's if it does
+    /// not. Only the deposit is ever split.
+    /// </remarks>
     public static Money DepositHeldFor(Booking booking)
     {
         ArgumentNullException.ThrowIfNull(booking);
