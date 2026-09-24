@@ -208,6 +208,11 @@ public static class BookingErrors
     public static readonly Error HandoverAlreadyRecorded =
         Error.Conflict("booking.handover_recorded", "This handover has already been recorded.");
 
+    public static readonly Error PaymentOutOfRange =
+        Error.Conflict(
+            "booking.payment_out_of_range",
+            "A payment must cover at least the deposit and at most the booking total to confirm it.");
+
     public static readonly Error CommissionExceedsDeposit =
         Error.Validation(
             "booking.commission_exceeds_deposit",

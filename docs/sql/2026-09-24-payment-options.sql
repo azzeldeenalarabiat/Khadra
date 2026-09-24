@@ -1,9 +1,15 @@
--- Payment purpose, processing fee and amount paid online (2026-09-24). One migration, ADDITIVE:
+-- Payment purpose, processing fee and amount paid online (2026-09-24). Two migrations, both ADDITIVE:
 --
 --   20260924155530_PaymentPurposeAndOnlinePaid
 --       payments.purpose         varchar(20)   NOT NULL DEFAULT 'Deposit'
 --       payments.processing_fee  numeric(18,3) NOT NULL DEFAULT 0
 --       bookings.online_paid     numeric(18,3) NOT NULL DEFAULT 0
+--   20260924162513_PaymentFeeRefundable
+--       payments.fee_refundable  boolean       NOT NULL DEFAULT TRUE
+--
+-- fee_refundable freezes, per payment, whether its processing fee goes back with a refund. TRUE is
+-- what every existing row has always meant: no payment has carried a fee, and every refund so far
+-- returned the whole capture.
 --
 -- The defaults describe every existing row truthfully: each payment so far was a deposit with no fee.
 -- The one write sets bookings.online_paid on bookings a payment has already confirmed — until this
@@ -52,6 +58,21 @@ BEGIN
     IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924155530_PaymentPurposeAndOnlinePaid') THEN
     INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
     VALUES ('20260924155530_PaymentPurposeAndOnlinePaid', '10.0.11');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924162513_PaymentFeeRefundable') THEN
+    ALTER TABLE payments ADD fee_refundable boolean NOT NULL DEFAULT TRUE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924162513_PaymentFeeRefundable') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260924162513_PaymentFeeRefundable', '10.0.11');
     END IF;
 END $EF$;
 COMMIT;

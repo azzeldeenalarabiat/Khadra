@@ -518,12 +518,14 @@ export class DealerBookingDetailComponent {
         v: money(b.pricing.securityDeposit),
       },
       {
-        k: this.t('dealerBooking.depositPaidByCard', {
-          percent: this.format.percent(b.pricing.depositPercent),
-        }),
-        // Nothing is paid until the server says the deposit cleared: zero, in the deposit's currency.
+        // A customer may pay the whole booking online (2026-09-24), so the line names what was PAID,
+        // from the server: the deposit, or everything.
+        k: paidDeposit && b.onlinePaid && b.onlinePaid.amount > b.pricing.depositAmount.amount
+          ? this.t('dealerBooking.paidInFullByCard')
+          : this.t('dealerBooking.depositPaidByCard', { percent: this.format.percent(b.pricing.depositPercent) }),
+        // Nothing is paid until the server says the payment cleared: zero, in the deposit's currency.
         v: paidDeposit
-          ? money(b.pricing.depositAmount)
+          ? money(b.onlinePaid ?? b.pricing.depositAmount)
           : this.format.money(0, b.pricing.depositAmount.currency),
         hi: live,
       },

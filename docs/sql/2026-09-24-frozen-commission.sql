@@ -17,8 +17,11 @@
 -- ORDER (Staging first; production is not in scope):
 --   1. Run PART 1 below from the Supabase SQL editor. The API that is live now ignores both keys.
 --   2. Deploy the API carrying 20260924154009_FrozenCommission.
---   3. Run PART 2 (catch-up) once more: it freezes any booking the OLD API created between steps 1
---      and 2, which would otherwise be unloadable. It is idempotent and safe to run again at any time.
+--   3. REQUIRED, immediately after the new API starts and before it takes traffic: run PART 2
+--      (catch-up), then the check query at the end, which must return 0 and 0. A booking the OLD API
+--      created between steps 1 and 2 is otherwise unloadable, and because the dealer and admin lists
+--      read every booking's commission, ONE such row fails those whole lists, not just itself.
+--      Idempotent and safe to run again at any time.
 --
 -- Reversible: the migration's Down removes the keys from rules-version-1 bookings only.
 

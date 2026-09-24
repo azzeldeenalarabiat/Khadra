@@ -54,6 +54,13 @@ public sealed class Payment : AggregateRoot
     /// </summary>
     public Money ProcessingFee => Money.Create(_processingFee, Amount.CurrencyCode);
 
+    // Whether the fee goes back with the payment, frozen when the attempt opened: a later change to the
+    // platform's rule never re-judges a capture already taken.
+    private bool _feeRefundable = true;
+
+    /// <summary>Whether <see cref="ProcessingFee"/> is returned when this payment is refunded in full.</summary>
+    public bool FeeRefundable => _feeRefundable;
+
     /// <summary>What this payment puts towards the booking itself: <see cref="Amount"/> less the fee.</summary>
     public Money AppliedToBooking => Amount.Subtract(ProcessingFee);
 
@@ -167,7 +174,8 @@ public sealed class Payment : AggregateRoot
         DateTimeOffset expiresAt,
         DateTimeOffset now,
         PaymentPurpose? purpose = null,
-        Money? processingFee = null)
+        Money? processingFee = null,
+        bool feeRefundable = true)
     {
         ArgumentNullException.ThrowIfNull(amount);
         ArgumentException.ThrowIfNullOrWhiteSpace(provider);
@@ -190,6 +198,7 @@ public sealed class Payment : AggregateRoot
             Amount = amount,
             Purpose = purpose ?? PaymentPurpose.Deposit,
             _processingFee = fee.Amount,
+            _feeRefundable = feeRefundable,
             Provider = provider,
             Status = PaymentStatus.Initiated,
             ExpiresAt = expiresAt,
@@ -342,7 +351,12 @@ public sealed class Payment : AggregateRoot
         if (FreeCancellationRefund is { } existing)
             return existing;
 
-        return AddRefund(AmountCaptured!, RefundReason.FreeCancellation, disputeTicketId: null, now);
+        // Everything that was captured goes back — except a processing fee the payment was opened as
+        // non-refundable (owner, 2026-09-24: configurable until the provider's contract says).
+        var refund = FeeRefundable || ProcessingFee.IsZero
+            ? AmountCaptured!
+            : AmountCaptured!.Subtract(ProcessingFee);
+        return AddRefund(refund, RefundReason.FreeCancellation, disputeTicketId: null, now);
     }
 
     /// <summary>The one way money is promised back on an applied payment: never beyond what was taken.</summary>

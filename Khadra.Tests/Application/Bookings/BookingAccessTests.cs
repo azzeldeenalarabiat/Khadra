@@ -151,6 +151,8 @@ public sealed class ReadBookingsTests
         Assert.Equal(17.5m, result.Value.Terms.CommissionPercent);
         Assert.Equal("Petra Wheels", result.Value.DealerName);
         Assert.Null(result.Value.Vehicle);
+        // Khadra's commission is between the platform and the office: never on a customer's copy.
+        Assert.Null(result.Value.CommissionAmount);
     }
 
     [Fact]

@@ -2032,6 +2032,7 @@ export const AR = {
   'dealerReports.today': 'اليوم',
   'dealerBooking.rentalLine': 'الإيجار · {count} × {rate}',
   'dealerBooking.depositPaidByCard': 'العربون المدفوع بالبطاقة ({percent})',
+  'dealerBooking.paidInFullByCard': 'مدفوع بالكامل بالبطاقة',
   'dealerBooking.platformCommissionFrozen': 'عمولة المنصة · {percent} (مجمَّدة على هذا الحجز)',
   'dealerBooking.amountFrozen': '{amount} · مجمَّدة على هذا الحجز',
   'dealerBooking.mileageAllowance': '{limit} كم يوميًا، و{fee} لكل كم إضافي',

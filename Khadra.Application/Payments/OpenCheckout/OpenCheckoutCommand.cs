@@ -94,8 +94,8 @@ public sealed class OpenDepositCheckoutHandler(
             return due.Error;
 
         var purpose = request.Purpose ?? PaymentPurpose.Deposit;
-        var choice = PaymentChoices.Choose(
-            booking, purpose, PaymentChoices.PolicyFrom(await businessRules.GetAsync(cancellationToken)));
+        var fee = PaymentChoices.PolicyFrom(await businessRules.GetAsync(cancellationToken));
+        var choice = PaymentChoices.Choose(booking, purpose, fee);
         if (choice.IsFailure)
             return choice.Error;
 
@@ -135,7 +135,8 @@ public sealed class OpenDepositCheckoutHandler(
             expiresAt,
             now,
             purpose,
-            choice.Value.ProcessingFee);
+            choice.Value.ProcessingFee,
+            fee.Refundable);
         payments.Add(payment);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

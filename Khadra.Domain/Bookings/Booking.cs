@@ -485,11 +485,13 @@ public sealed class Booking : AggregateRoot
             return UnitResult.Success<Error>();
         if (Status != BookingStatus.Approved)
             return UnitResult.Failure(BookingErrors.NotAwaitingPayment);
+        // Refused rather than thrown: this runs inside a provider's webhook, where a throw is a 5xx the
+        // provider retries forever. A refusal lets the caller orphan the capture and refund it.
         if (!string.Equals(appliedToBooking.CurrencyCode, Pricing.CurrencyCode, StringComparison.Ordinal) ||
             appliedToBooking.Amount < Pricing.DepositAmount.Amount ||
             appliedToBooking.Amount > Pricing.TotalPrice.Amount)
         {
-            throw new DomainException("A confirming payment must cover at least the deposit and at most the booking total.");
+            return UnitResult.Failure(BookingErrors.PaymentOutOfRange);
         }
 
         DepositPaymentId = depositPaymentId;

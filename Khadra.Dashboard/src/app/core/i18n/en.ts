@@ -2240,6 +2240,7 @@ export const EN = {
   'dealerReports.today': 'Today',
   'dealerBooking.rentalLine': 'Rental · {count} × {rate}',
   'dealerBooking.depositPaidByCard': 'Deposit paid by card ({percent})',
+  'dealerBooking.paidInFullByCard': 'Paid in full by card',
   'dealerBooking.platformCommissionFrozen':
     'Platform commission · {percent} (frozen on this booking)',
   'dealerBooking.amountFrozen': '{amount} · frozen on this booking',

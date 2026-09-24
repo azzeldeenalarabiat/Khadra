@@ -171,7 +171,8 @@ No table is added, so `supabase-lockdown.sql` does not need re-running for it.
 ## 7. `2026-09-24-payment-options.sql`
 
 Additive: `payments.purpose` (default `'Deposit'`), `payments.processing_fee` (default 0) and
-`bookings.online_paid` (default 0), for the two ways of paying an approved booking — the deposit or
+`bookings.online_paid` (default 0) and `payments.fee_refundable` (default true, which is what every
+existing row has always meant), for the two ways of paying an approved booking — the deposit or
 the full amount. The one write sets `online_paid` to the frozen deposit on every booking a payment
 already confirmed, since the deposit was the only way to confirm until this release. Apply after
 script 6 and before deploying the API; run its catch-up section once more after the deploy.

@@ -1118,6 +1118,42 @@ public sealed class PaymentUseCaseTests
     }
 
     [Fact]
+    public async Task A_fee_changed_while_a_full_payment_is_open_retires_it_rather_than_reusing_it()
+    {
+        var context = new Context { Rules = RulesWithFee(1.5m) };
+        var booking = context.GivenApproved();
+        await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
+        var first = context.Added[0];
+        context.GivenLive(first);
+
+        context.Rules = RulesWithFee(2m);
+        await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
+
+        // The open session was priced under the old fee: it is retired, never charged at a figure the
+        // customer was not shown.
+        Assert.Same(PaymentStatus.Failed, first.Status);
+        Assert.Equal(2, context.Added.Count);
+        Assert.NotEqual(first.Amount, context.Added[1].Amount);
+    }
+
+    [Fact]
+    public async Task The_fee_refundability_in_force_is_frozen_on_the_payment()
+    {
+        var rules = Substitute.For<IBusinessRulesProvider>();
+        rules.GetAsync(Arg.Any<CancellationToken>())
+            .Returns(TestBusinessRules.Values() with { ProcessingFee = new ProcessingFeeRules(true, 1.5m, "FullAmount", false) });
+        var context = new Context { Rules = rules };
+        var booking = context.GivenApproved();
+
+        await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
+
+        Assert.False(Assert.Single(context.Added).FeeRefundable);
+    }
+
+    [Fact]
     public async Task The_remaining_balance_cannot_be_paid_online_in_this_release()
     {
         var context = new Context();

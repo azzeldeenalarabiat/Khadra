@@ -87,7 +87,6 @@ public sealed class BookingPaymentAvailability(
             availability.PayBy,
             Of(booking.Pricing.RentalTotal.Amount),
             Of(booking.Pricing.DeliveryFee.Amount),
-            Of(booking.Pricing.TotalPrice.Amount),
             Of(booking.Pricing.DepositAmount.Amount),
             Of(booking.Pricing.TotalPrice.Amount),
             Of(booking.OnlinePaid.Amount),

@@ -203,8 +203,8 @@ public sealed class PaymentChoiceTests
     [Fact]
     public void Nothing_below_the_deposit_and_nothing_above_the_total_can_confirm_a_booking()
     {
-        Assert.Throws<DomainException>(() => Approved().ConfirmPayment(Id.New(), Money.Jod(49.999m), Now));
-        Assert.Throws<DomainException>(() => Approved().ConfirmPayment(Id.New(), Money.Jod(250.001m), Now));
+        Assert.Equal("booking.payment_out_of_range", Approved().ConfirmPayment(Id.New(), Money.Jod(49.999m), Now).Error.Code);
+        Assert.Equal("booking.payment_out_of_range", Approved().ConfirmPayment(Id.New(), Money.Jod(250.001m), Now).Error.Code);
     }
 
     [Fact]
@@ -218,6 +218,58 @@ public sealed class PaymentChoiceTests
 
         Assert.True(again.IsSuccess);
         Assert.Equal(Money.Jod(250m), booking.OnlinePaid);
+    }
+
+    [Fact]
+    public void The_booking_response_says_nothing_is_owed_after_a_full_payment_and_hides_the_commission_from_the_customer()
+    {
+        var booking = Approved();
+        booking.ConfirmPayment(Id.New(), Money.Jod(250m), Now);
+
+        var dto = Khadra.Application.Bookings.Dtos.BookingDto.From(booking, new Khadra.Application.Bookings.ReadModels.BookingContext(null, "Petra Wheels", false, null, "Layla Odeh", false, null, null), Now);
+
+        // Installed apps print pricing.balanceDue as "pay at pickup": a fully paid customer must read zero.
+        Assert.Equal(0m, dto.Pricing.BalanceDue.Amount);
+        Assert.Equal(250m, dto.OnlinePaid!.Amount);
+        Assert.NotNull(dto.CommissionAmount);
+        Assert.Null(dto.ForCustomer().CommissionAmount);
+    }
+
+    [Fact]
+    public void A_capture_that_does_not_fit_the_booking_is_refused_not_thrown()
+    {
+        var result = Approved().ConfirmPayment(Id.New(), Money.Jod(49.999m), Now);
+
+        Assert.Equal("booking.payment_out_of_range", result.Error.Code);
+    }
+
+    [Fact]
+    public void A_free_cancellation_of_a_full_payment_returns_everything_captured()
+    {
+        var booking = Approved();
+        var payment = Payment.Open(
+            booking.Id, booking.CustomerId, Money.Jod(253.75m), TestPayments.TestProviderName, Now.AddMinutes(30), Now,
+            PaymentPurpose.FullPayment, Money.Jod(3.75m));
+        payment.Apply(Money.Jod(253.75m), Now, Now);
+
+        var refund = payment.RefundForFreeCancellation(Now.AddMinutes(5));
+
+        Assert.Equal(Money.Jod(253.75m), refund.Value.Amount);
+    }
+
+    [Fact]
+    public void A_fee_opened_as_non_refundable_stays_when_the_payment_is_refunded()
+    {
+        var booking = Approved();
+        var payment = Payment.Open(
+            booking.Id, booking.CustomerId, Money.Jod(253.75m), TestPayments.TestProviderName, Now.AddMinutes(30), Now,
+            PaymentPurpose.FullPayment, Money.Jod(3.75m), feeRefundable: false);
+        payment.Apply(Money.Jod(253.75m), Now, Now);
+
+        var refund = payment.RefundForFreeCancellation(Now.AddMinutes(5));
+
+        Assert.Equal(Money.Jod(250m), refund.Value.Amount);
+        Assert.False(payment.FeeRefundable);
     }
 
     [Fact]

@@ -36,7 +36,6 @@ const CONFIRMED = {
     paymentWindowHours: 2, answerWindowHours: 48, postReturnSettlementWindowHours: 48,
     customerCancellationPenaltyPercent: 100, dealerPenaltyMinPercent: 25, dealerPenaltyMaxPercent: 50, rulesVersion: 1,
   },
-  commissionAmount: money(40),
   penalty: null,
   cancelledBy: null,
   cancellationReasonCode: null,

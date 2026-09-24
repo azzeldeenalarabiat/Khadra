@@ -2268,3 +2268,21 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924162513_PaymentFeeRefundable') THEN
+    ALTER TABLE payments ADD fee_refundable boolean NOT NULL DEFAULT TRUE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924162513_PaymentFeeRefundable') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260924162513_PaymentFeeRefundable', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

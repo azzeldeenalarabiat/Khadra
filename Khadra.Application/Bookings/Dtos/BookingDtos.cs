@@ -119,7 +119,12 @@ public sealed record BookingDto(
     /// The deposit's refund when a free cancellation returned it, or null. Added 2026-09-24, last so
     /// that no installed client's reading of the fields before it changes.
     /// </summary>
-    DepositRefundDto? DepositRefund = null)
+    DepositRefundDto? DepositRefund = null,
+    /// <summary>
+    /// What the customer has paid online towards the booking, fees excluded: zero until a payment
+    /// confirms it, then the deposit or the whole total. Added 2026-09-24, last.
+    /// </summary>
+    MoneyDto? OnlinePaid = null)
 {
     /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
     /// <remarks>
@@ -189,7 +194,8 @@ public sealed record BookingDto(
             context.CustomerAccountClosed,
             booking.Handovers.OrderBy(handover => handover.RecordedAt).Select(HandoverDto.From).ToList(),
             booking.StatusHistory.OrderBy(change => change.OccurredAt).Select(BookingStatusChangeDto.From).ToList(),
-            context.DepositRefund);
+            context.DepositRefund,
+            MoneyDto.From(booking.OnlinePaid));
     }
 }
 

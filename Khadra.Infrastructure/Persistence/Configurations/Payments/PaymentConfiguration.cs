@@ -50,6 +50,11 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             .HasPrecision(18, 3)
             .HasDefaultValue(0m)
             .IsRequired();
+        // Explicit rather than defaulted in SQL: a bool default of true would be EF's sentinel trap (a
+        // false value indistinguishable from "not set"), so every insert writes what the row holds.
+        entity.Property<bool>("_feeRefundable")
+            .HasColumnName("fee_refundable")
+            .IsRequired();
         entity.Property(payment => payment.Provider).HasMaxLength(30).IsRequired();
         entity.Property(payment => payment.ProviderReference).HasMaxLength(200);
         entity.Property(payment => payment.CheckoutUrl).HasMaxLength(2000);

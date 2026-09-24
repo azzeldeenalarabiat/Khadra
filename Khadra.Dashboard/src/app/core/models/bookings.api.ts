@@ -139,6 +139,8 @@ export interface Booking {
    * refund's own status. Null when there is none; absent on an older API.
    */
   readonly depositRefund?: DepositRefund | null;
+  /** What the customer paid online, fees excluded: the deposit or the whole total. Added 2026-09-24. */
+  readonly onlinePaid?: Money | null;
 }
 
 /** Requested and Sent: the refund is on its way. Settled: refunded. Failed: still owed, being retried. */

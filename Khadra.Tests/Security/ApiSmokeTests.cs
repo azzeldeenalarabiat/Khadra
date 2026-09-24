@@ -96,6 +96,25 @@ public sealed class ApiSmokeTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>
+    /// The two payment routes both customer clients call exist, and are closed to strangers. A 401,
+    /// not a 404: an unmapped route answers 404 before authorization ever runs, which is how these two
+    /// were once missing while every handler test passed.
+    /// </summary>
+    [Fact]
+    public async Task The_payment_choice_routes_exist_and_are_closed_without_a_token()
+    {
+        using var client = _factory.CreateClient();
+        var booking = Guid.NewGuid();
+
+        using var options = await client.GetAsync(new Uri($"/api/v1/bookings/{booking}/payment-options", UriKind.Relative));
+        using var checkout = await client.PostAsJsonAsync(
+            new Uri($"/api/v1/bookings/{booking}/checkout", UriKind.Relative), new { purpose = "FullPayment" });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, options.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, checkout.StatusCode);
+    }
+
     [Fact]
     public async Task Reading_someones_bookings_without_a_token_is_401()
     {

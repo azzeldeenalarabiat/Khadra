@@ -128,7 +128,6 @@ public sealed record PaymentOptionsDto(
     DateTimeOffset? PayBy,
     MoneyDto RentalSubtotal,
     MoneyDto DeliveryFee,
-    MoneyDto BookingTotal,
     MoneyDto RequiredDeposit,
     MoneyDto FullPayableAmount,
     MoneyDto AmountPaid,

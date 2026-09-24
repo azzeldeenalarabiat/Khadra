@@ -1,4 +1,6 @@
 using Khadra.Application.Payments.Dtos;
+using Khadra.Application.Payments.GetPaymentOptions;
+using Khadra.Domain.Payments;
 using Khadra.Application.Payments.OpenCheckout;
 using Khadra.Application.Payments.ReceiveProviderEvent;
 using Khadra.Application.Common;
@@ -52,6 +54,53 @@ public sealed class PaymentsController(ICurrentActor actor) : ApiControllerBase
     {
         var result = await Mediator.Send(
             new OpenDepositCheckoutCommand(actor.UserId!.Value, Id.From(bookingId)),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// Both ways of paying an approved booking, every figure worked out by the server.
+    /// </summary>
+    /// <remarks>
+    /// The deposit and the full amount, each with what it charges now (processing fee included) and
+    /// what remains owed after it. A client shows these figures and computes none of them.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.Customer)]
+    [HttpGet("bookings/{bookingId:guid}/payment-options")]
+    [ProducesResponseType<PaymentOptionsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> PaymentOptions(Guid bookingId, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new GetPaymentOptionsQuery(actor.UserId!.Value, Id.From(bookingId)),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// Starts, resumes or replaces the customer's checkout for the way of paying they chose.
+    /// </summary>
+    /// <remarks>
+    /// Names a PURPOSE ("Deposit" or "FullPayment"), never an amount. Choosing the other option retires
+    /// an open checkout for the first; choosing the same one again returns it unchanged.
+    /// </remarks>
+    [Authorize(Policy = SecurityPolicies.Customer)]
+    [HttpPost("bookings/{bookingId:guid}/checkout")]
+    [ProducesResponseType<PaymentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult> OpenCheckout(Guid bookingId, OpenCheckoutRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var purpose = Enumeration.GetAll<PaymentPurpose>()
+            .FirstOrDefault(known => string.Equals(known.Name, request.Purpose, StringComparison.Ordinal));
+        if (purpose is null)
+            return Failure(PaymentErrors.PurposeUnavailable);
+
+        var result = await Mediator.Send(
+            new OpenDepositCheckoutCommand(actor.UserId!.Value, Id.From(bookingId), purpose),
             cancellationToken);
         return FromResult(result);
     }
