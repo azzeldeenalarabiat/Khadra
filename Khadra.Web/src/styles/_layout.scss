@@ -232,6 +232,10 @@ $md: 1023px; // tablets
   padding-block: var(--s-6);
   margin-block-start: var(--s-7);
 }
+// A page that ends on the green band meets the footer directly, with no strip of page between.
+.site-main:has(.band:last-child) + kh-site-footer .site-footer {
+  margin-block-start: 0;
+}
 .site-footer__inner {
   display: flex;
   flex-wrap: wrap;
@@ -263,4 +267,104 @@ $md: 1023px; // tablets
 .site-footer__rights {
   inline-size: 100%;
   font-size: 13px;
+}
+
+// ── Header panels open and close with a short settle ────────────────────────
+.menu__panel {
+  animation: pop-in var(--dur) var(--ease) both;
+  transform-origin: top center;
+}
+
+// ── The bell's panel: a popover on a desktop, a sheet from the bottom on a phone ─
+.notif-panel {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: calc(100% + 8px);
+  z-index: 50;
+  inline-size: min(380px, calc(100vw - 2 * var(--s-4)));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+  animation: pop-in var(--dur) var(--ease) both;
+  .notification-list {
+    border: 0;
+  }
+  .notification {
+    padding: var(--s-3);
+  }
+  @media (max-width: $sm) {
+    position: fixed;
+    inset-inline: 0;
+    inset-block: auto 0;
+    inline-size: 100%;
+    max-block-size: 80vh;
+    border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+    padding-block-end: env(safe-area-inset-bottom);
+    animation-name: sheet-in;
+  }
+}
+.notif-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-block-end: 1px solid var(--divider);
+}
+.notif-panel__body {
+  max-block-size: min(420px, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.notif-panel__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-5) var(--s-4);
+  text-align: center;
+  .skeleton {
+    inline-size: 100%;
+  }
+}
+.notif-panel__empty-title {
+  font-weight: 800;
+}
+.notif-panel__all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--s-3);
+  border-block-start: 1px solid var(--divider);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  transition: background-color var(--dur-fast) var(--ease);
+  &:hover {
+    background: var(--accent-100);
+  }
+}
+// The header's blur makes it the containing block for anything fixed inside it, which would pin the
+// phone's sheet and scrim to the 64px header instead of the screen. While the panel is open the header
+// goes solid instead.
+.site-header:has(.notif-panel) {
+  backdrop-filter: none;
+  background: var(--surface);
+}
+// Only a phone's sheet has a scrim behind it; a desktop popover floats over the page as it is.
+.notif-scrim {
+  display: none;
+  @media (max-width: $sm) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: var(--scrim);
+    animation: arrive var(--dur) var(--ease) both;
+  }
 }

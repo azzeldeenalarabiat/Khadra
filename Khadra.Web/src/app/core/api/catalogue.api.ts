@@ -49,6 +49,18 @@ export interface CatalogueFacets {
   readonly fuelTypes: readonly string[];
   /** Newest first. */
   readonly years: readonly number[];
+  /**
+   * Per vehicle type: how many cars are LISTED (not free on any dates — facets ignore the window) and
+   * the newest one's photo. Added 2026-09-24; optional here so a renderer deployed before the API that
+   * serves it still draws the type cards, by name only.
+   */
+  readonly carTypes?: readonly CarTypeFacet[];
+}
+
+export interface CarTypeFacet {
+  readonly carTypeId: string;
+  readonly listedVehicleCount: number;
+  readonly coverImageUrl: string | null;
 }
 
 export interface GalleryDaySchedule {

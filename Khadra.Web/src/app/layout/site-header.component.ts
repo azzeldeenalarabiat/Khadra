@@ -5,12 +5,14 @@ import { filter, map } from 'rxjs';
 import { I18nService } from '../core/i18n/i18n.service';
 import { NotificationsService } from '../core/api/notifications.service';
 import { SessionService } from '../core/session/session.service';
+import { DismissDirective } from '../shared/dismiss/dismiss.directive';
 import { IconComponent } from '../shared/icon/icon.component';
+import { NotificationsPanelComponent } from './notifications-panel.component';
 
 @Component({
   selector: 'kh-site-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, IconComponent],
+  imports: [RouterLink, RouterLinkActive, IconComponent, DismissDirective, NotificationsPanelComponent],
   templateUrl: './site-header.component.html',
 })
 export class SiteHeaderComponent {
@@ -21,6 +23,7 @@ export class SiteHeaderComponent {
 
   protected readonly menuOpen = signal(false);
   protected readonly accountOpen = signal(false);
+  protected readonly notificationsOpen = signal(false);
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -40,7 +43,31 @@ export class SiteHeaderComponent {
     this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe(() => {
       this.menuOpen.set(false);
       this.accountOpen.set(false);
+      this.notificationsOpen.set(false);
     });
+  }
+
+  /** The bell is a toggle. Only one header panel is open at a time. */
+  protected toggleNotifications(): void {
+    this.accountOpen.set(false);
+    this.menuOpen.set(false);
+    this.notificationsOpen.update((open) => !open);
+  }
+
+  protected toggleAccount(): void {
+    this.notificationsOpen.set(false);
+    this.accountOpen.update((open) => !open);
+  }
+
+  /** Esc hands focus back to the button that opened the panel; a press elsewhere leaves it where it went. */
+  protected closeNotifications(reason: 'outside' | 'escape', trigger: HTMLElement): void {
+    this.notificationsOpen.set(false);
+    if (reason === 'escape') trigger.focus();
+  }
+
+  protected closeAccount(reason: 'outside' | 'escape', trigger: HTMLElement): void {
+    this.accountOpen.set(false);
+    if (reason === 'escape') trigger.focus();
   }
 
   protected switchLanguage(event: MouseEvent): void {

@@ -352,6 +352,7 @@ $sm: 767px;
   border: 0;
   background: var(--surface);
   text-align: start;
+  transition: background-color var(--dur-fast) var(--ease);
   &:hover {
     background: var(--n-100);
   }

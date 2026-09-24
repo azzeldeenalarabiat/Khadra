@@ -1,3 +1,5 @@
+@use 'mixins' as m;
+
 $sm: 767px;
 $md: 1023px;
 
@@ -24,31 +26,194 @@ $md: 1023px;
 }
 
 // ── Hero & search card ──────────────────────────────────────────────────────
+// White, with a faint green glow and two lanes of road behind the copy; real listing photos on the
+// other side. The search card overlaps nothing and floats on its own shadow.
 .hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   background:
-    radial-gradient(1200px 400px at 50% -120px, var(--accent-100), transparent 70%),
+    radial-gradient(900px 420px at 85% 10%, var(--accent-100), transparent 70%),
+    radial-gradient(700px 360px at 0% 100%, var(--accent-100), transparent 70%),
     var(--surface);
   border-block-end: 1px solid var(--divider);
-  padding-block: var(--s-7) var(--s-6);
+  padding-block: var(--s-8) var(--s-6);
   @media (max-width: $sm) {
-    padding-block: var(--s-5);
+    padding-block: var(--s-6) var(--s-5);
   }
+}
+.hero__road {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  z-index: -1;
+  pointer-events: none;
+  fill: none;
+  stroke-linecap: round;
+  // The road runs the reader's way: mirrored in RTL, so it rises toward the end of the line.
+  [dir='rtl'] & {
+    transform: scaleX(-1);
+  }
+}
+.hero__road-edge {
+  stroke: var(--road-line);
+  stroke-width: 2;
+}
+.hero__road-lane {
+  stroke: var(--road-line);
+  stroke-width: 3;
+  stroke-dasharray: 18 16;
 }
 .hero__inner {
   display: flex;
   flex-direction: column;
   gap: var(--s-5);
 }
+.hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: var(--s-6);
+  align-items: center;
+  .hero--solo & {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  @media (max-width: $md) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s-5);
+  }
+  // A phone reads the page top to bottom: the promise, then the search it came for, then the photo.
+  @media (max-width: $sm) {
+    display: contents;
+  }
+}
+@media (max-width: $sm) {
+  .hero__copy {
+    order: 1;
+  }
+  .hero__search {
+    order: 2;
+  }
+  .trust {
+    order: 3;
+  }
+  .hero__showcase {
+    order: 4;
+  }
+}
 .hero__copy {
-  max-inline-size: 720px;
+  max-inline-size: 620px;
+}
+.hero__title {
+  font-size: clamp(30px, 4.4vw, 50px);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
 }
 .hero__sub {
   color: var(--text-muted);
-  margin-block-start: var(--s-2);
-  font-size: 16px;
+  margin-block-start: var(--s-3);
+  font-size: clamp(15px, 1.5vw, 18px);
+  max-inline-size: 560px;
 }
-.hero__types {
-  margin-block-start: calc(var(--s-2) * -1);
+
+// Up to three real listings: one leading photo, two beside it. One or two collapse gracefully.
+.hero__showcase {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--s-3);
+  block-size: 340px;
+  &[data-count='1'] {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+  }
+  &[data-count='2'] {
+    grid-template-rows: 1fr;
+  }
+  @media (max-width: $md) {
+    block-size: 260px;
+  }
+  @media (max-width: $sm) {
+    block-size: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    .hero-shot:not(.hero-shot--lead) {
+      display: none;
+    }
+  }
+}
+.hero-shot {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--r-feature);
+  background: var(--image-placeholder);
+  box-shadow: var(--shadow-float);
+  @include m.interactive-card('img');
+  img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+  @media (max-width: $sm) {
+    aspect-ratio: 16 / 10;
+  }
+}
+.hero-shot--lead {
+  grid-row: 1 / -1;
+}
+.hero-shot__caption {
+  position: absolute;
+  inset-inline: var(--s-2);
+  inset-block-end: var(--s-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px var(--s-2);
+  padding: 6px var(--s-3);
+  border-radius: var(--r-chip);
+  background: rgb(255 255 255 / 94%);
+  box-shadow: var(--shadow-card);
+  font-size: 13px;
+}
+.hero-shot__name {
+  font-weight: 800;
+}
+.hero-shot__price {
+  color: var(--price);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+// ── Trust strip ─────────────────────────────────────────────────────────────
+.trust {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2) var(--s-5);
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.trust__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.trust__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 30px;
+  block-size: 30px;
+  border-radius: var(--r-chip);
+  background: var(--accent-200);
+  color: var(--accent);
+  font-size: 16px;
 }
 
 .search-card {
@@ -134,10 +299,7 @@ $md: 1023px;
   border-radius: var(--r-card);
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  transition: box-shadow 0.15s, transform 0.15s;
-  &:hover {
-    box-shadow: var(--shadow-float);
-  }
+  @include m.interactive-card('.car-card__media img');
 }
 .car-card__media {
   display: block;
@@ -244,35 +406,162 @@ $md: 1023px;
   background: rgb(255 255 255 / 94%);
   color: var(--text);
   font-size: 18px;
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  &:hover:not(:disabled) {
+    background: var(--surface);
+  }
   &.is-saved {
     color: var(--bad);
+  }
+  &.is-popping kh-icon {
+    animation: heart-pop var(--dur-slow) var(--ease);
   }
   &:disabled {
     opacity: 0.6;
   }
 }
 
+// ── Vehicle types ───────────────────────────────────────────────────────────
+.type-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--s-3);
+  @media (max-width: $sm) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.type-card {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  @include m.interactive-card('.type-card__media img');
+}
+.type-card__media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--accent-100);
+  color: var(--accent);
+  font-size: 40px;
+  img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
+  }
+}
+.type-card__body {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px var(--s-2);
+  padding: var(--s-3);
+}
+.type-card__name {
+  font-weight: 800;
+}
+.type-card__count {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+.section-head__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  kh-icon {
+    transition: transform var(--dur-fast) var(--ease);
+  }
+  &:hover kh-icon {
+    transform: translateX(3px);
+    [dir='rtl'] & {
+      transform: translateX(-3px);
+    }
+  }
+}
+
+// ── Office directory search ─────────────────────────────────────────────────
+.directory-search {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto;
+  gap: var(--s-3);
+  align-items: end;
+  padding: var(--s-4);
+  margin-block-end: var(--s-5);
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-feature);
+  box-shadow: var(--shadow-card);
+  @media (max-width: $md) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    .directory-search__name {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (max-width: $sm) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.directory-search__clear {
+  min-block-size: 48px;
+}
+.grid-offices.is-refreshing {
+  opacity: 0.6;
+  transition: opacity var(--dur) var(--ease);
+}
+
 // ── Office cards ────────────────────────────────────────────────────────────
 .grid-offices {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--s-3);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--s-4);
 }
+// A cover band, the logo overlapping its lower edge, then the office's own figures.
 .office-card {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-4);
-  &:hover {
-    box-shadow: var(--shadow-float);
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  @include m.interactive-card('.office-card__cover img');
+}
+.office-card__cover {
+  display: block;
+  block-size: 96px;
+  overflow: hidden;
+  // No cover photo: the brand's lightest tint with a lane marking, never an invented picture.
+  background:
+    repeating-linear-gradient(90deg, var(--road-line) 0 18px, transparent 18px 34px) center / 100% 3px no-repeat,
+    var(--accent-100);
+  img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
   }
 }
 .office-card__logo {
-  flex: none;
+  position: absolute;
+  inset-block-start: 64px;
+  inset-inline-start: var(--s-4);
   inline-size: 56px;
   block-size: 56px;
   border-radius: var(--r-row);
+  border: 3px solid var(--surface);
   background: var(--n-100);
+  box-shadow: var(--shadow-card);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -288,12 +577,21 @@ $md: 1023px;
 .office-card__body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-inline-size: 0;
+  gap: 6px;
   flex: 1;
+  min-inline-size: 0;
+  padding: var(--s-6) var(--s-4) var(--s-4);
 }
 .office-card__name {
   font-weight: 800;
+  font-size: 16px;
+}
+.office-card__city {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-faint);
 }
 .office-card__meta {
   display: flex;
@@ -302,10 +600,21 @@ $md: 1023px;
   align-items: center;
 }
 .office-card__go {
-  color: var(--n-500);
+  margin-block-start: auto;
+  padding-block-start: var(--s-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+}
+.office-card--skeleton .office-card__cover {
+  border-radius: 0;
 }
 
 // ── How it works ────────────────────────────────────────────────────────────
+// Three steps on one line, joined, with the step that answers "when do I pay" in green.
 .how h2 {
   margin-block-end: var(--s-4);
 }
@@ -314,29 +623,88 @@ $md: 1023px;
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--s-3);
-  counter-reset: step;
   @media (max-width: $md) {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
-  @media (max-width: $sm) {
-    grid-template-columns: 1fr;
+}
+.how__step {
+  position: relative;
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding: var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-card);
+  // The arrow between steps, pointing the reader's way.
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    inset-inline-end: calc(var(--s-3) * -0.5 - 5px);
+    inset-block-start: 50%;
+    inline-size: 10px;
+    block-size: 10px;
+    border-block-start: 2px solid var(--n-400);
+    border-inline-end: 2px solid var(--n-400);
+    background: var(--bg);
+    transform: translateY(-50%) rotate(45deg);
+    z-index: 1;
+    [dir='rtl'] & {
+      transform: translateY(-50%) rotate(-45deg);
+    }
+    @media (max-width: $md) {
+      display: none;
+    }
   }
-  li {
-    background: var(--surface);
-    border: 1px solid var(--divider);
-    border-radius: var(--r-card);
-    padding: var(--s-4);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+}
+.how__step--pay {
+  border-color: var(--accent-300);
+  background: var(--accent-100);
+  .how__icon {
+    background: var(--accent);
+    color: var(--on-brand);
   }
-  p {
+}
+.how__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  > span {
     color: var(--text-muted);
     font-size: 14px;
   }
 }
+
+// ── Closing call to action: the one green band (see _tokens.scss) ───────────
+.band {
+  margin-block-start: var(--s-8);
+  background:
+    radial-gradient(600px 240px at 90% 0%, rgb(255 255 255 / 8%), transparent 70%),
+    var(--band);
+  color: var(--on-brand);
+}
+.band__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4) var(--s-6);
+  padding-block: var(--s-7);
+  @media (max-width: $sm) {
+    padding-block: var(--s-6);
+  }
+}
+.band__title {
+  color: var(--on-brand);
+  font-size: clamp(22px, 3vw, 30px);
+}
+.band__text {
+  color: var(--on-band-muted);
+  margin-block-start: 4px;
+}
+
 .how__icon {
   inline-size: 40px;
   block-size: 40px;
@@ -347,7 +715,7 @@ $md: 1023px;
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  margin-block-end: var(--s-2);
+  flex: none;
 }
 
 // ── Results page ────────────────────────────────────────────────────────────
@@ -380,6 +748,7 @@ $md: 1023px;
 }
 .results-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: end;
   gap: var(--s-3);
@@ -390,9 +759,12 @@ $md: 1023px;
   align-items: center;
   gap: var(--s-2);
   margin-inline-start: auto;
+  min-inline-size: 0;
   .select {
     min-block-size: 40px;
     inline-size: auto;
+    max-inline-size: 100%;
+    min-inline-size: 0;
   }
 }
 .filters {
@@ -481,7 +853,6 @@ $md: 1023px;
     color: var(--accent);
   }
 }
-.car-page__layout,
 .office-page__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
@@ -491,9 +862,31 @@ $md: 1023px;
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.car-page__main,
 .office-page__main,
 .office-page__aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-inline-size: 0;
+}
+
+// The car page in two movements. First the decision: photos, name and key facts beside the booking
+// card. The card is sticky INSIDE this block only — the block is its containing box — so it follows
+// the photos and stops with them, instead of riding beside a long column of office text. Then the
+// details, in two balanced columns below, where no column is pinned at all.
+.car-page__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--s-5);
+  align-items: start;
+  @media (max-width: 1199px) {
+    grid-template-columns: minmax(0, 1fr) 330px;
+  }
+  @media (max-width: $md) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.car-page__primary {
   display: flex;
   flex-direction: column;
   gap: var(--s-4);
@@ -505,6 +898,23 @@ $md: 1023px;
   @media (max-width: $md) {
     position: static;
   }
+}
+.car-page__details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--s-4) var(--s-5);
+  align-items: start;
+  margin-block-start: var(--s-6);
+  @media (max-width: $md) {
+    grid-template-columns: minmax(0, 1fr);
+    margin-block-start: var(--s-4);
+  }
+}
+.car-page__column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  min-inline-size: 0;
 }
 .car-page__head {
   display: flex;
@@ -520,39 +930,158 @@ $md: 1023px;
   align-items: baseline;
   gap: 0 0.3em;
 }
+// The specs as one compact strip under the name, not a card of their own further down.
+.facts--strip {
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: var(--s-2);
+  .fact {
+    padding: var(--s-2) var(--s-3);
+    background: var(--surface);
+    border: 1px solid var(--divider);
+  }
+}
 .book-card {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
+  box-shadow: var(--shadow-float);
 }
 .book-card__rate {
-  font-size: 20px;
+  font-size: 22px;
   color: var(--price);
 }
 .gallery-skeleton {
   aspect-ratio: 16 / 10;
   border-radius: var(--r-feature);
 }
-.office-strip__head {
+
+// The office's own texts, folded.
+.folds {
+  display: flex;
+  flex-direction: column;
+  margin-block-start: var(--s-3);
+  border-block-start: 1px solid var(--divider);
+}
+.fold {
+  border-block-end: 1px solid var(--divider);
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2);
+    padding-block: var(--s-3);
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+    &::-webkit-details-marker {
+      display: none;
+    }
+    // A chevron that turns when the fold opens. Up and down are not reading directions, so its borders
+    // are PHYSICAL: logical ones would put the corner on the left in Arabic and point it sideways.
+    &::after {
+      content: '';
+      flex: none;
+      inline-size: 8px;
+      block-size: 8px;
+      border-bottom: 2px solid var(--n-500);
+      border-right: 2px solid var(--n-500);
+      transform: rotate(45deg);
+      transition: transform var(--dur) var(--ease);
+    }
+    &:hover {
+      color: var(--accent);
+    }
+  }
+  &[open] summary::after {
+    transform: rotate(-135deg);
+  }
+  &[open] > :not(summary) {
+    animation: arrive var(--dur) var(--ease) both;
+  }
+  > :not(summary) {
+    padding-block-end: var(--s-3);
+  }
+}
+
+// The office, beside a car: who it is, then delivery and hours as labelled rows.
+.office-mini {
   display: flex;
   align-items: center;
   gap: var(--s-3);
   flex-wrap: wrap;
-  > div {
-    flex: 1;
-    min-inline-size: 160px;
+  padding-block-end: var(--s-3);
+  border-block-end: 1px solid var(--divider);
+}
+.office-mini__logo {
+  flex: none;
+  inline-size: 52px;
+  block-size: 52px;
+  border-radius: var(--r-row);
+  background: var(--n-100);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 22px;
+  color: var(--text-muted);
+  img {
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: cover;
   }
 }
-.office-strip__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--s-5);
-  @media (max-width: $sm) {
-    grid-template-columns: 1fr;
+.office-mini__body {
+  flex: 1;
+  min-inline-size: 150px;
+}
+.office-mini__name {
+  font-weight: 800;
+  &:hover {
+    color: var(--accent);
   }
 }
-.hours dd {
-  font-weight: 600;
+.info-row {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding-block: var(--s-3);
+  & + & {
+    border-block-start: 1px solid var(--divider);
+  }
+}
+.info-row__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 34px;
+  block-size: 34px;
+  border-radius: var(--r-chip);
+  background: var(--accent-100);
+  color: var(--accent);
+  font-size: 17px;
+}
+.info-row__title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-block-end: 2px;
+}
+.info-row__grow {
+  flex: 1;
+  min-inline-size: 0;
+}
+.hours {
+  dd {
+    font-weight: 600;
+  }
+  > div.is-today {
+    font-weight: 800;
+    color: var(--text);
+  }
+}
+.hours__today {
+  margin-inline-start: 6px;
+  vertical-align: middle;
 }
 
 .sticky-cta {

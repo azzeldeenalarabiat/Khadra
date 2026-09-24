@@ -11,7 +11,15 @@
   font-weight: 700;
   font-size: 15px;
   white-space: nowrap;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
   &:disabled,
   &[aria-disabled='true'] {
     opacity: 0.5;
@@ -23,6 +31,15 @@
   color: var(--on-brand);
   &:hover:not(:disabled) {
     background: var(--accent-900);
+    box-shadow: 0 6px 16px rgb(21 128 61 / 24%);
+  }
+}
+// White on the deep-green band: the one place a button sits on green.
+.btn--on-band {
+  background: var(--surface);
+  color: var(--brand-deep);
+  &:hover:not(:disabled) {
+    background: var(--accent-100);
   }
 }
 .btn--secondary {
@@ -68,7 +85,9 @@
   background: transparent;
   font-size: 18px;
   position: relative;
-  &:hover {
+  transition: background-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  &:hover,
+  &[aria-expanded='true'] {
     background: var(--n-100);
   }
 }
@@ -531,5 +550,64 @@
   font-weight: 700;
   kh-icon {
     color: var(--star);
+  }
+}
+
+// ── An input with a leading icon ────────────────────────────────────────────
+.input-icon {
+  position: relative;
+  display: block;
+  kh-icon {
+    position: absolute;
+    inset-inline-start: var(--s-3);
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+    color: var(--n-500);
+    pointer-events: none;
+  }
+  .input {
+    padding-inline-start: calc(var(--s-3) * 2 + 16px);
+  }
+}
+
+// ── A checkbox that looks like a chip (a filter that is on or off) ──────────
+.toggle-chip {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+  input {
+    position: absolute;
+    opacity: 0;
+    inline-size: 1px;
+    block-size: 1px;
+  }
+  > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-block-size: 48px;
+    padding: 0 var(--s-4);
+    border-radius: var(--r-field);
+    border: 1px solid var(--n-300);
+    background: var(--surface);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-muted);
+    transition:
+      background-color var(--dur-fast) var(--ease),
+      border-color var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
+  }
+  &:hover > span {
+    border-color: var(--n-500);
+    color: var(--text);
+  }
+  input:checked + span {
+    background: var(--accent-100);
+    border-color: var(--accent);
+    color: var(--accent-900);
+  }
+  input:focus-visible + span {
+    box-shadow: var(--focus);
   }
 }

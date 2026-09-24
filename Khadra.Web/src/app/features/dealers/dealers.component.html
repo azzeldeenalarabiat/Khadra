@@ -6,24 +6,49 @@
         @if (offices.value(); as page) { · <strong>{{ i18n.t('offices.count', { count: page.totalCount }) }}</strong> }
       </p>
     </div>
-    <label class="field page-head__filter">
-      <span class="field__label">{{ i18n.t('search.city') }}</span>
+  </div>
+
+  <!-- The office search: its own, separate from the car search. -->
+  <form class="directory-search" role="search" [attr.aria-label]="i18n.t('offices.searchLabel')" (submit)="submitText($event)">
+    <label class="field directory-search__name">
+      <span class="field__label">{{ i18n.t('offices.nameLabel') }}</span>
+      <span class="input-icon">
+        <kh-icon name="magnifying-glass" />
+        <input class="input" type="search" name="q" autocomplete="off" [attr.maxlength]="textMax"
+          [placeholder]="i18n.t('offices.namePlaceholder')" [value]="boxText()" (input)="onType($any($event.target).value)" />
+      </span>
+    </label>
+    <label class="field directory-search__city">
+      <span class="field__label">{{ i18n.t('offices.cityLabel') }}</span>
       <select class="select" (change)="setCity($any($event.target).value)">
         <option value="">{{ i18n.t('search.anyCity') }}</option>
         @for (entry of lookups.activeCities(); track entry.id) {
-          <option [value]="entry.id" [selected]="entry.id === city()">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
+          <option [value]="entry.id" [selected]="entry.id === search().city">{{ i18n.isArabic() ? (entry.nameAr || entry.nameEn) : (entry.nameEn || entry.nameAr) }}</option>
         }
       </select>
     </label>
-  </div>
+    <label class="toggle-chip directory-search__delivery">
+      <input type="checkbox" [checked]="search().delivery" (change)="setDelivery($any($event.target).checked)" />
+      <span><kh-icon name="truck" />{{ i18n.t('offices.deliveryOnly') }}</span>
+    </label>
+    @if (narrowed()) {
+      <button type="button" class="btn btn--ghost btn--sm directory-search__clear" (click)="clear()">
+        <kh-icon name="x" />{{ i18n.t('cars.clearFilters') }}</button>
+    }
+  </form>
 
   @if (problem(); as failure) {
     <kh-state-panel kind="error" [problem]="failure" (action)="offices.reload()" />
   } @else if (offices.value(); as page) {
     @if (page.items.length === 0) {
-      <kh-state-panel icon="storefront" [title]="i18n.t('offices.emptyTitle')" [text]="i18n.t('offices.emptyText')" />
+      @if (narrowed()) {
+        <kh-state-panel icon="storefront" [title]="i18n.t('offices.noMatchTitle')" [text]="i18n.t('offices.noMatchText')"
+          [actionLabel]="i18n.t('cars.clearFilters')" (action)="clear()" />
+      } @else {
+        <kh-state-panel icon="storefront" [title]="i18n.t('offices.emptyTitle')" [text]="i18n.t('offices.emptyText')" />
+      }
     } @else {
-      <div class="grid-offices">
+      <div class="grid-offices arrive" [class.is-refreshing]="offices.isLoading()">
         @for (office of page.items; track office.dealerId) {
           <kh-office-card [office]="office" />
         }
@@ -45,7 +70,8 @@
   } @else {
     <div class="grid-offices" aria-busy="true">
       @for (index of skeletons; track index) {
-        <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+        <div class="office-card office-card--skeleton"><div class="skeleton office-card__cover"></div>
+          <div class="office-card__body"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div></div>
       }
     </div>
   }

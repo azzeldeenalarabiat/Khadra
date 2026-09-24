@@ -16,8 +16,10 @@
       <span aria-current="page" class="ltr">{{ c.make }} {{ c.model }}</span>
     </nav>
 
-    <div class="car-page__layout">
-      <div class="car-page__main">
+    <!-- The decision, together: photos, name and the booking card side by side. The card sticks only
+         while this block is on screen, so it never trails a long column down the page. -->
+    <div class="car-page__top">
+      <div class="car-page__primary">
         <kh-photo-gallery [photos]="c.imageUrls" [alt]="name()" />
 
         <header class="car-page__head">
@@ -32,9 +34,9 @@
           <kh-save-button [vehicleId]="c.vehicleId" />
         </header>
 
-        <section class="card card--pad" aria-labelledby="specs">
-          <h2 id="specs" class="card__title">{{ i18n.t('car.specs') }}</h2>
-          <dl class="facts">
+        <section aria-labelledby="specs">
+          <h2 id="specs" class="sr-only">{{ i18n.t('car.specs') }}</h2>
+          <dl class="facts facts--strip">
             <div class="fact"><kh-icon name="calendar-blank" /><div><dt>{{ i18n.t('car.year') }}</dt><dd class="ltr">{{ c.year }}</dd></div></div>
             @if (carType()) {
               <div class="fact"><kh-icon name="car-simple" /><div><dt>{{ i18n.t('car.type') }}</dt><dd>{{ carType() }}</dd></div></div>
@@ -46,98 +48,6 @@
               <div class="fact"><kh-icon name="image" /><div><dt>{{ i18n.t('car.colour') }}</dt><dd class="user-text">{{ c.color }}</dd></div></div>
             }
           </dl>
-        </section>
-
-        @if (c.description) {
-          <section class="card card--pad" aria-labelledby="about">
-            <h2 id="about" class="card__title">{{ i18n.t('car.about') }}</h2>
-            <kh-office-text [text]="c.description" />
-          </section>
-        }
-
-        <section class="card card--pad" aria-labelledby="policies">
-          <h2 id="policies" class="card__title">{{ i18n.t('car.rentalTerms') }}</h2>
-          <dl class="lines">
-            <div><dt>{{ i18n.t('car.mileage') }}</dt>
-              <dd>
-                @if (c.mileage.isUnlimited) {
-                  {{ i18n.t('car.mileageUnlimited') }}
-                } @else {
-                  {{ i18n.t('car.mileageLimited', { limit: format.number(c.mileage.dailyLimitKm ?? 0) }) }}
-                  @if (c.mileage.excessFeePerKm) {
-                    <span class="faint small d-block">{{ i18n.t('car.mileageExcess', { amount: format.money(c.mileage.excessFeePerKm) }) }}</span>
-                  }
-                }
-              </dd>
-            </div>
-            <div><dt>{{ i18n.t('car.fuelPolicy') }}</dt><dd>{{ fuelPolicy(c.fuelPolicy) }}</dd></div>
-            <div><dt>{{ i18n.t('car.securityDeposit') }}</dt>
-              <dd>{{ format.money(c.securityDeposit) }}<span class="faint small d-block">{{ i18n.t('car.securityDepositHelp') }}</span></dd></div>
-          </dl>
-        </section>
-
-        @if (office.value(); as page) {
-          @let sections = page.sections;
-          @if (sections.rentalConditions || sections.insurance || sections.pickupInstructions || (c.isDeliveryEligible && page.delivery.isEnabled && sections.deliveryNotes)) {
-            <section class="card card--pad" aria-labelledby="from-office">
-              <h2 id="from-office" class="card__title">{{ i18n.t('car.fromTheOffice') }}</h2>
-              <p class="faint small">{{ i18n.t('car.officeOwnWords') }}</p>
-              @if (sections.rentalConditions; as text) {
-                <h3 class="sub-title">{{ i18n.t('car.rentalTerms') }}</h3><kh-office-text [text]="text" />
-              }
-              @if (sections.insurance; as text) {
-                <h3 class="sub-title">{{ i18n.t('car.insurance') }}</h3><kh-office-text [text]="text" />
-              }
-              @if (sections.pickupInstructions; as text) {
-                <h3 class="sub-title">{{ i18n.t('car.pickupInstructions') }}</h3><kh-office-text [text]="text" />
-              }
-              @if (c.isDeliveryEligible && page.delivery.isEnabled && sections.deliveryNotes; as text) {
-                <h3 class="sub-title">{{ i18n.t('car.deliveryNotes') }}</h3><kh-office-text [text]="text" />
-              }
-            </section>
-          }
-        }
-
-        <section class="card card--pad office-strip" aria-labelledby="office">
-          <h2 id="office" class="card__title">{{ i18n.t('office.title') }}</h2>
-          <div class="office-strip__head">
-            <span class="office-card__logo">
-              @if (c.gallery.logoUrl) {
-                <img [src]="c.gallery.logoUrl" alt="" width="56" height="56" loading="lazy" />
-              } @else {
-                <kh-icon name="storefront" />
-              }
-            </span>
-            <div>
-              <a class="office-card__name user-text" [routerLink]="officeLink()">{{ c.gallery.businessName }}</a>
-              <p class="faint small">
-                @if (city()) { <kh-icon name="map-pin" /> {{ city() }} · }
-                @if (c.gallery.averageRating !== null) {
-                  <span class="rating"><kh-icon name="star-fill" />{{ format.number(c.gallery.averageRating, 1) }}</span>
-                  ({{ i18n.t('office.reviewCount', { count: c.gallery.reviewCount }) }})
-                } @else {
-                  {{ i18n.t('office.notRated') }}
-                }
-              </p>
-            </div>
-            <a class="btn btn--secondary btn--sm" [routerLink]="officeLink()">{{ i18n.t('office.view') }}</a>
-          </div>
-          <div class="office-strip__grid">
-            <div>
-              <h3 class="sub-title">{{ i18n.t('car.hours') }}</h3>
-              <kh-opening-hours [days]="c.gallery.operatingHours" />
-            </div>
-            <div>
-              <h3 class="sub-title">{{ i18n.t('office.delivery') }}</h3>
-              @if (!c.gallery.delivery.isEnabled) {
-                <p class="muted">{{ i18n.t('office.deliveryNotOffered') }}</p>
-              } @else if (!c.isDeliveryEligible) {
-                <p class="muted">{{ i18n.t('quote.deliveryNotForCar') }}</p>
-              } @else {
-                <p class="muted">{{ i18n.t('office.deliveryOffered', { radius: format.number(c.gallery.delivery.radiusKm), fee: format.money(c.gallery.delivery.fee) }) }}</p>
-              }
-            </div>
-          </div>
         </section>
       </div>
 
@@ -178,6 +88,115 @@
       </aside>
     </div>
 
+    <!-- Everything else, grouped and balanced: the car and its terms on one side, the office on the other. -->
+    <div class="car-page__details">
+      <div class="car-page__column">
+        @if (c.description) {
+          <section class="card card--pad" aria-labelledby="about">
+            <h2 id="about" class="card__title">{{ i18n.t('car.about') }}</h2>
+            <kh-office-text [text]="c.description" />
+          </section>
+        }
+
+        <section class="card card--pad" aria-labelledby="policies">
+          <h2 id="policies" class="card__title">{{ i18n.t('car.rentalTerms') }}</h2>
+          <dl class="lines">
+            <div><dt>{{ i18n.t('car.mileage') }}</dt>
+              <dd>
+                @if (c.mileage.isUnlimited) {
+                  {{ i18n.t('car.mileageUnlimited') }}
+                } @else {
+                  {{ i18n.t('car.mileageLimited', { limit: format.number(c.mileage.dailyLimitKm ?? 0) }) }}
+                  @if (c.mileage.excessFeePerKm) {
+                    <span class="faint small d-block">{{ i18n.t('car.mileageExcess', { amount: format.money(c.mileage.excessFeePerKm) }) }}</span>
+                  }
+                }
+              </dd>
+            </div>
+            <div><dt>{{ i18n.t('car.fuelPolicy') }}</dt><dd>{{ fuelPolicy(c.fuelPolicy) }}</dd></div>
+            <div><dt>{{ i18n.t('car.securityDeposit') }}</dt>
+              <dd>{{ format.money(c.securityDeposit) }}<span class="faint small d-block">{{ i18n.t('car.securityDepositHelp') }}</span></dd></div>
+          </dl>
+        </section>
+
+        @if (office.value(); as page) {
+          @let sections = page.sections;
+          @if (sections.rentalConditions || sections.insurance || sections.pickupInstructions || (c.isDeliveryEligible && page.delivery.isEnabled && sections.deliveryNotes)) {
+            <section class="card card--pad" aria-labelledby="from-office">
+              <h2 id="from-office" class="card__title">{{ i18n.t('car.fromTheOffice') }}</h2>
+              <p class="faint small">{{ i18n.t('car.officeOwnWords') }}</p>
+              <!-- The office texts can run long: each folds, so none stands between a visitor and the
+                   decision. Native details: works without script and when rendered on the server. -->
+              <div class="folds">
+                @if (sections.rentalConditions; as text) {
+                  <details class="fold"><summary>{{ i18n.t('car.officeConditions') }}</summary><kh-office-text [text]="text" /></details>
+                }
+                @if (sections.insurance; as text) {
+                  <details class="fold"><summary>{{ i18n.t('car.insurance') }}</summary><kh-office-text [text]="text" /></details>
+                }
+                @if (sections.pickupInstructions; as text) {
+                  <details class="fold"><summary>{{ i18n.t('car.pickupInstructions') }}</summary><kh-office-text [text]="text" /></details>
+                }
+                @if (c.isDeliveryEligible && page.delivery.isEnabled && sections.deliveryNotes; as text) {
+                  <details class="fold"><summary>{{ i18n.t('car.deliveryNotes') }}</summary><kh-office-text [text]="text" /></details>
+                }
+              </div>
+            </section>
+          }
+        }
+      </div>
+
+      <div class="car-page__column">
+        <section class="card card--pad" aria-labelledby="office">
+          <h2 id="office" class="card__title">{{ i18n.t('office.title') }}</h2>
+          <div class="office-mini">
+            <span class="office-mini__logo">
+              @if (c.gallery.logoUrl) {
+                <img [src]="c.gallery.logoUrl" alt="" width="56" height="56" loading="lazy" />
+              } @else {
+                <kh-icon name="storefront" />
+              }
+            </span>
+            <div class="office-mini__body">
+              <a class="office-mini__name user-text" [routerLink]="officeLink()">{{ c.gallery.businessName }}</a>
+              <p class="faint small">
+                @if (city()) { <kh-icon name="map-pin" /> {{ city() }} · }
+                @if (c.gallery.averageRating !== null) {
+                  <span class="rating"><kh-icon name="star-fill" />{{ format.number(c.gallery.averageRating, 1) }}</span>
+                  ({{ i18n.t('office.reviewCount', { count: c.gallery.reviewCount }) }})
+                } @else {
+                  {{ i18n.t('office.notRated') }}
+                }
+              </p>
+            </div>
+            <a class="btn btn--secondary btn--sm" [routerLink]="officeLink()">{{ i18n.t('office.view') }}</a>
+          </div>
+
+          <div class="info-row">
+            <span class="info-row__icon"><kh-icon name="truck" /></span>
+            <div>
+              <h3 class="info-row__title">{{ i18n.t('office.delivery') }}</h3>
+              @if (!c.gallery.delivery.isEnabled) {
+                <p class="muted small">{{ i18n.t('office.deliveryNotOffered') }}</p>
+              } @else if (!c.isDeliveryEligible) {
+                <p class="muted small">{{ i18n.t('quote.deliveryNotForCar') }}</p>
+              } @else {
+                <p class="muted small">{{ i18n.t('office.deliveryOffered', { radius: format.number(c.gallery.delivery.radiusKm), fee: format.money(c.gallery.delivery.fee) }) }}</p>
+              }
+            </div>
+          </div>
+
+          <div class="info-row">
+            <span class="info-row__icon"><kh-icon name="clock" /></span>
+            <div class="info-row__grow">
+              <h3 class="info-row__title">{{ i18n.t('car.hours') }}</h3>
+              <kh-opening-hours ngSkipHydration [days]="c.gallery.operatingHours" />
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
     <div class="sticky-cta show-md">
       <div>
         @if (quote.value(); as q) {
@@ -196,8 +215,8 @@
   </div>
 } @else {
   <div class="container page car-page" aria-busy="true">
-    <div class="car-page__layout">
-      <div class="car-page__main"><div class="skeleton gallery-skeleton"></div><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+    <div class="car-page__top">
+      <div class="car-page__primary"><div class="skeleton gallery-skeleton"></div><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
       <aside class="car-page__aside"><div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div></aside>
     </div>
   </div>

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ShortlistService } from '../../core/api/shortlist.service';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -26,6 +26,8 @@ export class SaveButtonComponent {
 
   protected readonly saved = computed(() => this.shortlist.savedIds().has(this.vehicleId()));
   protected readonly busy = computed(() => this.shortlist.busyIds().has(this.vehicleId()));
+  /** Set by a tap, never by a page load: only a heart the visitor just filled answers with a pop. */
+  protected readonly justSaved = signal(false);
 
   protected toggle(event: Event): void {
     event.preventDefault();
@@ -36,6 +38,7 @@ export class SaveButtonComponent {
       });
       return;
     }
+    this.justSaved.set(!this.saved());
     void this.shortlist.toggle(this.vehicleId());
   }
 }

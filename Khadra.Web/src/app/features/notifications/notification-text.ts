@@ -1,0 +1,40 @@
+import { NotificationItem } from '../../core/api/notifications.service';
+import { TranslationKey } from '../../core/i18n/en';
+import { I18nService } from '../../core/i18n/i18n.service';
+
+/**
+ * The customer kinds the platform sends (NotificationKind, the Your* entries). A kind a newer server
+ * sends reads as a generic update, never blank.
+ */
+export const KNOWN_KINDS: ReadonlySet<string> = new Set([
+  'YourBookingApproved',
+  'YourBookingRejected',
+  'YourBookingExpired',
+  'YourBookingCompleted',
+  'YourBookingMarkedNoShow',
+  'YourBookingConfirmed',
+  'YourBookingCancelled',
+  'YourBookingPickedUp',
+  'YourBookingReturned',
+  'YourPaymentReminder',
+  'YourPickupReminder',
+  'YourReturnReminder',
+  'YourDisputeUpdated',
+  'YourDepositRefunded',
+]);
+
+/** One notification's sentence, the same on the full page and in the header's panel. */
+export function notificationText(i18n: I18nService, item: NotificationItem): string {
+  const actor = item.actorName || i18n.t('notification.someone');
+  return KNOWN_KINDS.has(item.kind)
+    ? i18n.t(`notification.${item.kind}` as TranslationKey, { actor })
+    : i18n.t('notification.unknown', { actor });
+}
+
+/** "About booking KH-…" or "About dispute …", when the notification names what it is about. */
+export function notificationAbout(i18n: I18nService, item: NotificationItem): string {
+  if (!item.subjectReference) return '';
+  return i18n.t(item.kind === 'YourDisputeUpdated' ? 'notifications.aboutDispute' : 'notifications.about', {
+    reference: item.subjectReference,
+  });
+}

@@ -1,43 +1,23 @@
-import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { NotificationFeed, NotificationItem, NotificationsService } from '../../core/api/notifications.service';
+import { NotificationItem, NotificationsService } from '../../core/api/notifications.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
-import { TranslationKey } from '../../core/i18n/en';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { notificationTarget } from './notification-target';
+import { notificationAbout, notificationText } from './notification-text';
+
+export { KNOWN_KINDS } from './notification-text';
 
 const PAGE_SIZE = 20;
 
 /**
- * The customer kinds the platform sends (NotificationKind, the Your* entries). A kind a newer server
- * sends reads as a generic update, never blank.
- */
-export const KNOWN_KINDS: ReadonlySet<string> = new Set([
-  'YourBookingApproved',
-  'YourBookingRejected',
-  'YourBookingExpired',
-  'YourBookingCompleted',
-  'YourBookingMarkedNoShow',
-  'YourBookingConfirmed',
-  'YourBookingCancelled',
-  'YourBookingPickedUp',
-  'YourBookingReturned',
-  'YourPaymentReminder',
-  'YourPickupReminder',
-  'YourReturnReminder',
-  'YourDisputeUpdated',
-  'YourDepositRefunded',
-]);
-
-/**
- * The customer's notifications, from the backend — the same feed the app shows. Opening one marks it
- * read and goes to what it is about: its booking, or — for a dispute update — the dispute.
+ * The customer's notifications, from the backend — the same feed the app shows, and the "view all"
+ * behind the header's panel. Opening one marks it read and goes to what it is about: its booking, or —
+ * for a dispute update — the dispute.
  */
 @Component({
   selector: 'kh-notifications',
@@ -48,9 +28,8 @@ export const KNOWN_KINDS: ReadonlySet<string> = new Set([
 export class NotificationsComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly format = inject(FormatService);
-  private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
-  private readonly badge = inject(NotificationsService);
+  private readonly notifications = inject(NotificationsService);
 
   protected readonly items = signal<NotificationItem[]>([]);
   protected readonly loaded = signal(false);
@@ -70,9 +49,7 @@ export class NotificationsComponent {
     this.loading.set(true);
     this.problem.set(null);
     try {
-      const feed = await firstValueFrom(
-        this.http.get<NotificationFeed>('/api/v1/notifications', { params: { page: this.page + 1, pageSize: PAGE_SIZE } }),
-      );
+      const feed = await this.notifications.feed(this.page + 1, PAGE_SIZE);
       this.page = feed.page;
       this.items.update((current) => [...current, ...feed.items]);
       this.unread.set(feed.unreadCount);
@@ -92,26 +69,18 @@ export class NotificationsComponent {
   }
 
   protected text(item: NotificationItem): string {
-    const actor = item.actorName || this.i18n.t('notification.someone');
-    return KNOWN_KINDS.has(item.kind)
-      ? this.i18n.t(`notification.${item.kind}` as TranslationKey, { actor })
-      : this.i18n.t('notification.unknown', { actor });
+    return notificationText(this.i18n, item);
   }
 
   protected about(item: NotificationItem): string {
-    if (!item.subjectReference) return '';
-    return this.i18n.t(item.kind === 'YourDisputeUpdated' ? 'notifications.aboutDispute' : 'notifications.about', {
-      reference: item.subjectReference,
-    });
+    return notificationAbout(this.i18n, item);
   }
 
-  protected async open(item: NotificationItem): Promise<void> {
+  protected open(item: NotificationItem): void {
     if (!item.isRead) {
       this.items.update((current) => current.map((entry) => (entry === item ? { ...entry, isRead: true } : entry)));
       this.unread.update((count) => Math.max(0, count - 1));
-      void firstValueFrom(this.http.post(`/api/v1/notifications/${item.notificationId}/read`, {}))
-        .then(() => this.badge.refresh())
-        .catch(() => undefined);
+      void this.notifications.markRead(item.notificationId).catch(() => undefined);
     }
     // Every customer kind is about a booking, whose id is the subject — except a dispute update,
     // whose subject is the dispute ticket (as in the app).
@@ -121,10 +90,9 @@ export class NotificationsComponent {
 
   protected async markAll(): Promise<void> {
     try {
-      await firstValueFrom(this.http.post('/api/v1/notifications/read-all', {}));
+      await this.notifications.markAllRead();
       this.items.update((current) => current.map((entry) => ({ ...entry, isRead: true })));
       this.unread.set(0);
-      void this.badge.refresh();
     } catch (error) {
       this.problem.set(snapshotProblem(error));
     }

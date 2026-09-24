@@ -1,0 +1,51 @@
+// One interaction language for everything a visitor can click as a whole: car cards, office cards,
+// vehicle-type cards, notification rows. A slight lift, a hair of scale, a softer shadow, and an image
+// that leans in — on devices that can actually hover. Touch screens get none of it and lose nothing:
+// no content or action is ever reachable only by hovering.
+
+@mixin interactive-card($image: null) {
+  transition:
+    transform var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+
+  @if $image {
+    #{$image} {
+      transition: transform var(--dur-slow) var(--ease);
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      transform: translateY(var(--lift)) scale(var(--lift-scale));
+      box-shadow: var(--shadow-lift);
+      border-color: var(--n-300);
+      @if $image {
+        #{$image} {
+          transform: scale(var(--zoom));
+        }
+      }
+    }
+  }
+
+  // A keyboard user gets the same answer as a mouse user, without the movement.
+  &:focus-within {
+    box-shadow: var(--shadow-float), var(--focus);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &:hover {
+      transform: none;
+      @if $image {
+        #{$image} {
+          transform: none;
+        }
+      }
+    }
+  }
+}
+
+// Content arriving after a skeleton: a short fade and rise, never a slide across the page.
+@mixin arrive {
+  animation: arrive var(--dur-slow) var(--ease) both;
+}

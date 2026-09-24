@@ -1,14 +1,20 @@
 <dl class="lines hours">
-  @for (day of days(); track day.day) {
-    <div>
-      <dt>{{ format.weekday(day.day) }}</dt>
+  @for (run of runs(); track run.first) {
+    @let isToday = today() !== null && run.days.includes(today()!);
+    <div [class.is-today]="isToday">
+      <dt>
+        {{ format.weekday(run.first) }}@if (run.last !== run.first) { – {{ format.weekday(run.last) }} }
+        @if (isToday) { <span class="badge badge--ok hours__today">{{ i18n.t('office.today') }}</span> }
+      </dt>
       <dd>
-        @if (day.isClosed || !day.opens || !day.closes) {
+        @if (run.isClosed) {
           <span class="faint">{{ i18n.t('office.closed') }}</span>
         } @else {
-          <span class="ltr tabular">{{ format.clock(day.opens) }} – {{ format.clock(day.closes) }}</span>
+          <span class="ltr tabular">{{ format.clock(run.opens) }} – {{ format.clock(run.closes) }}</span>
         }
       </dd>
     </div>
+  } @empty {
+    <div><dd class="muted">{{ i18n.t('office.noHours') }}</dd></div>
   }
 </dl>

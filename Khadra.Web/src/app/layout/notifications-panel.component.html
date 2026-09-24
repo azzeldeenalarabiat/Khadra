@@ -1,0 +1,49 @@
+<div class="notif-panel" id="notifications-panel" role="dialog" [attr.aria-label]="i18n.t('notifications.title')">
+  <div class="notif-panel__head">
+    <strong>{{ i18n.t('notifications.title') }}</strong>
+    @if (unread() > 0) {
+      <button type="button" class="link small" (click)="markAll()">{{ i18n.t('notifications.markAll') }}</button>
+    }
+  </div>
+
+  <div class="notif-panel__body">
+    @if (problem(); as failure) {
+      <div class="notif-panel__state">
+        <p class="muted small">{{ i18n.t('notifications.panelFailed') }}</p>
+        <button type="button" class="btn btn--secondary btn--sm" (click)="load()">{{ i18n.t('common.retry') }}</button>
+      </div>
+    } @else if (items(); as list) {
+      @if (list.length === 0) {
+        <div class="notif-panel__state">
+          <span class="state__icon"><kh-icon name="bell" /></span>
+          <p class="notif-panel__empty-title">{{ i18n.t('notifications.emptyTitle') }}</p>
+          <p class="muted small">{{ i18n.t('notifications.emptyText') }}</p>
+        </div>
+      } @else {
+        <ul class="notification-list arrive">
+          @for (item of list; track item.notificationId) {
+            <li>
+              <button type="button" class="notification" [class.is-unread]="!item.isRead" (click)="open(item)">
+                <span class="notification__dot" aria-hidden="true"></span>
+                <span class="notification__body">
+                  <span class="notification__text">{{ text(item) }}</span>
+                  <span class="faint small">
+                    @if (about(item)) { <span class="user-text">{{ about(item) }}</span> · }
+                    {{ format.dateTime(item.occurredAt) }}</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    } @else {
+      <div class="notif-panel__state" aria-busy="true">
+        <div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div>
+      </div>
+    }
+  </div>
+
+  <a class="notif-panel__all" [routerLink]="i18n.link('notifications')" (click)="closed.emit()">
+    {{ i18n.t('notifications.viewAll') }}<kh-icon [name]="i18n.isArabic() ? 'arrow-left' : 'arrow-right'" />
+  </a>
+</div>

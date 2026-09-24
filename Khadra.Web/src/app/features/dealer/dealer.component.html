@@ -122,7 +122,7 @@
       <aside class="office-page__aside">
         <section class="card card--pad" id="hours" aria-labelledby="hours-title">
           <h2 id="hours-title" class="card__title">{{ i18n.t('office.hours') }}</h2>
-          <kh-opening-hours [days]="o.operatingHours" />
+          <kh-opening-hours ngSkipHydration [days]="o.operatingHours" />
         </section>
         <section class="card card--pad" aria-labelledby="delivery-title">
           <h2 id="delivery-title" class="card__title">{{ i18n.t('office.delivery') }}</h2>

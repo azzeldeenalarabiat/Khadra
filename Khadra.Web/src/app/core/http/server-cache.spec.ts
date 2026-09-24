@@ -10,11 +10,13 @@ import {
 describe('server cache', () => {
   beforeEach(() => clearServerCache());
 
-  it('holds only the three public lookups, per language', () => {
+  it('holds only the public lookups and the facets, per language', () => {
     expect(serverCacheKey('/api/v1/cities', 'ar')).toBe('ar|/api/v1/cities');
     expect(serverCacheKey('/api/v1/cities', 'en')).not.toBe(serverCacheKey('/api/v1/cities', 'ar'));
     expect(serverCacheKey('/api/v1/app-config', 'en')).not.toBeNull();
     expect(serverCacheKey('/api/v1/car-types', 'en')).not.toBeNull();
+    expect(serverCacheKey('/api/v1/vehicles/facets', 'ar')).toBe('ar|/api/v1/vehicles/facets');
+    expect(serverCacheKey('/api/v1/vehicles/facets?cityId=x', 'ar')).toBeNull();
   });
 
   it('never holds availability, prices, a quote or anything with a query', () => {

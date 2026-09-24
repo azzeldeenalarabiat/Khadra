@@ -1,5 +1,10 @@
 @let o = office();
-<a class="office-card card" [routerLink]="link()">
+<a class="office-card" [routerLink]="link()">
+  <span class="office-card__cover" aria-hidden="true">
+    @if (o.coverUrl) {
+      <img [src]="o.coverUrl" alt="" width="640" height="240" loading="lazy" decoding="async" />
+    }
+  </span>
   <span class="office-card__logo">
     @if (o.logoUrl) {
       <img [src]="o.logoUrl" alt="" width="56" height="56" loading="lazy" decoding="async" />
@@ -10,7 +15,7 @@
   <span class="office-card__body">
     <span class="office-card__name user-text">{{ o.businessName }}</span>
     @if (city()) {
-      <span class="faint small"><kh-icon name="map-pin" /> {{ city() }}</span>
+      <span class="office-card__city"><kh-icon name="map-pin" /> {{ city() }}</span>
     }
     <span class="office-card__meta">
       <span class="badge">{{ i18n.t('office.carCount', { count: o.listedVehicleCount }) }}</span>
@@ -22,6 +27,7 @@
           <span class="faint">({{ format.number(o.reviewCount) }})</span></span>
       }
     </span>
+    <span class="office-card__go">{{ i18n.t('office.view') }}
+      <kh-icon [name]="i18n.isArabic() ? 'arrow-left' : 'arrow-right'" /></span>
   </span>
-  <kh-icon class="office-card__go" [name]="i18n.isArabic() ? 'caret-left' : 'caret-right'" />
 </a>

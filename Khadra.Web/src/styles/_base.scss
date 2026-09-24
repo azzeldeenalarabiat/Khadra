@@ -23,8 +23,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+// The header's host must not be a box: a sticky element sticks only within its parent, and a
+// kh-site-header block exactly as tall as the header gave it nowhere to stick, so it scrolled away.
 kh-root,
-kh-site-shell {
+kh-site-shell,
+kh-site-header {
   display: contents;
 }
 
@@ -149,6 +152,56 @@ kh-icon {
   font-size: 1.15em;
   .icon {
     display: inline-flex;
+  }
+}
+
+// Content replacing its skeleton settles in rather than popping.
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.arrive {
+  animation: arrive var(--dur-slow) var(--ease) both;
+}
+
+// A panel opening from its trigger (menus, the notifications popover).
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+// A sheet rising from the bottom edge (phones).
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+// The save heart answering a tap.
+@keyframes heart-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 

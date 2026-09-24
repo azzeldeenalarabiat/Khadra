@@ -6,8 +6,12 @@
  * NEVER cached (they are `no-store` at the API for a reason), nothing belonging to an account can
  * reach it (the renderer never has a session), and the key includes the language because the API
  * words vocabulary per `Accept-Language`.
+ *
+ * The facets are here too: a filter vocabulary with no query string, read on every home and cars render.
+ * They carry per-type LISTED counts (never availability), so a minute of staleness in a type card is
+ * harmless, where the same minute on a search result would not be.
  */
-const CACHEABLE_PATHS = new Set(['/api/v1/app-config', '/api/v1/cities', '/api/v1/car-types']);
+const CACHEABLE_PATHS = new Set(['/api/v1/app-config', '/api/v1/cities', '/api/v1/car-types', '/api/v1/vehicles/facets']);
 
 export const SERVER_CACHE_TTL_MS = 60_000;
 

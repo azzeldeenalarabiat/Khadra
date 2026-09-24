@@ -43,6 +43,12 @@ export class NotificationsService {
 
   readonly unread = signal(0);
   private timer: ReturnType<typeof setInterval> | null = null;
+  /**
+   * Bumped by every read of the count and every change to it. An answer that arrives after a newer
+   * one was asked for, or after the visitor marked something read, is older than what the badge
+   * already knows and is dropped — otherwise a minute-old poll could put a cleared count back.
+   */
+  private generation = 0;
 
   constructor() {
     effect(() => {
@@ -61,10 +67,38 @@ export class NotificationsService {
     });
   }
 
+  /** One page of the feed, newest first. */
+  feed(page: number, pageSize: number): Promise<NotificationFeed> {
+    return firstValueFrom(this.http.get<NotificationFeed>('/api/v1/notifications', { params: { page, pageSize } }));
+  }
+
+  /**
+   * Marks one read. The badge drops at once, with the row the visitor just opened, then settles on the
+   * server's count; if the call fails the server's count puts it back.
+   */
+  async markRead(notificationId: string): Promise<void> {
+    this.generation++;
+    this.unread.update((count) => Math.max(0, count - 1));
+    try {
+      await firstValueFrom(this.http.post(`/api/v1/notifications/${notificationId}/read`, {}));
+    } finally {
+      void this.refresh();
+    }
+  }
+
+  async markAllRead(): Promise<void> {
+    await firstValueFrom(this.http.post('/api/v1/notifications/read-all', {}));
+    this.generation++;
+    this.unread.set(0);
+    void this.refresh();
+  }
+
   async refresh(): Promise<void> {
     if (!this.session.isSignedIn()) return;
+    const asked = ++this.generation;
     try {
-      this.unread.set(await firstValueFrom(this.http.get<number>('/api/v1/notifications/unread-count')));
+      const count = await firstValueFrom(this.http.get<number>('/api/v1/notifications/unread-count'));
+      if (asked === this.generation) this.unread.set(count);
     } catch {
       /* the badge keeps its last known count; the page itself reports failures */
     }

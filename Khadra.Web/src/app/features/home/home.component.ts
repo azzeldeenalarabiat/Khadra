@@ -4,8 +4,11 @@ import { CatalogueFacets, CatalogueListing, PublicGalleryCard } from '../../core
 import { Paged } from '../../core/api/common.api';
 import { LookupsService } from '../../core/api/lookups.service';
 import { ShortlistService } from '../../core/api/shortlist.service';
+import { AppConfigService } from '../../core/config/app-config.service';
 import { snapshotProblem } from '../../core/http/problem';
+import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { slugFor } from '../../core/routing/slug';
 import { SeoService } from '../../core/seo/seo.service';
 import { CarCardComponent } from '../../shared/car-card/car-card.component';
 import { IconComponent } from '../../shared/icon/icon.component';
@@ -15,15 +18,19 @@ import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { EMPTY_SEARCH, searchToParams } from '../cars/car-search';
 import { httpData } from '../../core/http/http-data';
 import { injectResponseStatus } from '../../core/http/server-context';
+import { homeCategories, heroShowcase } from './home-view';
 
 /** How many cars and offices the home page shows before "view all". Layout, not a business rule. */
 const HOME_CARS = 8;
 const HOME_OFFICES = 6;
+/** How many listing photos the hero shows. Layout, not a business rule. */
+const HERO_SHOTS = 3;
 
 /**
- * The home page is a search first. Below it: the car types the catalogue actually holds, the most
- * recently listed cars, and rental offices — each from its own API, each with its own loading, empty
- * and error state. Nothing on it is "popular" or "featured": the platform keeps no such figure.
+ * The home page is a search first. Around it, everything is the catalogue's own: the hero's photos are
+ * the newest real listings, the vehicle types are the ones a bookable car actually has (with the count
+ * and a photo the facets report), the offices are the directory's first page, and the closing figures
+ * are the two lists' totals. Nothing on it is "popular" or "featured": the platform keeps no such figure.
  */
 @Component({
   selector: 'kh-home',
@@ -33,7 +40,9 @@ const HOME_OFFICES = 6;
 })
 export class HomeComponent {
   protected readonly i18n = inject(I18nService);
-  protected readonly lookups = inject(LookupsService);
+  protected readonly format = inject(FormatService);
+  private readonly lookups = inject(LookupsService);
+  private readonly appConfig = inject(AppConfigService);
   private readonly router = inject(Router);
 
   protected readonly cars = httpData<Paged<CatalogueListing>>(() => ({
@@ -49,10 +58,20 @@ export class HomeComponent {
   protected readonly carsProblem = computed(() => (this.cars.error() ? snapshotProblem(this.cars.error()) : null));
   protected readonly officesProblem = computed(() => (this.offices.error() ? snapshotProblem(this.offices.error()) : null));
 
-  /** A type is offered only when the administrator lists it AND a bookable car has it. */
-  protected readonly types = computed(() => {
-    const present = new Set(this.facets.value()?.carTypeIds ?? []);
-    return this.lookups.activeCarTypes().filter((type) => present.has(type.id));
+  protected readonly showcase = computed(() => heroShowcase(this.cars.value()?.items ?? [], HERO_SHOTS));
+
+  protected readonly categories = computed(() =>
+    homeCategories(this.lookups.activeCarTypes(), this.facets.value(), this.i18n.isArabic()),
+  );
+
+  /** From /app-config, so the promise on the page is the one the platform enforces. */
+  protected readonly paymentWindowHours = computed(() => this.appConfig.config()?.paymentWindowHours ?? null);
+
+  /** The closing line's figures: the two lists' own totals, shown only once both have answered. */
+  protected readonly inventory = computed(() => {
+    const cars = this.cars.value();
+    const offices = this.offices.value();
+    return cars && offices && cars.totalCount > 0 ? { cars: cars.totalCount, offices: offices.totalCount } : null;
   });
 
   protected readonly skeletons = Array.from({ length: 4 }, (_, index) => index);
@@ -79,6 +98,10 @@ export class HomeComponent {
 
     const shortlist = inject(ShortlistService);
     effect(() => void shortlist.track(this.cars.value()?.items.map((car) => car.vehicleId) ?? []));
+  }
+
+  protected carLink(car: CatalogueListing): (string | number)[] {
+    return this.i18n.link('cars', slugFor(car.vehicleId, car.make, car.model, car.year));
   }
 
   protected search(value: SearchFormValue): void {

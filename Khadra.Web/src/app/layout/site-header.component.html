@@ -32,16 +32,23 @@
           <a class="btn btn--primary btn--sm hide-sm" [routerLink]="i18n.link('register')">{{ i18n.t('nav.register') }}</a>
         }
         @case ('signed-in') {
-          <a class="icon-btn hide-sm" [routerLink]="i18n.link('notifications')"
-            [attr.aria-label]="i18n.t('nav.notifications') + (notifications.unread() > 0 ? ', ' + i18n.t('nav.unreadCount', { count: notifications.unread() }) : '')">
-            <kh-icon name="bell" />
-            @if (notifications.unread() > 0) {
-              <span class="icon-btn__badge" aria-hidden="true">{{ notifications.unread() > 99 ? '99+' : notifications.unread() }}</span>
+          <div class="menu" khDismiss [khDismissWhen]="notificationsOpen()" (khDismiss)="closeNotifications($event, bell)">
+            <button #bell type="button" class="icon-btn" [attr.aria-expanded]="notificationsOpen()" aria-haspopup="dialog"
+              aria-controls="notifications-panel" (click)="toggleNotifications()"
+              [attr.aria-label]="i18n.t('nav.notifications') + (notifications.unread() > 0 ? ', ' + i18n.t('nav.unreadCount', { count: notifications.unread() }) : '')">
+              <kh-icon name="bell" />
+              @if (notifications.unread() > 0) {
+                <span class="icon-btn__badge" aria-hidden="true">{{ notifications.unread() > 99 ? '99+' : notifications.unread() }}</span>
+              }
+            </button>
+            @if (notificationsOpen()) {
+              <div class="notif-scrim" aria-hidden="true" (click)="notificationsOpen.set(false)"></div>
+              <kh-notifications-panel (closed)="notificationsOpen.set(false)" />
             }
-          </a>
-          <div class="menu hide-sm">
-            <button type="button" class="btn btn--ghost btn--sm" [attr.aria-expanded]="accountOpen()" aria-haspopup="true"
-              aria-controls="account-menu" (click)="accountOpen.set(!accountOpen())">
+          </div>
+          <div class="menu hide-sm" khDismiss [khDismissWhen]="accountOpen()" (khDismiss)="closeAccount($event, account)">
+            <button #account type="button" class="btn btn--ghost btn--sm" [attr.aria-expanded]="accountOpen()" aria-haspopup="true"
+              aria-controls="account-menu" (click)="toggleAccount()">
               <kh-icon name="user" />
               <span class="user-text">{{ session.user()?.fullName }}</span>
               <kh-icon name="caret-down" />
@@ -60,7 +67,7 @@
       }
 
       <button type="button" class="icon-btn show-sm" [attr.aria-expanded]="menuOpen()" aria-controls="site-drawer"
-        [attr.aria-label]="i18n.t(menuOpen() ? 'nav.closeMenu' : 'nav.menu')" (click)="menuOpen.set(!menuOpen())">
+        [attr.aria-label]="i18n.t(menuOpen() ? 'nav.closeMenu' : 'nav.menu')" (click)="menuOpen.set(!menuOpen()); notificationsOpen.set(false)">
         <kh-icon [name]="menuOpen() ? 'x' : 'list'" />
       </button>
     </div>
