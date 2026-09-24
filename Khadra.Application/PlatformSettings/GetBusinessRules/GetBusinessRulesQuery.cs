@@ -22,6 +22,7 @@ namespace Khadra.Application.PlatformSettings.GetBusinessRules;
 /// </summary>
 public sealed record BusinessRulesDto(
     decimal CommissionPercent,
+    string CommissionBasis,
     decimal DepositPercent,
     int NoShowTimeoutHours,
     decimal DealerNonDeliveryPenaltyMinPercent,
@@ -39,6 +40,7 @@ public sealed record BusinessRulesDto(
         ArgumentNullException.ThrowIfNull(rules);
         return new BusinessRulesDto(
             rules.CommissionPercent,
+            rules.CommissionBasis,
             rules.DepositPercent,
             rules.NoShowTimeoutHours,
             rules.DealerNonDeliveryPenaltyMinPercent,

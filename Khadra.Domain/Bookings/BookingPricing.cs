@@ -9,8 +9,10 @@ namespace Khadra.Domain.Bookings;
 // agreed to. A dealer raising the daily rate or tightening the mileage cap afterwards cannot change
 // what this booking costs or allows.
 //
-// The deposit and the commission are both taken on RentalTotal, deliberately excluding the delivery
-// fee: the fee is a pass-through for the driver's trip, not rental revenue to be shared.
+// The deposit is taken on RentalTotal, deliberately excluding the delivery fee: the fee is a
+// pass-through for the driver's trip, not rental revenue to be shared. The commission is frozen here
+// beside it, on the basis the booking's terms name (one day's rate since 2026-09-24, the whole rental
+// before) — and never on the delivery fee either.
 //
 // The two calendar dates are frozen here alongside the day count, and that is not redundancy. The
 // count is a fact about a LOCAL calendar, and the zone it was computed in is configuration
@@ -29,6 +31,9 @@ public sealed class BookingPricing : ValueObject
     public Money TotalPrice { get; }
     public Percentage DepositPercent { get; }
     public Money DepositAmount { get; }
+    // Khadra's commission on this booking, as the rule stood when it was made. Frozen and never
+    // recomputed: the dealer console, the office payable and the statement all read this one figure.
+    public Money CommissionAmount { get; }
     // Paid in cash to the dealer at handover; never moves through the platform (spec 5.3).
     public Money BalanceDue { get; }
     // Vehicle terms as agreed, snapshotted so later fleet edits cannot rewrite the contract.
@@ -53,6 +58,7 @@ public sealed class BookingPricing : ValueObject
         Money totalPrice,
         Percentage depositPercent,
         Money depositAmount,
+        Money commissionAmount,
         Money balanceDue,
         Money securityDeposit,
         MileagePolicy mileage,
@@ -67,6 +73,7 @@ public sealed class BookingPricing : ValueObject
         TotalPrice = totalPrice;
         DepositPercent = depositPercent;
         DepositAmount = depositAmount;
+        CommissionAmount = commissionAmount;
         BalanceDue = balanceDue;
         SecurityDeposit = securityDeposit;
         Mileage = mileage;
@@ -90,11 +97,15 @@ public sealed class BookingPricing : ValueObject
         DateOnly returnDate,
         Money deliveryFee,
         Percentage depositPercent,
+        Percentage commissionPercent,
+        CommissionBasis commissionBasis,
         Money securityDeposit,
         MileagePolicy mileage,
         FuelPolicy fuelPolicy)
     {
         ArgumentNullException.ThrowIfNull(dailyRate);
+        ArgumentNullException.ThrowIfNull(commissionPercent);
+        ArgumentNullException.ThrowIfNull(commissionBasis);
         ArgumentNullException.ThrowIfNull(deliveryFee);
         ArgumentNullException.ThrowIfNull(depositPercent);
         ArgumentNullException.ThrowIfNull(securityDeposit);
@@ -113,6 +124,12 @@ public sealed class BookingPricing : ValueObject
         var rentalTotal = dailyRate.MultiplyBy(days);
         var totalPrice = rentalTotal.Add(deliveryFee);
         var depositAmount = depositPercent.Of(rentalTotal);
+        var commissionAmount = commissionPercent.Of(commissionBasis == CommissionBasis.OneDay ? dailyRate : rentalTotal);
+
+        // The commission is collected out of what the customer pays online, and the deposit is the
+        // least they pay. A commission above it is money the platform could not be sure to hold.
+        if (commissionAmount.Amount > depositAmount.Amount)
+            return BookingErrors.CommissionExceedsDeposit;
         // The balance is what the customer still owes the dealer in cash: the rental not covered by
         // the deposit, plus the delivery fee, which the driver collects on arrival.
         var balanceDue = rentalTotal.Subtract(depositAmount).Add(deliveryFee);
@@ -127,6 +144,7 @@ public sealed class BookingPricing : ValueObject
             totalPrice,
             depositPercent,
             depositAmount,
+            commissionAmount,
             balanceDue,
             securityDeposit,
             mileage,
@@ -146,6 +164,7 @@ public sealed class BookingPricing : ValueObject
         yield return TotalPrice;
         yield return DepositPercent;
         yield return DepositAmount;
+        yield return CommissionAmount;
         yield return BalanceDue;
         yield return SecurityDeposit;
         yield return Mileage;

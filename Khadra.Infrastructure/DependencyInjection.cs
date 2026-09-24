@@ -189,6 +189,9 @@ public static class DependencyInjection
             // would leave the platform chasing every dealer for the difference on every booking.
             .Validate(options => options.DepositPercent >= options.CommissionPercent,
                 "BusinessRules: DepositPercent must be at least CommissionPercent.")
+            .Validate(options => Enumeration.GetAll<Khadra.Domain.Bookings.CommissionBasis>()
+                    .Any(basis => string.Equals(basis.Name, options.CommissionBasis, StringComparison.Ordinal)),
+                "BusinessRules: CommissionBasis must be OneDay or RentalTotal.")
             // Absence is a misconfiguration, not a default. Without this a deleted key binds to null,
             // the provider would have to invent a number, and a car would go straight back out with
             // no time to be cleaned. Zero remains a legitimate, deliberate value.

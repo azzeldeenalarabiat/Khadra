@@ -86,12 +86,18 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
         if (depositPercent.IsFailure)
             return depositPercent.Error;
 
+        var commissionPercent = Percentage.Create(rules.CommissionPercent);
+        if (commissionPercent.IsFailure)
+            return commissionPercent.Error;
+
         var pricing = BookingPricing.Calculate(
             vehicle.DailyRate,
             calendar.DayOf(period.Start),
             calendar.DayOf(period.End),
             deliveryFee,
             depositPercent.Value,
+            commissionPercent.Value,
+            Enumeration.FromName<CommissionBasis>(rules.CommissionBasis),
             vehicle.SecurityDeposit,
             vehicle.Mileage,
             vehicle.FuelPolicy);
@@ -109,9 +115,9 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
     /// The live rules, shaped for freezing onto a booking.
     /// </summary>
     /// <remarks>
-    /// `RulesVersion` is 1 for every booking, which is pre-launch checklist item 25. It stays a
-    /// literal here rather than being quietly invented from something else: the number is meant to
-    /// come from the settings aggregate, and that aggregate is not built.
+    /// `RulesVersion` is a literal, which is pre-launch checklist item 25: the number is meant to come
+    /// from the settings aggregate, and that aggregate is not built. It is 2 from 2026-09-24, when the
+    /// commission basis joined the frozen terms; every booking made before reads 1.
     /// </remarks>
     private static Result<BookingTerms, Error> BuildTerms(BusinessRules rules)
     {
@@ -130,6 +136,7 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
         return BookingTerms.Create(
             deposit.Value,
             commission.Value,
+            Enumeration.FromName<CommissionBasis>(rules.CommissionBasis),
             TimeSpan.FromMinutes(rules.FreeCancellationWindowMinutes),
             TimeSpan.FromHours(rules.NoShowTimeoutHours),
             TimeSpan.FromHours(rules.PaymentWindowHours),
@@ -140,7 +147,7 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
             dealerMax.Value,
             TimeSpan.FromMinutes(rules.TurnaroundMinutes),
             TimeSpan.FromMinutes(rules.NonDeliveryGraceMinutes),
-            rulesVersion: 1);
+            rulesVersion: 2);
     }
 }
 

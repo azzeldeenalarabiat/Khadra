@@ -4259,3 +4259,15 @@ else an office writes for customers is already bilingual (`ResolvedText`); its n
 **To close, if the owner wants it:** a second, optional Arabic name on the dealer, entered in the
 dealer console, resolved per `Accept-Language` like the office's texts, and searched alongside the
 first. It is a schema change and a contract addition, so it is decided before it is built.
+
+### 162. From the one-day commission on, the platform holds office money nothing records
+
+**Status:** open · **Raised:** 2026-09-24 · **Owner decision taken; build pending**
+
+Commission is 20% of one day's rental (frozen per booking since `FrozenCommission`), the deposit 20%
+of the whole rental. On any booking longer than a day the deposit exceeds the commission, and the
+difference belongs to the office — and a full online payment makes it the whole rental. The owner
+accepted holding it on 2026-09-24 with a manual office-payable ledger: payable at `Completed`, never
+marked settled while a refund or dispute on the booking is open, paid by hand, marked paid by an
+administrator with an audit entry. **To close:** that ledger (payments phase 8). Until then, no real
+money may move — which item 76 already guarantees, since there is no merchant account.

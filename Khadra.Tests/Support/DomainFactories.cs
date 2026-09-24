@@ -183,6 +183,7 @@ internal static class Build
     public static BookingTerms Terms(
         decimal depositPercent = 20m,
         decimal commissionPercent = 20m,
+        CommissionBasis? commissionBasis = null,
         TimeSpan? freeCancellationWindow = null,
         TimeSpan? noShowTimeout = null,
         TimeSpan? paymentWindow = null,
@@ -196,6 +197,7 @@ internal static class Build
         BookingTerms.Create(
             Percent(depositPercent),
             Percent(commissionPercent),
+            commissionBasis ?? CommissionBasis.OneDay,
             freeCancellationWindow ?? TimeSpan.FromHours(1),
             noShowTimeout ?? TimeSpan.FromHours(8),
             paymentWindow ?? TimeSpan.FromMinutes(20),
@@ -206,7 +208,7 @@ internal static class Build
             Percent(dealerPenaltyMax),
             turnaroundBuffer ?? TurnaroundBuffer,
             nonDeliveryGrace ?? TimeSpan.Zero,
-            rulesVersion: 1).Value;
+            rulesVersion: 2).Value;
 
     public static DateRange Period(DateTimeOffset? start = null, int days = 3)
     {
@@ -222,7 +224,9 @@ internal static class Build
         int days = 3,
         decimal deliveryFee = 0m,
         decimal depositPercent = 20m,
-        DateOnly? pickupDate = null)
+        DateOnly? pickupDate = null,
+        decimal commissionPercent = 20m,
+        CommissionBasis? commissionBasis = null)
     {
         var from = pickupDate ?? AmmanDate(Now.AddDays(7));
         return BookingPricing.Calculate(
@@ -231,6 +235,8 @@ internal static class Build
             from.AddDays(days),
             Money.Jod(deliveryFee),
             Percent(depositPercent),
+            Percent(commissionPercent),
+            commissionBasis ?? CommissionBasis.OneDay,
             Money.Jod(200m),
             MileagePolicy.Unlimited(),
             FuelPolicy.FullToFull).Value;

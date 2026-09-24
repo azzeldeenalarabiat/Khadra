@@ -278,13 +278,14 @@ public sealed class DealerConsoleHandlers(
         return total;
     }
 
-    // Per booking, at that booking's frozen rate, rounded the way a charge would be, then summed.
+    // Each booking's FROZEN commission, summed. Never recomputed from a percent: a booking made under
+    // the whole-rental rule keeps that figure after the one-day rule arrives.
     private static Money Commission(IEnumerable<RevenueFact> facts)
     {
         var currency = facts.FirstOrDefault()?.Currency ?? Money.JordanianDinar;
         var total = Money.ZeroIn(currency);
         foreach (var fact in facts)
-            total = total.Add(Percentage.FromValidated(fact.CommissionPercent).Of(Money.Create(fact.RentalTotal, fact.Currency)));
+            total = total.Add(Money.Create(fact.CommissionAmount, fact.Currency));
         return total;
     }
 

@@ -144,7 +144,7 @@ public sealed class RaiseDisputeHandlers(
         await tickets.AddAsync(ticket.Value, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await composer.ComposeAsync(ticket.Value, booking, cancellationToken);
+        return await composer.ComposeAsync(ticket.Value, booking, cancellationToken, party.Value);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(AddDisputeStatementCommand request, CancellationToken cancellationToken)
@@ -165,7 +165,7 @@ public sealed class RaiseDisputeHandlers(
             return added.Error;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return await composer.ComposeAsync(ticket, booking, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, cancellationToken, party);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(WithdrawDisputeCommand request, CancellationToken cancellationToken)
@@ -175,7 +175,7 @@ public sealed class RaiseDisputeHandlers(
         var loaded = await LoadOwnedAsync(request.TicketId, request.UserId, cancellationToken);
         if (loaded.IsFailure)
             return loaded.Error;
-        var (ticket, booking, _) = loaded.Value;
+        var (ticket, booking, viewer) = loaded.Value;
 
         // The aggregate decides whether this person may withdraw (only the opener can).
         var withdrawn = ticket.Withdraw(request.UserId, clock.UtcNow);
@@ -183,7 +183,7 @@ public sealed class RaiseDisputeHandlers(
             return withdrawn.Error;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return await composer.ComposeAsync(ticket, booking, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, cancellationToken, viewer);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(GetMyDisputeQuery request, CancellationToken cancellationToken)
@@ -193,9 +193,9 @@ public sealed class RaiseDisputeHandlers(
         var loaded = await LoadOwnedAsync(request.TicketId, request.UserId, cancellationToken);
         if (loaded.IsFailure)
             return loaded.Error;
-        var (ticket, booking, _) = loaded.Value;
+        var (ticket, booking, viewer) = loaded.Value;
 
-        return await composer.ComposeAsync(ticket, booking, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, cancellationToken, viewer);
     }
 
     /// <summary>A ticket plus its booking, for someone who is a party to that booking; not_found otherwise.</summary>

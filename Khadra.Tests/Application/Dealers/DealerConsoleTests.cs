@@ -54,8 +54,8 @@ public sealed class DealerConsoleTests
                 .Returns(
                 [
                     new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-1), 100m, "JOD", 20m),
-                    new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-2), 333.333m, "JOD", 15m),
-                    new RevenueFact(Guid.NewGuid(), "PickedUp", Build.Now, 500m, "JOD", 20m),
+                    new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-2), 333.333m, "JOD", 50m),
+                    new RevenueFact(Guid.NewGuid(), "PickedUp", Build.Now, 500m, "JOD", 100m),
                 ]);
             Bookings.OccupancyAsync(Arg.Any<Id>(), Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
                 .Returns(call =>
@@ -112,7 +112,8 @@ public sealed class DealerConsoleTests
         var report = result.Value;
         Assert.Equal(2, report.Bookings);
         Assert.Equal(433.333m, report.Revenue.Amount);
-        // 20% of 100 = 20.000; 15% of 333.333 = 50.000 (rounded per booking as Money rounds), not 17.5% of the total.
+        // Each booking's FROZEN commission, summed (20 + 50): never re-derived from a percent, so a
+        // booking made under the whole-rental rule keeps its figure after the one-day rule arrives.
         Assert.Equal(70m, report.Commission.Amount);
         Assert.Equal("JOD", report.Commission.Currency);
         Assert.Equal(500m, report.InProgress.Amount);
@@ -228,7 +229,7 @@ public sealed class DealerConsoleTests
     [Fact]
     public async Task A_hundred_percent_rate_takes_everything_and_the_net_is_exactly_zero()
     {
-        var context = WithRevenue(new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-1), 87.125m, "JOD", 100m));
+        var context = WithRevenue(new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-1), 87.125m, "JOD", 87.125m));
 
         var report = (await context.Handlers().Handle(new GetDealerReportQuery(OwnerId, "monthly"), CancellationToken.None)).Value;
 
@@ -247,10 +248,12 @@ public sealed class DealerConsoleTests
     public async Task Commission_is_never_negative_and_never_more_than_the_revenue(double rate)
     {
         var percent = (decimal)rate;
+        // The frozen amount each booking would carry at that rate, rounded as a booking rounds it.
+        decimal Frozen(decimal rental) => Percentage.FromValidated(percent).Of(Money.Jod(rental)).Amount;
         var context = WithRevenue(
-            new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-1), 0.001m, "JOD", percent),
-            new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-2), 19.999m, "JOD", percent),
-            new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-3), 333.333m, "JOD", percent));
+            new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-1), 0.001m, "JOD", Frozen(0.001m)),
+            new RevenueFact(Guid.NewGuid(), "Returned", Build.Now.AddDays(-2), 19.999m, "JOD", Frozen(19.999m)),
+            new RevenueFact(Guid.NewGuid(), "Completed", Build.Now.AddDays(-3), 333.333m, "JOD", Frozen(333.333m)));
 
         var report = (await context.Handlers().Handle(new GetDealerReportQuery(OwnerId, "monthly"), CancellationToken.None)).Value;
 

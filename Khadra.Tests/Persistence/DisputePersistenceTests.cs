@@ -148,6 +148,11 @@ public sealed class DisputePersistenceTests : IDisposable
         Assert.NotEqual(0m, stored.Terms.CommissionPercent.Value);
         Assert.Equal(booking.Pricing.DepositPercent.Value, stored.Pricing.DepositPercent.Value);
         Assert.Equal(booking.Pricing.DepositAmount.Amount, stored.Pricing.DepositAmount.Amount);
+        // The frozen commission (2026-09-24): its amount beside the deposit, and the rule it was
+        // priced under. Lost from the JSON, the amount would read as null and the first .Amount throw.
+        Assert.Equal(booking.Pricing.CommissionAmount, stored.Pricing.CommissionAmount);
+        Assert.NotEqual(0m, stored.Pricing.CommissionAmount.Amount);
+        Assert.Same(booking.Terms.CommissionBasis, stored.Terms.CommissionBasis);
 
         // The get-only primitives, every one of which convention leaves out of a JSON document. The
         // settlement window is the one CanBeDisputed reads: lost, it read as zero and no booking on

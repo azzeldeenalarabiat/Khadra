@@ -104,6 +104,8 @@ public sealed class DeliveryFeeTests
             new DateOnly(2026, 9, 13),
             deliveryFee: dealer.Delivery.Fee!,
             depositPercent: Percentage.Create(20m).Value,
+            commissionPercent: Percentage.Create(20m).Value,
+            commissionBasis: CommissionBasis.OneDay,
             securityDeposit: Money.Jod(150m),
             MileagePolicy.Unlimited(),
             FuelPolicy.FullToFull).Value;
@@ -129,6 +131,8 @@ public sealed class DeliveryFeeTests
             new DateOnly(2026, 9, 13),
             deliveryFee: Money.Jod(10m),
             depositPercent: Percentage.Create(20m).Value,
+            commissionPercent: Percentage.Create(20m).Value,
+            commissionBasis: CommissionBasis.OneDay,
             securityDeposit: Money.Jod(150m),
             MileagePolicy.Unlimited(),
             FuelPolicy.FullToFull).Value;

@@ -170,6 +170,7 @@ public sealed class GetBookingHandler(
             };
         }
 
-        return BookingDto.From(booking, context, clock.UtcNow);
+        var dto = BookingDto.From(booking, context, clock.UtcNow);
+        return party.Value == BookingParty.Customer ? dto.ForCustomer() : dto;
     }
 }

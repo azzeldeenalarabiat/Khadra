@@ -38,6 +38,7 @@ internal static class TestBusinessRules
         int paymentWindowHours = PaymentWindowHours,
         int minimumBookingLeadTimeMinutes = MinimumBookingLeadTimeMinutes) => new(
         CommissionPercent: 20m,
+        CommissionBasis: "OneDay",
         DepositPercent: 20m,
         NoShowTimeoutHours: 8,
         DealerNonDeliveryPenaltyMinPercent: 25m,

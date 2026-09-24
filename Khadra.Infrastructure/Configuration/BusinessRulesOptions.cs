@@ -11,6 +11,11 @@ public sealed class BusinessRulesOptions
     [Range(0.01, 100)]
     public decimal CommissionPercent { get; init; }
 
+    // "OneDay" or "RentalTotal": what CommissionPercent is a percent of. Required, like every number
+    // here: a missing key must stop the process, not quietly price every booking by the older rule.
+    [Required]
+    public string CommissionBasis { get; init; } = string.Empty;
+
     [Range(0.01, 100)]
     public decimal DepositPercent { get; init; }
 

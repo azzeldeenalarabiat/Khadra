@@ -13,6 +13,10 @@ namespace Khadra.Application.Common.Ports;
 // does delivery cost”, and a caller that wants one has to name whose delivery it is asking about.
 public sealed record BusinessRules(
     decimal CommissionPercent,
+    // What CommissionPercent is a percent OF, by name: "OneDay" (the owner's rule from 2026-09-24,
+    // one day's rental price) or "RentalTotal" (the rule every earlier booking was made under). A
+    // booking freezes both, so changing either never re-prices a booking already made.
+    string CommissionBasis,
     decimal DepositPercent,
     int NoShowTimeoutHours,
     decimal DealerNonDeliveryPenaltyMinPercent,

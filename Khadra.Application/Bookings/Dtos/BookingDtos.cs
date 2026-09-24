@@ -27,9 +27,10 @@ public sealed record BookingDto(
     string PaymentOption,
     BookingPricingDto Pricing,
     BookingTermsDto Terms,
-    // Terms.CommissionPercent of Pricing.RentalTotal, at the FROZEN rate, rounded the way a charge
-    // would be. Computed here so no screen ever multiplies money in the browser.
-    MoneyDto CommissionAmount,
+    // Khadra's commission, as frozen on the booking when it was made (Pricing.CommissionAmount), never
+    // recomputed here. NULL for the customer: it is an internal figure between the platform and the
+    // office, and a customer's copy of their booking carries none (see ForCustomer).
+    MoneyDto? CommissionAmount,
     PenaltyAssessmentDto? Penalty,
     string? CancelledBy,
     /// The closed-set code, for a client that renders it in the reader's own language.
@@ -120,6 +121,14 @@ public sealed record BookingDto(
     /// </summary>
     DepositRefundDto? DepositRefund = null)
 {
+    /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
+    /// <remarks>
+    /// The commission is between the platform and the office. The PERCENT stays on the terms, because
+    /// installed customer apps parse it; the amount, which no customer client has ever read, does not
+    /// travel to a customer at all.
+    /// </remarks>
+    public BookingDto ForCustomer() => this with { CommissionAmount = null };
+
     public static BookingDto From(Booking booking, BookingContext context, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(booking);
@@ -142,7 +151,7 @@ public sealed record BookingDto(
             booking.PaymentOption.Name,
             BookingPricingDto.From(booking.Pricing),
             BookingTermsDto.From(booking.Terms),
-            MoneyDto.From(booking.Terms.CommissionPercent.Of(booking.Pricing.RentalTotal)),
+            MoneyDto.From(booking.Pricing.CommissionAmount),
             PenaltyAssessmentDto.From(booking.Penalty),
             booking.CancelledBy?.Name,
             booking.CancellationReasonCode,
@@ -227,6 +236,8 @@ public sealed record BookingPricingDto(
 public sealed record BookingTermsDto(
     decimal DepositPercent,
     decimal CommissionPercent,
+    /// <summary>What CommissionPercent is a percent of: "OneDay" or "RentalTotal". Added 2026-09-24.</summary>
+    string CommissionBasis,
     double FreeCancellationWindowHours,
     double NoShowTimeoutHours,
     double PaymentWindowHours,
@@ -249,6 +260,7 @@ public sealed record BookingTermsDto(
         return new BookingTermsDto(
             terms.DepositPercent.Value,
             terms.CommissionPercent.Value,
+            terms.CommissionBasis.Name,
             terms.FreeCancellationWindow.TotalHours,
             terms.NoShowTimeout.TotalHours,
             terms.PaymentWindow.TotalHours,

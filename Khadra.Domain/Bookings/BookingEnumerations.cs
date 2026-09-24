@@ -69,6 +69,30 @@ public sealed class PaymentOption : Enumeration
     }
 }
 
+/// <summary>What Khadra's commission on a booking is a percentage OF, frozen onto the booking.</summary>
+/// <remarks>
+/// <para>
+/// <see cref="RentalTotal"/> is the rule every booking made before 2026-09-24 was priced under: the
+/// commission percent of the whole rental. <see cref="OneDay"/> is the owner's rule from 2026-09-24:
+/// the commission percent of ONE day's rental price, however long the rental — 20% of 50 JOD is 10 JOD
+/// for a five-day hire and for a ten-day one.
+/// </para>
+/// <para>
+/// It travels with the booking rather than living only in configuration because a past booking must
+/// never be re-judged by today's rule: what an office earns on a rental it has already agreed does not
+/// change the day the platform changes how it charges.
+/// </para>
+/// </remarks>
+public sealed class CommissionBasis : Enumeration
+{
+    public static readonly CommissionBasis RentalTotal = new(1, "RentalTotal");
+    public static readonly CommissionBasis OneDay = new(2, "OneDay");
+
+    private CommissionBasis(int id, string name) : base(id, name)
+    {
+    }
+}
+
 public sealed class BookingParty : Enumeration
 {
     public static readonly BookingParty Customer = new(1, "Customer");

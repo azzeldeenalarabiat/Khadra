@@ -14,13 +14,17 @@ public sealed class BookingPricingTests
         decimal dailyRate = 30m,
         int days = 3,
         decimal deliveryFee = 0m,
-        decimal depositPercent = 20m) =>
+        decimal depositPercent = 20m,
+        decimal commissionPercent = 20m,
+        CommissionBasis? basis = null) =>
         BookingPricing.Calculate(
             Money.Jod(dailyRate),
             Pickup,
             Pickup.AddDays(days),
             Money.Jod(deliveryFee),
             Build.Percent(depositPercent),
+            Build.Percent(commissionPercent),
+            basis ?? CommissionBasis.OneDay,
             Money.Jod(200m),
             MileagePolicy.Unlimited(),
             FuelPolicy.FullToFull).Value;
@@ -124,7 +128,7 @@ public sealed class BookingPricingTests
     {
         var pricing = BookingPricing.Calculate(
             Money.Jod(30m), Pickup, Pickup.AddDays(3), Money.Create(10m, "USD"), Build.Percent(20m),
-            Money.Jod(200m), MileagePolicy.Unlimited(), FuelPolicy.FullToFull);
+            Build.Percent(20m), CommissionBasis.OneDay, Money.Jod(200m), MileagePolicy.Unlimited(), FuelPolicy.FullToFull);
 
         Assert.Equal("booking.currency_mismatch", pricing.Error.Code);
     }
@@ -135,13 +139,73 @@ public sealed class BookingPricingTests
         var mileage = MileagePolicy.Limited(200, Money.Jod(0.25m)).Value;
         var pricing = BookingPricing.Calculate(
             Money.Jod(30m), Pickup, Pickup.AddDays(3), Money.Jod(0m), Build.Percent(20m),
-            Money.Jod(150m), mileage, FuelPolicy.SameToSame).Value;
+            Build.Percent(20m), CommissionBasis.OneDay, Money.Jod(150m), mileage, FuelPolicy.SameToSame).Value;
 
         // A dealer later tightening the mileage cap or raising the damage deposit cannot reach back
         // into a booking that has already been priced and accepted.
         Assert.Equal(mileage, pricing.Mileage);
         Assert.Same(FuelPolicy.SameToSame, pricing.FuelPolicy);
         Assert.Equal(Money.Jod(150m), pricing.SecurityDeposit);
+    }
+
+    // ── Commission (owner, 2026-09-24): 20% of ONE day's rental price, frozen on the booking ─────────
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(10)]
+    [InlineData(30)]
+    public void Commission_is_one_days_share_however_long_the_rental(int days)
+    {
+        // The owner's own example: 50 JOD a day. 5 days is 250 and 10 days is 500; both earn 10.
+        var pricing = Price(dailyRate: 50m, days: days);
+
+        Assert.Equal(Money.Jod(10m), pricing.CommissionAmount);
+        Assert.Equal(Money.Jod(50m * days * 0.2m), pricing.DepositAmount);
+    }
+
+    [Fact]
+    public void A_booking_made_under_the_whole_rental_rule_keeps_it()
+    {
+        var pricing = Price(dailyRate: 50m, days: 5, basis: CommissionBasis.RentalTotal);
+
+        Assert.Equal(Money.Jod(50m), pricing.CommissionAmount);
+    }
+
+    [Fact]
+    public void Commission_is_never_taken_on_the_delivery_fee()
+    {
+        var oneDay = Price(dailyRate: 50m, days: 3, deliveryFee: 15m);
+        var whole = Price(dailyRate: 50m, days: 3, deliveryFee: 15m, basis: CommissionBasis.RentalTotal);
+
+        Assert.Equal(Money.Jod(10m), oneDay.CommissionAmount);
+        Assert.Equal(Money.Jod(30m), whole.CommissionAmount);
+    }
+
+    [Fact]
+    public void Commission_rounds_to_three_decimals_half_to_even_like_every_other_amount()
+    {
+        // 12.5% of 10.004 is 1.2505: exactly half way at the third decimal. Half-to-even gives 1.250,
+        // where rounding half away from zero would give 1.251. One policy, the same as the deposit.
+        var pricing = Price(dailyRate: 10.004m, days: 1, commissionPercent: 12.5m);
+
+        Assert.Equal(Money.Jod(1.250m), pricing.CommissionAmount);
+    }
+
+    [Fact]
+    public void A_commission_above_the_deposit_is_refused_as_money_not_as_percentages()
+    {
+        // 50% of one day against a 20% deposit: over one day the commission (15) would exceed the
+        // deposit (6), which the platform could not be sure to hold.
+        var oneDay = BookingPricing.Calculate(
+            Money.Jod(30m), Pickup, Pickup.AddDays(1), Money.Jod(0m), Build.Percent(20m),
+            Build.Percent(50m), CommissionBasis.OneDay, Money.Jod(200m), MileagePolicy.Unlimited(), FuelPolicy.FullToFull);
+
+        Assert.Equal("booking.commission_exceeds_deposit", oneDay.Error.Code);
+
+        // The same 50% of one day is fine over five days: 15 against a 30 deposit.
+        var fiveDays = Price(dailyRate: 30m, days: 5, commissionPercent: 50m);
+        Assert.Equal(Money.Jod(15m), fiveDays.CommissionAmount);
     }
 }
 
@@ -150,10 +214,10 @@ public sealed class BookingTermsTests
     private static readonly TimeSpan Turnaround = TimeSpan.FromHours(2);
 
     [Fact]
-    public void Commission_can_never_exceed_the_deposit_it_is_collected_from()
+    public void Under_the_whole_rental_rule_the_commission_percent_can_never_exceed_the_deposit_percent()
     {
         var terms = BookingTerms.Create(
-            Build.Percent(20m), Build.Percent(25m),
+            Build.Percent(20m), Build.Percent(25m), CommissionBasis.RentalTotal,
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
             Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), Turnaround, TimeSpan.Zero, 1);
 
@@ -164,7 +228,7 @@ public sealed class BookingTermsTests
     public void The_dealer_penalty_range_cannot_be_inverted()
     {
         var terms = BookingTerms.Create(
-            Build.Percent(20m), Build.Percent(20m),
+            Build.Percent(20m), Build.Percent(20m), CommissionBasis.OneDay,
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
             Build.Percent(100m), Build.Percent(50m), Build.Percent(25m), Turnaround, TimeSpan.Zero, 1);
 
@@ -175,7 +239,7 @@ public sealed class BookingTermsTests
     public void Non_positive_windows_are_rejected()
     {
         var terms = BookingTerms.Create(
-            Build.Percent(20m), Build.Percent(20m),
+            Build.Percent(20m), Build.Percent(20m), CommissionBasis.OneDay,
             TimeSpan.FromHours(1), TimeSpan.Zero, TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
             Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), Turnaround, TimeSpan.Zero, 1);
 
@@ -186,7 +250,7 @@ public sealed class BookingTermsTests
     public void A_negative_turnaround_gap_is_not_a_gap()
     {
         var terms = BookingTerms.Create(
-            Build.Percent(20m), Build.Percent(20m),
+            Build.Percent(20m), Build.Percent(20m), CommissionBasis.OneDay,
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
             Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), TimeSpan.FromMinutes(-1), TimeSpan.Zero, 1);
 
@@ -199,7 +263,7 @@ public sealed class BookingTermsTests
         // A gallery that can turn a car around at the counter is allowed to say so. It is ABSENCE
         // that must be refused, and that refusal lives in configuration validation, not here.
         var terms = BookingTerms.Create(
-            Build.Percent(20m), Build.Percent(20m),
+            Build.Percent(20m), Build.Percent(20m), CommissionBasis.OneDay,
             TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
             Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), TimeSpan.Zero, TimeSpan.Zero, 1);
 
@@ -217,7 +281,21 @@ public sealed class BookingTermsTests
         Assert.Equal(TimeSpan.FromHours(8), terms.NoShowTimeout);
         Assert.Equal(TimeSpan.FromHours(1), terms.FreeCancellationWindow);
         Assert.Equal(TimeSpan.FromHours(2), terms.TurnaroundBuffer);
-        Assert.Equal(1, terms.RulesVersion);
+        Assert.Same(CommissionBasis.OneDay, terms.CommissionBasis);
+        Assert.Equal(2, terms.RulesVersion);
+    }
+
+    [Fact]
+    public void Under_the_one_day_rule_the_percentages_are_not_compared()
+    {
+        // 25% of one day against a 20% deposit on the whole rental is a legitimate pair; whether the
+        // AMOUNT fits is BookingPricing's question, asked where both amounts exist.
+        var terms = BookingTerms.Create(
+            Build.Percent(20m), Build.Percent(25m), CommissionBasis.OneDay,
+            TimeSpan.FromHours(1), TimeSpan.FromHours(8), TimeSpan.FromMinutes(20), TimeSpan.FromHours(48), TimeSpan.FromHours(48),
+            Build.Percent(100m), Build.Percent(25m), Build.Percent(50m), Turnaround, TimeSpan.Zero, 2);
+
+        Assert.True(terms.IsSuccess);
     }
 }
 

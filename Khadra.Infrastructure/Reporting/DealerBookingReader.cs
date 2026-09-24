@@ -168,7 +168,7 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
                 booking.ReturnedAt ?? booking.PickedUpAt ?? booking.CreatedAt,
                 booking.Pricing.RentalTotal.Amount,
                 booking.Pricing.RentalTotal.CurrencyCode,
-                booking.Terms.CommissionPercent.Value))
+                booking.Pricing.CommissionAmount.Amount))
             .ToListAsync(cancellationToken);
     }
 

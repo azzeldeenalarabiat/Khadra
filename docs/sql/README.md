@@ -144,3 +144,26 @@ A copy whose detector was deliberately broken stopped with the self-test's own
 message, `psql` exit 3, no new columns, all 16 legacy values untouched.
 
 No table is added, so `supabase-lockdown.sql` does not need re-running for it.
+
+## 6. `2026-09-24-frozen-commission.sql`
+
+Schema-neutral, but it **writes existing rows**: every booking gains
+`pricing.CommissionAmount` and `terms.CommissionBasis = "RentalTotal"`. The amount is
+exactly what every screen used to compute on the fly — the booking's frozen
+`CommissionPercent` of its `RentalTotal` — rounded half to even at three decimals,
+the way `Money` rounds. From this release new bookings freeze 20% of ONE day
+instead, and existing bookings must keep the figure they always showed.
+
+The new API cannot load a booking without these keys, so the order matters:
+
+1. Run **Part 1** (the idempotent migration) before deploying the API that needs it.
+   The API that is live ignores both keys.
+2. Deploy the API.
+3. Run **Part 2** (the unguarded catch-up) once more. It freezes any booking the old
+   API created between steps 1 and 2. Idempotent; safe to run again at any time.
+
+Rehearsed on 2026-09-24 against the local development database (80 bookings): every
+backfilled amount equalled the old computation, and the half-way cases were checked
+against .NET's half-to-even rounding (1.2505 → 1.250, 1.2515 → 1.252).
+
+No table is added, so `supabase-lockdown.sql` does not need re-running for it.

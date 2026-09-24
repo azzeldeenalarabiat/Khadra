@@ -41,7 +41,12 @@ public sealed class DisputeViewComposer(
         return await ComposeAsync(ticket, booking, cancellationToken);
     }
 
-    public async Task<DisputeDto> ComposeAsync(DisputeTicket ticket, Booking booking, CancellationToken cancellationToken)
+    /// <param name="viewer">The party the view is for. A customer's copy carries no commission.</param>
+    public async Task<DisputeDto> ComposeAsync(
+        DisputeTicket ticket,
+        Booking booking,
+        CancellationToken cancellationToken,
+        BookingParty? viewer = null)
     {
         ArgumentNullException.ThrowIfNull(ticket);
         ArgumentNullException.ThrowIfNull(booking);
@@ -105,6 +110,8 @@ public sealed class DisputeViewComposer(
                     Closed(resolved.ResolvedByAdminId))
                 : null,
             MoneyDto.From(BookingDisputeSettlement.DepositHeldFor(booking)),
-            BookingDto.From(booking, context, now));
+            viewer == BookingParty.Customer
+                ? BookingDto.From(booking, context, now).ForCustomer()
+                : BookingDto.From(booking, context, now));
     }
 }

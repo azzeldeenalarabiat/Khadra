@@ -38,14 +38,14 @@ public sealed record UpcomingHandover(
     string? CustomerName,
     bool IsOverdue);
 
-/// <summary>One booking's contribution to revenue, at the rate FROZEN on that booking.</summary>
+/// <summary>One booking's contribution to revenue, with the commission FROZEN on that booking.</summary>
 public sealed record RevenueFact(
     Guid BookingId,
     string Status,
     DateTimeOffset EarnedAt,
     decimal RentalTotal,
     string Currency,
-    decimal CommissionPercent);
+    decimal CommissionAmount);
 
 /// <summary>The stretch of a rental that overlaps a reporting window, for occupancy.</summary>
 public sealed record OccupancyFact(Guid VehicleId, DateTimeOffset Start, DateTimeOffset End, string Status);

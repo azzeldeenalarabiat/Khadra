@@ -81,6 +81,7 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             ConfigureMoney(pricing.OwnsOne(value => value.DeliveryFee));
             ConfigureMoney(pricing.OwnsOne(value => value.TotalPrice));
             ConfigureMoney(pricing.OwnsOne(value => value.DepositAmount));
+            ConfigureMoney(pricing.OwnsOne(value => value.CommissionAmount));
             ConfigureMoney(pricing.OwnsOne(value => value.BalanceDue));
             ConfigureMoney(pricing.OwnsOne(value => value.SecurityDeposit));
             ConfigurePercentage(pricing.OwnsOne(value => value.DepositPercent));
@@ -104,6 +105,8 @@ internal sealed class BookingConfiguration : IEntityTypeConfiguration<Booking>
             terms.ToJson();
             ConfigurePercentage(terms.OwnsOne(value => value.DepositPercent));
             ConfigurePercentage(terms.OwnsOne(value => value.CommissionPercent));
+            terms.Property(value => value.CommissionBasis)
+                .HasConversion(basis => basis.Name, name => Enumeration.FromName<CommissionBasis>(name));
             ConfigurePercentage(terms.OwnsOne(value => value.CustomerCancellationPenaltyPercent));
             ConfigurePercentage(terms.OwnsOne(value => value.DealerPenaltyMinPercent));
             ConfigurePercentage(terms.OwnsOne(value => value.DealerPenaltyMaxPercent));

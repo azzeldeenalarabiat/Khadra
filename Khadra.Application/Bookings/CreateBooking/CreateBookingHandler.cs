@@ -191,7 +191,7 @@ public sealed class CreateBookingHandler(
             return BookingErrors.VehicleUnavailable;
 
         var context = await reader.ContextAsync(booking.Value.Id, cancellationToken);
-        return BookingDto.From(booking.Value, context, now);
+        return BookingDto.From(booking.Value, context, now).ForCustomer();
     }
 
     /// <summary>

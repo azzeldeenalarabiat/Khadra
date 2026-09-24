@@ -14,6 +14,7 @@ internal sealed class ConfigurationBusinessRulesProvider(IOptionsMonitor<Busines
         var current = options.CurrentValue;
         return Task.FromResult(new BusinessRules(
             current.CommissionPercent,
+            current.CommissionBasis,
             current.DepositPercent,
             current.NoShowTimeoutHours,
             current.DealerNonDeliveryPenaltyMinPercent,

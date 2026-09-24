@@ -13,8 +13,10 @@ namespace Khadra.Domain.Bookings;
 public sealed class BookingTerms : ValueObject
 {
     public Percentage DepositPercent { get; }
-    // Recorded for traceability. Commission itself is calculated in the Payments context.
+    // The percent Khadra takes, and what it is a percent OF. The commission AMOUNT is frozen beside the
+    // deposit on BookingPricing, where both figures exist; these two record how it was arrived at.
     public Percentage CommissionPercent { get; }
+    public CommissionBasis CommissionBasis { get; }
     // Spec 2: no penalty for cancelling within this window. Spec 5.5 measures it from approval; it
     // has run from PAYMENT since 2026-09-07, because at approval nothing has been paid and there is
     // nothing to be penalised on. The duration is unchanged.
@@ -80,6 +82,7 @@ public sealed class BookingTerms : ValueObject
     private BookingTerms(
         Percentage depositPercent,
         Percentage commissionPercent,
+        CommissionBasis commissionBasis,
         TimeSpan freeCancellationWindow,
         TimeSpan noShowTimeout,
         TimeSpan paymentWindow,
@@ -94,6 +97,7 @@ public sealed class BookingTerms : ValueObject
     {
         DepositPercent = depositPercent;
         CommissionPercent = commissionPercent;
+        CommissionBasis = commissionBasis;
         FreeCancellationWindow = freeCancellationWindow;
         NoShowTimeout = noShowTimeout;
         PaymentWindow = paymentWindow;
@@ -110,6 +114,7 @@ public sealed class BookingTerms : ValueObject
     public static Result<BookingTerms, Error> Create(
         Percentage depositPercent,
         Percentage commissionPercent,
+        CommissionBasis commissionBasis,
         TimeSpan freeCancellationWindow,
         TimeSpan noShowTimeout,
         TimeSpan paymentWindow,
@@ -124,11 +129,16 @@ public sealed class BookingTerms : ValueObject
     {
         ArgumentNullException.ThrowIfNull(depositPercent);
         ArgumentNullException.ThrowIfNull(commissionPercent);
+        ArgumentNullException.ThrowIfNull(commissionBasis);
         ArgumentNullException.ThrowIfNull(customerCancellationPenaltyPercent);
         ArgumentNullException.ThrowIfNull(dealerPenaltyMinPercent);
         ArgumentNullException.ThrowIfNull(dealerPenaltyMaxPercent);
 
-        if (commissionPercent.IsGreaterThan(depositPercent))
+        // Comparing the two percentages means something only when they are percentages of the SAME
+        // base. Under OneDay they are not (one day against the whole rental), and the invariant that
+        // still matters — the commission never exceeds the deposit it is collected from — is about
+        // AMOUNTS, and is checked where both amounts exist: BookingPricing.Calculate.
+        if (commissionBasis == CommissionBasis.RentalTotal && commissionPercent.IsGreaterThan(depositPercent))
         {
             return Error.Validation(
                 "booking.commission_exceeds_deposit",
@@ -154,6 +164,7 @@ public sealed class BookingTerms : ValueObject
         return new BookingTerms(
             depositPercent,
             commissionPercent,
+            commissionBasis,
             freeCancellationWindow,
             noShowTimeout,
             paymentWindow,
@@ -171,6 +182,7 @@ public sealed class BookingTerms : ValueObject
     {
         yield return DepositPercent;
         yield return CommissionPercent;
+        yield return CommissionBasis;
         yield return FreeCancellationWindow;
         yield return NoShowTimeout;
         yield return PaymentWindow;

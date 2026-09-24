@@ -2185,3 +2185,45 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924154009_FrozenCommission') THEN
+    UPDATE bookings
+    SET pricing = jsonb_set(
+          pricing,
+          '{CommissionAmount}',
+          jsonb_build_object(
+            'Amount',
+            (SELECT (CASE
+                      WHEN (v * 1000) - trunc(v * 1000) = 0.5 AND mod(trunc(v * 1000), 2) = 0
+                        THEN trunc(v * 1000)
+                      ELSE round(v * 1000)
+                    END / 1000)::numeric(18, 3)
+               FROM (SELECT (pricing -> 'RentalTotal' ->> 'Amount')::numeric
+                            * (terms -> 'CommissionPercent' ->> 'Value')::numeric / 100 AS v) AS calc),
+            'CurrencyCode',
+            pricing -> 'RentalTotal' ->> 'CurrencyCode'))
+    WHERE NOT (pricing ? 'CommissionAmount');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924154009_FrozenCommission') THEN
+    UPDATE bookings
+    SET terms = jsonb_set(terms, '{CommissionBasis}', '"RentalTotal"')
+    WHERE NOT (terms ? 'CommissionBasis');
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20260924154009_FrozenCommission') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20260924154009_FrozenCommission', '10.0.11');
+    END IF;
+END $EF$;
+COMMIT;
+

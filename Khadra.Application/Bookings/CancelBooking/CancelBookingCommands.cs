@@ -207,5 +207,5 @@ public sealed class CancelBookingHandlers(
     }
 
     private async Task<BookingDto> DescribeAsync(Booking booking, DateTimeOffset now, CancellationToken cancellationToken) =>
-        BookingDto.From(booking, await reader.ContextAsync(booking.Id, cancellationToken), now);
+        BookingDto.From(booking, await reader.ContextAsync(booking.Id, cancellationToken), now).ForCustomer();
 }

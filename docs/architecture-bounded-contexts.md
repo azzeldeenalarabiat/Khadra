@@ -173,9 +173,18 @@ save as the cancellation, and `BookingDisputeSettlement.DepositHeldFor` reads ze
 so a later dispute cannot split money already on its way back. Every other cancellation refund is still
 undecided (decision 3).
 
-**What is not built, and why.** No `DealerLedger`, no payout rail, no dealer charge: at the confirmed
-20% commission and 20% deposit the two are equal, so the platform never pays a dealer and never holds
-dealer funds. Of the three spec cases that would need a rail, two are closed by construction —
+**The commission changed on 2026-09-24, and with it the "never holds dealer funds" property.** It is
+now 20% of ONE day's rental price, frozen on each booking as `Pricing.CommissionAmount` with the rule
+that produced it (`Terms.CommissionBasis`); bookings made before keep the whole-rental figure they always
+showed, written onto them by the `FrozenCommission` migration. Against a 20% deposit on the whole rental,
+every booking longer than a day now leaves the platform holding `Deposit − Commission` that belongs to
+the office. The owner accepted that on 2026-09-24, with a manual office-payable ledger (payable at
+`Completed`, marked paid by an administrator, audited) and no payout rail yet — built in the payments
+phases that follow this note, and until it exists the debt is recorded nowhere.
+
+**What was not built, and why (true until 2026-09-24).** No `DealerLedger`, no payout rail, no dealer
+charge: at the confirmed 20% commission and 20% deposit the two were equal, so the platform never paid a
+dealer and never held dealer funds. Of the three spec cases that would need a rail, two are closed by construction —
 `CreateBookingHandler` only ever writes `PaymentOption.DepositOnly`, and both `BookingTerms.Create` and
 `BusinessRuleSettings` refuse a commission above the deposit. What remains is the dealer non-delivery
 penalty, which is already an instruction with no rail (`DisputeResolution.DealerCharge`) and is settled

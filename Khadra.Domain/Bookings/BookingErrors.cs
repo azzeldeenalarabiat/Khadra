@@ -208,6 +208,11 @@ public static class BookingErrors
     public static readonly Error HandoverAlreadyRecorded =
         Error.Conflict("booking.handover_recorded", "This handover has already been recorded.");
 
+    public static readonly Error CommissionExceedsDeposit =
+        Error.Validation(
+            "booking.commission_exceeds_deposit",
+            "The commission on this booking would exceed its deposit, and commission is collected from what the customer pays online.");
+
     public static readonly Error CurrencyMismatch =
         Error.Validation("booking.currency_mismatch", "All amounts on a booking must use the same currency.");
 
