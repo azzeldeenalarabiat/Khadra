@@ -87,6 +87,21 @@ export interface PaymentAttempt {
   readonly failureCode: string | null;
   readonly createdAt: string;
   readonly isSandbox: boolean;
+  /** "Deposit" or "FullPayment". Absent from an API older than 2026-09-24. */
+  readonly purpose?: PaymentPurpose;
+  readonly processingFee?: Money;
+}
+
+/** The two ways an approved booking can be paid (2026-09-24). */
+export type PaymentPurpose = 'Deposit' | 'FullPayment';
+
+/** One way of paying, every figure the server's: the page shows these and computes none. */
+export interface PaymentOption {
+  readonly purpose: PaymentPurpose;
+  readonly selectedPaymentAmount: Money;
+  readonly processingFee: Money;
+  readonly totalChargedNow: Money;
+  readonly remainingBalanceAfter: Money;
 }
 
 /** Whether the deposit can be paid now, and what is in the way if not — the server's call. */
@@ -97,6 +112,8 @@ export interface PaymentAvailability {
   readonly amountDue: Money | null;
   readonly payBy: string | null;
   readonly liveAttempt: PaymentAttempt | null;
+  /** Deposit first, then the full amount. Empty when the booking cannot be paid now. */
+  readonly options?: readonly PaymentOption[];
 }
 
 export interface Handover {

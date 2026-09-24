@@ -283,6 +283,16 @@ class FakeApi extends KhadraApi {
     return attempt;
   }
 
+  /// The purposes `checkout` was asked for, in order: a test checks the app
+  /// names a PURPOSE and never an amount.
+  final List<String> checkoutPurposes = [];
+
+  @override
+  Future<PaymentAttempt> openCheckout(String bookingId, String purpose) async {
+    checkoutPurposes.add(purpose);
+    return openDepositCheckout(bookingId);
+  }
+
   @override
   Future<NotificationFeed> notifications({int page = 1, int pageSize = 25}) async =>
       const NotificationFeed(

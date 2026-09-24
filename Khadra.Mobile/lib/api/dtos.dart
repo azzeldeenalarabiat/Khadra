@@ -1486,6 +1486,7 @@ class PaymentAttempt {
     required this.expiresAt,
     required this.failureCode,
     required this.isSandbox,
+    this.purpose,
   });
 
   final String paymentId;
@@ -1503,6 +1504,9 @@ class PaymentAttempt {
   /// can differ — which is the whole point of a marker that outlives a setting.
   final bool isSandbox;
 
+  /// "Deposit" or "FullPayment" (2026-09-24). Null from an older server.
+  final String? purpose;
+
   static PaymentAttempt? maybe(dynamic value) => value is Map<String, dynamic>
       ? PaymentAttempt(
           paymentId: value['paymentId'] as String? ?? '',
@@ -1512,6 +1516,47 @@ class PaymentAttempt {
           expiresAt: _requiredDateTime(value['expiresAt']),
           failureCode: value['failureCode'] as String?,
           isSandbox: value['isSandbox'] as bool? ?? false,
+          purpose: value['purpose'] as String?,
+        )
+      : null;
+}
+
+/// One way of paying an approved booking (2026-09-24), every figure the
+/// SERVER's: the deposit, or the full amount. The screen shows these and
+/// computes none of them, so the app and the website can never disagree.
+class PaymentOption {
+  const PaymentOption({
+    required this.purpose,
+    required this.selectedPaymentAmount,
+    required this.processingFee,
+    required this.totalChargedNow,
+    required this.remainingBalanceAfter,
+  });
+
+  /// "Deposit" or "FullPayment" — what the checkout is opened with.
+  final String purpose;
+
+  /// What this payment puts towards the booking.
+  final Money selectedPaymentAmount;
+
+  /// The optional card-processing fee on top; zero unless it is switched on.
+  final Money processingFee;
+
+  /// What the card is charged: the amount plus the fee. The Pay button's figure.
+  final Money totalChargedNow;
+
+  /// What is still owed on the booking once this payment succeeds.
+  final Money remainingBalanceAfter;
+
+  bool get isDeposit => purpose == 'Deposit';
+
+  static PaymentOption? maybe(dynamic value) => value is Map<String, dynamic>
+      ? PaymentOption(
+          purpose: value['purpose'] as String? ?? '',
+          selectedPaymentAmount: Money.fromJson(value['selectedPaymentAmount'] as Map<String, dynamic>? ?? const {}),
+          processingFee: Money.fromJson(value['processingFee'] as Map<String, dynamic>? ?? const {}),
+          totalChargedNow: Money.fromJson(value['totalChargedNow'] as Map<String, dynamic>? ?? const {}),
+          remainingBalanceAfter: Money.fromJson(value['remainingBalanceAfter'] as Map<String, dynamic>? ?? const {}),
         )
       : null;
 }
@@ -1566,6 +1611,7 @@ class PaymentAvailability {
     required this.amountDue,
     required this.payBy,
     required this.liveAttempt,
+    this.options = const [],
   });
 
   final bool canPay;
@@ -1573,6 +1619,11 @@ class PaymentAvailability {
   final Money? amountDue;
   final DateTime? payBy;
   final PaymentAttempt? liveAttempt;
+
+  /// The ways to pay right now, deposit first (2026-09-24). Empty from an older
+  /// server, or when the booking cannot be paid; the screen then falls back to
+  /// the single deposit button.
+  final List<PaymentOption> options;
 
   /// Whether the platform itself cannot take cards, as opposed to this booking
   /// no longer being payable. Two different facts with two different remedies.
@@ -1586,6 +1637,10 @@ class PaymentAvailability {
           amountDue: Money.maybe(value['amountDue']),
           payBy: _dateTime(value['payBy']),
           liveAttempt: PaymentAttempt.maybe(value['liveAttempt']),
+          options: (value['options'] as List<dynamic>? ?? const [])
+              .map(PaymentOption.maybe)
+              .whereType<PaymentOption>()
+              .toList(),
         )
       : null;
 }

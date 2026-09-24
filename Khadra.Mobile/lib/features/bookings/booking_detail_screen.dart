@@ -21,6 +21,7 @@ import 'booking_providers.dart';
 import 'booking_timeline.dart';
 import 'checkout_screen.dart';
 import 'handover_code_screen.dart';
+import 'payment_choice.dart';
 import 'cancel_booking_sheet.dart';
 
 /// One booking, in full.
@@ -432,12 +433,17 @@ class _PaymentDue extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final deadline = booking.paymentDeadline;
+    final choosing = booking.payment?.canPay == true && (booking.payment?.options.isNotEmpty ?? false);
 
     return Column(
       children: [
         KhadraNotice(
-          title: l10n.bookingAwaitingPaymentTitle(
-              formats.money(booking.pricing.depositAmount)),
+          // With the two ways to pay on offer, the title asks the question; the
+          // figures are on the choices below. An older server offers none, and the
+          // deposit title still says what is due.
+          title: choosing
+              ? l10n.paymentChooseTitle
+              : l10n.bookingAwaitingPaymentTitle(formats.money(booking.pricing.depositAmount)),
           body: deadline == null
               ? null
               : '${l10n.bookingAwaitingPaymentBy(formats.dateTime(deadline))}\n'
@@ -446,7 +452,7 @@ class _PaymentDue extends StatelessWidget {
           icon: Icons.payments_outlined,
         ),
         const SizedBox(height: Space.md),
-        _PaymentAction(booking: booking),
+        _PaymentAction(booking: booking, formats: formats),
       ],
     );
   }
@@ -454,9 +460,10 @@ class _PaymentDue extends StatelessWidget {
 
 /// Pay, or the reason there is nothing to press.
 class _PaymentAction extends ConsumerStatefulWidget {
-  const _PaymentAction({required this.booking});
+  const _PaymentAction({required this.booking, required this.formats});
 
   final Booking booking;
+  final Formats formats;
 
   @override
   ConsumerState<_PaymentAction> createState() => _PaymentActionState();
@@ -464,6 +471,15 @@ class _PaymentAction extends ConsumerStatefulWidget {
 
 class _PaymentActionState extends ConsumerState<_PaymentAction> {
   bool _opening = false;
+
+  /// The way of paying the customer picked; null until they touch the choice.
+  String? _picked;
+
+  PaymentOption? get _chosen => chosenOption(
+        widget.booking.payment?.options ?? const [],
+        picked: _picked,
+        openAttempt: widget.booking.payment?.liveAttempt?.purpose,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -483,13 +499,89 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
       );
     }
 
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        onPressed: _opening ? null : _pay,
-        icon: const Icon(Icons.credit_card, size: 18),
-        label: Text(_opening ? l10n.bookingPaymentOpening : l10n.bookingPayDeposit),
-      ),
+    final chosen = _chosen;
+    // An older server offers no choices: the single deposit button, as before.
+    if (chosen == null) {
+      return SizedBox(
+        width: double.infinity,
+        child: FilledButton.icon(
+          onPressed: _opening ? null : _pay,
+          icon: const Icon(Icons.credit_card, size: 18),
+          label: Text(_opening ? l10n.bookingPaymentOpening : l10n.bookingPayDeposit),
+        ),
+      );
+    }
+
+    final formats = widget.formats;
+    final pricing = widget.booking.pricing;
+    final title = chosen.isDeposit ? l10n.paymentDepositTitle : l10n.paymentFullTitle;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // The two ways to pay (2026-09-24). A real radio group, so screen readers
+        // announce the choice; the card around each radio is what a finger taps.
+        RadioGroup<String>(
+          groupValue: chosen.purpose,
+          onChanged: (value) {
+            if (!_opening && value != null) setState(() => _picked = value);
+          },
+          child: Column(
+            children: [
+              for (final option in widget.booking.payment!.options) ...[
+                _PaymentOptionCard(
+                  option: option,
+                  formats: formats,
+                  selected: option.purpose == chosen.purpose,
+                  depositPercent: formats.percent(pricing.depositPercent),
+                  onSelect: _opening ? null : () => setState(() => _picked = option.purpose),
+                ),
+                const SizedBox(height: Space.sm),
+              ],
+            ],
+          ),
+        ),
+        // The consequence of the choice, before the button. Nothing about the
+        // money is hidden, and every figure is the server's.
+        KhadraCard(
+          child: Column(
+            children: [
+              KhadraDetailRow(
+                  label: l10n.paymentSummaryTotal,
+                  value: Text(formats.money(pricing.totalPrice)),
+                  dense: true),
+              KhadraDetailRow(label: l10n.paymentSummaryChoice, value: Text(title), dense: true),
+              if (chosen.isDeposit)
+                KhadraDetailRow(
+                    label: l10n.paymentSummaryDeposit,
+                    value: Text(formats.money(chosen.selectedPaymentAmount)),
+                    dense: true),
+              if (!chosen.processingFee.isZero)
+                KhadraDetailRow(
+                    label: l10n.paymentSummaryFee,
+                    value: Text(formats.money(chosen.processingFee)),
+                    dense: true),
+              KhadraDetailRow(
+                  label: l10n.paymentSummaryNow,
+                  value: Text(formats.money(chosen.totalChargedNow)),
+                  valueStyle: const TextStyle(fontWeight: FontWeight.w800, color: KhadraColors.price),
+                  dense: true),
+              KhadraDetailRow(
+                  label: l10n.paymentSummaryAfter,
+                  value: Text(formats.money(chosen.remainingBalanceAfter)),
+                  dense: true),
+            ],
+          ),
+        ),
+        const SizedBox(height: Space.md),
+        FilledButton.icon(
+          onPressed: _opening ? null : _pay,
+          icon: const Icon(Icons.credit_card, size: 18),
+          label: Text(_opening
+              ? l10n.bookingPaymentOpening
+              : l10n.paymentPayButton(formats.money(chosen.totalChargedNow))),
+        ),
+      ],
     );
   }
 
@@ -504,7 +596,13 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
     final bookingId = widget.booking.bookingId;
     setState(() => _opening = true);
     try {
-      final attempt = await ref.read(apiProvider).openDepositCheckout(bookingId);
+      // The purpose, never an amount: the server works out what the choice costs.
+      // An older server offers no choices, and its deposit endpoint still pays it.
+      final chosen = _chosen;
+      final api = ref.read(apiProvider);
+      final attempt = chosen == null
+          ? await api.openDepositCheckout(bookingId)
+          : await api.openCheckout(bookingId, chosen.purpose);
       if (!mounted) return;
 
       final url = attempt.checkoutUrl;
@@ -545,6 +643,68 @@ class _PaymentActionState extends ConsumerState<_PaymentAction> {
     } finally {
       if (mounted) setState(() => _opening = false);
     }
+  }
+}
+
+/// One way of paying, as a selectable card: its title, what it means, what it
+/// charges now and what is left after. Colours and corners come from the theme.
+class _PaymentOptionCard extends StatelessWidget {
+  const _PaymentOptionCard({
+    required this.option,
+    required this.formats,
+    required this.selected,
+    required this.depositPercent,
+    required this.onSelect,
+  });
+
+  final PaymentOption option;
+  final Formats formats;
+  final bool selected;
+  final String depositPercent;
+  final VoidCallback? onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return KhadraCard(
+      onTap: onSelect,
+      borderRadius: Radii.row,
+      borderColor: selected ? KhadraColors.accent : null,
+      background: selected ? KhadraColors.accent100 : null,
+      padding: const EdgeInsets.all(Space.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Radio<String>(value: option.purpose),
+          const SizedBox(width: Space.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  option.isDeposit ? l10n.paymentDepositTitle : l10n.paymentFullTitle,
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  option.isDeposit ? l10n.paymentDepositText(depositPercent) : l10n.paymentFullText,
+                  style: const TextStyle(color: KhadraColors.neutral700, fontSize: 13),
+                ),
+                const SizedBox(height: Space.xs),
+                Text(
+                  l10n.paymentPayNow(formats.money(option.totalChargedNow)),
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: KhadraColors.price),
+                ),
+                Text(
+                  l10n.paymentRemaining(formats.money(option.remainingBalanceAfter)),
+                  style: const TextStyle(color: KhadraColors.neutral600, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

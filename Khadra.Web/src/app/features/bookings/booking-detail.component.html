@@ -71,9 +71,51 @@
           @if (b.isAwaitingPayment) {
             <div class="notice notice--warn pay-box"><kh-icon name="credit-card" />
               <div>
-                <p class="notice__title">{{ i18n.t('booking.awaitingPaymentTitle', { amount: format.money(b.payment?.amountDue ?? b.pricing.depositAmount) }) }}</p>
+                @let chosen = option(b);
+                @if (chosen) {
+                  <p class="notice__title">{{ i18n.t('pay.title') }}</p>
+                } @else {
+                  <p class="notice__title">{{ i18n.t('booking.awaitingPaymentTitle', { amount: format.money(b.payment?.amountDue ?? b.pricing.depositAmount) }) }}</p>
+                }
                 <p>{{ i18n.t('booking.awaitingPaymentBy', { deadline: format.dateTime(b.paymentDeadline) }) }} · <strong>{{ paymentLeft() }}</strong></p>
-                @if (b.payment?.canPay) {
+                @if (b.payment?.canPay && chosen) {
+                  <!-- The two ways to pay (2026-09-24), as a radio group. Every figure is the server's. -->
+                  <div class="pay-options" role="radiogroup" [attr.aria-label]="i18n.t('pay.title')">
+                    @for (option of b.payment!.options!; track option.purpose) {
+                      <label class="pay-option" [class.is-selected]="option.purpose === chosen.purpose">
+                        <input type="radio" name="pay-purpose" [value]="option.purpose" [checked]="option.purpose === chosen.purpose"
+                          [disabled]="paying()" (change)="pickedPurpose.set(option.purpose)" />
+                        <span class="pay-option__body">
+                          <span class="pay-option__title">{{ i18n.t(option.purpose === 'Deposit' ? 'pay.depositTitle' : 'pay.fullTitle') }}</span>
+                          <span class="pay-option__text">{{ option.purpose === 'Deposit'
+                            ? i18n.t('pay.depositText', { percent: percent(b.pricing.depositPercent) })
+                            : i18n.t('pay.fullText') }}</span>
+                          <span class="pay-option__figures">
+                            <span>{{ i18n.t('pay.payNow', { amount: format.money(option.totalChargedNow) }) }}</span>
+                            <span class="faint">{{ i18n.t('pay.remaining', { amount: format.money(option.remainingBalanceAfter) }) }}</span>
+                          </span>
+                        </span>
+                      </label>
+                    }
+                  </div>
+                  <!-- The consequence of the choice, before the button: nothing about the money is hidden. -->
+                  <dl class="lines pay-summary">
+                    <div><dt>{{ i18n.t('pay.summaryTotal') }}</dt><dd>{{ format.money(b.pricing.totalPrice) }}</dd></div>
+                    <div><dt>{{ i18n.t('pay.summaryChoice') }}</dt>
+                      <dd>{{ i18n.t(chosen.purpose === 'Deposit' ? 'pay.depositTitle' : 'pay.fullTitle') }}</dd></div>
+                    @if (chosen.purpose === 'Deposit') {
+                      <div><dt>{{ i18n.t('quote.deposit', { percent: percent(b.pricing.depositPercent) }) }}</dt>
+                        <dd>{{ format.money(chosen.selectedPaymentAmount) }}</dd></div>
+                    }
+                    @if (chosen.processingFee.amount > 0) {
+                      <div><dt>{{ i18n.t('pay.summaryFee') }}</dt><dd>{{ format.money(chosen.processingFee) }}</dd></div>
+                    }
+                    <div class="lines__total"><dt>{{ i18n.t('pay.summaryNow') }}</dt><dd>{{ format.money(chosen.totalChargedNow) }}</dd></div>
+                    <div><dt>{{ i18n.t('pay.summaryAfter') }}</dt><dd>{{ format.money(chosen.remainingBalanceAfter) }}</dd></div>
+                  </dl>
+                  <button type="button" class="btn btn--primary btn--block" [disabled]="paying()" (click)="pay(b)">
+                    {{ paying() ? i18n.t('booking.payOpening') : i18n.t('pay.button', { amount: format.money(chosen.totalChargedNow) }) }}</button>
+                } @else if (b.payment?.canPay) {
                   <button type="button" class="btn btn--primary" [disabled]="paying()" (click)="pay(b)">
                     {{ paying() ? i18n.t('booking.payOpening') : i18n.t('booking.pay') }}</button>
                 } @else if (b.payment?.unavailableReason === 'payments.provider_unavailable') {

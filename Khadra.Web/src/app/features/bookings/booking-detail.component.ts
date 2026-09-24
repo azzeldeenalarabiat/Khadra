@@ -16,7 +16,7 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { Booking, DepositRefund, PaymentAttempt } from '../../core/api/bookings.api';
+import { Booking, DepositRefund, PaymentAttempt, PaymentOption, PaymentPurpose } from '../../core/api/bookings.api';
 import { vocabularyLabel } from '../../core/api/app-config.api';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
@@ -30,6 +30,7 @@ import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { LIFECYCLE, countdownText, partyLabel, stageLabel, statusLabel, statusTone } from './booking-presentation';
 import { countdownParts } from './countdown';
 import { HandoverCodeComponent } from './handover-code.component';
+import { chosenOption } from './payment-choice';
 import { httpData } from '../../core/http/http-data';
 
 /** How often an open booking is re-read while the page is visible (docs/refresh-policy.md: 60s). */
@@ -148,6 +149,12 @@ export class BookingDetailComponent {
   // ── Payment ──────────────────────────────────────────────────────────────
   protected readonly paying = signal(false);
   protected readonly payProblem = signal<ProblemSnapshot | null>(null);
+  /** The way of paying the visitor picked; null until they touch the choice. */
+  protected readonly pickedPurpose = signal<PaymentPurpose | null>(null);
+
+  protected option(b: Booking): PaymentOption | null {
+    return chosenOption(b.payment?.options, this.pickedPurpose(), b.payment?.liveAttempt?.purpose);
+  }
   protected readonly checkout = signal<'checking' | 'paid' | 'open' | 'ended' | null>(null);
   private checkoutStartedAt = 0;
   private checkoutPaymentId: string | null = null;
@@ -277,7 +284,14 @@ export class BookingDetailComponent {
     this.paying.set(true);
     this.payProblem.set(null);
     try {
-      const attempt = await firstValueFrom(this.http.post<PaymentAttempt>(`/api/v1/bookings/${booking.bookingId}/deposit-checkout`, {}));
+      // The purpose, never an amount: the server works out what that choice costs. An API from before
+      // the two options offers none, and the deposit endpoint is still the way to pay it.
+      const chosen = this.option(booking);
+      const attempt = await firstValueFrom(
+        chosen
+          ? this.http.post<PaymentAttempt>(`/api/v1/bookings/${booking.bookingId}/checkout`, { purpose: chosen.purpose })
+          : this.http.post<PaymentAttempt>(`/api/v1/bookings/${booking.bookingId}/deposit-checkout`, {}),
+      );
       const url = attempt.checkoutUrl ?? '';
       // Only ever follow an http(s) address the server generated; anything else is refused here.
       if (!/^https?:\/\//i.test(url)) throw { status: 0 };

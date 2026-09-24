@@ -376,6 +376,15 @@ class KhadraApi {
         '/api/v1/bookings/$bookingId/deposit-checkout',
       )))!;
 
+  /// Starts, resumes or replaces the checkout for the way of paying the customer
+  /// chose: "Deposit" or "FullPayment" (2026-09-24). Names a PURPOSE, never an
+  /// amount — the server works out what that choice costs.
+  Future<PaymentAttempt> openCheckout(String bookingId, String purpose) async =>
+      PaymentAttempt.maybe(_object(await _client.post<dynamic>(
+        '/api/v1/bookings/$bookingId/checkout',
+        body: {'purpose': purpose},
+      )))!;
+
   /// A fresh one-time code to show at the counter. The server decides whether it is
   /// for the pickup or the return from the booking's own status, and asking again
   /// replaces the previous code.

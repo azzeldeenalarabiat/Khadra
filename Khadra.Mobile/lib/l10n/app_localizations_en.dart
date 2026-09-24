@@ -1047,6 +1047,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingPayDeposit => 'Pay the deposit';
 
   @override
+  String get paymentChooseTitle => 'Choose how to pay';
+
+  @override
+  String get paymentDepositTitle => 'Pay deposit only';
+
+  @override
+  String paymentDepositText(String percent) {
+    return 'Pay $percent now to confirm your booking';
+  }
+
+  @override
+  String get paymentFullTitle => 'Pay full amount';
+
+  @override
+  String get paymentFullText => 'Pay the full booking amount now';
+
+  @override
+  String paymentPayNow(String amount) {
+    return 'Pay now: $amount';
+  }
+
+  @override
+  String paymentRemaining(String amount) {
+    return 'Remaining balance: $amount';
+  }
+
+  @override
+  String get paymentSummaryTotal => 'Booking total';
+
+  @override
+  String get paymentSummaryChoice => 'Payment choice';
+
+  @override
+  String get paymentSummaryDeposit => 'Deposit';
+
+  @override
+  String get paymentSummaryFee => 'Card processing fee';
+
+  @override
+  String get paymentSummaryNow => 'Charged now';
+
+  @override
+  String get paymentSummaryAfter => 'Remaining after payment';
+
+  @override
+  String paymentPayButton(String amount) {
+    return 'Pay $amount';
+  }
+
+  @override
   String get bookingPaymentOpening => 'Opening the payment page…';
 
   @override

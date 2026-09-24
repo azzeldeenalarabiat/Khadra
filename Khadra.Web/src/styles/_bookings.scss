@@ -126,6 +126,74 @@ $sm: 767px;
 .pay-box .btn {
   margin-block-start: var(--s-3);
 }
+// The two ways to pay, as selectable cards. The radio stays real (keyboard and screen readers use it);
+// the card around it is what a pointer clicks.
+.pay-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--s-3);
+  margin-block: var(--s-3);
+}
+.pay-option {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding: var(--s-3) var(--s-4);
+  border: 1px solid var(--n-300);
+  border-radius: var(--r-row);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+  input {
+    margin-block-start: 3px;
+    inline-size: 18px;
+    block-size: 18px;
+    accent-color: var(--accent);
+    flex: none;
+  }
+  &:hover {
+    border-color: var(--n-500);
+  }
+  &.is-selected {
+    border-color: var(--accent);
+    background: var(--accent-100);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  &:focus-within {
+    box-shadow: var(--focus);
+  }
+}
+.pay-option__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-inline-size: 0;
+}
+.pay-option__title {
+  font-weight: 800;
+}
+.pay-option__text {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.pay-option__figures {
+  display: flex;
+  flex-direction: column;
+  margin-block-start: var(--s-1);
+  font-size: 14px;
+  font-weight: 700;
+}
+.pay-summary {
+  margin-block-start: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-row);
+  background: var(--surface);
+  color: var(--text);
+}
 .timeline {
   list-style: none;
   margin: 0;

@@ -51,6 +51,7 @@ void main() {
     bool dealerRemoved = false,
     String? dealerCityId = 'city-amman',
     Map<String, dynamic>? penalty,
+    Map<String, dynamic>? payment,
   }) =>
       Booking.fromJson({
         'bookingId': 'b-1',
@@ -104,9 +105,10 @@ void main() {
         'dealerCityId': dealerCityId,
         'handovers': const <dynamic>[],
         'history': history,
+        'payment': payment,
       });
 
-  Future<void> pump(WidgetTester tester, Booking booking,
+  Future<FakeApi> pump(WidgetTester tester, Booking booking,
       {Locale locale = const Locale('en')}) async {
     tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1;
@@ -142,6 +144,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return api;
   }
 
   /// The history a booking has when it reached [status] the ordinary way.
@@ -318,6 +321,110 @@ void main() {
   });
 
   // The handover code: offered for exactly the two statuses the server issues one for.
+  // The two ways to pay an approved booking (owner, 2026-09-24). The figures are
+  // the server's own, the owner's example: 165 JOD booking, 33 deposit, and a
+  // 1.5% fee on the full amount so the fee line is exercised too.
+  group('paying an approved booking', () {
+    Map<String, dynamic> m(num amount) => {'amount': amount, 'currency': 'JOD'};
+    final payment = {
+      'canPay': true,
+      'unavailableReason': null,
+      'amountDue': m(33),
+      'payBy': now.add(const Duration(hours: 2)).toIso8601String(),
+      'liveAttempt': null,
+      'options': [
+        {
+          'purpose': 'Deposit',
+          'selectedPaymentAmount': m(33),
+          'processingFee': m(0),
+          'totalChargedNow': m(33),
+          'remainingBalanceAfter': m(132),
+        },
+        {
+          'purpose': 'FullPayment',
+          'selectedPaymentAmount': m(165),
+          'processingFee': m(2.475),
+          'totalChargedNow': m(167.475),
+          'remainingBalanceAfter': m(0),
+        },
+      ],
+    };
+
+    Booking approved() => bookingOf(
+          status: 'Approved',
+          history: pathTo('Approved'),
+          isAwaitingPayment: true,
+          payment: payment,
+        );
+
+    for (final locale in [const Locale('en'), const Locale('ar')]) {
+      final l10n = locale.languageCode == 'ar' ? ar : en;
+
+      screenTest('both choices are offered, the deposit chosen (${locale.languageCode})', (tester) async {
+        await pump(tester, approved(), locale: locale);
+
+        expect(find.text(l10n.paymentChooseTitle), findsOneWidget);
+        expect(find.text(l10n.paymentDepositTitle), findsWidgets);
+        expect(find.text(l10n.paymentFullTitle), findsOneWidget);
+        // The button carries the deposit's figure until the choice changes.
+        expect(find.textContaining(RegExp(r'33(\.000)?')), findsWidgets);
+        expect(find.byType(FilledButton), findsOneWidget);
+        final button = tester.widget<FilledButton>(find.byType(FilledButton));
+        expect(button.onPressed, isNotNull);
+      });
+    }
+
+    screenTest('switching to the full amount changes the charge and shows the fee', (tester) async {
+      await pump(tester, approved());
+
+      await tester.tap(find.text(en.paymentFullTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('167.475'), findsWidgets);
+      expect(find.text(en.paymentSummaryFee), findsOneWidget);
+      expect(find.textContaining('2.475'), findsWidgets);
+    });
+
+    screenTest('paying asks the server by PURPOSE, never by amount', (tester) async {
+      final api = await pump(tester, approved());
+      // A checkout with no page to open: the screen says so and stays put, which
+      // keeps the in-app browser out of a widget test.
+      api.checkoutAttempt = PaymentAttempt.maybe({
+        'paymentId': 'p-1',
+        'status': 'Pending',
+        'amount': m(167.475),
+        'checkoutUrl': null,
+        'expiresAt': now.add(const Duration(minutes: 30)).toIso8601String(),
+        'failureCode': null,
+        'isSandbox': true,
+        'purpose': 'FullPayment',
+      });
+
+      await tester.tap(find.text(en.paymentFullTitle));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byType(FilledButton));
+      await tester.tap(find.byType(FilledButton));
+      await tester.pumpAndSettle();
+
+      expect(api.checkoutPurposes, ['FullPayment']);
+    });
+
+    screenTest('an older server with no choices keeps the single deposit button', (tester) async {
+      await pump(
+        tester,
+        bookingOf(
+          status: 'Approved',
+          history: pathTo('Approved'),
+          isAwaitingPayment: true,
+          payment: {...payment, 'options': const <dynamic>[]},
+        ),
+      );
+
+      expect(find.text(en.paymentFullTitle), findsNothing);
+      expect(find.text(en.bookingPayDeposit), findsOneWidget);
+    });
+  });
+
   group('the handover code button', () {
     for (final (status, label) in [
       ('Confirmed', 'pickup'),

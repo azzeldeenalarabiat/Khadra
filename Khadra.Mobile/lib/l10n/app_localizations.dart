@@ -1790,6 +1790,90 @@ abstract class AppLocalizations {
   /// **'Pay the deposit'**
   String get bookingPayDeposit;
 
+  /// No description provided for @paymentChooseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how to pay'**
+  String get paymentChooseTitle;
+
+  /// No description provided for @paymentDepositTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay deposit only'**
+  String get paymentDepositTitle;
+
+  /// No description provided for @paymentDepositText.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {percent} now to confirm your booking'**
+  String paymentDepositText(String percent);
+
+  /// No description provided for @paymentFullTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay full amount'**
+  String get paymentFullTitle;
+
+  /// No description provided for @paymentFullText.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay the full booking amount now'**
+  String get paymentFullText;
+
+  /// No description provided for @paymentPayNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay now: {amount}'**
+  String paymentPayNow(String amount);
+
+  /// No description provided for @paymentRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining balance: {amount}'**
+  String paymentRemaining(String amount);
+
+  /// No description provided for @paymentSummaryTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking total'**
+  String get paymentSummaryTotal;
+
+  /// No description provided for @paymentSummaryChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment choice'**
+  String get paymentSummaryChoice;
+
+  /// No description provided for @paymentSummaryDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit'**
+  String get paymentSummaryDeposit;
+
+  /// No description provided for @paymentSummaryFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Card processing fee'**
+  String get paymentSummaryFee;
+
+  /// No description provided for @paymentSummaryNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Charged now'**
+  String get paymentSummaryNow;
+
+  /// No description provided for @paymentSummaryAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining after payment'**
+  String get paymentSummaryAfter;
+
+  /// No description provided for @paymentPayButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {amount}'**
+  String paymentPayButton(String amount);
+
   /// No description provided for @bookingPaymentOpening.
   ///
   /// In en, this message translates to:

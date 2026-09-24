@@ -1083,6 +1083,56 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingPayDeposit => 'ادفع العربون';
 
   @override
+  String get paymentChooseTitle => 'اختر طريقة الدفع';
+
+  @override
+  String get paymentDepositTitle => 'دفع العربون فقط';
+
+  @override
+  String paymentDepositText(String percent) {
+    return 'ادفع $percent الآن لتأكيد الحجز';
+  }
+
+  @override
+  String get paymentFullTitle => 'دفع المبلغ كاملًا';
+
+  @override
+  String get paymentFullText => 'ادفع قيمة الحجز كاملة الآن';
+
+  @override
+  String paymentPayNow(String amount) {
+    return 'المبلغ المطلوب الآن: $amount';
+  }
+
+  @override
+  String paymentRemaining(String amount) {
+    return 'المتبقي: $amount';
+  }
+
+  @override
+  String get paymentSummaryTotal => 'إجمالي الحجز';
+
+  @override
+  String get paymentSummaryChoice => 'طريقة الدفع';
+
+  @override
+  String get paymentSummaryDeposit => 'العربون';
+
+  @override
+  String get paymentSummaryFee => 'رسوم معالجة البطاقة';
+
+  @override
+  String get paymentSummaryNow => 'يُخصم الآن';
+
+  @override
+  String get paymentSummaryAfter => 'المتبقي بعد الدفع';
+
+  @override
+  String paymentPayButton(String amount) {
+    return 'ادفع $amount';
+  }
+
+  @override
   String get bookingPaymentOpening => 'جارٍ فتح صفحة الدفع…';
 
   @override

@@ -222,3 +222,81 @@ describe('refundStage', () => {
     expect(at('Failed')).toBe('delayed');
   });
 });
+
+describe('BookingDetailComponent, an approved booking awaiting payment', () => {
+  let http: HttpTestingController;
+  const money = (amount: number) => ({ amount, currency: 'JOD' });
+
+  // The owner's example: 250 JOD booking, 50 deposit. Figures as the server sends them.
+  const OPTIONS = [
+    { purpose: 'Deposit', selectedPaymentAmount: money(50), processingFee: money(0), totalChargedNow: money(50), remainingBalanceAfter: money(200) },
+    { purpose: 'FullPayment', selectedPaymentAmount: money(250), processingFee: money(3.75), totalChargedNow: money(253.75), remainingBalanceAfter: money(0) },
+  ];
+  const APPROVED = {
+    ...CONFIRMED,
+    status: 'Approved',
+    depositPaid: false,
+    isAwaitingPayment: true,
+    paymentDeadline: new Date(Date.now() + 90 * 60_000).toISOString(),
+    pricing: { ...CONFIRMED.pricing, totalPrice: money(250), depositAmount: money(50), balanceDue: money(200) },
+    payment: { canPay: true, unavailableReason: null, amountDue: money(50), payBy: null, liveAttempt: null, options: OPTIONS },
+  };
+
+  async function render() {
+    TestBed.configureTestingModule({
+      imports: [BookingDetailComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(BookingDetailComponent);
+    fixture.componentRef.setInput('bookingId', ID);
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    await settle();
+    http.match((request) => request.url === BOOKING_URL).forEach((read) => read.flush(APPROVED));
+    await settle();
+    return { page: fixture.nativeElement as HTMLElement, settle };
+  }
+
+  const payButton = (page: HTMLElement) => page.querySelector<HTMLButtonElement>('.pay-box .btn--primary')!;
+
+  it('offers both ways to pay, deposit chosen, with the server\'s own figures', async () => {
+    const { page } = await render();
+    const options = page.querySelectorAll('.pay-option');
+
+    expect(options).toHaveLength(2);
+    expect(options[0].textContent).toContain('دفع العربون فقط');
+    expect(options[1].textContent).toContain('دفع المبلغ كاملًا');
+    expect(options[0].classList).toContain('is-selected');
+    // Without /app-config the test page prints money without its fixed decimals; the figure is what matters.
+    expect(payButton(page).textContent).toMatch(/[^0-9.]50(.000)? JOD/);
+    expect(page.querySelector('.pay-summary')!.textContent).toMatch(/200(.000)? JOD/);
+  });
+
+  it('follows the choice: the full amount, its fee shown, nothing left after', async () => {
+    const { page, settle } = await render();
+
+    page.querySelectorAll<HTMLInputElement>('.pay-option input')[1].dispatchEvent(new Event('change'));
+    await settle();
+
+    expect(page.querySelectorAll('.pay-option')[1].classList).toContain('is-selected');
+    expect(payButton(page).textContent).toMatch(/253.750? JOD/);
+    const summary = page.querySelector('.pay-summary')!.textContent ?? '';
+    expect(summary).toMatch(/[^0-9.]3.750? JOD/);
+    expect(summary).toMatch(/[^0-9.]0(.000)? JOD/);
+  });
+
+  it('asks the server for a checkout by PURPOSE, never by amount', async () => {
+    const { page, settle } = await render();
+    page.querySelectorAll<HTMLInputElement>('.pay-option input')[1].dispatchEvent(new Event('change'));
+    await settle();
+
+    payButton(page).click();
+    await settle();
+
+    const request = http.expectOne((r) => r.method === 'POST' && r.url === `${BOOKING_URL}/checkout`);
+    expect(request.request.body).toEqual({ purpose: 'FullPayment' });
+  });
+});
