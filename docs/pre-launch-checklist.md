@@ -2010,6 +2010,12 @@ survives the build, not a gap in it.
 
 **Status:** open · **Raised:** 2026-09-08 · **Blocks:** every Confirmed booking
 
+**Also due before a real provider is connected** (recorded 2026-09-24, from the automatic
+free-cancellation refund): item 157 (back off a refund the provider keeps refusing), item 159 (the
+adapter's refund events must name the refund they settle), item 156 (the owner's policy for a
+gallery or admin cancelling a paid booking inside the free window), and item 158 (hide or zero the
+frozen commission and payout on a refunded cancellation).
+
 `Payments:Provider` is `None`, and `UnconfiguredPaymentProvider` is the only implementation this build
 ships. Every checkout answers 503 `payments.provider_unavailable`; the webhook answers 401, because
 with no secret there is no way to tell a provider from anyone else who found the URL.
