@@ -101,6 +101,35 @@ void main() {
       expect(booking.isAwaitingPayment, isFalse);
     });
 
+    test('reads how it was paid: the verdict and the payment that confirmed it', () {
+      final booking = Booking.fromJson(const {
+        'bookingId': 'b1',
+        'isPaidInFull': true,
+        'confirmingPayment': {
+          'purpose': 'FullPayment',
+          'amountCharged': {'amount': 102.75, 'currency': 'JOD'},
+          'processingFee': {'amount': 0, 'currency': 'JOD'},
+          'appliedToBooking': {'amount': 102.75, 'currency': 'JOD'},
+          'paidAt': '2026-09-25T17:56:00Z',
+          'refundOnFreeCancellation': {'amount': 102.75, 'currency': 'JOD'},
+        },
+      });
+
+      expect(booking.isPaidInFull, isTrue);
+      expect(booking.confirmingPayment!.isFullPayment, isTrue);
+      expect(booking.confirmingPayment!.amountCharged.amount, 102.75);
+      expect(booking.confirmingPayment!.refundOnFreeCancellation.currencyCode, 'JOD');
+    });
+
+    test('an API from before 2026-09-25 leaves the deposit wording in place', () {
+      // No verdict and no confirming payment: not paid in full, so every
+      // screen keeps saying "deposit", which is what that server's bookings were.
+      final booking = Booking.fromJson(const {'bookingId': 'b1', 'depositPaid': true});
+
+      expect(booking.isPaidInFull, isFalse);
+      expect(booking.confirmingPayment, isNull);
+    });
+
     test('reads the billed day count from the server, defaulting to one', () {
       final booking = Booking.fromJson(const {
         'bookingId': 'b1',

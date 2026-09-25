@@ -21,6 +21,7 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
+import { commissionRate } from '../../core/i18n/commission-rate';
 
 /**
  * One booking as the platform sees it.
@@ -109,7 +110,8 @@ export class AdminBookingDetailComponent {
       ...(booking.depositRefund
         ? [
             {
-              k: this.t('adminBooking.depositRefund'),
+              // The payment it returned: the whole booking when it was paid in full, or the deposit.
+              k: this.t(booking.isPaidInFull ? 'adminBooking.paymentRefund' : 'adminBooking.depositRefund'),
               v: this.t(depositRefundKey(booking.depositRefund), { amount: this.money(booking.depositRefund.amount) }),
             },
           ]
@@ -118,7 +120,7 @@ export class AdminBookingDetailComponent {
       { k: this.t('vehicleDetail.securityDeposit'), v: this.money(pricing.securityDeposit) },
       {
         k: this.t('adminBooking.platformCommissionWithPercent', {
-          percent: this.formats.percent(booking.terms.commissionPercent),
+          rate: commissionRate(this.t, this.formats.percent(booking.terms.commissionPercent), booking.terms.commissionBasis),
         }),
         // Unsigned: the amount Khadra charges, computed by the API at the frozen rate. The label
         // carries the subtraction; a sign typed here once printed "−0" on a zero commission.

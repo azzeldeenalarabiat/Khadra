@@ -1105,6 +1105,65 @@ class _VehicleCard extends ConsumerWidget {
   }
 }
 
+/// Where a free cancellation's refund is: initiated, refunded, or delayed.
+class _RefundBadge extends StatelessWidget {
+  const _RefundBadge({required this.refund, required this.l10n});
+
+  final DepositRefund refund;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) => KhadraBadge(
+        label: refund.isRefunded
+            ? l10n.bookingRefunded
+            : refund.isDelayed
+                ? l10n.bookingRefundDelayed
+                : l10n.bookingRefundInitiated,
+        colour: refund.isRefunded
+            ? KhadraColors.ok
+            : refund.isDelayed
+                ? KhadraColors.bad
+                : KhadraColors.warn,
+        icon: refund.isRefunded ? Icons.check_rounded : Icons.schedule_rounded,
+      );
+}
+
+/// What the refund badge means, in a sentence: initiated (and when), refunded
+/// (and when), or still owed and being retried. A booking paid in full speaks
+/// of the payment, a deposit of the deposit (owner, 2026-09-25).
+class _RefundText extends StatelessWidget {
+  const _RefundText({
+    required this.refund,
+    required this.fullPayment,
+    required this.formats,
+    required this.l10n,
+  });
+
+  final DepositRefund refund;
+  final bool fullPayment;
+  final Formats formats;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final amount = formats.money(refund.amount);
+    final text = refund.isRefunded
+        ? (fullPayment ? l10n.bookingRefundedPaymentText : l10n.bookingRefundedText)(
+            amount, formats.dateTime(refund.settledAt ?? refund.requestedAt))
+        : refund.isDelayed
+            ? (fullPayment ? l10n.bookingRefundDelayedPaymentText : l10n.bookingRefundDelayedText)(amount)
+            : (fullPayment ? l10n.bookingRefundInitiatedPaymentText : l10n.bookingRefundInitiatedText)(
+                amount, formats.dateTime(refund.requestedAt));
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: Space.sm),
+      child: Text(
+        text,
+        style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12, height: 1.45),
+      ),
+    );
+  }
+}
+
 class _Price extends StatelessWidget {
   const _Price({required this.booking, required this.formats});
 
@@ -1158,86 +1217,126 @@ class _Price extends StatelessWidget {
           ),
         ),
 
-        // BLOCK TWO: how that total is paid. These two figures ADD UP to the
-        // total above, which is why they are together and apart from what
-        // follows.
+        // BLOCK TWO: how that total is paid. These figures ADD UP to the total
+        // above, which is why they are together and apart from what follows.
+        // A booking paid in full says so, with what the card was charged, and is
+        // never worded as a deposit (owner, 2026-09-25); a deposit keeps its
+        // own lines exactly as before.
         const SizedBox(height: Space.md),
         KhadraCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _BlockLabel(l10n.bookingHowItIsPaid),
-              KhadraDetailRow(
-                label: l10n.bookDepositNow(formats.percent(pricing.depositPercent)),
-                value: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(formats.money(pricing.depositAmount)),
-                    // A free cancellation's refund replaces "Paid": after a
-                    // paid free cancellation the customer must never see only
-                    // that the deposit was paid (owner, 2026-09-24).
-                    if (booking.depositRefund case final refund?) ...[
-                      const SizedBox(width: Space.sm),
-                      KhadraBadge(
-                        label: refund.isRefunded
-                            ? l10n.bookingRefunded
-                            : refund.isDelayed
-                                ? l10n.bookingRefundDelayed
-                                : l10n.bookingRefundInitiated,
-                        colour: refund.isRefunded
-                            ? KhadraColors.ok
-                            : refund.isDelayed
-                                ? KhadraColors.bad
-                                : KhadraColors.warn,
-                        icon: refund.isRefunded
-                            ? Icons.check_rounded
-                            : Icons.schedule_rounded,
-                      ),
-                    ]
-                    // Whether it is already paid is a FACT on the booking, not
-                    // a guess from the status.
-                    else if (booking.depositPaid) ...[
-                      const SizedBox(width: Space.sm),
-                      KhadraBadge(
-                        label: l10n.bookingDepositPaidNote,
-                        colour: KhadraColors.ok,
-                        icon: Icons.check_rounded,
-                      ),
+              if (booking.isPaidInFull) ...[
+                KhadraDetailRow(
+                  label: l10n.bookingPaymentType,
+                  value: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(booking.confirmingPayment?.isFullPayment ?? false
+                          ? l10n.bookingPaymentTypeFull
+                          : l10n.bookingPaymentTypeDeposit),
+                      // A refund in progress replaces "Paid in full", as it
+                      // replaces "Paid" on a deposit.
+                      if (booking.depositRefund == null) ...[
+                        const SizedBox(width: Space.sm),
+                        KhadraBadge(
+                          label: l10n.bookingPaidInFullNote,
+                          colour: KhadraColors.ok,
+                          icon: Icons.check_rounded,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              if (booking.depositRefund case final refund?) ...[
-                const SizedBox(height: 2),
-                // What the badge means, in a sentence: initiated (and when),
-                // refunded (and when), or still owed and being retried.
-                Text(
-                  refund.isRefunded
-                      ? l10n.bookingRefundedText(formats.money(refund.amount),
-                          formats.dateTime(refund.settledAt ?? refund.requestedAt))
-                      : refund.isDelayed
-                          ? l10n.bookingRefundDelayedText(formats.money(refund.amount))
-                          : l10n.bookingRefundInitiatedText(
-                              formats.money(refund.amount), formats.dateTime(refund.requestedAt)),
-                  style: const TextStyle(
-                      color: KhadraColors.neutral600, fontSize: 12, height: 1.45),
+                KhadraDetailRow(
+                  label: l10n.bookingAmountCharged,
+                  value: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(formats.money(
+                          booking.confirmingPayment?.amountCharged ?? pricing.totalPrice)),
+                      if (booking.depositRefund case final refund?) ...[
+                        const SizedBox(width: Space.sm),
+                        _RefundBadge(refund: refund, l10n: l10n),
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: Space.sm),
-              ],
-              KhadraDetailRow(
-                label: l10n.bookBalanceAtPickup,
-                value: Text(formats.money(pricing.balanceDue)),
-              ),
-              if (!pricing.deliveryFee.isZero) ...[
-                const SizedBox(height: 2),
-                // Otherwise a reader adds the delivery line from the block above
-                // a second time: the fee is inside the cash figure, because the
-                // driver collects it.
-                Text(
-                  l10n.bookingBalanceIncludesDelivery,
-                  style: const TextStyle(
-                      color: KhadraColors.neutral500, fontSize: 12),
+                if (booking.confirmingPayment case final payment? when !payment.processingFee.isZero)
+                  KhadraDetailRow(
+                    label: l10n.paymentSummaryFee,
+                    value: Text(formats.money(payment.processingFee)),
+                  ),
+                if (booking.depositRefund case final refund?)
+                  _RefundText(
+                    refund: refund,
+                    fullPayment: booking.confirmingPayment?.isFullPayment ?? false,
+                    formats: formats,
+                    l10n: l10n,
+                  ),
+                KhadraDetailRow(
+                  label: l10n.bookingRemainingBalance,
+                  value: Text(formats.money(pricing.balanceDue)),
                 ),
+                if (booking.depositRefund == null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.bookingPaidInFullNothingDue,
+                    style: const TextStyle(
+                        color: KhadraColors.neutral500, fontSize: 12),
+                  ),
+                ],
+              ] else ...[
+                KhadraDetailRow(
+                  label: l10n.bookDepositNow(formats.percent(pricing.depositPercent)),
+                  value: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(formats.money(pricing.depositAmount)),
+                      // A free cancellation's refund replaces "Paid": after a
+                      // paid free cancellation the customer must never see only
+                      // that the deposit was paid (owner, 2026-09-24).
+                      if (booking.depositRefund case final refund?) ...[
+                        const SizedBox(width: Space.sm),
+                        _RefundBadge(refund: refund, l10n: l10n),
+                      ]
+                      // Whether it is already paid is a FACT on the booking, not
+                      // a guess from the status.
+                      else if (booking.depositPaid) ...[
+                        const SizedBox(width: Space.sm),
+                        KhadraBadge(
+                          label: l10n.bookingDepositPaidNote,
+                          colour: KhadraColors.ok,
+                          icon: Icons.check_rounded,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (booking.depositRefund case final refund?)
+                  _RefundText(
+                    refund: refund,
+                    fullPayment: false,
+                    formats: formats,
+                    l10n: l10n,
+                  ),
+                KhadraDetailRow(
+                  label: l10n.bookBalanceAtPickup,
+                  value: Text(formats.money(pricing.balanceDue)),
+                ),
+                if (!pricing.deliveryFee.isZero) ...[
+                  const SizedBox(height: 2),
+                  // Otherwise a reader adds the delivery line from the block above
+                  // a second time: the fee is inside the cash figure, because the
+                  // driver collects it.
+                  Text(
+                    l10n.bookingBalanceIncludesDelivery,
+                    style: const TextStyle(
+                        color: KhadraColors.neutral500, fontSize: 12),
+                  ),
+                ],
               ],
             ],
           ),
@@ -1460,6 +1559,7 @@ class _Activity extends ConsumerWidget {
               line: _reasonLine(l10n, entries[i], rejectionReasons, arabic),
               formats: formats,
               l10n: l10n,
+              confirmedBy: booking.confirmingPayment?.purpose,
             ),
             if (i != entries.length - 1)
               const Padding(
@@ -1533,12 +1633,16 @@ class _ActivityRow extends StatelessWidget {
     required this.line,
     required this.formats,
     required this.l10n,
+    this.confirmedBy,
   });
 
   final BookingStatusChange change;
   final String? line;
   final Formats formats;
   final AppLocalizations l10n;
+
+  /// The purpose of the payment that confirmed the booking, for its Confirmed entry.
+  final String? confirmedBy;
 
   @override
   Widget build(BuildContext context) {
@@ -1570,7 +1674,7 @@ class _ActivityRow extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      stageLabel(l10n, change.toStatus),
+                      stageLabel(l10n, change.toStatus, confirmedBy: confirmedBy),
                       style: const TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w700),
                     ),

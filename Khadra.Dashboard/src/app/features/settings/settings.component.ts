@@ -8,9 +8,12 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
+import { commissionRate } from '../../core/i18n/commission-rate';
 
 interface BusinessRules {
   readonly commissionPercent: number;
+  /** What commissionPercent is a percent OF for new bookings: 'OneDay' or 'RentalTotal'. */
+  readonly commissionBasis?: string;
   readonly depositPercent: number;
   readonly noShowTimeoutHours: number;
   readonly dealerNonDeliveryPenaltyMinPercent: number;
@@ -71,7 +74,7 @@ export class SettingsComponent {
     return [
       {
         k: this.t('dealerReports.platformCommission'),
-        v: this.formats.percent(rules.commissionPercent),
+        v: commissionRate(this.t, this.formats.percent(rules.commissionPercent), rules.commissionBasis),
       },
       {
         k: this.t('settings.bookingDeposit'),

@@ -90,7 +90,33 @@ public sealed record BookingContext(
     /// none. Composed for every reader of one booking — customer, gallery and admin all need to see
     /// that the deposit is going back.
     /// </summary>
-    DepositRefundDto? DepositRefund = null);
+    DepositRefundDto? DepositRefund = null,
+    /// <summary>
+    /// The payment that confirmed this booking, or null while none has. Composed for every reader of
+    /// one booking: the gallery's timeline words the confirmation from its purpose too.
+    /// </summary>
+    ConfirmingPaymentDto? ConfirmingPayment = null);
+
+/// <summary>
+/// The payment that confirmed a booking (owner, 2026-09-25): what KIND of payment it was and what it
+/// charged, so every screen words a full payment as one rather than as a deposit.
+/// </summary>
+/// <param name="Purpose">"Deposit" or "FullPayment": only those two ever confirm a booking.</param>
+/// <param name="AmountCharged">What the card was actually charged, the processing fee included.</param>
+/// <param name="ProcessingFee">The fee inside <paramref name="AmountCharged"/>; zero when none.</param>
+/// <param name="AppliedToBooking">What went towards the booking itself, the fee excluded.</param>
+/// <param name="PaidAt">When the payment was applied to the booking (or captured, on an older row).</param>
+/// <param name="RefundOnFreeCancellation">
+/// What a free cancellation would return, from the same property the refund itself reads, so the
+/// figure promised on the cancel sheet is the figure refunded.
+/// </param>
+public sealed record ConfirmingPaymentDto(
+    string Purpose,
+    MoneyDto AmountCharged,
+    MoneyDto ProcessingFee,
+    MoneyDto AppliedToBooking,
+    DateTimeOffset? PaidAt,
+    MoneyDto RefundOnFreeCancellation);
 
 /// <summary>
 /// Where the deposit's refund is (owner, 2026-09-24): the refund's own status, never a verdict a

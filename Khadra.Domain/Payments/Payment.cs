@@ -351,13 +351,25 @@ public sealed class Payment : AggregateRoot
         if (FreeCancellationRefund is { } existing)
             return existing;
 
-        // Everything that was captured goes back — except a processing fee the payment was opened as
-        // non-refundable (owner, 2026-09-24: configurable until the provider's contract says).
-        var refund = FeeRefundable || ProcessingFee.IsZero
-            ? AmountCaptured!
-            : AmountCaptured!.Subtract(ProcessingFee);
-        return AddRefund(refund, RefundReason.FreeCancellation, disputeTicketId: null, now);
+        return AddRefund(FreeCancellationRefundAmount!, RefundReason.FreeCancellation, disputeTicketId: null, now);
     }
+
+    /// <summary>
+    /// What a free cancellation returns from this payment: everything captured, except a processing
+    /// fee the payment was opened as non-refundable (owner, 2026-09-24: configurable until the
+    /// provider's contract says). Null until something was captured.
+    /// </summary>
+    /// <remarks>
+    /// One definition, read by <see cref="RefundForFreeCancellation"/> and by the booking screens that
+    /// state the figure BEFORE the customer cancels, so the promise and the refund cannot disagree.
+    /// A deposit-only payment returns the deposit; a full payment returns the whole booking.
+    /// </remarks>
+    public Money? FreeCancellationRefundAmount =>
+        AmountCaptured is null
+            ? null
+            : FeeRefundable || ProcessingFee.IsZero
+                ? AmountCaptured
+                : AmountCaptured.Subtract(ProcessingFee);
 
     /// <summary>The one way money is promised back on an applied payment: never beyond what was taken.</summary>
     private Result<Refund, Error> AddRefund(Money amount, RefundReason reason, Id? disputeTicketId, DateTimeOffset now)

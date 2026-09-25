@@ -26,6 +26,8 @@ import { TranslationKey } from '../../core/i18n/en';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { commissionRate } from '../../core/i18n/commission-rate';
+import { confirmedStepKey, paidByCardLabel, refundRowKey } from './booking-payment.presenter';
 import { toRenterDocumentsPanel } from './renter-documents.presenter';
 
 /**
@@ -35,8 +37,9 @@ import { toRenterDocumentsPanel } from './renter-documents.presenter';
  */
 const STEP_DESCRIPTIONS: Readonly<Record<string, TranslationKey>> = {
   Requested: 'dealerBooking.requestedAwaitingYourAnswer',
-  Approved: 'dealerBooking.approvedAwaitingTheDeposit',
-  Confirmed: 'dealerBooking.depositPaidBookingConfirmed',
+  // Awaiting PAYMENT: the customer chooses at checkout between the deposit and the whole booking.
+  Approved: 'dealerBooking.approvedAwaitingPayment',
+  // Confirmed is worded from the payment that confirmed it: see stepLabel.
   // The handover itself, not the queue's word for the rental it starts ("Active").
   PickedUp: 'status.pickedUp',
 };
@@ -519,10 +522,8 @@ export class DealerBookingDetailComponent {
       },
       {
         // A customer may pay the whole booking online (2026-09-24), so the line names what was PAID,
-        // from the server: the deposit, or everything.
-        k: paidDeposit && b.onlinePaid && b.onlinePaid.amount > b.pricing.depositAmount.amount
-          ? this.t('dealerBooking.paidInFullByCard')
-          : this.t('dealerBooking.depositPaidByCard', { percent: this.format.percent(b.pricing.depositPercent) }),
+        // from the server's own verdict: the deposit, or everything.
+        k: paidByCardLabel(this.t, b, this.format.percent(b.pricing.depositPercent)),
         // Nothing is paid until the server says the payment cleared: zero, in the deposit's currency.
         v: paidDeposit
           ? money(b.onlinePaid ?? b.pricing.depositAmount)
@@ -547,9 +548,10 @@ export class DealerBookingDetailComponent {
           : b.depositRefund
             ? [
                 {
-                  // The customer cancelled inside the free window after paying: the whole deposit
-                  // went back to them, so nothing of it is held for anyone to settle.
-                  k: this.t('common.deposit'),
+                  // The customer cancelled inside the free window after paying: the whole payment
+                  // (the deposit, or the booking paid in full) went back to them, so nothing of it is
+                  // held for anyone to settle.
+                  k: this.t(refundRowKey(b)),
                   v: this.t(depositRefundKey(b.depositRefund), { amount: money(b.depositRefund.amount) }),
                 },
               ]
@@ -561,9 +563,7 @@ export class DealerBookingDetailComponent {
                 },
               ]),
       {
-        k: this.t('dealerBooking.platformCommissionFrozen', {
-          percent: this.format.percent(b.terms.commissionPercent),
-        }),
+        k: this.t('dealerBooking.platformCommissionFrozen', { rate: this.commissionRate(b) }),
         // Unsigned, and computed by the API at the frozen rate; the console never multiplies money.
         v: money(b.commissionAmount),
       },
@@ -579,7 +579,7 @@ export class DealerBookingDetailComponent {
     const b = this.booking();
     if (!b) return [];
     const done = b.history.map((change) => ({
-      label: this.stepLabel(change.toStatus),
+      label: this.stepLabel(change.toStatus, b.confirmingPayment?.purpose),
       // Independent facts, each whole: when, who, and the reason exactly as somebody typed it —
       // quoted, never translated.
       meta: [
@@ -603,11 +603,12 @@ export class DealerBookingDetailComponent {
         tone: 'dim',
         future: true,
       });
-    // The step between the two that did not exist before: the customer's deposit, on their own
-    // clock, which is what turns an approval into a rental.
+    // The step between the two that did not exist before: the customer's payment — the deposit or
+    // the whole booking, their choice — on their own clock, which is what turns an approval into a
+    // rental.
     if (b.status === 'Approved' && b.paymentDeadline)
       future.push({
-        label: this.t('dealerBooking.depositPaid'),
+        label: this.t('dealerBooking.paymentReceived'),
         meta: this.t('dealerBooking.customerPaysBy', { when: this.dateTime(b.paymentDeadline) }),
         tone: 'dim',
         future: true,
@@ -788,6 +789,11 @@ export class DealerBookingDetailComponent {
   }
 
   /** "20%", in the reader's language. */
+  /** The frozen commission rate WITH its basis ("20% of one daily rate"), never a bare percent. */
+  protected commissionRate(b: Booking): string {
+    return commissionRate(this.t, this.format.percent(b.terms.commissionPercent), b.terms.commissionBasis);
+  }
+
   protected percent(value: number): string {
     return this.format.percent(value);
   }
@@ -813,7 +819,9 @@ export class DealerBookingDetailComponent {
     return Math.round((Date.parse(to) - Date.parse(from)) / 3_600_000);
   }
 
-  private stepLabel(status: string): string {
+  private stepLabel(status: string, confirmedBy?: string | null): string {
+    // "Paid in full · booking confirmed" or "Deposit paid · booking confirmed" (owner, 2026-09-25).
+    if (status === 'Confirmed') return this.t(confirmedStepKey(confirmedBy));
     const key = STEP_DESCRIPTIONS[status];
     // The office's own wording for everything else, the same the bookings list uses.
     return key ? this.t(key) : this.statusLabel(status, 'dealerBooking');

@@ -194,10 +194,17 @@ bool _isStalled(Booking booking, String stage) => switch (stage) {
 /// "Approved — deposit due" against a step whose deposit was paid weeks ago, and
 /// "awaiting the office's reply" against a request the office answered. A stage
 /// is a thing that happened, so it is named in the past.
-String stageLabel(AppLocalizations l10n, String status) => switch (status) {
+///
+/// The Confirmed stage names the payment that reached it (owner, 2026-09-25):
+/// "Deposit paid" was wrong for a booking paid in full. `confirmedBy` is the
+/// confirming payment's purpose, from the server; anything else keeps the
+/// deposit wording.
+String stageLabel(AppLocalizations l10n, String status, {String? confirmedBy}) => switch (status) {
       'Requested' => l10n.bookingStageRequested,
       'Approved' => l10n.bookingStageApproved,
-      'Confirmed' => l10n.bookingStageConfirmed,
+      'Confirmed' => confirmedBy == 'FullPayment'
+          ? l10n.bookingStagePaidInFull
+          : l10n.bookingStageConfirmed,
       'PickedUp' => l10n.bookingStagePickedUp,
       'Returned' => l10n.bookingStageReturned,
       'Completed' => l10n.bookingStageCompleted,
@@ -236,6 +243,7 @@ class BookingTimeline extends StatelessWidget {
               isLast: i == stages.length - 1,
               formats: formats,
               l10n: l10n,
+              confirmedBy: booking.confirmingPayment?.purpose,
             ),
         ],
       ),
@@ -249,12 +257,16 @@ class _Stage extends StatelessWidget {
     required this.isLast,
     required this.formats,
     required this.l10n,
+    this.confirmedBy,
   });
 
   final BookingStage stage;
   final bool isLast;
   final Formats formats;
   final AppLocalizations l10n;
+
+  /// The purpose of the payment that confirmed the booking, for the Confirmed stage.
+  final String? confirmedBy;
 
   /// The height of one row's rail segment, so the line meets the next dot.
   static const double _railWidth = 28;
@@ -302,7 +314,7 @@ class _Stage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    stageLabel(l10n, stage.status),
+                    stageLabel(l10n, stage.status, confirmedBy: confirmedBy),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: current ? FontWeight.w800 : FontWeight.w600,

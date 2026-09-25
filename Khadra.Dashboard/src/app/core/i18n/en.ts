@@ -424,6 +424,7 @@ export const EN = {
   'booking.depositRefunded': '{amount} refunded to the customer (free cancellation)',
   'booking.depositRefundDelayed': 'Refund of {amount} to the customer delayed — still owed, retrying',
   'adminBooking.depositRefund': 'Deposit refund',
+  'adminBooking.paymentRefund': 'Payment refund',
   'common.deposit': 'Deposit',
   'common.depositHeld': 'Deposit held',
   'common.description': 'Description',
@@ -719,7 +720,7 @@ export const EN = {
   'dealerBooking.attributedTo': 'Attributed to',
   'dealerBooking.commission': 'Commission',
   'dealerBooking.commissionIsDeductedFrom':
-    'Commission is deducted from the card deposit at the rate frozen when this booking was made. Payout scheduling is not live yet, so no net figure is shown.',
+    'Commission is deducted from the card payment at the rate frozen when this booking was made. Payout scheduling is not live yet, so no net figure is shown.',
   'dealerBooking.customer': 'Customer',
   'dealerBooking.history': 'History on Khadra',
   'dealerBooking.historyHint': 'What the platform recorded. Not shared by other galleries.',
@@ -789,7 +790,7 @@ export const EN = {
   'dealerDelivery.aBookingFreezesThe':
     'A booking freezes the fee it was made under. Changing the radius never changes an existing booking.',
   'dealerDelivery.chargedToTheCustomer':
-    'Charged to the customer on every delivery booking you take. It is not part of the card deposit and the platform takes no commission on it — your driver collects it in cash at handover, on top of the rental balance.',
+    'Charged to the customer on every delivery booking you take. It is not part of the deposit and the platform takes no commission on it. Unless the customer paid the whole booking online, your driver collects it in cash at handover, on top of the rental balance.',
   'dealerDelivery.couldntLoadDeliverySettings': "Couldn't load delivery settings",
   'dealerDelivery.customersInsideYourRadius':
     'Customers inside your radius can ask for the car to be brought to them. A booking outside the radius is only offered as pickup.',
@@ -1020,7 +1021,7 @@ export const EN = {
   'dealerReports.occupancy': 'Occupancy',
   'dealerReports.occupancyByVehicle': 'Occupancy by vehicle',
   'dealerReports.payoutsAreNotLive':
-    'Payouts are not live. Commission is deducted from the card deposit; the balance is collected in cash at handover.',
+    'Payouts are not live. Commission is deducted from the card payment; any balance is collected in cash at handover.',
   'dealerReports.platformCommission': 'Platform commission',
   'dealerReports.rentalRevenue': 'Rental revenue',
   'dealerReports.rentalTotalsOfThose': 'Rental totals of those bookings',
@@ -1657,7 +1658,7 @@ export const EN = {
     'Not live yet. Invitations and password links go by email; everything else is on the dashboard.',
   'dealerSettings.bankDetailsForPayouts': 'Bank details for payouts',
   'dealerSettings.notLiveYetPayouts':
-    'Not live yet. Payouts are not built; commission is deducted from the card deposit and the balance is collected in cash.',
+    'Not live yet. Payouts are not built; commission is deducted from the card payment and any balance is collected in cash.',
   'dealerSettings.pauseOrCloseThe': 'Pause or close the dealership',
   'dealerSettings.notLiveYetHide':
     'Not live yet. Hide individual cars from the fleet page to stop taking bookings; ask the platform to close the account.',
@@ -1773,13 +1774,16 @@ export const EN = {
   'dealerBooking.balanceToCollectIn': 'Balance to collect in cash at handover',
   'dealerBooking.balanceCollectedInCash': 'Balance collected in cash at handover',
   'dealerBooking.heldPendingSettlementSee': 'Held pending settlement — see the penalty panel',
-  'dealerBooking.depositPaid': 'Deposit paid',
+  'dealerBooking.paymentReceived': 'Payment received',
+  // The refund row of a booking paid in full: it returned the whole payment, not a deposit.
+  'dealerBooking.payment': 'Payment',
   'dealerBooking.return': 'Return',
   'dealerBooking.disputeOpened': 'Dispute opened',
   'dealerBooking.theVehicle': 'the vehicle',
   'dealerBooking.requestedAwaitingYourAnswer': 'Requested · awaiting your answer',
-  'dealerBooking.approvedAwaitingTheDeposit': 'Approved · awaiting the deposit',
+  'dealerBooking.approvedAwaitingPayment': 'Approved · awaiting payment',
   'dealerBooking.depositPaidBookingConfirmed': 'Deposit paid · booking confirmed',
+  'dealerBooking.paidInFullBookingConfirmed': 'Paid in full · booking confirmed',
   'dealerBooking.byYourStaff': 'by your staff',
   'dealerBooking.byYourDealership': 'by your dealership',
   'dealerBooking.byTheCustomer': 'by the customer',
@@ -1989,8 +1993,8 @@ export const EN = {
   // Keyed by key-copy.js, 2026-09-08.
   'dealerActivity.activityCouldNotBe': 'Activity could not be loaded. Nothing has been changed.',
   'dealerActivity.requestedAwaitingYourAnswer': 'Requested — awaiting your answer',
-  'dealerActivity.approvedAwaitingTheDeposit': 'Approved — awaiting the deposit',
-  'dealerActivity.depositPaidBookingConfirmed': 'Deposit paid — booking confirmed',
+  'dealerActivity.approvedAwaitingPayment': 'Approved — awaiting payment',
+  'dealerActivity.paymentReceivedBookingConfirmed': 'Payment received — booking confirmed',
   'dealerActivity.markedNoShow': 'Marked no-show',
   'dealerActivity.expiredUnanswered': 'Expired unanswered',
 
@@ -2120,7 +2124,8 @@ export const EN = {
   'notifications.you': 'You',
   'notifications.aBooking': 'a booking',
   'notifications.customerRequested': 'A customer requested {what}',
-  'notifications.customerPaid': 'A customer paid the deposit on {what}',
+  // One notification for a deposit and for a payment in full; the row does not say which.
+  'notifications.customerPaid': 'A customer paid for {what}',
   'notifications.approved': '{who} approved {what}',
   'notifications.rejected': '{who} rejected {what}',
   'notifications.recordedPickup': '{who} recorded the pickup for {what}',
@@ -2241,8 +2246,10 @@ export const EN = {
   'dealerBooking.rentalLine': 'Rental · {count} × {rate}',
   'dealerBooking.depositPaidByCard': 'Deposit paid by card ({percent})',
   'dealerBooking.paidInFullByCard': 'Paid in full by card',
+  // {rate} is a commission-rate phrase that names its basis ("20% of one daily rate"), never a bare
+  // percent: see core/i18n/commission-rate.ts.
   'dealerBooking.platformCommissionFrozen':
-    'Platform commission · {percent} (frozen on this booking)',
+    'Platform commission · {rate} (frozen on this booking)',
   'dealerBooking.amountFrozen': '{amount} · frozen on this booking',
   'dealerBooking.mileageAllowance': '{limit} km/day, {fee}/km over',
 
@@ -2698,7 +2705,7 @@ export const EN = {
     other: 'Daily rate × {count} days',
   },
   'adminBooking.depositWithPercent': 'Deposit ({percent})',
-  'adminBooking.platformCommissionWithPercent': 'Platform commission ({percent})',
+  'adminBooking.platformCommissionWithPercent': 'Platform commission ({rate})',
   'adminBooking.hours': {
     one: '{count} hour',
     other: '{count} hours',
@@ -2958,6 +2965,11 @@ export const EN = {
   // payments.mode = Sandbox, which a Production API can never do — it refuses to start on that
   // provider. Both consoles show it, because a dealer preparing a car and an administrator reading
   // a figure are equally entitled to know the money behind it is not real.
+  // What a commission percent is a percent OF (owner, 2026-09-25): printed wherever the rate is,
+  // so "20%" can never be read as a share of the whole rental. See core/i18n/commission-rate.ts.
+  'commission.percentOfOneDailyRate': '{percent} of one daily rate',
+  'commission.percentOfRentalTotal': '{percent} of the rental total',
+
   'sandbox.title': 'Test payments',
   'sandbox.body':
     'This platform is running a sandbox payment provider. No card is charged and no money moves, so any booking confirmed here is not a real rental.',

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:khadra_mobile/api/dtos.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/theme/khadra_theme.dart';
+import 'package:khadra_mobile/core/widgets/khadra_widgets.dart';
 import 'package:khadra_mobile/features/bookings/booking_detail_screen.dart';
 import 'package:khadra_mobile/features/bookings/booking_timeline.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
@@ -52,6 +53,11 @@ void main() {
     String? dealerCityId = 'city-amman',
     Map<String, dynamic>? penalty,
     Map<String, dynamic>? payment,
+    num balanceDue = 132,
+    bool isPaidInFull = false,
+    bool willRefundDeposit = false,
+    Map<String, dynamic>? confirmingPayment,
+    Map<String, dynamic>? depositRefund,
   }) =>
       Booking.fromJson({
         'bookingId': 'b-1',
@@ -74,7 +80,7 @@ void main() {
           'totalPrice': {'amount': 165, 'currency': 'JOD'},
           'depositPercent': 20,
           'depositAmount': {'amount': 33, 'currency': 'JOD'},
-          'balanceDue': {'amount': 132, 'currency': 'JOD'},
+          'balanceDue': {'amount': balanceDue, 'currency': 'JOD'},
           'securityDeposit': {'amount': 150, 'currency': 'JOD'},
           'mileageUnlimited': true,
           'fuelPolicy': 'SameToSame',
@@ -88,7 +94,11 @@ void main() {
         'canBeDisputed': canBeDisputed,
         'isAwaitingDecision': isAwaitingDecision,
         'isAwaitingPayment': isAwaitingPayment,
-        'cancellation': {'canCancel': canCancel},
+        'cancellation': {
+          'canCancel': canCancel,
+          'isFree': willRefundDeposit,
+          'willRefundDeposit': willRefundDeposit,
+        },
         'canReportNonDelivery': false,
         'nonDeliveryReportableFrom': now.toIso8601String(),
         'canBeReviewed': canBeReviewed,
@@ -106,6 +116,9 @@ void main() {
         'handovers': const <dynamic>[],
         'history': history,
         'payment': payment,
+        'isPaidInFull': isPaidInFull,
+        'confirmingPayment': confirmingPayment,
+        'depositRefund': depositRefund,
       });
 
   Future<FakeApi> pump(WidgetTester tester, Booking booking,
@@ -422,6 +435,125 @@ void main() {
 
       expect(find.text(en.paymentFullTitle), findsNothing);
       expect(find.text(en.bookingPayDeposit), findsOneWidget);
+    });
+  });
+
+  // Paid by deposit or in full (owner, 2026-09-25). The server's figures were
+  // right after a full payment, but every screen still called it a deposit. The
+  // app must tell the two apart, in both languages, from the server's own facts.
+  group('paid by deposit or in full', () {
+    Map<String, dynamic> m(num amount) => {'amount': amount, 'currency': 'JOD'};
+    Map<String, dynamic> confirming(String purpose, num charged) => {
+          'purpose': purpose,
+          'amountCharged': m(charged),
+          'processingFee': m(0),
+          'appliedToBooking': m(charged),
+          'paidAt': now.toIso8601String(),
+          'refundOnFreeCancellation': m(charged),
+        };
+
+    // The builder's 165.000 booking: 33.000 deposit, 132.000 cash at pickup.
+    Booking paid({required bool full, bool cancellable = false, Map<String, dynamic>? refund}) =>
+        bookingOf(
+          status: refund == null ? 'Confirmed' : 'Cancelled',
+          history: refund == null
+              ? pathTo('Confirmed')
+              : [
+                  ...pathTo('Confirmed'),
+                  changeJson('Cancelled', now.add(const Duration(hours: 3)), from: 'Confirmed'),
+                ],
+          depositPaid: true,
+          canCancel: cancellable,
+          willRefundDeposit: cancellable,
+          balanceDue: full ? 0 : 132,
+          isPaidInFull: full,
+          confirmingPayment: confirming(full ? 'FullPayment' : 'Deposit', full ? 165 : 33),
+          depositRefund: refund,
+        );
+
+    /// The figure beside a label in the "How it is paid" card.
+    Finder valueOf(String label) => find.descendant(
+          of: find.widgetWithText(KhadraDetailRow, label),
+          matching: find.byType(Text),
+        );
+
+    bool rowShows(WidgetTester tester, String label, RegExp figure) => tester
+        .widgetList<Text>(valueOf(label))
+        .any((text) => figure.hasMatch(text.data ?? ''));
+
+    for (final locale in [const Locale('en'), const Locale('ar')]) {
+      final l10n = locale.languageCode == 'ar' ? ar : en;
+      final tag = locale.languageCode;
+
+      screenTest('a deposit keeps the deposit wording ($tag)', (tester) async {
+        await pump(tester, paid(full: false), locale: locale);
+
+        expect(find.text(l10n.bookingStageConfirmed), findsWidgets);
+        expect(find.text(l10n.bookingStagePaidInFull), findsNothing);
+        expect(find.text(l10n.bookingDepositPaidNote), findsOneWidget);
+        expect(find.text(l10n.bookBalanceAtPickup), findsOneWidget);
+        expect(rowShows(tester, l10n.bookBalanceAtPickup, RegExp(r'132')), isTrue);
+        expect(find.text(l10n.bookingPaymentType), findsNothing);
+        expect(find.text(l10n.bookingPaidInFullNote), findsNothing);
+      });
+
+      screenTest('a full payment says paid in full, what was charged and that nothing is left ($tag)',
+          (tester) async {
+        await pump(tester, paid(full: true), locale: locale);
+
+        // The stage, in the lifecycle and in the activity log alike.
+        expect(find.text(l10n.bookingStagePaidInFull), findsWidgets);
+        expect(find.text(l10n.bookingStageConfirmed), findsNothing);
+        // The card: the payment's type, what it charged, and nothing remaining.
+        expect(find.text(l10n.bookingPaymentType), findsOneWidget);
+        expect(find.text(l10n.bookingPaymentTypeFull), findsOneWidget);
+        // The badge, in its own row: in English it shares its words with the stage.
+        expect(
+          find.descendant(
+            of: find.widgetWithText(KhadraDetailRow, l10n.bookingPaymentType),
+            matching: find.text(l10n.bookingPaidInFullNote),
+          ),
+          findsOneWidget,
+        );
+        expect(rowShows(tester, l10n.bookingAmountCharged, RegExp(r'165')), isTrue);
+        expect(rowShows(tester, l10n.bookingRemainingBalance, RegExp(r'(^|[^0-9.])0(\.000)?([^0-9]|$)')), isTrue);
+        expect(find.text(l10n.bookingPaidInFullNothingDue), findsOneWidget);
+        // Never the deposit wording, and never "cash at pickup".
+        expect(find.text(l10n.bookingDepositPaidNote), findsNothing);
+        expect(find.text(l10n.bookBalanceAtPickup), findsNothing);
+      });
+    }
+
+    screenTest('a free cancellation of a full payment promises the server refund figure', (tester) async {
+      await pump(tester, paid(full: true, cancellable: true));
+
+      await tester.ensureVisible(find.text(en.cancelTitle));
+      await tester.tap(find.text(en.cancelTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('will be refunded to your original payment method'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'Free cancellation\. .*165')), findsOneWidget);
+      expect(find.text(en.cancelFreeRefundNotice), findsNothing);
+    });
+
+    screenTest('the refund of a full payment speaks of the payment, in Arabic', (tester) async {
+      await pump(
+        tester,
+        paid(
+          full: true,
+          refund: {
+            'status': 'Sent',
+            'amount': m(165),
+            'requestedAt': now.add(const Duration(hours: 3)).toIso8601String(),
+            'settledAt': null,
+          },
+        ),
+        locale: const Locale('ar'),
+      );
+
+      expect(find.textContaining('من دفعتك'), findsOneWidget);
+      expect(find.textContaining('عربونك'), findsNothing);
+      expect(find.text(ar.bookingRefundInitiated), findsOneWidget);
     });
   });
 

@@ -16,8 +16,9 @@ import { I18nService } from '../../core/i18n/i18n.service';
  */
 const DESCRIPTIONS: Readonly<Record<string, TranslationKey>> = {
   Requested: 'dealerActivity.requestedAwaitingYourAnswer',
-  Approved: 'dealerActivity.approvedAwaitingTheDeposit',
-  Confirmed: 'dealerActivity.depositPaidBookingConfirmed',
+  Approved: 'dealerActivity.approvedAwaitingPayment',
+  // Neutral: an entry carries no payment, and a booking can be paid by its deposit or in full.
+  Confirmed: 'dealerActivity.paymentReceivedBookingConfirmed',
   PickedUp: 'status.pickedUp',
   NoShow: 'dealerActivity.markedNoShow',
   Expired: 'dealerActivity.expiredUnanswered',

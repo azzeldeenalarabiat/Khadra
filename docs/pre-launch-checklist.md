@@ -2100,6 +2100,17 @@ when the provider settles it (`YourDepositRefunded`, push and email).
 that ends with no ticket at all, a no-show, and (item 156) a gallery or admin cancelling a paid booking
 inside the window, which today assesses nothing and leaves the deposit held.
 
+**Also open since a booking can be PAID IN FULL (2026-09-24, noted 2026-09-25):** a fully paid booking
+cancelled after the free window, or marked no-show, is penalised on the deposit only, and the rest of
+the payment has no refund path yet — the office's rental revenue if the rental happens, the
+customer's own money if it does not (`BookingDisputeSettlement.DepositHeldFor` holds only the
+deposit). The owner decided on 2026-09-24 that the amount above the deposit is refundable; the payments
+Phase 3 ("refunds generalised") builds it. Until it does, no screen may say that money is held for
+settlement or forfeit: the dealer's "Held pending settlement" line sits under a Deposit label and must
+not be widened to the whole payment. The FREE cancellation of a full payment is not part of this gap:
+it already returns the whole capture (less a fee taken as non-refundable), and every screen now says
+so from `confirmingPayment.refundOnFreeCancellation`.
+
 ### 78. `DepositHeldFor` will need to read what is left, not what was taken
 
 **Status:** closed for the free cancellation · **Updated:** 2026-09-24 — by the booking's rule, not by "captured minus refunded".

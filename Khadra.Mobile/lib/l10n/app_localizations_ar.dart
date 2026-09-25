@@ -985,6 +985,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bookingStageConfirmed => 'دُفع العربون';
 
   @override
+  String get bookingStagePaidInFull => 'دُفع المبلغ كاملًا';
+
+  @override
   String get bookingStagePickedUp => 'استُلمت السيارة';
 
   @override
@@ -1027,6 +1030,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookingDepositPaidNote => 'مدفوع';
+
+  @override
+  String get bookingPaymentType => 'نوع الدفع';
+
+  @override
+  String get bookingPaymentTypeFull => 'دفع كامل';
+
+  @override
+  String get bookingPaymentTypeDeposit => 'عربون';
+
+  @override
+  String get bookingPaidInFullNote => 'مدفوع بالكامل';
+
+  @override
+  String get bookingAmountCharged => 'المبلغ المدفوع';
+
+  @override
+  String get bookingRemainingBalance => 'المبلغ المتبقي';
+
+  @override
+  String get bookingPaidInFullNothingDue =>
+      'دفعت قيمة الحجز كاملة عبر الإنترنت، فلا يتبقى عليك شيء للمكتب.';
 
   @override
   String get bookingRentalCost => 'تكلفة الإيجار';
@@ -1293,6 +1318,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'الإلغاء مجاني. سيتم استرداد مبلغ العربون بالكامل إلى وسيلة الدفع الأصلية. سنبدأ عملية الاسترداد فورًا، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
 
   @override
+  String cancelFreeRefundPaymentNotice(String amount) {
+    return 'الإلغاء مجاني. سيتم استرداد $amount إلى وسيلة الدفع الأصلية. سنبدأ عملية الاسترداد فورًا، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
   String get bookingRefundInitiated => 'بدأ الاسترداد';
 
   @override
@@ -1317,8 +1347,23 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String bookingRefundInitiatedPaymentText(String amount, String date) {
+    return 'يجري استرداد $amount من دفعتك إلى وسيلة الدفع الأصلية. بدأنا عملية الاسترداد في $date، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String bookingRefundedPaymentText(String amount, String date) {
+    return 'تم استرداد $amount من دفعتك إلى وسيلة الدفع الأصلية في $date. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String bookingRefundDelayedPaymentText(String amount) {
+    return 'ما زال استرداد $amount من دفعتك مستحقًا لك. يستغرق الاسترداد وقتًا أطول من المعتاد، ونعيد المحاولة تلقائيًا.';
+  }
+
+  @override
   String notificationYourDepositRefunded(String actor) {
-    return '$actor: تم استرداد عربونك';
+    return '$actor: تم استرداد دفعتك';
   }
 
   @override

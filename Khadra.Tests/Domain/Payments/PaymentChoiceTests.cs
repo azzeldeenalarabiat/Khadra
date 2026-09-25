@@ -19,13 +19,13 @@ public sealed class PaymentChoiceTests
 {
     private static readonly DateTimeOffset Now = Build.Now;
 
-    private static Booking Approved(decimal dailyRate = 50m, int days = 5, decimal deliveryFee = 0m)
+    private static Booking Approved(decimal dailyRate = 50m, int days = 5, decimal deliveryFee = 0m, decimal depositPercent = 20m)
     {
         var booking = Build.Booking(
             Now,
             period: Build.Period(days: days),
             pickupMethod: deliveryFee > 0m ? PickupMethod.Delivery : null,
-            pricing: Build.Pricing(dailyRate: dailyRate, days: days, deliveryFee: deliveryFee));
+            pricing: Build.Pricing(dailyRate: dailyRate, days: days, deliveryFee: deliveryFee, depositPercent: depositPercent));
         booking.Approve(Id.New(), Now);
         return booking;
     }
@@ -270,6 +270,126 @@ public sealed class PaymentChoiceTests
 
         Assert.Equal(Money.Jod(250m), refund.Value.Amount);
         Assert.False(payment.FeeRefundable);
+    }
+
+    // ── Paid in full (owner, 2026-09-25): the verdict every "paid in full" sentence keys on ─────────
+
+    [Fact]
+    public void A_full_payment_makes_the_booking_paid_in_full()
+    {
+        var booking = Approved();
+
+        booking.ConfirmPayment(Id.New(), Money.Jod(250m), Now);
+
+        Assert.True(booking.IsPaidInFull);
+    }
+
+    [Fact]
+    public void A_deposit_leaves_the_booking_not_paid_in_full()
+    {
+        var booking = Approved();
+
+        booking.ConfirmDepositPaid(Id.New(), Now);
+
+        Assert.False(booking.IsPaidInFull);
+    }
+
+    [Fact]
+    public void Nothing_paid_is_not_paid_in_full()
+    {
+        Assert.False(Approved().IsPaidInFull);
+    }
+
+    [Fact]
+    public void A_whole_rental_deposit_stops_short_of_the_total_while_a_delivery_fee_is_owed()
+    {
+        // The deposit base leaves the delivery fee out, so even a 100% deposit is not the whole booking.
+        var booking = Approved(dailyRate: 30m, days: 3, deliveryFee: 10m, depositPercent: 100m);
+
+        booking.ConfirmDepositPaid(Id.New(), Now);
+
+        Assert.Equal(Money.Jod(90m), booking.OnlinePaid);
+        Assert.Equal(Money.Jod(10m), booking.RemainingBalance);
+        Assert.False(booking.IsPaidInFull);
+    }
+
+    [Fact]
+    public void A_whole_rental_deposit_with_nothing_else_owed_is_paid_in_full()
+    {
+        var booking = Approved(depositPercent: 100m);
+
+        booking.ConfirmDepositPaid(Id.New(), Now);
+
+        Assert.True(booking.IsPaidInFull);
+    }
+
+    [Fact]
+    public void Money_received_stays_received_when_the_booking_is_cancelled()
+    {
+        var booking = Approved();
+        booking.ConfirmPayment(Id.New(), Money.Jod(250m), Now);
+
+        Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, "Plans changed.", Now.AddMinutes(10)).IsSuccess);
+
+        // It was paid and is now being returned: the fact about money received does not flip.
+        Assert.True(booking.IsPaidInFull);
+    }
+
+    [Theory]
+    [InlineData(true, 253.75)]
+    [InlineData(false, 250.0)]
+    public void The_refund_a_free_cancellation_would_make_is_the_refund_it_makes(bool feeRefundable, double expected)
+    {
+        var booking = Approved();
+        var payment = Payment.Open(
+            booking.Id, booking.CustomerId, Money.Jod(253.75m), TestPayments.TestProviderName, Now.AddMinutes(30), Now,
+            PaymentPurpose.FullPayment, Money.Jod(3.75m), feeRefundable: feeRefundable);
+        Assert.Null(payment.FreeCancellationRefundAmount);
+        payment.Apply(Money.Jod(253.75m), Now, Now);
+
+        // What the cancel sheet promises is read before cancelling; the refund is recorded after.
+        var promised = payment.FreeCancellationRefundAmount;
+        var refund = payment.RefundForFreeCancellation(Now.AddMinutes(5));
+
+        Assert.Equal(Money.Jod((decimal)expected), promised);
+        Assert.Equal(promised, refund.Value.Amount);
+    }
+
+    [Fact]
+    public void The_booking_response_carries_the_paid_in_full_verdict_and_the_confirming_payment_to_every_reader()
+    {
+        var booking = Approved();
+        booking.ConfirmPayment(Id.New(), Money.Jod(250m), Now);
+        var confirming = new Khadra.Application.Bookings.ReadModels.ConfirmingPaymentDto(
+            "FullPayment",
+            new Khadra.Application.Common.Dtos.MoneyDto(250m, "JOD"),
+            new Khadra.Application.Common.Dtos.MoneyDto(0m, "JOD"),
+            new Khadra.Application.Common.Dtos.MoneyDto(250m, "JOD"),
+            Now,
+            new Khadra.Application.Common.Dtos.MoneyDto(250m, "JOD"));
+        var context = new Khadra.Application.Bookings.ReadModels.BookingContext(
+            null, "Petra Wheels", false, null, "Layla Odeh", false, null, null, ConfirmingPayment: confirming);
+
+        var dto = Khadra.Application.Bookings.Dtos.BookingDto.From(booking, context, Now);
+
+        Assert.True(dto.IsPaidInFull);
+        Assert.Same(confirming, dto.ConfirmingPayment);
+        // Unlike the commission, both are the customer's own facts: their copy keeps them.
+        Assert.True(dto.ForCustomer().IsPaidInFull);
+        Assert.Same(confirming, dto.ForCustomer().ConfirmingPayment);
+    }
+
+    [Fact]
+    public void A_deposit_only_booking_response_is_not_paid_in_full()
+    {
+        var booking = Approved();
+        booking.ConfirmDepositPaid(Id.New(), Now);
+
+        var dto = Khadra.Application.Bookings.Dtos.BookingDto.From(
+            booking, new Khadra.Application.Bookings.ReadModels.BookingContext(null, "Petra Wheels", false, null, "Layla Odeh", false, null, null), Now);
+
+        Assert.False(dto.IsPaidInFull);
+        Assert.Equal(200m, dto.Pricing.BalanceDue.Amount);
     }
 
     [Fact]

@@ -1374,6 +1374,45 @@ class DepositRefund {
   }
 }
 
+/// The payment that confirmed a booking (owner, 2026-09-25): what kind it was and
+/// what it charged, all the server's own figures, so a booking paid in full is
+/// never worded as a deposit. Absent from an older API.
+class ConfirmingPayment {
+  const ConfirmingPayment({
+    required this.purpose,
+    required this.amountCharged,
+    required this.processingFee,
+    required this.refundOnFreeCancellation,
+  });
+
+  /// 'Deposit' or 'FullPayment': the only two that ever confirm a booking.
+  final String purpose;
+
+  /// What the card was charged, the processing fee included.
+  final Money amountCharged;
+  final Money processingFee;
+
+  /// What a free cancellation would return, from the same rule the refund
+  /// itself applies, so the sheet promises the figure that is refunded.
+  final Money refundOnFreeCancellation;
+
+  bool get isFullPayment => purpose == 'FullPayment';
+
+  static ConfirmingPayment? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final purpose = json['purpose'] as String?;
+    final charged = Money.maybe(json['amountCharged']);
+    final refund = Money.maybe(json['refundOnFreeCancellation']);
+    if (purpose == null || charged == null || refund == null) return null;
+    return ConfirmingPayment(
+      purpose: purpose,
+      amountCharged: charged,
+      processingFee: Money.maybe(json['processingFee']) ?? Money(0, charged.currencyCode),
+      refundOnFreeCancellation: refund,
+    );
+  }
+}
+
 class VehicleLabel {
   const VehicleLabel({
     required this.vehicleId,
@@ -1689,6 +1728,8 @@ class Booking implements HasDealerLabel {
     required this.handovers,
     required this.history,
     this.depositRefund,
+    this.isPaidInFull = false,
+    this.confirmingPayment,
   });
 
   final String bookingId;
@@ -1762,6 +1803,14 @@ class Booking implements HasDealerLabel {
   /// The deposit a free cancellation returned, or null. Absent from an older API.
   final DepositRefund? depositRefund;
 
+  /// Whether the whole total has been paid online: the server's verdict every
+  /// "paid in full" line keys on (owner, 2026-09-25). False from an older API,
+  /// which leaves the deposit wording in place.
+  final bool isPaidInFull;
+
+  /// The payment that confirmed the booking, or null. Absent from an older API.
+  final ConfirmingPayment? confirmingPayment;
+
   bool get isDelivery => pickupMethod == 'Delivery';
 
   static Booking fromJson(Map<String, dynamic> json) => Booking(
@@ -1818,6 +1867,8 @@ class Booking implements HasDealerLabel {
             .map(BookingStatusChange.fromJson)
             .toList(),
         depositRefund: DepositRefund.maybe(json['depositRefund']),
+        isPaidInFull: json['isPaidInFull'] as bool? ?? false,
+        confirmingPayment: ConfirmingPayment.maybe(json['confirmingPayment']),
       );
 }
 

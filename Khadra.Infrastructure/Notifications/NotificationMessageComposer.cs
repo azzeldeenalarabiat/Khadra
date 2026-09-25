@@ -53,8 +53,10 @@ internal sealed class NotificationMessageComposer(
             "Booking ran out of time", "Your booking {ref} with {actor} ran out of time. Nothing is owed.",
             "انتهى وقت حجزك", "انتهى وقت حجزك {ref} مع {actor}. لا شيء مستحق عليك."),
         ["YourBookingConfirmed"] = new(
-            "Booking confirmed", "Your deposit arrived. Booking {ref} with {actor} is confirmed.",
-            "تم تأكيد حجزك", "وصل العربون. تم تأكيد حجزك {ref} مع {actor}."),
+            // One kind for both ways to pay (owner, 2026-09-25): "deposit" was wrong for a booking
+            // paid in full, and the notification row does not record which it was.
+            "Booking confirmed", "Your payment arrived. Booking {ref} with {actor} is confirmed.",
+            "تم تأكيد حجزك", "وصلت دفعتك. تم تأكيد حجزك {ref} مع {actor}."),
         ["YourBookingCompleted"] = new(
             "Rental finished", "Your rental {ref} with {actor} is finished. Thank you for using Khadra.",
             "انتهى الإيجار", "انتهى إيجارك {ref} مع {actor}. شكراً لاستخدامك خضرا."),
@@ -80,8 +82,9 @@ internal sealed class NotificationMessageComposer(
             "Return soon", "Booking {ref} is due back at {actor} at {due}.",
             "موعد الإعادة قريب", "موعد إعادة سيارة الحجز {ref} إلى {actor} الساعة {due}."),
         ["YourDepositRefunded"] = new(
-            "Deposit refunded", "Booking {ref} with {actor}: your deposit has been refunded to your original payment method. Your bank may take some time to show it.",
-            "تم استرداد العربون", "الحجز {ref} مع {actor}: تم استرداد العربون إلى وسيلة الدفع الأصلية. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك."),
+            // Fires for a deposit AND for a booking paid in full, so it says "payment".
+            "Payment refunded", "Booking {ref} with {actor}: your payment has been refunded to your original payment method. Your bank may take some time to show it.",
+            "تم استرداد دفعتك", "الحجز {ref} مع {actor}: تم استرداد دفعتك إلى وسيلة الدفع الأصلية. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك."),
         ["YourDisputeUpdated"] = new(
             "Dispute updated", "There is an update on the dispute for booking {ref}.",
             "تحديث على النزاع", "هناك تحديث على النزاع الخاص بالحجز {ref}."),

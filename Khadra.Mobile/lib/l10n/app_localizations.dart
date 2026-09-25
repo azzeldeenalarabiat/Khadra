@@ -1622,6 +1622,12 @@ abstract class AppLocalizations {
   /// **'Deposit paid'**
   String get bookingStageConfirmed;
 
+  /// The Confirmed stage of a booking that a payment of the whole amount confirmed (owner, 2026-09-25). Never 'Deposit paid' for such a booking.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid in full'**
+  String get bookingStagePaidInFull;
+
   /// No description provided for @bookingStagePickedUp.
   ///
   /// In en, this message translates to:
@@ -1705,6 +1711,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paid'**
   String get bookingDepositPaidNote;
+
+  /// No description provided for @bookingPaymentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment type'**
+  String get bookingPaymentType;
+
+  /// No description provided for @bookingPaymentTypeFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Full payment'**
+  String get bookingPaymentTypeFull;
+
+  /// No description provided for @bookingPaymentTypeDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit'**
+  String get bookingPaymentTypeDeposit;
+
+  /// No description provided for @bookingPaidInFullNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid in full'**
+  String get bookingPaidInFullNote;
+
+  /// What the card was charged for a booking paid in full, the processing fee included.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount charged'**
+  String get bookingAmountCharged;
+
+  /// No description provided for @bookingRemainingBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining balance'**
+  String get bookingRemainingBalance;
+
+  /// No description provided for @bookingPaidInFullNothingDue.
+  ///
+  /// In en, this message translates to:
+  /// **'You paid the whole booking online, so there is nothing to pay the office.'**
+  String get bookingPaidInFullNothingDue;
 
   /// No description provided for @bookingRentalCost.
   ///
@@ -2084,6 +2132,12 @@ abstract class AppLocalizations {
   /// **'Free cancellation. Your deposit will be refunded in full to your original payment method. We will initiate the refund immediately, but your bank may take additional time to show it.'**
   String get cancelFreeRefundNotice;
 
+  /// A booking paid in full, cancelled inside the free window. The amount is the server's refund figure: the whole payment unless a processing fee was taken as non-refundable.
+  ///
+  /// In en, this message translates to:
+  /// **'Free cancellation. {amount} will be refunded to your original payment method. We will initiate the refund immediately, but your bank may take additional time to show it.'**
+  String cancelFreeRefundPaymentNotice(String amount);
+
   /// No description provided for @bookingRefundInitiated.
   ///
   /// In en, this message translates to:
@@ -2120,10 +2174,28 @@ abstract class AppLocalizations {
   /// **'Your deposit of {amount} is still owed to you. The refund is taking longer than usual, and we are retrying it automatically.'**
   String bookingRefundDelayedText(String amount);
 
+  /// No description provided for @bookingRefundInitiatedPaymentText.
+  ///
+  /// In en, this message translates to:
+  /// **'A refund of {amount} from your payment is on its way to your original payment method. We started it on {date}; your bank may take additional time to show it.'**
+  String bookingRefundInitiatedPaymentText(String amount, String date);
+
+  /// No description provided for @bookingRefundedPaymentText.
+  ///
+  /// In en, this message translates to:
+  /// **'{amount} of your payment was refunded to your original payment method on {date}. Your bank may take additional time to show it.'**
+  String bookingRefundedPaymentText(String amount, String date);
+
+  /// No description provided for @bookingRefundDelayedPaymentText.
+  ///
+  /// In en, this message translates to:
+  /// **'The refund of {amount} from your payment is still owed to you. It is taking longer than usual, and we are retrying it automatically.'**
+  String bookingRefundDelayedPaymentText(String amount);
+
   /// No description provided for @notificationYourDepositRefunded.
   ///
   /// In en, this message translates to:
-  /// **'{actor}: your deposit has been refunded'**
+  /// **'{actor}: your payment has been refunded'**
   String notificationYourDepositRefunded(String actor);
 
   /// No description provided for @cancelFreeNotice.

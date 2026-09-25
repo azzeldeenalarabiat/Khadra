@@ -17,6 +17,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { Booking, DepositRefund, PaymentAttempt, PaymentOption, PaymentPurpose } from '../../core/api/bookings.api';
+import { Money } from '../../core/api/common.api';
 import { vocabularyLabel } from '../../core/api/app-config.api';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
@@ -118,20 +119,21 @@ export class BookingDetailComponent {
     const at = (stage: string) => (stage === 'Requested' ? (booking.requestedAt ?? booking.createdAt) : (reachedAt.get(stage) ?? null));
     type Row = { readonly stage: string; readonly label: string; readonly at: string | null; readonly state: 'done' | 'current' | 'todo' | 'ended' };
 
+    const confirmedBy = booking.confirmingPayment?.purpose;
     const current = LIFECYCLE.indexOf(booking.status as (typeof LIFECYCLE)[number]);
     if (current >= 0) {
       return LIFECYCLE.map((stage, index): Row => ({
         stage,
-        label: stageLabel(this.t, stage),
+        label: stageLabel(this.t, stage, confirmedBy),
         at: index <= current ? at(stage) : null,
         state: index < current || booking.status === 'Completed' ? 'done' : index === current ? 'current' : 'todo',
       }));
     }
 
     const reached = LIFECYCLE.filter((stage) => at(stage) !== null).map(
-      (stage): Row => ({ stage, label: stageLabel(this.t, stage), at: at(stage), state: 'done' }),
+      (stage): Row => ({ stage, label: stageLabel(this.t, stage, confirmedBy), at: at(stage), state: 'done' }),
     );
-    return [...reached, { stage: booking.status, label: stageLabel(this.t, booking.status), at: reachedAt.get(booking.status) ?? booking.finishedAt, state: 'ended' } as Row];
+    return [...reached, { stage: booking.status, label: stageLabel(this.t, booking.status, confirmedBy), at: reachedAt.get(booking.status) ?? booking.finishedAt, state: 'ended' } as Row];
   });
 
   /** Why it ended, when it ended early: the reason recorded on the change into its final status. */
@@ -232,16 +234,48 @@ export class BookingDetailComponent {
     return stage === 'done' ? 'badge--ok' : stage === 'delayed' ? 'badge--bad' : 'badge--warn';
   }
 
-  protected refundText(refund: DepositRefund): string {
+  /** Deposit wording for a deposit, payment wording for a booking paid in full (owner, 2026-09-25). */
+  protected refundText(refund: DepositRefund, booking: Booking): string {
     const amount = this.format.money(refund.amount);
+    const full = this.paidWithFullPayment(booking);
     switch (refundStage(refund)) {
       case 'done':
-        return this.t('booking.refundedText', { amount, date: this.format.dateTime(refund.settledAt ?? refund.requestedAt) });
+        return this.t(full ? 'booking.refundedTextPayment' : 'booking.refundedText', {
+          amount,
+          date: this.format.dateTime(refund.settledAt ?? refund.requestedAt),
+        });
       case 'delayed':
-        return this.t('booking.refundDelayedText', { amount });
+        return this.t(full ? 'booking.refundDelayedTextPayment' : 'booking.refundDelayedText', { amount });
       default:
-        return this.t('booking.refundInitiatedText', { amount, date: this.format.dateTime(refund.requestedAt) });
+        return this.t(full ? 'booking.refundInitiatedTextPayment' : 'booking.refundInitiatedText', {
+          amount,
+          date: this.format.dateTime(refund.requestedAt),
+        });
     }
+  }
+
+  /** Whether the payment that confirmed this booking was the whole amount, from the server's record of it. */
+  protected paidWithFullPayment(booking: Booking): boolean {
+    return booking.confirmingPayment?.purpose === 'FullPayment';
+  }
+
+  /**
+   * What the card was charged, the processing fee included: the confirming payment's own figure. The
+   * amount paid online stands in on a server that sends no confirming payment.
+   */
+  protected amountCharged(booking: Booking): Money {
+    return booking.confirmingPayment?.amountCharged ?? booking.onlinePaid ?? booking.pricing.totalPrice;
+  }
+
+  /**
+   * What a free cancellation promises. A full payment names the server's refund figure, which is the
+   * whole payment unless a processing fee was taken as non-refundable; a deposit keeps its sentence.
+   */
+  protected freeRefundText(booking: Booking): string {
+    const payment = booking.confirmingPayment;
+    return payment?.purpose === 'FullPayment'
+      ? this.t('cancel.freeRefundPayment', { amount: this.format.money(payment.refundOnFreeCancellation) })
+      : this.t('cancel.freeRefund');
   }
 
   protected status(status: string): string {

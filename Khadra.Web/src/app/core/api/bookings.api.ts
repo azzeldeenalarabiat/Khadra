@@ -191,6 +191,30 @@ export interface Booking {
   readonly history: readonly BookingStatusChange[];
   /** The deposit a free cancellation returned, with the refund's own status. Absent on an older API. */
   readonly depositRefund?: DepositRefund | null;
+  /** What was paid online towards the booking, fees excluded. Absent on an older API. */
+  readonly onlinePaid?: Money | null;
+  /**
+   * The whole total has been paid online: the server's verdict every "paid in full" sentence keys on
+   * (owner, 2026-09-25). Absent on an older API, which leaves the deposit wording in place.
+   */
+  readonly isPaidInFull?: boolean;
+  /** The payment that confirmed the booking. Absent on an older API; null while none has. */
+  readonly confirmingPayment?: ConfirmingPayment | null;
+}
+
+/**
+ * The payment that confirmed a booking: what kind it was and what it charged, all the server's own
+ * figures. `purpose` is 'Deposit' or 'FullPayment', the only two that ever confirm a booking.
+ */
+export interface ConfirmingPayment {
+  readonly purpose: PaymentPurpose | string;
+  /** What the card was charged, the processing fee included. */
+  readonly amountCharged: Money;
+  readonly processingFee: Money;
+  readonly appliedToBooking: Money;
+  readonly paidAt: string | null;
+  /** What a free cancellation would return, from the same rule the refund itself applies. */
+  readonly refundOnFreeCancellation: Money;
 }
 
 /**

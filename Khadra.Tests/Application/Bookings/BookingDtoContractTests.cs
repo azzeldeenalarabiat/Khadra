@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
+using Khadra.Application.Common.Dtos;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Tests.Support;
@@ -147,6 +148,52 @@ public sealed class BookingDtoContractTests
         var penalty = json.RootElement.GetProperty("penalty");
         Assert.Equal(JsonValueKind.String, penalty.GetProperty("reason").ValueKind);
         Assert.Equal("CustomerCancelledAfterFreeWindow", penalty.GetProperty("reasonCode").GetString());
+    }
+
+    /// <summary>
+    /// How a booking was paid, on the wire (owner, 2026-09-25). The website, the app and the console
+    /// all read these names; a renamed one would compile everywhere and quietly put deposit wording
+    /// back on a booking paid in full.
+    /// </summary>
+    [Fact]
+    public void A_fully_paid_booking_says_so_and_names_the_payment_that_confirmed_it()
+    {
+        var booking = Build.ApprovedBooking();
+        Assert.True(booking.ConfirmPayment(Id.New(), booking.Pricing.TotalPrice, Build.Now).IsSuccess);
+        var total = booking.Pricing.TotalPrice.Amount;
+        var confirming = new ConfirmingPaymentDto(
+            "FullPayment",
+            new MoneyDto(total, "JOD"),
+            new MoneyDto(0m, "JOD"),
+            new MoneyDto(total, "JOD"),
+            Build.Now,
+            new MoneyDto(total, "JOD"));
+
+        var dto = BookingDto.From(booking, Context(false, false) with { ConfirmingPayment = confirming }, Build.Now).ForCustomer();
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(dto, WireOptions));
+        var root = json.RootElement;
+        Assert.True(root.GetProperty("isPaidInFull").GetBoolean());
+        Assert.Equal(0m, root.GetProperty("pricing").GetProperty("balanceDue").GetProperty("amount").GetDecimal());
+        var payment = root.GetProperty("confirmingPayment");
+        Assert.Equal("FullPayment", payment.GetProperty("purpose").GetString());
+        Assert.Equal(total, payment.GetProperty("amountCharged").GetProperty("amount").GetDecimal());
+        Assert.Equal("JOD", payment.GetProperty("amountCharged").GetProperty("currency").GetString());
+        Assert.Equal(0m, payment.GetProperty("processingFee").GetProperty("amount").GetDecimal());
+        Assert.Equal(total, payment.GetProperty("appliedToBooking").GetProperty("amount").GetDecimal());
+        Assert.Equal(total, payment.GetProperty("refundOnFreeCancellation").GetProperty("amount").GetDecimal());
+        Assert.Equal(JsonValueKind.String, payment.GetProperty("paidAt").ValueKind);
+    }
+
+    [Fact]
+    public void A_booking_nothing_has_confirmed_sends_false_and_null()
+    {
+        var dto = BookingDto.From(Build.Booking(), Context(false, false), Build.Now);
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(dto, WireOptions));
+
+        Assert.False(json.RootElement.GetProperty("isPaidInFull").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, json.RootElement.GetProperty("confirmingPayment").ValueKind);
     }
 
     private static void AssertParties(JsonElement root, bool dealerRemoved, bool customerAccountClosed)

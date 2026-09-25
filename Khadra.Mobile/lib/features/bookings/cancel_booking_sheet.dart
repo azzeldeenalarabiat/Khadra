@@ -140,9 +140,16 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
             const SizedBox(height: Space.lg),
 
             // The consequence, from the server, before the tap rather than after.
+            // A booking paid in full promises the server's refund figure — the
+            // whole payment, less a fee taken as non-refundable — never "your
+            // deposit" (owner, 2026-09-25).
             if (preview.willRefundDeposit)
               KhadraNotice(
-                title: l10n.cancelFreeRefundNotice,
+                title: switch ((widget.booking.confirmingPayment, formats)) {
+                  (final payment?, final formats?) when payment.isFullPayment =>
+                    l10n.cancelFreeRefundPaymentNotice(formats.money(payment.refundOnFreeCancellation)),
+                  _ => l10n.cancelFreeRefundNotice,
+                },
                 tone: NoticeTone.accent,
               )
             else if (preview.isFree)

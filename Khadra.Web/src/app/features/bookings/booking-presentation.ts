@@ -44,7 +44,13 @@ export function statusLabel(t: Translate, status: string): string {
   return KNOWN_STATUSES.has(status) ? t(`status.${status}` as TranslationKey) : status;
 }
 
-export function stageLabel(t: Translate, status: string): string {
+/**
+ * A stage in the past tense. The Confirmed stage names the payment that reached it (owner,
+ * 2026-09-25): "Deposit paid" was wrong for a booking paid in full. `confirmedBy` is the confirming
+ * payment's purpose, from the server; anything else keeps the deposit wording.
+ */
+export function stageLabel(t: Translate, status: string, confirmedBy?: string | null): string {
+  if (status === 'Confirmed' && confirmedBy === 'FullPayment') return t('booking.stage.ConfirmedPaidInFull');
   return KNOWN_STATUSES.has(status) ? t(`booking.stage.${status}` as TranslationKey) : status;
 }
 

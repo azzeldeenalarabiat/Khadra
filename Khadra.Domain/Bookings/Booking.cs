@@ -87,6 +87,26 @@ public sealed class Booking : AggregateRoot
         OnlinePaid.IsZero
             ? Money.Create(Pricing.BalanceDue.Amount, Pricing.CurrencyCode)
             : Money.Create(Math.Max(0m, Pricing.TotalPrice.Amount - _onlinePaid), Pricing.CurrencyCode);
+
+    /// <summary>
+    /// Whether the booking's whole total has been paid online, so nothing is left to hand over at
+    /// pickup or delivery.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The verdict every "paid in full" sentence keys on (owner, 2026-09-25), so no screen decides it
+    /// by comparing two amounts of its own. Compared on the amounts directly, not through
+    /// <see cref="RemainingBalance"/>, whose unpaid branch returns the frozen cash balance for a
+    /// reason that has nothing to do with this question.
+    /// </para>
+    /// <para>
+    /// A fact about money received, so it stays true after a cancellation: the money was paid and is
+    /// now being returned. What CONFIRMED the booking (a deposit or a full payment) is a different
+    /// fact, carried by the confirming payment's purpose; the two differ only when a deposit happens
+    /// to cover the whole total.
+    /// </para>
+    /// </remarks>
+    public bool IsPaidInFull => DepositPaymentId is not null && _onlinePaid >= Pricing.TotalPrice.Amount;
     // The dealer owner or employee who approved or rejected (spec 4.2 accountability).
     public Id? ActedByUserId { get; private set; }
     public BookingParty? CancelledBy { get; private set; }

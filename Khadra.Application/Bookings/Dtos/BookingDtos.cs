@@ -124,7 +124,18 @@ public sealed record BookingDto(
     /// What the customer has paid online towards the booking, fees excluded: zero until a payment
     /// confirms it, then the deposit or the whole total. Added 2026-09-24, last.
     /// </summary>
-    MoneyDto? OnlinePaid = null)
+    MoneyDto? OnlinePaid = null,
+    /// <summary>
+    /// Whether the whole total has been paid online (Booking.IsPaidInFull), the verdict every "paid
+    /// in full" sentence keys on. Added 2026-09-25, last; an installed app that does not read it
+    /// keeps its deposit wording.
+    /// </summary>
+    bool IsPaidInFull = false,
+    /// <summary>
+    /// The payment that confirmed the booking — its purpose and what it charged — or null while none
+    /// has. Added 2026-09-25, last.
+    /// </summary>
+    ConfirmingPaymentDto? ConfirmingPayment = null)
 {
     /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
     /// <remarks>
@@ -195,7 +206,9 @@ public sealed record BookingDto(
             booking.Handovers.OrderBy(handover => handover.RecordedAt).Select(HandoverDto.From).ToList(),
             booking.StatusHistory.OrderBy(change => change.OccurredAt).Select(BookingStatusChangeDto.From).ToList(),
             context.DepositRefund,
-            MoneyDto.From(booking.OnlinePaid));
+            MoneyDto.From(booking.OnlinePaid),
+            booking.IsPaidInFull,
+            context.ConfirmingPayment);
     }
 }
 

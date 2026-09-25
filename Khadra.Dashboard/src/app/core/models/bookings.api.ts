@@ -88,7 +88,10 @@ export interface Booking {
   readonly paymentOption: string;
   readonly pricing: BookingPricing;
   readonly terms: BookingTerms;
-  /** Terms.CommissionPercent of Pricing.RentalTotal, computed server-side at the frozen rate. */
+  /**
+   * Khadra's commission, frozen on the booking and computed server-side: Terms.CommissionPercent of one
+   * day's rate or of the rental total, as Terms.CommissionBasis says.
+   */
   readonly commissionAmount: Money;
   readonly penalty: PenaltyAssessment | null;
   readonly cancelledBy: string | null;
@@ -141,6 +144,20 @@ export interface Booking {
   readonly depositRefund?: DepositRefund | null;
   /** What the customer paid online, fees excluded: the deposit or the whole total. Added 2026-09-24. */
   readonly onlinePaid?: Money | null;
+  /** The whole total has been paid online: the server's verdict (owner, 2026-09-25). Absent on an older API. */
+  readonly isPaidInFull?: boolean;
+  /** The payment that confirmed the booking; null while none has. Absent on an older API. */
+  readonly confirmingPayment?: ConfirmingPayment | null;
+}
+
+/** The payment that confirmed a booking: 'Deposit' or 'FullPayment', and what it charged. */
+export interface ConfirmingPayment {
+  readonly purpose: string;
+  readonly amountCharged: Money;
+  readonly processingFee: Money;
+  readonly appliedToBooking: Money;
+  readonly paidAt: string | null;
+  readonly refundOnFreeCancellation: Money;
 }
 
 /** Requested and Sent: the refund is on its way. Settled: refunded. Failed: still owed, being retried. */
@@ -181,6 +198,8 @@ export interface BookingPricing {
 export interface BookingTerms {
   readonly depositPercent: number;
   readonly commissionPercent: number;
+  /** What commissionPercent is a percent OF, frozen on the booking: 'OneDay' or 'RentalTotal'. */
+  readonly commissionBasis?: string;
   readonly freeCancellationWindowHours: number;
   readonly noShowTimeoutHours: number;
   readonly paymentWindowHours: number;

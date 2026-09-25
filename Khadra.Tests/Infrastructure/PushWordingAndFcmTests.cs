@@ -59,6 +59,27 @@ public sealed class PushWordingAndFcmTests
         Assert.Contains("⁨Petra Rentals⁩", text.Body, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// One kind serves a deposit and a payment in full (owner, 2026-09-25), and the notification row
+    /// does not record which, so neither the confirmation nor the refund may say "deposit".
+    /// </summary>
+    [Theory]
+    [InlineData("YourBookingConfirmed")]
+    [InlineData("YourDepositRefunded")]
+    public void A_confirmation_and_a_refund_speak_of_the_payment_not_the_deposit(string kindName)
+    {
+        var kind = Enumeration.FromName<NotificationKind>(kindName);
+        var notification = Notification.Raise(Id.New(), kind, "Petra", Now, Id.New(), "KH-1");
+
+        var en = Composer(PaymentMode.Sandbox).ComposePush(notification, Language.English);
+        var ar = Composer(PaymentMode.Sandbox).ComposePush(notification, Language.Arabic);
+
+        Assert.DoesNotContain("deposit", en.Title + en.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("payment", en.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("العربون", ar.Title + ar.Body, StringComparison.Ordinal);
+        Assert.Contains("دفعتك", ar.Body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Every_kind_that_wakes_a_phone_has_its_own_words_in_both_languages()
     {

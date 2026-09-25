@@ -384,7 +384,39 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             CustomerAccountClosed: found.CustomerName is null,
             found.LiveDisputeId,
             found.MyReviewId,
-            DepositRefund: await DepositRefundAsync(bookingId, cancellationToken));
+            DepositRefund: await DepositRefundAsync(bookingId, cancellationToken),
+            ConfirmingPayment: await ConfirmingPaymentAsync(bookingId, cancellationToken));
+    }
+
+    /// <summary>
+    /// The payment that confirmed this booking, if one has: its purpose and what it charged.
+    /// </summary>
+    /// <remarks>
+    /// Reached through the booking's own <c>DepositPaymentId</c> — set by whichever payment confirmed
+    /// it, deposit or full (the name predates the choice) — and joined by id, never navigated:
+    /// Payments is another context. The row is read whole and untracked, so every figure comes from
+    /// the payment's own properties (the fee, what was applied, what a free cancellation returns)
+    /// instead of from a second derivation here that could drift from the one the refund uses.
+    /// </remarks>
+    private async Task<ConfirmingPaymentDto?> ConfirmingPaymentAsync(Id bookingId, CancellationToken cancellationToken)
+    {
+        var payment = await context.Set<Payment>()
+            .AsNoTracking()
+            .Where(payment => context.Bookings.Any(booking => booking.Id == bookingId && booking.DepositPaymentId == payment.Id))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // A booking is only confirmed by a capture, so an uncaptured row here would be a payment that
+        // never charged anything: stating a charge for it would be inventing one.
+        if (payment?.AmountCaptured is not { } charged || payment.FreeCancellationRefundAmount is not { } refund)
+            return null;
+
+        return new ConfirmingPaymentDto(
+            payment.Purpose.Name,
+            MoneyDto.From(charged),
+            MoneyDto.From(payment.ProcessingFee),
+            MoneyDto.From(payment.AppliedToBooking),
+            payment.AppliedAt ?? payment.CapturedAt,
+            MoneyDto.From(refund));
     }
 
     /// <summary>

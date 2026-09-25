@@ -401,6 +401,7 @@ export const AR = {
   'booking.depositRefunded': 'تم استرداد {amount} للعميل (إلغاء مجاني)',
   'booking.depositRefundDelayed': 'تأخر استرداد {amount} للعميل — ما زال مستحقًا، وتجري إعادة المحاولة',
   'adminBooking.depositRefund': 'استرداد العربون',
+  'adminBooking.paymentRefund': 'استرداد الدفعة',
   'common.deposit': 'العربون',
   'common.depositHeld': 'العربون المحتجز',
   'common.description': 'الوصف',
@@ -546,7 +547,7 @@ export const AR = {
   'dealerBooking.attributedTo': 'منسوبة إلى',
   'dealerBooking.commission': 'العمولة',
   'dealerBooking.commissionIsDeductedFrom':
-    'تُخصم العمولة من عربون البطاقة بالنسبة المجمَّدة عند إنشاء هذا الحجز. وجدولة التحويلات لم تُفعَّل بعد، لذا لا يُعرض صافي المبلغ.',
+    'تُخصم العمولة من دفعة البطاقة بالنسبة المجمَّدة عند إنشاء هذا الحجز. وجدولة التحويلات لم تُفعَّل بعد، لذا لا يُعرض صافي المبلغ.',
   'dealerBooking.customer': 'العميل',
   'dealerBooking.history': 'السجل على خضرا',
   'dealerBooking.historyHint': 'ما سجّلته المنصة. لا تشاركه المكاتب الأخرى.',
@@ -597,7 +598,7 @@ export const AR = {
   'dealerReports.occupancy': 'نسبة الإشغال',
   'dealerReports.occupancyByVehicle': 'الإشغال حسب السيارة',
   'dealerReports.payoutsAreNotLive':
-    'التحويلات لم تُفعَّل بعد. تُخصم العمولة من عربون البطاقة؛ ويُحصَّل الرصيد نقدًا عند التسليم.',
+    'التحويلات لم تُفعَّل بعد. تُخصم العمولة من دفعة البطاقة؛ ويُحصَّل الرصيد المتبقي، إن وُجد، نقدًا عند التسليم.',
   'dealerReports.platformCommission': 'عمولة المنصة',
   'dealerReports.rentalRevenue': 'إيرادات التأجير',
   'dealerReports.rentalTotalsOfThose': 'إجمالي قيمة تلك الحجوزات',
@@ -811,7 +812,7 @@ export const AR = {
   'dealerDelivery.aBookingFreezesThe':
     'يجمّد الحجز الرسوم التي أُنشئ بموجبها. وتغيير النطاق لا يغيّر حجزًا قائمًا أبدًا.',
   'dealerDelivery.chargedToTheCustomer':
-    'تُحصَّل من العميل في كل حجز توصيل تقبله. وهي ليست جزءًا من عربون البطاقة ولا تأخذ المنصة عليها عمولة — يحصّلها سائقك نقدًا عند التسليم، إضافةً إلى رصيد التأجير.',
+    'تُحصَّل من العميل في كل حجز توصيل تقبله. وهي ليست جزءًا من العربون ولا تأخذ المنصة عليها عمولة — وما لم يدفع العميل قيمة الحجز كاملة عبر الإنترنت، يحصّلها سائقك نقدًا عند التسليم، إضافةً إلى رصيد التأجير.',
   'dealerDelivery.couldntLoadDeliverySettings': 'تعذّر تحميل إعدادات التوصيل',
   'dealerDelivery.customersInsideYourRadius':
     'يستطيع العملاء داخل نطاقك طلب إحضار السيارة إليهم. أما الحجز خارج النطاق فيُعرض بالاستلام من المكتب فقط.',
@@ -1493,7 +1494,7 @@ export const AR = {
     'لم تُفعَّل بعد. تُرسَل الدعوات وروابط كلمات المرور بالبريد الإلكتروني؛ وكل ما عدا ذلك في لوحة التحكم.',
   'dealerSettings.bankDetailsForPayouts': 'البيانات البنكية للتحويلات',
   'dealerSettings.notLiveYetPayouts':
-    'لم تُفعَّل بعد. التحويلات لم تُبنَ؛ وتُخصم العمولة من عربون البطاقة ويُحصَّل الرصيد نقدًا.',
+    'لم تُفعَّل بعد. التحويلات لم تُبنَ؛ وتُخصم العمولة من دفعة البطاقة ويُحصَّل الرصيد المتبقي، إن وُجد، نقدًا.',
   'dealerSettings.pauseOrCloseThe': 'إيقاف المكتب مؤقتًا أو إغلاقه',
   'dealerSettings.notLiveYetHide':
     'لم تُفعَّل بعد. أخفِ السيارات فرادى من صفحة الأسطول لوقف استقبال الحجوزات؛ واطلب من المنصة إغلاق الحساب.',
@@ -1659,13 +1660,15 @@ export const AR = {
   'dealerBooking.balanceToCollectIn': 'المبلغ المتبقي نقداً عند التسليم',
   'dealerBooking.balanceCollectedInCash': 'المبلغ المتبقي المُحصَّل نقداً عند التسليم',
   'dealerBooking.heldPendingSettlementSee': 'محتجز بانتظار التسوية — انظر لوحة الغرامات',
-  'dealerBooking.depositPaid': 'تم دفع العربون',
+  'dealerBooking.paymentReceived': 'وصلت الدفعة',
+  'dealerBooking.payment': 'الدفعة',
   'dealerBooking.return': 'الإرجاع',
   'dealerBooking.disputeOpened': 'فُتِح نزاع',
   'dealerBooking.theVehicle': 'السيارة',
   'dealerBooking.requestedAwaitingYourAnswer': 'مطلوب · بانتظار ردّك',
-  'dealerBooking.approvedAwaitingTheDeposit': 'مقبول · بانتظار العربون',
+  'dealerBooking.approvedAwaitingPayment': 'مقبول · بانتظار الدفع',
   'dealerBooking.depositPaidBookingConfirmed': 'تم دفع العربون · تأكّد الحجز',
+  'dealerBooking.paidInFullBookingConfirmed': 'تم الدفع بالكامل · تأكّد الحجز',
   'dealerBooking.byYourStaff': 'بواسطة موظفيك',
   'dealerBooking.byYourDealership': 'بواسطة مكتبك',
   'dealerBooking.byTheCustomer': 'بواسطة العميل',
@@ -1837,8 +1840,8 @@ export const AR = {
   'fleetList.yourFleetCouldNot': 'تعذّر تحميل أسطولك. لم يتغيّر شيء.',
   'dealerActivity.activityCouldNotBe': 'تعذّر تحميل النشاط. لم يتغيّر شيء.',
   'dealerActivity.requestedAwaitingYourAnswer': 'مطلوب — بانتظار ردّك',
-  'dealerActivity.approvedAwaitingTheDeposit': 'مقبول — بانتظار العربون',
-  'dealerActivity.depositPaidBookingConfirmed': 'تم دفع العربون — تأكّد الحجز',
+  'dealerActivity.approvedAwaitingPayment': 'مقبول — بانتظار الدفع',
+  'dealerActivity.paymentReceivedBookingConfirmed': 'وصلت الدفعة — تأكّد الحجز',
   'dealerActivity.markedNoShow': 'سُجِّل عدم حضور',
   'dealerActivity.expiredUnanswered': 'انتهت المدة دون رد',
   'dealerDispute.thatDisputeIsNot': 'هذا النزاع ليس من نزاعاتك، أو لم يعد موجوداً.',
@@ -1907,7 +1910,7 @@ export const AR = {
   'notifications.you': 'أنت',
   'notifications.aBooking': 'حجزاً',
   'notifications.customerRequested': 'طلب أحد العملاء {what}',
-  'notifications.customerPaid': 'دفع أحد العملاء العربون على {what}',
+  'notifications.customerPaid': 'سدّد أحد العملاء دفعة على {what}',
   'notifications.approved': 'قبل {who} {what}',
   'notifications.rejected': 'رفض {who} {what}',
   'notifications.recordedPickup': 'سجّل {who} استلام {what}',
@@ -2033,7 +2036,7 @@ export const AR = {
   'dealerBooking.rentalLine': 'الإيجار · {count} × {rate}',
   'dealerBooking.depositPaidByCard': 'العربون المدفوع بالبطاقة ({percent})',
   'dealerBooking.paidInFullByCard': 'مدفوع بالكامل بالبطاقة',
-  'dealerBooking.platformCommissionFrozen': 'عمولة المنصة · {percent} (مجمَّدة على هذا الحجز)',
+  'dealerBooking.platformCommissionFrozen': 'عمولة المنصة · {rate} (مجمَّدة على هذا الحجز)',
   'dealerBooking.amountFrozen': '{amount} · مجمَّدة على هذا الحجز',
   'dealerBooking.mileageAllowance': '{limit} كم يوميًا، و{fee} لكل كم إضافي',
 
@@ -2669,7 +2672,7 @@ export const AR = {
     other: 'السعر اليومي عن {count} يوم',
   },
   'adminBooking.depositWithPercent': 'العربون ({percent})',
-  'adminBooking.platformCommissionWithPercent': 'عمولة المنصة ({percent})',
+  'adminBooking.platformCommissionWithPercent': 'عمولة المنصة ({rate})',
   'adminBooking.hours': {
     zero: '{count} ساعة',
     one: 'ساعة واحدة',
@@ -2997,6 +3000,9 @@ export const AR = {
   'dealerReview.noteNoLongerOnRecord': 'لم تعد الملاحظة موجودة في السجل.',
 
   // 2026-09-21: the sandbox payment provider.
+  'commission.percentOfOneDailyRate': '{percent} من سعر يوم واحد',
+  'commission.percentOfRentalTotal': '{percent} من إجمالي الإيجار',
+
   'sandbox.title': 'مدفوعات تجريبية',
   'sandbox.body':
     'تعمل المنصّة الآن بمزوّد دفع تجريبي. لا تُخصم أي بطاقة ولا تنتقل أي أموال، فأي حجز يُؤكَّد هنا ليس حجزًا حقيقيًا.',

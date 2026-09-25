@@ -4,6 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { I18nService } from '../../core/i18n/i18n.service';
 import { BookingDetailComponent, refundStage } from './booking-detail.component';
 
 const ID = '01a0d095-c204-7f23-b0b3-1be7852e4b23';
@@ -297,5 +298,169 @@ describe('BookingDetailComponent, an approved booking awaiting payment', () => {
 
     const request = http.expectOne((r) => r.method === 'POST' && r.url === `${BOOKING_URL}/checkout`);
     expect(request.request.body).toEqual({ purpose: 'FullPayment' });
+  });
+});
+
+/**
+ * Paid by deposit or in full (owner, 2026-09-25). The figures were right after a full payment, but
+ * the page still called it a deposit: "Your deposit is paid", a "Deposit (20%) … Paid" line while
+ * 102.750 had been charged, and a "Deposit paid" step. Booking B of the browser E2E, as the API sends
+ * it: 90.000 rental + 12.750 delivery = 102.750, an 18.000 deposit.
+ */
+describe('BookingDetailComponent, paid by deposit or in full', () => {
+  const money = (amount: number) => ({ amount, currency: 'JOD' });
+  const PRICING = {
+    ...CONFIRMED.pricing,
+    dailyRate: money(30), days: 3, rentalTotal: money(90), deliveryFee: money(12.75), totalPrice: money(102.75), depositAmount: money(18),
+  };
+  const paidBy = (purpose: 'Deposit' | 'FullPayment') => {
+    const full = purpose === 'FullPayment';
+    const charged = full ? 102.75 : 18;
+    return {
+      ...CONFIRMED,
+      pickupMethod: 'Delivery',
+      pricing: { ...PRICING, balanceDue: money(full ? 0 : 84.75) },
+      onlinePaid: money(charged),
+      isPaidInFull: full,
+      confirmingPayment: {
+        purpose, amountCharged: money(charged), processingFee: money(0), appliedToBooking: money(charged),
+        paidAt: '2026-09-25T17:56:00+00:00', refundOnFreeCancellation: money(charged),
+      },
+    };
+  };
+  const DEPOSIT = paidBy('Deposit');
+  const FULL = paidBy('FullPayment');
+  /**
+   * An amount as the page prints it: English puts the code first ("JOD 102.75"), Arabic after it,
+   * and without /app-config the fixed decimals are not applied. The figure is what matters.
+   */
+  const amount = (figure: string) => {
+    const digits = figure.replace('.', '[.]') + (figure.includes('.') ? '0?' : '([.]000)?');
+    return new RegExp(`(JOD\\s*${digits}|${digits}\\s*JOD)`);
+  };
+
+  afterEach(() => {
+    sessionStorage.removeItem(`kh.checkout.${ID}`);
+    vi.useRealTimers();
+  });
+
+  /** Renders the booking in one language; `returning` is the customer coming back from checkout. */
+  async function render(booking: object, language: 'ar' | 'en', returning = false) {
+    TestBed.configureTestingModule({
+      imports: [BookingDetailComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    TestBed.inject(I18nService).use(language);
+    if (returning) {
+      // Coming back from checkout: the page's first look at the payment is three seconds in. Only
+      // timeouts are faked, and they still advance with real time, so the settling below works.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'], shouldAdvanceTime: true });
+      sessionStorage.setItem(`kh.checkout.${ID}`, '01a0d9b6-f5e1-7f85-a4b7-fd81671e7d40');
+    }
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(BookingDetailComponent);
+    fixture.componentRef.setInput('bookingId', ID);
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    await settle();
+    http.match((request) => request.url === BOOKING_URL).forEach((read) => read.flush(booking));
+    await settle();
+    if (returning) {
+      await vi.advanceTimersByTimeAsync(3_100);
+      await settle();
+    }
+    const page = fixture.nativeElement as HTMLElement;
+    return {
+      text: page.textContent ?? '',
+      banner: page.querySelector('.notice[role=status]')?.textContent?.trim() ?? '',
+      stages: [...page.querySelectorAll('.timeline__label')].map((label) => label.textContent?.trim()),
+      /** The payment card's figure beside a label, or null when the card has no such line. */
+      line: (label: string) =>
+        [...page.querySelectorAll('section[aria-labelledby=payment-title] dl.lines > div')]
+          .find((row) => row.querySelector('dt')?.textContent?.trim() === label)
+          ?.querySelector('dd')?.textContent?.trim() ?? null,
+    };
+  }
+
+  it('keeps the deposit wording when only the deposit was paid (English)', async () => {
+    const page = await render(DEPOSIT, 'en', true);
+
+    expect(page.banner).toBe('Your deposit is paid. The booking is confirmed.');
+    expect(page.stages).toContain('Deposit paid');
+    expect(page.stages).not.toContain('Paid in full');
+    expect(page.line('Deposit (20%)')).toMatch(amount('18'));
+    expect(page.line('Deposit (20%)')).toMatch(/Paid$/);
+    expect(page.line('Paid to the office at pickup')).toMatch(amount('84.75'));
+    expect(page.line('Payment type')).toBeNull();
+    expect(page.text).not.toContain('Paid in full');
+  });
+
+  it('says a booking paid in full is paid in full, with what was charged and nothing left (English)', async () => {
+    const page = await render(FULL, 'en', true);
+
+    expect(page.banner).toBe('Paid in full. The booking is confirmed.');
+    expect(page.text).not.toContain('Your deposit is paid');
+    expect(page.stages).toContain('Paid in full');
+    expect(page.stages).not.toContain('Deposit paid');
+    expect(page.line('Payment type')).toMatch(/^Full payment\s*Paid in full$/);
+    expect(page.line('Amount charged')).toMatch(amount('102.75'));
+    expect(page.line('Remaining balance')).toMatch(amount('0'));
+    expect(page.line('Remaining balance')).not.toMatch(/[1-9]/);
+    expect(page.line('Deposit (20%)')).toBeNull();
+    expect(page.line('Paid to the office at pickup')).toBeNull();
+    expect(page.text).toContain('You paid the whole booking online, so there is nothing to pay the office.');
+  });
+
+  it('keeps the deposit wording in Arabic', async () => {
+    const page = await render(DEPOSIT, 'ar', true);
+
+    expect(page.banner).toBe('تم دفع العربون، والحجز مؤكد.');
+    expect(page.stages).toContain('دُفع العربون');
+    expect(page.stages).not.toContain('دُفع المبلغ كاملًا');
+    expect(page.line('نوع الدفع')).toBeNull();
+  });
+
+  it('says paid in full in Arabic, never the deposit', async () => {
+    const page = await render(FULL, 'ar', true);
+
+    expect(page.banner).toBe('تم دفع المبلغ كاملًا، والحجز مؤكد.');
+    expect(page.stages).toContain('دُفع المبلغ كاملًا');
+    expect(page.stages).not.toContain('دُفع العربون');
+    expect(page.line('نوع الدفع')).toContain('دفع كامل');
+    expect(page.line('المبلغ المدفوع')).toMatch(amount('102.75'));
+    expect(page.line('المبلغ المتبقي')).toMatch(amount('0'));
+    expect(page.line('المبلغ المتبقي')).not.toMatch(/[1-9]/);
+    expect(page.text).not.toContain('تم دفع العربون');
+    expect(page.text).toContain('فلا يتبقى عليك شيء للمكتب');
+  });
+
+  it("promises the whole payment back on a free cancellation, from the server's refund figure", async () => {
+    const cancellable = { ...FULL, cancellation: { ...FULL.cancellation, canCancel: true, isFree: true, willRefundDeposit: true } };
+
+    const english = await render(cancellable, 'en');
+
+    expect(english.text).toMatch(new RegExp(`Free cancellation[.] ${amount('102.75').source} will be refunded to your original payment method`));
+    expect(english.text).not.toContain('Your deposit will be refunded');
+  });
+
+  it('words the refund of a booking paid in full as a refund of the payment', async () => {
+    const cancelled = {
+      ...FULL,
+      status: 'Cancelled',
+      cancelledBy: 'Customer',
+      finishedAt: '2026-09-25T18:00:00+00:00',
+      depositRefund: {
+        status: 'Sent', amount: money(102.75), requestedAt: '2026-09-25T18:00:00+00:00',
+        sentAt: '2026-09-25T18:01:00+00:00', settledAt: null, failedAt: null,
+      },
+    };
+
+    const arabic = await render(cancelled, 'ar');
+
+    expect(arabic.text).toContain('من دفعتك');
+    expect(arabic.text).not.toContain('عربونك');
+    expect(arabic.line('المبلغ المدفوع')).toContain('بدأ الاسترداد');
   });
 });

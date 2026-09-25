@@ -948,6 +948,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingStageConfirmed => 'Deposit paid';
 
   @override
+  String get bookingStagePaidInFull => 'Paid in full';
+
+  @override
   String get bookingStagePickedUp => 'Collected';
 
   @override
@@ -991,6 +994,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookingDepositPaidNote => 'Paid';
+
+  @override
+  String get bookingPaymentType => 'Payment type';
+
+  @override
+  String get bookingPaymentTypeFull => 'Full payment';
+
+  @override
+  String get bookingPaymentTypeDeposit => 'Deposit';
+
+  @override
+  String get bookingPaidInFullNote => 'Paid in full';
+
+  @override
+  String get bookingAmountCharged => 'Amount charged';
+
+  @override
+  String get bookingRemainingBalance => 'Remaining balance';
+
+  @override
+  String get bookingPaidInFullNothingDue =>
+      'You paid the whole booking online, so there is nothing to pay the office.';
 
   @override
   String get bookingRentalCost => 'What the rental costs';
@@ -1231,6 +1256,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Free cancellation. Your deposit will be refunded in full to your original payment method. We will initiate the refund immediately, but your bank may take additional time to show it.';
 
   @override
+  String cancelFreeRefundPaymentNotice(String amount) {
+    return 'Free cancellation. $amount will be refunded to your original payment method. We will initiate the refund immediately, but your bank may take additional time to show it.';
+  }
+
+  @override
   String get bookingRefundInitiated => 'Refund initiated';
 
   @override
@@ -1255,8 +1285,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String bookingRefundInitiatedPaymentText(String amount, String date) {
+    return 'A refund of $amount from your payment is on its way to your original payment method. We started it on $date; your bank may take additional time to show it.';
+  }
+
+  @override
+  String bookingRefundedPaymentText(String amount, String date) {
+    return '$amount of your payment was refunded to your original payment method on $date. Your bank may take additional time to show it.';
+  }
+
+  @override
+  String bookingRefundDelayedPaymentText(String amount) {
+    return 'The refund of $amount from your payment is still owed to you. It is taking longer than usual, and we are retrying it automatically.';
+  }
+
+  @override
   String notificationYourDepositRefunded(String actor) {
-    return '$actor: your deposit has been refunded';
+    return '$actor: your payment has been refunded';
   }
 
   @override

@@ -399,6 +399,63 @@ public sealed class BookingReaderTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// The payment that confirmed a booking reaches every reader with its purpose and what it charged
+    /// (owner, 2026-09-25), so a full payment is never worded as a deposit on any screen.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_confirming_payment_is_read_with_its_purpose_and_what_it_charged(bool full)
+    {
+        var booking = Build.ApprovedBooking(Build.Now, dealerId: _dealerId);
+        var currency = booking.Pricing.CurrencyCode;
+        var applied = full ? booking.Pricing.TotalPrice.Amount : booking.Pricing.DepositAmount.Amount;
+        // A non-refundable fee on the full payment, so the free-cancellation figure is not simply the
+        // charge: it has to come from the payment's own rule.
+        var fee = full ? 1.5m : 0m;
+        var payment = Payment.Open(
+            booking.Id, booking.CustomerId, Money.Create(applied + fee, currency), "TestProvider", Build.Now.AddMinutes(30), Build.Now,
+            full ? PaymentPurpose.FullPayment : PaymentPurpose.Deposit, Money.Create(fee, currency), feeRefundable: false);
+        payment.AttachProviderSession("sess_confirming", "https://provider.test/sess_confirming");
+        Assert.True(payment.Apply(Money.Create(applied + fee, currency), Build.Now, Build.Now.AddMinutes(1)).IsSuccess);
+        Assert.True(booking.ConfirmPayment(payment.Id, payment.AppliedToBooking, Build.Now.AddMinutes(1)).IsSuccess);
+
+        await using (var write = NewContext())
+        {
+            write.Bookings.Add(booking);
+            write.Payments.Add(payment);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = NewContext();
+        var confirming = (await new BookingReader(read).ContextAsync(booking.Id)).ConfirmingPayment;
+
+        Assert.NotNull(confirming);
+        Assert.Equal(full ? "FullPayment" : "Deposit", confirming.Purpose);
+        Assert.Equal(applied + fee, confirming.AmountCharged.Amount);
+        Assert.Equal(currency, confirming.AmountCharged.Currency);
+        Assert.Equal(fee, confirming.ProcessingFee.Amount);
+        Assert.Equal(applied, confirming.AppliedToBooking.Amount);
+        Assert.Equal(applied, confirming.RefundOnFreeCancellation.Amount);
+        Assert.Equal(Build.Now.AddMinutes(1), confirming.PaidAt);
+    }
+
+    /// <summary>A booking no payment on record confirmed carries no confirming payment, rather than a guessed one.</summary>
+    [Fact]
+    public async Task A_booking_with_no_confirming_payment_on_record_reads_none()
+    {
+        var booking = Build.ConfirmedBooking(Build.Now, dealerId: _dealerId);
+        await using (var write = NewContext())
+        {
+            write.Bookings.Add(booking);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = NewContext();
+        Assert.Null((await new BookingReader(read).ContextAsync(booking.Id)).ConfirmingPayment);
+    }
+
     /// <summary>A booking with nothing refunded carries no refund, rather than an empty one.</summary>
     [Fact]
     public async Task A_booking_with_no_refund_reads_none()
