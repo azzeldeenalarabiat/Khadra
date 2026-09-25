@@ -10,13 +10,19 @@
         .\start-customer-web.ps1 -Stop                  # stop the API and both BFFs
         .\start-customer-web.ps1 -SetPassword           # save the local Postgres password first
 
+    -Restart starts the new API with the connection string THIS window can see. An API started from
+    another window may have drawn its password from that window's environment; restarting it from
+    here, with a stale password in user-secrets, stops it and cannot start its replacement. Save the
+    password with -SetPassword once and every window can restart the stack.
+
     -SetPassword asks for the password at a MASKED prompt and saves the local connection string
     into the API's user-secrets, the store the API itself reads, then starts the stack. Use it the
     first time, and whenever Postgres answers "28P01: password authentication failed".
 
     Ports, and why each one:
-      7112  https  API            both BFFs proxy here; it also serves the sandbox checkout page
-      5112  http   API            the website's server-side renderer reads public data here
+      7112  https  API            both BFFs proxy here
+      5112  http   API            the website's server-side renderer reads public data here, and
+                                  the sandbox checkout page is served here (see below)
       7243  https  console BFF    the console's dev server proxies here
       7244  https  customer BFF   the website's dev server proxies here
       4200         console        (ng serve)
@@ -224,9 +230,13 @@ $apiEnvironment = [ordered]@{
     ASPNETCORE_URLS                      = "$apiHttps;$apiHttp"
     ConnectionStrings__DefaultConnection = $connection
     Payments__Provider                   = 'Sandbox'
-    # The sandbox's checkout page is served by the API itself. The customer is sent back to the
-    # website afterwards, and every emailed customer link points there too.
-    Payments__SandboxConsoleBaseUrl      = $apiHttps
+    # The sandbox's checkout page is served by the API itself, on its PLAIN HTTP port: a browser
+    # that does not trust the ASP.NET development certificate (the desktop app's own browser, a
+    # phone) refuses https://localhost:7112 with ERR_CERT_AUTHORITY_INVALID before the page loads,
+    # and Development does not redirect HTTP to HTTPS. The address is stored on each checkout
+    # attempt, so an attempt opened before a change keeps the address it was given. The customer is
+    # sent back to the website afterwards, and every emailed customer link points there too.
+    Payments__SandboxConsoleBaseUrl      = $apiHttp
     Payments__ReturnUrlBase              = $website
     App__CustomerAppBaseUrl              = $website
     Email__Provider                      = 'Smtp'
