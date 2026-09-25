@@ -8,6 +8,11 @@
         .\start-customer-web.ps1 -Database khadra_e2e   # any other LOCAL database
         .\start-customer-web.ps1 -Restart               # replace a running API and both BFFs
         .\start-customer-web.ps1 -Stop                  # stop the API and both BFFs
+        .\start-customer-web.ps1 -SetPassword           # save the local Postgres password first
+
+    -SetPassword asks for the password at a MASKED prompt and saves the local connection string
+    into the API's user-secrets, the store the API itself reads, then starts the stack. Use it the
+    first time, and whenever Postgres answers "28P01: password authentication failed".
 
     Ports, and why each one:
       7112  https  API            both BFFs proxy here; it also serves the sandbox checkout page
@@ -40,6 +45,8 @@
 #>
 param(
     [string]$Database = 'khadra_web_it',
+    [string]$DbUser = 'khadra',
+    [switch]$SetPassword,
     [switch]$Restart,
     [switch]$Stop
 )
@@ -126,10 +133,14 @@ function Stop-Listeners([int[]]$Ports) {
 
 # The API's user-secrets, read the way the API reads them: flat "Section:Key" names, which is what
 # `dotnet user-secrets set` writes.
-function Get-ApiUserSecret([string]$Key) {
+function Get-ApiUserSecretsFile {
     $csproj = Get-Content (Join-Path $root 'Khadra.WebAPI\Khadra.WebAPI.csproj') -Raw
     if ($csproj -notmatch '<UserSecretsId>([^<]+)</UserSecretsId>') { throw 'Khadra.WebAPI.csproj names no UserSecretsId.' }
-    $file = Join-Path $env:APPDATA "Microsoft\UserSecrets\$($Matches[1])\secrets.json"
+    return Join-Path $env:APPDATA "Microsoft\UserSecrets\$($Matches[1])\secrets.json"
+}
+
+function Get-ApiUserSecret([string]$Key) {
+    $file = Get-ApiUserSecretsFile
     if (-not (Test-Path $file)) { return $null }
     $property = (Get-Content $file -Raw | ConvertFrom-Json).PSObject.Properties[$Key]
     if ($property) { return [string]$property.Value }
@@ -141,6 +152,31 @@ if ($Stop -or $Restart) {
     Stop-Listeners @(7112, 5112, 7243, 7244)
     if ($Stop) { return }
     Start-Sleep -Seconds 2
+}
+
+if ($SetPassword) {
+    Write-Host "`nLocal Postgres password" -ForegroundColor Cyan
+    $secure = Read-Host "  Password for the local Postgres user '$DbUser' (not shown)" -AsSecureString
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+    try {
+        $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+        # A ; would end the password inside the connection string, and Windows PowerShell passes a
+        # native argument's embedded quotes unescaped: either would save a different password from
+        # the one typed. Refused rather than silently mangled.
+        if ($plain -match '[";]') { throw 'A password containing " or ; cannot be saved safely this way; set it with dotnet user-secrets directly.' }
+        if (-not $plain) { throw 'No password entered; nothing saved.' }
+        & dotnet user-secrets set 'ConnectionStrings:DefaultConnection' "Host=localhost;Port=5432;Database=$Database;Username=$DbUser;Password=$plain" --project (Join-Path $root 'Khadra.WebAPI') | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'dotnet user-secrets could not save the connection string.' }
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+        $plain = $null
+    }
+    Write-Host "  saved ConnectionStrings:DefaultConnection ($Database, user $DbUser, password not shown)"
+    Write-Host "  into $(Get-ApiUserSecretsFile)"
+    # Anything this window carries would outrank what was just saved, exactly as it would for the API.
+    if ($env:ConnectionStrings__DefaultConnection) {
+        Write-Host '  NOTE: this window also sets $env:ConnectionStrings__DefaultConnection, which outranks user-secrets.' -ForegroundColor Yellow
+    }
 }
 
 Write-Host "`nPrerequisites" -ForegroundColor Cyan
