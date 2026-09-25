@@ -1,6 +1,9 @@
 <#
     Brings the whole Khadra development stack up.
 
+    For the customer WEBSITE with sandbox payments (API on 7112, both BFFs, website on 4400),
+    run .\start-customer-web.ps1 instead.
+
     Run it from a normal PowerShell window:
 
         .\start-dev.ps1
