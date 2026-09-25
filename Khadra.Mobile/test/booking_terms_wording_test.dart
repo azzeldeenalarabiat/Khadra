@@ -58,6 +58,26 @@ void main() {
       expect(ar.bookTermsFreeCancellation(1), contains('ساعة واحدة'));
     });
 
+    // The window starts when a PAYMENT confirms the booking - the deposit or
+    // the whole amount - and never runs past the rental start (owner,
+    // 2026-09-25). It used to say "after the deposit clears".
+    test('free cancellation is measured from payment, never the deposit or approval', () {
+      expect(
+        en.bookTermsFreeCancellation(1),
+        'Free cancellation within 1 hour after payment, as long as the rental has not started.',
+      );
+      expect(
+        ar.bookTermsFreeCancellation(1),
+        'الإلغاء مجاني خلال ساعة واحدة من وقت الدفع، ما دام الإيجار لم يبدأ.',
+      );
+      expect(ar.bookTermsFreeCancellation(2), contains('خلال ساعتين من وقت الدفع'));
+      for (final hours in [1, 2, 3, 24]) {
+        expect(en.bookTermsFreeCancellation(hours), isNot(contains('deposit')));
+        expect(en.bookTermsFreeCancellation(hours), isNot(contains('approval')));
+        expect(ar.bookTermsFreeCancellation(hours), isNot(contains('العربون')));
+      }
+    });
+
     test("the gallery's answer window is forty-eight and is untouched", () {
       expect(en.bookTermsAnswerWindow(48), contains('48 hours'));
       expect(ar.bookTermsAnswerWindow(48), contains('48 ساعة'));

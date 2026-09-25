@@ -188,7 +188,7 @@ export class DealerDashboardComponent {
         query: { tab: 'upcoming' },
       },
       {
-        label: this.t('dealerDashboard.awaitingDeposit'),
+        label: this.t('dealerDashboard.awaitingPayment'),
         main: this.formats.number(d.bookings.awaitingDeposit),
         note: this.t('dealerDashboard.approvedAndUnpaid'),
         icon: 'clock',

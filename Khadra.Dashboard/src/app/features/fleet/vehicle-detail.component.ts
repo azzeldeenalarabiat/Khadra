@@ -309,7 +309,7 @@ export class VehicleDetailComponent {
         if (hold.status === 'Approved')
           return {
             n: i + 1,
-            tag: this.t('status.awaitingDeposit'),
+            tag: this.t('status.awaitingPayment'),
             tone: 'bad',
             bookingId: hold.bookingId,
           };

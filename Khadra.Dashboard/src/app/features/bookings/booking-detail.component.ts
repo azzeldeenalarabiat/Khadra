@@ -138,7 +138,8 @@ export class AdminBookingDetailComponent {
     return [
       {
         k: this.t('myBooking.freeCancellationWindow'),
-        v: hours(terms.freeCancellationWindowHours),
+        // From PAYMENT, as the booking's own rule measures it: never "after approval".
+        v: this.t('freeCancellation.withinHoursOfPayment', { count: terms.freeCancellationWindowHours }),
       },
       { k: this.t('myBooking.paymentWindow'), v: hours(terms.paymentWindowHours) },
       { k: this.t('myBooking.noShowTimeout'), v: hours(terms.noShowTimeoutHours) },

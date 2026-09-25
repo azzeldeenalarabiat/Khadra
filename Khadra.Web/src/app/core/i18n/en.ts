@@ -587,7 +587,11 @@ export const EN = {
   'book.termsPayAfterApproval': 'Nothing is charged now. The deposit is due only if the office accepts.',
   'book.termsAnswer': { one: 'The office has {count} hour to answer. The car is held for you until then.', other: 'The office has {count} hours to answer. The car is held for you until then.' },
   'book.termsPayment': { one: 'Once accepted, you have {count} hour to pay the deposit, or the booking ends and the car goes back on the market.', other: 'Once accepted, you have {count} hours to pay the deposit, or the booking ends and the car goes back on the market.' },
-  'book.termsFreeCancel': { one: 'Cancelling is free within {count} hour of paying the deposit.', other: 'Cancelling is free within {count} hours of paying the deposit.' },
+  // From PAYMENT (the deposit or the whole amount), capped at the rental start: Booking.ConfirmPayment.
+  'book.termsFreeCancel': {
+    one: 'Cancelling is free within {count} hour after payment, as long as the rental has not started.',
+    other: 'Cancelling is free within {count} hours after payment, as long as the rental has not started.',
+  },
   'book.termsPenalty': 'Cancelling after that assesses {percent} of the deposit. Nothing is charged unless a dispute is opened and settled.',
   'book.submit': 'Send the request',
   'book.sending': 'Sending your request…',

@@ -97,7 +97,7 @@ export class SettingsComponent {
       { k: this.t('myBooking.paymentWindow'), v: hours(rules.paymentWindowHours) },
       {
         k: this.t('myBooking.freeCancellationWindow'),
-        v: this.t('settings.minutes', { count: rules.freeCancellationWindowMinutes }),
+        v: this.t('freeCancellation.withinMinutesOfPayment', { count: rules.freeCancellationWindowMinutes }),
       },
       { k: this.t('myBooking.noShowTimeout'), v: hours(rules.noShowTimeoutHours) },
       {

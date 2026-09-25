@@ -747,8 +747,10 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       hours,
       locale: localeName,
-      other: 'Free cancellation for $hours hours after the deposit clears.',
-      one: 'Free cancellation for 1 hour after the deposit clears.',
+      other:
+          'Free cancellation within $hours hours after payment, as long as the rental has not started.',
+      one:
+          'Free cancellation within 1 hour after payment, as long as the rental has not started.',
     );
     return '$_temp0';
   }

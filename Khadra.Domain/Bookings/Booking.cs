@@ -154,9 +154,11 @@ public sealed class Booking : AggregateRoot
 
     public DateTimeOffset? RequestedAt { get; private set; }
     public DateTimeOffset? ApprovedAt { get; private set; }
-    // Set when the DEPOSIT clears, not when the dealer approves, and capped at the period start so
-    // a booking paid just before pickup cannot be cancelled free after the customer was due to
-    // collect the car. Null until then: nothing has been paid, so there is nothing to be free of.
+    // Set when a PAYMENT confirms the booking (the deposit or the whole amount), not when the dealer
+    // approves, and capped at the period start so a booking paid just before pickup cannot be
+    // cancelled free after the customer was due to collect the car. Null until then: nothing has
+    // been paid, so there is nothing to be free of. Every screen words the window from this rule:
+    // "within N hours after payment", never "after approval".
     public DateTimeOffset? FreeCancellationDeadline { get; private set; }
     public DateTimeOffset? PickedUpAt { get; private set; }
     public DateTimeOffset? ReturnedAt { get; private set; }

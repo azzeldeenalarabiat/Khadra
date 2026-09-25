@@ -1557,7 +1557,8 @@ export const EN = {
   'dealerDashboard.activeRentals': 'Active rentals',
   'dealerDashboard.availableVehicles': 'Available vehicles',
   'dealerDashboard.confirmedNotYetCollected': 'Confirmed, not yet collected',
-  'dealerDashboard.awaitingDeposit': 'Awaiting deposit',
+  // Approved bookings await a PAYMENT: the customer chooses the deposit or the whole amount.
+  'dealerDashboard.awaitingPayment': 'Awaiting payment',
   'dealerDashboard.approvedAndUnpaid': 'approved, not paid for yet',
   'dealerDashboard.heldForTheirDates': 'held for their dates',
   'dealerDashboard.revenueThisMonth': 'Revenue · this month',
@@ -1748,7 +1749,7 @@ export const EN = {
   'status.pickedUp': 'Picked up',
   'status.confirmed': 'Confirmed',
   'status.pendingDealer': 'Pending',
-  'status.awaitingDeposit': 'Awaiting deposit',
+  'status.awaitingPayment': 'Awaiting payment',
   'status.activeRental': 'Active',
   'status.uploaded': 'Uploaded',
   'status.missing': 'Missing',
@@ -2227,7 +2228,7 @@ export const EN = {
   'common.theRentalOffice': 'The rental office',
   'common.unassigned': 'Unassigned',
   'status.requestedDealerBooking': 'Pending',
-  'status.approvedDealerBooking': 'Awaiting deposit',
+  'status.approvedDealerBooking': 'Awaiting payment',
   'status.pickedUpDealerBooking': 'Active',
   'queue.overdue': 'Overdue',
   'queue.slaLeft': 'SLA {duration}',
@@ -2509,9 +2510,15 @@ export const EN = {
   'dealerDispute.evidenceAttached': 'Attached: {files}',
   'dealerBooking.odometerAndFuel': '{km} km · fuel {fuel}',
   'dealerBooking.cashCollectedAmount': 'Cash collected: {amount}',
-  'dealerBooking.hoursAfterApproval': {
-    one: '{count}h after approval',
-    other: '{count}h after approval',
+  // The free-cancellation window starts when a payment confirms the booking (Booking.ConfirmPayment),
+  // never at approval.
+  'freeCancellation.withinHoursOfPayment': {
+    one: 'Within {count} hour after payment',
+    other: 'Within {count} hours after payment',
+  },
+  'freeCancellation.withinMinutesOfPayment': {
+    one: 'Within {count} minute after payment',
+    other: 'Within {count} minutes after payment',
   },
   'dealerBooking.hoursAfterReturn': {
     one: '{count}h after return',

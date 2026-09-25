@@ -1268,10 +1268,10 @@ abstract class AppLocalizations {
   /// **'{hours, plural, =1{Once they approve, you have 1 hour to pay the deposit or the booking ends and the car goes back on the market.} other{Once they approve, you have {hours} hours to pay the deposit or the booking ends and the car goes back on the market.}}'**
   String bookTermsPaymentWindow(num hours);
 
-  /// One hour today, which read as 'for 1 hours' until this became a plural.
+  /// The window starts when a payment confirms the booking - the deposit or the whole amount - and never runs past the rental start (Booking.ConfirmPayment). One hour today, which read as 'for 1 hours' until this became a plural.
   ///
   /// In en, this message translates to:
-  /// **'{hours, plural, =1{Free cancellation for 1 hour after the deposit clears.} other{Free cancellation for {hours} hours after the deposit clears.}}'**
+  /// **'{hours, plural, =1{Free cancellation within 1 hour after payment, as long as the rental has not started.} other{Free cancellation within {hours} hours after payment, as long as the rental has not started.}}'**
   String bookTermsFreeCancellation(num hours);
 
   /// No description provided for @bookTermsCancellationPenalty.

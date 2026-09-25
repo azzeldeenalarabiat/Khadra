@@ -260,9 +260,9 @@
     "description": "Two hours since 2026-09-11, which is exactly why this is a plural: Arabic says the two-hour form with its own word, not the number.",
     "placeholders": { "hours": { "type": "num" } }
   },
-  "bookTermsFreeCancellation": "{hours, plural, =1{Free cancellation for 1 hour after the deposit clears.} other{Free cancellation for {hours} hours after the deposit clears.}}",
+  "bookTermsFreeCancellation": "{hours, plural, =1{Free cancellation within 1 hour after payment, as long as the rental has not started.} other{Free cancellation within {hours} hours after payment, as long as the rental has not started.}}",
   "@bookTermsFreeCancellation": {
-    "description": "One hour today, which read as 'for 1 hours' until this became a plural.",
+    "description": "The window starts when a payment confirms the booking - the deposit or the whole amount - and never runs past the rental start (Booking.ConfirmPayment). One hour today, which read as 'for 1 hours' until this became a plural.",
     "placeholders": { "hours": { "type": "num" } }
   },
   "bookTermsCancellationPenalty": "Cancelling after that is assessed at {percent} of the deposit. Nothing is taken without a dispute being opened and settled.",
