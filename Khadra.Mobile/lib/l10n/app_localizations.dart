@@ -2270,6 +2270,174 @@ abstract class AppLocalizations {
   /// **'Refund'**
   String get refundReasonOther;
 
+  /// The booking's Payments section (payments Phase 4). Renamed Payments & Invoices once invoices exist.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments'**
+  String get paymentsTitle;
+
+  /// No description provided for @paymentsHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment history'**
+  String get paymentsHistory;
+
+  /// No description provided for @paymentsPaidOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid online'**
+  String get paymentsPaidOnline;
+
+  /// No description provided for @paymentsRefundDelayedTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund delayed — still owed'**
+  String get paymentsRefundDelayedTotal;
+
+  /// No description provided for @paymentsDueAtPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Due to the office at pickup'**
+  String get paymentsDueAtPickup;
+
+  /// No description provided for @paymentsCashRecordedPickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash the office recorded at pickup'**
+  String get paymentsCashRecordedPickup;
+
+  /// No description provided for @paymentsCashRecordedReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash the office recorded at return'**
+  String get paymentsCashRecordedReturn;
+
+  /// No description provided for @paymentsBalanceNotDue.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing further is due on this booking.'**
+  String get paymentsBalanceNotDue;
+
+  /// No description provided for @paymentsDepositHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is held until you collect the car, when it counts towards the rental.'**
+  String paymentsDepositHeld(String amount);
+
+  /// No description provided for @paymentsDepositAppliedToRental.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} counts towards the rental.'**
+  String paymentsDepositAppliedToRental(String amount);
+
+  /// No description provided for @paymentsDepositInSettlementWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is held until {date}, in case a dispute is opened.'**
+  String paymentsDepositInSettlementWindow(String amount, String date);
+
+  /// No description provided for @paymentsDepositUnderDispute.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is held while the dispute is open.'**
+  String paymentsDepositUnderDispute(String amount);
+
+  /// No description provided for @paymentsDepositSettledWithRental.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} went towards the rental.'**
+  String paymentsDepositSettledWithRental(String amount);
+
+  /// No description provided for @paymentsDepositReturnedWithPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit is refunded with your payment.'**
+  String get paymentsDepositReturnedWithPayment;
+
+  /// No description provided for @paymentsDepositHeldUntilWindowCloses.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is returned to you after {date}, unless a dispute is opened before then.'**
+  String paymentsDepositHeldUntilWindowCloses(String amount, String date);
+
+  /// No description provided for @paymentsDepositHeldForAssessedPenalty.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} is held because a customer penalty was assessed. A dispute can be opened until {date}.'**
+  String paymentsDepositHeldForAssessedPenalty(String amount, String date);
+
+  /// Pre-launch item 164, the owner's own sentence (2026-09-26): factual, promising nothing to either side.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit remains held because a customer penalty was assessed and no dispute was opened. Final settlement is still pending.'**
+  String get paymentsDepositHeldUnresolved;
+
+  /// No description provided for @paymentsDepositReleased.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} was returned to you when the dispute window closed.'**
+  String paymentsDepositReleased(String amount);
+
+  /// No description provided for @paymentsDepositDecidedByDispute.
+  ///
+  /// In en, this message translates to:
+  /// **'A dispute decided that {share} of your {amount} deposit is refunded to you.'**
+  String paymentsDepositDecidedByDispute(String share, String amount);
+
+  /// No description provided for @paymentsDepositDecidedByDisputeNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'A dispute decided your {amount} deposit; none of it is refunded to you.'**
+  String paymentsDepositDecidedByDisputeNothing(String amount);
+
+  /// No description provided for @paymentsKindDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit payment'**
+  String get paymentsKindDeposit;
+
+  /// No description provided for @paymentsKindFullPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Full payment'**
+  String get paymentsKindFullPayment;
+
+  /// No description provided for @paymentsKindOrphaned.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment not applied to the booking'**
+  String get paymentsKindOrphaned;
+
+  /// No description provided for @paymentsKindOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get paymentsKindOther;
+
+  /// No description provided for @paymentsIncludesFee.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes a card processing fee of {amount}'**
+  String paymentsIncludesFee(String amount);
+
+  /// No description provided for @paymentsPartlyRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Partly refunded'**
+  String get paymentsPartlyRefunded;
+
+  /// No description provided for @paymentsOrphanNote.
+  ///
+  /// In en, this message translates to:
+  /// **'This payment could not be applied to your booking, so all of it is refunded to you.'**
+  String get paymentsOrphanNote;
+
+  /// No description provided for @paymentsReviewing.
+  ///
+  /// In en, this message translates to:
+  /// **'Khadra is reviewing the payments on this booking.'**
+  String get paymentsReviewing;
+
   /// No description provided for @cancelRefundAboveDeposit.
   ///
   /// In en, this message translates to:

@@ -11,7 +11,57 @@ import { BookingDetailComponent, changedRefundOf, refundStage } from './booking-
 const ID = '01a0d095-c204-7f23-b0b3-1be7852e4b23';
 const BOOKING_URL = `/api/v1/bookings/${ID}`;
 const CODE_URL = `${BOOKING_URL}/handover-code`;
+const FINANCIALS_URL = `${BOOKING_URL}/financials`;
 const money = (amount: number) => ({ amount, currency: 'JOD' });
+
+/** One refund as the financial state lists it. */
+const financialRefund = (reason: string, status: string, figure: number) => ({
+  refundId: `fr-${reason}`, paymentId: 'p-1', reason, status, amount: money(figure), feePart: money(0),
+  requestedAt: '2026-09-25T20:00:00+00:00', sentAt: status === 'Requested' ? null : '2026-09-25T20:01:00+00:00',
+  settledAt: status === 'Settled' ? '2026-09-25T20:05:00+00:00' : null,
+  failedAt: status === 'Failed' ? '2026-09-25T20:02:00+00:00' : null, disputeTicketId: null,
+});
+
+/**
+ * The customer's projection of a booking's financial state (payments Phase 4): one payment of
+ * `charged` for `purpose`, the given refunds under it, and the balance and deposit as the server
+ * states them.
+ */
+function financials(options: {
+  status: string;
+  purpose: 'Deposit' | 'FullPayment';
+  charged: number;
+  balance: { state: string; amount: number };
+  deposit: { state: string; amount: number; refund?: object | null };
+  refunds?: object[];
+  progress?: string;
+  refunded?: number;
+  inProgress?: number;
+}) {
+  return {
+    bookingId: ID, bookingStatus: options.status, currency: 'JOD', generatedAt: '2026-09-26T08:00:00+00:00',
+    calculatorVersion: 1, needsReview: false,
+    summary: {
+      rentalSubtotal: money(90), deliveryFee: money(12.75), bookingTotal: money(102.75), requiredDeposit: money(18),
+      securityDeposit: money(500), paidOnline: money(options.charged), processingFees: money(0),
+      chargedOnline: money(options.charged), refunded: money(options.refunded ?? 0),
+      refundInProgress: money(options.inProgress ?? 0), refundDelayed: money(0),
+    },
+    balance: { state: options.balance.state, amount: money(options.balance.amount), cashRecorded: [] },
+    deposit: {
+      state: options.deposit.state, amount: money(options.deposit.amount), windowEndsAt: null,
+      refund: options.deposit.refund ?? null, decision: null,
+    },
+    commission: null,
+    payments: [{
+      paymentId: 'p-1', purpose: options.purpose, status: 'Applied', refundProgress: options.progress ?? 'None',
+      occurredAt: '2026-09-25T17:56:00+00:00', appliedToBooking: money(options.charged), amountCharged: money(options.charged),
+      processingFee: money(0), feeRefundable: true, refunds: options.refunds ?? [],
+      createdAt: null, isSandbox: null, providerReference: null, failureCode: null, orphanReason: null,
+    }],
+    issues: null,
+  };
+}
 
 /** A Confirmed booking, shaped as the API answered for one on 2026-09-24 (names replaced). */
 const CONFIRMED = {
@@ -176,6 +226,19 @@ describe('BookingDetailComponent, a paid booking cancelled inside the free windo
       .match((request) => request.url === BOOKING_URL)
       .forEach((read) => read.flush({ ...CONFIRMED, status: 'Cancelled', cancelledBy: 'Customer', finishedAt: '2026-09-23T23:40:00+00:00', depositRefund }));
     await settle();
+    // The Payments section reads the server's financial state for the same booking (payments Phase 4).
+    const status = (depositRefund as { status: string }).status;
+    const refundLine = financialRefund('FreeCancellation', status, 40);
+    http.match((request) => request.url === FINANCIALS_URL).forEach((read) => read.flush(financials({
+      status: 'Cancelled', purpose: 'Deposit', charged: 40,
+      balance: { state: 'NotDue', amount: 0 },
+      deposit: { state: 'ReturnedWithPayment', amount: 40, refund: refundLine },
+      refunds: [refundLine],
+      progress: status === 'Settled' ? 'Complete' : status === 'Failed' ? 'Delayed' : 'InProgress',
+      refunded: status === 'Settled' ? 40 : 0,
+      inProgress: status === 'Settled' ? 0 : 40,
+    })));
+    await settle();
     return fixture.nativeElement as HTMLElement;
   }
 
@@ -196,7 +259,10 @@ describe('BookingDetailComponent, a paid booking cancelled inside the free windo
 
     expect(text).toContain('بدأ الاسترداد');
     expect(text).toContain('بالكامل إلى وسيلة الدفع الأصلية');
-    expect(text).not.toContain('مدفوع');
+    // No status anywhere calls the refunded deposit simply "Paid": the payment reads as being refunded.
+    const badges = [...page.querySelectorAll('.badge')].map((badge) => badge.textContent?.trim());
+    expect(badges).not.toContain('مدفوع');
+    expect(badges).toContain('قيد الاسترداد');
   });
 
   it('says it was refunded once the provider settles it', async () => {
@@ -345,8 +411,18 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     vi.useRealTimers();
   });
 
+  /** The financial state served beside the two fixtures above. */
+  const FINANCIALS_DEPOSIT = financials({
+    status: 'Confirmed', purpose: 'Deposit', charged: 18,
+    balance: { state: 'DueAtHandover', amount: 84.75 }, deposit: { state: 'Held', amount: 18 },
+  });
+  const FINANCIALS_FULL = financials({
+    status: 'Confirmed', purpose: 'FullPayment', charged: 102.75,
+    balance: { state: 'PaidInFull', amount: 0 }, deposit: { state: 'Held', amount: 18 },
+  });
+
   /** Renders the booking in one language; `returning` is the customer coming back from checkout. */
-  async function render(booking: object, language: 'ar' | 'en', returning = false) {
+  async function render(booking: object, language: 'ar' | 'en', returning = false, money?: object) {
     TestBed.configureTestingModule({
       imports: [BookingDetailComponent],
       providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
@@ -368,73 +444,86 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     await settle();
     http.match((request) => request.url === BOOKING_URL).forEach((read) => read.flush(booking));
     await settle();
+    if (money) {
+      http.match((request) => request.url === FINANCIALS_URL).forEach((read) => read.flush(money));
+      await settle();
+    }
     if (returning) {
       await vi.advanceTimersByTimeAsync(3_100);
       await settle();
+      if (money) {
+        http.match((request) => request.url === FINANCIALS_URL).forEach((read) => read.flush(money));
+        await settle();
+      }
     }
     const page = fixture.nativeElement as HTMLElement;
+    const lineIn = (section: string) => (label: string) =>
+      [...page.querySelectorAll(`section[aria-labelledby=${section}] dl.lines > div`)]
+        .find((row) => row.querySelector('dt')?.textContent?.trim() === label)
+        ?.querySelector('dd')?.textContent?.trim() ?? null;
+    const payments = page.querySelector('section[aria-labelledby=payments-title]');
     return {
       text: page.textContent ?? '',
       banner: page.querySelector('.notice[role=status]')?.textContent?.trim() ?? '',
       stages: [...page.querySelectorAll('.timeline__label')].map((label) => label.textContent?.trim()),
-      /** The payment card's figure beside a label, or null when the card has no such line. */
-      line: (label: string) =>
-        [...page.querySelectorAll('section[aria-labelledby=payment-title] dl.lines > div')]
-          .find((row) => row.querySelector('dt')?.textContent?.trim() === label)
-          ?.querySelector('dd')?.textContent?.trim() ?? null,
+      /** The price card's figure beside a label, or null when the card has no such line. */
+      line: lineIn('payment-title'),
+      /** The Payments section's figure beside a label (payments Phase 4). */
+      paid: lineIn('payments-title'),
+      /** The Payments section's words, history included. */
+      payments: payments?.textContent ?? '',
     };
   }
 
   it('keeps the deposit wording when only the deposit was paid (English)', async () => {
-    const page = await render(DEPOSIT, 'en', true);
+    const page = await render(DEPOSIT, 'en', true, FINANCIALS_DEPOSIT);
 
     expect(page.banner).toBe('Your deposit is paid. The booking is confirmed.');
     expect(page.stages).toContain('Deposit paid');
     expect(page.stages).not.toContain('Paid in full');
+    // The price card states the frozen deposit; what was paid is the Payments section's (Phase 4).
     expect(page.line('Deposit (20%)')).toMatch(amount('18'));
-    expect(page.line('Deposit (20%)')).toMatch(/Paid$/);
-    expect(page.line('Paid to the office at pickup')).toMatch(amount('84.75'));
-    expect(page.line('Payment type')).toBeNull();
+    expect(page.paid('Paid online')).toMatch(amount('18'));
+    expect(page.paid('Paid to the office at pickup')).toMatch(amount('84.75'));
+    expect(page.payments).toContain('Deposit payment');
+    expect(page.payments).toContain('Paid');
     expect(page.text).not.toContain('Paid in full');
   });
 
   it('says a booking paid in full is paid in full, with what was charged and nothing left (English)', async () => {
-    const page = await render(FULL, 'en', true);
+    const page = await render(FULL, 'en', true, FINANCIALS_FULL);
 
     expect(page.banner).toBe('Paid in full. The booking is confirmed.');
     expect(page.text).not.toContain('Your deposit is paid');
     expect(page.stages).toContain('Paid in full');
     expect(page.stages).not.toContain('Deposit paid');
-    expect(page.line('Payment type')).toMatch(/^Full payment\s*Paid in full$/);
-    expect(page.line('Amount charged')).toMatch(amount('102.75'));
-    expect(page.line('Remaining balance')).toMatch(amount('0'));
-    expect(page.line('Remaining balance')).not.toMatch(/[1-9]/);
+    expect(page.payments).toContain('Full payment');
+    expect(page.paid('Paid online')).toMatch(amount('102.75'));
+    expect(page.paid('Paid to the office at pickup')).toBeNull();
     expect(page.line('Deposit (20%)')).toBeNull();
-    expect(page.line('Paid to the office at pickup')).toBeNull();
-    expect(page.text).toContain('You paid the whole booking online, so there is nothing to pay the office.');
+    expect(page.payments).toContain('You paid the whole booking online, so there is nothing to pay the office.');
   });
 
   it('keeps the deposit wording in Arabic', async () => {
-    const page = await render(DEPOSIT, 'ar', true);
+    const page = await render(DEPOSIT, 'ar', true, FINANCIALS_DEPOSIT);
 
     expect(page.banner).toBe('تم دفع العربون، والحجز مؤكد.');
     expect(page.stages).toContain('دُفع العربون');
     expect(page.stages).not.toContain('دُفع المبلغ كاملًا');
-    expect(page.line('نوع الدفع')).toBeNull();
+    expect(page.payments).toContain('دفعة العربون');
+    expect(page.payments).not.toContain('الدفع الكامل');
   });
 
   it('says paid in full in Arabic, never the deposit', async () => {
-    const page = await render(FULL, 'ar', true);
+    const page = await render(FULL, 'ar', true, FINANCIALS_FULL);
 
     expect(page.banner).toBe('تم دفع المبلغ كاملًا، والحجز مؤكد.');
     expect(page.stages).toContain('دُفع المبلغ كاملًا');
     expect(page.stages).not.toContain('دُفع العربون');
-    expect(page.line('نوع الدفع')).toContain('دفع كامل');
-    expect(page.line('المبلغ المدفوع')).toMatch(amount('102.75'));
-    expect(page.line('المبلغ المتبقي')).toMatch(amount('0'));
-    expect(page.line('المبلغ المتبقي')).not.toMatch(/[1-9]/);
+    expect(page.payments).toContain('الدفع الكامل');
+    expect(page.paid('المدفوع عبر الإنترنت')).toMatch(amount('102.75'));
     expect(page.text).not.toContain('تم دفع العربون');
-    expect(page.text).toContain('فلا يتبقى عليك شيء للمكتب');
+    expect(page.payments).toContain('فلا يتبقى عليك شيء للمكتب');
   });
 
   it("promises the whole payment back on a free cancellation, from the server's refund figure", async () => {
@@ -550,16 +639,25 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     expect(changedRefundOf(null)).toBeNull();
   });
 
+  /** The financial state of the late-cancelled booking above: the refund above the deposit, settled. */
+  const lateCancelledMoney = financials({
+    status: 'Cancelled', purpose: 'FullPayment', charged: 102.75,
+    balance: { state: 'NotDue', amount: 0 }, deposit: { state: 'HeldForAssessedPenalty', amount: 18 },
+    refunds: [financialRefund('EndedBeforePickup', 'Settled', 84.75)], progress: 'Partial', refunded: 84.75,
+  });
+
   it('lists every refund with why, how much and where it is, and the totals the server sent (English)', async () => {
-    const page = await render(lateCancelled, 'en');
+    const page = await render(lateCancelled, 'en', false, lateCancelledMoney);
 
     expect(page.text).toMatch(new RegExp(`Everything you paid above the deposit, ${amount('84.75').source}, was refunded to your original payment method`));
-    expect(page.text).toContain('Refunds');
-    expect(page.text).toContain('Paid above the deposit');
-    expect(page.text).toContain('Refunded to you');
-    expect(page.text).not.toContain('Refund in progress');
-    // Part of it came back: never "Paid in full" beside the payment any more.
-    expect(page.line('Payment type')).toMatch(/^Full payment$/);
+    expect(page.payments).toContain('Payments');
+    expect(page.payments).toContain('Paid above the deposit');
+    expect(page.paid('Refunded to you')).toMatch(amount('84.75'));
+    expect(page.paid('Refund in progress')).toBeNull();
+    // Part of it came back: the payment reads "Partly refunded", never "Paid in full".
+    expect(page.payments).toContain('Partly refunded');
+    expect(page.payments).not.toContain('Paid in full');
+    expect(page.payments).toContain('Nothing further is due on this booking.');
   });
 
   it('lists the refunds in Arabic, the deposit release included', async () => {
@@ -573,14 +671,21 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
       refundOutstandingAmount: money(18),
     };
 
-    const page = await render(released, 'ar');
+    const releaseLine = financialRefund('DisputeWindowClosed', 'Sent', 18);
+    const page = await render(released, 'ar', false, financials({
+      status: 'Cancelled', purpose: 'FullPayment', charged: 102.75,
+      balance: { state: 'NotDue', amount: 0 }, deposit: { state: 'Released', amount: 18, refund: releaseLine },
+      refunds: [financialRefund('EndedBeforePickup', 'Settled', 84.75), releaseLine], progress: 'InProgress',
+      refunded: 84.75, inProgress: 18,
+    }));
 
-    expect(page.text).toContain('المبالغ المستردة');
-    expect(page.text).toContain('المدفوع فوق العربون');
-    expect(page.text).toContain('إعادة العربون');
+    expect(page.payments).toContain('المدفوعات');
+    expect(page.payments).toContain('المدفوع فوق العربون');
+    expect(page.payments).toContain('إعادة العربون');
     expect(page.text).toContain('يجري استرداد عربونك');
-    expect(page.text).toContain('قيد الاسترداد');
-    expect(page.text).toContain('بدأ الاسترداد');
+    expect(page.paid('قيد الاسترداد')).toMatch(amount('18'));
+    expect(page.payments).toContain('بدأ الاسترداد');
+    expect(page.payments).toContain('أُعيد إليك عربونك');
   });
 
   it('words the refund of a booking paid in full as a refund of the payment', async () => {
@@ -595,10 +700,17 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
       },
     };
 
-    const arabic = await render(cancelled, 'ar');
+    const wholeLine = financialRefund('FreeCancellation', 'Sent', 102.75);
+    const arabic = await render(cancelled, 'ar', false, financials({
+      status: 'Cancelled', purpose: 'FullPayment', charged: 102.75,
+      balance: { state: 'NotDue', amount: 0 }, deposit: { state: 'ReturnedWithPayment', amount: 18, refund: wholeLine },
+      refunds: [wholeLine], progress: 'InProgress', inProgress: 102.75,
+    }));
 
     expect(arabic.text).toContain('من دفعتك');
-    expect(arabic.text).not.toContain('عربونك');
-    expect(arabic.line('المبلغ المدفوع')).toContain('بدأ الاسترداد');
+    // The status notice words the whole payment's refund; the Payments section lists it.
+    expect(arabic.payments).toContain('الدفع الكامل');
+    expect(arabic.payments).toContain('بدأ الاسترداد');
+    expect(arabic.paid('قيد الاسترداد')).toMatch(amount('102.75'));
   });
 });

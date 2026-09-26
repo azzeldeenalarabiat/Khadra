@@ -500,7 +500,7 @@ public sealed class Booking : AggregateRoot
         DepositPaymentId is not null &&
         !ReturnsWholePayment &&
         !depositClaimed &&
-        (Penalty is null || Penalty.IsNothingOwed || Penalty.AttributedTo != BookingParty.Customer) &&
+        !HasPenaltyAgainstCustomer &&
         FinishedAt is not null &&
         now >= FinishedAt.Value.Add(Terms.PostReturnSettlementWindow)
             ? Money.Create(Math.Min(Pricing.DepositAmount.Amount, _onlinePaid), Pricing.CurrencyCode)
@@ -573,19 +573,45 @@ public sealed class Booking : AggregateRoot
     /// settlement window having elapsed, so a dispute afterwards would reopen a closed financial
     /// record.
     /// </summary>
-    public bool CanBeDisputed(DateTimeOffset now)
-    {
-        var finishedAt = Status == BookingStatus.Returned
-            ? ReturnedAt
+    public bool CanBeDisputed(DateTimeOffset now) =>
+        DisputeWindowEndsAt is { } end && now < end;
+
+    /// <summary>
+    /// When this booking's own frozen dispute window closes: its return plus the settlement window for
+    /// a car that came back, its ending plus the window for one cancelled or never collected. Null for
+    /// every other status — no window is running.
+    /// </summary>
+    /// <remarks>
+    /// The one statement of where the window starts, read by <see cref="CanBeDisputed"/> and by the
+    /// booking's financial state (payments Phase 4), so "can it still be disputed" and "until when is
+    /// the deposit held" cannot drift apart.
+    /// </remarks>
+    public DateTimeOffset? DisputeWindowEndsAt =>
+        Status == BookingStatus.Returned
+            ? ReturnedAt?.Add(Terms.PostReturnSettlementWindow)
             : Status == BookingStatus.Cancelled || Status == BookingStatus.NoShow
-                ? FinishedAt
+                ? FinishedAt?.Add(Terms.PostReturnSettlementWindow)
                 : null;
 
-        if (finishedAt is null)
-            return false;
+    /// <summary>
+    /// Whether the booking assessed a penalty that the CUSTOMER owes: the claim that keeps a paid
+    /// deposit from being released when the window closes (owner, 2026-09-26). A penalty against the
+    /// office, or one that owes nothing, is not a claim on the customer's deposit.
+    /// </summary>
+    public bool HasPenaltyAgainstCustomer =>
+        Penalty is { IsNothingOwed: false } && Penalty.AttributedTo == BookingParty.Customer;
 
-        return now < finishedAt.Value.Add(Terms.PostReturnSettlementWindow);
-    }
+    /// <summary>
+    /// Whether the booking ended without the rental taking place: cancelled, a no-show, expired or
+    /// rejected. Nothing further is due on such a booking; what was paid is refunded or held by the
+    /// rules that ending froze.
+    /// </summary>
+    public bool EndedBeforePickup =>
+        PickedUpAt is null &&
+        (Status == BookingStatus.Cancelled ||
+         Status == BookingStatus.NoShow ||
+         Status == BookingStatus.Expired ||
+         Status == BookingStatus.Rejected);
 
     /// <summary>The deposit was paid. Shorthand for <see cref="ConfirmPayment"/> with the frozen deposit.</summary>
     public UnitResult<Error> ConfirmDepositPaid(Id depositPaymentId, DateTimeOffset now) =>

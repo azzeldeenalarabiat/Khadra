@@ -22,6 +22,7 @@ import 'booking_timeline.dart';
 import 'checkout_screen.dart';
 import 'handover_code_screen.dart';
 import 'payment_choice.dart';
+import 'payments_presentation.dart';
 import 'cancel_booking_sheet.dart';
 
 /// One booking, in full.
@@ -1346,6 +1347,64 @@ class _Price extends StatelessWidget {
           ),
         ),
 
+        // BLOCK TWO: what was paid online and what went back — the server's
+        // financial state (payments Phase 4), or, from an API without it, what the
+        // booking itself carries.
+        _Payments(booking: booking, formats: formats),
+
+        // BLOCK THREE, visibly apart: the security deposit is NOT part of the
+        // total and is not Khadra's. In one aligned column with the figures
+        // above it reads either as money owed on top or as a total that does not
+        // add up, so it gets its own card and the sentence that explains it.
+        if (!pricing.securityDeposit.isZero) ...[
+          const SizedBox(height: Space.md),
+          KhadraCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                KhadraDetailRow(
+                  label: l10n.vehicleSecurityDeposit,
+                  value: Text(formats.money(pricing.securityDeposit)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.vehicleSecurityDepositHelp,
+                  style: const TextStyle(
+                      color: KhadraColors.neutral600, fontSize: 12, height: 1.45),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        const SizedBox(height: Space.md),
+        Text(
+          l10n.bookingTermsFrozen,
+          style: const TextStyle(
+              color: KhadraColors.neutral500, fontSize: 12, height: 1.45),
+        ),
+      ],
+    );
+  }
+}
+
+/// What was paid, as the BOOKING carries it: the block this screen showed
+/// before payments Phase 4, kept for an API without `/financials` (a 404). An
+/// installed build must keep working against the API that is live when it is
+/// published, so this stays until that API is.
+class _LegacyPaid extends StatelessWidget {
+  const _LegacyPaid({required this.booking, required this.formats});
+
+  final Booking booking;
+  final Formats formats;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final pricing = booking.pricing;
+
+    return Column(
+      children: [
         // BLOCK TWO: how that total is paid. These figures ADD UP to the total
         // above, which is why they are together and apart from what follows.
         // A booking paid in full says so, with what the card was charged, and is
@@ -1395,10 +1454,10 @@ class _Price extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (booking.confirmingPayment case final payment? when !payment.processingFee.isZero)
+                if (booking.confirmingPayment?.processingFee case final fee? when !fee.isZero)
                   KhadraDetailRow(
                     label: l10n.paymentSummaryFee,
-                    value: Text(formats.money(payment.processingFee)),
+                    value: Text(formats.money(fee)),
                   ),
                 if (booking.refunds == null && booking.depositRefund != null)
                   _RefundText(
@@ -1479,39 +1538,217 @@ class _Price extends StatelessWidget {
           const SizedBox(height: Space.md),
           _Refunds(booking: booking, formats: formats),
         ],
+      ],
+    );
+  }
+}
 
-        // BLOCK THREE, visibly apart: the security deposit is NOT part of the
-        // total and is not Khadra's. In one aligned column with the figures
-        // above it reads either as money owed on top or as a total that does not
-        // add up, so it gets its own card and the sentence that explains it.
-        if (!pricing.securityDeposit.isZero) ...[
+/// The booking's Payments section (payments Phase 4, owner 2026-09-26), read
+/// from `GET /bookings/{id}/financials`. Named "Payments" until issued invoices
+/// exist; Phase 5 renames it "Payments & Invoices".
+class _Payments extends ConsumerWidget {
+  const _Payments({required this.booking, required this.formats});
+
+  final Booking booking;
+  final Formats formats;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final id = booking.bookingId;
+
+    // The booking is re-read on its own (the checkout return, a pull, a
+    // deadline); the financial state follows it only when its money may have
+    // moved, not on every read.
+    ref.listen(bookingProvider(id), (previous, next) {
+      final before = previous?.valueOrNull;
+      final after = next.valueOrNull;
+      if (before != null && after != null && paymentsVersion(before) != paymentsVersion(after)) {
+        ref.invalidate(bookingFinancialsProvider(id));
+      }
+    });
+
+    return switch (ref.watch(bookingFinancialsProvider(id))) {
+      AsyncData(:final value) when value != null =>
+        value.hasContent ? _PaymentsSection(financials: value, formats: formats) : const SizedBox.shrink(),
+      // Null: an API without payments Phase 4. The booking still says what was paid.
+      AsyncData() => _LegacyPaid(booking: booking, formats: formats),
+      AsyncError(:final error) => Padding(
+          padding: const EdgeInsets.only(top: Space.md),
+          child: KhadraCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _BlockLabel(l10n.paymentsTitle),
+                Text(
+                  ApiFailure.from(error).messageFor(l10n),
+                  style: const TextStyle(color: KhadraColors.neutral600, fontSize: 13, height: 1.45),
+                ),
+                TextButton(
+                  onPressed: () => ref.invalidate(bookingFinancialsProvider(id)),
+                  child: Text(l10n.actionRetry),
+                ),
+              ],
+            ),
+          ),
+        ),
+      _ => const SizedBox.shrink(),
+    };
+  }
+}
+
+class _PaymentsSection extends StatelessWidget {
+  const _PaymentsSection({required this.financials, required this.formats});
+
+  final BookingFinancials financials;
+  final Formats formats;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final summary = financials.summary;
+    final balance = financials.balance;
+    // While the records contradict one another, the review notice is the one
+    // thing said about them: a sentence read from them could be the
+    // contradiction itself (a refund the rule owes and nobody recorded).
+    final deposit = financials.needsReview ? null : depositSentence(l10n, formats, financials.deposit);
+
+    Widget? line(String label, Money? value) =>
+        value == null || value.isZero ? null : KhadraDetailRow(label: label, value: Text(formats.money(value)));
+    Widget note(String text) => Padding(
+          padding: const EdgeInsets.only(top: Space.xs),
+          child: Text(text, style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12, height: 1.45)),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: Space.md),
+        KhadraCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BlockLabel(l10n.paymentsTitle),
+              if (financials.needsReview) note(l10n.paymentsReviewing),
+              ?line(l10n.paymentsPaidOnline, summary.paidOnline),
+              ?line(l10n.paymentSummaryFee, summary.processingFees),
+              ?line(l10n.bookingRefundedTotal, summary.refunded),
+              ?line(l10n.bookingRefundOutstanding, summary.refundInProgress),
+              ?line(l10n.paymentsRefundDelayedTotal, summary.refundDelayed),
+              if (balance.state == 'DueAtHandover') ?line(l10n.bookBalanceAtPickup, balance.amount),
+              // Never "paid" without a record: what was due, and beside it
+              // whatever cash the office recorded.
+              if (balance.state == 'CashAtHandover') ...[
+                ?line(l10n.paymentsDueAtPickup, balance.amount),
+                for (final cash in balance.cashRecorded)
+                  ?line(
+                    cash.handover == 'Return' ? l10n.paymentsCashRecordedReturn : l10n.paymentsCashRecordedPickup,
+                    cash.amount,
+                  ),
+              ],
+              if (balance.state == 'PaidInFull') note(l10n.bookingPaidInFullNothingDue),
+              if (balance.state == 'NotDue') note(l10n.paymentsBalanceNotDue),
+              if (deposit != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: Space.sm),
+                  child: Wrap(
+                    spacing: Space.sm,
+                    runSpacing: Space.xs,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(deposit, style: const TextStyle(fontSize: 13, height: 1.45)),
+                      if (financials.deposit.refund case final refund?
+                          when refund.isRefunded || refund.isDelayed || refund.isInProgress)
+                        _RefundStatusBadge(refunded: refund.isRefunded, delayed: refund.isDelayed, l10n: l10n),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (financials.payments.isNotEmpty) ...[
           const SizedBox(height: Space.md),
           KhadraCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                KhadraDetailRow(
-                  label: l10n.vehicleSecurityDeposit,
-                  value: Text(formats.money(pricing.securityDeposit)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  l10n.vehicleSecurityDepositHelp,
-                  style: const TextStyle(
-                      color: KhadraColors.neutral600, fontSize: 12, height: 1.45),
-                ),
+                _BlockLabel(l10n.paymentsHistory),
+                for (final payment in financials.payments) _PaymentHistoryRow(payment: payment, formats: formats),
               ],
             ),
           ),
         ],
-
-        const SizedBox(height: Space.md),
-        Text(
-          l10n.bookingTermsFrozen,
-          style: const TextStyle(
-              color: KhadraColors.neutral500, fontSize: 12, height: 1.45),
-        ),
       ],
+    );
+  }
+}
+
+/// One payment in the history, with the refunds made against it indented below.
+class _PaymentHistoryRow extends StatelessWidget {
+  const _PaymentHistoryRow({required this.payment, required this.formats});
+
+  final FinancialPayment payment;
+  final Formats formats;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final progress = paymentProgress(l10n, payment.refundProgress);
+    final fee = payment.processingFee;
+
+    // Two lines, each free to wrap: what and when, then how much and where it
+    // stands. One row of label and value overflowed at 360 in Arabic, where the
+    // date and the badge are both long. A status this build does not know gets
+    // no badge at all.
+    Widget amountAndBadge(String amount, Widget? badge) => Wrap(
+          spacing: Space.sm,
+          runSpacing: Space.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [Text(amount, style: const TextStyle(fontWeight: FontWeight.w700)), ?badge],
+        );
+    const small = TextStyle(color: KhadraColors.neutral500, fontSize: 12, height: 1.45);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Space.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(paymentTitle(l10n, payment), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+          if (payment.occurredAt != null) Text(formats.dateTime(payment.occurredAt!), style: small),
+          const SizedBox(height: Space.xs),
+          amountAndBadge(
+            payment.amountCharged == null ? '' : formats.money(payment.amountCharged!),
+            progress == null ? null : KhadraBadge(label: progress.label, colour: progress.colour),
+          ),
+          if (fee != null && !fee.isZero) Text(l10n.paymentsIncludesFee(formats.money(fee)), style: small),
+          if (payment.isOrphaned)
+            Padding(
+              padding: const EdgeInsets.only(top: Space.xs),
+              child: Text(
+                l10n.paymentsOrphanNote,
+                style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12, height: 1.45),
+              ),
+            ),
+          for (final refund in payment.refunds)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: Space.lg, top: Space.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(refundReasonLabel(l10n, refund.reason), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  Text(formats.dateTime(refund.settledAt ?? refund.failedAt ?? refund.requestedAt), style: small),
+                  const SizedBox(height: 2),
+                  amountAndBadge(
+                    formats.money(refund.amount),
+                    refund.isRefunded || refund.isDelayed || refund.isInProgress
+                        ? _RefundStatusBadge(refunded: refund.isRefunded, delayed: refund.isDelayed, l10n: l10n)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

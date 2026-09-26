@@ -4482,3 +4482,17 @@ email delivery of each issued document; English and Arabic document and email co
 linked records that never overwrite the original payment receipt; and email delivery status and
 history the administrator can see (queued, sent, failed). **To close:** all of it built and verified
 end to end on both customer clients, in both languages — not the backend alone.
+
+### 173. The penalty notice still says "Nothing has been charged" after a dispute settled the penalty
+
+**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 4a browser run; not part of 4a) · **Wording for the owner**
+
+A booking with an assessed penalty carries a notice on the website (`booking.penaltyNotCharged` in
+`booking-detail.component.html`, whenever the penalty is not "nothing owed") and in the app
+(`bookingPenaltyNotCharged`, whenever `penalty.requiresTicketToEnforce`): "Nothing has been charged.
+An assessment only becomes money if a dispute is opened and Khadra settles it." Both say it for as long
+as the penalty exists — also after a dispute has settled it. On KH-NY8AHLNK, where a dispute split the
+18.000 deposit 9.000 to the customer and 9.000 to the office, the notice sits above the Payments
+section stating that decision and contradicts it. **To close:** once a dispute has decided the deposit
+(the financial state's `DecidedByDispute`), the notice says so instead, in wording the owner approves,
+on the website and in the app, in both languages, with tests.

@@ -123,7 +123,8 @@ Ratings are aggregated in SQL as read models.
 
 ## 8. Payments
 
-`Payment` is ONE CHECKOUT ATTEMPT for one booking's deposit, with `Refund` as a child entity, plus
+`Payment` is ONE CHECKOUT ATTEMPT for one booking — its deposit or, since 2026-09-24, its full amount
+(`PaymentPurpose`) — with `Refund` as a child entity, plus
 `ProviderEventReceipt` — an append-only log of provider notifications that is deliberately OUTSIDE the
 aggregate, because an event naming a reference this platform never issued has no payment to hang off
 and still has to be recorded.
@@ -193,10 +194,28 @@ dealer and never held dealer funds. Of the three spec cases that would need a ra
 penalty, which is already an instruction with no rail (`DisputeResolution.DealerCharge`) and is settled
 by hand.
 
-**Nobody may add a provider that simulates success.** `UnconfiguredPaymentProvider` is the only
-implementation, and a stub that confirmed bookings without money would be indistinguishable, in every
-table and on every screen, from a real payment. Tests substitute `IPaymentProvider` at the handler
-boundary. Writing a real adapter is one class implementing four methods; nothing above it changes.
+**A booking's financial state is ONE calculator** (payments Phase 4a, owner 2026-09-26).
+`BookingFinancialsCalculator` (Application/Payments/Financials) reads the booking, its payments with their
+refunds, and its resolved disputes, and answers every figure a screen shows: what was charged and applied,
+what went back and where it is, the balance (`BalanceStates`), the deposit (`DepositStates`), Khadra's
+commission (`CommissionStates`, never to a customer) and the payment history. It adds no rule of its own —
+each state reads a verdict the aggregates already give (`Booking.EndedBeforePickup`,
+`HasPenaltyAgainstCustomer`, `DisputeWindowEndsAt`, `ReturnsWholePayment`; `Payment.FeeInside`,
+`WholePaymentRefundAmount`) — and it never throws on records that contradict one another: it reports
+them (`FinancialIssues`) and serves what they say. Three projections of one answer — the customer's, the
+office's (no processing fees, no customer or platform dispute share) and the administrator's — are served
+by `GET /bookings/{id}/financials` and `GET /admin/bookings/{id}/financials`. It reads only frozen or
+immutable facts plus refund status, so Phase 5 can freeze its answer into an issued booking statement;
+`calculatorVersion` travels with it. See `docs/payments-programme.md` for the owner's decisions behind
+each state.
+
+**Nobody may add a provider that simulates success — except the one recorded exception.**
+`UnconfiguredPaymentProvider` answers "no provider" in production; `SandboxPaymentProvider` is the
+owner-approved exception (2026-09-21) for clicking the lifecycle through before a merchant account
+exists, and the three guards that make it allowable are in CLAUDE.md. A stub that confirmed bookings
+without money would otherwise be indistinguishable, in every table and on every screen, from a real
+payment. Tests substitute `IPaymentProvider` at the handler boundary. Writing a real adapter is one class
+implementing four methods; nothing above it changes.
 
 ## 9. Shortlist
 
@@ -247,7 +266,7 @@ These change field shapes, so they are worth settling before the affected contex
 
 1. **Customer cancellation penalty.** Spec 5.5 says a penalty applies to a late-cancelling customer but never names it. The code currently assumes 100% of the deposit, consistent with "deposit is forfeited" on a no-show. Confirm or replace.
 2. **Dealer non-delivery tier.** Spec 2.2 leaves 25%-50% open. The range travels with each booking and an Admin picks inside it; confirm whether that stands or a flat rate is preferred.
-3. **Held deposit with no ticket.** When a cancellation or no-show passes with nobody opening a ticket, is the held deposit refunded or retained? "No penalty is auto-applied" reads as refund, which contradicts "deposit is forfeited". This one is genuinely ambiguous in the spec.
+3. **Held deposit with no ticket — half decided.** The owner decided on 2026-09-26 that a deposit goes back when the booking's dispute window closes CLEANLY (no ticket that was not withdrawn, no penalty against the customer; Phase 3). A deposit held for a penalty against the customer with no ticket is still open: pre-launch item 164, which the office payables ledger (payments Phase 8) settles. Until then the customer reads the owner's neutral sentence and nothing is promised to either side.
 4. **Vehicle security deposit.** Does the damage deposit pass through the platform on card, or is it cash at handover? Card authorization holds typically lapse after about seven days, so holding one for a ten-day rental invites chargebacks. The model currently records it as cash on the handover record.
 5. **Delivery fee ownership.** Does the dealer keep the 10 JOD, or the platform?
 6. **Quick-cancellation processing fee** (spec 2.3), **minimum renter age**, and the **international driving permit requirement** for foreign renters (spec 2.2), all still unset.

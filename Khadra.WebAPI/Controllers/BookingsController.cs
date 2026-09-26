@@ -6,6 +6,7 @@ using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.Handover;
 using Khadra.Application.Bookings.ReadBookings;
 using Khadra.Application.Common;
+using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -88,6 +89,22 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
     {
         var result = await Mediator.Send(
             new GetBookingQuery(actor.UserId!.Value, Id.From(bookingId)),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// The booking's financial state (payments Phase 4): what was paid and refunded, the balance and
+    /// the deposit as the server states them, and the payment history. The customer's projection for
+    /// the customer, the office's for its owner and active employees; 404 to anyone else.
+    /// </summary>
+    [HttpGet("{bookingId:guid}/financials")]
+    [ProducesResponseType<BookingFinancialsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetFinancials(Guid bookingId, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(
+            new GetBookingFinancialsQuery(actor.UserId!.Value, Id.From(bookingId)),
             cancellationToken);
         return FromResult(result);
     }

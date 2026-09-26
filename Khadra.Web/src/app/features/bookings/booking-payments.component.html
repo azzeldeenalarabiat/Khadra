@@ -1,0 +1,61 @@
+@if (problem(); as failure) {
+  <section class="card card--pad" aria-labelledby="payments-title">
+    <h2 id="payments-title" class="card__title">{{ i18n.t('payments.title') }}</h2>
+    <kh-state-panel kind="error" [compact]="true" [problem]="failure" (action)="financials.reload()" />
+  </section>
+} @else if (view(); as v) {
+  @if (v.visible) {
+    <section class="card card--pad payments" aria-labelledby="payments-title">
+      <h2 id="payments-title" class="card__title">{{ i18n.t('payments.title') }}</h2>
+
+      @if (v.reviewing) {
+        <p class="notice" role="status">{{ i18n.t('payments.reviewing') }}</p>
+      }
+
+      @if (v.totals.length || v.balance || v.cash.length) {
+        <dl class="lines">
+          @for (line of v.totals; track line.label) {
+            <div><dt>{{ line.label }}</dt><dd>{{ line.value }}</dd></div>
+          }
+          @if (v.balance; as line) {
+            <div><dt>{{ line.label }}</dt><dd>{{ line.value }}</dd></div>
+          }
+          @for (line of v.cash; track $index) {
+            <div><dt>{{ line.label }}</dt><dd>{{ line.value }}</dd></div>
+          }
+        </dl>
+      }
+      @if (v.balanceText) {
+        <p class="payments__sentence">{{ v.balanceText }}</p>
+      }
+      @if (v.deposit) {
+        <p class="payments__sentence">{{ v.deposit }}
+          @if (v.depositBadge; as badge) { <span class="badge {{ badge.tone }}">{{ badge.label }}</span> }</p>
+      }
+
+      @if (v.payments.length) {
+        <h3 class="payments__heading">{{ i18n.t('payments.history') }}</h3>
+        <ul class="history payments__list">
+          @for (payment of v.payments; track payment.id) {
+            <li class="payments__payment">
+              <span><strong>{{ payment.title }}</strong>&ngsp;<span class="faint small">· {{ payment.date }}</span></span>
+              <span>{{ payment.amount }} @if (payment.badge; as badge) { <span class="badge {{ badge.tone }}">{{ badge.label }}</span> }</span>
+              @if (payment.fee) { <span class="faint small payments__full">{{ payment.fee }}</span> }
+              @if (payment.note) { <span class="small payments__full">{{ payment.note }}</span> }
+              @if (payment.refunds.length) {
+                <ul class="history payments__refunds">
+                  @for (refund of payment.refunds; track refund.id) {
+                    <li>
+                      <span>{{ refund.label }} <span class="faint small">· {{ refund.date }}</span></span>
+                      <span>{{ refund.amount }} @if (refund.badge; as badge) { <span class="badge {{ badge.tone }}">{{ badge.label }}</span> }</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+}

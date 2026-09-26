@@ -32,6 +32,7 @@ import { LIFECYCLE, countdownText, partyLabel, stageLabel, statusLabel, statusTo
 import { countdownParts } from './countdown';
 import { HandoverCodeComponent } from './handover-code.component';
 import { chosenOption } from './payment-choice';
+import { BookingPaymentsComponent } from './booking-payments.component';
 import { httpData } from '../../core/http/http-data';
 
 /** How often an open booking is re-read while the page is visible (docs/refresh-policy.md: 60s). */
@@ -59,16 +60,6 @@ export function refundStage(refund: DepositRefund): 'initiated' | 'done' | 'dela
   return refund.status === 'Settled' ? 'done' : refund.status === 'Failed' ? 'delayed' : 'initiated';
 }
 
-/** The refund reasons this site words; anything newer reads as a plain "Refund". */
-const REFUND_REASONS: ReadonlySet<string> = new Set([
-  'FreeCancellation',
-  'PlatformCancellation',
-  'EndedBeforePickup',
-  'DisputeWindowClosed',
-  'DisputeResolution',
-  'OrphanedCapture',
-]);
-
 /**
  * The refund a `booking.refund_changed` refusal says cancelling would now return (owner, 2026-09-26),
  * read from the ProblemDetails beside its code. Null when the body carries no usable figure.
@@ -86,7 +77,7 @@ export function changedRefundOf(error: unknown): Money | null {
 @Component({
   selector: 'kh-booking-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, IconComponent, StatePanelComponent, HandoverCodeComponent],
+  imports: [RouterLink, IconComponent, StatePanelComponent, HandoverCodeComponent, BookingPaymentsComponent],
   templateUrl: './booking-detail.component.html',
 })
 export class BookingDetailComponent {
@@ -166,6 +157,18 @@ export class BookingDetailComponent {
     if (!booking) return '';
     const change = [...booking.history].reverse().find((entry) => entry.toStatus === booking.status);
     return this.reasonLabel(change?.reasonCode ?? booking.cancellationReasonCode);
+  });
+
+  /**
+   * What the Payments section re-reads on: the booking's money-relevant facts as last read — its status,
+   * whether it is paid, each refund's status, the handovers. The section's own figures come from the
+   * server's financial state; this only says when that may have moved.
+   */
+  protected readonly paymentsVersion = computed(() => {
+    const b = this.view();
+    if (!b) return '';
+    const refunds = (b.refunds ?? []).map((refund) => `${refund.refundId}:${refund.status}`).join(',');
+    return [b.status, b.depositPaid, b.isPaidInFull ?? false, refunds, b.handovers.length, b.liveDisputeId ?? ''].join('|');
   });
 
   protected readonly canShowHandover = computed(() => ['Confirmed', 'PickedUp'].includes(this.view()?.status ?? ''));
@@ -250,16 +253,6 @@ export class BookingDetailComponent {
 
   private readonly seo = inject(SeoService);
 
-  /** The deposit's refund in the customer's words: initiated, refunded, or delayed and still owed. */
-  protected refundLabel(refund: DepositRefund): string {
-    return this.t(refundStage(refund) === 'done' ? 'booking.refunded' : refundStage(refund) === 'delayed' ? 'booking.refundDelayed' : 'booking.refundInitiated');
-  }
-
-  protected refundTone(refund: DepositRefund): string {
-    const stage = refundStage(refund);
-    return stage === 'done' ? 'badge--ok' : stage === 'delayed' ? 'badge--bad' : 'badge--warn';
-  }
-
   /** Deposit wording for a deposit, payment wording for a booking paid in full (owner, 2026-09-25). */
   protected refundText(refund: DepositRefund, booking: Booking): string {
     return this.paidWithFullPayment(booking) ? this.paymentRefundText(refund) : this.depositRefundText(refund);
@@ -291,16 +284,6 @@ export class BookingDetailComponent {
     }
   }
 
-  /** Why a refund is owed, in the reader's language. */
-  protected refundReason(refund: Refund): string {
-    return this.t((REFUND_REASONS.has(refund.reason) ? `booking.refundReason.${refund.reason}` : 'booking.refundReason.other') as TranslationKey);
-  }
-
-  /** When the refund last moved: settled, refused, or started. */
-  protected refundDate(refund: Refund): string {
-    return this.format.dateTime(refund.settledAt ?? refund.failedAt ?? refund.requestedAt);
-  }
-
   /**
    * One refund in a sentence, by what it returns: the money paid above the deposit, the deposit
    * itself (a free cancellation's on a deposit, the clean-close release), or part of the payment.
@@ -322,22 +305,9 @@ export class BookingDetailComponent {
     return this.paymentRefundText(refund);
   }
 
-  /** Whether any money was, or is being, given back. The badge "Paid in full" is withheld once it has. */
-  protected hasRefunds(booking: Booking): boolean {
-    return (booking.refunds?.length ?? 0) > 0 || !!booking.depositRefund;
-  }
-
   /** Whether the payment that confirmed this booking was the whole amount, from the server's record of it. */
   protected paidWithFullPayment(booking: Booking): boolean {
     return booking.confirmingPayment?.purpose === 'FullPayment';
-  }
-
-  /**
-   * What the card was charged, the processing fee included: the confirming payment's own figure. The
-   * amount paid online stands in on a server that sends no confirming payment.
-   */
-  protected amountCharged(booking: Booking): Money {
-    return booking.confirmingPayment?.amountCharged ?? booking.onlinePaid ?? booking.pricing.totalPrice;
   }
 
   /**

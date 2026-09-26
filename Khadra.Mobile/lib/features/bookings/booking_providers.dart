@@ -182,6 +182,13 @@ final bookingProvider =
   return ref.watch(apiProvider).booking(bookingId);
 });
 
+/// The booking's financial state (payments Phase 4), or null from an API
+/// without it — the screen then keeps what the booking itself carries.
+final bookingFinancialsProvider = FutureProvider.autoDispose
+    .family<BookingFinancials?, String>((ref, bookingId) async {
+  return ref.watch(apiProvider).bookingFinancials(bookingId);
+});
+
 /// The caller's own review of a booking, or null if they have not left one.
 ///
 /// Null is a legitimate answer about a booking that exists, which is why the API
@@ -216,6 +223,7 @@ final myReputationProvider =
 void invalidateBookings(WidgetRef ref, {String? bookingId}) {
   if (bookingId != null) {
     ref.invalidate(bookingProvider(bookingId));
+    ref.invalidate(bookingFinancialsProvider(bookingId));
     ref.invalidate(myReviewProvider(bookingId));
   }
   ref.invalidate(bookingTabCountsProvider);

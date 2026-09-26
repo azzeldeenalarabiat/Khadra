@@ -1384,6 +1384,9 @@ class Refund {
   bool get isRefunded => status == 'Settled';
   bool get isDelayed => status == 'Failed';
 
+  /// On its way: recorded, or accepted by the provider.
+  bool get isInProgress => status == 'Requested' || status == 'Sent';
+
   static Refund? maybe(dynamic json) {
     if (json is! Map<String, dynamic>) return null;
     final amount = Money.maybe(json['amount']);
@@ -1458,7 +1461,10 @@ class ConfirmingPayment {
 
   /// What the card was charged, the processing fee included.
   final Money amountCharged;
-  final Money processingFee;
+
+  /// The processing fee inside [amountCharged], as the server sent it. Null from
+  /// an API that sent none: the app does not invent a figure (payments Phase 4).
+  final Money? processingFee;
 
   /// What a free cancellation would return, from the same rule the refund
   /// itself applies, so the sheet promises the figure that is refunded.
@@ -1475,7 +1481,7 @@ class ConfirmingPayment {
     return ConfirmingPayment(
       purpose: purpose,
       amountCharged: charged,
-      processingFee: Money.maybe(json['processingFee']) ?? Money(0, charged.currencyCode),
+      processingFee: Money.maybe(json['processingFee']),
       refundOnFreeCancellation: refund,
     );
   }
@@ -2008,7 +2014,9 @@ class BookingListItem implements HasDealerLabel {
         days: _int(json['days'], 1),
         pickupMethod: json['pickupMethod'] as String? ?? 'SelfPickup',
         totalPrice: _num(json['totalPrice']),
-        currency: json['currency'] as String? ?? 'JOD',
+        // No default: an amount with no currency renders with none, visibly wrong
+        // rather than quietly wrong (see Money).
+        currency: json['currency'] as String? ?? '',
         createdAt: _requiredDateTime(json['createdAt']),
         vehicle: VehicleLabel.maybe(json['vehicle']),
         dealerName: json['dealerName'] as String? ?? '',
@@ -2501,4 +2509,205 @@ class MyReview {
 String? _url(dynamic value) {
   if (value is! String || value.isEmpty) return null;
   return AppEnvironment.resolve(value);
+}
+
+/// A booking's financial state as the CUSTOMER may see it (payments Phase 4,
+/// owner 2026-09-26): `GET /api/v1/bookings/{id}/financials`.
+///
+/// Every figure, state and status is the server's; the app renders them and
+/// computes none. ADDITIVE: an API without Phase 4 answers 404, and the booking
+/// screen then keeps showing what the booking itself carries. A field this build
+/// cannot read degrades to "nothing to show", never to a thrown cast.
+class BookingFinancials {
+  const BookingFinancials({
+    required this.bookingId,
+    required this.bookingStatus,
+    required this.needsReview,
+    required this.summary,
+    required this.balance,
+    required this.deposit,
+    required this.payments,
+  });
+
+  final String bookingId;
+
+  /// The booking's status when this was computed: a screen that read the booking
+  /// on the other side of a transition reads both again.
+  final String bookingStatus;
+
+  /// The records contradict one another; the figures are what they say, and
+  /// Khadra will look.
+  final bool needsReview;
+  final FinancialSummary summary;
+  final FinancialBalance balance;
+  final FinancialDeposit deposit;
+  final List<FinancialPayment> payments;
+
+  /// Whether there is anything to show: a payment, or a deposit the booking
+  /// holds or held. A booking nobody has paid for has no Payments section.
+  /// An answer without a deposit state is not a deposit to show.
+  bool get hasContent => payments.isNotEmpty || (deposit.state.isNotEmpty && deposit.state != 'NotPaid');
+
+  static BookingFinancials fromJson(Map<String, dynamic> json) => BookingFinancials(
+        bookingId: json['bookingId'] as String? ?? '',
+        bookingStatus: json['bookingStatus'] as String? ?? '',
+        needsReview: json['needsReview'] as bool? ?? false,
+        summary: FinancialSummary.fromJson(
+            json['summary'] as Map<String, dynamic>? ?? const {}),
+        balance: FinancialBalance.fromJson(
+            json['balance'] as Map<String, dynamic>? ?? const {}),
+        deposit: FinancialDeposit.fromJson(
+            json['deposit'] as Map<String, dynamic>? ?? const {}),
+        payments: (json['payments'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(FinancialPayment.fromJson)
+            .toList(),
+      );
+}
+
+/// The booking's figures. A figure the server did not send is null and not shown.
+class FinancialSummary {
+  const FinancialSummary({
+    this.paidOnline,
+    this.processingFees,
+    this.refunded,
+    this.refundInProgress,
+    this.refundDelayed,
+  });
+
+  /// Paid online towards the booking, processing fees excluded.
+  final Money? paidOnline;
+  final Money? processingFees;
+  final Money? refunded;
+  final Money? refundInProgress;
+
+  /// Refused by the provider, still owed, and being sent again.
+  final Money? refundDelayed;
+
+  static FinancialSummary fromJson(Map<String, dynamic> json) => FinancialSummary(
+        paidOnline: Money.maybe(json['paidOnline']),
+        processingFees: Money.maybe(json['processingFees']),
+        refunded: Money.maybe(json['refunded']),
+        refundInProgress: Money.maybe(json['refundInProgress']),
+        refundDelayed: Money.maybe(json['refundDelayed']),
+      );
+}
+
+/// What is still to be paid: `NotYetDue`, `DueAtHandover`, `CashAtHandover`,
+/// `PaidInFull` or `NotDue`.
+class FinancialBalance {
+  const FinancialBalance({required this.state, this.amount, this.cashRecorded = const []});
+
+  final String state;
+  final Money? amount;
+
+  /// Cash the office recorded on a handover, shown beside the balance and never
+  /// compared with it: the platform never sees that money.
+  final List<FinancialCashRecord> cashRecorded;
+
+  static FinancialBalance fromJson(Map<String, dynamic> json) => FinancialBalance(
+        state: json['state'] as String? ?? '',
+        amount: Money.maybe(json['amount']),
+        cashRecorded: (json['cashRecorded'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(FinancialCashRecord.maybe)
+            .whereType<FinancialCashRecord>()
+            .toList(),
+      );
+}
+
+class FinancialCashRecord {
+  const FinancialCashRecord({required this.handover, required this.amount});
+
+  /// `Pickup` or `Return`.
+  final String handover;
+  final Money amount;
+
+  static FinancialCashRecord? maybe(Map<String, dynamic> json) {
+    final amount = Money.maybe(json['amount']);
+    return amount == null
+        ? null
+        : FinancialCashRecord(handover: json['handover'] as String? ?? '', amount: amount);
+  }
+}
+
+/// Where the deposit is, as the server states it.
+class FinancialDeposit {
+  const FinancialDeposit({
+    required this.state,
+    this.amount,
+    this.windowEndsAt,
+    this.refund,
+    this.toCustomer,
+  });
+
+  /// `NotPaid`, `Held`, `AppliedToRental`, `InSettlementWindow`, `UnderDispute`,
+  /// `SettledWithRental`, `ReturnedWithPayment`, `HeldUntilWindowCloses`,
+  /// `HeldForAssessedPenalty`, `HeldUnresolved`, `Released` or `DecidedByDispute`.
+  final String state;
+  final Money? amount;
+  final DateTime? windowEndsAt;
+
+  /// The refund that returned or released the deposit.
+  final Refund? refund;
+
+  /// On a dispute decision, the customer's OWN share: the only one they are
+  /// sent (owner, 2026-09-26).
+  final Money? toCustomer;
+
+  static FinancialDeposit fromJson(Map<String, dynamic> json) {
+    final decision = json['decision'];
+    return FinancialDeposit(
+      state: json['state'] as String? ?? '',
+      amount: Money.maybe(json['amount']),
+      windowEndsAt: _dateTime(json['windowEndsAt']),
+      refund: Refund.maybe(json['refund']),
+      toCustomer: decision is Map<String, dynamic> ? Money.maybe(decision['toCustomer']) : null,
+    );
+  }
+}
+
+/// One payment in the booking's history, with the refunds made against it.
+class FinancialPayment {
+  const FinancialPayment({
+    required this.paymentId,
+    required this.purpose,
+    required this.status,
+    required this.refundProgress,
+    required this.refunds,
+    this.occurredAt,
+    this.amountCharged,
+    this.processingFee,
+  });
+
+  final String paymentId;
+
+  /// `Deposit` or `FullPayment`.
+  final String purpose;
+
+  /// `Applied`, or `Orphaned` for a capture that could not be applied to the
+  /// booking (it is refunded in full).
+  final String status;
+
+  /// `None`, `InProgress`, `Delayed`, `Partial` or `Complete`.
+  final String refundProgress;
+  final DateTime? occurredAt;
+
+  /// What the card was charged, the processing fee included.
+  final Money? amountCharged;
+  final Money? processingFee;
+  final List<Refund> refunds;
+
+  bool get isOrphaned => status == 'Orphaned';
+
+  static FinancialPayment fromJson(Map<String, dynamic> json) => FinancialPayment(
+        paymentId: json['paymentId'] as String? ?? '',
+        purpose: json['purpose'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+        refundProgress: json['refundProgress'] as String? ?? 'None',
+        occurredAt: _dateTime(json['occurredAt']),
+        amountCharged: Money.maybe(json['amountCharged']) ?? Money.maybe(json['appliedToBooking']),
+        processingFee: Money.maybe(json['processingFee']),
+        refunds: Refund.listOrNull(json['refunds']) ?? const [],
+      );
 }

@@ -329,6 +329,23 @@ class KhadraApi {
   Future<Booking> booking(String bookingId) async =>
       Booking.fromJson(_object(await _client.get<dynamic>('/api/v1/bookings/$bookingId')));
 
+  /// The booking's financial state (payments Phase 4, owner 2026-09-26), or
+  /// null from an API without it.
+  ///
+  /// A 404 here can only mean that: the booking itself has already answered 200
+  /// to the same caller. This build must keep working against the API that is
+  /// live when it is published (docs/contracts), so the screen falls back to
+  /// what the booking carries instead of failing.
+  Future<BookingFinancials?> bookingFinancials(String bookingId) async {
+    try {
+      return BookingFinancials.fromJson(
+          _object(await _client.get<dynamic>('/api/v1/bookings/$bookingId/financials')));
+    } on ApiFailure catch (failure) {
+      if (failure.isNotFound) return null;
+      rethrow;
+    }
+  }
+
   /// Asks a gallery for a car. NO PRICES travel: every figure on the resulting
   /// booking is computed and frozen server-side, because a client that could name
   /// a total could name a cheaper one.

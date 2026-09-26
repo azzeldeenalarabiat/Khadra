@@ -1411,6 +1411,116 @@ class AppLocalizationsAr extends AppLocalizations {
   String get refundReasonOther => 'استرداد';
 
   @override
+  String get paymentsTitle => 'المدفوعات';
+
+  @override
+  String get paymentsHistory => 'سجل المدفوعات';
+
+  @override
+  String get paymentsPaidOnline => 'المدفوع عبر الإنترنت';
+
+  @override
+  String get paymentsRefundDelayedTotal => 'استرداد متأخر ولا يزال مستحقًا';
+
+  @override
+  String get paymentsDueAtPickup => 'المستحق للمكتب عند الاستلام';
+
+  @override
+  String get paymentsCashRecordedPickup =>
+      'النقد الذي سجّله المكتب عند الاستلام';
+
+  @override
+  String get paymentsCashRecordedReturn =>
+      'النقد الذي سجّله المكتب عند الإرجاع';
+
+  @override
+  String get paymentsBalanceNotDue => 'لا يترتب على هذا الحجز أي مبلغ آخر.';
+
+  @override
+  String paymentsDepositHeld(String amount) {
+    return 'عربونك البالغ $amount محتجز حتى تستلم السيارة، وعندها يُحتسب من قيمة الإيجار.';
+  }
+
+  @override
+  String paymentsDepositAppliedToRental(String amount) {
+    return 'يُحتسب عربونك البالغ $amount من قيمة الإيجار.';
+  }
+
+  @override
+  String paymentsDepositInSettlementWindow(String amount, String date) {
+    return 'عربونك البالغ $amount محتجز حتى $date تحسّبًا لفتح نزاع.';
+  }
+
+  @override
+  String paymentsDepositUnderDispute(String amount) {
+    return 'عربونك البالغ $amount محتجز ما دام النزاع مفتوحًا.';
+  }
+
+  @override
+  String paymentsDepositSettledWithRental(String amount) {
+    return 'احتُسب عربونك البالغ $amount من قيمة الإيجار.';
+  }
+
+  @override
+  String get paymentsDepositReturnedWithPayment => 'يُسترد عربونك مع دفعتك.';
+
+  @override
+  String paymentsDepositHeldUntilWindowCloses(String amount, String date) {
+    return 'يُعاد إليك عربونك البالغ $amount بعد $date، ما لم يُفتح نزاع قبل ذلك.';
+  }
+
+  @override
+  String paymentsDepositHeldForAssessedPenalty(String amount, String date) {
+    return 'عربونك البالغ $amount محتجز لأنّ غرامةً قُدِّرت على العميل. يمكن فتح نزاع حتى $date.';
+  }
+
+  @override
+  String get paymentsDepositHeldUnresolved =>
+      'لا يزال عربونك محتجزًا لأنّ غرامةً قُدِّرت على العميل ولم يُفتح أيّ نزاع. التسوية النهائية لا تزال معلّقة.';
+
+  @override
+  String paymentsDepositReleased(String amount) {
+    return 'أُعيد إليك عربونك البالغ $amount عند انتهاء مهلة النزاع.';
+  }
+
+  @override
+  String paymentsDepositDecidedByDispute(String share, String amount) {
+    return 'قرّر نزاع أن يُسترد لك $share من عربونك البالغ $amount.';
+  }
+
+  @override
+  String paymentsDepositDecidedByDisputeNothing(String amount) {
+    return 'قرّر نزاع مصير عربونك البالغ $amount، ولا يُسترد لك منه شيء.';
+  }
+
+  @override
+  String get paymentsKindDeposit => 'دفعة العربون';
+
+  @override
+  String get paymentsKindFullPayment => 'الدفع الكامل';
+
+  @override
+  String get paymentsKindOrphaned => 'دفعة لم تُحتسب على الحجز';
+
+  @override
+  String get paymentsKindOther => 'دفعة';
+
+  @override
+  String paymentsIncludesFee(String amount) {
+    return 'تشمل رسوم معالجة البطاقة بقيمة $amount';
+  }
+
+  @override
+  String get paymentsPartlyRefunded => 'استُرد جزئيًا';
+
+  @override
+  String get paymentsOrphanNote =>
+      'تعذّر احتساب هذه الدفعة على حجزك، لذلك يُسترد لك كامل مبلغها.';
+
+  @override
+  String get paymentsReviewing => 'تراجع خضرا المدفوعات على هذا الحجز.';
+
+  @override
   String cancelRefundAboveDeposit(String amount) {
     return 'سيُعاد إليك $amount إلى وسيلة الدفع الأصلية: كل ما دفعته فوق العربون. سنبدأ عملية الاسترداد فورًا، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
   }

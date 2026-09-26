@@ -224,63 +224,26 @@
       </ol>
     </section>
 
-    <!-- Money: the price frozen on the booking, never today's -->
+    <!-- Money: the price frozen on the booking, never today's. What was paid and what went back is the
+         Payments section's, read from the server's financial state (payments Phase 4). -->
     <section class="card card--pad" aria-labelledby="payment-title">
-      <h2 id="payment-title" class="card__title">{{ i18n.t('booking.payment') }}</h2>
+      <h2 id="payment-title" class="card__title">{{ i18n.t('booking.rentalCost') }}</h2>
       <dl class="lines">
         <div><dt>{{ format.money(b.pricing.dailyRate) }} × {{ i18n.t('booking.days', { count: b.pricing.days }) }}</dt><dd>{{ format.money(b.pricing.rentalTotal) }}</dd></div>
         @if (b.pricing.deliveryFee.amount > 0) {
           <div><dt>{{ i18n.t('quote.deliveryFee') }}</dt><dd>{{ format.money(b.pricing.deliveryFee) }}</dd></div>
         }
         <div class="lines__total"><dt>{{ i18n.t('quote.total') }}</dt><dd>{{ format.money(b.pricing.totalPrice) }}</dd></div>
-        @if (b.isPaidInFull) {
-          <!-- Paid in full (owner, 2026-09-25): the payment's own type and what it charged, never "Deposit". -->
-          <div><dt>{{ i18n.t('booking.paymentType') }}</dt>
-            <dd>{{ i18n.t(paidWithFullPayment(b) ? 'booking.paymentTypeFull' : 'booking.paymentTypeDeposit') }}
-              @if (!hasRefunds(b)) { <span class="badge badge--ok">{{ i18n.t('booking.paidInFull') }}</span> }</dd></div>
-          <div><dt>{{ i18n.t('booking.amountCharged') }}</dt>
-            <dd>{{ format.money(amountCharged(b)) }}
-              <!-- An older API names only the deposit's refund; a newer one lists every refund below. -->
-              @if (!b.refunds && b.depositRefund; as refund) { <span class="badge {{ refundTone(refund) }}">{{ refundLabel(refund) }}</span> }</dd></div>
-          @if (b.confirmingPayment; as payment) {
-            @if (payment.processingFee.amount > 0) {
-              <div><dt>{{ i18n.t('pay.summaryFee') }}</dt><dd>{{ format.money(payment.processingFee) }}</dd></div>
-            }
-          }
-          <div><dt>{{ i18n.t('booking.remainingBalance') }}</dt><dd>{{ format.money(b.pricing.balanceDue) }}</dd></div>
-        } @else {
-          <div><dt>{{ i18n.t('quote.deposit', { percent: percent(b.pricing.depositPercent) }) }}</dt>
-            <dd>{{ format.money(b.pricing.depositAmount) }}
-              @if (b.depositRefund; as refund) {
-                <span class="badge {{ refundTone(refund) }}">{{ refundLabel(refund) }}</span>
-              } @else if (b.depositPaid) {
-                <span class="badge badge--ok">{{ i18n.t('booking.depositPaid') }}</span>
-              }</dd></div>
-          <div><dt>{{ i18n.t('quote.balance') }}</dt><dd>{{ format.money(b.pricing.balanceDue) }}</dd></div>
+        <!-- A booking paid in full is never worded as a deposit (owner, 2026-09-25). -->
+        @if (!b.isPaidInFull) {
+          <div><dt>{{ i18n.t('quote.deposit', { percent: percent(b.pricing.depositPercent) }) }}</dt><dd>{{ format.money(b.pricing.depositAmount) }}</dd></div>
         }
         <div><dt>{{ i18n.t('quote.securityDeposit') }}</dt><dd>{{ format.money(b.pricing.securityDeposit) }}</dd></div>
       </dl>
       <p class="faint small">{{ i18n.t('booking.termsFrozen') }}</p>
     </section>
 
-    <!-- Refunds: every one, with why, how much and where it is (Phase 3). The totals are the server's. -->
-    @if (b.refunds?.length) {
-      <section class="card card--pad" aria-labelledby="refunds-title">
-        <h2 id="refunds-title" class="card__title">{{ i18n.t('booking.refunds') }}</h2>
-        <dl class="lines">
-          @for (refund of b.refunds; track refund.refundId) {
-            <div><dt>{{ refundReason(refund) }} <span class="faint small">· {{ refundDate(refund) }}</span></dt>
-              <dd>{{ format.money(refund.amount) }} <span class="badge {{ refundTone(refund) }}">{{ refundLabel(refund) }}</span></dd></div>
-          }
-          @if (b.refundedAmount && b.refundedAmount.amount > 0) {
-            <div><dt>{{ i18n.t('booking.refundedTotal') }}</dt><dd>{{ format.money(b.refundedAmount) }}</dd></div>
-          }
-          @if (b.refundOutstandingAmount && b.refundOutstandingAmount.amount > 0) {
-            <div><dt>{{ i18n.t('booking.refundOutstanding') }}</dt><dd>{{ format.money(b.refundOutstandingAmount) }}</dd></div>
-          }
-        </dl>
-      </section>
-    }
+    <kh-booking-payments [bookingId]="b.bookingId" [version]="paymentsVersion()" />
 
     <!-- Collection and return -->
     <section class="card card--pad" aria-labelledby="handover-when-title">

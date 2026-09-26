@@ -253,6 +253,24 @@ class FakeApi extends KhadraApi {
     return found;
   }
 
+  /// The financial state the booking's financials endpoint answers with
+  /// (payments Phase 4). Null by default: an API without Phase 4, whose 404 the
+  /// app reads as "fall back to what the booking carries".
+  BookingFinancials? financialsById;
+
+  /// When set, the financials endpoint fails with it (a server error, not a 404).
+  ApiFailure? financialsFailure;
+
+  int financialsReads = 0;
+
+  @override
+  Future<BookingFinancials?> bookingFinancials(String bookingId) async {
+    financialsReads++;
+    final failure = financialsFailure;
+    if (failure != null) throw failure;
+    return financialsById;
+  }
+
   /// Every cancellation this phone sent: (reason code, details, expected refund).
   final List<(String, String?, num?)> cancellations = [];
 

@@ -14,7 +14,7 @@ deliver is written down so it cannot be dropped. The rules already in force are 
 | 1 | Khadra's commission frozen on each booking, at 20% of one daily rate for new bookings | done (`9e3db1d`) |
 | 2 | Payment purpose and processing fee, the amount paid online, deposit or full payment on the website and in the app | done (`43f4128`, `e04a55f`, `de384c5`) |
 | 3 | Refunds generalised: what a paid booking owes back when it ends before pickup, the clean-close release, named refund events | done (`82a66e7`); items 169/170 (`b7c9db0`, `43b3707`) |
-| 4a | One server calculator of a booking's financial state; `GET /bookings/{id}/financials` and its admin twin; the "Payments" section on the website and in app 1.3.0 | approved 2026-09-26 |
+| 4a | One server calculator of a booking's financial state; `GET /bookings/{id}/financials` and its admin twin; the "Payments" section on the website and in app 1.3.0 | done (2026-09-26) |
 | 4b | The consoles: the office's Financial section and the admin's Money section from the calculator; the admin Payments and Refunds screens; the dashboard's money panel | approved 2026-09-26 |
 | 5 | Issued documents: payment receipts, refund receipts and booking statement versions, with numbering and immutable snapshots | not started |
 | 6 | PDF rendering and secure download | not started (QuestPDF only if its Community licence applies) |
@@ -70,6 +70,11 @@ deliver is written down so it cannot be dropped. The rules already in force are 
      النهائية لا تزال معلّقة."
 3. **Dispute shares by reader:** the customer sees only their own share; the rental office sees its
    own share and any charge assessed to it; the administrator sees every share.
+   - What follows from it in 4a: the office is not shown the refund that carries the customer's
+     share, so the office's refund badge is read from the refunds it IS shown, and reads "refunded in
+     full" only when those return all the booking money the payment applied. A badge judged by the
+     whole payment would tell an office that got nothing from a dispute that the customer got
+     everything.
 4. **Phase 5 refund storage:** each refund's split into booking money and processing fee is stored in
    the Phase 5 persistence model, in addition to being frozen into the issued document.
 5. **Two commits:** 4a (backend and the customer surfaces), then 4b (the consoles).

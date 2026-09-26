@@ -1347,6 +1347,116 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refundReasonOther => 'Refund';
 
   @override
+  String get paymentsTitle => 'Payments';
+
+  @override
+  String get paymentsHistory => 'Payment history';
+
+  @override
+  String get paymentsPaidOnline => 'Paid online';
+
+  @override
+  String get paymentsRefundDelayedTotal => 'Refund delayed — still owed';
+
+  @override
+  String get paymentsDueAtPickup => 'Due to the office at pickup';
+
+  @override
+  String get paymentsCashRecordedPickup => 'Cash the office recorded at pickup';
+
+  @override
+  String get paymentsCashRecordedReturn => 'Cash the office recorded at return';
+
+  @override
+  String get paymentsBalanceNotDue => 'Nothing further is due on this booking.';
+
+  @override
+  String paymentsDepositHeld(String amount) {
+    return 'Your deposit of $amount is held until you collect the car, when it counts towards the rental.';
+  }
+
+  @override
+  String paymentsDepositAppliedToRental(String amount) {
+    return 'Your deposit of $amount counts towards the rental.';
+  }
+
+  @override
+  String paymentsDepositInSettlementWindow(String amount, String date) {
+    return 'Your deposit of $amount is held until $date, in case a dispute is opened.';
+  }
+
+  @override
+  String paymentsDepositUnderDispute(String amount) {
+    return 'Your deposit of $amount is held while the dispute is open.';
+  }
+
+  @override
+  String paymentsDepositSettledWithRental(String amount) {
+    return 'Your deposit of $amount went towards the rental.';
+  }
+
+  @override
+  String get paymentsDepositReturnedWithPayment =>
+      'Your deposit is refunded with your payment.';
+
+  @override
+  String paymentsDepositHeldUntilWindowCloses(String amount, String date) {
+    return 'Your deposit of $amount is returned to you after $date, unless a dispute is opened before then.';
+  }
+
+  @override
+  String paymentsDepositHeldForAssessedPenalty(String amount, String date) {
+    return 'Your deposit of $amount is held because a customer penalty was assessed. A dispute can be opened until $date.';
+  }
+
+  @override
+  String get paymentsDepositHeldUnresolved =>
+      'Your deposit remains held because a customer penalty was assessed and no dispute was opened. Final settlement is still pending.';
+
+  @override
+  String paymentsDepositReleased(String amount) {
+    return 'Your deposit of $amount was returned to you when the dispute window closed.';
+  }
+
+  @override
+  String paymentsDepositDecidedByDispute(String share, String amount) {
+    return 'A dispute decided that $share of your $amount deposit is refunded to you.';
+  }
+
+  @override
+  String paymentsDepositDecidedByDisputeNothing(String amount) {
+    return 'A dispute decided your $amount deposit; none of it is refunded to you.';
+  }
+
+  @override
+  String get paymentsKindDeposit => 'Deposit payment';
+
+  @override
+  String get paymentsKindFullPayment => 'Full payment';
+
+  @override
+  String get paymentsKindOrphaned => 'Payment not applied to the booking';
+
+  @override
+  String get paymentsKindOther => 'Payment';
+
+  @override
+  String paymentsIncludesFee(String amount) {
+    return 'Includes a card processing fee of $amount';
+  }
+
+  @override
+  String get paymentsPartlyRefunded => 'Partly refunded';
+
+  @override
+  String get paymentsOrphanNote =>
+      'This payment could not be applied to your booking, so all of it is refunded to you.';
+
+  @override
+  String get paymentsReviewing =>
+      'Khadra is reviewing the payments on this booking.';
+
+  @override
   String cancelRefundAboveDeposit(String amount) {
     return 'You will get $amount back to your original payment method: everything you paid above the deposit. We will initiate the refund immediately, but your bank may take additional time to show it.';
   }

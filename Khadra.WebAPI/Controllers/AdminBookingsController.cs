@@ -3,6 +3,7 @@ using Khadra.Application.Bookings.AdminBookings;
 using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -70,6 +71,20 @@ public sealed class AdminBookingsController : ApiControllerBase
     public async Task<ActionResult> Get(Guid bookingId, CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(new GetAnyBookingQuery(Id.From(bookingId)), cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// Any booking's financial state as the administrator sees it (payments Phase 4): every payment
+    /// attempt, every refund with its provider reference, every dispute share, the commission, and
+    /// whether the records contradict one another.
+    /// </summary>
+    [HttpGet("{bookingId:guid}/financials")]
+    [ProducesResponseType<BookingFinancialsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetFinancials(Guid bookingId, CancellationToken cancellationToken)
+    {
+        var result = await Mediator.Send(new GetAnyBookingFinancialsQuery(Id.From(bookingId)), cancellationToken);
         return FromResult(result);
     }
 

@@ -12,6 +12,32 @@ Entries are newest first.
 
 ---
 
+## 2026-09-24 to 2026-09-26 — Payments: the commission, two ways to pay, refunds, and one financial state
+
+**Supersedes:** §2.1 on what the commission is a percentage of; §5.3 on what the customer pays online
+after approval; and what §5.5 implies a cancelled or missed PAID booking returns. The decisions, with
+their dates, are in `docs/payments-programme.md`; this entry states the result.
+
+- **Commission** is 20% of ONE day's rental price, frozen on each booking with the rule that produced it.
+  Bookings made before 2026-09-24 keep the whole-rental figure they always showed.
+- **Two ways to pay** after approval, inside the unchanged two-hour window: the mandatory deposit (20% of
+  the rental total, delivery excluded) or the whole booking total online. Either confirms the booking; the
+  deposit is the minimum. An optional card processing fee on the full payment exists as a configurable
+  capability, off by default and not to be enabled in Production until approved.
+- **The free-cancellation window runs from payment**, not from approval.
+- **What a paid booking returns when it ends before pickup:** a customer's free cancellation and an
+  administrator's cancellation return the whole payment; any other paid ending returns everything paid
+  above the deposit. The deposit itself goes back when the booking's dispute window closes cleanly;
+  penalties and disputes stay deposit-based, and a later dispute splits only what earlier ones left.
+- **One financial state.** Every screen — the customer's website and app, the office's console, the
+  administrator's — reads a booking's money from one server calculator (payments Phase 4). No client
+  computes a figure.
+- **Still open:** no real money moves until a merchant account exists (pre-launch item 76) and the office
+  payables ledger records what Khadra holds for offices (item 162); a deposit held for an undisputed
+  customer penalty (item 164).
+
+---
+
 ## 2026-09-08 — The customer app, and four things the platform owed it
 
 **Supersedes:** nothing outright. It closes gaps §5.5, §5.6 and §4.1 described and nothing implemented.

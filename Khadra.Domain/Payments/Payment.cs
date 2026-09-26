@@ -498,6 +498,52 @@ public sealed class Payment : AggregateRoot
         return applied.IsGreaterThan(deposit) ? Money.Create(deposit.Amount, deposit.CurrencyCode) : applied;
     }
 
+    /// <summary>
+    /// The part of <paramref name="refund"/> that returns this payment's processing fee, by the rule
+    /// the refund was recorded under — never a figure a screen works out.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The fee goes back ONCE and only with the money it rode on: whole with a whole-payment refund
+    /// (free or administrator's cancellation) and with the refund of everything above the deposit, when
+    /// the payment froze it as refundable; never with the deposit's own release or a dispute's share,
+    /// which are booking money alone (<see cref="RefundAboveDeposit"/>,
+    /// <see cref="WholePaymentRefundAmount"/>, <see cref="HeldDepositRefundAmount"/>). An orphaned
+    /// capture goes back whole, so it carries the fee the attempt asked for, up to what it returns.
+    /// </para>
+    /// <para>
+    /// Every input is frozen on the payment (the fee and whether it is refundable), so the split can
+    /// never change after the refund is recorded. Phase 5 stores it on the refund (owner, 2026-09-26);
+    /// until then this is where it is read.
+    /// </para>
+    /// </remarks>
+    public Money FeeInside(Refund refund)
+    {
+        ArgumentNullException.ThrowIfNull(refund);
+        if (refund.PaymentId != Id)
+            throw new DomainException($"Refund {refund.Id} does not belong to payment {Id}.");
+
+        var currency = refund.Amount.CurrencyCode;
+        // A refund in another currency can only be an orphaned capture the provider took in the wrong
+        // one; the fee was asked for in this payment's currency, so none of it is inside.
+        if (_processingFee == 0m || !string.Equals(currency, Amount.CurrencyCode, StringComparison.Ordinal))
+            return Money.ZeroIn(currency);
+
+        var fee = refund.Reason == RefundReason.OrphanedCapture
+            ? _processingFee
+            : refund.Reason.ReturnsWholePayment || refund.Reason == RefundReason.EndedBeforePickup
+                ? RefundableFee.Amount
+                : 0m;
+        return Money.Create(Math.Min(fee, refund.Amount.Amount), currency);
+    }
+
+    /// <summary>What <paramref name="refund"/> returns of the booking's own money: its amount less the fee inside it.</summary>
+    public Money BookingMoneyIn(Refund refund)
+    {
+        ArgumentNullException.ThrowIfNull(refund);
+        return refund.Amount.Subtract(FeeInside(refund));
+    }
+
     /// <summary>The one way money is promised back on an applied payment: never beyond what was taken.</summary>
     private Result<Refund, Error> AddRefund(Money amount, RefundReason reason, Id? disputeTicketId, DateTimeOffset now)
     {
