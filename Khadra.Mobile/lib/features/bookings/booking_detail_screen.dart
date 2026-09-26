@@ -1051,20 +1051,25 @@ class _VehicleCard extends ConsumerWidget {
                             style: const TextStyle(
                                 color: KhadraColors.neutral600, fontSize: 12),
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${l10n.bookingPlate}: ',
-                                style: const TextStyle(
-                                    color: KhadraColors.neutral600, fontSize: 12),
+                          // One run that may wrap. A Row of the label and the
+                          // plate could not, and overflowed beside the photo at
+                          // 360 and 375 in Arabic. The plate stays one isolated
+                          // Latin unit inside it.
+                          Text.rich(
+                            TextSpan(children: [
+                              TextSpan(text: '${l10n.bookingPlate}: '),
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: LatinRun(
+                                  vehicle.plateNumber,
+                                  style: const TextStyle(
+                                      color: KhadraColors.neutral600, fontSize: 12),
+                                ),
                               ),
-                              LatinRun(
-                                vehicle.plateNumber,
-                                style: const TextStyle(
-                                    color: KhadraColors.neutral600, fontSize: 12),
-                              ),
-                            ],
+                            ]),
+                            style: const TextStyle(
+                                color: KhadraColors.neutral600, fontSize: 12),
                           ),
                         ],
                       ),

@@ -133,8 +133,8 @@ void main() {
       });
 
   Future<FakeApi> pump(WidgetTester tester, Booking booking,
-      {Locale locale = const Locale('en'), FakeApi? api}) async {
-    tester.view.physicalSize = const Size(412, 915);
+      {Locale locale = const Locale('en'), FakeApi? api, double width = 412}) async {
+    tester.view.physicalSize = Size(width, 915);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -201,6 +201,27 @@ void main() {
   // One test per state PER LANGUAGE, not a loop inside one body: two screens in
   // one test would unmount the first tree mid-body and leave Riverpod's disposal
   // timer queued behind the assertions.
+  // The card's plate line was a Row that could not wrap, and at 360 and 375 in
+  // Arabic it overflowed beside the car's photo. Every state was only ever
+  // rendered at 412, which is why nothing caught it.
+  group('the booking card fits a narrow phone', () {
+    for (final locale in [const Locale('en'), const Locale('ar')]) {
+      for (final width in [360.0, 375.0]) {
+        screenTest('at ${width.toInt()} in ${locale.languageCode}', (tester) async {
+          await pump(
+            tester,
+            bookingOf(status: 'Confirmed', history: pathTo('Confirmed'), depositPaid: true),
+            locale: locale,
+            width: width,
+          );
+
+          expect(tester.takeException(), isNull);
+          expect(find.textContaining('12-34567', findRichText: true), findsWidgets);
+        });
+      }
+    }
+  });
+
   group('every state renders', () {
     for (final locale in [const Locale('en'), const Locale('ar')]) {
       final tag = locale.languageCode;
