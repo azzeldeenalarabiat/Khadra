@@ -4424,18 +4424,20 @@ only PART of its basis today; whether one may is item 170.
 
 ### 170. A dispute resolution must decide the whole deposit it can split
 
-**Status:** open · **Raised:** 2026-09-26 (while closing item 169) · **Owner decision**
+**Status:** closed · **Raised:** 2026-09-26 (while closing item 169) · **Settled:** 2026-09-26, owner — kept as it is
 
 `DepositDisposition.Create` insists the three legs add up to EXACTLY the basis, so a resolution always
-decides all of what its ticket can split, and after one resolution every later ticket's basis is
-zero. The owner's example for item 169 — a first dispute resolving only 5.000 of an 18.000 deposit,
-leaving 13.000 for a second — therefore cannot happen yet, although the calculator and the resolve
-handler already treat such a decision correctly (tests pin it). Allowing it is a money decision: the
-undecided remainder would stay held with NO ticket on it, the clean-close release is blocked by any
-resolved ticket, and no dispute can be opened after the window — the same stranding as item 164. **To
-close, the owner chooses:** keep "a resolution decides its whole basis" (no change), or allow partial
-decisions with an explicit fourth leg (`LeftHeld`) and a rule for where that remainder goes when the
-window closes — which belongs with item 164 and the office payables ledger (item 162, payments Phase 8).
+decides all of what its ticket can split, and after one resolution every later ticket's basis is zero.
+The question was whether a resolution may decide only PART of it and leave the rest held for later.
+
+**Decision (owner, 2026-09-26):** no. Every resolution fully allocates the amount currently available
+to its dispute — customer share + office share + platform share = the whole available held amount —
+and how it is split stays the administrator's choice: for an 18.000 deposit, for example, 13.000 back
+to the customer and 5.000 to the office. A partial, unresolved decision is not needed and is not built.
+Were it ever wanted, it would need an explicit held leg and a rule for where the remainder goes when
+the window closes, because an undecided remainder would otherwise be stranded exactly as in item 164.
+The calculator and the resolve handler already treat an earlier partial decision correctly (tests pin
+it), so nothing here would have to change first.
 
 ### 171. A later dispute's basis leans on ticket opening times, and dispute_tickets has no plain booking index
 
