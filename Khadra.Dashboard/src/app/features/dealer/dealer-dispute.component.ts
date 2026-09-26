@@ -22,6 +22,7 @@ import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { Dispute, DisputeResolution, DisputeStatement } from '../../core/models/disputes.api';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { decidedEarlier, earlierDecisionNotice } from '../disputes/earlier-decisions.presenter';
 
 /**
  * A dispute from the dealer's side (spec 3.3).
@@ -83,6 +84,20 @@ export class DealerDisputeComponent {
     if (d.status === 'Resolved') return 'ok';
     if (d.status === 'Withdrawn') return 'dim';
     return d.isOverdue ? 'bad' : 'warn';
+  });
+
+  /** What earlier disputes on this booking already decided (item 169): the server's figure, or null. */
+  protected readonly decidedEarlier = computed(() => {
+    const d = this.dispute();
+    return d ? decidedEarlier(d) : null;
+  });
+
+  /** On a live ticket, the sentence saying so. */
+  protected readonly earlierNotice = computed(() => {
+    const d = this.dispute();
+    return d
+      ? earlierDecisionNotice(d, this.t, (value) => this.formats.money(value.amount, value.currency))
+      : null;
   });
 
   protected readonly openedByMe = computed(

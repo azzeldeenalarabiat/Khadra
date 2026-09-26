@@ -849,6 +849,11 @@ export const AR: Record<TranslationKey, Message> = {
   'dispute.recordedNotPaid': 'هذه هي التسوية التي سجّلتها خضرا. المبالغ المعروضة ليست دفعة وصلتك بالفعل.',
   'dispute.closedAt': 'أُغلق {date}',
   'dispute.inApp': 'لإضافة إفادة أو سحب النزاع، استخدم تطبيق خضرا.',
+  'dispute.decidedEarlier': 'حُسم في نزاعات سابقة',
+  'dispute.earlierDecidedPart':
+    'قرّر نزاع سابق على هذا الحجز مصير {decided} من عربونه البالغ {onBooking}، فلا يملك هذا النزاع إلا المتبقي منه: {held}.',
+  'dispute.earlierDecidedAll':
+    'قرّر نزاع سابق على هذا الحجز مصير عربونه كاملًا البالغ {onBooking}، فلم يبقَ منه ما يوزّعه هذا النزاع.',
   'dispute.view': 'عرض النزاع',
   'dispute.notFoundTitle': 'النزاع غير موجود',
   'dispute.notFoundText': 'قد يكون تابعًا لحساب آخر.',

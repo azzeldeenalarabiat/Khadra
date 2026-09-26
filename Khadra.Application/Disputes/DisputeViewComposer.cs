@@ -11,7 +11,9 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Payments;
+using Microsoft.Extensions.Logging;
 
 namespace Khadra.Application.Disputes;
 
@@ -22,12 +24,14 @@ namespace Khadra.Application.Disputes;
 /// Evidence links are minted here, per request, and expire: spec 7 keeps evidence private, and a
 /// stored URL would be a credential sitting in a database.
 /// </summary>
-public sealed class DisputeViewComposer(
+public sealed partial class DisputeViewComposer(
     IBookingRepository bookings,
     IBookingReader bookingReader,
     IDisputeAdminReader names,
     IDocumentLinkSigner signer,
-    IClock clock)
+    IDisputeTicketRepository tickets,
+    IClock clock,
+    ILogger<DisputeViewComposer> logger)
 {
     private const string ClosedAccountName = "Account closed";
 
@@ -86,6 +90,8 @@ public sealed class DisputeViewComposer(
                     .ToList()))
             .ToList();
 
+        var basis = await BasisAsync(ticket, booking, context, cancellationToken);
+
         return new DisputeDto(
             ticket.Id.Value,
             ticket.BookingId.Value,
@@ -110,11 +116,51 @@ public sealed class DisputeViewComposer(
                     NameOf(resolved.ResolvedByAdminId),
                     Closed(resolved.ResolvedByAdminId))
                 : null,
-            MoneyDto.From(BookingDisputeSettlement.DepositHeldFor(
-                booking,
-                (context.Refunds ?? []).Any(refund => refund.Reason == RefundReason.DisputeWindowClosed.Name))),
+            basis.Held,
             viewer == BookingParty.Customer
                 ? BookingDto.From(booking, context, now).ForCustomer()
-                : BookingDto.From(booking, context, now));
+                : BookingDto.From(booking, context, now),
+            basis.OnBooking,
+            basis.DecidedEarlier);
     }
+
+    /// <summary>
+    /// The three deposit figures a ticket shows, all from <see cref="DisputedDeposit"/>: a resolved
+    /// ticket keeps the basis it was decided against, never a recomputed one.
+    /// </summary>
+    private async Task<(MoneyDto Held, MoneyDto? OnBooking, MoneyDto? DecidedEarlier)> BasisAsync(
+        DisputeTicket ticket,
+        Booking booking,
+        BookingContext context,
+        CancellationToken cancellationToken)
+    {
+        var released = (context.Refunds ?? []).Any(refund => refund.Reason == RefundReason.DisputeWindowClosed.Name);
+        var basis = DisputedDeposit.For(
+            ticket,
+            booking,
+            released,
+            await tickets.ListResolvedForBookingAsync(booking.Id, cancellationToken));
+
+        if (basis.IsFailure)
+        {
+            // Never a 500 on a read, and never a figure the server knows is wrong: the handler refuses
+            // to split, this says why somebody must look, and the two explaining figures are left out
+            // (every client reads their absence as "nothing to explain"). depositHeld stays zero for a
+            // live ticket — non-nullable in the contract, and the only split the handler would accept.
+            LogOverAllocated(logger, ticket.Id.Value, booking.Id.Value);
+            var nothing = MoneyDto.From(Money.ZeroIn(booking.Pricing.CurrencyCode));
+            return (ticket.Resolution is { } decided ? MoneyDto.From(decided.Deposit.DepositHeld) : nothing, null, null);
+        }
+
+        var held = ticket.Resolution is { } resolution
+            ? MoneyDto.From(resolution.Deposit.DepositHeld)
+            : MoneyDto.From(basis.Value.Basis);
+        return (held, MoneyDto.From(basis.Value.DepositOnBooking), MoneyDto.From(basis.Value.DecidedByEarlierTickets));
+    }
+
+    [LoggerMessage(
+        2400,
+        LogLevel.Error,
+        "Dispute {TicketId}: earlier decisions on booking {BookingId} allocated more than its deposit. Nothing can be split until a human corrects it.")]
+    private static partial void LogOverAllocated(ILogger logger, Guid ticketId, Guid bookingId);
 }

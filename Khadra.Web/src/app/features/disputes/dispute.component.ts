@@ -9,6 +9,7 @@ import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { httpData } from '../../core/http/http-data';
+import { decidedEarlier, earlierDecisionNotice, readsAsWaived } from './earlier-decisions';
 
 /** `GET /api/v1/disputes/{id}` — only the fields this page shows. */
 interface Dispute {
@@ -35,6 +36,12 @@ interface Dispute {
     readonly resolvedAt: string;
   } | null;
   readonly booking: { readonly reference: string };
+  /** What this ticket can split; on a later ticket, what earlier disputes left (item 169). */
+  readonly depositHeld?: Money;
+  /** Added 2026-09-26; absent from an older API. */
+  readonly depositOnBooking?: Money;
+  /** What the booking's earlier resolved disputes decided. Added 2026-09-26; absent from an older API. */
+  readonly decidedByEarlierTickets?: Money;
 }
 
 const STATUSES = ['Open', 'UnderReview', 'Resolved', 'Withdrawn'];
@@ -64,6 +71,26 @@ export class DisputeComponent {
   protected readonly notFound = computed(
     () => !/^[0-9a-f-]{36}$/i.test(this.ticketId()) || this.problem()?.status === 404 || this.problem()?.status === 403,
   );
+
+  /** On a live ticket, what earlier disputes on this booking already decided, in the server's figures. */
+  protected readonly earlierNotice = computed(() => {
+    const d = this.dispute.value();
+    return d
+      ? earlierDecisionNotice(d, (key, params) => this.i18n.t(key, params), (value) => this.format.money(value))
+      : null;
+  });
+
+  /** What earlier disputes on this booking decided, shown beside a later ticket's settlement. */
+  protected readonly earlierDecided = computed(() => {
+    const d = this.dispute.value();
+    return d ? decidedEarlier(d) : null;
+  });
+
+  /** "Nothing is owed by either side" — only where no earlier dispute makes that untrue. */
+  protected readonly waived = computed(() => {
+    const d = this.dispute.value();
+    return d ? readsAsWaived(d) : false;
+  });
 
   constructor() {
     const seo = inject(SeoService);

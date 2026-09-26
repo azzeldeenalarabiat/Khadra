@@ -2994,6 +2994,18 @@ export const EN = {
   'commission.percentOfOneDailyRate': '{percent} of one daily rate',
   'commission.percentOfRentalTotal': '{percent} of the rental total',
 
+  // Item 169 (owner, 2026-09-26): a later dispute on a booking splits only what earlier ones left.
+  // Every figure is the server's; the console chooses the sentence, never the amount.
+  'common.decidedByEarlierDisputes': 'Decided by earlier disputes',
+  'common.earlierDisputeDecidedPart':
+    'An earlier dispute on this booking already decided {decided} of its {onBooking} deposit, so this one can decide only what is left: {held}.',
+  'common.earlierDisputeDecidedAll':
+    'An earlier dispute on this booking already decided its whole {onBooking} deposit, so this one has nothing left to split.',
+  'disputeDetail.chargeOutsideRange':
+    'The charge to the office must stay inside the penalty range this booking assessed, counting what earlier disputes on it already charged.',
+  'disputeDetail.depositOverAllocated':
+    'Earlier decisions on this booking allocated more than its deposit. Nothing can be split until that is corrected.',
+
   'sandbox.title': 'Test payments',
   'sandbox.body':
     'This platform is running a sandbox payment provider. No card is charged and no money moves, so any booking confirmed here is not a real rental.',

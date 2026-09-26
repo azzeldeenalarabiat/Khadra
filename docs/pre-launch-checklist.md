@@ -4392,17 +4392,61 @@ window opens when the customer pays, with a dictionary test.
 
 ### 169. A resolved dispute does not stop a second ticket splitting the same deposit
 
-**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run; older than Phase 3) · **Owner decision**
+**Status:** closed · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run; older than Phase 3) · **Settled:** 2026-09-26, owner · **Built:** 2026-09-26
 
-Opening a dispute checks only that no ticket is LIVE (`RaiseDisputeHandlers`, `HasLiveTicketAsync`),
-and a resolution does not move a cancelled or no-show booking out of its window
-(`Booking.CloseAfterDisputeResolved` is a no-op for an ended booking). So after one ticket is
-resolved, either party can open another inside the window, and
-`BookingDisputeSettlement.DepositHeldFor` offers its resolution the WHOLE deposit again. The capture
-guard keeps the customer's refund legs within what was captured, but the platform and office legs are
-settled by hand with no guard, so the same deposit could be split twice. The clean-close release is
-not affected: a resolved ticket already blocks it. **To close, the owner chooses:** refuse a second
-ticket after a resolution — a request the installed app would see refused where it used to be
-accepted, which is a breaking contract change under CLAUDE.md — or keep accepting it and make every
-later ticket's deposit held read zero, the way a released deposit already does (no contract change;
-the recommended shape). Either way with a handler test for the second ticket.
+The owner's rule: a second dispute may still be OPENED inside the window, but it can only split the
+part of the deposit earlier disputes left unresolved, never the original deposit again, and the
+backend is the only source of that figure. Built as:
+
+- **One calculator**, `DisputedDeposit.For` (Application/Disputes): the deposit the booking holds for
+  disputes (`BookingDisputeSettlement.DepositHeldFor`, which already reads zero once the whole payment
+  went back or the window released it) less every leg — refund, platform, office — of the booking's
+  RESOLVED tickets opened BEFORE the one asked about (`IDisputeTicketRepository.ListResolvedForBookingAsync`).
+  A withdrawn ticket decided nothing. A resolved ticket keeps the basis it was decided against.
+- **The resolve handler** validates against it: the split must still add up to exactly the basis
+  (`dispute.disposition_unbalanced`), so after a resolution that decided the whole 18.000 a second
+  ticket can close only with an all-zero split and a note. Earlier decisions that already exceed the
+  deposit are refused (`dispute.deposit_over_allocated`, 409), never floored at zero.
+- **The office charge** is bounded across the booking's disputes too: every charge together stays
+  inside the booking's assessed range, the minimum binds only the first, and an office charged the
+  maximum cannot be charged again (`DisputeResolution.Create`, `alreadyChargedToDealer`).
+- **The view** states all three figures from the same calculator — `depositHeld` (what this ticket can
+  split), `depositOnBooking`, `decidedByEarlierTickets` — additively (docs/contracts). The admin form,
+  the office's dispute page, the customer website's dispute page and app 1.3.0 show them with an EN/AR
+  notice on a live ticket; no client subtracts. The app's resolution card also stopped calling the
+  dispute deposit the car's "Security deposit".
+
+No schema change and no migration. A second ticket is reachable only on a cancelled or no-show
+booking: resolving a dispute on a returned booking completes it, and a completed booking cannot be
+disputed. The owner's second example — a first dispute that resolves only 5.000 of 18.000 — is honoured
+by the calculator and the handler (a later ticket then splits 13.000), but no resolution can decide
+only PART of its basis today; whether one may is item 170.
+
+### 170. A dispute resolution must decide the whole deposit it can split
+
+**Status:** open · **Raised:** 2026-09-26 (while closing item 169) · **Owner decision**
+
+`DepositDisposition.Create` insists the three legs add up to EXACTLY the basis, so a resolution always
+decides all of what its ticket can split, and after one resolution every later ticket's basis is
+zero. The owner's example for item 169 — a first dispute resolving only 5.000 of an 18.000 deposit,
+leaving 13.000 for a second — therefore cannot happen yet, although the calculator and the resolve
+handler already treat such a decision correctly (tests pin it). Allowing it is a money decision: the
+undecided remainder would stay held with NO ticket on it, the clean-close release is blocked by any
+resolved ticket, and no dispute can be opened after the window — the same stranding as item 164. **To
+close, the owner chooses:** keep "a resolution decides its whole basis" (no change), or allow partial
+decisions with an explicit fourth leg (`LeftHeld`) and a rule for where that remainder goes when the
+window closes — which belongs with item 164 and the office payables ledger (item 162, payments Phase 8).
+
+### 171. A later dispute's basis leans on ticket opening times, and dispute_tickets has no plain booking index
+
+**Status:** open · **Raised:** 2026-09-26 (Fable advisor review of item 169) · **Low priority**
+
+`DisputedDeposit.For` counts the resolved tickets opened BEFORE the one asked about. That is exact
+while one API node writes `OpenedAt` (only one ticket per booking can be live, so a ticket always opens
+after the previous one closed), but a tie or a clock skew between nodes inside an open-resolve-open
+sequence would make neither ticket "earlier", and both would be offered the full deposit. Not reachable
+through a console at human speed. **To close:** make it timestamp-free — for a live ticket count every
+other resolved ticket; for a resolved one read what earlier disputes decided as its stored basis
+subtracted from the deposit on the booking — and add a plain index on `dispute_tickets.booking_id`
+(the only one today is the partial index for live rows), which `ListResolvedForBookingAsync` and
+`HasClaimOnDepositAsync` both scan without. The index needs a migration; the table is small.

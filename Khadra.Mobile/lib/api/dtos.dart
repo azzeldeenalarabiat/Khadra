@@ -2158,6 +2158,8 @@ class Dispute {
     required this.resolution,
     required this.depositHeld,
     required this.booking,
+    this.depositOnBooking,
+    this.decidedByEarlierTickets,
   });
 
   final String ticketId;
@@ -2173,10 +2175,20 @@ class Dispute {
   final List<DisputeStatement> statements;
   final DisputeResolution? resolution;
 
-  /// The deposit this ticket could split. Zero on a booking cancelled before the
-  /// deposit ever cleared, which is every booking on the platform today.
+  /// What THIS ticket can split, as the server states it: on a live ticket, the
+  /// deposit less what earlier disputes on the booking already decided (item
+  /// 169); on a resolved one, what it was decided against. The app never
+  /// subtracts to find it.
   final Money depositHeld;
   final Booking? booking;
+
+  /// The deposit held for disputes before any was resolved. ADDITIVE
+  /// (2026-09-26): an older API sends none, and that reads as null.
+  final Money? depositOnBooking;
+
+  /// What the booking's EARLIER resolved disputes already decided: zero on a
+  /// first dispute. ADDITIVE (2026-09-26); null from an older API.
+  final Money? decidedByEarlierTickets;
 
   bool get openedByMe => openedByParty == 'Customer';
 
@@ -2201,6 +2213,8 @@ class Dispute {
         booking: json['booking'] is Map<String, dynamic>
             ? Booking.fromJson(json['booking'] as Map<String, dynamic>)
             : null,
+        depositOnBooking: Money.maybe(json['depositOnBooking']),
+        decidedByEarlierTickets: Money.maybe(json['decidedByEarlierTickets']),
       );
 }
 

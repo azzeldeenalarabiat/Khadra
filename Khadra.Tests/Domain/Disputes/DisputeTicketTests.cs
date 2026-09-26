@@ -1,3 +1,4 @@
+using CSharpFunctionalExtensions;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
@@ -276,6 +277,55 @@ public sealed class DepositDispositionTests
         Assert.True(resolution.IsSuccess);
         Assert.Equal(amount, resolution.Value.DealerCharge!.Amount);
         Assert.False(resolution.Value.WaivesEverything);
+    }
+
+    // The range is the BOOKING's, not the ticket's (item 169): every charge on one booking together
+    // stays inside it, so a later dispute can only top up to the maximum, and the minimum binds the
+    // first charge only.
+    private static Result<DisputeResolution, Error> ChargeAfter(decimal alreadyCharged, decimal charge) =>
+        DisputeResolution.Create(
+            DepositDisposition.Create(Money.Jod(0m), Money.Jod(0m), Money.Jod(0m), Money.Jod(0m)).Value,
+            dealerCharge: Money.Jod(charge),
+            assessedPenalty: DealerPenalty(),
+            "A later dispute on the same booking.",
+            Id.New(),
+            Build.Now,
+            alreadyChargedToDealer: Money.Jod(alreadyCharged));
+
+    [Theory]
+    [InlineData(25, 25)]    // the minimum first, then up to the maximum
+    [InlineData(25, 1)]     // the floor bound only the first charge
+    [InlineData(40, 10)]
+    public void A_later_charge_may_top_up_to_the_maximum(decimal alreadyCharged, decimal charge) =>
+        Assert.True(ChargeAfter(alreadyCharged, charge).IsSuccess);
+
+    [Theory]
+    [InlineData(25, 25.001)]
+    [InlineData(40, 10.001)]
+    [InlineData(50, 0.001)] // charged the maximum already: nothing more, ever
+    public void A_later_charge_beyond_the_maximum_is_refused(decimal alreadyCharged, decimal charge) =>
+        Assert.Equal("dispute.dealer_charge_out_of_range", ChargeAfter(alreadyCharged, charge).Error.Code);
+
+    [Fact]
+    public void What_earlier_disputes_charged_counts_only_in_the_ranges_currency()
+    {
+        var resolution = DisputeResolution.Create(
+            DepositDisposition.Create(Money.Jod(0m), Money.Jod(0m), Money.Jod(0m), Money.Jod(0m)).Value,
+            dealerCharge: Money.Jod(10m),
+            assessedPenalty: DealerPenalty(),
+            "A later dispute on the same booking.",
+            Id.New(),
+            Build.Now,
+            alreadyChargedToDealer: Money.Create(25m, "USD"));
+
+        Assert.Equal("dispute.dealer_charge_currency_mismatch", resolution.Error.Code);
+    }
+
+    [Fact]
+    public void While_nothing_was_charged_the_minimum_still_binds()
+    {
+        Assert.Equal("dispute.dealer_charge_out_of_range", ChargeAfter(0m, 24m).Error.Code);
+        Assert.True(ChargeAfter(0m, 25m).IsSuccess);
     }
 
     [Fact]

@@ -18,6 +18,12 @@ public interface IDisputeTicketRepository
     /// </summary>
     Task<bool> HasClaimOnDepositAsync(Id bookingId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The booking's RESOLVED tickets, oldest first, read-only and without their statements: what
+    /// earlier decisions allocated is what a later dispute may no longer split (item 169).
+    /// </summary>
+    Task<IReadOnlyList<DisputeTicket>> ListResolvedForBookingAsync(Id bookingId, CancellationToken cancellationToken = default);
+
     // Feeds the Admin dashboard's open-dispute queue and the 48-hour SLA alert.
     Task<IReadOnlyList<DisputeTicket>> ListLiveAsync(CancellationToken cancellationToken = default);
 

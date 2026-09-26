@@ -40,6 +40,22 @@ internal sealed class DisputeTicketRepository(KhadraDbContext context) : IDisput
             .OrderBy(ticket => ticket.SlaDeadline)
             .ToListAsync(cancellationToken);
 
+    // Untracked, and without statements: a figure is read from each decision, and nothing here may be
+    // saved back. Summed in memory — one or two rows per booking — rather than inside the JSON column,
+    // whose functions differ between PostgreSQL and SQLite.
+    public async Task<IReadOnlyList<DisputeTicket>> ListResolvedForBookingAsync(
+        Id bookingId,
+        CancellationToken cancellationToken = default)
+    {
+        var resolved = DisputeStatus.Resolved;
+        return await context.DisputeTickets
+            .AsNoTracking()
+            .Where(ticket => ticket.BookingId == bookingId && ticket.Status == resolved)
+            .OrderBy(ticket => ticket.OpenedAt)
+            .ThenBy(ticket => ticket.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(DisputeTicket ticket, CancellationToken cancellationToken = default) =>
         await context.DisputeTickets.AddAsync(ticket, cancellationToken);
 

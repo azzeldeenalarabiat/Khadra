@@ -239,6 +239,13 @@
               </div>
             }
 
+            @if (earlierNotice(); as notice) {
+              <div class="note-box is-plain">
+                <kh-icon name="info" />
+                {{ notice }}
+              </div>
+            }
+
             <div class="stack stack-9">
               @for (option of presets(); track option.key) {
                 <label class="radio resolution-option" [class.is-on]="preset() === option.key">

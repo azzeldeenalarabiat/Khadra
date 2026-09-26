@@ -705,6 +705,12 @@ export const EN = {
   'dispute.recordedNotPaid': 'This is the settlement Khadra recorded. Amounts shown are not a payment that has already been made to you.',
   'dispute.closedAt': 'Closed {date}',
   'dispute.inApp': 'To add a statement or withdraw the dispute, use the Khadra app.',
+  // Item 169 (owner, 2026-09-26): the server's figures; the page picks the sentence, never the amount.
+  'dispute.decidedEarlier': 'Decided by earlier disputes',
+  'dispute.earlierDecidedPart':
+    'An earlier dispute on this booking already decided {decided} of its {onBooking} deposit, so this one can decide only what is left: {held}.',
+  'dispute.earlierDecidedAll':
+    'An earlier dispute on this booking already decided its whole {onBooking} deposit, so this one has nothing left to split.',
   'dispute.view': 'View the dispute',
   'dispute.notFoundTitle': 'Dispute not found',
   'dispute.notFoundText': 'It may belong to another account.',

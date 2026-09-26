@@ -22,6 +22,7 @@ import { TranslationKey } from '../../core/i18n/en';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { decidedEarlier, earlierDecisionNotice } from './earlier-decisions.presenter';
 
 /** The four shapes spec 3.3 names, each one a preset split of the deposit the booking holds. */
 type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
@@ -176,6 +177,14 @@ export class DisputeDetailComponent {
     roundTo(this.held() - this.allocated(), this.scale()),
   );
   protected readonly balanced = computed(() => this.remainder() === 0);
+  /** On a live ticket, what earlier disputes on this booking already decided (item 169), or null. */
+  protected readonly earlierNotice = computed(() => {
+    const d = this.dispute();
+    return d
+      ? earlierDecisionNotice(d, this.t, (value) => this.formats.money(value.amount, value.currency))
+      : null;
+  });
+
   protected readonly canResolve = computed(
     () =>
       !!this.dispute()?.isLive && this.balanced() && this.note().trim().length > 0 && !this.busy(),
@@ -219,6 +228,7 @@ export class DisputeDetailComponent {
     const money = (value: { readonly amount: number; readonly currency: string }): string =>
       this.formats.money(value.amount, value.currency);
     const penalty = b.penalty && !b.penalty.isNothingOwed ? b.penalty : null;
+    const earlier = decidedEarlier(d);
     return [
       {
         title: this.t('common.booking'),
@@ -266,6 +276,8 @@ export class DisputeDetailComponent {
         rows: [
           { k: this.t('myBooking.rentalTotal'), v: money(b.pricing.rentalTotal) },
           { k: this.t('common.depositHeld'), v: money(d.depositHeld) },
+          // Why a later ticket holds less (item 169): the server's figure, shown, never subtracted.
+          ...(earlier ? [{ k: this.t('common.decidedByEarlierDisputes'), v: money(earlier) }] : []),
           { k: this.t('vehicleDetail.securityDeposit'), v: money(b.pricing.securityDeposit) },
           {
             k: this.t('common.penaltyAssessed'),
@@ -596,6 +608,10 @@ function describeRefusal(
   switch (problem.code) {
     case 'dispute.disposition_unbalanced':
       return t('disputeDetail.theThreeAmountsMust');
+    case 'dispute.dealer_charge_out_of_range':
+      return t('disputeDetail.chargeOutsideRange');
+    case 'dispute.deposit_over_allocated':
+      return t('disputeDetail.depositOverAllocated');
     case 'dispute.resolution_note_required':
       return t('disputeDetail.aNoteIsRequired');
     case 'dispute.already_resolved':

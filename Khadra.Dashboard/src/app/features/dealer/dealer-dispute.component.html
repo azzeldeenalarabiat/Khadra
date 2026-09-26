@@ -64,6 +64,12 @@
             <span class="k-label">{{ t('common.depositHeld') }}</span
             ><span class="num">{{ r.depositHeld | money }} </span>
           </div>
+          @if (decidedEarlier(); as earlier) {
+            <div class="history-line">
+              <span class="k-label">{{ t('common.decidedByEarlierDisputes') }}</span
+              ><span class="num">{{ earlier | money }} </span>
+            </div>
+          }
           <div class="history-line">
             <span class="k-label">{{ t('common.refundedToTheCustomer') }}</span
             ><span class="num"
@@ -143,6 +149,12 @@
       <section class="sect">
         <div class="sect-h"><span class="sect-t">{{ t('dealerDispute.addToTheDispute') }}</span></div>
         <div class="sect-pad stack stack-10">
+          @if (earlierNotice(); as notice) {
+            <div class="note-box is-plain">
+              <kh-icon name="info" />
+              {{ notice }}
+            </div>
+          }
           @if (problemText(); as message) {
             <div class="banner s-bad" role="alert">
               <kh-icon name="warning-circle" class="banner-icon" />

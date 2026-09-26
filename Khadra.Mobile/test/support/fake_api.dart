@@ -243,6 +243,16 @@ class FakeApi extends KhadraApi {
     return found;
   }
 
+  /// The one dispute the detail endpoint answers with. Set by the dispute tests.
+  Dispute? disputeById;
+
+  @override
+  Future<Dispute> dispute(String ticketId) async {
+    final found = disputeById;
+    if (found == null) throw StateError("no dispute was staged for $ticketId");
+    return found;
+  }
+
   /// Every cancellation this phone sent: (reason code, details, expected refund).
   final List<(String, String?, num?)> cancellations = [];
 

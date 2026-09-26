@@ -39,7 +39,7 @@ public static class DisputeErrors
     public static readonly Error DealerChargeOutsideAssessment =
         Error.Validation(
             "dispute.dealer_charge_out_of_range",
-            "A dealer charge must fall inside the penalty range assessed on the booking.");
+            "A dealer charge must fall inside the penalty range assessed on the booking, counting what earlier disputes on it already charged.");
 
     // Also the answer for a ticket that exists but is not yours to see: a 403 would confirm the id.
     public static readonly Error NotFound =
@@ -66,6 +66,13 @@ public static class DisputeErrors
     // error. It must never be resolved as if the money were known.
     public static readonly Error BookingMissing =
         Error.Conflict("dispute.booking_missing", "The booking behind this dispute could not be loaded.");
+
+    // Earlier resolutions on the booking allocated more than it ever held (item 169). A data-integrity
+    // failure like BookingMissing: nothing is split against a figure that cannot be true.
+    public static readonly Error DepositOverAllocated =
+        Error.Conflict(
+            "dispute.deposit_over_allocated",
+            "Earlier decisions on this booking allocated more than its deposit. Nothing can be split until that is corrected.");
 
     public static readonly Error DealerChargeCurrencyMismatch =
         Error.Validation(

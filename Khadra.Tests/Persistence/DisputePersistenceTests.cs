@@ -2,6 +2,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 using Khadra.Infrastructure.Persistence;
+using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -121,6 +122,54 @@ public sealed class DisputePersistenceTests : IDisposable
         await second.SaveChangesAsync();
 
         Assert.Equal(2, await second.DisputeTickets.CountAsync(t => t.BookingId == bookingId));
+    }
+
+    [Fact]
+    public async Task The_resolved_tickets_of_a_booking_are_read_oldest_first_with_their_split()
+    {
+        // What a later dispute may still split is the deposit less these (item 169), so the query has
+        // to return exactly the booking's RESOLVED tickets, with every leg of the split read back.
+        var bookingId = Id.New();
+        DisputeTicket Resolved(int hours, decimal refund, decimal dealer)
+        {
+            var ticket = DisputeTicket.Open(bookingId, Id.New(), BookingParty.Customer, "Something went wrong.", TimeSpan.FromHours(48), Build.Now.AddHours(hours)).Value;
+            ticket.Resolve(DisputeResolution.Create(
+                DepositDisposition.Create(Money.Jod(refund + dealer), Money.Jod(refund), Money.Jod(0m), Money.Jod(dealer)).Value,
+                dealerCharge: null,
+                assessedPenalty: null,
+                "Decided.",
+                Id.New(),
+                Build.Now.AddHours(hours + 1)).Value);
+            return ticket;
+        }
+
+        var later = Resolved(6, 0m, 0m);
+        var earlier = Resolved(2, 13m, 5m);
+        var withdrawn = DisputeTicket.Open(bookingId, Id.New(), BookingParty.Customer, "Never mind.", TimeSpan.FromHours(48), Build.Now.AddHours(1)).Value;
+        withdrawn.Withdraw(withdrawn.OpenedByUserId, Build.Now.AddHours(1.5));
+        var live = DisputeTicket.Open(bookingId, Id.New(), BookingParty.Dealer, "Still open.", TimeSpan.FromHours(48), Build.Now.AddHours(8)).Value;
+        var otherBooking = OpenTicket(Id.New());
+        otherBooking.Resolve(DisputeResolution.Create(
+            DepositDisposition.RefundEverything(Money.Jod(18m)).Value, null, null, "Elsewhere.", Id.New(), Build.Now.AddHours(3)).Value);
+
+        await using (var context = NewContext())
+        {
+            context.DisputeTickets.AddRange(later, earlier, withdrawn, live, otherBooking);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var resolved = await new DisputeTicketRepository(reader).ListResolvedForBookingAsync(bookingId);
+
+        Assert.Equal([earlier.Id, later.Id], resolved.Select(ticket => ticket.Id));
+        var first = resolved[0].Resolution!.Deposit;
+        Assert.Equal(18m, first.DepositHeld.Amount);
+        Assert.Equal(13m, first.RefundToCustomer.Amount);
+        Assert.Equal(0m, first.RetainedByPlatform.Amount);
+        Assert.Equal(5m, first.TransferredToDealer.Amount);
+        Assert.Equal("JOD", first.TransferredToDealer.CurrencyCode);
+        // Read to be summed, never to be saved back.
+        Assert.Empty(reader.ChangeTracker.Entries<DisputeTicket>());
     }
 
     [Fact]

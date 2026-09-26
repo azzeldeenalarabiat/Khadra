@@ -563,6 +563,13 @@
   "disputeCannotOpen": "A dispute can only be opened while the settlement window is open.",
   "disputeExisting": "You already have a dispute open on this booking.",
   "disputeView": "View the dispute",
+  "disputeDepositHeld": "Deposit held",
+  "@disputeDepositHeld": { "description": "The booking deposit a dispute decision split. Not the car's security deposit." },
+  "disputeDecidedEarlier": "Decided by earlier disputes",
+  "disputeEarlierDecidedPart": "An earlier dispute on this booking already decided {decided} of its {onBooking} deposit, so this one can decide only what is left: {held}.",
+  "@disputeEarlierDecidedPart": { "placeholders": { "decided": { "type": "String" }, "onBooking": { "type": "String" }, "held": { "type": "String" } } },
+  "disputeEarlierDecidedAll": "An earlier dispute on this booking already decided its whole {onBooking} deposit, so this one has nothing left to split.",
+  "@disputeEarlierDecidedAll": { "placeholders": { "onBooking": { "type": "String" } } },
 
   "reviewTitle": "Rate this rental",
   "reviewQuestion": "How was {gallery}?",

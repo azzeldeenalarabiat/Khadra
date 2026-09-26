@@ -1508,6 +1508,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get disputeView => 'View the dispute';
 
   @override
+  String get disputeDepositHeld => 'Deposit held';
+
+  @override
+  String get disputeDecidedEarlier => 'Decided by earlier disputes';
+
+  @override
+  String disputeEarlierDecidedPart(
+    String decided,
+    String onBooking,
+    String held,
+  ) {
+    return 'An earlier dispute on this booking already decided $decided of its $onBooking deposit, so this one can decide only what is left: $held.';
+  }
+
+  @override
+  String disputeEarlierDecidedAll(String onBooking) {
+    return 'An earlier dispute on this booking already decided its whole $onBooking deposit, so this one has nothing left to split.';
+  }
+
+  @override
   String get reviewTitle => 'Rate this rental';
 
   @override

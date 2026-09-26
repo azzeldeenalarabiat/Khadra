@@ -21,7 +21,9 @@ using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications;
 using Khadra.Domain.Notifications.Repositories;
+using System.Text.Json;
 using Khadra.Tests.Support;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace Khadra.Tests.Application.Disputes;
@@ -90,7 +92,13 @@ public sealed class DisputeUseCaseTests
             return ticket;
         }
 
-        public DisputeViewComposer Composer() => new(Bookings, BookingReader, Names, Signer, Clock);
+        public DisputeViewComposer Composer() =>
+            new(Bookings, BookingReader, Names, Signer, Tickets, Clock, NullLogger<DisputeViewComposer>.Instance);
+
+        /// <summary>The booking's resolved tickets as the repository answers them, oldest first (item 169).</summary>
+        public void GivenResolved(Booking booking, params DisputeTicket[] resolved) =>
+            Tickets.ListResolvedForBookingAsync(booking.Id, Arg.Any<CancellationToken>())
+                .Returns(resolved.OrderBy(ticket => ticket.OpenedAt).ToList());
 
         public RaiseDisputeHandlers Raise() => new(
             Bookings, Tickets, new BookingPartyResolver(Dealers), Composer(), Uploads, Storage,
@@ -393,6 +401,323 @@ public sealed class DisputeUseCaseTests
         Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
         Assert.Equal(0m, ticket.Resolution!.Deposit.DepositHeld.Amount);
         Assert.DoesNotContain(payment.Refunds, refund => refund.Reason == RefundReason.DisputeResolution);
+    }
+
+    // ── A later dispute splits only what earlier ones left (owner, 2026-09-26; item 169) ─────────
+
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+
+    private static async Task<DisputeTicket> ResolvedFirst(Context context, Booking booking, decimal refund, decimal platform, decimal dealer)
+    {
+        var first = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(first.Id, refund, platform, dealer, null, "First decision."),
+            CancellationToken.None);
+        Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
+        context.GivenResolved(booking, first);
+        return first;
+    }
+
+    /// <summary>
+    /// The owner's first example: the first dispute decides the whole 18.000, so a second one may still
+    /// OPEN (the installed app sends that request) but has 0.000 to split, and only an all-zero decision
+    /// is accepted. The server says so in the view; no client subtracts.
+    /// </summary>
+    [Theory]
+    [InlineData(18, 0, 0)]  // "Refund the customer"
+    [InlineData(9, 0, 9)]   // an even split
+    [InlineData(13, 0, 5)]  // the "Partial" option: 5 to the office, the rest back
+    public async Task A_second_dispute_after_a_whole_split_can_open_but_splits_nothing(int refund, int platform, int dealer)
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        Assert.Equal(18m, booking.Pricing.DepositAmount.Amount);
+        await ResolvedFirst(context, booking, refund, platform, dealer);
+        context.Clock.UtcNow = Build.Now.AddHours(6);
+
+        var opened = await context.Raise().Handle(
+            new OpenDisputeCommand(CustomerId, booking.Id, "Something else went wrong.", []),
+            CancellationToken.None);
+        Assert.True(opened.IsSuccess, opened.IsFailure ? opened.Error.Code : null);
+        var second = context.GivenTicket(Assert.Single(context.Added));
+        Assert.Equal(0m, opened.Value.DepositHeld.Amount);
+        Assert.Equal(18m, opened.Value.DepositOnBooking!.Amount);
+        Assert.Equal(18m, opened.Value.DecidedByEarlierTickets!.Amount);
+
+        var refused = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 1m, 0m, 0m, null, "Any more money."),
+            CancellationToken.None);
+        Assert.Equal("dispute.disposition_unbalanced", refused.Error.Code);
+
+        var closed = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 0m, 0m, 0m, null, "The deposit was already decided by the first dispute."),
+            CancellationToken.None);
+        Assert.True(closed.IsSuccess, closed.IsFailure ? closed.Error.Code : null);
+        Assert.Equal(0m, second.Resolution!.Deposit.DepositHeld.Amount);
+    }
+
+    /// <summary>
+    /// The owner's second example: an earlier decision allocated only 5.000 of the 18.000, so the next
+    /// dispute operates on the remaining 13.000 — every fils of it, and never the original deposit.
+    /// Today's resolve always decides the whole of its basis, so the partial decision is recorded
+    /// directly: this pins what the handler does with one, however it came to exist.
+    /// </summary>
+    [Fact]
+    public async Task A_second_dispute_after_a_partial_decision_splits_only_the_remaining_deposit()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var first = OpenTicket(booking, Build.Now.AddHours(4));
+        Assert.True(first.Resolve(DisputeResolution.Create(
+            DepositDisposition.Create(Money.Jod(5m), Money.Jod(0m), Money.Jod(0m), Money.Jod(5m)).Value,
+            null, null, "Five to the office for the damage.", AdminId, Build.Now.AddHours(5)).Value).IsSuccess);
+        context.GivenResolved(booking, first);
+        var second = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(6)));
+
+        var view = (await context.Admin().Handle(new GetDisputeForReviewQuery(second.Id), CancellationToken.None)).Value;
+        Assert.Equal(13m, view.DepositHeld.Amount);
+        Assert.Equal(18m, view.DepositOnBooking!.Amount);
+        Assert.Equal(5m, view.DecidedByEarlierTickets!.Amount);
+
+        foreach (var (refund, platform, dealer) in new[] { (14m, 0m, 0m), (18m, 0m, 0m), (8m, 0m, 0m) })
+        {
+            var refused = await context.Admin().Handle(
+                new ResolveDisputeCommand(second.Id, refund, platform, dealer, null, "Not the remainder."), CancellationToken.None);
+            Assert.Equal("dispute.disposition_unbalanced", refused.Error.Code);
+        }
+
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 10m, 3m, 0m, null, "The rest, decided."), CancellationToken.None);
+        Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
+        Assert.Equal(13m, second.Resolution!.Deposit.DepositHeld.Amount);
+        // Both decisions together: exactly the deposit, never more.
+        Assert.Equal(18m, first.Resolution!.Deposit.DepositHeld.Amount + second.Resolution.Deposit.DepositHeld.Amount);
+    }
+
+    /// <summary>
+    /// A second, all-zero resolution on a booking with a REAL applied payment records no second refund:
+    /// the zero customer leg returns before the payment is touched, which is all that stands between
+    /// the handler and <c>Payment.RequestRefund</c> refusing a zero amount.
+    /// </summary>
+    [Fact]
+    public async Task A_second_all_zero_resolution_records_no_second_refund_on_the_payment()
+    {
+        var context = new Context();
+        var (booking, payment) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        // Past the free window: the deposit stays held and a penalty is assessed against the customer.
+        Assert.True(booking.Cancel(BookingParty.Customer, CustomerId, "Changed plans.", Build.Now.AddHours(3)).IsSuccess);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        context.Payments.GetByIdAsync(payment.Id, Arg.Any<CancellationToken>()).Returns(payment);
+        context.Payments.GetAppliedForBookingAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(payment);
+
+        var first = await ResolvedFirst(context, booking, 9, 0, 9);
+        var second = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(8)));
+        var closed = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 0m, 0m, 0m, null, "The deposit was already decided by the first dispute."),
+            CancellationToken.None);
+
+        Assert.True(closed.IsSuccess, closed.IsFailure ? closed.Error.Code : null);
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.DisputeResolution, refund.Reason);
+        Assert.Equal(9m, refund.Amount.Amount);
+        Assert.Equal(first.Id, refund.DisputeTicketId);
+    }
+
+    /// <summary>A withdrawn ticket decided nothing: the next one may split the whole deposit.</summary>
+    [Fact]
+    public async Task A_withdrawn_first_dispute_leaves_the_whole_deposit_to_the_next()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var withdrawn = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        Assert.True(withdrawn.Withdraw(CustomerId, Build.Now.AddHours(5)).IsSuccess);
+        context.GivenResolved(booking);
+
+        var second = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(6)));
+        var view = await context.Admin().Handle(new GetDisputeForReviewQuery(second.Id), CancellationToken.None);
+        Assert.Equal(18m, view.Value.DepositHeld.Amount);
+        Assert.Equal(0m, view.Value.DecidedByEarlierTickets!.Amount);
+
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 18m, 0m, 0m, null, "Refund in full."),
+            CancellationToken.None);
+        Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
+    }
+
+    /// <summary>
+    /// A resolved ticket keeps the basis it was decided against, whatever later tickets do: "earlier"
+    /// means opened before it, never "any other".
+    /// </summary>
+    [Fact]
+    public async Task A_resolved_dispute_keeps_its_own_basis_after_a_later_one_resolves()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var first = await ResolvedFirst(context, booking, 9, 0, 9);
+        var second = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(8)));
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 0m, 0m, 0m, null, "Nothing left."), CancellationToken.None)).IsSuccess);
+        context.GivenResolved(booking, first, second);
+
+        var firstView = (await context.Admin().Handle(new GetDisputeForReviewQuery(first.Id), CancellationToken.None)).Value;
+        var secondView = (await context.Admin().Handle(new GetDisputeForReviewQuery(second.Id), CancellationToken.None)).Value;
+
+        Assert.Equal(18m, firstView.DepositHeld.Amount);
+        Assert.Equal(0m, firstView.DecidedByEarlierTickets!.Amount);
+        Assert.Equal(0m, secondView.DepositHeld.Amount);
+        Assert.Equal(18m, secondView.DecidedByEarlierTickets!.Amount);
+        // Two decisions, one deposit: never more allocated than it held.
+        var allocated = new[] { first, second }.Sum(ticket =>
+            ticket.Resolution!.Deposit.RefundToCustomer.Amount +
+            ticket.Resolution.Deposit.RetainedByPlatform.Amount +
+            ticket.Resolution.Deposit.TransferredToDealer.Amount);
+        Assert.Equal(18m, allocated);
+    }
+
+    /// <summary>Earlier decisions that add up to more than the deposit are a data fault: refused, never floored at zero.</summary>
+    [Fact]
+    public async Task Earlier_decisions_that_over_allocate_the_deposit_are_refused_not_hidden()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        DisputeTicket Decided(int hours)
+        {
+            var ticket = OpenTicket(booking, Build.Now.AddHours(hours));
+            Assert.True(ticket.Resolve(DisputeResolution.Create(
+                DepositDisposition.RefundEverything(Money.Jod(18m)).Value, null, null, "Recorded.", AdminId, Build.Now.AddHours(hours + 1)).Value).IsSuccess);
+            return ticket;
+        }
+        context.GivenResolved(booking, Decided(4), Decided(6));
+        var third = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(8)));
+
+        var refused = await context.Admin().Handle(
+            new ResolveDisputeCommand(third.Id, 0m, 0m, 0m, null, "Anything."), CancellationToken.None);
+        var view = await context.Admin().Handle(new GetDisputeForReviewQuery(third.Id), CancellationToken.None);
+
+        Assert.Equal("dispute.deposit_over_allocated", refused.Error.Code);
+        Assert.Equal(ErrorKind.Conflict, refused.Error.Kind);
+        Assert.Equal(0m, view.Value.DepositHeld.Amount);
+        // The explaining figures are left out rather than stated wrong.
+        Assert.Null(view.Value.DepositOnBooking);
+        Assert.Null(view.Value.DecidedByEarlierTickets);
+        Assert.Null(third.Resolution);
+    }
+
+    /// <summary>
+    /// The office charge is bounded by the booking's range across its disputes too: a second ticket
+    /// can only top up to the maximum, and the minimum binds only the first charge.
+    /// </summary>
+    [Fact]
+    public async Task The_charge_to_the_office_stays_inside_the_range_across_disputes()
+    {
+        var context = new Context();
+        var (booking, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        var penalty = booking.Penalty!;
+        Assert.Same(BookingParty.Dealer, penalty.AttributedTo);
+        var (min, max) = (penalty.MinAmount.Amount, penalty.MaxAmount.Amount);
+
+        var first = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(first.Id, 18m, 0m, 0m, min, "The office cancelled late."), CancellationToken.None)).IsSuccess);
+        context.GivenResolved(booking, first);
+
+        var second = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(6)));
+        var beyond = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 0m, 0m, 0m, max - min + 0.001m, "More."), CancellationToken.None);
+        Assert.Equal("dispute.dealer_charge_out_of_range", beyond.Error.Code);
+
+        // Below the floor is fine now: the floor bound only the first charge.
+        var topUp = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 0m, 0m, 0m, 1m, "A small top-up."), CancellationToken.None);
+        Assert.True(topUp.IsSuccess, topUp.IsFailure ? topUp.Error.Code : null);
+    }
+
+    [Fact]
+    public async Task Once_the_office_was_charged_the_maximum_no_later_dispute_can_charge_it_again()
+    {
+        var context = new Context();
+        var (booking, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        var max = booking.Penalty!.MaxAmount.Amount;
+
+        var first = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(first.Id, 18m, 0m, 0m, max, "Full penalty."), CancellationToken.None)).IsSuccess);
+        context.GivenResolved(booking, first);
+
+        var second = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(6)));
+        var again = await context.Admin().Handle(
+            new ResolveDisputeCommand(second.Id, 0m, 0m, 0m, 0.001m, "Anything more."), CancellationToken.None);
+
+        Assert.Equal("dispute.dealer_charge_out_of_range", again.Error.Code);
+    }
+
+    /// <summary>
+    /// A second ticket is only reachable on a cancelled or no-show booking: resolving a dispute on a
+    /// returned booking completes it, and a completed booking can no longer be disputed.
+    /// </summary>
+    [Fact]
+    public async Task A_returned_booking_cannot_be_disputed_again_once_its_dispute_is_resolved()
+    {
+        var context = new Context();
+        var booking = Build.ConfirmedBooking(customerId: CustomerId);
+        booking.RecordPickup(BookingParty.Dealer, Id.New(), booking.Period.Start);
+        booking.RecordReturn(BookingParty.Dealer, Id.New(), booking.Period.End);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        context.Clock.UtcNow = booking.Period.End.AddHours(1);
+
+        var first = context.GivenTicket(OpenTicket(booking, booking.Period.End.AddHours(1)));
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(first.Id, 18m, 0m, 0m, null, "Refunded."), CancellationToken.None)).IsSuccess);
+        Assert.Same(BookingStatus.Completed, booking.Status);
+
+        var second = await context.Raise().Handle(
+            new OpenDisputeCommand(CustomerId, booking.Id, "Again.", []), CancellationToken.None);
+        Assert.Equal("dispute.booking_not_disputable", second.Error.Code);
+    }
+
+    /// <summary>
+    /// Installed apps read this JSON: every field they know keeps its name and its shape, and the two
+    /// new figures arrive beside them, additive.
+    /// </summary>
+    [Fact]
+    public async Task The_dispute_json_keeps_every_field_an_installed_app_reads_and_adds_the_new_figures()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        await ResolvedFirst(context, booking, 9, 0, 9);
+        var second = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(8)));
+
+        var view = await context.Admin().Handle(new GetDisputeForReviewQuery(second.Id), CancellationToken.None);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(view.Value, Web));
+        var root = json.RootElement;
+
+        foreach (var name in new[] { "ticketId", "bookingId", "status", "isLive", "openedByParty", "reason", "openedAt", "slaDeadline", "isOverdue", "statements", "resolution", "booking" })
+            Assert.True(root.TryGetProperty(name, out _), name);
+        Assert.Equal(JsonValueKind.Number, root.GetProperty("depositHeld").GetProperty("amount").ValueKind);
+        Assert.Equal("JOD", root.GetProperty("depositHeld").GetProperty("currency").GetString());
+        Assert.Equal(0m, root.GetProperty("depositHeld").GetProperty("amount").GetDecimal());
+        Assert.Equal(18m, root.GetProperty("depositOnBooking").GetProperty("amount").GetDecimal());
+        Assert.Equal(18m, root.GetProperty("decidedByEarlierTickets").GetProperty("amount").GetDecimal());
+    }
+
+    [Fact]
+    public void The_audit_line_of_a_second_dispute_names_the_nothing_it_split()
+    {
+        var resolution = DisputeResolution.Create(
+            DepositDisposition.Create(Money.Jod(0m), Money.Jod(0m), Money.Jod(0m), Money.Jod(0m)).Value,
+            null, null, "Already decided.", AdminId, Build.Now).Value;
+
+        var line = DisputeAuditor.Describe(resolution);
+        Assert.Contains("of 0 JOD held", line, StringComparison.Ordinal);
+        Assert.Contains("refund 0, platform 0, dealer 0", line, StringComparison.Ordinal);
     }
 
     [Fact]

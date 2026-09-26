@@ -13,6 +13,7 @@ import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
 import '../bookings/booking_providers.dart';
+import 'earlier_decisions.dart';
 
 /// One dispute: what was said, by whom, and what Khadra decided.
 ///
@@ -168,9 +169,20 @@ class _BodyState extends ConsumerState<_Body> {
           ),
         ),
 
+        // A later ticket on the booking splits only what earlier ones left
+        // (item 169), and says so in the server's own figures.
+        if (earlierDecisionNotice(dispute, l10n, formats) case final notice?) ...[
+          const SizedBox(height: Space.lg),
+          KhadraNotice(title: notice, tone: NoticeTone.neutral),
+        ],
+
         if (dispute.resolution case final resolution?) ...[
           const SizedBox(height: Space.lg),
-          _Resolution(resolution: resolution, formats: formats),
+          _Resolution(
+            resolution: resolution,
+            decidedEarlier: decidedEarlier(dispute),
+            formats: formats,
+          ),
         ],
 
         const SizedBox(height: Space.xl),
@@ -313,9 +325,16 @@ class _Statement extends StatelessWidget {
 /// saying nothing has moved is not decoration: until Payments exists, a resolution
 /// is a record of a decision and no funds change hands.
 class _Resolution extends StatelessWidget {
-  const _Resolution({required this.resolution, required this.formats});
+  const _Resolution({
+    required this.resolution,
+    required this.decidedEarlier,
+    required this.formats,
+  });
 
   final DisputeResolution resolution;
+
+  /// What earlier disputes on the booking decided before this one, or null.
+  final Money? decidedEarlier;
   final Formats formats;
 
   @override
@@ -331,10 +350,17 @@ class _Resolution extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: Space.md),
+          // The booking's deposit this decision split — not the car's security
+          // deposit, which the office holds and no dispute touches.
           KhadraDetailRow(
-            label: l10n.vehicleSecurityDeposit,
+            label: l10n.disputeDepositHeld,
             value: Text(formats.money(resolution.depositHeld)),
           ),
+          if (decidedEarlier case final earlier?)
+            KhadraDetailRow(
+              label: l10n.disputeDecidedEarlier,
+              value: Text(formats.money(earlier)),
+            ),
           KhadraDetailRow(
             label: l10n.bookingPartyCustomer,
             value: Text(formats.money(resolution.refundToCustomer)),

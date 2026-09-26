@@ -2540,6 +2540,34 @@ abstract class AppLocalizations {
   /// **'View the dispute'**
   String get disputeView;
 
+  /// The booking deposit a dispute decision split. Not the car's security deposit.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit held'**
+  String get disputeDepositHeld;
+
+  /// No description provided for @disputeDecidedEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'Decided by earlier disputes'**
+  String get disputeDecidedEarlier;
+
+  /// No description provided for @disputeEarlierDecidedPart.
+  ///
+  /// In en, this message translates to:
+  /// **'An earlier dispute on this booking already decided {decided} of its {onBooking} deposit, so this one can decide only what is left: {held}.'**
+  String disputeEarlierDecidedPart(
+    String decided,
+    String onBooking,
+    String held,
+  );
+
+  /// No description provided for @disputeEarlierDecidedAll.
+  ///
+  /// In en, this message translates to:
+  /// **'An earlier dispute on this booking already decided its whole {onBooking} deposit, so this one has nothing left to split.'**
+  String disputeEarlierDecidedAll(String onBooking);
+
   /// No description provided for @reviewTitle.
   ///
   /// In en, this message translates to:

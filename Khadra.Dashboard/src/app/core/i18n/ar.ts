@@ -3027,6 +3027,17 @@ export const AR = {
   'commission.percentOfOneDailyRate': '{percent} من سعر يوم واحد',
   'commission.percentOfRentalTotal': '{percent} من إجمالي الإيجار',
 
+  // البند 169: لا يوزّع نزاع لاحق إلا ما تركته النزاعات السابقة من العربون.
+  'common.decidedByEarlierDisputes': 'حُسم في نزاعات سابقة',
+  'common.earlierDisputeDecidedPart':
+    'قرّر نزاع سابق على هذا الحجز مصير {decided} من عربونه البالغ {onBooking}، فلا يملك هذا النزاع إلا المتبقي منه: {held}.',
+  'common.earlierDisputeDecidedAll':
+    'قرّر نزاع سابق على هذا الحجز مصير عربونه كاملًا البالغ {onBooking}، فلم يبقَ منه ما يوزّعه هذا النزاع.',
+  'disputeDetail.chargeOutsideRange':
+    'يجب أن يبقى المبلغ المفروض على المكتب ضمن نطاق الغرامة الذي قدّره هذا الحجز، محسوبًا معه ما فرضته عليه نزاعات سابقة على الحجز نفسه.',
+  'disputeDetail.depositOverAllocated':
+    'وزّعت قرارات سابقة على هذا الحجز أكثر من عربونه. لا يمكن توزيع أي مبلغ قبل تصحيح ذلك.',
+
   'sandbox.title': 'مدفوعات تجريبية',
   'sandbox.body':
     'تعمل المنصّة الآن بمزوّد دفع تجريبي. لا تُخصم أي بطاقة ولا تنتقل أي أموال، فأي حجز يُؤكَّد هنا ليس حجزًا حقيقيًا.',

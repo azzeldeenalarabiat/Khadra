@@ -1568,6 +1568,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get disputeView => 'عرض النزاع';
 
   @override
+  String get disputeDepositHeld => 'العربون المحتجز';
+
+  @override
+  String get disputeDecidedEarlier => 'حُسم في نزاعات سابقة';
+
+  @override
+  String disputeEarlierDecidedPart(
+    String decided,
+    String onBooking,
+    String held,
+  ) {
+    return 'قرّر نزاع سابق على هذا الحجز مصير $decided من عربونه البالغ $onBooking، فلا يملك هذا النزاع إلا المتبقي منه: $held.';
+  }
+
+  @override
+  String disputeEarlierDecidedAll(String onBooking) {
+    return 'قرّر نزاع سابق على هذا الحجز مصير عربونه كاملًا البالغ $onBooking، فلم يبقَ منه ما يوزّعه هذا النزاع.';
+  }
+
+  @override
   String get reviewTitle => 'قيّم هذا الإيجار';
 
   @override

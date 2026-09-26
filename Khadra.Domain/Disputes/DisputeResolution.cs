@@ -139,13 +139,19 @@ public sealed class DisputeResolution : ValueObject
     /// says "an Admin picks inside it on a ticket", and until now nothing enforced the "inside it"
     /// part, leaving DealerCharge a free-form amount on a money decision.
     /// </param>
+    /// <param name="alreadyChargedToDealer">
+    /// What EARLIER resolutions on the same booking charged the office (item 169). The range is the
+    /// booking's, not the ticket's: all charges together stay inside it, so a later ticket may only top
+    /// up to the maximum, and the minimum binds only while nothing has been charged yet.
+    /// </param>
     public static Result<DisputeResolution, Error> Create(
         DepositDisposition deposit,
         Money? dealerCharge,
         PenaltyAssessment? assessedPenalty,
         string? note,
         Id resolvedByAdminId,
-        DateTimeOffset resolvedAt)
+        DateTimeOffset resolvedAt,
+        Money? alreadyChargedToDealer = null)
     {
         ArgumentNullException.ThrowIfNull(deposit);
         if (string.IsNullOrWhiteSpace(note))
@@ -167,13 +173,25 @@ public sealed class DisputeResolution : ValueObject
                 return DisputeErrors.DealerChargeCurrencyMismatch;
             }
 
-            // A flat penalty is simply a range whose ends are equal, so the owner's still-open tier
-            // decision does not change this check.
-            if (dealerCharge.Amount < assessedPenalty.MinAmount.Amount ||
-                dealerCharge.Amount > assessedPenalty.MaxAmount.Amount)
+            // What earlier disputes charged counts only in the currency of the range it counts against.
+            if (alreadyChargedToDealer is not null &&
+                !string.Equals(
+                    alreadyChargedToDealer.CurrencyCode,
+                    assessedPenalty.MinAmount.CurrencyCode,
+                    StringComparison.Ordinal))
             {
-                return DisputeErrors.DealerChargeOutsideAssessment;
+                return DisputeErrors.DealerChargeCurrencyMismatch;
             }
+
+            // A flat penalty is simply a range whose ends are equal, so the owner's still-open tier
+            // decision does not change this check. Across the booking's disputes the range is shared:
+            // what earlier resolutions charged comes off the top, and the floor applies only to the
+            // first charge.
+            var charged = alreadyChargedToDealer?.Amount ?? 0m;
+            var floor = charged > 0m ? 0m : assessedPenalty.MinAmount.Amount;
+            var ceiling = assessedPenalty.MaxAmount.Amount - charged;
+            if (dealerCharge.Amount < floor || dealerCharge.Amount > ceiling)
+                return DisputeErrors.DealerChargeOutsideAssessment;
         }
 
         return new DisputeResolution(deposit, dealerCharge, note.Trim(), resolvedByAdminId, resolvedAt);

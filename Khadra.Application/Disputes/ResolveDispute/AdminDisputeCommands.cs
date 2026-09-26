@@ -159,13 +159,25 @@ public sealed class AdminDisputeHandlers(
             return DisputeErrors.BookingMissing;
 
         var now = clock.UtcNow;
-        var held = BookingDisputeSettlement.DepositHeldFor(booking);
-        // A deposit the window already released is not held any more (Phase 3): the split must then
-        // be all zeros, whatever the ticket says. Asked only while a deposit is still held.
-        if (!held.IsZero &&
+
+        // A deposit the window already released is not held any more (Phase 3). Asked only while the
+        // booking holds one at all.
+        var released =
+            !BookingDisputeSettlement.DepositHeldFor(booking).IsZero &&
             booking.DepositPaymentId is { } depositPaymentId &&
-            (await payments.GetByIdAsync(depositPaymentId, cancellationToken))?.RefundFor(RefundReason.DisputeWindowClosed) is not null)
-            held = BookingDisputeSettlement.DepositHeldFor(booking, releasedOnCleanClose: true);
+            (await payments.GetByIdAsync(depositPaymentId, cancellationToken))?.RefundFor(RefundReason.DisputeWindowClosed) is not null;
+
+        // What THIS ticket may split: the deposit less what the booking's earlier disputes decided
+        // (owner, 2026-09-26; item 169). Every resolution still decides the whole of its basis, so a
+        // ticket opened after one was resolved splits nothing and can close only with a note.
+        var basis = DisputedDeposit.For(
+            ticket,
+            booking,
+            released,
+            await tickets.ListResolvedForBookingAsync(booking.Id, cancellationToken));
+        if (basis.IsFailure)
+            return basis.Error;
+        var held = basis.Value.Basis;
         var currency = held.CurrencyCode;
 
         var disposition = DepositDisposition.Create(
@@ -176,14 +188,16 @@ public sealed class AdminDisputeHandlers(
         if (disposition.IsFailure)
             return disposition.Error;
 
-        // Attributed to the signed-in admin, never to an id in the request body.
+        // Attributed to the signed-in admin, never to an id in the request body. The office charge is
+        // bounded by the booking's range across every dispute on it, not per ticket.
         var resolution = DisputeResolution.Create(
             disposition.Value,
             request.DealerCharge is { } charge ? Money.Create(charge, currency) : null,
             booking.Penalty,
             request.Note,
             actor.UserId!.Value,
-            now);
+            now,
+            basis.Value.ChargedToDealerEarlier);
         if (resolution.IsFailure)
             return resolution.Error;
 

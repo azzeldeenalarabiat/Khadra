@@ -40,7 +40,7 @@
     @if (d.resolution; as r) {
       <section class="card card--pad" aria-labelledby="resolution-title">
         <h2 id="resolution-title" class="card__title">{{ i18n.t('dispute.resolution') }}</h2>
-        @if (r.waivesEverything) {
+        @if (waived()) {
           <p>{{ i18n.t('dispute.waived') }}</p>
         } @else {
           <dl class="lines">
@@ -48,11 +48,18 @@
             @if (r.dealerCharge) {
               <div><dt>{{ i18n.t('dispute.dealerCharge') }}</dt><dd>{{ format.money(r.dealerCharge) }}</dd></div>
             }
+            @if (earlierDecided(); as earlier) {
+              <div><dt>{{ i18n.t('dispute.decidedEarlier') }}</dt><dd>{{ format.money(earlier) }}</dd></div>
+            }
           </dl>
         }
         @if (r.note) { <p class="prose user-text" dir="auto">{{ r.note }}</p> }
         <p class="faint small">{{ i18n.t('dispute.recordedNotPaid') }}</p>
       </section>
+    }
+
+    @if (earlierNotice(); as notice) {
+      <div class="notice"><kh-icon name="info" /><p>{{ notice }}</p></div>
     }
 
     @if (d.isLive) {

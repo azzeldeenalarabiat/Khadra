@@ -39,10 +39,21 @@ public sealed record DisputeDto(
     DateTimeOffset? ClosedAt,
     IReadOnlyList<DisputeStatementDto> Statements,
     DisputeResolutionDto? Resolution,
-    // The basis any resolution must split, taken from the same helper the resolve handler validates
-    // against, so the workspace and the rule can never disagree about what is actually held.
+    // What THIS ticket can split: for a live or withdrawn ticket, the deposit less what the booking's
+    // earlier disputes decided (item 169); for a resolved one, the basis it was decided against. The
+    // same calculator the resolve handler validates against, so the form and the rule never disagree.
     MoneyDto DepositHeld,
-    BookingDto Booking);
+    BookingDto Booking,
+    /// <summary>
+    /// The deposit the platform held for disputes before any was resolved (zero once the whole payment
+    /// went back or the window released it). Added 2026-09-26, last.
+    /// </summary>
+    MoneyDto? DepositOnBooking = null,
+    /// <summary>
+    /// What the booking's EARLIER resolved disputes already decided, so a later ticket's smaller basis
+    /// is explained rather than a mystery. Zero on a first dispute. Added 2026-09-26, last.
+    /// </summary>
+    MoneyDto? DecidedByEarlierTickets = null);
 
 public sealed record DisputeStatementDto(
     Guid StatementId,

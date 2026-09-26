@@ -32,9 +32,23 @@ export interface Dispute {
   readonly closedAt: string | null;
   readonly statements: readonly DisputeStatement[];
   readonly resolution: DisputeResolution | null;
-  /** What a resolution must split, from the server. The console never derives this itself. */
+  /**
+   * What a resolution must split, from the server. The console never derives this itself. On a live
+   * ticket it is what earlier disputes on the booking LEFT (item 169); on a resolved one, the basis it
+   * was decided against.
+   */
   readonly depositHeld: Money;
   readonly booking: Booking;
+  /**
+   * The deposit the platform held for disputes before any was resolved (zero once the whole payment
+   * went back or the window released it). Added 2026-09-26; absent from an older API.
+   */
+  readonly depositOnBooking?: Money;
+  /**
+   * What the booking's EARLIER resolved disputes already decided: zero on a first dispute. Added
+   * 2026-09-26; absent from an older API. Shown, never subtracted by the console.
+   */
+  readonly decidedByEarlierTickets?: Money;
 }
 
 export interface DisputeStatement {

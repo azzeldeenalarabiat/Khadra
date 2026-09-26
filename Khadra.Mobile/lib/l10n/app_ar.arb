@@ -492,6 +492,10 @@
   "disputeCannotOpen": "لا يمكن فتح نزاع إلا خلال مهلة التسوية.",
   "disputeExisting": "لديك نزاع مفتوح على هذا الحجز بالفعل.",
   "disputeView": "عرض النزاع",
+  "disputeDepositHeld": "العربون المحتجز",
+  "disputeDecidedEarlier": "حُسم في نزاعات سابقة",
+  "disputeEarlierDecidedPart": "قرّر نزاع سابق على هذا الحجز مصير {decided} من عربونه البالغ {onBooking}، فلا يملك هذا النزاع إلا المتبقي منه: {held}.",
+  "disputeEarlierDecidedAll": "قرّر نزاع سابق على هذا الحجز مصير عربونه كاملًا البالغ {onBooking}، فلم يبقَ منه ما يوزّعه هذا النزاع.",
 
   "reviewTitle": "قيّم هذا الإيجار",
   "reviewQuestion": "كيف كانت تجربتك مع {gallery}؟",
