@@ -4368,3 +4368,41 @@ The dealer console says a deposit is "held pending settlement" when it was paid 
 returned or decided it. A dispute resolved with nothing to the customer records no refund, so such a
 deposit still reads "held". **To close:** the booking's financial state from the server (payments
 Phase 4), which the consoles render instead of deriving.
+
+### 167. The website's Arabic penalty line reads "على أنت"
+
+**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run; not part of Phase 3)
+
+On a booking the customer cancelled late, the website's Arabic page says "قُدِّر مبلغ … على أنت":
+`booking.penalty` and `booking.penaltyRange` in `Khadra.Web/src/app/core/i18n/ar.ts` put the party's
+word after "على", and the customer's word (`booking.party.Customer`) is "أنت", which Arabic does not
+attach that way — it is "عليك". The customer app already solved this with its own on-you sentences
+(`bookingPenaltyAssessedOnYou`, `bookingPenaltyRangeOnYou`). **To close:** the same pair on the
+website, chosen when the penalty is attributed to the customer, with an Arabic test.
+
+### 168. The office's approve dialog says free cancellation starts at approval
+
+**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run) · **Fix before release**
+
+The dealer console's approve confirmation (`dealerDecide.approve.body`, English and Arabic) ends
+"The customer's free-cancellation window starts now." Since 2026-09-25 the window starts when the
+PAYMENT is confirmed ("within 1 hour after payment", `Booking.FreeCancellationDeadline`), not at
+approval, so the office is told the wrong moment. **To close:** reword both languages to say the
+window opens when the customer pays, with a dictionary test.
+
+### 169. A resolved dispute does not stop a second ticket splitting the same deposit
+
+**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run; older than Phase 3) · **Owner decision**
+
+Opening a dispute checks only that no ticket is LIVE (`RaiseDisputeHandlers`, `HasLiveTicketAsync`),
+and a resolution does not move a cancelled or no-show booking out of its window
+(`Booking.CloseAfterDisputeResolved` is a no-op for an ended booking). So after one ticket is
+resolved, either party can open another inside the window, and
+`BookingDisputeSettlement.DepositHeldFor` offers its resolution the WHOLE deposit again. The capture
+guard keeps the customer's refund legs within what was captured, but the platform and office legs are
+settled by hand with no guard, so the same deposit could be split twice. The clean-close release is
+not affected: a resolved ticket already blocks it. **To close, the owner chooses:** refuse a second
+ticket after a resolution — a request the installed app would see refused where it used to be
+accepted, which is a breaking contract change under CLAUDE.md — or keep accepting it and make every
+later ticket's deposit held read zero, the way a released deposit already does (no contract change;
+the recommended shape). Either way with a handler test for the second ticket.
