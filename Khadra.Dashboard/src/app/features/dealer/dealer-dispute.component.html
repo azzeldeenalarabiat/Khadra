@@ -70,18 +70,8 @@
               ><span class="num">{{ earlier | money }} </span>
             </div>
           }
-          <div class="history-line">
-            <span class="k-label">{{ t('common.refundedToTheCustomer') }}</span
-            ><span class="num"
-              >{{ r.refundToCustomer | money }} </span
-            >
-          </div>
-          <div class="history-line">
-            <span class="k-label">{{ t('common.keptByThePlatform') }}</span
-            ><span class="num"
-              >{{ r.retainedByPlatform | money }} </span
-            >
-          </div>
+          <!-- The office's part of the decision only: the customer's and the platform's shares are not
+               sent to the office (owner decision 3, pre-launch item 151). -->
           <div class="history-line">
             <span class="k-label">{{ t('dealerDispute.transferredToYou') }}</span
             ><span class="num"
@@ -98,7 +88,7 @@
           <div class="page-sub">{{ t('disputeDetail.quoted', { text: r.note }) }}</div>
           <div class="note-box is-plain">
             <kh-icon name="info" />
-            {{ t('common.decisionRecordedNoFunds') }}
+            {{ t('dealerDispute.decisionRecordedForYou') }}
           </div>
         </div>
       </section>

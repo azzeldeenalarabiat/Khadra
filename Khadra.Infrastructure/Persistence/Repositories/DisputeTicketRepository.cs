@@ -56,6 +56,24 @@ internal sealed class DisputeTicketRepository(KhadraDbContext context) : IDisput
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<DisputeTicket>> ListClaimsForBookingsAsync(
+        IReadOnlyCollection<Id> bookingIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(bookingIds);
+        if (bookingIds.Count == 0)
+            return [];
+
+        var ids = bookingIds.ToList();
+        var withdrawn = DisputeStatus.Withdrawn;
+        return await context.DisputeTickets
+            .AsNoTracking()
+            .Where(ticket => ids.Contains(ticket.BookingId) && ticket.Status != withdrawn)
+            .OrderBy(ticket => ticket.OpenedAt)
+            .ThenBy(ticket => ticket.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(DisputeTicket ticket, CancellationToken cancellationToken = default) =>
         await context.DisputeTickets.AddAsync(ticket, cancellationToken);
 

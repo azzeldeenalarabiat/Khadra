@@ -175,13 +175,18 @@ export interface Refund {
 }
 
 /** The payment that confirmed a booking: 'Deposit' or 'FullPayment', and what it charged. */
+/**
+ * The payment that confirmed a booking. `amountCharged`, `processingFee` and
+ * `refundOnFreeCancellation` are null on the rental office's copy (payments Phase 4b): each carries the
+ * processing fee, which the office never sees. The administrator's copy always has them.
+ */
 export interface ConfirmingPayment {
   readonly purpose: string;
-  readonly amountCharged: Money;
-  readonly processingFee: Money;
+  readonly amountCharged: Money | null;
+  readonly processingFee: Money | null;
   readonly appliedToBooking: Money;
   readonly paidAt: string | null;
-  readonly refundOnFreeCancellation: Money;
+  readonly refundOnFreeCancellation: Money | null;
 }
 
 /** Requested and Sent: the refund is on its way. Settled: refunded. Failed: still owed, being retried. */

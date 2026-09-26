@@ -1,3 +1,4 @@
+import { BookingFinancials } from '../models/financials.api';
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
@@ -73,6 +74,12 @@ export class AdminBookingsService {
     return id ? `${this.base}/${id}` : undefined;
   });
 
+  /** The booking's money as the administrator sees it (payments Phase 4b): every attempt and every share. */
+  readonly financials = httpResource<BookingFinancials>(() => {
+    const id = this.viewing();
+    return id ? `${this.base}/${id}/financials` : undefined;
+  });
+
   private async act(bookingId: string, action: string, body: unknown = {}): Promise<Booking> {
     const token = await firstValueFrom(this.http.get<{ requestToken: string }>('/bff/antiforgery'));
     return firstValueFrom(
@@ -96,6 +103,7 @@ export class AdminBookingsService {
    */
   refresh(): void {
     this.booking.reload();
+    this.financials.reload();
     this.list.reload();
     this.counts.reload();
     this.dashboard.refreshWorkload();

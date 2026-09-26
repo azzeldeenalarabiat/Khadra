@@ -1,0 +1,137 @@
+@if (failure(); as message) {
+  <section class="sect">
+    <div class="state-block">
+      <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+      <div class="state-title">{{ t('paymentDetail.loadFailed') }}</div>
+      <div class="state-text">{{ message }}</div>
+      <div class="state-actions">
+        <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        <a class="btn btn-secondary btn-sm" routerLink="/payments">{{ t('nav.payments') }}</a>
+      </div>
+    </div>
+  </section>
+} @else if (page(); as p) {
+  <div class="stack stack-14">
+    <div class="dc-head">
+      <div>
+        <!-- The title is a sentence in the reader's language ("الدفعة 01a0d99c"); its id is isolated by
+             the translation, so the heading itself is not forced left-to-right. -->
+        <div class="row row-gap-9 row-wrap">
+          <h1 class="page-title">{{ p.title }}</h1>
+          <span class="pill" [class]="'s-' + p.tone">{{ p.status }}</span>
+          @if (p.sandbox) {
+            <span class="pill s-warn">{{ t('payments.test') }}</span>
+          }
+        </div>
+        <div class="page-sub">{{ p.subtitle }}</div>
+      </div>
+      <div class="dc-head-actions">
+        @if (p.bookingId) {
+          <a class="btn btn-secondary btn-sm" [routerLink]="['/bookings', p.bookingId]">{{ t('paymentDetail.viewBooking') }}</a>
+        } @else {
+          <span class="page-sub">{{ t('paymentDetail.bookingGone') }}</span>
+        }
+      </div>
+    </div>
+
+    @if (p.notice; as notice) {
+      <div class="banner" [class]="'s-' + notice.tone">
+        <kh-icon name="warning-circle" />
+        <div>{{ notice.text }}</div>
+      </div>
+    }
+    @if (p.sandbox) {
+      <div class="note-box">
+        <kh-icon name="info" />
+        {{ t('paymentDetail.sandbox') }}
+      </div>
+    }
+
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon name="credit-card" class="kpi-icon" />
+        <span class="sect-t">{{ t('paymentDetail.transaction') }}</span>
+      </div>
+      <div class="kv-body">
+        @for (fact of p.facts; track fact.k) {
+          <div class="kv-split">
+            <div class="kv-key">{{ fact.k }}</div>
+            <div class="kv-val" [class.mono]="fact.code" [class.ltr]="fact.code">{{ fact.v }}</div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon name="arrow-counter-clockwise" class="kpi-icon" />
+        <span class="sect-t">{{ t('paymentDetail.refunds') }}</span>
+      </div>
+      <div class="kv-body">
+        @for (refund of p.refunds; track refund.id) {
+          <div class="kv-split">
+            <div class="kv-key">
+              {{ refund.reason }}
+              @for (date of refund.dates; track $index) {
+                <div class="td-sub">{{ date }}</div>
+              }
+              @if (refund.disputeTicketId) {
+                <a class="td-sub row-link" [routerLink]="['/disputes', refund.disputeTicketId]">{{ t('paymentDetail.openDispute') }}</a>
+              }
+            </div>
+            <div class="kv-val">
+              <div class="row row-gap-8 row-wrap row-end">
+                <span class="num">{{ refund.amount }}</span>
+                <span class="pill" [class]="'s-' + refund.tone">{{ refund.status }}</span>
+              </div>
+              <div class="td-sub num">{{ refund.split }}</div>
+              @if (refund.code) {
+                <div class="td-sub mono ltr">{{ t('refunds.providerCode', { code: refund.code }) }}</div>
+              }
+              @if (refund.providerReference) {
+                <div class="td-sub mono ltr">{{ refund.providerReference }}</div>
+              }
+            </div>
+          </div>
+        } @empty {
+          <div class="state-text">{{ t('paymentDetail.noRefunds') }}</div>
+        }
+      </div>
+    </section>
+
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon name="receipt" class="kpi-icon" />
+        <span class="sect-t">{{ t('paymentDetail.events') }}</span>
+      </div>
+      <div class="kv-body">
+        @for (event of p.events; track event.id) {
+          <div class="kv-split">
+            <div class="kv-key">
+              <span class="mono ltr">{{ event.kind }}</span>
+              <div class="td-sub">{{ event.when }}</div>
+              @if (event.byReference) {
+                <div class="td-sub">{{ t('paymentDetail.byReference') }}</div>
+              }
+            </div>
+            <div class="kv-val">
+              <span>{{ event.outcome }}</span>
+              @if (event.amount) {
+                <div class="td-sub num">{{ event.amount }}</div>
+              }
+              <div class="td-sub mono ltr">{{ event.id }}</div>
+            </div>
+          </div>
+        } @empty {
+          <div class="state-text">{{ t('paymentDetail.noEvents') }}</div>
+        }
+      </div>
+    </section>
+  </div>
+} @else {
+  <section class="sect sect-pad" aria-busy="true">
+    @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+      <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+    }
+  </section>
+}

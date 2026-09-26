@@ -33,8 +33,15 @@ export interface QueueItem {
   readonly entity: string;
   /** Rendered countdown, e.g. "13h over". Recomputed locally from the deadline the API sent. */
   readonly sla: string;
-  /** How much of the SLA window has elapsed, as a percentage. */
-  readonly percent: number;
+  /** How much of the SLA window has elapsed, as a percentage; null for a row with no clock. */
+  readonly percent: number | null;
+  /**
+   * Whether the row runs against a deadline. Money owed back does not (payments Phase 4b): nobody
+   * froze a deadline for it, so its row says how long it has waited instead of counting down.
+   */
+  readonly hasClock: boolean;
   readonly action: string;
   readonly route: string;
+  /** A filter the row opens its list with, e.g. the payments that could not be applied. */
+  readonly queryParams?: Readonly<Record<string, string>>;
 }

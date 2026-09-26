@@ -24,6 +24,12 @@ public interface IDisputeTicketRepository
     /// </summary>
     Task<IReadOnlyList<DisputeTicket>> ListResolvedForBookingAsync(Id bookingId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Every ticket that was not withdrawn — open, under review or resolved — on several bookings, in ONE
+    /// read-only query without statements: for batches that run the calculator per booking.
+    /// </summary>
+    Task<IReadOnlyList<DisputeTicket>> ListClaimsForBookingsAsync(IReadOnlyCollection<Id> bookingIds, CancellationToken cancellationToken = default);
+
     // Feeds the Admin dashboard's open-dispute queue and the 48-hour SLA alert.
     Task<IReadOnlyList<DisputeTicket>> ListLiveAsync(CancellationToken cancellationToken = default);
 

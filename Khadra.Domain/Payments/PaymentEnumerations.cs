@@ -144,3 +144,48 @@ public sealed class RefundStatus : Enumeration
 
     public bool IsOutstanding => this == Requested || this == Sent;
 }
+
+/// <summary>
+/// Where a payment's refunds stand, read as ONE status (payments Phase 4): nothing refunded, on its way,
+/// refused and being sent again, partly back, or everything back. The one definition, read by the
+/// booking's financial state and the administrator's payments list alike.
+/// </summary>
+public sealed class RefundProgress : Enumeration
+{
+    /// <summary>Nothing has been refunded.</summary>
+    public static readonly RefundProgress None = new(1, "None");
+
+    /// <summary>A refund is on its way.</summary>
+    public static readonly RefundProgress InProgress = new(2, "InProgress");
+
+    /// <summary>A refund was refused and is being sent again: still owed.</summary>
+    public static readonly RefundProgress Delayed = new(3, "Delayed");
+
+    /// <summary>Every refund shown reached the customer, and part of the payment was kept.</summary>
+    public static readonly RefundProgress Partial = new(4, "Partial");
+
+    /// <summary>Everything the reader is owed back has reached the customer.</summary>
+    public static readonly RefundProgress Complete = new(5, "Complete");
+
+    private RefundProgress(int id, string name) : base(id, name)
+    {
+    }
+
+    /// <summary>
+    /// One reading of the refunds a reader is shown. A refused refund outranks one on its way, because it
+    /// needs a human; whether the rest is complete is the caller's to say — for the whole payment,
+    /// <see cref="Payment.IsWhollyReturned"/>; for a reader shown only some refunds, what those cover.
+    /// </summary>
+    public static RefundProgress Of(IEnumerable<Refund> shown, bool complete)
+    {
+        ArgumentNullException.ThrowIfNull(shown);
+        var refunds = shown.ToList();
+        if (refunds.Count == 0)
+            return None;
+        if (refunds.Exists(refund => refund.Status == RefundStatus.Failed))
+            return Delayed;
+        if (refunds.Exists(refund => refund.Status.IsOutstanding))
+            return InProgress;
+        return complete ? Complete : Partial;
+    }
+}

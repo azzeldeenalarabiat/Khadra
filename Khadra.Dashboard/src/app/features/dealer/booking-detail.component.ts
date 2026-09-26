@@ -10,7 +10,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone, toneClass } from '../../core/models/console.models';
-import { Booking, PenaltyAssessment, depositRefundKey } from '../../core/models/bookings.api';
+import { Booking, PenaltyAssessment } from '../../core/models/bookings.api';
 import { enumKey } from '../../core/i18n/status-key';
 import { DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
@@ -27,8 +27,9 @@ import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { commissionRate } from '../../core/i18n/commission-rate';
-import { refundLines } from '../../core/i18n/refund-words';
-import { confirmedStepKey, depositStillHeld, paidByCardLabel, refundRowKey } from './booking-payment.presenter';
+import { MoneyFormat } from '../../core/i18n/money-words';
+import { confirmedStepKey } from './booking-payment.presenter';
+import { officeMoney } from './office-money.presenter';
 import { toRenterDocumentsPanel } from './renter-documents.presenter';
 
 /**
@@ -483,112 +484,27 @@ export class DealerBookingDetailComponent {
     ];
   });
 
+  /** How the money section prints a figure, a rate and an instant: in its own currency, and in Amman. */
+  private readonly moneyFormat: MoneyFormat = {
+    money: (value) => this.format.money(value.amount, value.currency),
+    percent: (value) => this.format.percent(value),
+    dateTime: (iso) => this.format.dateTime(iso),
+  };
+
+  protected readonly financialsResource = this.service.financials;
+  /** Guarded like the booking: `value()` throws in the error state. */
+  private readonly financialsData = loaded(this.financialsResource);
+
   /**
-   * The money on THIS booking, as frozen when it was made.
-   *
-   * Every amount carries its own currency code and goes through `FormatService`, so it prints at the
-   * currency's scale and never as "−0". The commission is the amount Khadra charges, unsigned: a sign
-   * typed in front of it printed "−0" when the frozen rate was zero, and Arabic bidi then carried that
-   * sign to the far end of the figure.
+   * The money on THIS booking (payments Phase 4b), from the financial state's OFFICE projection: the
+   * server's figures and states, worded by `officeMoney`. Nothing is added, subtracted or compared
+   * here, and the booking's own copy no longer carries refunds or fees for the office to read.
    */
-  protected readonly moneyRows = computed(() => {
-    const b = this.booking();
-    if (!b) return [];
-    const money = (value: { readonly amount: number; readonly currency: string }): string =>
-      this.format.money(value.amount, value.currency);
-    // What the customer has paid and what is still due only mean something while a handover can
-    // still happen. A rejected or expired request refunds its deposit (Payments will do that);
-    // a cancelled or no-show booking is settled through the penalty panel, not this one.
-    const live =
-      b.status === 'Requested' ||
-      b.status === 'Approved' ||
-      b.status === 'Confirmed' ||
-      b.status === 'PickedUp';
-    const settling = b.status === 'Returned' || b.status === 'Completed';
-    // From the server, not from the status: a booking that ended after being paid is still one the
-    // customer paid, and reading that off a list of statuses is how a screen starts lying.
-    const paidDeposit = b.depositPaid;
-    // Every refund, with its reason (Phase 3): a server that lists them is read whole; an older one
-    // names only the deposit's refund, handled below as it always was.
-    const refunds: readonly { readonly k: string; readonly v: string; readonly hi?: boolean; readonly dim?: boolean }[] =
-      b.refunds ? refundLines(this.t, b.refunds, money) : [];
-    return [
-      {
-        k: this.t('dealerBooking.rentalLine', {
-          count: b.pricing.days,
-          rate: money(b.pricing.dailyRate),
-        }),
-        v: money(b.pricing.rentalTotal),
-      },
-      { k: this.t('dealerBooking.deliveryFeeYours'), v: money(b.pricing.deliveryFee) },
-      {
-        k: this.t('dealerBooking.securityDepositHeldPer'),
-        v: money(b.pricing.securityDeposit),
-      },
-      {
-        // A customer may pay the whole booking online (2026-09-24), so the line names what was PAID,
-        // from the server's own verdict: the deposit, or everything.
-        k: paidByCardLabel(this.t, b, this.format.percent(b.pricing.depositPercent)),
-        // Nothing is paid until the server says the payment cleared: zero, in the deposit's currency.
-        v: paidDeposit
-          ? money(b.onlinePaid ?? b.pricing.depositAmount)
-          : this.format.money(0, b.pricing.depositAmount.currency),
-        hi: live,
-      },
-      ...(live
-        ? [
-            {
-              k: this.t('dealerBooking.balanceToCollectIn'),
-              v: money(b.pricing.balanceDue),
-              hi: true,
-            },
-            ...refunds,
-          ]
-        : settling
-          ? [
-              {
-                k: this.t('dealerBooking.balanceCollectedInCash'),
-                v: money(b.pricing.balanceDue),
-              },
-              ...refunds,
-            ]
-          : b.refunds
-            ? [
-                ...refunds,
-                // "Held pending settlement" only while it IS held: paid, and nothing has returned or
-                // decided it yet.
-                ...(depositStillHeld(b)
-                  ? [{ k: this.t('common.deposit'), v: this.t('dealerBooking.heldPendingSettlementSee'), dim: true }]
-                  : []),
-              ]
-          : b.depositRefund
-            ? [
-                {
-                  // The customer cancelled inside the free window after paying: the whole payment
-                  // (the deposit, or the booking paid in full) went back to them, so nothing of it is
-                  // held for anyone to settle.
-                  k: this.t(refundRowKey(b)),
-                  v: this.t(depositRefundKey(b.depositRefund), { amount: money(b.depositRefund.amount) }),
-                },
-              ]
-            : [
-                {
-                  k: this.t('common.deposit'),
-                  v: this.t('dealerBooking.heldPendingSettlementSee'),
-                  dim: true,
-                },
-              ]),
-      {
-        k: this.t('dealerBooking.platformCommissionFrozen', { rate: this.commissionRate(b) }),
-        // Unsigned, and computed by the API at the frozen rate; the console never multiplies money.
-        v: money(b.commissionAmount),
-      },
-      {
-        k: this.t('dealerReports.netPayout'),
-        v: this.t('dealerReports.notAvailableYet'),
-        dim: true,
-      },
-    ];
+  protected readonly money = computed(() => {
+    const financials = this.financialsData();
+    return financials
+      ? { ...officeMoney(financials, this.t, this.moneyFormat), currency: financials.currency }
+      : null;
   });
 
   protected readonly timeline = computed<readonly TimelineStep[]>(() => {

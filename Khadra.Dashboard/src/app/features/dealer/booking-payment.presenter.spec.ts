@@ -4,7 +4,7 @@ import { EN, TranslationKey } from '../../core/i18n/en';
 import { MessageParams } from '../../core/i18n/language';
 import { resolveMessage } from '../../core/i18n/resolve';
 import { refundLines, refundReasonKey, refundStatusKey } from '../../core/i18n/refund-words';
-import { confirmedStepKey, depositStillHeld, paidByCardLabel, refundRowKey } from './booking-payment.presenter';
+import { confirmedStepKey } from './booking-payment.presenter';
 
 /**
  * A booking paid in full is never worded as a deposit in the dealer console (owner, 2026-09-25).
@@ -35,19 +35,6 @@ describe('the Confirmed step on a booking timeline', () => {
   });
 });
 
-describe('the money line for what the customer paid by card', () => {
-  it('names a full payment from the server verdict, not from comparing amounts', () => {
-    expect(paidByCardLabel(en, { isPaidInFull: true }, '20%')).toBe('Paid in full by card');
-    expect(paidByCardLabel(ar, { isPaidInFull: true }, '20%')).toBe('مدفوع بالكامل بالبطاقة');
-  });
-
-  it('names the deposit with its frozen rate otherwise, including on an API too old to say', () => {
-    expect(paidByCardLabel(en, { isPaidInFull: false }, '20%')).toBe('Deposit paid by card (20%)');
-    expect(paidByCardLabel(en, {}, '20%')).toBe('Deposit paid by card (20%)');
-    expect(paidByCardLabel(ar, { isPaidInFull: false }, '20%')).toBe('العربون المدفوع بالبطاقة (20%)');
-  });
-});
-
 // Phase 3 (owner, 2026-09-26): every refund, with why, how much and where it is, on both consoles.
 describe('the refunds a booking lists', () => {
   const refund = (reason: string, status: string, amount = 72) => ({
@@ -74,33 +61,9 @@ describe('the refunds a booking lists', () => {
     expect(refundStatusKey({ status: 'Sent' })).toBe('booking.refundInitiatedTo');
   });
 
-  it('says the deposit is held only while nothing has returned or decided it', () => {
-    expect(depositStillHeld({ depositPaid: true, refunds: [] })).toBe(true);
-    // The money above the deposit going back leaves the deposit itself held.
-    expect(depositStillHeld({ depositPaid: true, refunds: [refund('EndedBeforePickup', 'Settled')] })).toBe(true);
-    expect(depositStillHeld({ depositPaid: true, refunds: [refund('DisputeWindowClosed', 'Sent')] })).toBe(false);
-    expect(depositStillHeld({ depositPaid: true, refunds: [refund('PlatformCancellation', 'Sent')] })).toBe(false);
-    expect(depositStillHeld({ depositPaid: true, refunds: [refund('DisputeResolution', 'Settled')] })).toBe(false);
-    expect(depositStillHeld({ depositPaid: false, refunds: [] })).toBe(false);
-  });
-
   it('tells the administrator a platform cancellation returns the whole payment, never that nothing is refunded', () => {
     expect(en('adminBooking.cancelRefundsAmount', { amount: 'JOD 94.5' })).toContain('the deposit included');
     expect(ar('adminBooking.cancelRefundsAmount', { amount: 'JOD 94.5' })).toContain('بما فيه العربون');
-  });
-});
-
-describe('the refund row a free cancellation leaves', () => {
-  it('names the payment when the booking was paid in full, the deposit otherwise', () => {
-    expect(en(refundRowKey({ isPaidInFull: true }))).toBe('Payment');
-    expect(ar(refundRowKey({ isPaidInFull: true }))).toBe('الدفعة');
-    expect(en(refundRowKey({ isPaidInFull: false }))).toBe('Deposit');
-    expect(en(refundRowKey({}))).toBe('Deposit');
-  });
-
-  it('reads the same way on the administrator booking page', () => {
-    expect(en('adminBooking.paymentRefund')).toBe('Payment refund');
-    expect(AR['adminBooking.paymentRefund']).not.toContain('العربون');
   });
 });
 

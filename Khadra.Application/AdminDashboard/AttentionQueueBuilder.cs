@@ -2,6 +2,7 @@ using System.Globalization;
 using Khadra.Application.AdminDashboard.Dtos;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
 
 namespace Khadra.Application.AdminDashboard;
@@ -25,6 +26,15 @@ public static class AttentionQueueBuilder
         public const string DisputeOverdue = "DisputeOverdue";
         public const string DisputeOpen = "DisputeOpen";
         public const string DealerApplicationsAtRisk = "DealerApplicationsAtRisk";
+
+        /// <summary>Refunds the provider refused: still owed, being sent again, and a human has to look.</summary>
+        public const string RefundFailed = "RefundFailed";
+
+        /// <summary>Captures that could not be applied, whose refund is on its way and not back.</summary>
+        public const string OrphanedCaptureOwed = "OrphanedCaptureOwed";
+
+        /// <summary>A deposit held for a penalty against the customer with no dispute (pre-launch item 164).</summary>
+        public const string DepositAwaitingDecision = "DepositAwaitingDecision";
     }
 
     public static class Severities
@@ -45,7 +55,8 @@ public static class AttentionQueueBuilder
         IReadOnlyCollection<PendingDealerApplication> pendingApplications,
         decimal slaWarningThreshold,
         int slaHours,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        MoneyAttention? money = null)
     {
         ArgumentNullException.ThrowIfNull(liveDisputes);
         ArgumentNullException.ThrowIfNull(disputeSubtitles);
@@ -98,10 +109,17 @@ public static class AttentionQueueBuilder
                 IsOverdue: anyOverdue));
         }
 
-        // Overdue work first, then whatever runs out of time soonest. An admin reads top-down.
+        AddMoney(items, money ?? MoneyAttention.None);
+
+        // Overdue work first; then whatever runs out of time soonest, because each of those is a promise
+        // the platform made and can still keep; then money a human has to look at, which has no clock —
+        // a refused refund is sent again by the payment sweep on its own, so it loses nothing by waiting
+        // behind a live deadline; then money that is only being watched until the rules give it an exit.
+        // Inside a band with no clock, whatever has waited longest. An admin reads top-down.
         var ordered = items
-            .OrderByDescending(item => item.IsOverdue)
+            .OrderBy(Band)
             .ThenBy(item => item.SlaDeadlineAt)
+            .ThenBy(item => item.SlaStartedAt)
             .ToList();
 
         return new AttentionQueueDto(
@@ -113,6 +131,75 @@ public static class AttentionQueueBuilder
             OverdueCount: ordered.Count(item => item.IsOverdue),
             Items: ordered);
     }
+
+    /// <summary>
+    /// The Payments context's rows (payments Phase 4b). None has a deadline: nobody has frozen one for
+    /// money owed back, and inventing one would be a business number nobody decided. Grouped where there
+    /// is a list to open (the refunds queue, the payments list), one per booking where each is its own
+    /// decision. A subtitle carries booking references only — the console words the count.
+    /// </summary>
+    private static void AddMoney(List<AttentionItemDto> items, MoneyAttention money)
+    {
+        if (money.FailedRefunds.Count > 0)
+        {
+            items.Add(new AttentionItemDto(
+                Id: "refunds-failed",
+                Kind: Kinds.RefundFailed,
+                // Money still owed that the provider refused: a human has to look, so never merely Info.
+                Severity: Severities.Warning,
+                Count: money.FailedRefunds.Count,
+                SubjectIds: [.. money.FailedRefunds.Select(refund => refund.RefundId)],
+                Subtitle: References(money.FailedRefunds.Select(refund => refund.BookingReference)),
+                Description: null,
+                SlaStartedAt: money.FailedRefunds.Min(refund => refund.RequestedAt),
+                SlaDeadlineAt: null,
+                IsOverdue: false));
+        }
+
+        if (money.OwedOrphans.Count > 0)
+        {
+            items.Add(new AttentionItemDto(
+                Id: "orphaned-captures",
+                Kind: Kinds.OrphanedCaptureOwed,
+                Severity: Severities.Info,
+                Count: money.OwedOrphans.Count,
+                SubjectIds: [.. money.OwedOrphans.Select(orphan => orphan.PaymentId)],
+                Subtitle: References(money.OwedOrphans.Select(orphan => orphan.BookingReference)),
+                Description: null,
+                SlaStartedAt: money.OwedOrphans.Min(orphan => orphan.OrphanedAt),
+                SlaDeadlineAt: null,
+                IsOverdue: false));
+        }
+
+        foreach (var held in money.HeldDeposits)
+        {
+            items.Add(new AttentionItemDto(
+                Id: $"deposit:{held.BookingId}",
+                Kind: Kinds.DepositAwaitingDecision,
+                // Nothing an administrator can do until payments Phase 8: the row makes the money visible.
+                Severity: Severities.Info,
+                Count: 1,
+                SubjectIds: [held.BookingId],
+                Subtitle: held.Subtitle,
+                Description: null,
+                SlaStartedAt: held.HeldSince,
+                SlaDeadlineAt: null,
+                IsOverdue: false));
+        }
+    }
+
+    /// <summary>Up to three booking references, the ones a human reads first; the console states the count.</summary>
+    private static string? References(IEnumerable<string?> references)
+    {
+        var shown = references.OfType<string>().Distinct(StringComparer.Ordinal).Take(3).ToList();
+        return shown.Count == 0 ? null : string.Join(" · ", shown);
+    }
+
+    private static int Band(AttentionItemDto item) =>
+        item.IsOverdue ? 0
+        : item.SlaDeadlineAt is not null ? 1
+        : item.Severity == Severities.Warning ? 2
+        : 3;
 
     private static string Severity(
         bool isOverdue,
@@ -148,4 +235,17 @@ public static class AttentionQueueBuilder
 
         return (decimal)(elapsed.TotalSeconds / window.TotalSeconds) >= threshold;
     }
+}
+
+/// <summary>A deposit awaiting a decision, with its booking's label.</summary>
+public sealed record HeldDepositRow(Guid BookingId, string? Subtitle, DateTimeOffset HeldSince);
+
+/// <summary>What the Payments context owes a human, for the work queue (payments Phase 4b).</summary>
+public sealed record MoneyAttention(
+    IReadOnlyCollection<FailedRefundItem> FailedRefunds,
+    IReadOnlyCollection<OwedOrphanItem> OwedOrphans,
+    IReadOnlyCollection<HeldDepositRow> HeldDeposits)
+{
+    /// <summary>Nothing owed to anybody's attention.</summary>
+    public static readonly MoneyAttention None = new([], [], []);
 }

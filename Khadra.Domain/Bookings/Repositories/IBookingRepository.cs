@@ -49,6 +49,14 @@ public interface IBookingRepository
     Task<IReadOnlyList<Booking>> ListDueForDepositReleaseAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Paid bookings that ended before pickup with a penalty against the CUSTOMER and nothing that has
+    /// decided their deposit: candidates for pre-launch item 164's "deposit awaiting a decision", which
+    /// the financial state's calculator then confirms (<c>HeldUnresolved</c>). The release query above
+    /// with its penalty condition inverted, so the two never both claim one booking. Oldest ending first.
+    /// </summary>
+    Task<IReadOnlyList<Booking>> ListHeldForCustomerPenaltyAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Bookings on one vehicle, overlapping one candidate window, whose hold has run out but whose
     /// status has not caught up.
     /// </summary>

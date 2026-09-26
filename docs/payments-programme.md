@@ -14,8 +14,8 @@ deliver is written down so it cannot be dropped. The rules already in force are 
 | 1 | Khadra's commission frozen on each booking, at 20% of one daily rate for new bookings | done (`9e3db1d`) |
 | 2 | Payment purpose and processing fee, the amount paid online, deposit or full payment on the website and in the app | done (`43f4128`, `e04a55f`, `de384c5`) |
 | 3 | Refunds generalised: what a paid booking owes back when it ends before pickup, the clean-close release, named refund events | done (`82a66e7`); items 169/170 (`b7c9db0`, `43b3707`) |
-| 4a | One server calculator of a booking's financial state; `GET /bookings/{id}/financials` and its admin twin; the "Payments" section on the website and in app 1.3.0 | done (2026-09-26) |
-| 4b | The consoles: the office's Financial section and the admin's Money section from the calculator; the admin Payments and Refunds screens; the dashboard's money panel | approved 2026-09-26 |
+| 4a | One server calculator of a booking's financial state; `GET /bookings/{id}/financials` and its admin twin; the "Payments" section on the website and in app 1.3.0 | done (`c50ab9b`); item 173 (`673c586`) |
+| 4b | The consoles: the office's Financial section and the admin's Money section from the calculator; the admin Payments and Refunds screens; the dashboard's money panel | done (2026-09-27) |
 | 5 | Issued documents: payment receipts, refund receipts and booking statement versions, with numbering and immutable snapshots | not started |
 | 6 | PDF rendering and secure download | not started (QuestPDF only if its Community licence applies) |
 | 7 | Receipt and invoice email | not started |
@@ -74,7 +74,14 @@ deliver is written down so it cannot be dropped. The rules already in force are 
      share, so the office's refund badge is read from the refunds it IS shown, and reads "refunded in
      full" only when those return all the booking money the payment applied. A badge judged by the
      whole payment would tell an office that got nothing from a dispute that the customer got
-     everything.
+     everything. The office console shows no badge at all (4b): it sees one payment, and "partly
+     refunded" would invite the question the share it is not shown answers.
+   - And in 4b: the office's own copy of a booking (`GET /bookings/{id}` and every answer a decision
+     returns) no longer carries the refund list — a dispute decision's row is on it — or any figure
+     that includes the processing fee (decision 8). The office reads its money from the financial
+     state's office projection only. Its copy of a dispute decision carries only the basis, its own
+     share and any charge assessed to it (owner, 2026-09-27; pre-launch item 151). The customer's copy
+     of a dispute still carries every share: that half of item 151 is deferred.
 4. **Phase 5 refund storage:** each refund's split into booking money and processing fee is stored in
    the Phase 5 persistence model, in addition to being frozen into the issued document.
 5. **Two commits:** 4a (backend and the customer surfaces), then 4b (the consoles).

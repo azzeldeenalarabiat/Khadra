@@ -1,6 +1,7 @@
 using Khadra.Application.Bookings;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Dtos;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Disputes;
 using Khadra.Application.Disputes.RaiseDispute;
@@ -882,7 +883,7 @@ public sealed class DisputeUseCaseTests
                 [AdminId.Value] = "Rania Haddad",
             });
 
-        var view = await context.Composer().ComposeAsync(ticket, booking, CancellationToken.None);
+        var view = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
 
         Assert.Equal("Layla Odeh", view.OpenedByName);
         Assert.False(view.OpenedByAccountClosed);
@@ -909,8 +910,8 @@ public sealed class DisputeUseCaseTests
         var heldByLeaver = OpenTicket(booking, Build.Now.AddHours(4));
         Assert.True(heldByLeaver.AssignToAdmin(Id.New()).IsSuccess);
 
-        var nobody = await context.Composer().ComposeAsync(unassigned, booking, CancellationToken.None);
-        var leaver = await context.Composer().ComposeAsync(heldByLeaver, booking, CancellationToken.None);
+        var nobody = await context.Composer().ComposeAsync(unassigned, booking, BookingParty.Admin, CancellationToken.None);
+        var leaver = await context.Composer().ComposeAsync(heldByLeaver, booking, BookingParty.Admin, CancellationToken.None);
 
         Assert.Null(nobody.AssignedAdminId);
         Assert.Null(nobody.AssignedAdminName);
@@ -934,7 +935,7 @@ public sealed class DisputeUseCaseTests
         Assert.True(resolved.IsSuccess);
 
         // The context resolves no names at all, so the admin who decided is gone by the time it is read.
-        var view = await context.Composer().ComposeAsync(ticket, booking, CancellationToken.None);
+        var view = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
 
         Assert.True(view.Resolution!.ResolvedByAccountClosed);
         Assert.Equal("Account closed", view.Resolution.ResolvedByName);
@@ -955,7 +956,7 @@ public sealed class DisputeUseCaseTests
             new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, null, "Refunded in full."),
             CancellationToken.None)).IsSuccess);
 
-        var view = await context.Composer().ComposeAsync(ticket, booking, CancellationToken.None);
+        var view = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
         using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(view, WireOptions));
         var root = json.RootElement;
 
@@ -971,5 +972,151 @@ public sealed class DisputeUseCaseTests
         var resolution = root.GetProperty("resolution");
         Assert.Equal(System.Text.Json.JsonValueKind.String, resolution.GetProperty("resolvedByName").ValueKind);
         Assert.True(resolution.GetProperty("resolvedByAccountClosed").GetBoolean());
+    }
+
+    // ── Who is shown which share (owner decision 3, 2026-09-26; pre-launch item 151) ─────────────
+    //
+    // The rental office is shown the basis a decision split, its own share and any charge assessed to
+    // it, and nothing of the customer's or the platform's shares. The customer's copy is unchanged: it
+    // is the installed app's contract, and the owner deferred its half of item 151 (2026-09-27).
+
+    /// <summary>A customer-penalty booking whose dispute was split three ways: 9, 2 and 7 of 18.</summary>
+    private static async Task<(Context Context, Booking Booking, DisputeTicket Ticket, decimal Held, decimal ToOffice)> SplitThreeWaysAsync()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+        var toOffice = held - (held / 2) - 2m;
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held / 2, 2m, toOffice, null, "Both sides partly at fault."),
+            CancellationToken.None);
+        Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
+        return (context, booking, ticket, held, toOffice);
+    }
+
+    [Fact]
+    public async Task The_office_is_shown_the_basis_and_its_own_share_and_never_the_customers_or_the_platforms()
+    {
+        var (context, booking, ticket, held, toOffice) = await SplitThreeWaysAsync();
+        // The customer's refund row is on the booking too; the office's copy of the booking drops it (4b).
+        context.BookingReader.ContextAsync(booking.Id, Arg.Any<CancellationToken>())
+            .Returns(new BookingContext(null, "Petra Wheels", false, null, "Layla Odeh", false, null, null,
+                Refunds: [new RefundDto(Guid.NewGuid(), Guid.NewGuid(), "DisputeResolution", MoneyDto.From(Money.Jod(held / 2)), "Requested", Build.Now, null, null, null, ticket.Id.Value)],
+                HasResolvedDispute: true));
+
+        var office = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None);
+
+        var decision = office.Resolution!;
+        Assert.Equal(held, decision.DepositHeld.Amount);
+        Assert.Equal(toOffice, decision.TransferredToDealer.Amount);
+        Assert.Null(decision.DealerCharge);
+        Assert.Null(decision.RefundToCustomer);
+        Assert.Null(decision.RetainedByPlatform);
+        Assert.Null(decision.WaivesEverything);
+        Assert.Equal("Both sides partly at fault.", decision.Note);
+        Assert.Equal(held, office.DepositHeld.Amount);
+        Assert.Null(office.Booking.Refunds);
+    }
+
+    /// <summary>
+    /// Through the handler, not the composer: "my dispute" is the one path that can hand the office a
+    /// decision (a resolved ticket takes no statement and cannot be withdrawn), and it must pass the
+    /// office as the reader.
+    /// </summary>
+    [Fact]
+    public async Task Reading_its_dispute_the_office_gets_its_own_copy_of_the_decision()
+    {
+        var context = new Context();
+        var dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
+        var booking = Build.Booking(customerId: CustomerId, dealerId: dealer.Id, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        booking.Approve(Id.New(), Build.Now.AddMinutes(10));
+        booking.ConfirmDepositPaid(Id.New(), Build.Now);
+        booking.Cancel(BookingParty.Customer, CustomerId, "Changed plans.", Build.Now.AddHours(3));
+        context.GivenBooking(booking);
+        context.Dealers.GetByOwnerUserIdAsync(OwnerId, Arg.Any<CancellationToken>()).Returns(dealer);
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held / 2, 2m, held - (held / 2) - 2m, null, "Both sides partly at fault."),
+            CancellationToken.None)).IsSuccess);
+
+        var office = await context.Raise().Handle(new GetMyDisputeQuery(OwnerId, ticket.Id), CancellationToken.None);
+        var customer = await context.Raise().Handle(new GetMyDisputeQuery(CustomerId, ticket.Id), CancellationToken.None);
+
+        Assert.True(office.IsSuccess, office.IsFailure ? office.Error.Code : null);
+        Assert.Null(office.Value.Resolution!.RefundToCustomer);
+        Assert.Null(office.Value.Resolution.RetainedByPlatform);
+        Assert.Equal(held - (held / 2) - 2m, office.Value.Resolution.TransferredToDealer.Amount);
+        Assert.Equal(held / 2, customer.Value.Resolution!.RefundToCustomer!.Amount);
+    }
+
+    [Fact]
+    public async Task The_office_is_shown_a_charge_assessed_to_it()
+    {
+        var context = new Context();
+        var (booking, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        var charge = booking.Penalty!.MinAmount.Amount;
+        var held = booking.Pricing.DepositAmount.Amount;
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, charge, "The office cancelled late."), CancellationToken.None)).IsSuccess);
+
+        var decision = (await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None)).Resolution!;
+
+        Assert.Equal(charge, decision.DealerCharge!.Amount);
+        Assert.Equal(0m, decision.TransferredToDealer.Amount);
+        Assert.Null(decision.RefundToCustomer);
+    }
+
+    [Fact]
+    public async Task The_customers_and_the_administrators_copies_still_carry_every_share()
+    {
+        var (context, booking, ticket, held, toOffice) = await SplitThreeWaysAsync();
+
+        var customer = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None);
+        var admin = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
+
+        foreach (var decision in new[] { customer.Resolution!, admin.Resolution! })
+        {
+            Assert.Equal(held / 2, decision.RefundToCustomer!.Amount);
+            Assert.Equal(2m, decision.RetainedByPlatform!.Amount);
+            Assert.Equal(toOffice, decision.TransferredToDealer.Amount);
+            Assert.False(decision.WaivesEverything);
+        }
+    }
+
+    /// <summary>
+    /// A decision that gives the customer everything and charges nobody: its waiver flag would tell the
+    /// office the customer's share, so the office reads null there too. The customer's JSON keeps every
+    /// name and type the installed app parses.
+    /// </summary>
+    [Fact]
+    public async Task On_the_wire_the_office_reads_null_where_the_customer_still_reads_the_figures()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, null, "Refunded in full."), CancellationToken.None)).IsSuccess);
+
+        JsonElement WireOf(Khadra.Application.Disputes.Dtos.DisputeDto view) =>
+            JsonDocument.Parse(JsonSerializer.Serialize(view, WireOptions)).RootElement.GetProperty("resolution").Clone();
+        var office = WireOf(await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None));
+        var customer = WireOf(await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None));
+
+        Assert.Equal(JsonValueKind.Null, office.GetProperty("refundToCustomer").ValueKind);
+        Assert.Equal(JsonValueKind.Null, office.GetProperty("retainedByPlatform").ValueKind);
+        Assert.Equal(JsonValueKind.Null, office.GetProperty("waivesEverything").ValueKind);
+        Assert.Equal(held, office.GetProperty("depositHeld").GetProperty("amount").GetDecimal());
+        Assert.Equal(0m, office.GetProperty("transferredToDealer").GetProperty("amount").GetDecimal());
+
+        Assert.Equal(held, customer.GetProperty("refundToCustomer").GetProperty("amount").GetDecimal());
+        Assert.Equal(0m, customer.GetProperty("retainedByPlatform").GetProperty("amount").GetDecimal());
+        Assert.Equal(JsonValueKind.True, customer.GetProperty("waivesEverything").ValueKind);
     }
 }

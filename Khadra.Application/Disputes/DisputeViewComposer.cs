@@ -19,7 +19,9 @@ namespace Khadra.Application.Disputes;
 
 /// <summary>
 /// Turns a ticket into the view everyone shares -- the parties and the Admin see the same dispute,
-/// because both sides' statements are visible to both sides by design (one ticket per booking).
+/// because both sides' statements are visible to both sides by design (one ticket per booking). The
+/// money is projected per reader: the rental office's copy of the booking and of the decision carries
+/// only what is the office's (owner decision 3).
 ///
 /// Evidence links are minted here, per request, and expire: spec 7 keeps evidence private, and a
 /// stored URL would be a credential sitting in a database.
@@ -35,7 +37,10 @@ public sealed partial class DisputeViewComposer(
 {
     private const string ClosedAccountName = "Account closed";
 
-    public async Task<Result<DisputeDto, Error>> ComposeAsync(DisputeTicket ticket, CancellationToken cancellationToken)
+    public async Task<Result<DisputeDto, Error>> ComposeAsync(
+        DisputeTicket ticket,
+        BookingParty viewer,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ticket);
 
@@ -43,18 +48,23 @@ public sealed partial class DisputeViewComposer(
         if (booking is null)
             return DisputeErrors.BookingMissing;
 
-        return await ComposeAsync(ticket, booking, cancellationToken);
+        return await ComposeAsync(ticket, booking, viewer, cancellationToken);
     }
 
-    /// <param name="viewer">The party the view is for. A customer's copy carries no commission.</param>
+    /// <param name="viewer">
+    /// The party the view is for, always named: a path that forgot it must not get the administrator's
+    /// copy by default. A customer's copy carries no commission; an office's carries no refund, no fee,
+    /// and of a decision only the basis, the office's own share and any charge to it (owner decision 3).
+    /// </param>
     public async Task<DisputeDto> ComposeAsync(
         DisputeTicket ticket,
         Booking booking,
-        CancellationToken cancellationToken,
-        BookingParty? viewer = null)
+        BookingParty viewer,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(ticket);
         ArgumentNullException.ThrowIfNull(booking);
+        ArgumentNullException.ThrowIfNull(viewer);
 
         var now = clock.UtcNow;
         var context = await bookingReader.ContextAsync(booking.Id, cancellationToken);
@@ -91,6 +101,16 @@ public sealed partial class DisputeViewComposer(
             .ToList();
 
         var basis = await BasisAsync(ticket, booking, context, cancellationToken);
+        var decision = ticket.Resolution is { } resolved
+            ? DisputeResolutionDto.From(resolved, NameOf(resolved.ResolvedByAdminId), Closed(resolved.ResolvedByAdminId))
+            : null;
+        var copy = BookingDto.From(booking, context, now);
+        // Each reader's copy, named explicitly, the same shape as BookingFinancialsDto.For: anything
+        // else is a programming error, never a quiet fall-through to the administrator's view.
+        (copy, decision) = viewer == BookingParty.Customer ? (copy.ForCustomer(), decision)
+            : viewer == BookingParty.Dealer ? (copy.ForDealer(), decision?.ForDealer())
+            : viewer == BookingParty.Admin ? (copy, decision)
+            : throw new ArgumentOutOfRangeException(nameof(viewer), viewer.Name, "A dispute is read by the customer, the office or an administrator.");
 
         return new DisputeDto(
             ticket.Id.Value,
@@ -110,16 +130,9 @@ public sealed partial class DisputeViewComposer(
             ticket.AssignedAdminId is { } holder && Closed(holder),
             ticket.ClosedAt,
             statements,
-            ticket.Resolution is { } resolved
-                ? DisputeResolutionDto.From(
-                    resolved,
-                    NameOf(resolved.ResolvedByAdminId),
-                    Closed(resolved.ResolvedByAdminId))
-                : null,
+            decision,
             basis.Held,
-            viewer == BookingParty.Customer
-                ? BookingDto.From(booking, context, now).ForCustomer()
-                : BookingDto.From(booking, context, now),
+            copy,
             basis.OnBooking,
             basis.DecidedEarlier);
     }

@@ -182,6 +182,18 @@ public sealed class Payment : AggregateRoot
         !whole.IsZero &&
         !whole.IsGreaterThan(RefundSettled);
 
+    /// <summary>
+    /// Whether everything this payment will EVER return has reached the customer: an orphaned capture
+    /// its whole capture, fee included; an applied payment its <see cref="WholePaymentRefundAmount"/>.
+    /// </summary>
+    public bool IsWhollyReturned =>
+        Status == PaymentStatus.Orphaned
+            ? AmountCaptured is { } captured && !captured.IsGreaterThan(RefundSettled)
+            : IsRefundedInFull;
+
+    /// <summary>Where this payment's refunds stand, read over every one of them.</summary>
+    public RefundProgress RefundProgress => RefundProgress.Of(_refunds, IsWhollyReturned);
+
     private Payment()
     {
     }

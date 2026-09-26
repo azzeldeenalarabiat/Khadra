@@ -32,6 +32,9 @@ public interface IPaymentRepository
     /// <summary>Every attempt on a booking, newest first. For the admin's view of a disputed rental.</summary>
     Task<IReadOnlyList<Payment>> ListForBookingAsync(Id bookingId, CancellationToken cancellationToken = default);
 
+    /// <summary>Every attempt on several bookings, with their refunds, in ONE read: for batches that run the calculator per booking.</summary>
+    Task<IReadOnlyList<Payment>> ListForBookingsAsync(IReadOnlyCollection<Id> bookingIds, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// The payment that actually holds this booking's deposit, or null if none ever did.
     /// </summary>

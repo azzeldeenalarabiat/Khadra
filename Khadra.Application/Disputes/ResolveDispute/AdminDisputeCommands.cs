@@ -5,6 +5,7 @@ using Khadra.Application.Common;
 using Khadra.Application.Disputes.Dtos;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Domain.Auditing;
+using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
@@ -115,7 +116,7 @@ public sealed class AdminDisputeHandlers(
         if (ticket is null)
             return DisputeErrors.NotFound;
 
-        return await composer.ComposeAsync(ticket, cancellationToken);
+        return await composer.ComposeAsync(ticket, BookingParty.Admin, cancellationToken);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(AssignDisputeCommand request, CancellationToken cancellationToken)
@@ -140,7 +141,7 @@ public sealed class AdminDisputeHandlers(
         await TellCustomerAsync(ticket, booking);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await composer.ComposeAsync(ticket, booking, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, BookingParty.Admin, cancellationToken);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(ResolveDisputeCommand request, CancellationToken cancellationToken)
@@ -238,7 +239,7 @@ public sealed class AdminDisputeHandlers(
         // BEFORE commit, which is exactly what the post-commit rule exists to prevent.
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await composer.ComposeAsync(ticket, booking, cancellationToken);
+        return await composer.ComposeAsync(ticket, booking, BookingParty.Admin, cancellationToken);
     }
 
     /// <summary>

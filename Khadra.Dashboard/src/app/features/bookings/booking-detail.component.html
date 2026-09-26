@@ -80,14 +80,89 @@
             <span class="sect-t">{{ t('common.money') }}</span>
             <span class="sect-hint">{{ t('adminBooking.frozenWhenTheBooking') }}</span>
           </div>
-          <div class="kv-body">
-            @for (row of moneyRows(); track row.k) {
-              <div class="kv-split">
-                <div class="kv-key">{{ row.k }}</div>
-                <div class="kv-val num">{{ row.v }}</div>
+          <!-- The administrator's projection of the booking's financial state (payments Phase 4b). -->
+          @if (financialsResource.error()) {
+            <div class="sect-pad">
+              <div class="state-text">{{ t('money.loadFailed') }}</div>
+              <div class="state-actions">
+                <button type="button" class="btn btn-secondary btn-sm" (click)="financialsResource.reload()">
+                  {{ t('common.retry') }}
+                </button>
+              </div>
+            </div>
+          } @else if (moneyView(); as money) {
+            @if (money.reviewing) {
+              <div class="sect-pad">
+                <div class="banner s-warn">
+                  <kh-icon name="warning" />
+                  <div>
+                    <div>{{ t('adminMoney.needsReview') }}</div>
+                    @for (issue of money.issues; track $index) {
+                      <div class="td-sub">{{ issue }}</div>
+                    }
+                  </div>
+                </div>
               </div>
             }
-          </div>
+            <div class="kv-body">
+              @for (row of money.lines; track $index) {
+                <div class="kv-split">
+                  <div class="kv-key">{{ row.k }}</div>
+                  <div class="kv-val num">{{ row.v }}</div>
+                </div>
+              }
+            </div>
+            <div class="sect-h">
+              <span class="sect-t">{{ t('adminMoney.payments') }}</span>
+            </div>
+            <div class="kv-body">
+              @for (payment of money.payments; track payment.paymentId) {
+                <div class="kv-split">
+                  <div class="kv-key">
+                    <a class="row-link" [routerLink]="['/payments', payment.paymentId]">{{ payment.title }}</a>
+                    <div class="td-sub">{{ payment.when }}</div>
+                  </div>
+                  <div class="kv-val">
+                    <div class="row row-gap-8 row-wrap row-end">
+                      <span class="pill" [class]="'s-' + payment.tone">{{ payment.status }}</span>
+                      @if (payment.sandbox) {
+                        <span class="pill s-warn">{{ t('payments.test') }}</span>
+                      }
+                      @if (payment.progress) {
+                        <span class="pill s-dim">{{ payment.progress }}</span>
+                      }
+                    </div>
+                    <div class="td-sub num">{{ payment.figures }}</div>
+                    @if (payment.code) {
+                      <div class="td-sub mono ltr">{{ payment.code }}</div>
+                    }
+                  </div>
+                </div>
+                @for (refund of payment.refunds; track $index) {
+                  <div class="kv-split">
+                    <div class="kv-key td-sub">{{ refund.k }}</div>
+                    <div class="kv-val">
+                      <div class="num">{{ refund.v }}</div>
+                      @if (refund.split) {
+                        <div class="td-sub num">{{ refund.split }}</div>
+                      }
+                      @if (refund.code) {
+                        <div class="td-sub mono ltr">{{ t('refunds.providerCode', { code: refund.code }) }}</div>
+                      }
+                    </div>
+                  </div>
+                }
+              } @empty {
+                <div class="state-text">{{ t('adminMoney.noPayments') }}</div>
+              }
+            </div>
+          } @else {
+            <div class="sect-pad">
+              @for (row of [0, 1, 2, 3]; track row) {
+                <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+              }
+            </div>
+          }
         </section>
 
         @if (b.penalty; as penalty) {

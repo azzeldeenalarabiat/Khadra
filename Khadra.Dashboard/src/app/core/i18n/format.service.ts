@@ -190,6 +190,25 @@ export class FormatService {
       : '—';
   }
 
+  /**
+   * September 2026, for a calendar date — the first day of a reporting month the server sent as
+   * `YYYY-MM-DD`. The same zone rule as `calendarDayMonth`: through `monthYear`, the first of the
+   * month is midnight UTC, which is still August anywhere west of Greenwich.
+   */
+  calendarMonthYear(isoDate: string | null | undefined): string {
+    const date = this.calendarDate(isoDate);
+    return date
+      ? this.isolate(
+          new Intl.DateTimeFormat(this.locale(), {
+            month: 'long',
+            year: 'numeric',
+            calendar: 'gregory',
+            timeZone: 'UTC',
+          }).format(date),
+        )
+      : '—';
+  }
+
   /** Tue 2 Sept, for a calendar date. The same zone rule as `calendarDayMonth`. */
   calendarWeekdayDayMonth(isoDate: string | null | undefined): string {
     const date = this.calendarDate(isoDate);

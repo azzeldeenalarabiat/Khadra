@@ -1,0 +1,256 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('nav.payments') }}</h1>
+      <div class="page-sub">{{ t('payments.subtitle') }}</div>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    <div class="tabs" role="tablist">
+      <a class="tab" role="tab" routerLink="/payments" [class.is-active]="view === 'payments'"
+         [attr.aria-selected]="view === 'payments'">{{ t('payments.tabPayments') }}</a>
+      <a class="tab" role="tab" routerLink="/payments/refunds" [class.is-active]="view === 'refunds'"
+         [attr.aria-selected]="view === 'refunds'">{{ t('payments.tabRefunds') }}</a>
+    </div>
+
+    @if (view === 'payments') {
+      <!-- Every option comes from /admin/payments/vocabulary: the console keeps no list of the domain's words. -->
+      <div class="list-toolbar filters-row">
+        <label class="field-inline">
+          <span class="k">{{ t('payments.filterStatus') }}</span>
+          <select class="input input-sm" (change)="setFilter('status', $event)">
+            <option value="" [selected]="!filters().status">{{ t('payments.filterAll') }}</option>
+            @for (option of statusOptions(); track option.name) {
+              <option [value]="option.name" [selected]="filters().status === option.name">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="field-inline">
+          <span class="k">{{ t('payments.filterPurpose') }}</span>
+          <select class="input input-sm" (change)="setFilter('purpose', $event)">
+            <option value="" [selected]="!filters().purpose">{{ t('payments.filterAll') }}</option>
+            @for (option of purposeOptions(); track option.name) {
+              <option [value]="option.name" [selected]="filters().purpose === option.name">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="field-inline">
+          <span class="k">{{ t('payments.filterReference') }}</span>
+          <input class="input input-sm ltr" [value]="filters().reference" (change)="setFilter('reference', $event)" />
+        </label>
+        <label class="field-inline">
+          <span class="k">{{ t('payments.filterFrom') }}</span>
+          <input class="input input-sm" type="date" [value]="filters().from" (change)="setFilter('from', $event)" />
+        </label>
+        <label class="field-inline">
+          <span class="k">{{ t('payments.filterTo') }}</span>
+          <input class="input input-sm" type="date" [value]="filters().to" (change)="setFilter('to', $event)" />
+        </label>
+        @if (filtered()) {
+          <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+            {{ t('payments.clearFilters') }}
+          </button>
+        }
+      </div>
+
+      @if (failure(); as message) {
+        <div class="state-block">
+          <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+          <div class="state-title">{{ t('payments.loadFailed') }}</div>
+          <div class="state-text">{{ message }}</div>
+          <div class="state-actions">
+            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          </div>
+        </div>
+      } @else if (paymentsResource.isLoading() && paymentRows().length === 0) {
+        <div class="sect-pad" aria-busy="true" aria-live="polite">
+          @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          }
+        </div>
+      } @else if (paymentRows().length === 0) {
+        <div class="state-block is-empty">
+          <div class="state-icon is-outline"><kh-icon name="credit-card" /></div>
+          <div class="state-title">{{ filtered() ? t('payments.empty') : t('payments.emptyAll') }}</div>
+          @if (filtered()) {
+            <div class="state-actions">
+              <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+                {{ t('payments.clearFilters') }}
+              </button>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table table-wide">
+            <thead>
+              <tr>
+                <th>{{ t('payments.colPayment') }}</th>
+                <th>{{ t('payments.colBooking') }}</th>
+                <th>{{ t('payments.colParties') }}</th>
+                <th>{{ t('payments.colPurpose') }}</th>
+                <th class="td-num">{{ t('payments.colAmount') }}</th>
+                <th class="td-num">{{ t('payments.colFee') }}</th>
+                <th>{{ t('payments.colStatus') }}</th>
+                <th>{{ t('payments.colRefunds') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of paymentRows(); track row.id) {
+                <tr class="rowlink" (click)="open(row.id)">
+                  <td class="td">
+                    <a class="row-link mono ltr" [routerLink]="['/payments', row.id]" (click)="$event.stopPropagation()">{{ row.shortId }}</a>
+                    <div class="td-sub">{{ row.created }}</div>
+                  </td>
+                  <td class="td">
+                    @if (row.reference) {
+                      <a class="row-link mono ltr" [routerLink]="['/bookings', row.bookingId]" (click)="$event.stopPropagation()">{{ row.reference }}</a>
+                    } @else {
+                      <span class="td-sub">{{ t('payments.noBooking') }}</span>
+                    }
+                  </td>
+                  <td class="td">
+                    <div class="entity-name">{{ row.customer }}</div>
+                    <div class="entity-sub">{{ row.dealer }}</div>
+                  </td>
+                  <td class="td">{{ row.purpose }}</td>
+                  <td class="td td-num num">{{ row.charged }}</td>
+                  <td class="td td-num num">{{ row.fee }}</td>
+                  <td class="td">
+                    <div class="row row-gap-8 row-wrap">
+                      <span class="pill" [class]="'s-' + row.tone">{{ row.status }}</span>
+                      @if (row.sandbox) {
+                        <span class="pill s-warn">{{ t('payments.test') }}</span>
+                      }
+                    </div>
+                  </td>
+                  <td class="td">
+                    @if (row.progress) {
+                      <span class="td-sub">{{ row.progress }}</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pager">
+          <span class="pager-count">{{ t('payments.shownOf', { shown: paymentRows().length, count: paymentsTotal() }) }}</span>
+          <div class="pager-nav">
+            <button type="button" class="btn btn-secondary btn-page" [disabled]="page() <= 1" (click)="goToPayments(page() - 1)">
+              {{ t('common.previous') }}
+            </button>
+            <span class="pager-count">{{ t('common.pageOf', { page: page(), total: paymentsPages() }) }}</span>
+            <button type="button" class="btn btn-secondary btn-page" [disabled]="page() >= paymentsPages()" (click)="goToPayments(page() + 1)">
+              {{ t('common.next') }}
+            </button>
+          </div>
+        </div>
+      }
+    } @else {
+      <div class="tabs" role="tablist">
+        @for (option of refundViews(); track option.key) {
+          <button type="button" class="tab" role="tab" [class.is-active]="refundView() === option.key"
+                  [attr.aria-selected]="refundView() === option.key" (click)="selectRefundView(option.key)">
+            {{ option.label }}
+          </button>
+        }
+      </div>
+      <div class="sect-pad">
+        <div class="note-box">
+          <kh-icon name="info" />
+          {{ t('refunds.note') }}
+        </div>
+      </div>
+
+      @if (failure(); as message) {
+        <div class="state-block">
+          <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+          <div class="state-title">{{ t('refunds.loadFailed') }}</div>
+          <div class="state-text">{{ message }}</div>
+          <div class="state-actions">
+            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          </div>
+        </div>
+      } @else if (refundsResource.isLoading() && refundRows().length === 0) {
+        <div class="sect-pad" aria-busy="true" aria-live="polite">
+          @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          }
+        </div>
+      } @else if (refundRows().length === 0) {
+        <div class="state-block is-empty">
+          <div class="state-icon is-outline"><kh-icon name="arrow-counter-clockwise" /></div>
+          <div class="state-title">{{ refundView() === 'live' ? t('refunds.empty') : t('refunds.emptyView') }}</div>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table table-wide">
+            <thead>
+              <tr>
+                <th>{{ t('refunds.colRefund') }}</th>
+                <th>{{ t('payments.colBooking') }}</th>
+                <th>{{ t('payments.colParties') }}</th>
+                <th class="td-num">{{ t('refunds.colAmount') }}</th>
+                <th>{{ t('payments.colStatus') }}</th>
+                <!-- A settled refund is not owed: its view dates each row by when it came back. -->
+                <th>{{ refundView() === 'Settled' ? t('refunds.colRefundedOn') : t('refunds.colOwedSince') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of refundRows(); track row.id) {
+                <tr class="rowlink" (click)="open(row.paymentId)">
+                  <td class="td">
+                    <div>{{ row.reason }}</div>
+                    @if (row.disputeTicketId) {
+                      <a class="td-sub row-link" [routerLink]="['/disputes', row.disputeTicketId]" (click)="$event.stopPropagation()">{{ t('paymentDetail.openDispute') }}</a>
+                    }
+                  </td>
+                  <td class="td">
+                    @if (row.reference) {
+                      <a class="row-link mono ltr" [routerLink]="['/bookings', row.bookingId]" (click)="$event.stopPropagation()">{{ row.reference }}</a>
+                    } @else {
+                      <span class="td-sub">{{ t('payments.noBooking') }}</span>
+                    }
+                  </td>
+                  <td class="td">
+                    <div class="entity-name">{{ row.customer }}</div>
+                    <div class="entity-sub">{{ row.dealer }}</div>
+                  </td>
+                  <td class="td td-num num">{{ row.amount }}</td>
+                  <td class="td">
+                    <div class="row row-gap-8 row-wrap">
+                      <span class="pill" [class]="'s-' + row.tone">{{ row.status }}</span>
+                      @if (row.sandbox) {
+                        <span class="pill s-warn">{{ t('payments.test') }}</span>
+                      }
+                    </div>
+                    @if (row.code) {
+                      <div class="td-sub mono ltr">{{ t('refunds.providerCode', { code: row.code }) }}</div>
+                    }
+                  </td>
+                  <td class="td">{{ row.date }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="pager">
+          <span class="pager-count">{{ t('refunds.shownOf', { shown: refundRows().length, count: refundsTotal() }) }}</span>
+          <div class="pager-nav">
+            <button type="button" class="btn btn-secondary btn-page" [disabled]="refundPage() <= 1" (click)="goToRefunds(refundPage() - 1)">
+              {{ t('common.previous') }}
+            </button>
+            <span class="pager-count">{{ t('common.pageOf', { page: refundPage(), total: refundsPages() }) }}</span>
+            <button type="button" class="btn btn-secondary btn-page" [disabled]="refundPage() >= refundsPages()" (click)="goToRefunds(refundPage() + 1)">
+              {{ t('common.next') }}
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+</div>

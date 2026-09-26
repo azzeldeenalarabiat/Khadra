@@ -6,6 +6,7 @@ using Khadra.Application.AdminDashboard.GetBookingTrend;
 using Khadra.Application.AdminDashboard.GetCustomerCounts;
 using Khadra.Application.AdminDashboard.GetDealerCounts;
 using Khadra.Application.AdminDashboard.GetDisputeCounts;
+using Khadra.Application.AdminDashboard.GetFinanceSummary;
 using Khadra.Application.AdminDashboard.GetRecentActivity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -83,6 +84,15 @@ public sealed class AdminDashboardController : ApiControllerBase
     [ProducesResponseType<BookingTrendDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult> BookingTrend(CancellationToken cancellationToken) =>
         FromResult(await Mediator.Send(new GetBookingTrendQuery(), cancellationToken));
+
+    /// <summary>
+    /// "Money in motion" (payments Phase 4b): this Amman month's payments applied and refunds settled, and
+    /// the refunds still owed right now. No commission or revenue figure: those are payments Phase 8's.
+    /// </summary>
+    [HttpGet("dashboard/finance")]
+    [ProducesResponseType<FinanceSummaryDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult> Finance(CancellationToken cancellationToken) =>
+        FromResult(await Mediator.Send(new GetFinanceSummaryQuery(), cancellationToken));
 
     /// <summary>The last few privileged actions. Not the audit log: no filters, no paging.</summary>
     [HttpGet("dashboard/activity")]

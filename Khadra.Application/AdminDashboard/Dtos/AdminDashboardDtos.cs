@@ -1,3 +1,5 @@
+using Khadra.Application.Common.Dtos;
+
 namespace Khadra.Application.AdminDashboard.Dtos;
 
 // The admin dashboard, as one response per panel.
@@ -104,6 +106,10 @@ public sealed record AttentionQueueDto(
 /// Count is 1 for a single subject and N for a grouped row (the design shows pending dealer
 /// applications as one line, not one line each). A client that meets an unknown Kind must still
 /// render the row generically: that is what lets the Payments kinds be added without a breaking change.
+///
+/// <see cref="SlaDeadlineAt"/> is null for a row with no clock (payments Phase 4b): money owed back has
+/// no deadline anybody has frozen, and inventing one would be a business number nobody decided. Such a
+/// row still carries <see cref="SlaStartedAt"/> — how long it has waited.
 /// </summary>
 public sealed record AttentionItemDto(
     string Id,
@@ -114,7 +120,7 @@ public sealed record AttentionItemDto(
     string? Subtitle,
     string? Description,
     DateTimeOffset SlaStartedAt,
-    DateTimeOffset SlaDeadlineAt,
+    DateTimeOffset? SlaDeadlineAt,
     bool IsOverdue);
 
 /// <summary>The audit feed as the dashboard shows it: newest first, capped by AdminDashboard:ActivityFeedSize.</summary>
@@ -129,3 +135,61 @@ public sealed record ActivityEntryDto(
     string Action,
     string EntityType,
     string SubjectLabel);
+
+/// <summary>
+/// "Money in motion" (payments Phase 4b): what moved through the platform this Amman month, and what is
+/// still owed back right now. No commission or revenue figure: commission is earned per booking and
+/// decided by its financial state, and a platform-wide sum of it is the office payables ledger's
+/// (payments Phase 8).
+/// </summary>
+/// <param name="PaymentMode">The provider's own answer — None, Sandbox or Live — as <c>/app-config</c> publishes it.</param>
+/// <param name="Currency">The platform's currency. Every figure below is in it; others are listed apart.</param>
+/// <param name="OtherCurrencies">
+/// Money in another currency: only ever a capture the provider took in the wrong one, which is listed
+/// here and never added to a figure in the platform's.
+/// </param>
+public sealed record FinanceSummaryDto(
+    DateTimeOffset GeneratedAt,
+    string PaymentMode,
+    string Currency,
+    FinanceThisMonthDto ThisMonth,
+    FinanceRightNowDto RightNow,
+    IReadOnlyList<FinanceOtherCurrencyDto> OtherCurrencies);
+
+/// <summary>The month's FLOWS, each counted by its own event date inside [From, To).</summary>
+/// <param name="From">The month's first Amman day.</param>
+/// <param name="To">The next month's first Amman day: exclusive.</param>
+/// <param name="AppliedToBookings">Booking money from payments that applied this month, fees excluded.</param>
+/// <param name="ProcessingFeesCharged">
+/// The processing fees charged on those payments. Charged, not kept: a refundable fee goes back inside
+/// a refund.
+/// </param>
+/// <param name="RefundsSettled">Refunds that reached the customer this month, whatever month their payment was in.</param>
+public sealed record FinanceThisMonthDto(
+    DateOnly From,
+    DateOnly To,
+    MoneyDto AppliedToBookings,
+    int PaymentsApplied,
+    MoneyDto ProcessingFeesCharged,
+    MoneyDto RefundsSettled,
+    int RefundsSettledCount);
+
+/// <summary>The STOCK of refunds owed back at <c>GeneratedAt</c>: the same refunds the refunds queue lists.</summary>
+/// <param name="RefundsInProgress">Recorded or sent, not back yet.</param>
+/// <param name="RefundsFailed">Refused by the provider, still owed, and being sent again.</param>
+/// <param name="OrphanedCapturesOwed">
+/// Of the two above, what goes back from captures that could not be applied: a PART of them, never added to them.
+/// </param>
+public sealed record FinanceRightNowDto(
+    MoneyDto RefundsInProgress,
+    int RefundsInProgressCount,
+    MoneyDto RefundsFailed,
+    int RefundsFailedCount,
+    MoneyDto OrphanedCapturesOwed,
+    int OrphanedCapturesOwedCount);
+
+/// <summary>Money in a currency that is not the platform's, listed apart rather than summed.</summary>
+public sealed record FinanceOtherCurrencyDto(
+    string Currency,
+    MoneyDto RefundsSettledThisMonth,
+    MoneyDto RefundsOutstanding);

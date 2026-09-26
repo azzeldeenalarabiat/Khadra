@@ -1,7 +1,10 @@
 import { Booking } from './bookings.api';
 import { Money } from './fleet.api';
 
-/** A dispute as the API returns it (Khadra.Application/Disputes/Dtos). Both parties and the Admin see the same shape. */
+/**
+ * A dispute as the API returns it to the administrator (Khadra.Application/Disputes/Dtos). The rental
+ * office receives the same ticket with its own copy of the decision: `OfficeDispute`.
+ */
 export interface Dispute {
   readonly ticketId: string;
   readonly bookingId: string;
@@ -72,7 +75,10 @@ export interface DisputeStatement {
   }[];
 }
 
-/** Recorded, not executed: nothing moves money until the Payments module ships. */
+/**
+ * The administrator's copy of a decision: every share. The customer's share is refunded automatically;
+ * what the platform keeps and what goes to the office are settled by hand until a payout rail exists.
+ */
 export interface DisputeResolution {
   readonly depositHeld: Money;
   readonly refundToCustomer: Money;
@@ -91,6 +97,22 @@ export interface DisputeResolution {
   readonly resolvedByAccountClosed: boolean;
   readonly resolvedAt: string;
 }
+
+/**
+ * The rental office's copy of a decision (owner decision 3, 2026-09-26; pre-launch item 151): the basis
+ * the decision split, the office's own share and any charge assessed to it. The server sends the
+ * customer's refund, the platform's share and the waiver flag (read from the platform's share) as null
+ * to the office, and this type leaves them out, so no office screen can show them.
+ */
+export type OfficeDisputeResolution = Omit<
+  DisputeResolution,
+  'refundToCustomer' | 'retainedByPlatform' | 'waivesEverything'
+>;
+
+/** A dispute as the rental office receives it: the same ticket, with the office's copy of the decision. */
+export type OfficeDispute = Omit<Dispute, 'resolution'> & {
+  readonly resolution: OfficeDisputeResolution | null;
+};
 
 export interface EvidenceUpload {
   readonly uploadUrl: string;

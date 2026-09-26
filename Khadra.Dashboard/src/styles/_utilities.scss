@@ -171,6 +171,14 @@
 .row-gap-14 {
   gap: 14px;
 }
+/* Pills side by side: an inline run of them has no space between, because templates drop whitespace. */
+.row-wrap {
+  flex-wrap: wrap;
+}
+/* A row in a value column that is aligned to the end (`.kv-split .kv-val`); logical, so RTL flips it. */
+.row-end {
+  justify-content: flex-end;
+}
 .push {
   margin-inline-start: auto;
 }

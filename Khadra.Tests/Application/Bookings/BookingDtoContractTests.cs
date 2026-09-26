@@ -172,6 +172,47 @@ public sealed class BookingDtoContractTests
         Assert.Equal(state, json.RootElement.GetProperty("penalty").GetProperty("state").GetString());
     }
 
+    private static MoneyDto Jod(decimal amount) => new(amount, "JOD");
+
+    /// <summary>
+    /// The rental office's copy of a booking carries no money the office is not shown (owner decisions
+    /// 3 and 8, 2026-09-26): no refund list — a dispute decision's share is on it — and no processing fee
+    /// anywhere, in the confirming payment or in the cancellation preview. Its money comes from the
+    /// financial state's office projection. The customer's copy keeps all of it.
+    /// </summary>
+    [Fact]
+    public void The_offices_copy_carries_no_refund_rows_and_no_processing_fee()
+    {
+        var booking = Build.ConfirmedBooking();
+        var context = Context(false, false) with
+        {
+            ConfirmingPayment = new ConfirmingPaymentDto("FullPayment", Jod(94.5m), Jod(4.5m), Jod(90m), Build.Now, Jod(94.5m), Jod(4.5m)),
+            Refunds = [new RefundDto(Guid.NewGuid(), Guid.NewGuid(), "DisputeResolution", Jod(9m), "Requested", Build.Now, null, null, null, Guid.NewGuid())],
+            DepositRefund = new DepositRefundDto("Requested", Jod(9m), Build.Now, null, null, null),
+        };
+        var full = BookingDto.From(booking, context, Build.Now);
+        Assert.NotNull(full.Cancellation.RefundAmount);
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(full.ForDealer(), WireOptions));
+        var root = json.RootElement;
+
+        foreach (var withheld in new[] { "refunds", "refundedAmount", "refundOutstandingAmount", "depositRefund" })
+            Assert.Equal(JsonValueKind.Null, root.GetProperty(withheld).ValueKind);
+        var confirming = root.GetProperty("confirmingPayment");
+        Assert.Equal("FullPayment", confirming.GetProperty("purpose").GetString());
+        Assert.Equal(90m, confirming.GetProperty("appliedToBooking").GetProperty("amount").GetDecimal());
+        foreach (var fee in new[] { "amountCharged", "processingFee", "refundOnFreeCancellation", "refundableFee" })
+            Assert.Equal(JsonValueKind.Null, confirming.GetProperty(fee).ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("cancellation").GetProperty("refundAmount").ValueKind);
+        // What the office IS shown stays: the frozen commission and the booking money paid online.
+        Assert.Equal(JsonValueKind.Object, root.GetProperty("commissionAmount").ValueKind);
+        Assert.Equal(JsonValueKind.Object, root.GetProperty("onlinePaid").ValueKind);
+
+        var customer = full.ForCustomer();
+        Assert.Single(customer.Refunds!);
+        Assert.Equal(4.5m, customer.ConfirmingPayment!.ProcessingFee!.Amount);
+    }
+
     /// <summary>
     /// A cancellation PREVIEW's penalty is not assessed yet, so it carries no state — and a booking with
     /// no penalty sends none, whatever its disputes.

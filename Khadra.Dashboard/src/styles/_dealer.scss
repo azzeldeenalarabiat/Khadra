@@ -261,6 +261,13 @@
   color: var(--text-70);
 }
 
+/* A value can be a sentence (a refund's state, payments Phase 4b): it wraps inside its share of the row
+   rather than squeezing the label to one word per line on a narrow card. */
+.money-line .num {
+  max-width: 60%;
+  text-align: end;
+}
+
 .money-line.is-hi .k-label,
 .money-line.is-hi .num {
   color: var(--color-text);

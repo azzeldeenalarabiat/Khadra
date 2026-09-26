@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AdminDashboardService } from '../../core/services/admin-dashboard.service';
+import { financePanel } from '../../core/services/finance-panel.presenter';
 import {
   formatChangePercent,
   toActivityRows,
@@ -50,6 +51,7 @@ export class DashboardComponent {
   protected readonly queueResource = this.service.attentionQueue;
   protected readonly trendResource = this.service.bookingTrend;
   protected readonly activityResource = this.service.activity;
+  protected readonly financeResource = this.service.finance;
 
   // Every panel reads its data through loaded(): Resource.value() throws while a request has
   // failed, and one broken panel must not take the row -- or the shell around it -- down with it.
@@ -60,6 +62,7 @@ export class DashboardComponent {
   private readonly queueData = loaded(this.queueResource);
   private readonly trendData = loaded(this.trendResource);
   private readonly activityData = loaded(this.activityResource);
+  private readonly financeData = loaded(this.financeResource);
 
   protected readonly toneClass = toneClass;
 
@@ -118,6 +121,17 @@ export class DashboardComponent {
   protected readonly activity = computed(() => {
     const data = this.activityData();
     return data ? toActivityRows(data.entries, this.now(), this.t, this.i18n.localeTag()) : [];
+  });
+
+  /** "Money in motion": the server's figures for this Amman month and what is owed back now. */
+  protected readonly finance = computed(() => {
+    const data = this.financeData();
+    return data
+      ? financePanel(data, this.t, {
+          money: (value) => this.formats.money(value.amount, value.currency),
+          calendarMonthYear: (iso) => this.formats.calendarMonthYear(iso),
+        })
+      : null;
   });
 
   protected readonly trendChange = computed(() =>

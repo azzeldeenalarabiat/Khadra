@@ -1,6 +1,7 @@
 using Khadra.Application.AdminDashboard;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
 
 namespace Khadra.Tests.Application.AdminDashboard;
@@ -23,14 +24,22 @@ public sealed class AttentionQueueBuilderTests
     private static AttentionQueueDtoWrapper Build(
         IReadOnlyCollection<LiveDispute>? disputes = null,
         IReadOnlyCollection<PendingDealerApplication>? applications = null,
-        IReadOnlyDictionary<Id, string>? subtitles = null) =>
+        IReadOnlyDictionary<Id, string>? subtitles = null,
+        MoneyAttention? money = null) =>
         new(AttentionQueueBuilder.Build(
             disputes ?? [],
             subtitles ?? new Dictionary<Id, string>(),
             applications ?? [],
             WarningThreshold,
             SlaHours,
-            Now));
+            Now,
+            money));
+
+    private static FailedRefundItem Failed(string reference, DateTimeOffset requestedAt) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), reference, requestedAt);
+
+    private static OwedOrphanItem Orphan(string reference, DateTimeOffset orphanedAt) =>
+        new(Guid.NewGuid(), Guid.NewGuid(), reference, orphanedAt);
 
     // Small wrapper so the assertions below read as questions about the queue rather than indexing.
     private sealed record AttentionQueueDtoWrapper(Khadra.Application.AdminDashboard.Dtos.AttentionQueueDto Queue)
@@ -180,5 +189,85 @@ public sealed class AttentionQueueBuilderTests
 
         Assert.Equal(3, result.Queue.OpenCount);
         Assert.Equal(2, result.Queue.OverdueCount);
+    }
+
+    // ── Money (payments Phase 4b) ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Refused_refunds_collapse_into_one_warning_row_with_no_clock()
+    {
+        var older = Failed("KH-AAA11111", Now.AddDays(-3));
+        var newer = Failed("KH-BBB22222", Now.AddDays(-1));
+
+        var result = Build(money: new MoneyAttention([newer, older], [], []));
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(AttentionQueueBuilder.Kinds.RefundFailed, item.Kind);
+        Assert.Equal(AttentionQueueBuilder.Severities.Warning, item.Severity);
+        Assert.Equal(2, item.Count);
+        Assert.Equal([newer.RefundId, older.RefundId], item.SubjectIds);
+        // How long the oldest has waited; no deadline anybody froze, so none is invented.
+        Assert.Equal(older.RequestedAt, item.SlaStartedAt);
+        Assert.Null(item.SlaDeadlineAt);
+        Assert.False(item.IsOverdue);
+        // References only: the console words the count in its reader's language.
+        Assert.Equal("KH-BBB22222 · KH-AAA11111", item.Subtitle);
+        Assert.Equal(0, result.Queue.OverdueCount);
+    }
+
+    [Fact]
+    public void Owed_orphans_are_one_info_row_and_each_held_deposit_is_its_own()
+    {
+        var orphan = Orphan("KH-CCC33333", Now.AddHours(-5));
+        var first = new HeldDepositRow(Guid.NewGuid(), "Petra Wheels · KH-DDD44444", Now.AddDays(-9));
+        var second = new HeldDepositRow(Guid.NewGuid(), null, Now.AddDays(-2));
+
+        var result = Build(money: new MoneyAttention([], [orphan], [second, first]));
+
+        var orphans = Assert.Single(result.Items, item => item.Kind == AttentionQueueBuilder.Kinds.OrphanedCaptureOwed);
+        Assert.Equal(AttentionQueueBuilder.Severities.Info, orphans.Severity);
+        Assert.Equal([orphan.PaymentId], orphans.SubjectIds);
+        var held = result.Items.Where(item => item.Kind == AttentionQueueBuilder.Kinds.DepositAwaitingDecision).ToList();
+        Assert.Equal(2, held.Count);
+        Assert.All(held, item =>
+        {
+            Assert.Equal(AttentionQueueBuilder.Severities.Info, item.Severity);
+            Assert.Equal(1, item.Count);
+            Assert.Null(item.SlaDeadlineAt);
+        });
+        Assert.Equal([first.BookingId], held.Single(item => item.Id == $"deposit:{first.BookingId}").SubjectIds);
+        Assert.Equal("Petra Wheels · KH-DDD44444", held.Single(item => item.Id == $"deposit:{first.BookingId}").Subtitle);
+    }
+
+    [Fact]
+    public void Overdue_work_leads_then_deadlines_then_refused_refunds_then_money_only_being_watched()
+    {
+        var overdue = Dispute(Now.AddHours(-61), Now.AddHours(-13));
+        var dueSoon = Dispute(Now.AddHours(-40), Now.AddHours(8));
+        var failed = Failed("KH-EEE55555", Now.AddDays(-2));
+        var olderHeld = new HeldDepositRow(Guid.NewGuid(), null, Now.AddDays(-20));
+        var orphan = Orphan("KH-FFF66666", Now.AddDays(-1));
+
+        var result = Build(disputes: [dueSoon, overdue], money: new MoneyAttention([failed], [orphan], [olderHeld]));
+
+        Assert.Equal(
+            [
+                AttentionQueueBuilder.Kinds.DisputeOverdue,
+                // A promise that can still be kept outranks a refund the sweep is already sending again.
+                AttentionQueueBuilder.Kinds.DisputeOpen,
+                AttentionQueueBuilder.Kinds.RefundFailed,
+                // Watched money, longest waiting first.
+                AttentionQueueBuilder.Kinds.DepositAwaitingDecision,
+                AttentionQueueBuilder.Kinds.OrphanedCaptureOwed,
+            ],
+            result.Items.Select(item => item.Kind));
+        Assert.Equal(5, result.Queue.OpenCount);
+        Assert.Equal(1, result.Queue.OverdueCount);
+    }
+
+    [Fact]
+    public void No_money_owed_adds_no_row()
+    {
+        Assert.Empty(Build(money: MoneyAttention.None).Items);
     }
 }

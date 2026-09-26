@@ -4197,6 +4197,30 @@ The booking's financial views follow it from payments Phase 4. The dispute pages
 customer's payload carries the office's and the platform's shares (above), and the office's dispute
 page shows the customer's refund and the platform's share. Closing this item brings both into line.
 
+**The office's half is done, 2026-09-27 (payments Phase 4b; owner, 2026-09-27).** Its copies of the
+BOOKING are projected: `BookingDto.ForDealer` drops the refund list (a dispute decision's row is on it),
+the refunded and outstanding totals, the deposit's refund and every figure that carries the processing
+fee — on `GET /bookings/{id}`, on the answers to approve, reject, pickup and return, and on the booking
+inside the office's dispute view. So is its copy of a DECISION: `DisputeResolutionDto.ForDealer` keeps
+the basis the decision split, the office's own share and any charge assessed to it, and sends
+`refundToCustomer`, `retainedByPlatform` and `waivesEverything` (true only when the platform kept
+nothing, so it would tell the office the customer's share) as null — on `GET /disputes/{id}` and the
+answers to open, add a statement and withdraw. The office's dispute page shows its part only, and the
+administrator's resolve form says the office sees only its share, so the note should not name the
+others. `DisputeUseCaseTests` pins each party's copy, the office's JSON included, and the composer
+takes its reader as a required argument, so a path that forgets it cannot fall through to the
+administrator's copy. Not a gap: the customer-reputation panel an office sees on a LIVE booking counts
+disputes the customer won outright (`CustomerReputationReader`), which is the same "the platform kept
+nothing" fact the office's copy withholds — aggregated across the customer's bookings and never on the
+booking the dispute was about. That is the panel's own design (2026-09-11), not a leak to close here.
+
+**What remains, deferred by the owner on 2026-09-27:** the customer's half. The customer's copy still
+carries every share (`transferredToDealer`, `retainedByPlatform`) and every other field above; changing
+it changes what installed builds are sent, so it is checked against what they parse and, if any of them
+reads those fields, ships under the raised-minimum rule. The non-money parts of the original "To close"
+— administrator ids and names for non-admin callers, the gallery's name for a dealer statement — are
+untouched for both parties.
+
 ### 152. A free cancellation says "costs you nothing" while the deposit stays held
 
 **Status:** closed · **Closed:** 2026-09-24 — the paid free cancellation now refunds the deposit, and every screen says so.
@@ -4263,9 +4287,23 @@ permanently refuses (a closed card, a provider rule) becomes a log flood and an 
 **To close:** back off (a growing interval, a cap), surface refunds refused more than N times on the
 admin's payments screen for a human, and test both, before a real provider is connected.
 
+**Progress, 2026-09-27 (payments Phase 4b):** the human half is built. The refunds queue
+(`/payments/refunds`) lists refused refunds first, each with the provider's code; the dashboard's work
+queue carries one `RefundFailed` row for all of them, and the bell rings for it; the money panel counts
+them (`refundsFailed`). It surfaces EVERY refused refund, not those refused more than N times, because
+the count cannot be read: `Refund` stores only `FailedAt`, which `MarkFailed` overwrites on every
+refusal. What remains — the back-off and the log flood — needs that field first: a refusal counter on
+the refund (a migration), the growing interval and the cap read from it, and their tests.
+
 ### 158. The gallery's screens still show commission and payout on a free-cancelled paid booking
 
-**Status:** open · **Raised:** 2026-09-24
+**Status:** closed · **Closed:** 2026-09-27 — the office's money section words commission from the server's state.
+
+The office's booking page reads its money from the financial state's office projection (payments
+Phase 4b). Commission is worded from its `commission.state` (projected, expected, earned, not earned,
+undecided), and the payout line is left out whenever the platform keeps nothing (`NotEarned`,
+`NotApplicable`), so a free-cancelled paid booking says the commission was not earned and shows no
+payout. `office-money.presenter.spec.ts` pins both cases.
 
 The dealer console's money panel lists the frozen platform commission and the net payout for every
 booking, including a cancelled one whose deposit a free cancellation refunded, where the platform
@@ -4348,6 +4386,10 @@ sandbox cannot produce it (a tester settles by hand). **To close, with the real 
 platform's own refund id where the provider echoes the idempotency key, or save after each send, or
 reconcile Sent refunds against the provider — with a test of the race.
 
+Since payments Phase 4b (2026-09-27) the event is at least VISIBLE: a payment's page (`/payments/{id}`)
+lists every provider event tied to it, by id or by reference, with its outcome, so an `Unmatched`
+event reads "No refund matched" beside the refund still showing Sent. The race itself is unchanged.
+
 ### 164. A deposit held for a penalty against the customer has no way out once the window closes
 
 **Status:** open · **Raised:** 2026-09-26 (Fable advisor review) · **Owner decision**
@@ -4365,6 +4407,16 @@ either side — "Your deposit remains held because a customer penalty was assess
 opened. Final settlement is still pending." / "لا يزال عربونك محتجزًا لأنّ غرامةً قُدِّرت على العميل
 ولم يُفتح أيّ نزاع. التسوية النهائية لا تزال معلّقة." Phase 4 shows it; the outcome is still this item's.
 
+**Progress, 2026-09-27 (payments Phase 4b):** each such deposit is on the administrator's work queue, one
+`DepositAwaitingDecision` row per booking — found by `ListHeldForCustomerPenaltyAsync` and kept only
+where the calculator reads `HeldUnresolved` (`HeldDepositFinder`), so the calculator stays the one
+definition. It is WATCHED, not work: the dashboard lists it, the bell does not, because nothing an
+administrator can do clears it before Phase 8. **The candidate set is unbounded and re-read often:**
+every such booking since launch, loaded with its payments and tickets, each time the queue is read — and
+every administrator's console polls it every 60 seconds while open, on every screen, for the bell. Harmless at today's volumes. **Cap it** (list the oldest few with a total, or keep a watermark)
+before the set passes a few hundred bookings, or retire the query when Phase 8 gives these deposits an
+exit and the set stops growing.
+
 ### 165. Bookings that ended before Phase 3 are settled by today's rule when it deploys
 
 **Status:** open · **Raised:** 2026-09-26
@@ -4378,7 +4430,13 @@ what each logged payment is owed; there is no administrator rail to record such 
 
 ### 166. The consoles decide "deposit held" from the list of refunds
 
-**Status:** open · **Raised:** 2026-09-26
+**Status:** closed · **Closed:** 2026-09-27 — both consoles render the server's `deposit.state`.
+
+The office's and the administrator's booking pages read the booking's financial state
+(`GET /bookings/{id}/financials`, payments Phases 4a and 4b) and word the deposit from its
+`deposit.state` instead of deriving it from the refund list. A dispute resolved with nothing to the
+customer is `DecidedByDispute`, not held; a deposit held for an assessed customer penalty is
+`HeldForAssessedPenalty` and then `HeldUnresolved` (item 164).
 
 The dealer console says a deposit is "held pending settlement" when it was paid and no refund has
 returned or decided it. A dispute resolved with nothing to the customer records no refund, so such a

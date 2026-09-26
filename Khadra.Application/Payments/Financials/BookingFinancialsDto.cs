@@ -77,6 +77,9 @@ internal sealed record Reader(bool Customer, bool Office, bool Admin)
         : throw new ArgumentOutOfRangeException(nameof(party), party.Name, "A financial state is read by the customer, the office or an administrator.");
 }
 
+/// <param name="Days">The billed calendar days, frozen on the booking (payments Phase 4b): never counted by a screen.</param>
+/// <param name="DailyRate">The frozen daily rate (payments Phase 4b).</param>
+/// <param name="DepositPercent">The frozen share of the rental the deposit is (payments Phase 4b).</param>
 /// <param name="ProcessingFees">Processing fees on the payments that applied. Null for the office.</param>
 /// <param name="ChargedOnline">Everything the card was charged, a capture that never applied included. Null for the office.</param>
 /// <param name="Refunded">
@@ -93,7 +96,10 @@ public sealed record FinancialSummaryDto(
     MoneyDto? ChargedOnline,
     MoneyDto Refunded,
     MoneyDto RefundInProgress,
-    MoneyDto RefundDelayed)
+    MoneyDto RefundDelayed,
+    int Days,
+    MoneyDto DailyRate,
+    decimal DepositPercent)
 {
     internal static FinancialSummaryDto For(FinancialSummary summary, Reader view)
     {
@@ -109,7 +115,10 @@ public sealed record FinancialSummaryDto(
             view.Office ? null : MoneyDto.From(summary.ChargedOnline),
             MoneyDto.From(refunds.Settled),
             MoneyDto.From(refunds.InProgress),
-            MoneyDto.From(refunds.Delayed));
+            MoneyDto.From(refunds.Delayed),
+            summary.Days,
+            MoneyDto.From(summary.DailyRate),
+            summary.DepositPercent);
     }
 }
 
@@ -196,7 +205,7 @@ public sealed record FinancialCommissionDto(MoneyDto Amount, decimal Percent, st
 /// <summary>One checkout attempt in the booking's history.</summary>
 /// <param name="Purpose">"Deposit" or "FullPayment".</param>
 /// <param name="Status">"Applied" or "Orphaned" (a capture that could not be applied); an administrator also sees attempts that took no money.</param>
-/// <param name="RefundProgress">One of <see cref="RefundProgresses"/>.</param>
+/// <param name="RefundProgress">A <see cref="Khadra.Domain.Payments.RefundProgress"/> name: the payment's own verdict, read for the office over the refunds it is shown.</param>
 /// <param name="AppliedToBooking">What went towards the booking, fees excluded; zero for a capture that never applied.</param>
 /// <param name="AmountCharged">What the card was charged, the fee included. Null for the office.</param>
 /// <param name="ProcessingFee">The fee inside the charge. Null for the office.</param>
@@ -230,7 +239,7 @@ public sealed record FinancialPaymentDto(
             payment.PaymentId.Value,
             payment.Purpose.Name,
             payment.Status.Name,
-            view.Office ? payment.OfficeRefundProgress : payment.RefundProgress,
+            (view.Office ? payment.OfficeRefundProgress : payment.RefundProgress).Name,
             payment.OccurredAt,
             MoneyDto.From(payment.AppliedToBooking),
             seesFees ? MoneyDto.From(payment.AmountCharged) : null,
@@ -272,7 +281,13 @@ public sealed record FinancialRefundDto(
     /// <summary>The provider's reference for the refund. Administrator only.</summary>
     string? ProviderReference,
     /// <summary>The provider's code for a refusal. Administrator only.</summary>
-    string? FailureCode)
+    string? FailureCode,
+    /// <summary>
+    /// The booking money inside the refund, beside <c>FeePart</c> (payments Phase 4b), so no screen
+    /// subtracts one from the other. For the office it equals <c>Amount</c>, which is already booking
+    /// money only.
+    /// </summary>
+    MoneyDto BookingPart)
 {
     internal static FinancialRefundDto For(RefundRecord refund, Reader view) =>
         new(
@@ -288,5 +303,6 @@ public sealed record FinancialRefundDto(
             refund.FailedAt,
             refund.DisputeTicketId?.Value,
             view.Admin ? refund.ProviderReference : null,
-            view.Admin ? refund.FailureCode : null);
+            view.Admin ? refund.FailureCode : null,
+            MoneyDto.From(refund.BookingPart));
 }

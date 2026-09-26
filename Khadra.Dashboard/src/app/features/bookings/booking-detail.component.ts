@@ -7,7 +7,6 @@ import {
   BookingStatus,
   Handover,
   PenaltyAssessment,
-  depositRefundKey,
 } from '../../core/models/bookings.api';
 import { enumKey } from '../../core/i18n/status-key';
 import { KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
@@ -21,8 +20,8 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
-import { commissionRate } from '../../core/i18n/commission-rate';
-import { refundLines } from '../../core/i18n/refund-words';
+import { MoneyFormat } from '../../core/i18n/money-words';
+import { adminMoney } from './admin-money.presenter';
 
 /**
  * One booking as the platform sees it.
@@ -81,65 +80,28 @@ export class AdminBookingDetailComponent {
   /** The server's own word for the state, in the customer's language. */
   protected readonly statusLabel = computed(() => this.status(this.booking()?.status, 'booking'));
 
-  /** What the booking is worth, all of it frozen at the moment it was made. */
-  protected readonly moneyRows = computed<readonly KeyValue[]>(() => {
+  /** How the Money section prints a figure, a rate and an instant: in its own currency, and in Amman. */
+  private readonly moneyFormat: MoneyFormat = {
+    money: (value) => this.money(value),
+    percent: (value) => this.formats.percent(value),
+    dateTime: (iso) => this.formats.dateTime(iso),
+  };
+
+  protected readonly financialsResource = this.service.financials;
+  /** Guarded like the booking: `value()` throws in the error state. */
+  private readonly financialsData = loaded(this.financialsResource);
+
+  /**
+   * The booking's money (payments Phase 4b), from the financial state's ADMINISTRATOR projection:
+   * everything it froze, every attempt, every refund with its fee apart, every share of a dispute and
+   * the records' contradictions — the server's figures and states, worded by `adminMoney`.
+   */
+  protected readonly moneyView = computed(() => {
+    const financials = this.financialsData();
     const booking = this.booking();
-    if (!booking) return [];
-    const pricing = booking.pricing;
-    const rows: KeyValue[] = [
-      // The days the booking froze, never a subtraction of its two instants.
-      {
-        k: this.t('adminBooking.dailyRateForDays', { count: pricing.days }),
-        v: this.money(pricing.dailyRate),
-      },
-      { k: this.t('myBooking.rentalTotal'), v: this.money(pricing.rentalTotal) },
-    ];
-    // Keyed on the pickup method, not the amount: 0 is now a real answer a gallery can give, and
-    // hiding the row would make free delivery indistinguishable from no delivery at all.
-    if (booking.pickupMethod === 'Delivery')
-      rows.push({ k: this.t('vehicleWizard.deliveryFee'), v: this.money(pricing.deliveryFee) });
-    rows.push(
-      { k: this.t('myBooking.totalPrice'), v: this.money(pricing.totalPrice) },
-      // The percentages come from the booking's own terms, never from the settings in force today.
-      {
-        k: this.t('adminBooking.depositWithPercent', {
-          percent: this.formats.percent(pricing.depositPercent),
-        }),
-        v: this.money(pricing.depositAmount),
-      },
-      // Every refund, with its reason and where it is (Phase 3): the admin sees what the customer and
-      // the gallery see. An older API names only a free cancellation's refund, read as before.
-      ...(booking.refunds
-        ? [
-            ...refundLines(this.t, booking.refunds, (value) => this.money(value)),
-            ...(booking.refundedAmount && booking.refundedAmount.amount > 0
-              ? [{ k: this.t('adminBooking.refundedTotal'), v: this.money(booking.refundedAmount) }]
-              : []),
-            ...(booking.refundOutstandingAmount && booking.refundOutstandingAmount.amount > 0
-              ? [{ k: this.t('adminBooking.refundOutstanding'), v: this.money(booking.refundOutstandingAmount) }]
-              : []),
-          ]
-        : booking.depositRefund
-        ? [
-            {
-              // The payment it returned: the whole booking when it was paid in full, or the deposit.
-              k: this.t(booking.isPaidInFull ? 'adminBooking.paymentRefund' : 'adminBooking.depositRefund'),
-              v: this.t(depositRefundKey(booking.depositRefund), { amount: this.money(booking.depositRefund.amount) }),
-            },
-          ]
-        : []),
-      { k: this.t('myBooking.balanceDue'), v: this.money(pricing.balanceDue) },
-      { k: this.t('vehicleDetail.securityDeposit'), v: this.money(pricing.securityDeposit) },
-      {
-        k: this.t('adminBooking.platformCommissionWithPercent', {
-          rate: commissionRate(this.t, this.formats.percent(booking.terms.commissionPercent), booking.terms.commissionBasis),
-        }),
-        // Unsigned: the amount Khadra charges, computed by the API at the frozen rate. The label
-        // carries the subtraction; a sign typed here once printed "−0" on a zero commission.
-        v: this.money(booking.commissionAmount),
-      },
-    );
-    return rows;
+    return financials && booking
+      ? adminMoney(financials, booking.pickupMethod, this.t, this.enumLabel, this.moneyFormat)
+      : null;
   });
 
   /** The rulebook this booking froze. Version included: it is what makes the rest reproducible. */
@@ -304,7 +266,7 @@ export class AdminBookingDetailComponent {
         }),
         // Owner, 2026-09-26: a platform cancellation before pickup returns the whole payment, deposit
         // included. The figure is the server's own whole-payment refund, never a sum made here.
-        note: booking.depositPaid && booking.confirmingPayment
+        note: booking.depositPaid && booking.confirmingPayment?.refundOnFreeCancellation
           ? this.t('adminBooking.cancelRefundsAmount', { amount: this.money(booking.confirmingPayment.refundOnFreeCancellation) })
           : this.t('adminBooking.cancelRefundsWholePayment'),
         fields: [

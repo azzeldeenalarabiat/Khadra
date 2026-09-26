@@ -362,7 +362,8 @@ public sealed class BookingDecisionHandlers(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         var context = await reader.ContextAsync(booking.Id, cancellationToken);
-        return BookingDto.From(booking, context, clock.UtcNow);
+        // Every decision here is the office's, and so is the answer.
+        return BookingDto.From(booking, context, clock.UtcNow).ForDealer();
     }
 
     // Cash at handover is in the booking's own currency and is recorded, never computed from.

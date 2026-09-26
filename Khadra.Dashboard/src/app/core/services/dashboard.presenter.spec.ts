@@ -123,6 +123,83 @@ describe('toQueueItems', () => {
  * twelve bars. The figures were real the whole time and looked invented, which is the one thing this
  * console must not do. These pin that every bar carries the day and the count it was drawn from.
  */
+/**
+ * The money rows (payments Phase 4b): they have no clock — nobody froze a deadline for money owed
+ * back — so they say how long they have waited instead of counting down, carry no meter, and open the
+ * list or the booking they are about.
+ */
+describe('toQueueItems, the money rows', () => {
+  const now = Date.parse('2026-09-26T12:00:00Z');
+  const money = (over: Partial<AttentionItem>): AttentionItem => ({
+    id: 'refunds-failed',
+    kind: 'RefundFailed',
+    severity: 'Warning',
+    count: 2,
+    subjectIds: ['r1', 'r2'],
+    subtitle: 'KH-AAA11111 · KH-BBB22222',
+    description: null,
+    slaStartedAt: '2026-09-24T12:00:00Z',
+    slaDeadlineAt: null,
+    isOverdue: false,
+    ...over,
+  });
+  const queue = (...items: AttentionItem[]): AttentionQueue => ({
+    slaHours: 48,
+    openCount: items.length,
+    overdueCount: 0,
+    items,
+    generatedAt: '2026-09-26T12:00:00Z',
+  });
+
+  it('words refused refunds as money still owed, with how long they have waited and no meter', () => {
+    const [row] = toQueueItems(queue(money({})), now, t);
+
+    expect(row.title).toBe('2 refunds refused — still owed');
+    expect(row.severity).toBe('Needs a look');
+    expect(row.sla).toBe('Waiting 2d');
+    expect(row.hasClock).toBe(false);
+    expect(row.percent).toBeNull();
+    expect(row.route).toBe('/payments/refunds');
+    expect(row.entity).toBe('KH-AAA11111 · KH-BBB22222');
+  });
+
+  it('opens the captures being refunded as a filtered payments list', () => {
+    const [row] = toQueueItems(
+      queue(money({ id: 'orphaned-captures', kind: 'OrphanedCaptureOwed', severity: 'Info', count: 1, subjectIds: ['p1'] })),
+      now,
+      t,
+    );
+
+    expect(row.title).toBe('1 capture being refunded — it could not be applied');
+    expect(row.severity).toBe('Watching');
+    expect(row.route).toBe('/payments');
+    expect(row.queryParams).toEqual({ status: 'Orphaned' });
+  });
+
+  it('opens the booking a held deposit belongs to', () => {
+    const [row] = toQueueItems(
+      queue(money({ id: 'deposit:b1', kind: 'DepositAwaitingDecision', severity: 'Info', count: 1, subjectIds: ['b1'], subtitle: 'Petra Wheels · KH-CCC33333' })),
+      now,
+      t,
+    );
+
+    expect(row.title).toBe('Deposit held for a customer penalty — no dispute was opened');
+    expect(row.route).toBe('/bookings/b1');
+    expect(row.queryParams).toBeUndefined();
+  });
+
+  it('keeps a clock and a meter on the rows that have a deadline', () => {
+    const [row] = toQueueItems(
+      queue(money({ id: 'dispute:t1', kind: 'DisputeOpen', severity: 'Info', count: 1, subjectIds: ['t1'], slaDeadlineAt: '2026-09-27T12:00:00Z' })),
+      now,
+      t,
+    );
+
+    expect(row.hasClock).toBe(true);
+    expect(row.percent).not.toBeNull();
+  });
+});
+
 describe('toTrendBars', () => {
   const trend = (counts: readonly number[], changePercent: number | null = 0): BookingTrend => ({
     generatedAt: '2026-09-05T00:00:00Z',

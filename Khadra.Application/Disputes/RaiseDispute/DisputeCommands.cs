@@ -144,7 +144,7 @@ public sealed class RaiseDisputeHandlers(
         await tickets.AddAsync(ticket.Value, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await composer.ComposeAsync(ticket.Value, booking, cancellationToken, party.Value);
+        return await composer.ComposeAsync(ticket.Value, booking, party.Value, cancellationToken);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(AddDisputeStatementCommand request, CancellationToken cancellationToken)
@@ -165,7 +165,7 @@ public sealed class RaiseDisputeHandlers(
             return added.Error;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return await composer.ComposeAsync(ticket, booking, cancellationToken, party);
+        return await composer.ComposeAsync(ticket, booking, party, cancellationToken);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(WithdrawDisputeCommand request, CancellationToken cancellationToken)
@@ -183,7 +183,7 @@ public sealed class RaiseDisputeHandlers(
             return withdrawn.Error;
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return await composer.ComposeAsync(ticket, booking, cancellationToken, viewer);
+        return await composer.ComposeAsync(ticket, booking, viewer, cancellationToken);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(GetMyDisputeQuery request, CancellationToken cancellationToken)
@@ -195,7 +195,7 @@ public sealed class RaiseDisputeHandlers(
             return loaded.Error;
         var (ticket, booking, viewer) = loaded.Value;
 
-        return await composer.ComposeAsync(ticket, booking, cancellationToken, viewer);
+        return await composer.ComposeAsync(ticket, booking, viewer, cancellationToken);
     }
 
     /// <summary>A ticket plus its booking, for someone who is a party to that booking; not_found otherwise.</summary>

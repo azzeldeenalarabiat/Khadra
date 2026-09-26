@@ -481,6 +481,10 @@ public sealed class BookingReaderTests : IDisposable
 
         Assert.NotNull(confirming);
         Assert.Equal(full ? "FullPayment" : "Deposit", confirming.Purpose);
+        // The reader composes every figure; only the office's copy of a booking drops the fee-bearing ones.
+        Assert.NotNull(confirming.AmountCharged);
+        Assert.NotNull(confirming.ProcessingFee);
+        Assert.NotNull(confirming.RefundOnFreeCancellation);
         Assert.Equal(applied + fee, confirming.AmountCharged.Amount);
         Assert.Equal(currency, confirming.AmountCharged.Currency);
         Assert.Equal(fee, confirming.ProcessingFee.Amount);

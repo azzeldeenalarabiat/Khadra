@@ -51,6 +51,9 @@ public sealed record BookingFinancials(
 }
 
 /// <summary>The booking's figures, every one in the booking's currency.</summary>
+/// <param name="Days">The billed calendar days, frozen on the booking: a screen never counts them.</param>
+/// <param name="DailyRate">The frozen daily rate the rental was priced at.</param>
+/// <param name="DepositPercent">The frozen share of the rental the deposit is.</param>
 /// <param name="RentalSubtotal">The rental alone: the frozen daily rate over the frozen days.</param>
 /// <param name="BookingTotal">Rental plus delivery fee: what the booking costs, before any fee or deposit.</param>
 /// <param name="SecurityDeposit">
@@ -70,6 +73,9 @@ public sealed record BookingFinancials(
 /// the customer's (owner, 2026-09-26).
 /// </param>
 public sealed record FinancialSummary(
+    int Days,
+    Money DailyRate,
+    decimal DepositPercent,
     Money RentalSubtotal,
     Money DeliveryFee,
     Money BookingTotal,
@@ -131,7 +137,7 @@ public sealed record CommissionPosition(Money Amount, decimal Percent, string Ba
 /// <summary>One checkout attempt, as the financial history shows it.</summary>
 /// <param name="AmountCharged">What the card was charged: the capture, or what was asked while nothing was.</param>
 /// <param name="AppliedToBooking">What went towards the booking: the charge less the fee, or nothing if it did not apply.</param>
-/// <param name="RefundProgress">Where this payment's refunds stand (<see cref="RefundProgresses"/>).</param>
+/// <param name="RefundProgress">Where this payment's refunds stand: <see cref="Payment.RefundProgress"/>.</param>
 /// <param name="OfficeRefundProgress">
 /// The same reading over only the refunds the office is shown — every one but a dispute decision's share,
 /// which is the customer's (owner, 2026-09-26) — and complete only when THOSE return all the booking money
@@ -141,8 +147,8 @@ public sealed record PaymentRecord(
     Id PaymentId,
     PaymentPurpose Purpose,
     PaymentStatus Status,
-    string RefundProgress,
-    string OfficeRefundProgress,
+    RefundProgress RefundProgress,
+    RefundProgress OfficeRefundProgress,
     DateTimeOffset OccurredAt,
     DateTimeOffset CreatedAt,
     Money AmountCharged,
@@ -263,24 +269,6 @@ public static class CommissionStates
 }
 
 /// <summary>Where a payment's refunds stand, as one reading of their statuses.</summary>
-public static class RefundProgresses
-{
-    /// <summary>Nothing has been refunded.</summary>
-    public const string None = "None";
-
-    /// <summary>A refund is on its way.</summary>
-    public const string InProgress = "InProgress";
-
-    /// <summary>A refund was refused and is being sent again: still owed.</summary>
-    public const string Delayed = "Delayed";
-
-    /// <summary>Every refund reached the customer, and part of the payment was kept.</summary>
-    public const string Partial = "Partial";
-
-    /// <summary>Everything the payment will ever return has reached the customer.</summary>
-    public const string Complete = "Complete";
-}
-
 /// <summary>Contradictions between the records, as stable codes an administrator reads.</summary>
 public static class FinancialIssues
 {

@@ -2,6 +2,7 @@ using Khadra.Application.Bookings;
 using Khadra.Application.Bookings.ReadBookings;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Dtos;
 using Khadra.Application.Dealers;
 using Khadra.Application.Payments;
 using Khadra.Domain.Payments.Repositories;
@@ -153,6 +154,31 @@ public sealed class ReadBookingsTests
         Assert.Null(result.Value.Vehicle);
         // Khadra's commission is between the platform and the office: never on a customer's copy.
         Assert.Null(result.Value.CommissionAmount);
+    }
+
+    /// <summary>
+    /// The office reads its OWN copy (owner decisions 3 and 8): no refund list, whose dispute rows
+    /// carry the customer's share, and no fee. Its money is on the financial state's office projection.
+    /// </summary>
+    [Fact]
+    public async Task The_office_reads_the_offices_copy_of_the_booking()
+    {
+        var dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
+        _dealers.GetByOwnerUserIdAsync(OwnerId, Arg.Any<CancellationToken>()).Returns(dealer);
+        var booking = Build.Booking(customerId: CustomerId, dealerId: dealer.Id);
+        _bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
+        _reader.ContextAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(EmptyContext with
+        {
+            Refunds = [new RefundDto(Guid.NewGuid(), Guid.NewGuid(), "DisputeResolution", new MoneyDto(9m, "JOD"), "Requested", Build.Now, null, null, null, Guid.NewGuid())],
+        });
+
+        var office = await Get().Handle(new GetBookingQuery(OwnerId, booking.Id), CancellationToken.None);
+        var customer = await Get().Handle(new GetBookingQuery(CustomerId, booking.Id), CancellationToken.None);
+
+        Assert.True(office.IsSuccess);
+        Assert.Null(office.Value.Refunds);
+        Assert.NotNull(office.Value.CommissionAmount);
+        Assert.Single(customer.Value.Refunds!);
     }
 
     [Fact]

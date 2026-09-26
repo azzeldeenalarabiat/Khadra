@@ -1,11 +1,12 @@
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { Dispute, EvidenceUpload } from '../models/disputes.api';
+import { EvidenceUpload, OfficeDispute } from '../models/disputes.api';
 
 /**
  * A party's side of a dispute (spec 3.3): open one from a booking, add to it, withdraw it. The Admin's
- * decision arrives on the same ticket. All calls go through the BFF.
+ * decision arrives on the same ticket, as the office's copy of it (`OfficeDispute`). All calls go
+ * through the BFF.
  */
 @Injectable({ providedIn: 'root' })
 export class DealerDisputesService {
@@ -14,23 +15,23 @@ export class DealerDisputesService {
 
   readonly viewing = signal<string | null>(null);
 
-  readonly dispute = httpResource<Dispute>(() => {
+  readonly dispute = httpResource<OfficeDispute>(() => {
     const id = this.viewing();
     return id ? `${this.base}/${id}` : undefined;
   });
 
-  open(bookingId: string, reason: string, evidenceKeys: readonly string[]): Promise<Dispute> {
-    return firstValueFrom(this.http.post<Dispute>(this.base, { bookingId, reason, evidenceKeys }));
+  open(bookingId: string, reason: string, evidenceKeys: readonly string[]): Promise<OfficeDispute> {
+    return firstValueFrom(this.http.post<OfficeDispute>(this.base, { bookingId, reason, evidenceKeys }));
   }
 
-  addStatement(ticketId: string, body: string, evidenceKeys: readonly string[]): Promise<Dispute> {
+  addStatement(ticketId: string, body: string, evidenceKeys: readonly string[]): Promise<OfficeDispute> {
     return firstValueFrom(
-      this.http.post<Dispute>(`${this.base}/${ticketId}/statements`, { body, evidenceKeys }),
+      this.http.post<OfficeDispute>(`${this.base}/${ticketId}/statements`, { body, evidenceKeys }),
     );
   }
 
-  withdraw(ticketId: string): Promise<Dispute> {
-    return firstValueFrom(this.http.post<Dispute>(`${this.base}/${ticketId}/withdraw`, {}));
+  withdraw(ticketId: string): Promise<OfficeDispute> {
+    return firstValueFrom(this.http.post<OfficeDispute>(`${this.base}/${ticketId}/withdraw`, {}));
   }
 
   /** Evidence is uploaded before the ticket exists, scoped to the booking; the ticket quotes the keys. */

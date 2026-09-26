@@ -86,7 +86,11 @@ export interface AttentionItem {
   readonly subtitle: string | null;
   readonly description: string | null;
   readonly slaStartedAt: string;
-  readonly slaDeadlineAt: string;
+  /**
+   * Null for a row with no clock (payments Phase 4b): money owed back has no deadline anybody froze.
+   * Such a row still says how long it has waited, from `slaStartedAt`.
+   */
+  readonly slaDeadlineAt: string | null;
   readonly isOverdue: boolean;
 }
 
@@ -109,4 +113,48 @@ export interface ActivityEntry {
 
 export interface ActivityFeed extends PanelResponse {
   readonly entries: readonly ActivityEntry[];
+}
+
+/** A money figure on the finance panel: always the server's, in the currency it names. */
+export interface PanelMoney {
+  readonly amount: number;
+  readonly currency: string;
+}
+
+/**
+ * "Money in motion" (payments Phase 4b): this Amman month's flows — payments applied and refunds
+ * settled, each by its own event date — and the refunds still owed back right now. No commission or
+ * revenue figure: those are the office payables ledger's (payments Phase 8).
+ */
+export interface FinanceSummary {
+  readonly generatedAt: string;
+  /** `None`, `Sandbox` or `Live`: the provider's own answer, as /app-config publishes it. */
+  readonly paymentMode: string;
+  readonly currency: string;
+  readonly thisMonth: {
+    /** The month's first Amman day. */
+    readonly from: string;
+    /** The next month's first Amman day: exclusive. */
+    readonly to: string;
+    readonly appliedToBookings: PanelMoney;
+    readonly paymentsApplied: number;
+    readonly processingFeesCharged: PanelMoney;
+    readonly refundsSettled: PanelMoney;
+    readonly refundsSettledCount: number;
+  };
+  readonly rightNow: {
+    readonly refundsInProgress: PanelMoney;
+    readonly refundsInProgressCount: number;
+    readonly refundsFailed: PanelMoney;
+    readonly refundsFailedCount: number;
+    /** A PART of the two above, never added to them. */
+    readonly orphanedCapturesOwed: PanelMoney;
+    readonly orphanedCapturesOwedCount: number;
+  };
+  /** Money in another currency — only ever a capture taken in the wrong one — listed apart. */
+  readonly otherCurrencies: readonly {
+    readonly currency: string;
+    readonly refundsSettledThisMonth: PanelMoney;
+    readonly refundsOutstanding: PanelMoney;
+  }[];
 }

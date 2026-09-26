@@ -427,21 +427,42 @@
           <div class="sect-h">
             <kh-icon name="currency-circle-dollar" class="kpi-icon" />
             <span class="sect-t">{{ t('dealerBooking.financial') }}</span>
-            <span class="sect-hint">{{
-              t('dealerBooking.allAmountsFrozen', { currency: b.pricing.totalPrice.currency })
-            }}</span>
+            @if (money(); as m) {
+              <span class="sect-hint">{{ t('dealerBooking.allAmountsFrozen', { currency: m.currency }) }}</span>
+            }
           </div>
           <div class="sect-pad">
-            @for (row of moneyRows(); track row.k) {
-              <div class="money-line" [class.is-hi]="row.hi" [class.is-dim]="row.dim">
-                <span class="k-label">{{ row.k }}</span>
-                <span class="num">{{ row.v }}</span>
+            <!-- The office's projection of the booking's financial state (payments Phase 4b): its own
+                 money only — no processing fee, no customer or platform share of a dispute. -->
+            @if (financialsResource.error()) {
+              <div class="state-text">{{ t('money.loadFailed') }}</div>
+              <div class="state-actions">
+                <button type="button" class="btn btn-secondary btn-sm" (click)="financialsResource.reload()">
+                  {{ t('common.retry') }}
+                </button>
               </div>
+            } @else if (money(); as m) {
+              @if (m.reviewing) {
+                <div class="note-box">
+                  <kh-icon name="info" />
+                  {{ t('money.reviewing') }}
+                </div>
+              }
+              @for (row of m.lines; track $index) {
+                <div class="money-line" [class.is-hi]="row.hi" [class.is-dim]="row.dim">
+                  <span class="k-label">{{ row.k }}</span>
+                  <span class="num">{{ row.v }}</span>
+                </div>
+              }
+              <div class="note-box">
+                <kh-icon name="info" />
+                {{ t('dealerBooking.commissionIsDeductedFrom') }}
+              </div>
+            } @else {
+              @for (row of [0, 1, 2, 3]; track row) {
+                <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+              }
             }
-            <div class="note-box">
-              <kh-icon name="info" />
-              {{ t('dealerBooking.commissionIsDeductedFrom') }}
-            </div>
           </div>
         </section>
 

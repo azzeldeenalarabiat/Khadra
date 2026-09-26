@@ -112,6 +112,21 @@ internal sealed class PaymentRepository(KhadraDbContext context) : IPaymentRepos
 
     // Refunds are part of the aggregate: loading a payment without them would let RefundedOrOwed read
     // zero and a second refund pass a guard it should have failed.
+    public async Task<IReadOnlyList<Payment>> ListForBookingsAsync(
+        IReadOnlyCollection<Id> bookingIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(bookingIds);
+        if (bookingIds.Count == 0)
+            return [];
+
+        var ids = bookingIds.ToList();
+        return await WithRefunds()
+            .AsNoTracking()
+            .Where(payment => ids.Contains(payment.BookingId))
+            .ToListAsync(cancellationToken);
+    }
+
     private IQueryable<Payment> WithRefunds() => context.Payments.Include(payment => payment.Refunds);
 }
 

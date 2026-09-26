@@ -40,8 +40,22 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
  *   Unattributed, Admin).
  * - `handoverType`: `HandoverType` — Pickup, Return.
  * - `penaltyReason`: `PenaltyReason` — the stable code for a system-written penalty sentence.
+ * - The Payments context (payments Phase 4b): a payment's status and purpose, a refund's status, the
+ *   refund progress of a payment, Khadra's commission state, what became of a provider event, the
+ *   contradictions a booking's records can show, and the platform's payment mode.
  */
-export type EnumFamily = 'party' | 'handoverType' | 'penaltyReason';
+export type EnumFamily =
+  | 'party'
+  | 'handoverType'
+  | 'penaltyReason'
+  | 'paymentStatus'
+  | 'paymentPurpose'
+  | 'refundStatus'
+  | 'refundProgress'
+  | 'commissionState'
+  | 'providerEventOutcome'
+  | 'financialIssue'
+  | 'paymentMode';
 
 /** The dictionary key for a server enum name within its family, or null when this build has none. */
 export function enumKey(family: EnumFamily, name: string): TranslationKey | null {

@@ -157,7 +157,9 @@ const severityTone = (severity: string): Tone => {
  * own queue instead of a screen we have not been told about — which is what lets the Payments kinds
  * arrive later without a frontend release.
  */
-const kindTarget = (item: AttentionItem): { route: string; action: TranslationKey } => {
+const kindTarget = (
+  item: AttentionItem,
+): { route: string; action: TranslationKey; filter?: { readonly key: string; readonly value: string } } => {
   const only = item.subjectIds?.length === 1 ? item.subjectIds[0] : null;
   switch (item.kind) {
     case 'DisputeOverdue':
@@ -165,6 +167,14 @@ const kindTarget = (item: AttentionItem): { route: string; action: TranslationKe
       return { route: only ? `/disputes/${only}` : '/disputes', action: 'queue.actionResolve' };
     case 'DealerApplicationsAtRisk':
       return { route: only ? `/dealers/${only}` : '/dealers', action: 'queue.actionReview' };
+    // The money rows (payments Phase 4b): refused refunds open the refunds queue, where they lead; the
+    // captures being refunded open the payments that could not be applied; a held deposit its booking.
+    case 'RefundFailed':
+      return { route: '/payments/refunds', action: 'queue.actionOpen' };
+    case 'OrphanedCaptureOwed':
+      return { route: '/payments', action: 'queue.actionOpen', filter: { key: 'status', value: 'Orphaned' } };
+    case 'DepositAwaitingDecision':
+      return { route: only ? `/bookings/${only}` : '/bookings', action: 'queue.actionOpen' };
     default:
       return { route: '/dashboard', action: 'queue.actionOpen' };
   }
@@ -178,6 +188,8 @@ const kindTarget = (item: AttentionItem): { route: string; action: TranslationKe
  * rounded up promised time that was not there.
  */
 const severityLabel = (item: AttentionItem, now: number, t: Translate): string => {
+  // No clock: money owed back has no deadline, so the badge says whether it needs a human or is watched.
+  if (item.slaDeadlineAt === null) return t(item.severity === 'Warning' ? 'queue.needsALook' : 'queue.watching');
   if (slaReading(item.slaDeadlineAt, now, t, item.isOverdue).passed) return t('queue.overdue');
   // The same clock as the line beside it, to the same unit. Computed here in hours, the badge read
   // "SLA 0h" under an hour while the line read "59m remaining".
@@ -191,11 +203,16 @@ const severityLabel = (item: AttentionItem, now: number, t: Translate): string =
  * passed one says by how much. See `slaReading`.
  */
 export function slaLabel(item: AttentionItem, now: number, t: Translate): string {
+  // A row with no clock says how long it has waited: there is no promise to count down to.
+  if (item.slaDeadlineAt === null) {
+    return t('queue.waitingFor', { duration: clockDuration(Math.max(0, now - Date.parse(item.slaStartedAt)), t) });
+  }
   return slaReading(item.slaDeadlineAt, now, t, item.isOverdue).text;
 }
 
-/** How full the meter is. Overdue pins at 100 rather than running off the end. */
-export function slaPercent(item: AttentionItem, now: number): number {
+/** How full the meter is. Overdue pins at 100 rather than running off the end; no clock, no meter. */
+export function slaPercent(item: AttentionItem, now: number): number | null {
+  if (item.slaDeadlineAt === null) return null;
   const start = Date.parse(item.slaStartedAt);
   const deadline = Date.parse(item.slaDeadlineAt);
   if (!(deadline > start)) return 100;
@@ -211,6 +228,11 @@ const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
       count: item.count,
     });
   }
+
+  // The money rows: the count in the reader's language; the subtitle carries the booking references.
+  if (item.kind === 'RefundFailed') return t('queue.refundsRefused', { count: item.count });
+  if (item.kind === 'OrphanedCaptureOwed') return t('queue.capturesBeingRefunded', { count: item.count });
+  if (item.kind === 'DepositAwaitingDecision') return t('queue.depositAwaitingDecision');
 
   const ageHours = Math.max(0, Math.round((now - Date.parse(item.slaStartedAt)) / 3_600_000));
   if (item.kind === 'DisputeOverdue' || item.kind === 'DisputeOpen') {
@@ -235,8 +257,10 @@ export function toQueueItems(
       entity: item.subtitle ?? '',
       sla: slaLabel(item, now, t),
       percent: slaPercent(item, now),
+      hasClock: item.slaDeadlineAt !== null,
       action: t(target.action),
       route: target.route,
+      ...(target.filter ? { queryParams: { [target.filter.key]: target.filter.value } } : {}),
     };
   });
 }

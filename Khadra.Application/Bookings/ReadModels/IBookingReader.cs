@@ -152,13 +152,19 @@ public sealed record RefundDto(
 /// The processing fee that goes back with the booking money (the whole fee when this payment froze
 /// it as refundable, zero otherwise). Added 2026-09-26, last.
 /// </param>
+/// <remarks>
+/// <paramref name="AmountCharged"/>, <paramref name="ProcessingFee"/> and
+/// <paramref name="RefundOnFreeCancellation"/> are null on the rental office's copy of a booking
+/// (<c>BookingDto.ForDealer</c>): the office never sees a processing fee (owner, 2026-09-26), and each of
+/// the three carries one. The customer's and the administrator's copies always have them.
+/// </remarks>
 public sealed record ConfirmingPaymentDto(
     string Purpose,
-    MoneyDto AmountCharged,
-    MoneyDto ProcessingFee,
+    MoneyDto? AmountCharged,
+    MoneyDto? ProcessingFee,
     MoneyDto AppliedToBooking,
     DateTimeOffset? PaidAt,
-    MoneyDto RefundOnFreeCancellation,
+    MoneyDto? RefundOnFreeCancellation,
     MoneyDto? RefundableFee = null);
 
 /// <summary>

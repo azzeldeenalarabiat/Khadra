@@ -163,6 +163,30 @@ public sealed record BookingDto(
     /// </remarks>
     public BookingDto ForCustomer() => this with { CommissionAmount = null };
 
+    /// <summary>
+    /// The rental office's copy: the same booking without the money the office is not shown (owner
+    /// decisions 3 and 8, 2026-09-26).
+    /// </summary>
+    /// <remarks>
+    /// The refund list carries a dispute decision's share, which is the customer's, and the confirming
+    /// payment and the cancellation preview each carry the processing fee, which the office never sees.
+    /// The office reads its money from the financial state's office projection
+    /// (<c>GET /bookings/{id}/financials</c>) instead, which shows it its own money and nothing else;
+    /// only the payment's purpose stays here, for the timeline's "paid in full" label. The customer app
+    /// never reads this copy, so no installed build is affected.
+    /// </remarks>
+    public BookingDto ForDealer() => this with
+    {
+        Refunds = null,
+        RefundedAmount = null,
+        RefundOutstandingAmount = null,
+        DepositRefund = null,
+        ConfirmingPayment = ConfirmingPayment is { } paid
+            ? paid with { AmountCharged = null, ProcessingFee = null, RefundOnFreeCancellation = null, RefundableFee = null }
+            : null,
+        Cancellation = Cancellation with { RefundAmount = null },
+    };
+
     public static BookingDto From(Booking booking, BookingContext context, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(booking);
@@ -255,13 +279,13 @@ public sealed record BookingDto(
     /// </summary>
     private static MoneyDto? CancellationRefund(Booking booking, ConfirmingPaymentDto? payment, DateTimeOffset now)
     {
-        if (payment is null)
+        if (payment?.RefundOnFreeCancellation is not { } whole)
             return null;
 
-        var currency = payment.RefundOnFreeCancellation.Currency;
+        var currency = whole.Currency;
         var refund = BookingEndingRefunds.PreviewForCustomer(
             booking,
-            Money.Create(payment.RefundOnFreeCancellation.Amount, currency),
+            Money.Create(whole.Amount, currency),
             payment.RefundableFee is { } fee ? Money.Create(fee.Amount, fee.Currency) : Money.ZeroIn(currency),
             now);
         return refund is null ? null : MoneyDto.From(refund);

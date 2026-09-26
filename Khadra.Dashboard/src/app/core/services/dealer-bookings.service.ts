@@ -1,3 +1,4 @@
+import { BookingFinancials } from '../models/financials.api';
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
@@ -122,6 +123,16 @@ export class DealerBookingsService {
     return id ? `${this.base}/${id}` : undefined;
   });
 
+  /**
+   * The booking's money as the OFFICE may see it (payments Phase 4b): booking money only, its own share
+   * of a dispute and any charge to it, never a processing fee. The one source the Financial section
+   * reads; the booking's own copy no longer carries refunds or fees for the office.
+   */
+  readonly financials = httpResource<BookingFinancials>(() => {
+    const id = this.viewing();
+    return id ? `${this.base}/${id}/financials` : undefined;
+  });
+
   approve(bookingId: string, note: string | null): Promise<Booking> {
     return firstValueFrom(this.http.post<Booking>(`${this.base}/${bookingId}/approve`, { note }));
   }
@@ -222,6 +233,7 @@ export class DealerBookingsService {
     this.live.touch('dealer.bookings');
     this.live.touch('dealer.counts');
     this.booking.reload();
+    this.financials.reload();
     this.reputation.reload();
     this.customerRating.reload();
     // A decision changes whether the booking is still live, and the renter panel's whole content

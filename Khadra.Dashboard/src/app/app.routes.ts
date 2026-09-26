@@ -163,8 +163,28 @@ export const routes: Routes = [
           },
 
           notBuilt('finance', 'nav.finance'),
-          notBuilt('payments', 'nav.payments'),
-          notBuilt('payments/detail', 'screen.paymentDetails', 'payment-detail'),
+          // Payments (payments Phase 4b): every checkout attempt, the refunds queue, and one payment's
+          // page. `payments/refunds` comes before `payments/:paymentId`, which would otherwise take it.
+          {
+            path: 'payments',
+            title: title('nav.payments'),
+            data: { view: 'payments' },
+            loadComponent: () =>
+              import('./features/payments/payments.component').then((m) => m.PaymentsComponent),
+          },
+          {
+            path: 'payments/refunds',
+            title: title('nav.payments'),
+            data: { view: 'refunds' },
+            loadComponent: () =>
+              import('./features/payments/payments.component').then((m) => m.PaymentsComponent),
+          },
+          {
+            path: 'payments/:paymentId',
+            title: title('screen.paymentDetails'),
+            loadComponent: () =>
+              import('./features/payments/payment-detail.component').then((m) => m.PaymentDetailComponent),
+          },
           notBuilt('payouts', 'nav.payouts'),
 
           // Disputes are real: the queue, and the workspace where the platform's only decision

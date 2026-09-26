@@ -209,6 +209,23 @@ immutable facts plus refund status, so Phase 5 can freeze its answer into an iss
 `calculatorVersion` travels with it. See `docs/payments-programme.md` for the owner's decisions behind
 each state.
 
+**The administrator's money screens read the same verdicts** (payments Phase 4b). A payment's refund
+progress is the payment's own (`Payment.RefundProgress`, a smart enum), read identically by the
+calculator and by the payments list; a payment's page is `BookingFinancialsCalculator.Describe` under the
+administrator's projection. `IPaymentAdminReader` serves the payments list, the refunds queue (refused
+first, owed longest first, by `RequestedAt`) and a payment's provider events, tied by the payment's id OR
+its provider reference — a receipt that arrived before the reference was saved carries only that.
+`IPaymentDashboardReader` returns FACTS that `FinanceSummaryBuilder` adds up: the month's applied payments
+loaded as payments, so booking money and fee are the aggregate's own arithmetic, and the refunds settled
+in it or still owed. The work queue's money rows have no deadline (`slaDeadlineAt` null): refused refunds
+and captures being refunded as one grouped row each, and each deposit pre-launch item 164 is about as its
+own — found by a candidate query and kept only where the calculator reads `HeldUnresolved`
+(`HeldDepositFinder`), so the calculator stays the one definition. Rows with a deadline come before
+refused refunds, which the payment sweep is already sending again; the bell carries the refused refunds
+and leaves the watched rows to the dashboard. The office reads its money from its projection only: its
+own copy of a booking (`BookingDto.ForDealer`) carries no refund list and no fee, and its copy of a
+dispute decision (`DisputeResolutionDto.ForDealer`) only the basis, its own share and any charge to it.
+
 **Nobody may add a provider that simulates success — except the one recorded exception.**
 `UnconfiguredPaymentProvider` answers "no provider" in production; `SandboxPaymentProvider` is the
 owner-approved exception (2026-09-21) for clicking the lifecycle through before a merchant account

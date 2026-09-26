@@ -11,6 +11,7 @@ import {
   CustomerCounts,
   DealerCounts,
   DisputeCounts,
+  FinanceSummary,
 } from '../models/dashboard.api';
 import { SessionService } from './session.service';
 
@@ -122,6 +123,8 @@ export class AdminDashboardService {
   );
   readonly bookingTrend = httpResource<BookingTrend>(() => this.adminUrl('booking-trend'));
   readonly activity = httpResource<ActivityFeed>(() => this.adminUrl('activity'));
+  /** "Money in motion" (payments Phase 4b): this Amman month's flows and what is owed back now. */
+  readonly finance = httpResource<FinanceSummary>(() => this.adminUrl('finance'));
 
   /** Everything the dashboard screen draws. The rail's workload refreshes on its own cadence. */
   reload(): void {
@@ -132,6 +135,7 @@ export class AdminDashboardService {
     this.attentionQueue.reload();
     this.bookingTrend.reload();
     this.activity.reload();
+    this.finance.reload();
   }
 
   /**

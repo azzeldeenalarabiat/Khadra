@@ -101,13 +101,18 @@
               </div>
               <div class="queue-side">
                 <div class="sla-head">
-                  <span class="k">{{ t('adminDashboard.sla') }}</span>
+                  @if (item.hasClock) {
+                    <span class="k">{{ t('adminDashboard.sla') }}</span>
+                  }
                   <span class="num sla-value">{{ item.sla }}</span>
                 </div>
-                <div class="meter">
-                  <div class="meter-fill" [style.width.%]="item.percent"></div>
-                </div>
-                <a class="btn btn-primary btn-sm" [routerLink]="item.route">{{ item.action }}</a>
+                <!-- No clock, no meter: money owed back has no deadline to fill towards. -->
+                @if (item.percent !== null) {
+                  <div class="meter">
+                    <div class="meter-fill" [style.width.%]="item.percent"></div>
+                  </div>
+                }
+                <a class="btn btn-primary btn-sm" [routerLink]="item.route" [queryParams]="item.queryParams ?? null">{{ item.action }}</a>
               </div>
             </div>
           } @empty {
@@ -181,22 +186,63 @@
           }
         </section>
 
-        <!-- No request is made for these figures. The Payments context is not built, so nothing can
-             answer for money, and asking an endpoint in order to be told so on every page load is
-             the waste this split removed. It says it once, plainly, the way `features/not-built/`
-             speaks for a whole screen. -->
+        <!-- Money in motion (payments Phase 4b): the server's figures for this Amman month, and what
+             is owed back right now. No revenue or commission total: commission is decided per
+             booking, and a platform-wide figure is the office payables ledger's (Phase 8). -->
         <section class="sect sect-pad stack stack-10">
           <span class="k">{{ t('adminDashboard.moneyInMotion') }}</span>
-          <div class="state-block is-empty">
-            <div class="state-icon is-outline"><kh-icon name="currency-circle-dollar" /></div>
-            <div class="state-title">{{ t('adminDashboard.noMoneyHasMoved') }}</div>
-            <div class="state-text">
-              {{ t('adminDashboard.grossBookingValueCommission') }}
+          @if (panelFailed(financeResource)) {
+            <div class="state-text">{{ t('adminDashboard.moneyLoadFailed') }}</div>
+            <div class="state-actions">
+              <button type="button" class="btn btn-secondary btn-sm" (click)="financeResource.reload()">
+                {{ t('common.retry') }}
+              </button>
+            </div>
+          } @else if (finance(); as panel) {
+            <div>
+              <span class="pill" [class]="panel.sandbox ? 's-warn' : 's-dim'">{{ panel.mode }}</span>
+            </div>
+            <span class="k">{{ panel.period }}</span>
+            @for (line of panel.month; track line.label) {
+              <div class="money-line" [class.is-hi]="line.hi">
+                <span class="k-label">
+                  {{ line.label }}
+                  @if (line.note) {
+                    <span class="td-sub">{{ line.note }}</span>
+                  }
+                </span>
+                <span class="num">{{ line.value }}</span>
+              </div>
+            }
+            <span class="k">{{ t('adminDashboard.rightNow') }}</span>
+            @for (line of panel.now; track line.label) {
+              <div class="money-line" [class.is-hi]="line.hi" [class.is-dim]="line.part">
+                <span class="k-label">
+                  {{ line.label }}
+                  @if (line.note) {
+                    <span class="td-sub">{{ line.note }}</span>
+                  }
+                </span>
+                <span class="num">{{ line.value }}</span>
+              </div>
+            }
+            @for (other of panel.otherCurrencies; track other) {
+              <div class="state-text">{{ other }}</div>
+            }
+            <div class="note-box">
+              <kh-icon name="info" />
+              {{ t('adminDashboard.noRevenueHere') }}
             </div>
             <div class="state-actions">
-              <a class="btn btn-secondary btn-sm" routerLink="/finance">{{ t('adminDashboard.whatThisWillShow') }}</a>
+              <a class="btn btn-secondary btn-sm" routerLink="/payments">{{ t('adminDashboard.seePayments') }}</a>
             </div>
-          </div>
+          } @else {
+            <div class="sect-pad" aria-busy="true">
+              @for (row of [0, 1, 2]; track row) {
+                <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+              }
+            </div>
+          }
         </section>
 
         <section class="sect sect-clip">

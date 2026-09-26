@@ -7,6 +7,7 @@ using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Payments.ReadModels;
 using Khadra.Application.Reviews.ReadModels;
 using Khadra.Application.Shortlist.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
@@ -359,6 +360,10 @@ public static class DependencyInjection
         services.AddScoped<ICityRepository, CityRepository>();
         services.AddScoped<ICustomerAdminReader, CustomerAdminReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
+        // The administrator's payments list, refunds queue and payment page, and the dashboard's money
+        // panel and attention rows (payments Phase 4b).
+        services.AddScoped<IPaymentAdminReader, PaymentAdminReader>();
+        services.AddScoped<IPaymentDashboardReader, PaymentDashboardReader>();
         services.AddScoped<IAuditFeedReader, AuditFeedReader>();
         services.AddScoped<IGalleryReviewReader, GalleryReviewReader>();
         services.AddScoped<IShortlistReader, ShortlistReader>();

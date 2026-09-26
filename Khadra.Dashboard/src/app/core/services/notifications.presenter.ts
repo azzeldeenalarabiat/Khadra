@@ -1,4 +1,4 @@
-import { AttentionQueue } from '../models/dashboard.api';
+import { AttentionItem, AttentionQueue } from '../models/dashboard.api';
 import { DealerDashboard } from '../models/dealer-console.api';
 import { Tone } from '../models/console.models';
 import { IconName } from '../../shared/icon/icon-paths';
@@ -17,10 +17,20 @@ export interface NotificationRow {
 }
 
 /**
+ * Whether a row asks something of the reader. One with no clock and no warning is WATCHED money — a
+ * capture being refunded, a deposit held for pre-launch item 164's decision — which the dashboard
+ * lists and the bell does not: the badge counts the bell's rows, and a count that cannot clear until
+ * payments Phase 8 would teach an administrator to ignore the bell, refused refunds included.
+ */
+const asksForAction = (item: AttentionItem): boolean =>
+  item.slaDeadlineAt !== null || item.severity !== 'Info';
+
+/**
  * What is waiting on an administrator.
  *
  * The attention queue, through the same presenter the dashboard's "Requires attention" panel uses,
  * so the bell and the panel below it cannot word the same item differently or count it differently.
+ * The bell leaves out only what nobody has to act on (`asksForAction`).
  */
 export function toAdminNotifications(
   queue: AttentionQueue | null,
@@ -28,7 +38,7 @@ export function toAdminNotifications(
   t: Translate,
 ): readonly NotificationRow[] {
   if (!queue) return [];
-  return toQueueItems(queue, now, t).map((item) => ({
+  return toQueueItems({ ...queue, items: queue.items.filter(asksForAction) }, now, t).map((item) => ({
     id: item.id,
     title: item.title,
     // The entity is the more useful of the two when both are present: it names the record.

@@ -161,7 +161,7 @@ public sealed class BookingFinancialsTests
         Assert.Equal(CommissionStates.Expected, financials.Commission.State);
         var record = Assert.Single(financials.Payments);
         Assert.Same(PaymentPurpose.Deposit, record.Purpose);
-        Assert.Equal(RefundProgresses.None, record.RefundProgress);
+        Assert.Equal(RefundProgress.None, record.RefundProgress);
         Assert.Equal(Money.Jod(18m), financials.Summary.PaidOnline);
         Assert.Equal(Money.Jod(18m), financials.Summary.ChargedOnline);
     }
@@ -289,9 +289,9 @@ public sealed class BookingFinancialsTests
         Assert.Equal(DepositStates.ReturnedWithPayment, owed.Deposit.State);
         Assert.Equal(refund.Id, owed.Deposit.Refund!.RefundId);
         Assert.Equal(CommissionStates.NotEarned, owed.Commission.State);
-        Assert.Equal(RefundProgresses.InProgress, Assert.Single(owed.Payments).RefundProgress);
+        Assert.Equal(RefundProgress.InProgress, Assert.Single(owed.Payments).RefundProgress);
         Assert.Equal(Money.Jod(18m), owed.Summary.Refunds.InProgress);
-        Assert.Equal(RefundProgresses.Complete, Assert.Single(settled.Payments).RefundProgress);
+        Assert.Equal(RefundProgress.Complete, Assert.Single(settled.Payments).RefundProgress);
         Assert.Equal(Money.Jod(18m), settled.Summary.Refunds.Settled);
     }
 
@@ -312,7 +312,7 @@ public sealed class BookingFinancialsTests
         // Owner, 2026-09-26: no commission from a deposit held for a customer penalty in Phase 4.
         Assert.Equal(CommissionStates.Undecided, financials.Commission.State);
         var record = Assert.Single(financials.Payments);
-        Assert.Equal(RefundProgresses.Partial, record.RefundProgress);
+        Assert.Equal(RefundProgress.Partial, record.RefundProgress);
         var line = Assert.Single(record.Refunds);
         Assert.Equal(Money.Jod(76.5m), line.Amount);
         Assert.Equal(Money.Jod(4.5m), line.FeePart);
@@ -384,11 +384,11 @@ public sealed class BookingFinancialsTests
         Assert.Equal(CommissionStates.NotEarned, financials.Commission.State);
         Assert.Equal(Money.Jod(94.5m), financials.Summary.Refunds.Settled);
         var record = Assert.Single(financials.Payments);
-        Assert.Equal(RefundProgresses.Complete, record.RefundProgress);
-        Assert.Equal(RefundProgresses.Complete, record.OfficeRefundProgress);
+        Assert.Equal(RefundProgress.Complete, record.RefundProgress);
+        Assert.Equal(RefundProgress.Complete, record.OfficeRefundProgress);
         // The office reads booking money only: all 90 it applied, and never the fee.
         Assert.Equal(90m, office.Summary.Refunded.Amount);
-        Assert.Equal(RefundProgresses.Complete, Assert.Single(office.Payments).RefundProgress);
+        Assert.Equal(RefundProgress.Complete.Name, Assert.Single(office.Payments).RefundProgress);
     }
 
     [Fact]
@@ -508,8 +508,8 @@ public sealed class BookingFinancialsTests
         var financials = Calculate(booking, [payment], [ticket]);
         var office = BookingFinancialsDto.For(financials, BookingParty.Dealer);
 
-        Assert.Equal(RefundProgresses.Complete, Assert.Single(financials.Payments).RefundProgress);
-        Assert.Equal(RefundProgresses.Partial, Assert.Single(office.Payments).RefundProgress);
+        Assert.Equal(RefundProgress.Complete, Assert.Single(financials.Payments).RefundProgress);
+        Assert.Equal(RefundProgress.Partial.Name, Assert.Single(office.Payments).RefundProgress);
         Assert.Equal(72m, office.Summary.Refunded.Amount);
         Assert.Null(office.Deposit.Decision!.ToCustomer);
     }
@@ -574,7 +574,7 @@ public sealed class BookingFinancialsTests
         var admin = BookingFinancialsDto.For(financials, BookingParty.Admin);
         var customer = BookingFinancialsDto.For(financials, BookingParty.Customer);
 
-        Assert.Equal(RefundProgresses.Delayed, Assert.Single(financials.Payments).RefundProgress);
+        Assert.Equal(RefundProgress.Delayed, Assert.Single(financials.Payments).RefundProgress);
         Assert.Equal(Money.Jod(18m), financials.Summary.Refunds.Delayed);
         Assert.Equal("card_closed", Assert.Single(Assert.Single(admin.Payments).Refunds).FailureCode);
         // No provider code reaches a customer (pre-launch item 135 is still open).
@@ -635,7 +635,7 @@ public sealed class BookingFinancialsTests
         Assert.True(financials.Summary.Refunds.InProgress.IsZero);
         var record = Assert.Single(financials.Payments);
         Assert.Equal(Money.Create(25.4m, "USD"), record.AmountCharged);
-        Assert.Equal(RefundProgresses.InProgress, record.RefundProgress);
+        Assert.Equal(RefundProgress.InProgress, record.RefundProgress);
         var refund = Assert.Single(record.Refunds);
         Assert.Equal(Money.Create(25.4m, "USD"), refund.BookingPart);
         Assert.True(refund.FeePart.IsZero);
@@ -656,7 +656,7 @@ public sealed class BookingFinancialsTests
         Assert.False(record.FeeRefundable);
         Assert.Equal(Money.Jod(90m), Assert.Single(record.Refunds).Amount);
         Assert.True(Assert.Single(record.Refunds).FeePart.IsZero);
-        Assert.Equal(RefundProgresses.Complete, record.RefundProgress);
+        Assert.Equal(RefundProgress.Complete, record.RefundProgress);
         Assert.Equal(CommissionStates.NotEarned, financials.Commission.State);
     }
 

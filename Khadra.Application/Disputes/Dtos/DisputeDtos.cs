@@ -5,7 +5,9 @@ using Khadra.Domain.Disputes;
 namespace Khadra.Application.Disputes.Dtos;
 
 /// <summary>
-/// One dispute in full, for whoever is allowed to see it: both parties and the Admin.
+/// One dispute in full, for whoever is allowed to see it: both parties and the Admin. The money is the
+/// exception: the rental office's copy carries only its own part of a decision
+/// (<see cref="DisputeResolutionDto.ForDealer"/>).
 ///
 /// Carries the whole booking, because a dispute is unreadable without it -- the reason references the
 /// car, the resolution is a split of the booking's own deposit, and the penalty range the Admin picks
@@ -70,16 +72,22 @@ public sealed record DisputeStatementDto(
 public sealed record EvidenceLinkDto(string FileName, string Url, DateTimeOffset ExpiresAt);
 
 /// <summary>
-/// The Admin's decision, as money. Recorded, not executed: until the Payments context ships, nothing
-/// here moves funds, and the console says so on every resolution.
+/// The Admin's decision, as money. The customer's share is refunded automatically (payments Phase 3);
+/// what the platform keeps and what goes to the office are settled by hand until a payout rail exists.
 /// </summary>
 public sealed record DisputeResolutionDto(
     MoneyDto DepositHeld,
-    MoneyDto RefundToCustomer,
-    MoneyDto RetainedByPlatform,
+    /// <summary>The customer's share. Null on the rental office's copy (<see cref="ForDealer"/>).</summary>
+    MoneyDto? RefundToCustomer,
+    /// <summary>The platform's share. Null on the rental office's copy (<see cref="ForDealer"/>).</summary>
+    MoneyDto? RetainedByPlatform,
     MoneyDto TransferredToDealer,
     MoneyDto? DealerCharge,
-    bool WaivesEverything,
+    /// <summary>
+    /// True when the customer received the whole basis and nobody was charged. Null on the rental
+    /// office's copy: it is read from the platform's share, so it would tell the office the customer's.
+    /// </summary>
+    bool? WaivesEverything,
     string Note,
     Guid ResolvedByAdminId,
     string ResolvedByName,
@@ -106,6 +114,15 @@ public sealed record DisputeResolutionDto(
             resolvedByAccountClosed,
             resolution.ResolvedAt);
     }
+
+    /// <summary>
+    /// The rental office's copy (owner decision 3, 2026-09-26; pre-launch item 151): the basis the decision
+    /// split, the office's own share and any charge assessed to it — never the customer's refund or the
+    /// platform's share, nor the waiver flag, which is read from them. The customer's copy is unchanged:
+    /// it is the installed app's contract, and the owner deferred its half of item 151 (2026-09-27).
+    /// </summary>
+    public DisputeResolutionDto ForDealer() =>
+        this with { RefundToCustomer = null, RetainedByPlatform = null, WaivesEverything = null };
 }
 
 /// <summary>What the party gets back from a successful upload request: where to PUT, and the key to quote.</summary>

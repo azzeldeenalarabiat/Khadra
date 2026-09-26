@@ -58,7 +58,7 @@ public static class BookingFinancialsCalculator
             .ThenBy(ticket => ticket.Id.Value)
             .ToList();
 
-        var records = own.Select(Record).ToList();
+        var records = own.Select(Describe).ToList();
 
         // The payment that CONFIRMED the booking — the only one whose money is the booking's.
         var confirming = booking.DepositPaymentId is { } confirmingId
@@ -84,7 +84,11 @@ public static class BookingFinancialsCalculator
 
     // ── One payment ────────────────────────────────────────────────────────────────────────────────
 
-    private static PaymentRecord Record(Payment payment)
+    /// <summary>
+    /// One payment as the financial history shows it — the same description on a booking's financial
+    /// state and on the payment's own page (payments Phase 4b), so the two can never differ.
+    /// </summary>
+    public static PaymentRecord Describe(Payment payment)
     {
         var refunds = payment.Refunds
             .OrderBy(refund => refund.RequestedAt)
@@ -92,14 +96,17 @@ public static class BookingFinancialsCalculator
             .Select(refund => RefundOf(payment, refund))
             .ToList();
         // The office is shown every refund but a dispute decision's share, which is the customer's.
-        var officeRefunds = refunds.Where(refund => refund.Reason != RefundReason.DisputeResolution).ToList();
+        var officeRefunds = payment.Refunds.Where(refund => refund.Reason != RefundReason.DisputeResolution).ToList();
 
         return new PaymentRecord(
             payment.Id,
             payment.Purpose,
             payment.Status,
-            ProgressOf(refunds, WhollyReturned(payment)),
-            ProgressOf(officeRefunds, BookingMoneyReturned(payment, officeRefunds)),
+            payment.RefundProgress,
+            // Never anything but None for a payment that did not apply: the office is not shown one.
+            payment.Status == PaymentStatus.Applied
+                ? RefundProgress.Of(officeRefunds, BookingMoneyReturned(payment, officeRefunds))
+                : RefundProgress.None,
             payment.AppliedAt ?? payment.CapturedAt ?? payment.FailedAt ?? payment.CreatedAt,
             payment.CreatedAt,
             Fresh(payment.AmountCaptured ?? payment.Amount),
@@ -136,44 +143,19 @@ public static class BookingFinancialsCalculator
     }
 
     /// <summary>
-    /// One reading of the statuses of the refunds a reader is shown. A refused refund outranks one on
-    /// its way, because it needs a human; whether the rest is complete is the caller's to say.
-    /// </summary>
-    private static string ProgressOf(List<RefundRecord> refunds, bool complete)
-    {
-        if (refunds.Count == 0)
-            return RefundProgresses.None;
-        if (refunds.Any(refund => refund.Status == RefundStatus.Failed))
-            return RefundProgresses.Delayed;
-        if (refunds.Any(refund => refund.Status.IsOutstanding))
-            return RefundProgresses.InProgress;
-        return complete ? RefundProgresses.Complete : RefundProgresses.Partial;
-    }
-
-    /// <summary>
-    /// Whether everything the payment will EVER return has arrived: an orphan returns its whole
-    /// capture, an applied payment its <c>WholePaymentRefundAmount</c>.
-    /// </summary>
-    private static bool WhollyReturned(Payment payment) =>
-        payment.Status == PaymentStatus.Orphaned
-            ? payment.AmountCaptured is { } captured && !captured.IsGreaterThan(payment.RefundSettled)
-            : payment.IsRefundedInFull;
-
-    /// <summary>
     /// The office's "complete": the booking money in the refunds the office is shown covers all the
     /// payment applied to the booking. Judged from those rows alone — never from
     /// <see cref="Payment.IsRefundedInFull"/>, which counts a dispute decision's share too — so the
-    /// customer's share can neither complete the office's badge nor be read back out of it.
+    /// customer's share can neither complete the office's badge nor be read back out of it. Which rows
+    /// the office is shown is this reader's policy, which is why it lives here and not on the payment.
     /// </summary>
-    private static bool BookingMoneyReturned(Payment payment, List<RefundRecord> shown)
+    private static bool BookingMoneyReturned(Payment payment, List<Refund> shown)
     {
-        if (payment.Status != PaymentStatus.Applied)
-            return false;
         var applied = payment.AppliedToBooking;
         var returned = shown
             .Where(refund => refund.Status == RefundStatus.Settled &&
-                string.Equals(refund.BookingPart.CurrencyCode, applied.CurrencyCode, StringComparison.Ordinal))
-            .Sum(refund => refund.BookingPart.Amount);
+                string.Equals(refund.Amount.CurrencyCode, applied.CurrencyCode, StringComparison.Ordinal))
+            .Sum(refund => payment.BookingMoneyIn(refund).Amount);
         return !applied.IsZero && returned >= applied.Amount;
     }
 
@@ -205,6 +187,9 @@ public static class BookingFinancialsCalculator
             .ToList();
 
         return new FinancialSummary(
+            pricing.Days,
+            Fresh(pricing.DailyRate),
+            pricing.DepositPercent.Value,
             Fresh(pricing.RentalTotal),
             Fresh(pricing.DeliveryFee),
             Fresh(pricing.TotalPrice),

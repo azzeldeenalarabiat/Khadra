@@ -20,7 +20,11 @@ import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
-import { Dispute, DisputeResolution, DisputeStatement } from '../../core/models/disputes.api';
+import {
+  DisputeStatement,
+  OfficeDispute,
+  OfficeDisputeResolution,
+} from '../../core/models/disputes.api';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { decidedEarlier, earlierDecisionNotice } from '../disputes/earlier-decisions.presenter';
 
@@ -29,7 +33,9 @@ import { decidedEarlier, earlierDecisionNotice } from '../disputes/earlier-decis
  *
  * Both parties' statements are visible to both, by design: one ticket per booking. The dealer can
  * add to a live ticket and, if they opened it, withdraw it. The Admin's decision appears here when it
- * is made -- as a recorded decision, with the note that no money moves until Payments is live.
+ * is made, as the office's part of it (owner decision 3, pre-launch item 151): the deposit it split,
+ * the office's own share and any charge to it. The customer's and the platform's shares are not the
+ * office's, and the server does not send them here.
  */
 @Component({
   selector: 'kh-dealer-dispute',
@@ -206,7 +212,7 @@ export class DealerDisputeComponent {
   // Every name here arrives with a fact beside it. When the fact says the account is gone, the name
   // is an English stand-in kept for older customer apps, and this screen words it instead.
 
-  protected openerName(d: Dispute): string {
+  protected openerName(d: OfficeDispute): string {
     return d.openedByAccountClosed ? this.t('common.accountClosed') : d.openedByName;
   }
 
@@ -214,12 +220,12 @@ export class DealerDisputeComponent {
     return s.authorAccountClosed ? this.t('common.accountClosed') : s.authorName;
   }
 
-  protected resolverName(r: DisputeResolution): string {
+  protected resolverName(r: OfficeDisputeResolution): string {
     return r.resolvedByAccountClosed ? this.t('common.accountClosed') : r.resolvedByName;
   }
 
   /** Who holds the ticket, or null while nobody does. A closed account still holds it. */
-  protected holderName(d: Dispute): string | null {
+  protected holderName(d: OfficeDispute): string | null {
     if (d.assignedAdminId === null) return null;
     return d.assignedAdminAccountClosed || d.assignedAdminName === null
       ? this.t('common.accountClosed')

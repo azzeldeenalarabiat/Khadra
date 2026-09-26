@@ -5,6 +5,8 @@ using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Payments.Financials;
+using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
 using MediatR;
 
@@ -27,6 +29,8 @@ public sealed class GetAttentionQueueHandler(
     IDisputeDashboardReader disputes,
     IDealerDashboardReader dealers,
     IBookingDashboardReader bookings,
+    IPaymentDashboardReader payments,
+    HeldDepositFinder heldDeposits,
     IBusinessRulesProvider businessRules,
     IAdminDashboardSettings settings,
     IClock clock)
@@ -44,7 +48,19 @@ public sealed class GetAttentionQueueHandler(
         // is ACROSS panels — each is its own request with its own scope — not inside one handler.
         var live = await disputes.LiveAsync(cancellationToken);
         var pending = await dealers.PendingApplicationsAsync(cancellationToken);
-        var subtitles = await ResolveDisputeSubtitlesAsync(live, cancellationToken);
+        var failedRefunds = await payments.FailedRefundsAsync(cancellationToken);
+        var owedOrphans = await payments.OwedOrphansAsync(cancellationToken);
+        var held = await heldDeposits.FindAsync(now, cancellationToken);
+        var labels = await ResolveBookingLabelsAsync(
+            [.. live.Select(dispute => dispute.BookingId), .. held.Select(deposit => deposit.BookingId)],
+            cancellationToken);
+
+        // A ticket whose booking has gone gets no subtitle rather than a fabricated one. The row still
+        // renders: the deadline is the fact that matters, and inventing a label would be the one thing
+        // this console must never do.
+        var subtitles = live
+            .Where(dispute => labels.ContainsKey(dispute.BookingId))
+            .ToDictionary(dispute => dispute.TicketId, dispute => labels[dispute.BookingId]);
 
         return AttentionQueueBuilder.Build(
             live,
@@ -52,49 +68,42 @@ public sealed class GetAttentionQueueHandler(
             pending,
             settings.SlaWarningThreshold,
             rules.AdminSlaHours,
-            now);
+            now,
+            new MoneyAttention(
+                failedRefunds,
+                owedOrphans,
+                [.. held.Select(deposit => new HeldDepositRow(
+                    deposit.BookingId.Value,
+                    labels.GetValueOrDefault(deposit.BookingId),
+                    deposit.HeldSince))]));
     }
 
     /// <summary>
-    /// Builds "Aqaba Coast Cars · KH-20411" for each live ticket.
+    /// Builds "Aqaba Coast Cars · KH-20411" for each booking a row names: a live ticket's, or a held
+    /// deposit's.
     ///
     /// A ticket knows only its BookingId, and a booking knows only its DealerId: cross-context
     /// references are by id, with no navigation properties. So the labels are resolved by asking each
     /// context in turn through its own port, rather than by joining three tables across three
-    /// context boundaries in one query.
+    /// context boundaries in one query. A booking that has gone gets no label rather than a made-up one.
     /// </summary>
-    private async Task<IReadOnlyDictionary<Id, string>> ResolveDisputeSubtitlesAsync(
-        IReadOnlyList<LiveDispute> live,
+    private async Task<IReadOnlyDictionary<Id, string>> ResolveBookingLabelsAsync(
+        IReadOnlyCollection<Id> bookingIds,
         CancellationToken cancellationToken)
     {
-        if (live.Count == 0)
+        if (bookingIds.Count == 0)
             return new Dictionary<Id, string>();
 
-        var labels = await bookings.LabelsAsync(
-            [.. live.Select(dispute => dispute.BookingId).Distinct()],
-            cancellationToken);
-        var byBooking = labels.ToDictionary(label => label.BookingId);
-
+        var labels = await bookings.LabelsAsync([.. bookingIds.Distinct()], cancellationToken);
         var names = await dealers.NamesAsync(
             [.. labels.Select(label => label.DealerId).Distinct()],
             cancellationToken);
         var byDealer = names.ToDictionary(name => name.DealerId, name => name.BusinessName);
 
-        var subtitles = new Dictionary<Id, string>(live.Count);
-        foreach (var dispute in live)
-        {
-            // A ticket whose booking has gone gets no subtitle rather than a fabricated one. The row
-            // still renders: the deadline is the fact that matters, and inventing a label would be
-            // the one thing this console must never do.
-            if (!byBooking.TryGetValue(dispute.BookingId, out var label))
-                continue;
-
-            var dealerName = byDealer.GetValueOrDefault(label.DealerId);
-            subtitles[dispute.TicketId] = dealerName is null
-                ? label.Reference
-                : $"{dealerName} · {label.Reference}";
-        }
-
-        return subtitles;
+        return labels.ToDictionary(
+            label => label.BookingId,
+            label => byDealer.GetValueOrDefault(label.DealerId) is { } dealerName
+                ? $"{dealerName} · {label.Reference}"
+                : label.Reference);
     }
 }

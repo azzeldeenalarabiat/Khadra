@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<InvitationReissuer>();
         services.AddScoped<Bookings.BookingPartyResolver>();
         services.AddScoped<Payments.BookingPaymentAvailability>();
+        services.AddScoped<Payments.Financials.HeldDepositFinder>();
         services.AddScoped<Bookings.BookingPricer>();
         services.AddScoped<Disputes.DisputeAuditor>();
         services.AddScoped<Disputes.DisputeViewComposer>();
