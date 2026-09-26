@@ -66,6 +66,7 @@ public sealed class PushWordingAndFcmTests
     [Theory]
     [InlineData("YourBookingConfirmed")]
     [InlineData("YourDepositRefunded")]
+    [InlineData("YourPartialRefundSettled")]
     public void A_confirmation_and_a_refund_speak_of_the_payment_not_the_deposit(string kindName)
     {
         var kind = Enumeration.FromName<NotificationKind>(kindName);
@@ -78,6 +79,23 @@ public sealed class PushWordingAndFcmTests
         Assert.Contains("payment", en.Body, StringComparison.Ordinal);
         Assert.DoesNotContain("العربون", ar.Title + ar.Body, StringComparison.Ordinal);
         Assert.Contains("دفعتك", ar.Body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Phase 3: while part of a payment is still out or held, the customer is never told "your payment
+    /// has been refunded" — that sentence is kept for the moment all of it is back.
+    /// </summary>
+    [Fact]
+    public void A_partial_refund_says_part_of_the_payment_in_both_languages()
+    {
+        var notification = Notification.Raise(Id.New(), NotificationKind.YourPartialRefundSettled, "Petra", Now, Id.New(), "KH-1");
+
+        var en = Composer(PaymentMode.Sandbox).ComposePush(notification, Language.English);
+        var ar = Composer(PaymentMode.Sandbox).ComposePush(notification, Language.Arabic);
+
+        Assert.Contains("part of your payment", en.Body, StringComparison.Ordinal);
+        Assert.Contains("جزء من دفعتك", ar.Body, StringComparison.Ordinal);
+        Assert.Contains("KH-1", en.Body, StringComparison.Ordinal);
     }
 
     [Fact]

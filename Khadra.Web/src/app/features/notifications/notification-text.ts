@@ -21,6 +21,7 @@ export const KNOWN_KINDS: ReadonlySet<string> = new Set([
   'YourReturnReminder',
   'YourDisputeUpdated',
   'YourDepositRefunded',
+  'YourPartialRefundSettled',
 ]);
 
 /** One notification's sentence, the same on the full page and in the header's panel. */

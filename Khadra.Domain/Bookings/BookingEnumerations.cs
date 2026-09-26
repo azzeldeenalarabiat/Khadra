@@ -2,6 +2,15 @@ using Khadra.Domain.Common;
 
 namespace Khadra.Domain.Bookings;
 
+/// <summary>
+/// The booking money a cancellation would return, and whether that is the whole payment (deposit
+/// included) or only the part above the deposit. The payment turns it into what the card receives.
+/// </summary>
+public sealed record RefundOnCancellation(Money BookingPart, bool WholePayment)
+{
+    public bool IsNothing => BookingPart.IsZero && !WholePayment;
+}
+
 // The booking lifecycle. Every transition is forward-only, and the terminal set is
 // {Rejected, Cancelled, NoShow, Expired, Completed} so no booking can sit in limbo forever.
 public sealed class BookingStatus : Enumeration

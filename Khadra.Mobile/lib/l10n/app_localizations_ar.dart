@@ -1366,6 +1366,70 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String bookingRefundAboveDepositInitiatedText(String amount, String date) {
+    return 'يجري استرداد كل ما دفعته فوق العربون، وهو $amount، إلى وسيلة الدفع الأصلية. بدأنا عملية الاسترداد في $date، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String bookingRefundAboveDepositRefundedText(String amount, String date) {
+    return 'تم استرداد كل ما دفعته فوق العربون، وهو $amount، إلى وسيلة الدفع الأصلية في $date. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String bookingRefundAboveDepositDelayedText(String amount) {
+    return 'ما زال استرداد $amount مما دفعته فوق العربون مستحقًا لك. يستغرق الاسترداد وقتًا أطول من المعتاد، ونعيد المحاولة تلقائيًا.';
+  }
+
+  @override
+  String get bookingRefundsTitle => 'المبالغ المستردة';
+
+  @override
+  String get bookingRefundedTotal => 'تم استرداده لك';
+
+  @override
+  String get bookingRefundOutstanding => 'قيد الاسترداد';
+
+  @override
+  String get refundReasonFreeCancellation => 'إلغاء مجاني';
+
+  @override
+  String get refundReasonPlatformCancellation => 'ألغته خضرا';
+
+  @override
+  String get refundReasonEndedBeforePickup => 'المدفوع فوق العربون';
+
+  @override
+  String get refundReasonDisputeWindowClosed => 'إعادة العربون';
+
+  @override
+  String get refundReasonDisputeResolution => 'قرار النزاع';
+
+  @override
+  String get refundReasonOrphanedCapture => 'دفعة تعذّر استخدامها';
+
+  @override
+  String get refundReasonOther => 'استرداد';
+
+  @override
+  String cancelRefundAboveDeposit(String amount) {
+    return 'سيُعاد إليك $amount إلى وسيلة الدفع الأصلية: كل ما دفعته فوق العربون. سنبدأ عملية الاسترداد فورًا، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
+  }
+
+  @override
+  String cancelRefundChanged(String amount) {
+    return 'تغيّر المبلغ الذي سيُعاد إليك وأصبح $amount. يُرجى مراجعته والتأكيد مرة أخرى.';
+  }
+
+  @override
+  String get cancelRefundChangedNone =>
+      'لن يُعاد إليك أي مبلغ إذا ألغيت الآن. يُرجى المراجعة والتأكيد مرة أخرى.';
+
+  @override
+  String notificationYourPartialRefundSettled(String actor) {
+    return '$actor: تم استرداد جزء من دفعتك';
+  }
+
+  @override
   String notificationYourDepositRefunded(String actor) {
     return '$actor: تم استرداد دفعتك';
   }

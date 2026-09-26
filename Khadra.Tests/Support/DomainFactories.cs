@@ -4,6 +4,7 @@ using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.Payments;
 using Khadra.Domain.Shortlist;
 
 namespace Khadra.Tests.Support;
@@ -314,6 +315,46 @@ internal static class Build
         booking.ConfirmDepositPaid(Id.New(), moment);
         booking.ClearDomainEvents();
         return booking;
+    }
+
+    // Approved and paid the way production pays: against a REAL payment that opened, reached the
+    // provider and captured — the deposit, or the whole total with an optional processing fee — and
+    // confirmed the booking with what it applied. The payment carries a provider session, so a refund
+    // can be sent against it.
+    public static (Booking Booking, Payment Payment) PaidBooking(
+        bool inFull = false,
+        decimal fee = 0m,
+        bool feeRefundable = true,
+        DateTimeOffset? now = null,
+        BookingTerms? terms = null,
+        Id? customerId = null,
+        Id? dealerId = null,
+        PickupMethod? pickupMethod = null)
+    {
+        var moment = now ?? Now;
+        var booking = ApprovedBooking(moment, pickupMethod, terms, customerId, dealerId);
+        var part = inFull ? booking.Pricing.TotalPrice : booking.Pricing.DepositAmount;
+        var feeMoney = Money.Create(fee, part.CurrencyCode);
+        var charged = Money.Create(part.Amount, part.CurrencyCode).Add(feeMoney);
+        var payment = Payment.Open(
+            booking.Id,
+            booking.CustomerId,
+            charged,
+            "TestProvider",
+            moment.AddMinutes(30),
+            moment,
+            inFull ? PaymentPurpose.FullPayment : PaymentPurpose.Deposit,
+            feeMoney,
+            feeRefundable);
+        if (payment.AttachProviderSession("sess_" + booking.Reference.Value, "https://provider.test/checkout").IsFailure)
+            throw new InvalidOperationException("The test payment could not reach its provider.");
+        if (payment.Apply(Money.Create(charged.Amount, charged.CurrencyCode), moment, moment).IsFailure)
+            throw new InvalidOperationException("The test payment could not capture.");
+        if (booking.ConfirmPayment(payment.Id, payment.AppliedToBooking, moment).IsFailure)
+            throw new InvalidOperationException("The test payment could not confirm its booking.");
+        booking.ClearDomainEvents();
+        payment.ClearDomainEvents();
+        return (booking, payment);
     }
 
     // A shortlist entry built OUTSIDE its aggregate, so a test can stage the race the unique index

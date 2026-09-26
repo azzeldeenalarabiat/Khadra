@@ -82,6 +82,16 @@ public abstract class ApiControllerBase : ControllerBase
         };
         if (error.Details is not null)
             problem.Extensions["errors"] = error.Details;
+        // Top-level, beside `code`: a refusal that carries the figure that changed (booking.refund_changed).
+        // The reserved names are never overwritten by a payload.
+        if (error.Extensions is not null)
+        {
+            foreach (var (key, value) in error.Extensions)
+            {
+                if (key is not ("code" or "traceId" or "errors"))
+                    problem.Extensions[key] = value;
+            }
+        }
 
         return new ObjectResult(problem) { StatusCode = status, ContentTypes = { "application/problem+json" } };
     }

@@ -70,13 +70,20 @@ public sealed record CheckoutSession(string ProviderReference, string CheckoutUr
 /// The provider's own id for THIS DELIVERY, not for the payment. It is the replay key, so an adapter
 /// that cannot supply a stable one has to synthesise a deterministic one from the payload and say so.
 /// </param>
+/// <param name="RefundReference">
+/// For a refund event, the provider's own id for the REFUND — the one it returned when the refund was
+/// sent (<see cref="ProviderRefund"/>). A payment can carry several refunds in flight at once (Phase
+/// 3), and this is how the event says which one it settles or refuses. Null on every other kind, and
+/// on a provider that cannot name refunds, which is then matched only when it cannot be ambiguous.
+/// </param>
 public sealed record ProviderEvent(
     string ProviderEventId,
     string ProviderReference,
     ProviderEventKind Kind,
     Money? Amount,
     string? FailureCode,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? RefundReference = null);
 
 public sealed record ProviderPaymentState(ProviderEventKind Kind, Money? Amount, string? FailureCode);
 

@@ -105,8 +105,10 @@ public sealed class PaymentUseCaseTests
                 UnitOfWork,
                 NullLogger<ReceiveProviderEventHandler>.Instance);
 
+        public RecordingLogger<SettlePaymentsHandler> SweepLog { get; } = new();
+
         public SettlePaymentsHandler Sweep() =>
-            new(Payments, Provider, Settings, Clock, UnitOfWork, NullLogger<SettlePaymentsHandler>.Instance);
+            new(Payments, Provider, Settings, Clock, UnitOfWork, SweepLog);
     }
 
     // ---------------------------------------------------------------- opening a checkout
@@ -901,15 +903,19 @@ public sealed class PaymentUseCaseTests
         Assert.True(payment.Apply(Money.Jod(booking.Pricing.DepositAmount.Amount), Now, Now).IsSuccess);
         Assert.True(booking.ConfirmDepositPaid(payment.Id, Now).IsSuccess);
         Assert.True(booking.Cancel(BookingParty.Customer, CustomerId, null, Now).IsSuccess);
-        DepositRefundSettlement.RefundForFreeCancellation(booking, payment, Now);
+        BookingEndingRefunds.Record(booking, payment, Now);
         context.GivenReference(payment);
         context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
         context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([payment]);
         return (booking, payment);
     }
 
-    private static ProviderEvent RefundEvent(ProviderEventKind kind, string eventId, string? failureCode = null) =>
-        new(eventId, "sess_1", kind, null, failureCode, Now);
+    private static ProviderEvent RefundEvent(
+        ProviderEventKind kind,
+        string eventId,
+        string? failureCode = null,
+        string? refundReference = "ref_1") =>
+        new(eventId, "sess_1", kind, null, failureCode, Now, refundReference);
 
     private static void Deliver(Context context, ProviderEvent notification) =>
         context.Provider.ParseEvent(Arg.Any<string>(), Arg.Any<IReadOnlyDictionary<string, string>>())
@@ -1248,5 +1254,216 @@ public sealed class PaymentUseCaseTests
         var retry = await context.Open().Handle(
             new OpenDepositCheckoutCommand(CustomerId, booking.Id, PaymentPurpose.FullPayment), CancellationToken.None);
         Assert.True(retry.IsSuccess);
+    }
+
+    // ---------------------------------------------------------------- refunds named by the provider (Phase 3, 2026-09-26)
+
+    /// <summary>
+    /// A booking paid in full (90 and a 4.5 fee) that the GALLERY cancelled after the free window: the
+    /// money above the deposit with the fee (76.5) went back at once, and the deposit (18) was released
+    /// when the dispute window closed. Both refunds are out with the provider.
+    /// </summary>
+    private static (Booking Booking, Payment Payment, Refund Above, Refund Deposit) TwoRefundsOut(Context context)
+    {
+        var (booking, payment) = Build.PaidBooking(inFull: true, fee: 4.5m, customerId: CustomerId);
+        context.Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
+        context.GivenDealerFor(booking);
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "The car failed its inspection.", Now.AddHours(3)).IsSuccess);
+
+        var above = BookingEndingRefunds.Record(booking, payment, Now.AddHours(3))!;
+        var deposit = payment.RefundHeldDeposit(Money.Jod(booking.Pricing.DepositAmount.Amount), Now.AddDays(3)).Value!;
+        above.MarkSent("rf_above", Now.AddHours(3));
+        deposit.MarkSent("rf_deposit", Now.AddDays(3));
+        context.GivenReference(payment);
+        return (booking, payment, above, deposit);
+    }
+
+    private static ProviderEvent RefundEventFor(
+        Payment payment,
+        ProviderEventKind kind,
+        string eventId,
+        string? refundReference,
+        Money? amount = null,
+        string? failureCode = null) =>
+        new(eventId, payment.ProviderReference!, kind, amount, failureCode, Now.AddDays(3), refundReference);
+
+    /// <summary>
+    /// Pre-launch item 159: with two refunds in flight, "the first one still sent" is the wrong one
+    /// half the time. Each event settles exactly the refund it names, and the customer is told "part
+    /// of your payment" until the last of it is back, then "your payment has been refunded".
+    /// </summary>
+    [Fact]
+    public async Task Each_refund_event_settles_exactly_the_refund_it_names()
+    {
+        var context = new Context();
+        var (booking, payment, above, deposit) = TwoRefundsOut(context);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_deposit", "rf_deposit"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(RefundStatus.Settled, deposit.Status);
+        Assert.Same(RefundStatus.Sent, above.Status);
+        Assert.Same(ProviderEventOutcome.Acted, context.Recorded.Last().Outcome);
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.RecipientUserId == booking.CustomerId &&
+            notification.Kind == NotificationKind.YourPartialRefundSettled));
+        context.Notifier.DidNotReceive().Raise(Arg.Is<Notification>(n => n.Kind == NotificationKind.YourDepositRefunded));
+
+        context.Notifier.ClearReceivedCalls();
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_above", "rf_above"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(RefundStatus.Settled, above.Status);
+        Assert.True(payment.IsRefundedInFull);
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.RecipientUserId == booking.CustomerId &&
+            notification.Kind == NotificationKind.YourDepositRefunded));
+    }
+
+    [Fact]
+    public async Task A_refund_event_naming_a_refund_this_payment_never_sent_is_recorded_unmatched_and_moves_nothing()
+    {
+        var context = new Context();
+        var (_, payment, above, deposit) = TwoRefundsOut(context);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_stranger", "rf_somebody_else"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(ProviderEventOutcome.Unmatched, context.Recorded.Last().Outcome);
+        Assert.Same(RefundStatus.Sent, above.Status);
+        Assert.Same(RefundStatus.Sent, deposit.Status);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+    }
+
+    /// <summary>
+    /// A provider that cannot name refunds is matched only when the event cannot be anyone else's:
+    /// exactly one refund out for exactly its amount.
+    /// </summary>
+    [Fact]
+    public async Task An_unnamed_refund_event_settles_only_the_one_refund_its_amount_can_mean()
+    {
+        var context = new Context();
+        var (_, payment, above, deposit) = TwoRefundsOut(context);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_unnamed_1", null, Money.Jod(18m)));
+        Assert.True((await Receive(context)).IsSuccess);
+        Assert.Same(RefundStatus.Settled, deposit.Status);
+        Assert.Same(RefundStatus.Sent, above.Status);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_unnamed_2", null, Money.Jod(999m)));
+        Assert.True((await Receive(context)).IsSuccess);
+        Assert.Same(ProviderEventOutcome.Unmatched, context.Recorded.Last().Outcome);
+        Assert.Same(RefundStatus.Sent, above.Status);
+
+        // No amount at all is never enough to choose.
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_unnamed_3", null));
+        Assert.True((await Receive(context)).IsSuccess);
+        Assert.Same(ProviderEventOutcome.Unmatched, context.Recorded.Last().Outcome);
+        Assert.Same(RefundStatus.Sent, above.Status);
+    }
+
+    [Fact]
+    public async Task An_unnamed_refund_event_that_two_refunds_could_answer_is_never_guessed()
+    {
+        var context = new Context();
+        var (booking, payment) = Build.PaidBooking(inFull: true, customerId: CustomerId);
+        context.Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
+        var first = payment.RequestRefund(Money.Jod(9m), Id.New(), Now).Value;
+        var second = payment.RequestRefund(Money.Jod(9m), Id.New(), Now).Value;
+        first.MarkSent("rf_first", Now);
+        second.MarkSent("rf_second", Now);
+        context.GivenReference(payment);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_ambiguous", null, Money.Jod(9m)));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(ProviderEventOutcome.Unmatched, context.Recorded.Last().Outcome);
+        Assert.Same(RefundStatus.Sent, first.Status);
+        Assert.Same(RefundStatus.Sent, second.Status);
+    }
+
+    [Fact]
+    public async Task A_named_refusal_fails_only_that_refund_and_the_next_sweep_sends_it_again()
+    {
+        var context = new Context();
+        var (_, payment, above, deposit) = TwoRefundsOut(context);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundFailed, "evt_refused", "rf_above", failureCode: "refund_declined"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(RefundStatus.Failed, above.Status);
+        Assert.Equal("refund_declined", above.FailureCode);
+        Assert.Same(RefundStatus.Sent, deposit.Status);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+
+        context.Payments.ListStaleLiveAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
+        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([payment]);
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.Same(RefundStatus.Sent, above.Status);
+        await context.Provider.Received(1).RefundAsync(
+            Arg.Is<RefundRequest>(request => request.RefundId == above.Id && request.Amount == above.Amount),
+            Arg.Any<CancellationToken>());
+        await context.Provider.DidNotReceive().RefundAsync(
+            Arg.Is<RefundRequest>(request => request.RefundId == deposit.Id), Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>A settlement the platform already recorded is acknowledged, and nobody is told twice.</summary>
+    [Fact]
+    public async Task A_second_settlement_for_a_settled_refund_is_ignored_and_tells_nobody()
+    {
+        var context = new Context();
+        var (_, payment, _, deposit) = TwoRefundsOut(context);
+        deposit.MarkSettled(Now.AddDays(3));
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_again", "rf_deposit"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        Assert.Same(ProviderEventOutcome.Ignored, context.Recorded.Last().Outcome);
+        context.Notifier.DidNotReceive().Raise(Arg.Any<Notification>());
+    }
+
+    /// <summary>
+    /// Every settled refund now tells the customer (Phase 3), an orphaned capture's included: the
+    /// money came back whole, so it is "your payment has been refunded".
+    /// </summary>
+    [Fact]
+    public async Task A_settled_orphan_refund_tells_the_customer_their_payment_was_refunded()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        Assert.True(payment.Orphan(Money.Jod(booking.Pricing.DepositAmount.Amount), Now, "BookingExpired", Now).IsSuccess);
+        Assert.Single(payment.Refunds).MarkSent("rf_orphan", Now);
+        context.GivenReference(payment);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_orphan", "rf_orphan"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.RecipientUserId == booking.CustomerId &&
+            notification.Kind == NotificationKind.YourDepositRefunded));
+    }
+
+    /// <summary>
+    /// The safety net under the ending refunds: a payment in full whose booking ended before pickup
+    /// with no refund recorded is named in the log every sweep, and nothing is recorded FOR it — a
+    /// sweep that wrote refunds would be a second writer of money owed.
+    /// </summary>
+    [Fact]
+    public async Task The_sweep_names_a_payment_in_full_whose_ending_recorded_no_refund_and_records_nothing()
+    {
+        var context = new Context { Provider = TestPayments.NoProvider() };
+        var (_, payment) = Build.PaidBooking(inFull: true, customerId: CustomerId);
+        context.Payments.ListEndedWithoutEndingRefundAsync(Arg.Any<CancellationToken>()).Returns([payment]);
+        context.Payments.ListWithOutstandingRefundsAsync(Arg.Any<CancellationToken>()).Returns([]);
+
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Assert.True(context.SweepLog.Logged(2316));
+        Assert.Contains(payment.Id.Value.ToString(), context.SweepLog.AllText, StringComparison.Ordinal);
+        Assert.Empty(payment.Refunds);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

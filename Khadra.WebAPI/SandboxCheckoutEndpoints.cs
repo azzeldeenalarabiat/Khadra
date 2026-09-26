@@ -130,9 +130,18 @@ internal static class SandboxCheckoutEndpoints
 
         if (payment is null) return Results.NotFound();
 
-        Money? amount = outcome.Kind is "captured" or "refund_settled"
-            ? Money.Create(outcome.Amount ?? payment.Amount.Amount, payment.Amount.CurrencyCode)
+        // A refund event carries the REFUND's amount, and names the refund when the tester pressed its
+        // own button (Phase 3); the unnamed buttons send the amount typed on the page, to exercise the
+        // fallback that settles only an unambiguous match.
+        var isRefund = outcome.Kind is "refund_settled" or "refund_failed";
+        var named = isRefund && !string.IsNullOrWhiteSpace(outcome.RefundReference)
+            ? payment.RefundWithProviderReference(outcome.RefundReference)
             : null;
+        Money? amount = outcome.Kind == "captured"
+            ? Money.Create(outcome.Amount ?? payment.Amount.Amount, payment.Amount.CurrencyCode)
+            : isRefund
+                ? Money.Create(outcome.Amount ?? named?.Amount.Amount ?? payment.Amount.Amount, payment.Amount.CurrencyCode)
+                : null;
 
         // The event id is the tester's, so "deliver this again" is literally sending the same body
         // twice — which is the duplicate-webhook case, with no code behind the button.
@@ -143,15 +152,22 @@ internal static class SandboxCheckoutEndpoints
             amount,
             settings.Value.WebhookSecret,
             outcome.FailureCode,
-            clock.UtcNow);
+            clock.UtcNow,
+            isRefund ? outcome.RefundReference : null);
 
         return Results.Ok(new { body, signature, header = SandboxEvents.SignatureHeader });
     }
 
     /// <param name="EventId">The provider's id for this DELIVERY. Reusing one is a replay, on purpose.</param>
     /// <param name="Kind">captured | failed | refund_settled | refund_failed.</param>
-    /// <param name="Amount">Major units. Null means "the amount on the row".</param>
-    internal sealed record SandboxOutcome(string EventId, string Kind, decimal? Amount, string? FailureCode);
+    /// <param name="Amount">Major units. Null means "the amount on the row" (or on the named refund).</param>
+    /// <param name="RefundReference">The refund a refund event is about; null sends an unnamed one.</param>
+    internal sealed record SandboxOutcome(
+        string EventId,
+        string Kind,
+        decimal? Amount,
+        string? FailureCode,
+        string? RefundReference = null);
 
     /// <summary>
     /// One self-contained page. No framework, no build step, and nothing that outlives the sandbox.
@@ -183,13 +199,28 @@ internal static class SandboxCheckoutEndpoints
         var expired = now >= payment.ExpiresAt;
         var status = WebUtility.HtmlEncode(payment.Status.Name);
         var expiry = payment.ExpiresAt.ToString("u", CultureInfo.InvariantCulture);
-        // The refunds this payment owes, so a tester can see what a refund event would act on. A
-        // refund event settles or fails the one the sweep has SENT; a Requested one waits for the
-        // sweep's next tick.
+        // The refunds this payment owes, each with its own Settle and Fail buttons once the sweep has
+        // sent it and the provider's reference exists (Phase 3): a refund event names the refund it is
+        // about. A Requested one waits for the sweep's next tick. The reference and the amount are
+        // written into data attributes, HTML-encoded, and read back by the script — never spliced
+        // into the script itself.
         var refunds = payment.Refunds.Count == 0
-            ? "none"
-            : string.Join("<br>", payment.Refunds.Select(refund => WebUtility.HtmlEncode(
-                $"{refund.Reason.Name}: {refund.Amount.Amount.ToString("0.000", CultureInfo.InvariantCulture)} {refund.Amount.CurrencyCode}, {refund.Status.Name}")));
+            ? "<p class=\"muted\">No refunds.</p>"
+            : string.Join("", payment.Refunds
+                .OrderBy(refund => refund.RequestedAt)
+                .Select(refund =>
+                {
+                    var figure = refund.Amount.Amount.ToString("0.000", CultureInfo.InvariantCulture);
+                    var line = WebUtility.HtmlEncode(
+                        $"{refund.Reason.Name}: {figure} {refund.Amount.CurrencyCode}, {refund.Status.Name}");
+                    if (refund.ProviderReference is not { } sent)
+                        return $"<div class=\"refund\"><div>{line}</div><div class=\"muted\">Not sent yet — the payment sweep sends it within a minute.</div></div>";
+
+                    var encoded = WebUtility.HtmlEncode(sent);
+                    return $"<div class=\"refund\"><div>{line}</div><div class=\"muted\">{encoded}</div>"
+                        + $"<button class=\"pay\" data-ref=\"{encoded}\" data-amount=\"{figure}\" data-kind=\"refund_settled\">Settle this refund</button>"
+                        + $"<button class=\"decline\" data-ref=\"{encoded}\" data-amount=\"{figure}\" data-kind=\"refund_failed\">Fail this refund</button></div>";
+                }));
 
         return $$"""
             <!doctype html>
@@ -208,22 +239,26 @@ internal static class SandboxCheckoutEndpoints
               .again{background:#3a352a;color:#f4f1ea}
               #out{margin-top:18px;padding:12px;border-radius:8px;background:#1d1a14;white-space:pre-wrap;font:13px ui-monospace,monospace}
               label{display:block;margin-top:14px;opacity:.7;font-size:14px}
+              .refund{border:1px solid #57503f;border-radius:10px;padding:10px 12px;margin:10px 0}
+              .muted{opacity:.7;font-size:13px;word-break:break-all}
+              h2{font-size:16px;margin:24px 0 4px}
             </style></head><body><div class="card">
             <div class="warn">SANDBOX &mdash; no money moves. Nothing here touches a card network.</div>
             <dl>
               <dt>Amount</dt><dd>{{amount}} {{currency}}</dd>
               <dt>Attempt</dt><dd>{{status}}</dd>
               <dt>Session expires</dt><dd>{{expiry}}{{(expired ? " (expired)" : "")}}</dd>
-              <dt>Refunds</dt><dd>{{refunds}}</dd>
             </dl>
-            <label for="amount">Amount to pay (edit to test a mismatch)</label>
+            <label for="amount">Amount (to pay — edit to test a mismatch — or for an unnamed refund event)</label>
             <input id="amount" type="text" inputmode="decimal" value="{{amount}}">
             <label for="evt">Delivery id (send the same one twice to test a replay)</label>
             <input id="evt" type="text" value="">
             <button class="pay"     onclick="go('captured')">Pay</button>
             <button class="decline" onclick="go('failed','card_declined')">Decline</button>
-            <button class="pay"     onclick="go('refund_settled')">Refund settled</button>
-            <button class="decline" onclick="go('refund_failed','refund_declined')">Refund failed</button>
+            <h2>Refunds</h2>
+            <div id="refunds">{{refunds}}</div>
+            <button class="again"   onclick="go('refund_settled')">Unnamed "refund settled" for the amount above</button>
+            <button class="again"   onclick="go('refund_failed','refund_declined')">Unnamed "refund failed" for the amount above</button>
             <button class="again"   onclick="send()">Deliver the last one again</button>
             <div id="out">Ready.</div>
             <p id="leaving" hidden>Returning to the booking&hellip; <button class="again" onclick="stay()">Stay on this page</button></p>
@@ -249,12 +284,25 @@ internal static class SandboxCheckoutEndpoints
               leaving.hidden = true;
             }
 
-            async function go(kind, failureCode) {
+            // Each refund's own buttons name it; the reference and amount come from the markup.
+            document.getElementById('refunds').addEventListener('click', event => {
+              const button = event.target.closest('button[data-ref]');
+              if (!button) return;
+              go(button.dataset.kind,
+                 button.dataset.kind === 'refund_failed' ? 'refund_declined' : null,
+                 button.dataset.ref,
+                 Number(button.dataset.amount));
+            });
+
+            async function go(kind, failureCode, refundReference, refundAmount) {
+              const typed = Number(document.getElementById('amount').value);
+              const isRefund = kind === 'refund_settled' || kind === 'refund_failed';
               const body = {
                 eventId: evt.value,
                 kind,
-                amount: kind === 'captured' ? Number(document.getElementById('amount').value) : null,
-                failureCode: failureCode || null
+                amount: kind === 'captured' ? typed : isRefund ? (refundAmount ?? typed) : null,
+                failureCode: failureCode || null,
+                refundReference: refundReference || null
               };
               const signed = await fetch(location.pathname + '/events', {
                 method: 'POST',
@@ -266,8 +314,10 @@ internal static class SandboxCheckoutEndpoints
               const accepted = await send();
               // A new action is a new delivery. Replaying is what "Deliver the last one again" is for.
               evt.value = freshId();
-              // Only once the webhook has taken it. A refusal stays on screen to be read.
-              if (accepted) returnToBooking();
+              // Only once the webhook has taken it. A refusal stays on screen to be read. A refund
+              // event reloads this page instead, so the refund's new status is what the tester sees.
+              if (accepted && isRefund) setTimeout(() => location.reload(), 1500);
+              else if (accepted) returnToBooking();
             }
 
             // The real webhook, on the real route, with the real signature header. Same origin, so

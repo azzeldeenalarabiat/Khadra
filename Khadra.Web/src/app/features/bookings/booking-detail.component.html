@@ -154,7 +154,9 @@
             <div><p class="notice__title">{{ i18n.t('booking.cancelledTitle') }}</p>
               <p>{{ b.cancelledBy === 'Customer' ? i18n.t('booking.cancelledByYou') : i18n.t('booking.cancelledBy', { party: party(b.cancelledBy) }) }}
                 @if (endReason()) { · {{ endReason() }} }</p>
-              @if (b.depositRefund; as refund) {
+              @if (b.refunds) {
+                @for (refund of b.refunds; track refund.refundId) { <p>{{ refundSentence(refund, b) }}</p> }
+              } @else if (b.depositRefund; as refund) {
                 <p>{{ refundText(refund, b) }}</p>
               }</div></div>
         }
@@ -168,7 +170,9 @@
             <p>{{ i18n.t('booking.expiredText') }}</p></div></div>
         }
         @case ('NoShow') {
-          <div class="notice notice--bad"><kh-icon name="warning" /><p class="notice__title">{{ i18n.t('booking.noShowTitle') }}</p></div>
+          <div class="notice notice--bad"><kh-icon name="warning" />
+            <div><p class="notice__title">{{ i18n.t('booking.noShowTitle') }}</p>
+              @for (refund of b.refunds ?? []; track refund.refundId) { <p>{{ refundSentence(refund, b) }}</p> }</div></div>
         }
       }
 
@@ -233,10 +237,11 @@
           <!-- Paid in full (owner, 2026-09-25): the payment's own type and what it charged, never "Deposit". -->
           <div><dt>{{ i18n.t('booking.paymentType') }}</dt>
             <dd>{{ i18n.t(paidWithFullPayment(b) ? 'booking.paymentTypeFull' : 'booking.paymentTypeDeposit') }}
-              @if (!b.depositRefund) { <span class="badge badge--ok">{{ i18n.t('booking.paidInFull') }}</span> }</dd></div>
+              @if (!hasRefunds(b)) { <span class="badge badge--ok">{{ i18n.t('booking.paidInFull') }}</span> }</dd></div>
           <div><dt>{{ i18n.t('booking.amountCharged') }}</dt>
             <dd>{{ format.money(amountCharged(b)) }}
-              @if (b.depositRefund; as refund) { <span class="badge {{ refundTone(refund) }}">{{ refundLabel(refund) }}</span> }</dd></div>
+              <!-- An older API names only the deposit's refund; a newer one lists every refund below. -->
+              @if (!b.refunds && b.depositRefund; as refund) { <span class="badge {{ refundTone(refund) }}">{{ refundLabel(refund) }}</span> }</dd></div>
           @if (b.confirmingPayment; as payment) {
             @if (payment.processingFee.amount > 0) {
               <div><dt>{{ i18n.t('pay.summaryFee') }}</dt><dd>{{ format.money(payment.processingFee) }}</dd></div>
@@ -257,6 +262,25 @@
       </dl>
       <p class="faint small">{{ i18n.t('booking.termsFrozen') }}</p>
     </section>
+
+    <!-- Refunds: every one, with why, how much and where it is (Phase 3). The totals are the server's. -->
+    @if (b.refunds?.length) {
+      <section class="card card--pad" aria-labelledby="refunds-title">
+        <h2 id="refunds-title" class="card__title">{{ i18n.t('booking.refunds') }}</h2>
+        <dl class="lines">
+          @for (refund of b.refunds; track refund.refundId) {
+            <div><dt>{{ refundReason(refund) }} <span class="faint small">· {{ refundDate(refund) }}</span></dt>
+              <dd>{{ format.money(refund.amount) }} <span class="badge {{ refundTone(refund) }}">{{ refundLabel(refund) }}</span></dd></div>
+          }
+          @if (b.refundedAmount && b.refundedAmount.amount > 0) {
+            <div><dt>{{ i18n.t('booking.refundedTotal') }}</dt><dd>{{ format.money(b.refundedAmount) }}</dd></div>
+          }
+          @if (b.refundOutstandingAmount && b.refundOutstandingAmount.amount > 0) {
+            <div><dt>{{ i18n.t('booking.refundOutstanding') }}</dt><dd>{{ format.money(b.refundOutstandingAmount) }}</dd></div>
+          }
+        </dl>
+      </section>
+    }
 
     <!-- Collection and return -->
     <section class="card card--pad" aria-labelledby="handover-when-title">
@@ -316,6 +340,13 @@
           <h2 class="card__title">{{ i18n.t('cancel.title') }}</h2>
           <button type="button" class="icon-btn" [attr.aria-label]="i18n.t('common.close')" (click)="closeCancel()"><kh-icon name="x" /></button>
         </div>
+        @if (refundChanged(); as changed) {
+          <div class="notice notice--warn" role="alert"><kh-icon name="warning" />
+            <p>{{ changed.amount > 0 ? i18n.t('cancel.refundChanged', { amount: format.money(changed) }) : i18n.t('cancel.refundChangedNone') }}</p></div>
+        }
+        @if (aboveDepositRefund(b); as refund) {
+          <div class="notice notice--ok"><kh-icon name="check-circle" /><p>{{ i18n.t('cancel.refundAboveDeposit', { amount: format.money(refund) }) }}</p></div>
+        }
         @if (b.cancellation.willRefundDeposit) {
           <div class="notice notice--ok"><kh-icon name="check-circle" /><p>{{ freeRefundText(b) }}</p></div>
         } @else if (b.cancellation.isFree) {

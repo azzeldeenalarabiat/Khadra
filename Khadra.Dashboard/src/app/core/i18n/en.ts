@@ -418,13 +418,32 @@ export const EN = {
   'common.currentPassword': 'Current password',
   'common.deactivate': 'Deactivate',
   'common.decisionRecordedNoFunds':
-    "Decision recorded — no funds moved. Money only moves once the platform's payment module is live.",
+    "Decision recorded. The customer's share is refunded to their original payment method automatically; what the platform keeps and what goes to the office are settled by hand, because no payout rail exists yet.",
   'common.delivery': 'Delivery',
   'booking.depositRefundInitiated': 'Refund of {amount} to the customer initiated (free cancellation)',
   'booking.depositRefunded': '{amount} refunded to the customer (free cancellation)',
   'booking.depositRefundDelayed': 'Refund of {amount} to the customer delayed — still owed, retrying',
   'adminBooking.depositRefund': 'Deposit refund',
   'adminBooking.paymentRefund': 'Payment refund',
+  // Phase 3 (2026-09-26): every refund, with its reason and where it is, on both consoles.
+  'booking.refundReason.FreeCancellation': 'Refund — free cancellation',
+  'booking.refundReason.PlatformCancellation': 'Refund — cancelled by Khadra',
+  'booking.refundReason.EndedBeforePickup': 'Refund — paid above the deposit',
+  'booking.refundReason.DisputeWindowClosed': 'Deposit returned — dispute window closed',
+  'booking.refundReason.DisputeResolution': 'Refund — dispute decision',
+  'booking.refundReason.OrphanedCapture': 'Refund — payment that could not be applied',
+  'booking.refundReason.other': 'Refund',
+  'booking.refundInitiatedTo': 'Refund of {amount} to the customer initiated',
+  'booking.refundedTo': '{amount} refunded to the customer',
+  'booking.refundDelayedTo': 'Refund of {amount} to the customer delayed — still owed, retrying',
+  'adminBooking.refundedTotal': 'Refunded to the customer',
+  'adminBooking.refundOutstanding': 'Refund in progress',
+  'adminBooking.cancelRefundsWholePayment':
+    'If the customer has paid, the whole payment, the deposit included, goes back to their original payment method. Nothing is charged to anyone.',
+  'adminBooking.cancelRefundsAmount':
+    'The customer paid {amount}. All of it, the deposit included, goes back to their original payment method. Nothing is charged to anyone.',
+  'adminBooking.noShowRefundsAboveDeposit':
+    'They paid in full, so everything above the deposit goes back to their original payment method; the deposit stays held.',
   'common.deposit': 'Deposit',
   'common.depositHeld': 'Deposit held',
   'common.description': 'Description',
@@ -522,14 +541,14 @@ export const EN = {
 
   // Booking details (admin).
   'adminBooking.assessedNotChargedMoney':
-    'Assessed, not charged. Money moves only when an administrator resolves a dispute.',
+    'Assessed, not charged. A penalty becomes money only when an administrator resolves a dispute.',
   'adminBooking.cancelBooking': 'Cancel booking',
   'adminBooking.expireBooking': 'Expire booking',
   'adminBooking.frozenWhenTheBooking': 'Frozen when the booking was made',
   'adminBooking.history': 'History',
   'adminBooking.markAsNoShow': 'Mark as no-show',
   'adminBooking.noneOfTheseMoves':
-    "None of these moves money. A cancellation by the platform assesses no penalty against either party; the two deadline actions are refused while this booking's own window still has time in it. Every one is attributed to you in the",
+    "None of these charges anyone. A cancellation by the platform assesses no penalty against either party and returns the customer's whole payment, the deposit included, if they paid; a no-show returns what they paid above the deposit. The two deadline actions are refused while this booking's own window still has time in it. Every one is attributed to you in the",
   'adminBooking.nothingIsOwed': 'Nothing is owed',
   'adminBooking.openCustomer': 'Open customer',
   'adminBooking.parties': 'Parties',
@@ -596,7 +615,7 @@ export const EN = {
   'disputeDetail.overdue': 'Overdue',
   'disputeDetail.platformSla': 'Platform SLA',
   'disputeDetail.resolvingRecordsTheDecision':
-    'Resolving records the decision. No funds move until the payment module is live.',
+    "Resolving records the decision. The customer's share is refunded to their original payment method automatically; what the platform keeps and what goes to the office are settled by hand.",
   'disputeDetail.separateFromTheDeposit':
     'Separate from the deposit, and only inside the range this booking assessed.',
   'disputeDetail.takeThisOn': 'Take this on',
@@ -1530,8 +1549,6 @@ export const EN = {
   'dealerReview.theyCanTradeAgain':
     'They can trade again straight away; their approval was never withdrawn.',
   'dealerReview.dealerReactivated': 'Dealer reactivated',
-  'adminBooking.nothingIsRefundedHere':
-    'Nothing is refunded here. Money moves only through a dispute resolution, and Payments is not live.',
   'adminBooking.whyIsThePlatform': 'Why is the platform cancelling this booking?',
   'adminBooking.bookingCancelled': 'Booking cancelled',
   'adminBooking.recordedAgainstYourAccount': 'Recorded against your account in the audit log.',
@@ -1549,10 +1566,10 @@ export const EN = {
   'disputeDetail.moneyOnThisBooking': 'Money on this booking',
   'disputeDetail.recordThisDecision': 'Record this decision?',
   'disputeDetail.decisionRecordedNoFunds':
-    'Decision recorded — no funds moved. Payments is not live, so nothing is transferred yet.',
+    "The customer's share is refunded to their original payment method automatically. What the platform keeps and what goes to the office are settled by hand; no payout rail exists yet.",
   'disputeDetail.resolveDispute': 'Resolve dispute',
   'disputeDetail.disputeResolved': 'Dispute resolved',
-  'disputeDetail.decisionRecordedNoFunds2': 'Decision recorded — no funds moved.',
+  'disputeDetail.decisionRecordedNoFunds2': "Decision recorded. Any refund to the customer is on its way; the rest is settled by hand.",
   'dealerDashboard.pendingRequests': 'Pending requests',
   'dealerDashboard.activeRentals': 'Active rentals',
   'dealerDashboard.availableVehicles': 'Available vehicles',

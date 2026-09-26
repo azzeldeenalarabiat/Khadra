@@ -123,6 +123,42 @@ public sealed class SandboxCheckoutReturnTests
         Assert.Contains($"""href="https://customer.example/a&amp;b/bookings/{payment.BookingId.Value}">""", page, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Each refund the sweep has SENT gets its own Settle and Fail buttons naming it (Phase 3), the
+    /// reference HTML-encoded into the markup and never spliced into the script; one not sent yet says
+    /// so. A refund event reloads the console, so the new status is what the tester sees.
+    /// </summary>
+    [Fact]
+    public async Task Every_sent_refund_gets_its_own_buttons_naming_it()
+    {
+        var payment = OpenPayment();
+        Assert.True(payment.AttachProviderSession(Reference, "https://console.example/x").IsSuccess);
+        Assert.True(payment.Orphan(Money.Jod(18m), Build.Now, "BookingExpired", Build.Now).IsSuccess);
+        var sent = Assert.Single(payment.Refunds);
+        sent.MarkSent("sbxrf_a<b", Build.Now);
+
+        var page = await PageFor(payment, Settings(Website));
+
+        Assert.Contains("""data-ref="sbxrf_a&lt;b" data-amount="18.000" data-kind="refund_settled">Settle this refund""", page, StringComparison.Ordinal);
+        Assert.Contains("""data-ref="sbxrf_a&lt;b" data-amount="18.000" data-kind="refund_failed">Fail this refund""", page, StringComparison.Ordinal);
+        Assert.Contains("if (accepted && isRefund) setTimeout(() => location.reload(), 1500);", page, StringComparison.Ordinal);
+        var script = page[page.IndexOf("<script>", StringComparison.Ordinal)..];
+        Assert.DoesNotContain("sbxrf_a", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_refund_not_sent_yet_has_no_buttons_and_says_why()
+    {
+        var payment = OpenPayment();
+        Assert.True(payment.AttachProviderSession(Reference, "https://console.example/x").IsSuccess);
+        Assert.True(payment.Orphan(Money.Jod(18m), Build.Now, "BookingExpired", Build.Now).IsSuccess);
+
+        var page = await PageFor(payment, Settings(Website));
+
+        Assert.Contains("Not sent yet", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("Settle this refund", page, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task An_unknown_reference_is_still_a_bare_404()
     {

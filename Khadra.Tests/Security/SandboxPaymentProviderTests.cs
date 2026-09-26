@@ -130,6 +130,51 @@ public sealed class SandboxPaymentProviderTests
         Assert.Equal(expected, parsed.Value.Kind);
     }
 
+    /// <summary>
+    /// A refund event names the refund it is about (Phase 3), and the name crosses the wire intact.
+    /// Every other kind carries none.
+    /// </summary>
+    [Fact]
+    public void A_refund_event_names_its_refund_across_the_round_trip()
+    {
+        var (body, signature) = SandboxEvents.Build(
+            "evt_rf", "sbx_abc", "refund_settled", Money.Jod(18m), Secret, refundReference: "sbxrf_0123");
+
+        var parsed = Provider().ParseEvent(body, Headers(signature));
+
+        Assert.True(parsed.IsSuccess);
+        Assert.Equal(ProviderEventKind.RefundSettled, parsed.Value.Kind);
+        Assert.Equal("sbxrf_0123", parsed.Value.RefundReference);
+        Assert.Equal(18m, parsed.Value.Amount!.Amount);
+
+        var (capture, captureSignature) = SandboxEvents.Build("evt_c", "sbx_abc", "captured", Money.Jod(18m), Secret);
+        Assert.Null(Provider().ParseEvent(capture, Headers(captureSignature)).Value.RefundReference);
+    }
+
+    /// <summary>
+    /// Idempotent like a real provider: the same refund sent again is the SAME refund, so an event
+    /// for the first send still names the row after the sweep re-sends it. Keyed, so it cannot be
+    /// worked out from the refund's id.
+    /// </summary>
+    [Fact]
+    public async Task Sending_the_same_refund_again_returns_the_same_reference()
+    {
+        var provider = Provider();
+        var refundId = Id.New();
+        var request = new RefundRequest(refundId, "sbx_abc", Money.Jod(18m));
+
+        var first = await provider.RefundAsync(request);
+        var again = await provider.RefundAsync(request);
+        var other = await provider.RefundAsync(new RefundRequest(Id.New(), "sbx_abc", Money.Jod(18m)));
+        var otherSecret = await Provider(secret: "a-different-secret-that-is-long-enough").RefundAsync(request);
+
+        Assert.StartsWith("sbxrf_", first.Value.ProviderReference, StringComparison.Ordinal);
+        Assert.Equal(first.Value.ProviderReference, again.Value.ProviderReference);
+        Assert.NotEqual(first.Value.ProviderReference, other.Value.ProviderReference);
+        Assert.NotEqual(first.Value.ProviderReference, otherSecret.Value.ProviderReference);
+        Assert.DoesNotContain(refundId.Value.ToString("N"), first.Value.ProviderReference, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ------------------------------------------------------------------ the signature
 
     /// <summary>One changed byte and the body is refused. The endpoint is anonymous; this is the lock.</summary>

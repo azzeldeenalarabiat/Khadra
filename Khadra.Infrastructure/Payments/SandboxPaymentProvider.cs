@@ -182,7 +182,8 @@ internal sealed class SandboxPaymentProvider(IOptions<PaymentOptions> options, I
                 kind,
                 amount,
                 body.FailureCode,
-                body.OccurredAt ?? clock.UtcNow));
+                body.OccurredAt ?? clock.UtcNow,
+                string.IsNullOrWhiteSpace(body.RefundReference) ? null : body.RefundReference.Trim()));
         }
         catch (JsonException)
         {
@@ -230,15 +231,19 @@ internal sealed class SandboxPaymentProvider(IOptions<PaymentOptions> options, I
     /// </summary>
     /// <remarks>
     /// It records nothing and moves nothing; the platform's own <c>Refund</c> row is the record, and
-    /// it settles when a signed <c>refund_settled</c> event is delivered — the same way a real one
-    /// would.
+    /// it settles when a signed <c>refund_settled</c> event naming this reference is delivered — the
+    /// same way a real one would. The reference is the same every time the same refund is sent, as a
+    /// real provider's is for the same idempotency key (<see cref="SandboxEvents.RefundReferenceFor"/>).
     /// </remarks>
     public Task<Result<ProviderRefund, Error>> RefundAsync(
         RefundRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var reference = $"sbxrf_{Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant()}";
+        if (string.IsNullOrWhiteSpace(Secret))
+            return Task.FromResult(Result.Failure<ProviderRefund, Error>(PaymentErrors.ProviderUnavailable));
+
+        var reference = SandboxEvents.RefundReferenceFor(request.RefundId.Value, Secret);
         return Task.FromResult(Result.Success<ProviderRefund, Error>(new ProviderRefund(reference)));
     }
 

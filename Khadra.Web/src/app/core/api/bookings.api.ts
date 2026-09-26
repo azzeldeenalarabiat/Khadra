@@ -176,6 +176,12 @@ export interface Booking {
     readonly penalty: PenaltyAssessment;
     /** Cancelling now returns the PAID deposit in full to the original payment method. Absent on an older API. */
     readonly willRefundDeposit?: boolean;
+    /**
+     * What cancelling now returns to the card, all of it (Phase 3): the whole payment inside the free
+     * window, everything above the deposit after it; null when nothing. Sent back as `expectedRefund`.
+     * Absent on an older API.
+     */
+    readonly refundAmount?: Money | null;
   };
   readonly liveDisputeId: string | null;
   readonly payment: PaymentAvailability | null;
@@ -200,6 +206,36 @@ export interface Booking {
   readonly isPaidInFull?: boolean;
   /** The payment that confirmed the booking. Absent on an older API; null while none has. */
   readonly confirmingPayment?: ConfirmingPayment | null;
+  /** Every refund against this booking's payments, oldest first (Phase 3). Absent on an older API. */
+  readonly refunds?: readonly Refund[];
+  /** What has reached the customer: the settled refunds, in the booking's currency. Absent on an older API. */
+  readonly refundedAmount?: Money | null;
+  /** What is promised back and not there yet. Absent on an older API. */
+  readonly refundOutstandingAmount?: Money | null;
+}
+
+/**
+ * One refund, as the server records it (Phase 3). `reason` is a code this site words; one it does not
+ * know yet reads as a plain "Refund".
+ */
+export interface Refund {
+  readonly refundId: string;
+  readonly paymentId: string;
+  readonly reason:
+    | 'FreeCancellation'
+    | 'PlatformCancellation'
+    | 'EndedBeforePickup'
+    | 'DisputeWindowClosed'
+    | 'DisputeResolution'
+    | 'OrphanedCapture'
+    | string;
+  readonly amount: Money;
+  readonly status: 'Requested' | 'Sent' | 'Settled' | 'Failed' | string;
+  readonly requestedAt: string;
+  readonly sentAt: string | null;
+  readonly settledAt: string | null;
+  readonly failedAt: string | null;
+  readonly disputeTicketId: string | null;
 }
 
 /**
@@ -215,6 +251,8 @@ export interface ConfirmingPayment {
   readonly paidAt: string | null;
   /** What a free cancellation would return, from the same rule the refund itself applies. */
   readonly refundOnFreeCancellation: Money;
+  /** The fee that goes back with the booking money. Absent on an older API. */
+  readonly refundableFee?: Money | null;
 }
 
 /**

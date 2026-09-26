@@ -91,9 +91,33 @@ public sealed class RefundReason : Enumeration
     /// </summary>
     public static readonly RefundReason FreeCancellation = new(3, "FreeCancellation");
 
+    /// <summary>
+    /// A PAID booking ended before the car was collected — a cancellation after the free window, a
+    /// no-show, the office never handing the car over — so everything the customer paid ABOVE the
+    /// deposit goes back, with the processing fee when it was refundable (owner, 2026-09-24). The
+    /// deposit itself keeps the cancellation rules: penalties and disputes stay deposit-based.
+    /// </summary>
+    public static readonly RefundReason EndedBeforePickup = new(4, "EndedBeforePickup");
+
+    /// <summary>
+    /// An administrator cancelled a PAID booking before pickup with no penalty on the customer, so
+    /// the whole payment goes back, deposit included (owner, 2026-09-26).
+    /// </summary>
+    public static readonly RefundReason PlatformCancellation = new(5, "PlatformCancellation");
+
+    /// <summary>
+    /// A paid booking ended before pickup and its dispute window closed CLEANLY — no dispute ever
+    /// opened, no penalty assessed, nothing else holding it — so the deposit it held goes back
+    /// (owner, 2026-09-26; spec 3.3: with no ticket, no penalty applies). Recorded by the sweep.
+    /// </summary>
+    public static readonly RefundReason DisputeWindowClosed = new(6, "DisputeWindowClosed");
+
     private RefundReason(int id, string name) : base(id, name)
     {
     }
+
+    /// <summary>Whether this refund returns everything the payment took, deposit included.</summary>
+    public bool ReturnsWholePayment => this == FreeCancellation || this == PlatformCancellation;
 }
 
 /// <summary>

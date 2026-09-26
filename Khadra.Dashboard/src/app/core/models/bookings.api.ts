@@ -148,6 +148,30 @@ export interface Booking {
   readonly isPaidInFull?: boolean;
   /** The payment that confirmed the booking; null while none has. Absent on an older API. */
   readonly confirmingPayment?: ConfirmingPayment | null;
+  /**
+   * Every refund against this booking's payments, oldest first (Phase 3, 2026-09-26): the same list
+   * the customer and the other console read. Absent on an older API, which names only depositRefund.
+   */
+  readonly refunds?: readonly Refund[];
+  /** What has reached the customer, the settled refunds: the server's total. */
+  readonly refundedAmount?: Money | null;
+  /** What is promised back and not there yet: the server's total. */
+  readonly refundOutstandingAmount?: Money | null;
+}
+
+/** One refund: why it is owed, how much, and where it is. The provider's references stay on the server. */
+export interface Refund {
+  readonly refundId: string;
+  readonly paymentId: string;
+  /** FreeCancellation, PlatformCancellation, EndedBeforePickup, DisputeWindowClosed, DisputeResolution or OrphanedCapture. */
+  readonly reason: string;
+  readonly amount: Money;
+  readonly status: 'Requested' | 'Sent' | 'Settled' | 'Failed' | string;
+  readonly requestedAt: string;
+  readonly sentAt: string | null;
+  readonly settledAt: string | null;
+  readonly failedAt: string | null;
+  readonly disputeTicketId: string | null;
 }
 
 /** The payment that confirmed a booking: 'Deposit' or 'FullPayment', and what it charged. */

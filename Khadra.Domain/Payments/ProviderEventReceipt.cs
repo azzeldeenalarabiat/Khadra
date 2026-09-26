@@ -24,6 +24,13 @@ public sealed class ProviderEventOutcome : Enumeration
     /// <summary>A kind this platform does not act on. Seen, acknowledged, nothing done.</summary>
     public static readonly ProviderEventOutcome Ignored = new(4, "Ignored");
 
+    /// <summary>
+    /// A refund event for one of our payments that could not be tied to ONE of its refunds: it named
+    /// a refund reference the payment never sent, or named none and more than one refund (or none)
+    /// could be the one it meant. Recorded and logged, never guessed (Phase 3, 2026-09-26).
+    /// </summary>
+    public static readonly ProviderEventOutcome Unmatched = new(5, "Unmatched");
+
     private ProviderEventOutcome(int id, string name) : base(id, name)
     {
     }

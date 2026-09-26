@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:khadra_mobile/api/dtos.dart';
+import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/theme/khadra_theme.dart';
 import 'package:khadra_mobile/core/widgets/khadra_widgets.dart';
@@ -58,6 +59,11 @@ void main() {
     bool willRefundDeposit = false,
     Map<String, dynamic>? confirmingPayment,
     Map<String, dynamic>? depositRefund,
+    Map<String, dynamic>? cancellationPenalty,
+    Map<String, dynamic>? refundAmount,
+    List<Map<String, dynamic>>? refunds,
+    Map<String, dynamic>? refundedAmount,
+    Map<String, dynamic>? refundOutstandingAmount,
   }) =>
       Booking.fromJson({
         'bookingId': 'b-1',
@@ -98,6 +104,8 @@ void main() {
           'canCancel': canCancel,
           'isFree': willRefundDeposit,
           'willRefundDeposit': willRefundDeposit,
+          if (cancellationPenalty != null) 'penalty': cancellationPenalty,
+          if (refundAmount != null) 'refundAmount': refundAmount,
         },
         'canReportNonDelivery': false,
         'nonDeliveryReportableFrom': now.toIso8601String(),
@@ -119,15 +127,18 @@ void main() {
         'isPaidInFull': isPaidInFull,
         'confirmingPayment': confirmingPayment,
         'depositRefund': depositRefund,
+        if (refunds != null) 'refunds': refunds,
+        if (refundedAmount != null) 'refundedAmount': refundedAmount,
+        if (refundOutstandingAmount != null) 'refundOutstandingAmount': refundOutstandingAmount,
       });
 
   Future<FakeApi> pump(WidgetTester tester, Booking booking,
-      {Locale locale = const Locale('en')}) async {
+      {Locale locale = const Locale('en'), FakeApi? api}) async {
     tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    final api = FakeApi()..bookingById = booking;
+    api = (api ?? FakeApi())..bookingById = booking;
     final container = ProviderContainer(overrides: [
       apiProvider.overrideWithValue(api),
       sessionStoreProvider.overrideWithValue(FakeSessionStore()),
@@ -535,6 +546,137 @@ void main() {
       expect(find.textContaining(RegExp(r'Free cancellation\. .*165')), findsOneWidget);
       expect(find.text(en.cancelFreeRefundNotice), findsNothing);
     });
+
+    // ── Phase 3 (owner, 2026-09-26): a full payment ending before pickup ──
+    final latePenalty = {
+      'attributedTo': 'Customer', 'minPercent': 100, 'maxPercent': 100, 'minAmount': m(33), 'maxAmount': m(33),
+      'isRange': false, 'isNothingOwed': false, 'requiresTicketToEnforce': true, 'reason': '',
+    };
+    Booking lateCancellable() => bookingOf(
+          status: 'Confirmed',
+          history: pathTo('Confirmed'),
+          depositPaid: true,
+          canCancel: true,
+          balanceDue: 0,
+          isPaidInFull: true,
+          confirmingPayment: confirming('FullPayment', 165),
+          cancellationPenalty: latePenalty,
+          refundAmount: m(132),
+        );
+    FakeApi withReasons() => FakeApi()
+      ..cancellationReasons = [
+        {'name': 'PlansChanged', 'labelEn': 'Plans changed', 'labelAr': 'تغيّرت الخطط'},
+      ];
+
+    Future<void> openSheetAndConfirm(WidgetTester tester) async {
+      await tester.ensureVisible(find.text(en.cancelTitle));
+      await tester.tap(find.text(en.cancelTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Plans changed'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(en.cancelConfirm));
+      await tester.tap(find.text(en.cancelConfirm));
+      await tester.pumpAndSettle();
+    }
+
+    screenTest('a late cancellation of a full payment says what comes back above the deposit, and sends it',
+        (tester) async {
+      final api = await pump(tester, lateCancellable(), api: withReasons());
+
+      await tester.ensureVisible(find.text(en.cancelTitle));
+      await tester.tap(find.text(en.cancelTitle));
+      await tester.pumpAndSettle();
+      expect(find.textContaining(RegExp(r'You will get .*132.* everything you paid above the deposit')), findsOneWidget);
+      expect(find.textContaining('Free cancellation'), findsNothing);
+
+      await tester.tap(find.text('Plans changed'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(en.cancelConfirm));
+      await tester.tap(find.text(en.cancelConfirm));
+      await tester.pumpAndSettle();
+
+      expect(api.cancellations.single.$3, 132);
+    });
+
+    screenTest('a refund that changed while the sheet was open is shown, and nothing is cancelled', (tester) async {
+      final api = withReasons()
+        ..cancelFailure = const ApiFailure(
+          kind: ApiFailureKind.conflict,
+          code: 'booking.refund_changed',
+          statusCode: 409,
+          extensions: {
+            'currentRefund': {'amount': 99, 'currency': 'JOD'},
+          },
+        );
+      await pump(tester, lateCancellable(), api: api);
+
+      await openSheetAndConfirm(tester);
+
+      expect(find.textContaining(RegExp(r'has changed to .*99')), findsOneWidget);
+      expect(find.text(en.cancelConfirm), findsOneWidget);
+
+      // Confirmed again, the sheet sends the figure it was just given.
+      await tester.ensureVisible(find.text(en.cancelConfirm));
+      await tester.tap(find.text(en.cancelConfirm));
+      await tester.pumpAndSettle();
+      expect(api.cancellations.map((sent) => sent.$3), [132, 99]);
+    });
+
+    for (final locale in [const Locale('en'), const Locale('ar')]) {
+      final l10n = locale.languageCode == 'ar' ? ar : en;
+      final tag = locale.languageCode;
+
+      screenTest('every refund is listed with its reason, amount and status ($tag)', (tester) async {
+        Map<String, dynamic> row(String reason, String status, num amount) => {
+              'refundId': 'r-$reason',
+              'paymentId': 'p-1',
+              'reason': reason,
+              'amount': m(amount),
+              'status': status,
+              'requestedAt': now.add(const Duration(hours: 3)).toIso8601String(),
+              'settledAt': status == 'Settled' ? now.add(const Duration(hours: 4)).toIso8601String() : null,
+              'failedAt': null,
+            };
+        await pump(
+          tester,
+          bookingOf(
+            status: 'Cancelled',
+            history: [
+              ...pathTo('Confirmed'),
+              changeJson('Cancelled', now.add(const Duration(hours: 3)), from: 'Confirmed', actor: 'Dealer'),
+            ],
+            depositPaid: true,
+            balanceDue: 0,
+            isPaidInFull: true,
+            confirmingPayment: confirming('FullPayment', 165),
+            refunds: [row('EndedBeforePickup', 'Settled', 132), row('DisputeWindowClosed', 'Sent', 33)],
+            refundedAmount: m(132),
+            refundOutstandingAmount: m(33),
+          ),
+          locale: locale,
+        );
+
+        // The notice is at the top; the refunds card is below the price, past the
+        // list's build window, so the page is scrolled to it.
+        expect(find.textContaining(tag == 'ar' ? 'فوق العربون' : 'above the deposit'), findsWidgets);
+        await tester.scrollUntilVisible(
+          find.text(l10n.bookingRefundsTitle),
+          300,
+          scrollable: find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text(l10n.bookingRefundsTitle), findsOneWidget);
+        expect(find.textContaining(l10n.refundReasonEndedBeforePickup), findsOneWidget);
+        expect(find.textContaining(l10n.refundReasonDisputeWindowClosed), findsOneWidget);
+        expect(find.text(l10n.bookingRefundedTotal), findsOneWidget);
+        expect(find.text(l10n.bookingRefundOutstanding), findsOneWidget);
+        expect(find.text(l10n.bookingRefunded), findsOneWidget);
+        expect(find.text(l10n.bookingRefundInitiated), findsOneWidget);
+        // Part of it came back: never "Paid in full".
+        expect(find.text(l10n.bookingPaidInFullNote), findsNothing);
+        expect(find.text(l10n.bookingPaidInFullNothingDue), findsNothing);
+      });
+    }
 
     screenTest('the refund of a full payment speaks of the payment, in Arabic', (tester) async {
       await pump(

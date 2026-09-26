@@ -9,6 +9,8 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Application.Notifications;
+using Khadra.Application.Payments;
+using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Notifications;
 using MediatR;
 
@@ -16,10 +18,11 @@ namespace Khadra.Application.Bookings.AdminBookings;
 
 // The three interventions an administrator can make in a booking.
 //
-// None of them moves money, and none of them may. Penalties are ASSESSED, never charged (CLAUDE.md,
-// spec 3.3): the aggregate records what the booking's own frozen terms say is owed, and money only
-// ever moves when an Admin resolves a dispute ticket. Nothing here touches the Payments context,
-// which is not built.
+// Penalties are ASSESSED, never charged (CLAUDE.md, spec 3.3): none of these takes money from
+// anyone. What they DO record is the refund a paid booking's ending owes the customer (Phase 3,
+// 2026-09-26), in the same save: an administrator's cancellation returns the whole payment, deposit
+// included, and a no-show returns everything above the deposit. The deposit a no-show holds follows
+// the dispute rules.
 
 /// <summary>
 /// Cancels a booking the platform has to step into — a dealership suspended mid-rental, a booking
@@ -64,6 +67,7 @@ public sealed class CancelBookingAsAdminCommandValidator : AbstractValidator<Can
 
 public sealed class AdminBookingCommandHandlers(
     IBookingRepository bookings,
+    IPaymentRepository payments,
     IBookingReader reader,
     AdminActionRecorder audit,
     DealerTeamNotifier team,
@@ -137,9 +141,14 @@ public sealed class AdminBookingCommandHandlers(
             return BookingErrors.NotFound;
 
         var previousStatus = booking.Status.Name;
-        var outcome = act(booking, clock.UtcNow);
+        var now = clock.UtcNow;
+        var outcome = act(booking, now);
         if (outcome.IsFailure)
             return outcome.Error;
+
+        // The refund this ending owes, in THIS save: the whole payment for an administrator's
+        // cancellation before pickup (owner, 2026-09-26), everything above the deposit for a no-show.
+        await BookingEndingRefunds.RecordAsync(booking, payments, now, cancellationToken);
 
         audit.Record(
             action,
@@ -163,6 +172,7 @@ public sealed class AdminBookingCommandHandlers(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return BookingDto.From(booking, context, clock.UtcNow);
+        // Read again after the save, so the answer carries the refund this action just recorded.
+        return BookingDto.From(booking, await reader.ContextAsync(booking.Id, cancellationToken), clock.UtcNow);
     }
 }

@@ -164,14 +164,17 @@ This project has no outbox and dispatches domain events after commit, so a cross
 between the two would mean money captured, booking unconfirmed, and the car released at its deadline.
 
 **Refunds are RECORDED when owed and SENT afterwards**, by the payment sweep that runs beside the
-booking settlement pass. Two triggers exist: an orphaned capture (automatic, in the capture's own
-transaction), an admin's dispute resolution returning money to the customer, and — since the owner's
-decision of 2026-09-24 — a customer's own cancellation of a PAID booking inside the free-cancellation
-window, which refunds the whole deposit. That one is recorded by the cancel handler through
-`DepositRefundSettlement` (the Payments-owned seam, twin of `BookingDepositSettlement`) in the same
-save as the cancellation, and `BookingDisputeSettlement.DepositHeldFor` reads zero for such a booking,
-so a later dispute cannot split money already on its way back. Every other cancellation refund is still
-undecided (decision 3).
+booking settlement pass. The triggers: an orphaned capture (automatic, in the capture's own
+transaction), an admin's dispute resolution returning money to the customer, and — since payments
+Phase 3 (owner, 2026-09-24/26) — every PAID booking that ends before pickup. Those endings are recorded
+through ONE seam, `BookingEndingRefunds` (Payments-owned, twin of `BookingDepositSettlement`), in the
+same save as the transition that ended the booking: the whole payment for a customer's free
+cancellation and an administrator's cancellation, everything above the deposit for any other paid
+ending. The deposit itself goes back when the booking's own dispute window closes with no claim on it
+and no penalty against the customer, released by the settlement sweep. `BookingDisputeSettlement
+.DepositHeldFor` reads zero once the whole payment went back or the deposit was released, so a
+dispute can never split money already on its way back, and the money above the deposit is never part
+of what a dispute splits.
 
 **The commission changed on 2026-09-24, and with it the "never holds dealer funds" property.** It is
 now 20% of ONE day's rental price, frozen on each booking as `Pricing.CommissionAmount` with the rule

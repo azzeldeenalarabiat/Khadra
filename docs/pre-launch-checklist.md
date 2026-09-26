@@ -2087,12 +2087,29 @@ this item rather than defects today.
 
 ### 77. Cancellation does not refund, and that is the owner's decision to make
 
-**Status:** partly closed · **Updated:** 2026-09-24 — the owner decided the customer's free cancellation of a paid booking.
+**Status:** closed · **Closed:** 2026-09-26 — payments Phase 3, on the owner's three decisions.
+
+**Decided and built (owner, 2026-09-26):** a PAID booking that ends before the car is collected
+records what it owes in the save that ends it, through one seam (`BookingEndingRefunds`), decided by
+the booking's own frozen state: the whole payment for a customer's free cancellation and for an
+ADMINISTRATOR's cancellation with no penalty on the customer (`PlatformCancellation`); everything paid
+above the deposit, with a processing fee the payment froze as refundable, for every other paid ending
+(`EndedBeforePickup` — a late cancellation, a no-show, a gallery's cancellation, a non-delivery
+report). Penalties and disputes stay deposit-based; a deposit-only booking gains nothing new. The
+deposit itself goes back when the booking's own dispute window closes CLEANLY — no ticket that was not
+withdrawn, no penalty against the customer — released by the settlement sweep
+(`DisputeWindowClosed`). Three readings of "cleanly" the advisor confirmed and the owner should know:
+a penalty against the OFFICE does not hold the customer's deposit; a DELIVERY no-show is assessed
+against nobody, so its deposit goes back unless the gallery opens a ticket inside the window; and a
+deposit held for a penalty against the customer has no way out once the window closes (item 164).
+
+What follows is the history of the item before Phase 3.
 
 **Decided (owner, 2026-09-24):** a customer who has PAID the deposit and cancels inside the
 free-cancellation window gets the WHOLE deposit refunded automatically to the original payment method,
 with no admin. The cancel handler records the refund (`RefundReason.FreeCancellation`) through
-`DepositRefundSettlement` in the same save as the cancellation; the payment sweep sends it within a
+the ending-refund seam (then `DepositRefundSettlement`, since Phase 3 `BookingEndingRefunds`) in the
+same save as the cancellation; the payment sweep sends it within a
 minute under the refund's own id; a provider refusal leaves it owed and re-sent. The customer is told
 when the provider settles it (`YourDepositRefunded`, push and email).
 
@@ -2113,7 +2130,17 @@ so from `confirmingPayment.refundOnFreeCancellation`.
 
 ### 78. `DepositHeldFor` will need to read what is left, not what was taken
 
-**Status:** closed for the free cancellation · **Updated:** 2026-09-24 — by the booking's rule, not by "captured minus refunded".
+**Status:** closed for refunds · **Updated:** 2026-09-26 — still by the booking's rule; Phase 3 added the other refunds and kept it. One pre-existing gap about a SECOND ticket is logged on its own (item 169).
+
+Phase 3 (2026-09-26) added the other refunds of an applied payment, and `DepositHeldFor` still reads
+the booking's rule rather than "captured minus refunded": zero once the ending returned the whole
+payment (`Booking.ReturnsWholePayment`, a free or an administrator's cancellation), and zero when the
+window already released the deposit — which only a ticket opened in the very instant the window closed
+can meet, and whose resolution must then be all zeros (`DisputeUseCaseTests`). The money above the
+deposit is never part of it: it is refunded at the ending, never disputed. What it does NOT yet read is
+an earlier RESOLVED ticket on the same booking: opening a dispute checks only for a live one, so a
+second ticket inside the window would be offered the whole deposit again — found in the Phase 3
+browser run, older than Phase 3, and logged as item 169 for the owner to decide.
 
 The first refund of an APPLIED payment arrived with the free cancellation (item 77). `DepositHeldFor`
 now reads zero for a booking whose deposit that cancellation returned
@@ -4206,7 +4233,12 @@ show the city filter as unavailable while the lookup has failed, with a test.
 
 ### 156. A gallery or admin cancelling a PAID booking inside the free window refunds nothing
 
-**Status:** open · **Raised:** 2026-09-24 · **Owner decision**
+**Status:** closed · **Closed:** 2026-09-26 — the owner's Phase 3 decisions.
+
+An administrator's cancellation of a paid booking before pickup now returns the whole payment, deposit
+included, at once (`PlatformCancellation`). A gallery's cancellation returns everything above the
+deposit at once, and the deposit when the window closes with no claim on it — the penalty such a
+cancellation assesses is against the office and never holds the customer's money.
 
 `AssessCancellation` treats the free window as free for EITHER party, so a gallery that cancels a paid
 booking within that hour is assessed nothing — and, because the owner's refund rule names the
@@ -4238,7 +4270,13 @@ test per status.
 
 ### 159. A real adapter's refund events must name the refund they settle
 
-**Status:** open · **Raised:** 2026-09-24 (Fable advisor review) · **Belongs with item 76**
+**Status:** closed · **Closed:** 2026-09-26 — `ProviderEvent.RefundReference`; the sandbox names every refund.
+
+The webhook settles or refuses exactly the refund the event names (`Payment.RefundWithProviderReference`).
+An event that names none is accepted only when exactly one refund is out with the provider for exactly
+its amount; anything else is recorded as `Unmatched` and logged at Error, never guessed. The sandbox's
+refund reference is derived from the refund's id under the webhook secret, so a re-send keeps it, as a
+real provider's idempotency does. What remains for the real adapter is item 163.
 
 `ProviderEvent` carries no refund reference, so `RefundSettled` / `RefundFailed` settle "the first Sent
 refund" of the payment. That is safe today — at most one refund of a payment is ever Sent, which the
@@ -4249,7 +4287,12 @@ on it, with a test that two refunds on one payment settle independently.
 
 ### 160. The refund promise on the sheet can be a minute older than the tap
 
-**Status:** open · **Raised:** 2026-09-24 · **Owner decision**
+**Status:** closed · **Closed:** 2026-09-26 — `expectedRefund` (owner decision 2).
+
+The cancel sheet on the website and in the app sends the refund it showed (`cancellation.refundAmount`);
+when it no longer matches, nothing is cancelled and the answer is 409 `booking.refund_changed` with the
+current figure, which both clients show before asking again. An installed app that does not send it is
+answered as before.
 
 `cancellation.willRefundDeposit` is computed when the booking is read. A customer who opens the sheet
 inside the free window and taps after it closes is assessed the penalty and refunded nothing, against
@@ -4282,3 +4325,46 @@ accepted holding it on 2026-09-24 with a manual office-payable ledger: payable a
 marked settled while a refund or dispute on the booking is open, paid by hand, marked paid by an
 administrator with an audit entry. **To close:** that ledger (payments phase 8). Until then, no real
 money may move — which item 76 already guarantees, since there is no merchant account.
+
+### 163. A refund event can arrive before the platform has recorded the refund as sent
+
+**Status:** open · **Raised:** 2026-09-26 (Fable advisor review) · **Belongs with item 76**
+
+The payment sweep sends each refund, marks it Sent in memory, and saves once after the loop. A provider
+fast enough to post `refund_settled` inside that window names a reference the row does not carry yet:
+the event is recorded `Unmatched`, answered 2xx, and not retried, so the refund reads Sent for ever. The
+sandbox cannot produce it (a tester settles by hand). **To close, with the real adapter:** match on the
+platform's own refund id where the provider echoes the idempotency key, or save after each send, or
+reconcile Sent refunds against the provider — with a test of the race.
+
+### 164. A deposit held for a penalty against the customer has no way out once the window closes
+
+**Status:** open · **Raised:** 2026-09-26 (Fable advisor review) · **Owner decision**
+
+A late cancellation or a self-pickup no-show assesses a penalty against the customer on the deposit.
+Phase 3 correctly does not release that deposit when the window closes. But money moves only through a
+dispute ticket, and none can be opened after the window, so the deposit then sits on the platform with
+no path to the office or back to the customer. The dealer console says "Held pending settlement" for it,
+which is true and open-ended. **To close:** the owner decides what a closed window with an assessed,
+undisputed customer penalty means for the money — it belongs with the office payables ledger (item
+162, payments Phase 8).
+
+### 165. Bookings that ended before Phase 3 are settled by today's rule when it deploys
+
+**Status:** open · **Raised:** 2026-09-26
+
+On its first pass the settlement sweep releases the deposit of every earlier paid booking whose window
+closed cleanly (a gallery's cancellation, for instance), and the payment sweep logs — but does not
+refund — a payment in full whose booking ended before pickup, or an administrator's cancellation,
+without the refund Phase 3 would now record. Only sandbox money exists on staging, so nothing real
+moves. **To close:** before a real provider, look at the `2316` lines on staging and decide by hand
+what each logged payment is owed; there is no administrator rail to record such a refund yet.
+
+### 166. The consoles decide "deposit held" from the list of refunds
+
+**Status:** open · **Raised:** 2026-09-26
+
+The dealer console says a deposit is "held pending settlement" when it was paid and no refund has
+returned or decided it. A dispute resolved with nothing to the customer records no refund, so such a
+deposit still reads "held". **To close:** the booking's financial state from the server (payments
+Phase 4), which the consoles render instead of deriving.

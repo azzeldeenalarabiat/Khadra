@@ -16,11 +16,16 @@ public enum ErrorKind
 
 // The single error currency across Domain, Application and API. `Code` is a stable machine code
 // (e.g. "auth.invalid_credentials") that clients localise; `Message` is a user-safe English message.
+//
+// `Details` is for validation messages per field and travels under `errors`. `Extensions` is for a
+// refusal that must say WHAT changed — the refund a cancellation would now return — and each entry
+// travels top-level on the ProblemDetails, so a client never reads money as a validation message.
 public sealed record Error(
     string Code,
     string Message,
     ErrorKind Kind,
-    IReadOnlyDictionary<string, string[]>? Details = null)
+    IReadOnlyDictionary<string, string[]>? Details = null,
+    IReadOnlyDictionary<string, object?>? Extensions = null)
 {
     public static Error ValidationDetails(IReadOnlyDictionary<string, string[]> details) =>
         new("validation.failed", "One or more fields are invalid.", ErrorKind.Validation, details);

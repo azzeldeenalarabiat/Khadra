@@ -66,6 +66,23 @@ public static class SandboxEvents
         public string? Currency { get; init; }
         public string? FailureCode { get; init; }
         public DateTimeOffset? OccurredAt { get; init; }
+        public string? RefundReference { get; init; }
+    }
+
+    /// <summary>
+    /// The sandbox's id for a refund: derived from the platform's refund id under the shared secret.
+    /// </summary>
+    /// <remarks>
+    /// Deterministic, because a real provider is idempotent on the refund's own id: sending the same
+    /// refund again returns the SAME refund, so an event for the first send still names the row after a
+    /// re-send. A random reference per call would strand exactly that event. Keyed, so it cannot be
+    /// guessed from an id either — the same care the checkout reference takes.
+    /// </remarks>
+    public static string RefundReferenceFor(Guid refundId, string secret)
+    {
+        using var mac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+        var digest = mac.ComputeHash(Encoding.UTF8.GetBytes($"refund:{refundId:N}"));
+        return $"sbxrf_{Convert.ToHexString(digest, 0, 12).ToLowerInvariant()}";
     }
 
     /// <summary>Signs a body the way this provider expects to receive it.</summary>
@@ -92,7 +109,8 @@ public static class SandboxEvents
         Money? amount,
         string secret,
         string? failureCode = null,
-        DateTimeOffset? occurredAt = null)
+        DateTimeOffset? occurredAt = null,
+        string? refundReference = null)
     {
         var payload = new Dictionary<string, object?>
         {
@@ -107,6 +125,8 @@ public static class SandboxEvents
             ["currency"] = amount?.CurrencyCode,
             ["failureCode"] = failureCode,
             ["occurredAt"] = occurredAt?.ToString("O", CultureInfo.InvariantCulture),
+            // Which refund a refund event is about (Phase 3). Absent on a capture or a failure.
+            ["refundReference"] = refundReference,
         };
 
         var body = JsonSerializer.Serialize(payload, Json);

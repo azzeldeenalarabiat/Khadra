@@ -344,11 +344,11 @@ public sealed class PaymentChoiceTests
         var payment = Payment.Open(
             booking.Id, booking.CustomerId, Money.Jod(253.75m), TestPayments.TestProviderName, Now.AddMinutes(30), Now,
             PaymentPurpose.FullPayment, Money.Jod(3.75m), feeRefundable: feeRefundable);
-        Assert.Null(payment.FreeCancellationRefundAmount);
+        Assert.Null(payment.WholePaymentRefundAmount);
         payment.Apply(Money.Jod(253.75m), Now, Now);
 
         // What the cancel sheet promises is read before cancelling; the refund is recorded after.
-        var promised = payment.FreeCancellationRefundAmount;
+        var promised = payment.WholePaymentRefundAmount;
         var refund = payment.RefundForFreeCancellation(Now.AddMinutes(5));
 
         Assert.Equal(Money.Jod((decimal)expected), promised);

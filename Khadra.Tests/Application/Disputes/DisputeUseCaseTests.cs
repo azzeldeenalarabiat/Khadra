@@ -14,6 +14,7 @@ using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Payments;
 using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.IdentityAccess;
@@ -359,6 +360,39 @@ public sealed class DisputeUseCaseTests
         Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
         Assert.Equal(0m, ticket.Resolution!.Deposit.DepositHeld.Amount);
         await context.Payments.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+    }
+
+    /// <summary>
+    /// Phase 3: a ticket opened in the very instant the dispute window closed can meet a deposit the
+    /// sweep already released to the customer. It holds nothing to split — only the all-zero
+    /// resolution is accepted, and it records no second refund of money the customer already has.
+    /// </summary>
+    [Fact]
+    public async Task A_deposit_already_released_leaves_a_late_ticket_nothing_to_split()
+    {
+        var context = new Context();
+        var (booking, payment) = Build.PaidBooking(customerId: CustomerId);
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", Build.Now.AddHours(3)).IsSuccess);
+        booking.ClearDomainEvents();
+        context.GivenBooking(booking);
+        context.Payments.GetByIdAsync(payment.Id, Arg.Any<CancellationToken>()).Returns(payment);
+        context.Payments.GetAppliedForBookingAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(payment);
+        Assert.NotNull(payment.RefundHeldDeposit(Money.Jod(18m), Build.Now.AddDays(3)).Value);
+        var held = booking.Pricing.DepositAmount.Amount;
+
+        var refused = await context.Admin().Handle(
+            new ResolveDisputeCommand(context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4))).Id, held, 0m, 0m, null, "Refund in full."),
+            CancellationToken.None);
+        Assert.Equal("dispute.disposition_unbalanced", refused.Error.Code);
+
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var resolved = await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, 0m, 0m, 0m, null, "The deposit already went back when the window closed."),
+            CancellationToken.None);
+
+        Assert.True(resolved.IsSuccess, resolved.IsFailure ? resolved.Error.Code : null);
+        Assert.Equal(0m, ticket.Resolution!.Deposit.DepositHeld.Amount);
+        Assert.DoesNotContain(payment.Refunds, refund => refund.Reason == RefundReason.DisputeResolution);
     }
 
     [Fact]

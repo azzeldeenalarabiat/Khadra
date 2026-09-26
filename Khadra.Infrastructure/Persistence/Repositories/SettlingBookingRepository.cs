@@ -87,6 +87,11 @@ internal sealed class SettlingBookingRepository(BookingRepository inner, IClock 
         CancellationToken cancellationToken = default) =>
         inner.ListDueForSettlementAsync(now, cancellationToken);
 
+    public Task<IReadOnlyList<Booking>> ListDueForDepositReleaseAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        inner.ListDueForDepositReleaseAsync(now, cancellationToken);
+
     public Task<IReadOnlyList<Booking>> ListStaleHoldsForVehicleAsync(
         Id vehicleId,
         DateRange candidatePeriod,

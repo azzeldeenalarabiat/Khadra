@@ -349,12 +349,13 @@ class _StateNotice extends StatelessWidget {
         ),
       'Cancelled' => KhadraNotice(
           title: l10n.bookingCancelledTitle,
-          body: _cancellationReason(l10n),
+          body: _joined([_cancellationReason(l10n), ..._refundSentences(l10n)]),
           tone: NoticeTone.neutral,
           icon: Icons.cancel_outlined,
         ),
       'NoShow' => KhadraNotice(
           title: l10n.bookingNoShowTitle,
+          body: _joined(_refundSentences(l10n)),
           tone: NoticeTone.bad,
           icon: Icons.person_off_outlined,
         ),
@@ -382,6 +383,18 @@ class _StateNotice extends StatelessWidget {
     }
     return null;
   }
+
+  static String? _joined(List<String?> lines) {
+    final present = lines.whereType<String>().where((line) => line.isNotEmpty).toList();
+    return present.isEmpty ? null : present.join('\n');
+  }
+
+  /// One sentence per refund, from a server that lists them (Phase 3). An older
+  /// API's deposit refund keeps its sentence in the payment summary instead.
+  List<String> _refundSentences(AppLocalizations l10n) => [
+        for (final refund in booking.refunds ?? const <Refund>[])
+          refundSentence(l10n, formats, refund, booking),
+      ];
 
   String? _cancellationReason(AppLocalizations l10n) {
     final label =
@@ -1105,6 +1118,125 @@ class _VehicleCard extends ConsumerWidget {
   }
 }
 
+/// One refund in a sentence, by what it returns: the money paid above the
+/// deposit, the deposit itself (a free cancellation's on a deposit, the release
+/// when the dispute window closed cleanly), or part of the payment.
+String refundSentence(AppLocalizations l10n, Formats formats, Refund refund, Booking booking) {
+  final amount = formats.money(refund.amount);
+  final settled = formats.dateTime(refund.settledAt ?? refund.requestedAt);
+  final started = formats.dateTime(refund.requestedAt);
+  final wording = switch (refund.reason) {
+    'EndedBeforePickup' => _Wording.aboveDeposit,
+    'DisputeWindowClosed' => _Wording.deposit,
+    'FreeCancellation' || 'PlatformCancellation' =>
+      booking.confirmingPayment?.isFullPayment ?? false ? _Wording.payment : _Wording.deposit,
+    _ => _Wording.payment,
+  };
+  return switch (wording) {
+    _Wording.aboveDeposit => refund.isRefunded
+        ? l10n.bookingRefundAboveDepositRefundedText(amount, settled)
+        : refund.isDelayed
+            ? l10n.bookingRefundAboveDepositDelayedText(amount)
+            : l10n.bookingRefundAboveDepositInitiatedText(amount, started),
+    _Wording.deposit => refund.isRefunded
+        ? l10n.bookingRefundedText(amount, settled)
+        : refund.isDelayed
+            ? l10n.bookingRefundDelayedText(amount)
+            : l10n.bookingRefundInitiatedText(amount, started),
+    _Wording.payment => refund.isRefunded
+        ? l10n.bookingRefundedPaymentText(amount, settled)
+        : refund.isDelayed
+            ? l10n.bookingRefundDelayedPaymentText(amount)
+            : l10n.bookingRefundInitiatedPaymentText(amount, started),
+  };
+}
+
+enum _Wording { aboveDeposit, deposit, payment }
+
+/// Why a refund is owed, in the reader's language.
+String refundReasonLabel(AppLocalizations l10n, String reason) => switch (reason) {
+      'FreeCancellation' => l10n.refundReasonFreeCancellation,
+      'PlatformCancellation' => l10n.refundReasonPlatformCancellation,
+      'EndedBeforePickup' => l10n.refundReasonEndedBeforePickup,
+      'DisputeWindowClosed' => l10n.refundReasonDisputeWindowClosed,
+      'DisputeResolution' => l10n.refundReasonDisputeResolution,
+      'OrphanedCapture' => l10n.refundReasonOrphanedCapture,
+      _ => l10n.refundReasonOther,
+    };
+
+/// Every refund, with why, how much and where it is, and the server's totals.
+class _Refunds extends StatelessWidget {
+  const _Refunds({required this.booking, required this.formats});
+
+  final Booking booking;
+  final Formats formats;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final refunds = booking.refunds ?? const <Refund>[];
+    return KhadraCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _BlockLabel(l10n.bookingRefundsTitle),
+          for (final refund in refunds)
+            KhadraDetailRow(
+              label: '${refundReasonLabel(l10n, refund.reason)} · '
+                  '${formats.dateTime(refund.settledAt ?? refund.failedAt ?? refund.requestedAt)}',
+              value: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(formats.money(refund.amount)),
+                  const SizedBox(width: Space.sm),
+                  _RefundStatusBadge(
+                    refunded: refund.isRefunded,
+                    delayed: refund.isDelayed,
+                    l10n: l10n,
+                  ),
+                ],
+              ),
+            ),
+          if (booking.refundedAmount case final refunded? when !refunded.isZero)
+            KhadraDetailRow(
+              label: l10n.bookingRefundedTotal,
+              value: Text(formats.money(refunded)),
+            ),
+          if (booking.refundOutstandingAmount case final outstanding? when !outstanding.isZero)
+            KhadraDetailRow(
+              label: l10n.bookingRefundOutstanding,
+              value: Text(formats.money(outstanding)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A refund's stage as a badge: initiated, refunded, or delayed and still owed.
+class _RefundStatusBadge extends StatelessWidget {
+  const _RefundStatusBadge({required this.refunded, required this.delayed, required this.l10n});
+
+  final bool refunded;
+  final bool delayed;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) => KhadraBadge(
+        label: refunded
+            ? l10n.bookingRefunded
+            : delayed
+                ? l10n.bookingRefundDelayed
+                : l10n.bookingRefundInitiated,
+        colour: refunded
+            ? KhadraColors.ok
+            : delayed
+                ? KhadraColors.bad
+                : KhadraColors.warn,
+        icon: refunded ? Icons.check_rounded : Icons.schedule_rounded,
+      );
+}
+
 /// Where a free cancellation's refund is: initiated, refunded, or delayed.
 class _RefundBadge extends StatelessWidget {
   const _RefundBadge({required this.refund, required this.l10n});
@@ -1113,18 +1245,10 @@ class _RefundBadge extends StatelessWidget {
   final AppLocalizations l10n;
 
   @override
-  Widget build(BuildContext context) => KhadraBadge(
-        label: refund.isRefunded
-            ? l10n.bookingRefunded
-            : refund.isDelayed
-                ? l10n.bookingRefundDelayed
-                : l10n.bookingRefundInitiated,
-        colour: refund.isRefunded
-            ? KhadraColors.ok
-            : refund.isDelayed
-                ? KhadraColors.bad
-                : KhadraColors.warn,
-        icon: refund.isRefunded ? Icons.check_rounded : Icons.schedule_rounded,
+  Widget build(BuildContext context) => _RefundStatusBadge(
+        refunded: refund.isRefunded,
+        delayed: refund.isDelayed,
+        l10n: l10n,
       );
 }
 
@@ -1239,7 +1363,7 @@ class _Price extends StatelessWidget {
                           : l10n.bookingPaymentTypeDeposit),
                       // A refund in progress replaces "Paid in full", as it
                       // replaces "Paid" on a deposit.
-                      if (booking.depositRefund == null) ...[
+                      if (!booking.hasRefunds) ...[
                         const SizedBox(width: Space.sm),
                         KhadraBadge(
                           label: l10n.bookingPaidInFullNote,
@@ -1257,9 +1381,11 @@ class _Price extends StatelessWidget {
                     children: [
                       Text(formats.money(
                           booking.confirmingPayment?.amountCharged ?? pricing.totalPrice)),
-                      if (booking.depositRefund case final refund?) ...[
+                      // An older API names only the deposit's refund; a newer one
+                      // lists every refund in their own card below.
+                      if (booking.refunds == null && booking.depositRefund != null) ...[
                         const SizedBox(width: Space.sm),
-                        _RefundBadge(refund: refund, l10n: l10n),
+                        _RefundBadge(refund: booking.depositRefund!, l10n: l10n),
                       ],
                     ],
                   ),
@@ -1269,9 +1395,9 @@ class _Price extends StatelessWidget {
                     label: l10n.paymentSummaryFee,
                     value: Text(formats.money(payment.processingFee)),
                   ),
-                if (booking.depositRefund case final refund?)
+                if (booking.refunds == null && booking.depositRefund != null)
                   _RefundText(
-                    refund: refund,
+                    refund: booking.depositRefund!,
                     fullPayment: booking.confirmingPayment?.isFullPayment ?? false,
                     formats: formats,
                     l10n: l10n,
@@ -1280,7 +1406,7 @@ class _Price extends StatelessWidget {
                   label: l10n.bookingRemainingBalance,
                   value: Text(formats.money(pricing.balanceDue)),
                 ),
-                if (booking.depositRefund == null) ...[
+                if (!booking.hasRefunds) ...[
                   const SizedBox(height: 2),
                   Text(
                     l10n.bookingPaidInFullNothingDue,
@@ -1315,9 +1441,9 @@ class _Price extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (booking.depositRefund case final refund?)
+                if (booking.refunds == null && booking.depositRefund != null)
                   _RefundText(
-                    refund: refund,
+                    refund: booking.depositRefund!,
                     fullPayment: false,
                     formats: formats,
                     l10n: l10n,
@@ -1341,6 +1467,13 @@ class _Price extends StatelessWidget {
             ],
           ),
         ),
+
+        // Every refund, with its reason, amount and status (Phase 3): the same
+        // list the office and Khadra see.
+        if (booking.refunds?.isNotEmpty ?? false) ...[
+          const SizedBox(height: Space.md),
+          _Refunds(booking: booking, formats: formats),
+        ],
 
         // BLOCK THREE, visibly apart: the security deposit is NOT part of the
         // total and is not Khadra's. In one aligned column with the figures

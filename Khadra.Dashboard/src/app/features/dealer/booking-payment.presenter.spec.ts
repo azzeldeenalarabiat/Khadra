@@ -3,7 +3,8 @@ import { AR } from '../../core/i18n/ar';
 import { EN, TranslationKey } from '../../core/i18n/en';
 import { MessageParams } from '../../core/i18n/language';
 import { resolveMessage } from '../../core/i18n/resolve';
-import { confirmedStepKey, paidByCardLabel, refundRowKey } from './booking-payment.presenter';
+import { refundLines, refundReasonKey, refundStatusKey } from '../../core/i18n/refund-words';
+import { confirmedStepKey, depositStillHeld, paidByCardLabel, refundRowKey } from './booking-payment.presenter';
 
 /**
  * A booking paid in full is never worded as a deposit in the dealer console (owner, 2026-09-25).
@@ -44,6 +45,48 @@ describe('the money line for what the customer paid by card', () => {
     expect(paidByCardLabel(en, { isPaidInFull: false }, '20%')).toBe('Deposit paid by card (20%)');
     expect(paidByCardLabel(en, {}, '20%')).toBe('Deposit paid by card (20%)');
     expect(paidByCardLabel(ar, { isPaidInFull: false }, '20%')).toBe('العربون المدفوع بالبطاقة (20%)');
+  });
+});
+
+// Phase 3 (owner, 2026-09-26): every refund, with why, how much and where it is, on both consoles.
+describe('the refunds a booking lists', () => {
+  const refund = (reason: string, status: string, amount = 72) => ({
+    refundId: `r-${reason}`, paymentId: 'p-1', reason, status, amount: { amount, currency: 'JOD' },
+    requestedAt: '2026-09-26T10:00:00Z', sentAt: null, settledAt: null, failedAt: null, disputeTicketId: null,
+  });
+  const jod = (value: { amount: number; currency: string }) => `${value.currency} ${value.amount}`;
+
+  it('words each refund by its reason and where it is, in both languages', () => {
+    const lines = refundLines(en, [refund('EndedBeforePickup', 'Settled'), refund('DisputeWindowClosed', 'Sent', 18)], jod);
+    expect(lines).toEqual([
+      { k: 'Refund — paid above the deposit', v: 'JOD 72 refunded to the customer' },
+      { k: 'Deposit returned — dispute window closed', v: 'Refund of JOD 18 to the customer initiated' },
+    ]);
+
+    const arabic = refundLines(ar, [refund('PlatformCancellation', 'Failed')], jod);
+    expect(arabic[0].k).toBe('استرداد — ألغته خضرا');
+    expect(arabic[0].v).toContain('ما زال مستحقًا');
+  });
+
+  it('never leaves a reason unworded: one a newer server adds reads as a plain refund', () => {
+    expect(en(refundReasonKey('SomethingNew'))).toBe('Refund');
+    expect(refundStatusKey({ status: 'Requested' })).toBe('booking.refundInitiatedTo');
+    expect(refundStatusKey({ status: 'Sent' })).toBe('booking.refundInitiatedTo');
+  });
+
+  it('says the deposit is held only while nothing has returned or decided it', () => {
+    expect(depositStillHeld({ depositPaid: true, refunds: [] })).toBe(true);
+    // The money above the deposit going back leaves the deposit itself held.
+    expect(depositStillHeld({ depositPaid: true, refunds: [refund('EndedBeforePickup', 'Settled')] })).toBe(true);
+    expect(depositStillHeld({ depositPaid: true, refunds: [refund('DisputeWindowClosed', 'Sent')] })).toBe(false);
+    expect(depositStillHeld({ depositPaid: true, refunds: [refund('PlatformCancellation', 'Sent')] })).toBe(false);
+    expect(depositStillHeld({ depositPaid: true, refunds: [refund('DisputeResolution', 'Settled')] })).toBe(false);
+    expect(depositStillHeld({ depositPaid: false, refunds: [] })).toBe(false);
+  });
+
+  it('tells the administrator a platform cancellation returns the whole payment, never that nothing is refunded', () => {
+    expect(en('adminBooking.cancelRefundsAmount', { amount: 'JOD 94.5' })).toContain('the deposit included');
+    expect(ar('adminBooking.cancelRefundsAmount', { amount: 'JOD 94.5' })).toContain('بما فيه العربون');
   });
 });
 

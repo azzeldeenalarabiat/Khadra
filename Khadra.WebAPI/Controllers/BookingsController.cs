@@ -146,9 +146,15 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
     /// text: a required text box produces "asdf", and neither the gallery nor the owner can count it.
     /// </param>
     /// <param name="Details">Optional, and the customer's own words in their own language.</param>
+    /// <param name="ExpectedRefund">
+    /// The refund the customer was shown (the booking's <c>cancellation.refundAmount</c>), so a figure
+    /// that changed since — the free window closing while the sheet was open — is refused with
+    /// <c>booking.refund_changed</c> and the current figure instead of cancelling for less. Optional.
+    /// </param>
     public sealed record CancelBookingRequest(
         [Required, MaxLength(40)] string ReasonCode,
-        [MaxLength(500)] string? Details);
+        [MaxLength(500)] string? Details,
+        decimal? ExpectedRefund = null);
 
     /// <summary>
     /// The customer ends their own booking (spec 5.5).
@@ -182,7 +188,7 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
         ArgumentNullException.ThrowIfNull(request);
 
         var result = await Mediator.Send(
-            new CancelMyBookingCommand(actor.UserId!.Value, Id.From(bookingId), request.ReasonCode, request.Details),
+            new CancelMyBookingCommand(actor.UserId!.Value, Id.From(bookingId), request.ReasonCode, request.Details, request.ExpectedRefund),
             cancellationToken);
         return FromResult(result);
     }

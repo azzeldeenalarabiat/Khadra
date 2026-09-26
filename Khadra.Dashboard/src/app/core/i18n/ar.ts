@@ -395,13 +395,31 @@ export const AR = {
   'common.currentPassword': 'كلمة المرور الحالية',
   'common.deactivate': 'إيقاف',
   'common.decisionRecordedNoFunds':
-    'سُجِّل القرار — ولم يُحوَّل أي مبلغ. لا تتحرك الأموال إلا بعد تفعيل وحدة المدفوعات في المنصة.',
+    'سُجِّل القرار. تُعاد حصة العميل إلى وسيلة الدفع الأصلية تلقائيًا؛ أما ما تحتفظ به المنصة وما يذهب إلى المكتب فيُسوّى يدويًا، إذ لا توجد بعدُ آلية لتحويل المستحقات.',
   'common.delivery': 'التوصيل',
   'booking.depositRefundInitiated': 'بدأ استرداد {amount} للعميل (إلغاء مجاني)',
   'booking.depositRefunded': 'تم استرداد {amount} للعميل (إلغاء مجاني)',
   'booking.depositRefundDelayed': 'تأخر استرداد {amount} للعميل — ما زال مستحقًا، وتجري إعادة المحاولة',
   'adminBooking.depositRefund': 'استرداد العربون',
   'adminBooking.paymentRefund': 'استرداد الدفعة',
+  'booking.refundReason.FreeCancellation': 'استرداد — إلغاء مجاني',
+  'booking.refundReason.PlatformCancellation': 'استرداد — ألغته خضرا',
+  'booking.refundReason.EndedBeforePickup': 'استرداد — المدفوع فوق العربون',
+  'booking.refundReason.DisputeWindowClosed': 'إعادة العربون — انتهت مهلة النزاع',
+  'booking.refundReason.DisputeResolution': 'استرداد — قرار نزاع',
+  'booking.refundReason.OrphanedCapture': 'استرداد — دفعة تعذّر تطبيقها',
+  'booking.refundReason.other': 'استرداد',
+  'booking.refundInitiatedTo': 'بدأ استرداد {amount} للعميل',
+  'booking.refundedTo': 'تم استرداد {amount} للعميل',
+  'booking.refundDelayedTo': 'تأخر استرداد {amount} للعميل — ما زال مستحقًا، وتجري إعادة المحاولة',
+  'adminBooking.refundedTotal': 'تم استرداده للعميل',
+  'adminBooking.refundOutstanding': 'قيد الاسترداد',
+  'adminBooking.cancelRefundsWholePayment':
+    'إذا كان العميل قد دفع، تُعاد دفعته كاملة، بما فيها العربون، إلى وسيلة الدفع الأصلية. ولا يُحصَّل أي مبلغ من أحد.',
+  'adminBooking.cancelRefundsAmount':
+    'دفع العميل {amount}. يُعاد المبلغ كله، بما فيه العربون، إلى وسيلة الدفع الأصلية. ولا يُحصَّل أي مبلغ من أحد.',
+  'adminBooking.noShowRefundsAboveDeposit':
+    'دفع العميل المبلغ كاملًا، فيُعاد إليه كل ما دفعه فوق العربون إلى وسيلة الدفع الأصلية، ويبقى العربون محتجزًا.',
   'common.deposit': 'العربون',
   'common.depositHeld': 'العربون المحتجز',
   'common.description': 'الوصف',
@@ -677,7 +695,7 @@ export const AR = {
   'disputeDetail.overdue': 'متأخرة',
   'disputeDetail.platformSla': 'مدة استجابة المنصة',
   'disputeDetail.resolvingRecordsTheDecision':
-    'البتّ يسجّل القرار. ولا تتحرك الأموال إلى أن تُفعَّل وحدة المدفوعات.',
+    'البتّ يسجّل القرار. تُعاد حصة العميل إلى وسيلة الدفع الأصلية تلقائيًا؛ أما ما تحتفظ به المنصة وما يذهب إلى المكتب فيُسوّى يدويًا.',
   'disputeDetail.separateFromTheDeposit': 'منفصل عن العربون، وضمن النطاق الذي قدّره هذا الحجز فقط.',
   'disputeDetail.takeThisOn': 'تولّي هذه القضية',
   'disputeDetail.theDecisionYourNote':
@@ -945,14 +963,14 @@ export const AR = {
   'bookingsList.total': 'الإجمالي',
   'bookingsList.vehicle': 'السيارة',
   'adminBooking.assessedNotChargedMoney':
-    'مقدَّرة لا محصَّلة. ولا تتحرك الأموال إلا حين يبتّ مشرف في نزاع.',
+    'مقدَّرة لا محصَّلة. ولا تصبح الغرامة مبلغًا فعليًا إلا حين يبتّ مشرف في نزاع.',
   'adminBooking.cancelBooking': 'إلغاء الحجز',
   'adminBooking.expireBooking': 'إنهاء صلاحية الحجز',
   'adminBooking.frozenWhenTheBooking': 'جُمِّدت عند إنشاء الحجز',
   'adminBooking.history': 'السجل',
   'adminBooking.markAsNoShow': 'تسجيل عدم حضور',
   'adminBooking.noneOfTheseMoves':
-    'لا يحرّك أيٌّ من هذه الإجراءات أموالًا. والإلغاء من المنصة لا يقدّر غرامة على أي طرف؛ أما إجراءا المهلة فيُرفضان ما دامت مهلة هذا الحجز نفسها لم تنتهِ. وكل إجراء يُنسب إليك في',
+    'لا يُحصِّل أيٌّ من هذه الإجراءات مالًا من أحد. والإلغاء من المنصة لا يقدّر غرامة على أي طرف، ويُعيد إلى العميل دفعته كاملة، بما فيها العربون، إن كان قد دفع؛ وتسجيل عدم الاستلام يُعيد إليه ما دفعه فوق العربون. أما إجراءا المهلة فيُرفضان ما دامت مهلة هذا الحجز نفسها لم تنتهِ. وكل إجراء يُنسب إليك في',
   'adminBooking.nothingIsOwed': 'لا توجد مستحقات',
   'adminBooking.openCustomer': 'فتح ملف العميل',
   'adminBooking.parties': 'الأطراف',
@@ -1400,8 +1418,6 @@ export const AR = {
   'adminDashboard.noRecordedActivityYet': 'لا يوجد نشاط مسجَّل بعد.',
 
   // Copy that lives in a component: dialogs, toasts, field labels.
-  'adminBooking.nothingIsRefundedHere':
-    'لا يُستردّ شيء هنا. فالأموال لا تتحرك إلا عبر حسم نزاع، ووحدة المدفوعات غير مفعّلة.',
   'adminBooking.whyIsThePlatform': 'لماذا تلغي المنصة هذا الحجز؟',
   'adminBooking.bookingCancelled': 'أُلغي الحجز',
   'adminBooking.recordedAgainstYourAccount': 'يُسجَّل باسم حسابك في سجل التدقيق.',
@@ -1504,10 +1520,10 @@ export const AR = {
   'disputeDetail.moneyOnThisBooking': 'المبالغ على هذا الحجز',
   'disputeDetail.recordThisDecision': 'تسجيل هذا القرار؟',
   'disputeDetail.decisionRecordedNoFunds':
-    'سُجِّل القرار — ولم يُحوَّل أي مبلغ. وحدة المدفوعات غير مفعّلة، فلا يُحوَّل شيء بعد.',
+    'تُعاد حصة العميل إلى وسيلة الدفع الأصلية تلقائيًا. أما ما تحتفظ به المنصة وما يذهب إلى المكتب فيُسوّى يدويًا؛ إذ لا توجد بعدُ آلية لتحويل المستحقات.',
   'disputeDetail.resolveDispute': 'حسم النزاع',
   'disputeDetail.disputeResolved': 'حُسم النزاع',
-  'disputeDetail.decisionRecordedNoFunds2': 'سُجِّل القرار — ولم يُحوَّل أي مبلغ.',
+  'disputeDetail.decisionRecordedNoFunds2': 'سُجِّل القرار. أي مبلغ يُعاد إلى العميل في طريقه إليه، ويُسوّى الباقي يدويًا.',
   'disputesList.liveQueue': 'القائمة النشطة',
   'employeeBusiness.verificationStatus': 'حالة التحقق',
   'employeeBusiness.businessNameAndLocation': 'اسم النشاط التجاري وموقعه',

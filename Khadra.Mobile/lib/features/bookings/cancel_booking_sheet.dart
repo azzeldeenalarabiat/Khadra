@@ -56,6 +56,15 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
   bool _busy = false;
   String? _error;
 
+  /// The refund changed while the sheet was open (owner, 2026-09-26): the
+  /// server's new figure, shown until the customer confirms again.
+  Money? _refundChangedTo;
+
+  /// The booking as last read. The server's re-read replaces it after a
+  /// changed refund, so the sheet states the new consequence before a second tap.
+  Booking _booking(WidgetRef ref) =>
+      ref.watch(bookingProvider(widget.booking.bookingId)).valueOrNull ?? widget.booking;
+
   @override
   void dispose() {
     _details.dispose();
@@ -76,11 +85,18 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
       _error = null;
     });
 
+    // The refund the sheet showed. After a changed refund it is the server's
+    // new figure: that is what the customer is now agreeing to.
+    final preview = _booking(ref).cancellation;
+    final shown = _refundChangedTo?.amount ??
+        (preview.publishesRefundAmount ? (preview.refundAmount?.amount ?? 0) : null);
+
     try {
       final updated = await ref.read(apiProvider).cancelBooking(
             widget.booking.bookingId,
             reasonCode: code,
             details: _details.text.trim().isEmpty ? null : _details.text.trim(),
+            expectedRefund: shown,
           );
 
       invalidateBookings(ref, bookingId: widget.booking.bookingId);
@@ -96,9 +112,16 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
       );
     } on ApiFailure catch (failure) {
       if (!mounted) return;
+      // Nothing was cancelled: the refund moved on. Say to what, and read the
+      // booking again so the rest of the sheet states the new consequence.
+      final changed = failure.hasCode('booking.refund_changed')
+          ? Money.maybe(failure.extensions['currentRefund'])
+          : null;
+      if (changed != null) invalidateBookings(ref, bookingId: widget.booking.bookingId);
       setState(() {
         _busy = false;
-        _error = failure.messageFor(l10n);
+        _refundChangedTo = changed;
+        _error = changed == null ? failure.messageFor(l10n) : null;
       });
     }
   }
@@ -112,7 +135,15 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
         ref.watch(appConfigProvider).valueOrNull?.vocabularies.cancellationReasons ??
             const <VocabularyEntry>[];
 
-    final preview = widget.booking.cancellation;
+    final booking = _booking(ref);
+    final preview = booking.cancellation;
+    // Everything above the deposit, promised after the free window (Phase 3).
+    // Inside it the free-cancellation sentence already names the whole figure.
+    final aboveDeposit = !preview.willRefundDeposit &&
+            preview.refundAmount != null &&
+            !preview.refundAmount!.isZero
+        ? preview.refundAmount
+        : null;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -139,13 +170,31 @@ class _CancelSheetState extends ConsumerState<_CancelSheet> {
             ),
             const SizedBox(height: Space.lg),
 
+            if (_refundChangedTo case final changed? when formats != null) ...[
+              KhadraNotice(
+                title: changed.isZero
+                    ? l10n.cancelRefundChangedNone
+                    : l10n.cancelRefundChanged(formats.money(changed)),
+                tone: NoticeTone.warn,
+                icon: Icons.sync_problem_outlined,
+              ),
+              const SizedBox(height: Space.md),
+            ],
+            if (aboveDeposit != null && formats != null) ...[
+              KhadraNotice(
+                title: l10n.cancelRefundAboveDeposit(formats.money(aboveDeposit)),
+                tone: NoticeTone.accent,
+              ),
+              const SizedBox(height: Space.md),
+            ],
+
             // The consequence, from the server, before the tap rather than after.
             // A booking paid in full promises the server's refund figure — the
             // whole payment, less a fee taken as non-refundable — never "your
             // deposit" (owner, 2026-09-25).
             if (preview.willRefundDeposit)
               KhadraNotice(
-                title: switch ((widget.booking.confirmingPayment, formats)) {
+                title: switch ((booking.confirmingPayment, formats)) {
                   (final payment?, final formats?) when payment.isFullPayment =>
                     l10n.cancelFreeRefundPaymentNotice(formats.money(payment.refundOnFreeCancellation)),
                   _ => l10n.cancelFreeRefundNotice,

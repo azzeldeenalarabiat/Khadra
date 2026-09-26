@@ -32,7 +32,7 @@ public sealed class FreeCancellationRefundTests
         Assert.Equal(Money.Jod(40m), refund.Amount);
         Assert.Null(refund.DisputeTicketId);
         Assert.Single(payment.Refunds);
-        Assert.Equal(Money.Jod(40m), payment.RefundedTotal);
+        Assert.Equal(Money.Jod(40m), payment.RefundedOrOwed);
         Assert.Same(refund, payment.FreeCancellationRefund);
     }
 

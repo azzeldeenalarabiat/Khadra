@@ -9,6 +9,7 @@ using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Disputes.Repositories;
+using Khadra.Domain.Payments;
 using Khadra.Domain.Payments.Repositories;
 using Khadra.Application.Notifications;
 using Khadra.Domain.Notifications;
@@ -159,6 +160,12 @@ public sealed class AdminDisputeHandlers(
 
         var now = clock.UtcNow;
         var held = BookingDisputeSettlement.DepositHeldFor(booking);
+        // A deposit the window already released is not held any more (Phase 3): the split must then
+        // be all zeros, whatever the ticket says. Asked only while a deposit is still held.
+        if (!held.IsZero &&
+            booking.DepositPaymentId is { } depositPaymentId &&
+            (await payments.GetByIdAsync(depositPaymentId, cancellationToken))?.RefundFor(RefundReason.DisputeWindowClosed) is not null)
+            held = BookingDisputeSettlement.DepositHeldFor(booking, releasedOnCleanClose: true);
         var currency = held.CurrencyCode;
 
         var disposition = DepositDisposition.Create(

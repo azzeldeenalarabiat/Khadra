@@ -33,7 +33,15 @@ class FakeApi extends KhadraApi {
   /// The `payments.mode` `/app-config` answers with, or null to leave the section out.
   String? paymentsMode;
 
-  static AppConfig fakeConfig({Map<String, dynamic>? mobileApp, String? paymentsMode}) => AppConfig.fromJson({
+  /// The cancellation reasons `/app-config` publishes; none unless a test needs to cancel.
+  List<Map<String, dynamic>> cancellationReasons = const [];
+
+  static AppConfig fakeConfig({
+    Map<String, dynamic>? mobileApp,
+    String? paymentsMode,
+    List<Map<String, dynamic>> cancellationReasons = const [],
+  }) =>
+      AppConfig.fromJson({
         'timeZone': 'Asia/Amman',
         'currency': {'code': 'JOD', 'minorUnits': 3},
         'maxAdvanceBookingDays': 180,
@@ -44,7 +52,9 @@ class FakeApi extends KhadraApi {
           'maximumSizeBytes': 8388608,
           'allowedContentTypes': ['image/jpeg', 'image/png'],
         },
-        'vocabularies': <String, dynamic>{},
+        'vocabularies': <String, dynamic>{
+          if (cancellationReasons.isNotEmpty) 'cancellationReasons': cancellationReasons,
+        },
         if (mobileApp != null) 'mobileApp': mobileApp,
         if (paymentsMode != null) 'payments': {'mode': paymentsMode},
       });
@@ -73,7 +83,11 @@ class FakeApi extends KhadraApi {
       );
 
   @override
-  Future<AppConfig> appConfig() async => fakeConfig(mobileApp: mobileApp, paymentsMode: paymentsMode);
+  Future<AppConfig> appConfig() async => fakeConfig(
+        mobileApp: mobileApp,
+        paymentsMode: paymentsMode,
+        cancellationReasons: cancellationReasons,
+      );
 
   /// The lookups, empty unless a test says otherwise.
   List<Lookup> cityLookups = const [];
@@ -224,6 +238,30 @@ class FakeApi extends KhadraApi {
   @override
   Future<Booking> booking(String bookingId) async {
     bookingReads++;
+    final found = bookingById;
+    if (found == null) throw StateError("no booking was staged for $bookingId");
+    return found;
+  }
+
+  /// Every cancellation this phone sent: (reason code, details, expected refund).
+  final List<(String, String?, num?)> cancellations = [];
+
+  /// When set, the next cancellation is refused with it, once.
+  ApiFailure? cancelFailure;
+
+  @override
+  Future<Booking> cancelBooking(
+    String bookingId, {
+    required String reasonCode,
+    String? details,
+    num? expectedRefund,
+  }) async {
+    cancellations.add((reasonCode, details, expectedRefund));
+    final failure = cancelFailure;
+    if (failure != null) {
+      cancelFailure = null;
+      throw failure;
+    }
     final found = bookingById;
     if (found == null) throw StateError("no booking was staged for $bookingId");
     return found;

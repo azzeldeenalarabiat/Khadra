@@ -55,6 +55,15 @@ public interface IPaymentRepository
     /// <summary>Payments carrying a refund that has not reached the provider yet.</summary>
     Task<IReadOnlyList<Payment>> ListWithOutstandingRefundsAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// The safety net under the ending refunds (Phase 3): applied payments IN FULL whose booking ended
+    /// before pickup with no refund recorded for the ending, and payments whose booking an
+    /// administrator cancelled before pickup with no whole-payment refund. Normally empty; a row here
+    /// is a way of ending a booking that forgot to record what it owes, or a booking ended before the
+    /// rule existed.
+    /// </summary>
+    Task<IReadOnlyList<Payment>> ListEndedWithoutEndingRefundAsync(CancellationToken cancellationToken = default);
+
     void Add(Payment payment);
 }
 

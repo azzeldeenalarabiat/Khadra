@@ -92,7 +92,7 @@ public sealed class PaymentPersistenceTests : IDisposable
         Assert.Equal(Now.AddMinutes(1), storedRefund.SentAt);
         Assert.Null(storedRefund.DisputeTicketId);
         // Loaded WITH its refunds, so the ceiling on a second refund is computed against the truth.
-        Assert.Equal(Money.Jod(18m), stored.RefundedTotal);
+        Assert.Equal(Money.Jod(18m), stored.RefundedOrOwed);
     }
 
     /// <summary>

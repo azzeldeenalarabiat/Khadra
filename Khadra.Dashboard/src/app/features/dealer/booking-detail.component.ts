@@ -27,7 +27,8 @@ import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { commissionRate } from '../../core/i18n/commission-rate';
-import { confirmedStepKey, paidByCardLabel, refundRowKey } from './booking-payment.presenter';
+import { refundLines } from '../../core/i18n/refund-words';
+import { confirmedStepKey, depositStillHeld, paidByCardLabel, refundRowKey } from './booking-payment.presenter';
 import { toRenterDocumentsPanel } from './renter-documents.presenter';
 
 /**
@@ -507,6 +508,10 @@ export class DealerBookingDetailComponent {
     // From the server, not from the status: a booking that ended after being paid is still one the
     // customer paid, and reading that off a list of statuses is how a screen starts lying.
     const paidDeposit = b.depositPaid;
+    // Every refund, with its reason (Phase 3): a server that lists them is read whole; an older one
+    // names only the deposit's refund, handled below as it always was.
+    const refunds: readonly { readonly k: string; readonly v: string; readonly hi?: boolean; readonly dim?: boolean }[] =
+      b.refunds ? refundLines(this.t, b.refunds, money) : [];
     return [
       {
         k: this.t('dealerBooking.rentalLine', {
@@ -537,6 +542,7 @@ export class DealerBookingDetailComponent {
               v: money(b.pricing.balanceDue),
               hi: true,
             },
+            ...refunds,
           ]
         : settling
           ? [
@@ -544,7 +550,17 @@ export class DealerBookingDetailComponent {
                 k: this.t('dealerBooking.balanceCollectedInCash'),
                 v: money(b.pricing.balanceDue),
               },
+              ...refunds,
             ]
+          : b.refunds
+            ? [
+                ...refunds,
+                // "Held pending settlement" only while it IS held: paid, and nothing has returned or
+                // decided it yet.
+                ...(depositStillHeld(b)
+                  ? [{ k: this.t('common.deposit'), v: this.t('dealerBooking.heldPendingSettlementSee'), dim: true }]
+                  : []),
+              ]
           : b.depositRefund
             ? [
                 {

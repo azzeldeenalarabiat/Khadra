@@ -16,7 +16,7 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { Booking, DepositRefund, PaymentAttempt, PaymentOption, PaymentPurpose } from '../../core/api/bookings.api';
+import { Booking, DepositRefund, PaymentAttempt, PaymentOption, PaymentPurpose, Refund } from '../../core/api/bookings.api';
 import { Money } from '../../core/api/common.api';
 import { vocabularyLabel } from '../../core/api/app-config.api';
 import { AppConfigService } from '../../core/config/app-config.service';
@@ -57,6 +57,30 @@ const CHECKOUT_KEY = 'kh.checkout.';
 /** Requested and Sent read alike to a customer (the server has started it); Failed is still owed. */
 export function refundStage(refund: DepositRefund): 'initiated' | 'done' | 'delayed' {
   return refund.status === 'Settled' ? 'done' : refund.status === 'Failed' ? 'delayed' : 'initiated';
+}
+
+/** The refund reasons this site words; anything newer reads as a plain "Refund". */
+const REFUND_REASONS: ReadonlySet<string> = new Set([
+  'FreeCancellation',
+  'PlatformCancellation',
+  'EndedBeforePickup',
+  'DisputeWindowClosed',
+  'DisputeResolution',
+  'OrphanedCapture',
+]);
+
+/**
+ * The refund a `booking.refund_changed` refusal says cancelling would now return (owner, 2026-09-26),
+ * read from the ProblemDetails beside its code. Null when the body carries no usable figure.
+ */
+export function changedRefundOf(error: unknown): Money | null {
+  const body = (typeof error === 'object' && error !== null ? (error as { error?: unknown }).error : null) as
+    | { code?: unknown; currentRefund?: { amount?: unknown; currency?: unknown } }
+    | null;
+  const current = body?.code === 'booking.refund_changed' ? body.currentRefund : undefined;
+  return current && typeof current.amount === 'number' && typeof current.currency === 'string'
+    ? { amount: current.amount, currency: current.currency }
+    : null;
 }
 
 @Component({
@@ -172,6 +196,8 @@ export class BookingDetailComponent {
   protected readonly cancelProblem = signal<ProblemSnapshot | null>(null);
   protected readonly cancelOutcome = signal<'cancelled' | 'expired' | null>(null);
   protected readonly cancelMissingReason = signal(false);
+  /** The refund changed while the sheet was open: the server's new figure, until the customer confirms again. */
+  protected readonly refundChanged = signal<Money | null>(null);
 
   protected readonly problemMessage = (problem: ProblemSnapshot | null) =>
     problem ? problemText(problem, this.t, this.i18n.language(), this.appConfig.config()) : null;
@@ -236,22 +262,69 @@ export class BookingDetailComponent {
 
   /** Deposit wording for a deposit, payment wording for a booking paid in full (owner, 2026-09-25). */
   protected refundText(refund: DepositRefund, booking: Booking): string {
+    return this.paidWithFullPayment(booking) ? this.paymentRefundText(refund) : this.depositRefundText(refund);
+  }
+
+  /** The deposit, in full, on its way back. */
+  private depositRefundText(refund: DepositRefund): string {
     const amount = this.format.money(refund.amount);
-    const full = this.paidWithFullPayment(booking);
     switch (refundStage(refund)) {
       case 'done':
-        return this.t(full ? 'booking.refundedTextPayment' : 'booking.refundedText', {
-          amount,
-          date: this.format.dateTime(refund.settledAt ?? refund.requestedAt),
-        });
+        return this.t('booking.refundedText', { amount, date: this.format.dateTime(refund.settledAt ?? refund.requestedAt) });
       case 'delayed':
-        return this.t(full ? 'booking.refundDelayedTextPayment' : 'booking.refundDelayedText', { amount });
+        return this.t('booking.refundDelayedText', { amount });
       default:
-        return this.t(full ? 'booking.refundInitiatedTextPayment' : 'booking.refundInitiatedText', {
-          amount,
-          date: this.format.dateTime(refund.requestedAt),
-        });
+        return this.t('booking.refundInitiatedText', { amount, date: this.format.dateTime(refund.requestedAt) });
     }
+  }
+
+  /** An amount of the payment on its way back: the whole of it, or a part a dispute decided. */
+  private paymentRefundText(refund: DepositRefund): string {
+    const amount = this.format.money(refund.amount);
+    switch (refundStage(refund)) {
+      case 'done':
+        return this.t('booking.refundedTextPayment', { amount, date: this.format.dateTime(refund.settledAt ?? refund.requestedAt) });
+      case 'delayed':
+        return this.t('booking.refundDelayedTextPayment', { amount });
+      default:
+        return this.t('booking.refundInitiatedTextPayment', { amount, date: this.format.dateTime(refund.requestedAt) });
+    }
+  }
+
+  /** Why a refund is owed, in the reader's language. */
+  protected refundReason(refund: Refund): string {
+    return this.t((REFUND_REASONS.has(refund.reason) ? `booking.refundReason.${refund.reason}` : 'booking.refundReason.other') as TranslationKey);
+  }
+
+  /** When the refund last moved: settled, refused, or started. */
+  protected refundDate(refund: Refund): string {
+    return this.format.dateTime(refund.settledAt ?? refund.failedAt ?? refund.requestedAt);
+  }
+
+  /**
+   * One refund in a sentence, by what it returns: the money paid above the deposit, the deposit
+   * itself (a free cancellation's on a deposit, the clean-close release), or part of the payment.
+   */
+  protected refundSentence(refund: Refund, booking: Booking): string {
+    if (refund.reason === 'EndedBeforePickup') {
+      const amount = this.format.money(refund.amount);
+      switch (refundStage(refund)) {
+        case 'done':
+          return this.t('booking.refundAboveDepositRefundedText', { amount, date: this.format.dateTime(refund.settledAt ?? refund.requestedAt) });
+        case 'delayed':
+          return this.t('booking.refundAboveDepositDelayedText', { amount });
+        default:
+          return this.t('booking.refundAboveDepositInitiatedText', { amount, date: this.format.dateTime(refund.requestedAt) });
+      }
+    }
+    if (refund.reason === 'DisputeWindowClosed') return this.depositRefundText(refund);
+    if (refund.reason === 'FreeCancellation' || refund.reason === 'PlatformCancellation') return this.refundText(refund, booking);
+    return this.paymentRefundText(refund);
+  }
+
+  /** Whether any money was, or is being, given back. The badge "Paid in full" is withheld once it has. */
+  protected hasRefunds(booking: Booking): boolean {
+    return (booking.refunds?.length ?? 0) > 0 || !!booking.depositRefund;
   }
 
   /** Whether the payment that confirmed this booking was the whole amount, from the server's record of it. */
@@ -398,7 +471,18 @@ export class BookingDetailComponent {
     this.cancelDetails.set('');
     this.cancelProblem.set(null);
     this.cancelMissingReason.set(false);
+    this.refundChanged.set(null);
     this.cancelDialog()?.nativeElement.showModal();
+  }
+
+  /**
+   * The money cancelling now gives back ABOVE the deposit — the case the free-cancellation sentence
+   * does not cover. Null inside the free window (the whole payment is promised there) and when nothing
+   * comes back.
+   */
+  protected aboveDepositRefund(booking: Booking): Money | null {
+    const refund = booking.cancellation.refundAmount;
+    return !booking.cancellation.willRefundDeposit && refund && refund.amount > 0 ? refund : null;
   }
 
   protected closeCancel(): void {
@@ -414,17 +498,27 @@ export class BookingDetailComponent {
     this.cancelling.set(true);
     this.cancelProblem.set(null);
     try {
+      // The figure the sheet showed, so a refund that changed while it was open (the free window
+      // closing) is refused with the new figure rather than cancelled for less. Not sent to a server
+      // that published no figure: it would not know what the sheet showed.
+      const shown = booking.cancellation.refundAmount;
       const updated = await firstValueFrom(
         this.http.post<Booking>(`/api/v1/bookings/${booking.bookingId}/cancel`, {
           reasonCode: this.cancelReason(),
           details: this.cancelDetails().trim() || null,
+          ...(shown === undefined ? {} : { expectedRefund: shown?.amount ?? 0 }),
         }),
       );
       this.booking.set(updated);
       this.cancelOutcome.set(updated.status === 'Expired' ? 'expired' : 'cancelled');
+      this.refundChanged.set(null);
       this.closeCancel();
     } catch (error) {
-      this.cancelProblem.set(snapshotProblem(error));
+      // The refund moved on: say by how much, re-read the booking so the sheet states it, and let the
+      // customer decide again. Nothing was cancelled.
+      const changed = changedRefundOf(error);
+      this.refundChanged.set(changed);
+      this.cancelProblem.set(changed ? null : snapshotProblem(error));
       this.booking.reload();
     } finally {
       this.cancelling.set(false);

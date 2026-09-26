@@ -1,7 +1,10 @@
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common.Dtos;
+using Khadra.Application.Payments;
 using Khadra.Application.Payments.Dtos;
 using Khadra.Domain.Bookings;
+using Khadra.Domain.Common;
+using Khadra.Domain.Payments;
 
 namespace Khadra.Application.Bookings.Dtos;
 
@@ -135,7 +138,22 @@ public sealed record BookingDto(
     /// The payment that confirmed the booking — its purpose and what it charged — or null while none
     /// has. Added 2026-09-25, last.
     /// </summary>
-    ConfirmingPaymentDto? ConfirmingPayment = null)
+    ConfirmingPaymentDto? ConfirmingPayment = null,
+    /// <summary>
+    /// Every refund against this booking's payments, oldest first: reason, amount and status (Phase 3,
+    /// 2026-09-26). Empty when there is none. Added last.
+    /// </summary>
+    IReadOnlyList<RefundDto>? Refunds = null,
+    /// <summary>
+    /// What has actually reached the customer — the settled refunds — in the booking's currency. Zero
+    /// when nothing has. Added 2026-09-26, last.
+    /// </summary>
+    MoneyDto? RefundedAmount = null,
+    /// <summary>
+    /// What is promised back and not there yet — requested, sent, or refused and being sent again — in
+    /// the booking's currency. Zero when nothing is. Added 2026-09-26, last.
+    /// </summary>
+    MoneyDto? RefundOutstandingAmount = null)
 {
     /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
     /// <remarks>
@@ -190,7 +208,8 @@ public sealed record BookingDto(
             booking.IsAwaitingPayment(now),
             CancellationPreviewDto.From(
                 booking.PreviewCancellation(BookingParty.Customer, now),
-                booking.CancellationWouldReturnDeposit(BookingParty.Customer, now)),
+                booking.CancellationWouldReturnDeposit(BookingParty.Customer, now),
+                CancellationRefund(booking, context.ConfirmingPayment, now)),
             context.LiveDisputeId,
             context.Payment,
             booking.CanReportNonDelivery(now),
@@ -208,7 +227,44 @@ public sealed record BookingDto(
             context.DepositRefund,
             MoneyDto.From(booking.OnlinePaid),
             booking.IsPaidInFull,
-            context.ConfirmingPayment);
+            context.ConfirmingPayment,
+            context.Refunds ?? [],
+            RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: true),
+            RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: false));
+    }
+
+    /// <summary>
+    /// What cancelling right now would return to the customer's card: the figure the cancel sheet
+    /// states and <c>expectedRefund</c> sends back. The same rule the cancellation's own guard reads
+    /// (<see cref="BookingEndingRefunds.PreviewForCustomer(Booking, Money?, Money, DateTimeOffset)"/>),
+    /// fed from the payment's read model.
+    /// </summary>
+    private static MoneyDto? CancellationRefund(Booking booking, ConfirmingPaymentDto? payment, DateTimeOffset now)
+    {
+        if (payment is null)
+            return null;
+
+        var currency = payment.RefundOnFreeCancellation.Currency;
+        var refund = BookingEndingRefunds.PreviewForCustomer(
+            booking,
+            Money.Create(payment.RefundOnFreeCancellation.Amount, currency),
+            payment.RefundableFee is { } fee ? Money.Create(fee.Amount, fee.Currency) : Money.ZeroIn(currency),
+            now);
+        return refund is null ? null : MoneyDto.From(refund);
+    }
+
+    /// <summary>
+    /// The settled refunds, or the ones still on their way, totalled in the booking's currency. A
+    /// refund in another currency — only ever an orphaned capture, which may be why it was orphaned —
+    /// is listed on its own and never added to a figure it cannot be part of.
+    /// </summary>
+    private static MoneyDto RefundTotal(IReadOnlyList<RefundDto>? refunds, string currency, bool settled)
+    {
+        var total = (refunds ?? [])
+            .Where(refund => string.Equals(refund.Amount.Currency, currency, StringComparison.Ordinal))
+            .Where(refund => (refund.Status == RefundStatus.Settled.Name) == settled)
+            .Sum(refund => refund.Amount.Amount);
+        return MoneyDto.From(Money.Create(total, currency));
     }
 }
 
@@ -413,15 +469,30 @@ public sealed record BookingStatusChangeDto(
 /// 2026-09-24), from the same rule the cancellation itself applies, so the promise on the sheet and
 /// the refund recorded cannot disagree. False on a free cancellation with nothing paid.
 /// </param>
-public sealed record CancellationPreviewDto(bool CanCancel, bool IsFree, PenaltyAssessmentDto Penalty, bool WillRefundDeposit = false)
+/// <param name="RefundAmount">
+/// What cancelling now returns to the customer's card, all of it: the whole payment inside the free
+/// window, everything above the deposit after it (Phase 3), null when nothing. The figure a client
+/// states and sends back as <c>expectedRefund</c>, so a change while the sheet was open is refused
+/// with <c>booking.refund_changed</c> instead of cancelling for less. Added 2026-09-26, last.
+/// </param>
+public sealed record CancellationPreviewDto(
+    bool CanCancel,
+    bool IsFree,
+    PenaltyAssessmentDto Penalty,
+    bool WillRefundDeposit = false,
+    MoneyDto? RefundAmount = null)
 {
-    public static CancellationPreviewDto From(CancellationPreview preview, bool willRefundDeposit = false)
+    public static CancellationPreviewDto From(
+        CancellationPreview preview,
+        bool willRefundDeposit = false,
+        MoneyDto? refundAmount = null)
     {
         ArgumentNullException.ThrowIfNull(preview);
         return new CancellationPreviewDto(
             preview.CanCancel,
             preview.IsFree,
             PenaltyAssessmentDto.From(preview.Penalty)!,
-            willRefundDeposit);
+            willRefundDeposit,
+            preview.CanCancel ? refundAmount : null);
     }
 }

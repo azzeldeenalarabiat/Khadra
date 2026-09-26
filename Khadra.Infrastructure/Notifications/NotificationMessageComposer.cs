@@ -85,6 +85,10 @@ internal sealed class NotificationMessageComposer(
             // Fires for a deposit AND for a booking paid in full, so it says "payment".
             "Payment refunded", "Booking {ref} with {actor}: your payment has been refunded to your original payment method. Your bank may take some time to show it.",
             "تم استرداد دفعتك", "الحجز {ref} مع {actor}: تم استرداد دفعتك إلى وسيلة الدفع الأصلية. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك."),
+        ["YourPartialRefundSettled"] = new(
+            // Part of the payment is back and part is not (yet): never "your payment has been refunded".
+            "Part of your payment refunded", "Booking {ref} with {actor}: part of your payment has been refunded to your original payment method. Open Khadra to see the amount. Your bank may take some time to show it.",
+            "تم استرداد جزء من دفعتك", "الحجز {ref} مع {actor}: تم استرداد جزء من دفعتك إلى وسيلة الدفع الأصلية. افتح خضرا لمعرفة المبلغ. قد يحتاج البنك بعض الوقت لإظهاره في حسابك."),
         ["YourDisputeUpdated"] = new(
             "Dispute updated", "There is an update on the dispute for booking {ref}.",
             "تحديث على النزاع", "هناك تحديث على النزاع الخاص بالحجز {ref}."),

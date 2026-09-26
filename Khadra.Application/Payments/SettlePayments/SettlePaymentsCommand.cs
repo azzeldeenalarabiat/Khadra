@@ -56,6 +56,8 @@ public sealed partial class SettlePaymentsHandler(
         SettlePaymentsCommand request,
         CancellationToken cancellationToken)
     {
+        await WarnOfUnrecordedEndingRefundsAsync(cancellationToken);
+
         // Nothing to sweep without a provider to ask. The outstanding refunds are still counted and
         // logged, because "we owe six customers money and cannot send it" is the single most
         // important thing this sweep can say.
@@ -75,6 +77,24 @@ public sealed partial class SettlePaymentsHandler(
         if (closed + sent + failed > 0)
             LogSwept(logger, closed, sent, failed);
         return report;
+    }
+
+    /// <summary>
+    /// The safety net under the ending refunds (Phase 3): a payment made in full whose booking ended
+    /// before pickup with no refund recorded for that ending, or a booking an administrator cancelled
+    /// with no whole-payment refund.
+    /// </summary>
+    /// <remarks>
+    /// Normally nothing. Every way of ending a booking records its refund through one seam, in the
+    /// same save; a row here is a new way of ending one that forgot, or a booking ended before the rule
+    /// existed. It only SAYS so — recording refunds from a sweep would make a second writer of money
+    /// owed, which is how two refunds for one ending come about.
+    /// </remarks>
+    private async Task WarnOfUnrecordedEndingRefundsAsync(CancellationToken cancellationToken)
+    {
+        var unrecorded = await payments.ListEndedWithoutEndingRefundAsync(cancellationToken);
+        foreach (var payment in unrecorded)
+            LogEndingRefundMissing(logger, payment.Id.Value, payment.BookingId.Value);
     }
 
     private async Task<int> CloseStaleAsync(DateTimeOffset now, CancellationToken cancellationToken)
@@ -207,4 +227,11 @@ public sealed partial class SettlePaymentsHandler(
 
     [LoggerMessage(2315, LogLevel.Error, "Refund {RefundId} was refused by the provider ({Code}). It stays owed.")]
     private static partial void LogRefundRefused(ILogger logger, Guid refundId, string code);
+
+    [LoggerMessage(
+        2316,
+        LogLevel.Error,
+        "Payment {PaymentId} for booking {BookingId}: the booking ended before the car was collected and owes the "
+        + "customer a refund for that ending, but none is recorded. A human must look.")]
+    private static partial void LogEndingRefundMissing(ILogger logger, Guid paymentId, Guid bookingId);
 }

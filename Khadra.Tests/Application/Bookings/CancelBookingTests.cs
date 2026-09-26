@@ -83,14 +83,27 @@ public sealed class CancelBookingTests
             return Given(booking);
         }
 
+        /// <summary>Paid IN FULL — 90 for the booking and <paramref name="fee"/> on top — against a real payment.</summary>
+        public Booking GivenPaidInFull(out Payment payment, decimal fee = 0m, bool feeRefundable = true)
+        {
+            var (booking, paid) = Build.PaidBooking(
+                inFull: true, fee: fee, feeRefundable: feeRefundable, now: Clock.UtcNow, customerId: CustomerId, dealerId: Dealer.Id);
+            payment = paid;
+            Payments.GetByIdAsync(paid.Id, Arg.Any<CancellationToken>()).Returns(paid);
+            return Given(booking);
+        }
+
         public CancelBookingHandlers Handlers() =>
             new(Bookings, Reader, Dealers, Payments, new DealerTeamNotifier(Notifier, Users), Clock, UnitOfWork);
 
         public Task<Result<BookingDto, Error>> Cancel(
             Id bookingId,
             string reasonCode = "PlansChanged",
-            string? details = null) =>
-            Handlers().Handle(new CancelMyBookingCommand(CustomerId, bookingId, reasonCode, details), CancellationToken.None);
+            string? details = null,
+            decimal? expectedRefund = null) =>
+            Handlers().Handle(
+                new CancelMyBookingCommand(CustomerId, bookingId, reasonCode, details, expectedRefund),
+                CancellationToken.None);
     }
 
     [Fact]
@@ -389,8 +402,9 @@ public sealed class CancelBookingTests
         Assert.True(Khadra.Application.Bookings.Dtos.CancellationPreviewDto.From(
             paid.PreviewCancellation(BookingParty.Customer, now),
             paid.CancellationWouldReturnDeposit(BookingParty.Customer, now)).WillRefundDeposit);
-        // The owner's rule names the customer: a gallery or an admin cancelling in that hour does not
-        // trigger it (an open owner question, recorded in the pre-launch checklist).
+        // This promise is the CUSTOMER's sheet. A gallery cancelling in that hour does not return the
+        // whole payment; an administrator's cancellation does (owner, 2026-09-26), through its own
+        // rule (Booking.ReturnsWholePayment), and is covered with the admin actions.
         Assert.False(paid.CancellationWouldReturnDeposit(BookingParty.Dealer, now));
         Assert.False(paid.CancellationWouldReturnDeposit(BookingParty.Admin, now));
         // Past the window, and with nothing paid, there is nothing to promise.
@@ -408,6 +422,172 @@ public sealed class CancelBookingTests
 
         Assert.False(unknown.IsValid);
         Assert.True(known.IsValid);
+    }
+
+    // ---------------------------------------------------------------- paid in full, and the refund the sheet showed (Phase 3)
+
+    /// <summary>
+    /// The core of Phase 3 (owner, 2026-09-24/26): a booking paid in full and cancelled AFTER its free
+    /// window returns everything above the deposit at once, with the fee that was refundable. The
+    /// deposit stays held — the penalty is assessed against it, never charged without a ticket.
+    /// </summary>
+    [Fact]
+    public async Task A_booking_paid_in_full_cancelled_late_returns_everything_above_the_deposit()
+    {
+        var context = new Context();
+        var booking = context.GivenPaidInFull(out var payment, fee: 4.5m);
+        context.Clock.UtcNow = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+
+        var result = await context.Cancel(booking.Id);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.EndedBeforePickup, refund.Reason);
+        Assert.Same(RefundStatus.Requested, refund.Status);
+        // 90 paid for the booking less the 18 deposit, and the 4.5 fee with it.
+        Assert.Equal(Money.Jod(76.5m), refund.Amount);
+        Assert.False(booking.ReturnsWholePayment);
+        Assert.Same(BookingParty.Customer, booking.Penalty!.AttributedTo);
+        Assert.Equal(booking.Pricing.DepositAmount.Amount, booking.Penalty.MaxAmount.Amount);
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Theory]
+    [InlineData(true, 94.5, 76.5)]
+    [InlineData(false, 90, 72)]
+    public async Task The_processing_fee_follows_the_refundability_the_payment_froze(
+        bool feeRefundable, decimal insideWindow, decimal afterWindow)
+    {
+        var early = new Context();
+        var free = early.GivenPaidInFull(out var freePayment, fee: 4.5m, feeRefundable: feeRefundable);
+        await early.Cancel(free.Id);
+        var whole = Assert.Single(freePayment.Refunds);
+        Assert.Same(RefundReason.FreeCancellation, whole.Reason);
+        Assert.Equal(Money.Jod(insideWindow), whole.Amount);
+
+        var late = new Context();
+        var paid = late.GivenPaidInFull(out var latePayment, fee: 4.5m, feeRefundable: feeRefundable);
+        late.Clock.UtcNow = paid.FreeCancellationDeadline!.Value.AddMinutes(1);
+        await late.Cancel(paid.Id);
+        var above = Assert.Single(latePayment.Refunds);
+        Assert.Same(RefundReason.EndedBeforePickup, above.Reason);
+        Assert.Equal(Money.Jod(afterWindow), above.Amount);
+    }
+
+    /// <summary>A deposit-only booking gains nothing new: past the window it owes no refund, and its payment is never read.</summary>
+    [Fact]
+    public async Task A_deposit_only_booking_cancelled_late_records_no_refund()
+    {
+        var context = new Context();
+        var booking = context.GivenConfirmed(out var payment);
+        context.Clock.UtcNow = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+        context.Payments.ClearReceivedCalls();
+
+        var result = await context.Cancel(booking.Id);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(payment.Refunds);
+        await context.Payments.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+    }
+
+    /// <summary>
+    /// Owner, 2026-09-26: the refund the customer confirmed must be the refund they get. The free
+    /// window closed while the sheet was open, so the cancellation is refused, NOTHING changes, and
+    /// the answer carries the new figure for the client to show and ask again.
+    /// </summary>
+    [Fact]
+    public async Task A_refund_that_changed_since_the_sheet_was_shown_refuses_the_cancellation_and_names_the_new_figure()
+    {
+        var context = new Context();
+        var booking = context.GivenPaidInFull(out var payment, fee: 4.5m);
+        // Shown inside the window: the whole 94.5. Confirmed after it closed.
+        context.Clock.UtcNow = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+
+        var result = await context.Cancel(booking.Id, expectedRefund: 94.5m);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("booking.refund_changed", result.Error.Code);
+        Assert.Equal(ErrorKind.Conflict, result.Error.Kind);
+        var current = Assert.IsType<Dictionary<string, object?>>(result.Error.Extensions!["currentRefund"]);
+        Assert.Equal(76.5m, current["amount"]);
+        Assert.Equal("JOD", current["currency"]);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+        Assert.Empty(payment.Refunds);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+
+        // Asked again with the figure it was just given, it cancels.
+        var again = await context.Cancel(booking.Id, expectedRefund: 76.5m);
+        Assert.True(again.IsSuccess, again.IsFailure ? again.Error.Code : null);
+        Assert.Equal(Money.Jod(76.5m), Assert.Single(payment.Refunds).Amount);
+    }
+
+    [Fact]
+    public async Task An_expected_refund_is_compared_as_money_not_as_digits()
+    {
+        var context = new Context();
+        var booking = context.GivenPaidInFull(out var payment, fee: 4.5m);
+
+        var result = await context.Cancel(booking.Id, expectedRefund: 94.500m);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Same(RefundReason.FreeCancellation, Assert.Single(payment.Refunds).Reason);
+    }
+
+    /// <summary>Nothing paid is a refund of zero, and a promise of more than that is a change too.</summary>
+    [Fact]
+    public async Task An_unpaid_booking_expects_a_refund_of_zero()
+    {
+        var context = new Context();
+        var promised = context.GivenApproved();
+        var refused = await context.Cancel(promised.Id, expectedRefund: 5m);
+        Assert.Equal("booking.refund_changed", refused.Error.Code);
+        Assert.Same(BookingStatus.Approved, promised.Status);
+
+        var cancelled = await context.Cancel(promised.Id, expectedRefund: 0m);
+        Assert.True(cancelled.IsSuccess, cancelled.IsFailure ? cancelled.Error.Code : null);
+    }
+
+    /// <summary>A retry of a cancellation that already went through is answered, never refused as a change.</summary>
+    [Fact]
+    public async Task A_retried_cancellation_is_not_refused_because_the_refund_moved_on()
+    {
+        var context = new Context();
+        var booking = context.GivenPaidInFull(out var payment);
+
+        Assert.True((await context.Cancel(booking.Id, expectedRefund: 90m)).IsSuccess);
+        context.Clock.UtcNow = booking.FreeCancellationDeadline!.Value.AddHours(1);
+        var retried = await context.Cancel(booking.Id, expectedRefund: 90m);
+
+        Assert.True(retried.IsSuccess, retried.IsFailure ? retried.Error.Code : null);
+        Assert.Single(payment.Refunds);
+    }
+
+    [Fact]
+    public void A_negative_expected_refund_is_refused_before_the_handler()
+    {
+        var validator = new CancelMyBookingCommandValidator();
+
+        Assert.False(validator.Validate(new CancelMyBookingCommand(CustomerId, Id.New(), "PlansChanged", null, -1m)).IsValid);
+        Assert.True(validator.Validate(new CancelMyBookingCommand(CustomerId, Id.New(), "PlansChanged", null, 0m)).IsValid);
+        Assert.True(validator.Validate(new CancelMyBookingCommand(CustomerId, Id.New(), "PlansChanged", null)).IsValid);
+    }
+
+    /// <summary>The car never came: everything above the deposit goes back at once; the deposit follows the dispute rules.</summary>
+    [Fact]
+    public async Task A_non_delivery_report_on_a_booking_paid_in_full_returns_everything_above_the_deposit()
+    {
+        var context = new Context();
+        var booking = context.GivenPaidInFull(out var payment, fee: 4.5m);
+        context.Clock.UtcNow = booking.Period.Start;
+
+        var result = await context.Handlers().Handle(
+            new ReportNonDeliveryCommand(CustomerId, booking.Id, "Nobody came."), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Same(BookingParty.Dealer, booking.Penalty!.AttributedTo);
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.EndedBeforePickup, refund.Reason);
+        Assert.Equal(Money.Jod(76.5m), refund.Amount);
     }
 
     /// <summary>

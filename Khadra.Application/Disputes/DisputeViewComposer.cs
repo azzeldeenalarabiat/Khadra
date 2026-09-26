@@ -11,6 +11,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Payments;
 
 namespace Khadra.Application.Disputes;
 
@@ -109,7 +110,9 @@ public sealed class DisputeViewComposer(
                     NameOf(resolved.ResolvedByAdminId),
                     Closed(resolved.ResolvedByAdminId))
                 : null,
-            MoneyDto.From(BookingDisputeSettlement.DepositHeldFor(booking)),
+            MoneyDto.From(BookingDisputeSettlement.DepositHeldFor(
+                booking,
+                (context.Refunds ?? []).Any(refund => refund.Reason == RefundReason.DisputeWindowClosed.Name))),
             viewer == BookingParty.Customer
                 ? BookingDto.From(booking, context, now).ForCustomer()
                 : BookingDto.From(booking, context, now));

@@ -22,6 +22,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { commissionRate } from '../../core/i18n/commission-rate';
+import { refundLines } from '../../core/i18n/refund-words';
 
 /**
  * One booking as the platform sees it.
@@ -106,8 +107,19 @@ export class AdminBookingDetailComponent {
         }),
         v: this.money(pricing.depositAmount),
       },
-      // A free cancellation's refund, where one exists: the admin sees the same status the customer does.
-      ...(booking.depositRefund
+      // Every refund, with its reason and where it is (Phase 3): the admin sees what the customer and
+      // the gallery see. An older API names only a free cancellation's refund, read as before.
+      ...(booking.refunds
+        ? [
+            ...refundLines(this.t, booking.refunds, (value) => this.money(value)),
+            ...(booking.refundedAmount && booking.refundedAmount.amount > 0
+              ? [{ k: this.t('adminBooking.refundedTotal'), v: this.money(booking.refundedAmount) }]
+              : []),
+            ...(booking.refundOutstandingAmount && booking.refundOutstandingAmount.amount > 0
+              ? [{ k: this.t('adminBooking.refundOutstanding'), v: this.money(booking.refundOutstandingAmount) }]
+              : []),
+          ]
+        : booking.depositRefund
         ? [
             {
               // The payment it returned: the whole booking when it was paid in full, or the deposit.
@@ -290,7 +302,11 @@ export class AdminBookingDetailComponent {
           customer: this.customerName(booking),
           dealer: this.dealerName(booking),
         }),
-        note: this.t('adminBooking.nothingIsRefundedHere'),
+        // Owner, 2026-09-26: a platform cancellation before pickup returns the whole payment, deposit
+        // included. The figure is the server's own whole-payment refund, never a sum made here.
+        note: booking.depositPaid && booking.confirmingPayment
+          ? this.t('adminBooking.cancelRefundsAmount', { amount: this.money(booking.confirmingPayment.refundOnFreeCancellation) })
+          : this.t('adminBooking.cancelRefundsWholePayment'),
         fields: [
           {
             name: this.t('myBooking.reason'),
@@ -350,7 +366,9 @@ export class AdminBookingDetailComponent {
         tone: 'bad',
         danger: true,
         title: this.t('adminBooking.noShowTitle', { reference: booking.reference }),
-        body: this.t('adminBooking.noShowBody', { customer: this.customerName(booking) }),
+        body: booking.isPaidInFull
+          ? `${this.t('adminBooking.noShowBody', { customer: this.customerName(booking) })} ${this.t('adminBooking.noShowRefundsAboveDeposit')}`
+          : this.t('adminBooking.noShowBody', { customer: this.customerName(booking) }),
         note: this.t('adminBooking.refusedUntilTheNo'),
         confirm: this.t('adminBooking.markNoShow'),
         result: { title: this.t('adminBooking.recordedAsANo'), body: '', tone: 'bad' },

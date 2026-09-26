@@ -26,6 +26,23 @@ export function refundRowKey(booking: Pick<Booking, 'isPaidInFull'>): Translatio
   return booking.isPaidInFull ? 'dealerBooking.payment' : 'common.deposit';
 }
 
+/** Refunds that return or decide the DEPOSIT: once one exists, the deposit is no longer held. */
+const DEPOSIT_DECIDED: ReadonlySet<string> = new Set([
+  'FreeCancellation',
+  'PlatformCancellation',
+  'DisputeWindowClosed',
+  'DisputeResolution',
+]);
+
+/**
+ * Whether the deposit is still HELD pending settlement (Phase 3): it was paid, and no refund has
+ * returned it (a free cancellation's, an administrator's, the clean-close release) or decided it (a
+ * dispute's). Only then does the console say "held pending settlement".
+ */
+export function depositStillHeld(booking: Pick<Booking, 'depositPaid' | 'refunds'>): boolean {
+  return booking.depositPaid && !(booking.refunds ?? []).some((refund) => DEPOSIT_DECIDED.has(refund.reason));
+}
+
 /**
  * The money line for what the customer paid by card: the whole booking, or the deposit at its frozen
  * rate. `percent` is the deposit percent, already formatted.

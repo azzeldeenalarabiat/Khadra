@@ -86,16 +86,48 @@ public sealed record BookingContext(
     /// </remarks>
     PaymentAvailabilityDto? Payment = null,
     /// <summary>
-    /// The refund of this booking's deposit that a free cancellation recorded, or null when there is
-    /// none. Composed for every reader of one booking — customer, gallery and admin all need to see
-    /// that the deposit is going back.
+    /// The refund that returns this booking's DEPOSIT — a free cancellation's, an administrator's
+    /// cancellation's, or the release when the dispute window closed cleanly — or null when there is
+    /// none. Kept for installed apps, which read the deposit's refund from here; everything newer
+    /// reads <see cref="Refunds"/>.
     /// </summary>
     DepositRefundDto? DepositRefund = null,
     /// <summary>
     /// The payment that confirmed this booking, or null while none has. Composed for every reader of
     /// one booking: the gallery's timeline words the confirmation from its purpose too.
     /// </summary>
-    ConfirmingPaymentDto? ConfirmingPayment = null);
+    ConfirmingPaymentDto? ConfirmingPayment = null,
+    /// <summary>
+    /// Every refund against any payment for this booking, oldest first (Phase 3, 2026-09-26): its
+    /// reason, amount and status, the same list for the customer, the gallery and the administrator.
+    /// Null only where nobody composed it.
+    /// </summary>
+    IReadOnlyList<RefundDto>? Refunds = null);
+
+/// <summary>
+/// One refund, as every screen shows it (Phase 3, 2026-09-26): WHY it is owed, HOW MUCH, and WHERE it
+/// is. The provider's references stay on the server; nobody reading a booking needs them.
+/// </summary>
+/// <param name="Reason">
+/// <c>FreeCancellation</c>, <c>PlatformCancellation</c>, <c>EndedBeforePickup</c>,
+/// <c>DisputeWindowClosed</c>, <c>DisputeResolution</c> or <c>OrphanedCapture</c> — a code each client
+/// words in its reader's language, with a generic fallback for one it does not know yet.
+/// </param>
+/// <param name="Status">
+/// <c>Requested</c> or <c>Sent</c> (on its way), <c>Settled</c> (back with the customer), or
+/// <c>Failed</c> (refused, still owed, and being sent again).
+/// </param>
+public sealed record RefundDto(
+    Guid RefundId,
+    Guid PaymentId,
+    string Reason,
+    MoneyDto Amount,
+    string Status,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset? SentAt,
+    DateTimeOffset? SettledAt,
+    DateTimeOffset? FailedAt,
+    Guid? DisputeTicketId);
 
 /// <summary>
 /// The payment that confirmed a booking (owner, 2026-09-25): what KIND of payment it was and what it
@@ -110,13 +142,18 @@ public sealed record BookingContext(
 /// What a free cancellation would return, from the same property the refund itself reads, so the
 /// figure promised on the cancel sheet is the figure refunded.
 /// </param>
+/// <param name="RefundableFee">
+/// The processing fee that goes back with the booking money (the whole fee when this payment froze
+/// it as refundable, zero otherwise). Added 2026-09-26, last.
+/// </param>
 public sealed record ConfirmingPaymentDto(
     string Purpose,
     MoneyDto AmountCharged,
     MoneyDto ProcessingFee,
     MoneyDto AppliedToBooking,
     DateTimeOffset? PaidAt,
-    MoneyDto RefundOnFreeCancellation);
+    MoneyDto RefundOnFreeCancellation,
+    MoneyDto? RefundableFee = null);
 
 /// <summary>
 /// Where the deposit's refund is (owner, 2026-09-24): the refund's own status, never a verdict a

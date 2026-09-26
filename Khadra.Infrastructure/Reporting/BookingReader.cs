@@ -375,6 +375,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         if (found is null)
             return new BookingContext(null, string.Empty, DealerRemoved: false, null, string.Empty, CustomerAccountClosed: false, null, null);
 
+        var refunds = await RefundsAsync(bookingId, cancellationToken);
         return new BookingContext(
             found.Vehicle,
             found.Dealer?.Name ?? RemovedDealerName,
@@ -384,8 +385,9 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             CustomerAccountClosed: found.CustomerName is null,
             found.LiveDisputeId,
             found.MyReviewId,
-            DepositRefund: await DepositRefundAsync(bookingId, cancellationToken),
-            ConfirmingPayment: await ConfirmingPaymentAsync(bookingId, cancellationToken));
+            DepositRefund: DepositRefundOf(refunds),
+            ConfirmingPayment: await ConfirmingPaymentAsync(bookingId, cancellationToken),
+            Refunds: refunds);
     }
 
     /// <summary>
@@ -407,7 +409,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
 
         // A booking is only confirmed by a capture, so an uncaptured row here would be a payment that
         // never charged anything: stating a charge for it would be inventing one.
-        if (payment?.AmountCaptured is not { } charged || payment.FreeCancellationRefundAmount is not { } refund)
+        if (payment?.AmountCaptured is not { } charged || payment.WholePaymentRefundAmount is not { } refund)
             return null;
 
         return new ConfirmingPaymentDto(
@@ -416,26 +418,28 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             MoneyDto.From(payment.ProcessingFee),
             MoneyDto.From(payment.AppliedToBooking),
             payment.AppliedAt ?? payment.CapturedAt,
-            MoneyDto.From(refund));
+            MoneyDto.From(refund),
+            MoneyDto.From(payment.RefundableFee));
     }
 
     /// <summary>
-    /// The refund a free cancellation recorded against this booking's deposit payment, if any.
+    /// Every refund against any payment made for this booking, in the order it was promised.
     /// </summary>
     /// <remarks>
-    /// Reached through the booking's own <c>DepositPaymentId</c> and joined by id, never navigated:
-    /// Payments is another context. Scalars only, so no owned value object leaves the query without
-    /// its owner.
+    /// Joined through the payment's own <c>BookingId</c>, never navigated: Payments is another context.
+    /// Every payment, not only the one that confirmed the booking — a capture that landed too late is
+    /// this booking's money too, and its refund is part of the same story. Scalars only, so no owned
+    /// value object leaves the query without its owner.
     /// </remarks>
-    private async Task<DepositRefundDto?> DepositRefundAsync(Id bookingId, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<RefundDto>> RefundsAsync(Id bookingId, CancellationToken cancellationToken)
     {
-        var freeCancellation = RefundReason.FreeCancellation;
-        var row = await context.Set<Refund>()
-            .Where(refund =>
-                refund.Reason == freeCancellation &&
-                context.Bookings.Any(booking => booking.Id == bookingId && booking.DepositPaymentId == refund.PaymentId))
+        var rows = await context.Set<Refund>()
+            .Where(refund => context.Set<Payment>().Any(payment => payment.Id == refund.PaymentId && payment.BookingId == bookingId))
             .Select(refund => new
             {
+                refund.Id,
+                refund.PaymentId,
+                refund.Reason,
                 refund.Status,
                 Amount = refund.Amount.Amount,
                 Currency = refund.Amount.CurrencyCode,
@@ -443,18 +447,51 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                 refund.SentAt,
                 refund.SettledAt,
                 refund.FailedAt,
+                refund.DisputeTicketId,
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
 
-        return row is null
-            ? null
-            : new DepositRefundDto(
-                row.Status.Name,
+        // Ordered here rather than in SQL: a handful of rows, and the id breaks a tie in RequestedAt so
+        // two refunds recorded in one save always come back in the same order.
+        return rows
+            .OrderBy(row => row.RequestedAt)
+            .ThenBy(row => row.Id.Value)
+            .Select(row => new RefundDto(
+                row.Id.Value,
+                row.PaymentId.Value,
+                row.Reason.Name,
                 new MoneyDto(row.Amount, row.Currency),
+                row.Status.Name,
                 row.RequestedAt,
                 row.SentAt,
                 row.SettledAt,
-                row.FailedAt);
+                row.FailedAt,
+                row.DisputeTicketId?.Value))
+            .ToList();
+    }
+
+    /// <summary>
+    /// The refund that returns the booking's deposit, in the shape installed apps already read: a free
+    /// cancellation's, an administrator's cancellation's, or the clean-close release. At most one of
+    /// them can exist for a booking — a booking that returned its whole payment holds no deposit to
+    /// release.
+    /// </summary>
+    private static DepositRefundDto? DepositRefundOf(IReadOnlyList<RefundDto> refunds)
+    {
+        var deposit = refunds.FirstOrDefault(refund =>
+            refund.Reason == RefundReason.FreeCancellation.Name ||
+            refund.Reason == RefundReason.PlatformCancellation.Name ||
+            refund.Reason == RefundReason.DisputeWindowClosed.Name);
+
+        return deposit is null
+            ? null
+            : new DepositRefundDto(
+                deposit.Status,
+                deposit.Amount,
+                deposit.RequestedAt,
+                deposit.SentAt,
+                deposit.SettledAt,
+                deposit.FailedAt);
     }
 
     /// <summary>A booking's context as it leaves the database: each party's name is null when it did not resolve.</summary>

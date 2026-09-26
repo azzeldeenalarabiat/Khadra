@@ -4,8 +4,9 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppConfigService } from '../../core/config/app-config.service';
 import { I18nService } from '../../core/i18n/i18n.service';
-import { BookingDetailComponent, refundStage } from './booking-detail.component';
+import { BookingDetailComponent, changedRefundOf, refundStage } from './booking-detail.component';
 
 const ID = '01a0d095-c204-7f23-b0b3-1be7852e4b23';
 const BOOKING_URL = `/api/v1/bookings/${ID}`;
@@ -443,6 +444,143 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
 
     expect(english.text).toMatch(new RegExp(`Free cancellation[.] ${amount('102.75').source} will be refunded to your original payment method`));
     expect(english.text).not.toContain('Your deposit will be refunded');
+  });
+
+  // ── Phase 3 (owner, 2026-09-26): what a booking paid in full gets back when it ends early ──
+  const PAST_WINDOW_PENALTY = {
+    attributedTo: 'Customer', minPercent: 100, maxPercent: 100, minAmount: money(18), maxAmount: money(18),
+    isRange: false, isNothingOwed: false, requiresTicketToEnforce: true, reason: '', reasonCode: 'CustomerCancelledAfterFreeWindow',
+    assessedAt: '2026-09-25T20:00:00+00:00',
+  };
+  const lateCancellable = {
+    ...FULL,
+    cancellation: { canCancel: true, isFree: false, willRefundDeposit: false, penalty: PAST_WINDOW_PENALTY, refundAmount: money(84.75) },
+  };
+  const refundRow = (reason: string, status: string, figure: number) => ({
+    refundId: `r-${reason}`, paymentId: 'p-1', reason, amount: money(figure), status,
+    requestedAt: '2026-09-25T20:00:00+00:00', sentAt: status === 'Requested' ? null : '2026-09-25T20:01:00+00:00',
+    settledAt: status === 'Settled' ? '2026-09-25T20:05:00+00:00' : null, failedAt: null, disputeTicketId: null,
+  });
+  const lateCancelled = {
+    ...FULL,
+    status: 'Cancelled',
+    isTerminal: true,
+    cancelledBy: 'Customer',
+    finishedAt: '2026-09-25T20:00:00+00:00',
+    penalty: PAST_WINDOW_PENALTY,
+    depositRefund: null,
+    refunds: [refundRow('EndedBeforePickup', 'Settled', 84.75)],
+    refundedAmount: money(84.75),
+    refundOutstandingAmount: money(0),
+  };
+
+  /** The cancel sheet, opened, in one language; with the platform's reasons when a test confirms. */
+  async function openSheet(booking: object, language: 'ar' | 'en', withReasons = false) {
+    TestBed.configureTestingModule({
+      imports: [BookingDetailComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
+    });
+    TestBed.inject(I18nService).use(language);
+    const http = TestBed.inject(HttpTestingController);
+    const fixture = TestBed.createComponent(BookingDetailComponent);
+    fixture.componentRef.setInput('bookingId', ID);
+    const settle = async () => {
+      for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+      fixture.detectChanges();
+    };
+    await settle();
+    http.match((request) => request.url === BOOKING_URL).forEach((read) => read.flush(booking));
+    if (withReasons) {
+      // The reasons are the platform's vocabulary, published on /app-config.
+      void TestBed.inject(AppConfigService).load();
+      http.expectOne('/api/v1/app-config').flush({
+        currency: { code: 'JOD', minorUnits: 3 },
+        vocabularies: { cancellationReasons: [{ name: 'PlansChanged', labelEn: 'Plans changed', labelAr: 'تغيّرت الخطط' }], rejectionReasons: [] },
+      });
+    }
+    await settle();
+    const page = fixture.nativeElement as HTMLElement;
+    const dialog = page.querySelector('dialog') as HTMLDialogElement;
+    // jsdom has no modal dialogs; the sheet's content is what is under test.
+    dialog.showModal = () => dialog.setAttribute('open', '');
+    (page.querySelector('button.btn--danger') as HTMLButtonElement).click();
+    await settle();
+    return { http, page, dialog, settle };
+  }
+
+  it('tells a customer cancelling a full payment late what comes back above the deposit, in both languages', async () => {
+    const english = await openSheet(lateCancellable, 'en');
+    expect(english.dialog.textContent).toMatch(new RegExp(`You will get ${amount('84.75').source} back to your original payment method: everything you paid above the deposit`));
+    expect(english.dialog.textContent).toContain('Cancelling now assesses');
+    expect(english.dialog.textContent).not.toContain('Free cancellation');
+    TestBed.resetTestingModule();
+
+    const arabic = await openSheet(lateCancellable, 'ar');
+    expect(arabic.dialog.textContent).toContain('كل ما دفعته فوق العربون');
+    expect(arabic.dialog.textContent).toMatch(amount('84.75'));
+  });
+
+  it('sends the refund it showed, and on a changed refund shows the new figure and cancels nothing', async () => {
+    const sheet = await openSheet(lateCancellable, 'en', true);
+    (sheet.dialog.querySelector('input[type=radio]') as HTMLInputElement).click();
+    await sheet.settle();
+    const confirm = [...sheet.dialog.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Cancel the booking')!;
+    confirm.click();
+    await sheet.settle();
+
+    const post = sheet.http.expectOne((request) => request.method === 'POST' && request.url === `${BOOKING_URL}/cancel`);
+    expect(post.request.body).toEqual({ reasonCode: 'PlansChanged', details: null, expectedRefund: 84.75 });
+    post.flush(
+      { status: 409, title: 'The refund for cancelling this booking has changed.', code: 'booking.refund_changed', currentRefund: { amount: 66.75, currency: 'JOD' } },
+      { status: 409, statusText: 'Conflict' },
+    );
+    await sheet.settle();
+
+    expect(sheet.dialog.textContent).toMatch(new RegExp(`What you would get back has changed to ${amount('66.75').source}`));
+    expect(sheet.dialog.hasAttribute('open')).toBe(true);
+    // Read again, so the sheet states the new figure before the customer confirms.
+    expect(sheet.http.match((request) => request.url === BOOKING_URL).length).toBeGreaterThan(0);
+  });
+
+  it('reads the changed refund from the refusal, and nothing from any other refusal', () => {
+    const refusal = { status: 409, error: { code: 'booking.refund_changed', currentRefund: { amount: 84.75, currency: 'JOD' } } };
+    expect(changedRefundOf(refusal)).toEqual({ amount: 84.75, currency: 'JOD' });
+    expect(changedRefundOf({ status: 409, error: { code: 'booking.not_cancellable' } })).toBeNull();
+    expect(changedRefundOf({ status: 409, error: { code: 'booking.refund_changed', currentRefund: { amount: '84.75', currency: 'JOD' } } })).toBeNull();
+    expect(changedRefundOf(null)).toBeNull();
+  });
+
+  it('lists every refund with why, how much and where it is, and the totals the server sent (English)', async () => {
+    const page = await render(lateCancelled, 'en');
+
+    expect(page.text).toMatch(new RegExp(`Everything you paid above the deposit, ${amount('84.75').source}, was refunded to your original payment method`));
+    expect(page.text).toContain('Refunds');
+    expect(page.text).toContain('Paid above the deposit');
+    expect(page.text).toContain('Refunded to you');
+    expect(page.text).not.toContain('Refund in progress');
+    // Part of it came back: never "Paid in full" beside the payment any more.
+    expect(page.line('Payment type')).toMatch(/^Full payment$/);
+  });
+
+  it('lists the refunds in Arabic, the deposit release included', async () => {
+    const released = {
+      ...lateCancelled,
+      cancelledBy: 'Dealer',
+      penalty: { ...PAST_WINDOW_PENALTY, attributedTo: 'Dealer' },
+      refunds: [refundRow('EndedBeforePickup', 'Settled', 84.75), refundRow('DisputeWindowClosed', 'Sent', 18)],
+      depositRefund: { status: 'Sent', amount: money(18), requestedAt: '2026-09-27T20:00:00+00:00', sentAt: '2026-09-27T20:01:00+00:00', settledAt: null, failedAt: null },
+      refundedAmount: money(84.75),
+      refundOutstandingAmount: money(18),
+    };
+
+    const page = await render(released, 'ar');
+
+    expect(page.text).toContain('المبالغ المستردة');
+    expect(page.text).toContain('المدفوع فوق العربون');
+    expect(page.text).toContain('إعادة العربون');
+    expect(page.text).toContain('يجري استرداد عربونك');
+    expect(page.text).toContain('قيد الاسترداد');
+    expect(page.text).toContain('بدأ الاسترداد');
   });
 
   it('words the refund of a booking paid in full as a refund of the payment', async () => {

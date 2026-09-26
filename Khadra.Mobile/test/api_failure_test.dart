@@ -32,6 +32,16 @@ void main() {
     expect(failure.isTransport, isFalse);
   });
 
+  test('keeps the rest of the body, so a refusal can carry the figure that changed', () {
+    final failure = ApiFailure.from(responseWith(409, {
+      'code': 'booking.refund_changed',
+      'currentRefund': {'amount': 84.75, 'currency': 'JOD'},
+    }));
+
+    expect(failure.hasCode('booking.refund_changed'), isTrue);
+    expect(failure.extensions['currentRefund'], {'amount': 84.75, 'currency': 'JOD'});
+  });
+
   test('reads FluentValidation field errors', () {
     final failure = ApiFailure.from(responseWith(400, {
       'code': 'validation.failed',

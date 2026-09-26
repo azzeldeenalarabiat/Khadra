@@ -21,6 +21,14 @@ internal sealed class DisputeTicketRepository(KhadraDbContext context) : IDisput
     public Task<bool> HasLiveTicketAsync(Id bookingId, CancellationToken cancellationToken = default) =>
         Live().AnyAsync(ticket => ticket.BookingId == bookingId, cancellationToken);
 
+    public Task<bool> HasClaimOnDepositAsync(Id bookingId, CancellationToken cancellationToken = default)
+    {
+        var withdrawn = DisputeStatus.Withdrawn;
+        return context.DisputeTickets.AnyAsync(
+            ticket => ticket.BookingId == bookingId && ticket.Status != withdrawn,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<DisputeTicket>> ListLiveAsync(CancellationToken cancellationToken = default) =>
         await Live().OrderBy(ticket => ticket.SlaDeadline).ToListAsync(cancellationToken);
 

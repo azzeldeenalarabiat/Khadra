@@ -1319,6 +1319,8 @@ class CancellationPreview {
     required this.isFree,
     required this.penalty,
     this.willRefundDeposit = false,
+    this.refundAmount,
+    this.publishesRefundAmount = false,
   });
 
   final bool canCancel;
@@ -1330,13 +1332,79 @@ class CancellationPreview {
   /// cancellation applies. Absent from an older API, where it reads false.
   final bool willRefundDeposit;
 
+  /// What cancelling now returns to the card, all of it (Phase 3): the whole
+  /// payment inside the free window, everything above the deposit after it;
+  /// null when nothing does. Sent back as `expectedRefund`.
+  final Money? refundAmount;
+
+  /// Whether the server published [refundAmount] at all. An older API does not,
+  /// and then no `expectedRefund` is sent: it would not know what the sheet showed.
+  final bool publishesRefundAmount;
+
   static CancellationPreview fromJson(Map<String, dynamic>? json) =>
       CancellationPreview(
         canCancel: json?['canCancel'] as bool? ?? false,
         isFree: json?['isFree'] as bool? ?? true,
         penalty: PenaltyAssessment.maybe(json?['penalty']),
         willRefundDeposit: json?['willRefundDeposit'] as bool? ?? false,
+        refundAmount: Money.maybe(json?['refundAmount']),
+        publishesRefundAmount: json?.containsKey('refundAmount') ?? false,
       );
+}
+
+/// One refund against a booking's payments (Phase 3, 2026-09-26): why it is
+/// owed, how much, and where it is. Every reader of the booking sees the same
+/// list.
+class Refund {
+  const Refund({
+    required this.refundId,
+    required this.reason,
+    required this.amount,
+    required this.status,
+    required this.requestedAt,
+    this.settledAt,
+    this.failedAt,
+  });
+
+  final String refundId;
+
+  /// FreeCancellation, PlatformCancellation, EndedBeforePickup,
+  /// DisputeWindowClosed, DisputeResolution or OrphanedCapture. A reason this
+  /// build does not know reads as a plain "Refund".
+  final String reason;
+  final Money amount;
+
+  /// Requested and Sent read alike (initiated); Settled is refunded; Failed is
+  /// still owed and being retried by the server.
+  final String status;
+  final DateTime requestedAt;
+  final DateTime? settledAt;
+  final DateTime? failedAt;
+
+  bool get isRefunded => status == 'Settled';
+  bool get isDelayed => status == 'Failed';
+
+  static Refund? maybe(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final amount = Money.maybe(json['amount']);
+    final requestedAt = _dateTime(json['requestedAt']);
+    if (amount == null || requestedAt == null) return null;
+    return Refund(
+      refundId: json['refundId'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      amount: amount,
+      status: json['status'] as String? ?? 'Requested',
+      requestedAt: requestedAt,
+      settledAt: _dateTime(json['settledAt']),
+      failedAt: _dateTime(json['failedAt']),
+    );
+  }
+
+  /// The list, or null when the server sent none: an older API, whose deposit
+  /// refund the screens keep reading from [Booking.depositRefund].
+  static List<Refund>? listOrNull(dynamic json) => json is List<dynamic>
+      ? json.map(Refund.maybe).whereType<Refund>().toList()
+      : null;
 }
 
 /// Where the deposit a free cancellation returned is (owner, 2026-09-24).
@@ -1730,6 +1798,9 @@ class Booking implements HasDealerLabel {
     this.depositRefund,
     this.isPaidInFull = false,
     this.confirmingPayment,
+    this.refunds,
+    this.refundedAmount,
+    this.refundOutstandingAmount,
   });
 
   final String bookingId;
@@ -1811,6 +1882,19 @@ class Booking implements HasDealerLabel {
   /// The payment that confirmed the booking, or null. Absent from an older API.
   final ConfirmingPayment? confirmingPayment;
 
+  /// Every refund against this booking's payments, oldest first (Phase 3). Null
+  /// from an older API, which names only [depositRefund].
+  final List<Refund>? refunds;
+
+  /// What has reached the customer, the settled refunds: the server's total.
+  final Money? refundedAmount;
+
+  /// What is promised back and not there yet: the server's total.
+  final Money? refundOutstandingAmount;
+
+  /// Whether any money was, or is being, given back.
+  bool get hasRefunds => (refunds?.isNotEmpty ?? false) || depositRefund != null;
+
   bool get isDelivery => pickupMethod == 'Delivery';
 
   static Booking fromJson(Map<String, dynamic> json) => Booking(
@@ -1869,6 +1953,9 @@ class Booking implements HasDealerLabel {
         depositRefund: DepositRefund.maybe(json['depositRefund']),
         isPaidInFull: json['isPaidInFull'] as bool? ?? false,
         confirmingPayment: ConfirmingPayment.maybe(json['confirmingPayment']),
+        refunds: Refund.listOrNull(json['refunds']),
+        refundedAmount: Money.maybe(json['refundedAmount']),
+        refundOutstandingAmount: Money.maybe(json['refundOutstandingAmount']),
       );
 }
 

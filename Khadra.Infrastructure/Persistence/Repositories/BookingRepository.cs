@@ -1,6 +1,8 @@
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Domain.Disputes;
+using Khadra.Domain.Payments;
 using Microsoft.EntityFrameworkCore;
 
 namespace Khadra.Infrastructure.Persistence.Repositories;
@@ -127,6 +129,41 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
                 booking.Period.End > candidateHoldStart &&
                 ((booking.Status == requested && booking.DecisionDeadline <= now) ||
                  (booking.Status == approved && booking.PaymentDeadline <= now)))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Booking>> ListDueForDepositReleaseAsync(
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        // Everything that decides a deposit FOR GOOD is excluded here, in SQL, so a cancelled booking
+        // is not re-read every minute for the rest of time (Cancelled and NoShow are terminal): a refund
+        // that returned or released the deposit, a claim on it (any dispute not withdrawn), and a
+        // penalty against the customer. What is left is the handful still inside their window and the
+        // few the next pass releases. Joined by id, never navigated: Payments and Disputes are other
+        // contexts. The window itself is frozen per booking, in its Terms; the aggregate judges it.
+        var cancelled = BookingStatus.Cancelled;
+        var noShow = BookingStatus.NoShow;
+        var customer = BookingParty.Customer;
+        var freeCancellation = RefundReason.FreeCancellation;
+        var platformCancellation = RefundReason.PlatformCancellation;
+        var released = RefundReason.DisputeWindowClosed;
+        var withdrawn = DisputeStatus.Withdrawn;
+
+        return await WithChildren()
+            .Where(booking =>
+                (booking.Status == cancelled || booking.Status == noShow) &&
+                booking.PickedUpAt == null &&
+                booking.DepositPaymentId != null &&
+                booking.FinishedAt != null &&
+                booking.FinishedAt <= now &&
+                (booking.Penalty == null ||
+                 booking.Penalty.AttributedTo != customer ||
+                 booking.Penalty.MaxAmount.Amount == 0m) &&
+                !context.Set<Refund>().Any(refund =>
+                    refund.PaymentId == booking.DepositPaymentId &&
+                    (refund.Reason == freeCancellation || refund.Reason == platformCancellation || refund.Reason == released)) &&
+                !context.DisputeTickets.Any(ticket => ticket.BookingId == booking.Id && ticket.Status != withdrawn))
             .ToListAsync(cancellationToken);
     }
 

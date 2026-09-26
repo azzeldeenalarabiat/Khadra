@@ -137,6 +137,30 @@ public static class BookingErrors
             "booking.no_time_to_decide",
             "That rental starts too soon for the office to answer and for the deposit to be paid.");
 
+    /// <summary>
+    /// The refund cancelling would return changed since the customer was shown it — most often the
+    /// free window closed while the sheet was open (owner, 2026-09-26; pre-launch item 160). Nothing
+    /// was cancelled. Carries the CURRENT figure so the client can show it and ask again.
+    /// </summary>
+    public static Error RefundChanged(Money current)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        return Error.Conflict(
+                "booking.refund_changed",
+                "The refund for cancelling this booking has changed. Review the new amount and confirm again.")
+            with
+            {
+                Extensions = new Dictionary<string, object?>
+                {
+                    ["currentRefund"] = new Dictionary<string, object?>
+                    {
+                        ["amount"] = current.Amount,
+                        ["currency"] = current.CurrencyCode,
+                    },
+                },
+            };
+    }
+
     public static readonly Error NotAwaitingPayment =
         Error.Conflict("booking.not_awaiting_payment", "This booking is not awaiting payment.");
 

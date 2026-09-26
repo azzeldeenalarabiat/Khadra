@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Notifications;
+using Khadra.Application.Payments;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
@@ -8,6 +9,8 @@ using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Notifications;
+using Khadra.Domain.Payments;
+using Khadra.Domain.Payments.Repositories;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -31,19 +34,32 @@ namespace Khadra.Application.Bookings.SettleBookings;
 /// Idempotent by construction: every transition it calls re-checks its own status and deadline, so a
 /// second pass over the same booking does nothing. Each booking is committed on its own, so one that
 /// fails — a concurrency conflict with a dealer acting at the same instant — cannot hold up the rest.
+///
+/// Two passes touch money (Phase 3, 2026-09-26), and only by RECORDING what is owed; the payment
+/// sweep sends it. A paid no-show owes the customer everything above the deposit, recorded in the
+/// save that marks it. And a deposit whose dispute window closed cleanly — no claim on it, no penalty
+/// against the customer — goes back to the customer (owner, 2026-09-26): the booking decides that
+/// from its own frozen window, never from the time alone.
 /// </remarks>
 public sealed record SettleDueBookingsCommand : ICommand<Result<SettlementReport, Error>>;
 
 /// <summary>What one pass did. Logged, and returned so a test can assert on it.</summary>
-public sealed record SettlementReport(int ExpiredUnanswered, int ExpiredUnpaid, int MarkedNoShow, int Completed, int Failed)
+public sealed record SettlementReport(
+    int ExpiredUnanswered,
+    int ExpiredUnpaid,
+    int MarkedNoShow,
+    int Completed,
+    int Failed,
+    int DepositsReleased = 0)
 {
-    public int Total => ExpiredUnanswered + ExpiredUnpaid + MarkedNoShow + Completed;
+    public int Total => ExpiredUnanswered + ExpiredUnpaid + MarkedNoShow + Completed + DepositsReleased;
 
     public static readonly SettlementReport Empty = new(0, 0, 0, 0, 0);
 }
 
 public sealed partial class SettleDueBookingsHandler(
     IBookingRepository bookings,
+    IPaymentRepository payments,
     IDisputeTicketRepository disputes,
     IDealerRepository dealers,
     DealerTeamNotifier team,
@@ -77,24 +93,140 @@ public sealed partial class SettleDueBookingsHandler(
             count => failed += count,
             cancellationToken);
 
-        var noShows = await SettleAsync(
-            await bookings.ListDueForNoShowAsync(now, cancellationToken),
-            booking => booking.MarkNoShow(now),
-            NotificationKind.YourBookingMarkedNoShow,
-            now,
-            count => failed += count,
-            cancellationToken);
+        var noShows = await SettleNoShowsAsync(now, count => failed += count, cancellationToken);
 
         var completed = await SettleCompletionsAsync(now, error => failed += error, cancellationToken);
 
-        var report = new SettlementReport(unanswered, unpaid, noShows, completed, failed);
+        var released = await ReleaseCleanDepositsAsync(now, count => failed += count, cancellationToken);
+
+        var report = new SettlementReport(unanswered, unpaid, noShows, completed, failed, released);
 
         // Silent when there was nothing to do, which is most passes. A line a minute saying "nothing"
         // buries the ones that matter.
         if (report.Total > 0 || report.Failed > 0)
-            LogSettled(logger, unanswered, unpaid, noShows, completed, failed);
+            LogSettled(logger, unanswered, unpaid, noShows, completed, released, failed);
 
         return report;
+    }
+
+    /// <summary>
+    /// A rental nobody collected is marked a no-show, and a PAID one records, in the same save, the
+    /// refund of everything the customer paid above the deposit (Phase 3). The deposit stays held:
+    /// the no-show penalty is assessed against it, and only a dispute can move it.
+    /// </summary>
+    /// <remarks>
+    /// The payment is checked BEFORE the booking changes. A booking whose payment cannot take the
+    /// refund is left exactly as it was, logged, and counted as deferred — never marked a no-show with
+    /// the money it owes unrecorded. The request handlers can simply throw in that case, because a
+    /// request rolls back whole; this pass commits booking by booking, and a throw would abandon the
+    /// rest of the pass.
+    /// </remarks>
+    private async Task<int> SettleNoShowsAsync(
+        DateTimeOffset now,
+        Action<int> onFailure,
+        CancellationToken cancellationToken)
+    {
+        var due = await bookings.ListDueForNoShowAsync(now, cancellationToken);
+        var settled = 0;
+
+        foreach (var booking in due)
+        {
+            // Only a booking paid above its deposit will owe a refund once marked; only that one
+            // needs its payment, and needs it BEFORE the booking changes.
+            Payment? payment = null;
+            if (!booking.PaidAboveDeposit.IsZero)
+            {
+                payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
+                if (!BookingEndingRefunds.CanRecord(booking, payment))
+                {
+                    LogPaymentUnusable(logger, booking.Reference.Value);
+                    onFailure(1);
+                    continue;
+                }
+            }
+
+            var result = booking.MarkNoShow(now);
+            if (result.IsFailure)
+                continue;
+
+            BookingEndingRefunds.Record(booking, payment, now);
+            await NotifyBothPartiesAsync(booking, NotificationKind.YourBookingMarkedNoShow, now, cancellationToken);
+
+            if (await CommitAsync(booking, cancellationToken))
+                settled++;
+            else
+                onFailure(1);
+        }
+
+        return settled;
+    }
+
+    /// <summary>
+    /// Returns a held deposit to the customer once its booking's dispute window has closed CLEANLY
+    /// (owner, 2026-09-26): the booking ended before pickup, nobody claimed the deposit, and no
+    /// penalty stands against the customer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The query leaves out, in SQL, every booking whose deposit something has already decided — a
+    /// refund that returned or released it, a dispute not withdrawn, a penalty on the customer — so
+    /// this is the handful still inside their window plus the few now due. The BOOKING judges each
+    /// one against its own frozen window (<see cref="Booking.DepositReleasedOnCleanClose"/>), and the
+    /// claim is asked again here because a ticket can be opened between the query and this line.
+    /// </para>
+    /// <para>
+    /// Nothing about the booking changes, so nothing is announced: the refund row is the record, the
+    /// booking shows it, and the customer is told when the money actually arrives.
+    /// </para>
+    /// </remarks>
+    private async Task<int> ReleaseCleanDepositsAsync(
+        DateTimeOffset now,
+        Action<int> onFailure,
+        CancellationToken cancellationToken)
+    {
+        var due = await bookings.ListDueForDepositReleaseAsync(now, cancellationToken);
+        var released = 0;
+
+        foreach (var booking in due)
+        {
+            // Asked per booking rather than in bulk, for the same reason as the completions: the
+            // queries share one scoped DbContext and must not run concurrently.
+            var claimed = await disputes.HasClaimOnDepositAsync(booking.Id, cancellationToken);
+            var deposit = booking.DepositReleasedOnCleanClose(now, claimed);
+            if (deposit.IsZero)
+                continue;
+
+            var payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
+            if (!BookingEndingRefunds.CanRecord(booking, payment))
+            {
+                LogPaymentUnusable(logger, booking.Reference.Value);
+                onFailure(1);
+                continue;
+            }
+
+            // Released already — the query leaves these out; asked again so a pass never counts, or
+            // commits, a release it did not make.
+            if (payment!.RefundFor(RefundReason.DisputeWindowClosed) is not null)
+                continue;
+
+            var refund = payment.RefundHeldDeposit(deposit, now);
+            if (refund.IsFailure)
+            {
+                LogReleaseRefused(logger, booking.Reference.Value, refund.Error.Code);
+                onFailure(1);
+                continue;
+            }
+
+            if (refund.Value is null)
+                continue;
+
+            if (await CommitAsync(booking, cancellationToken))
+                released++;
+            else
+                onFailure(1);
+        }
+
+        return released;
     }
 
     /// <summary>
@@ -226,9 +358,24 @@ public sealed partial class SettleDueBookingsHandler(
     [LoggerMessage(
         2100,
         LogLevel.Information,
-        "Booking settlement: {Unanswered} unanswered, {Unpaid} unpaid, {NoShows} no-shows, {Completed} completed, {Failed} deferred.")]
+        "Booking settlement: {Unanswered} unanswered, {Unpaid} unpaid, {NoShows} no-shows, {Completed} completed, "
+        + "{Released} deposit(s) released, {Failed} deferred.")]
     private static partial void LogSettled(
-        ILogger logger, int unanswered, int unpaid, int noShows, int completed, int failed);
+        ILogger logger, int unanswered, int unpaid, int noShows, int completed, int released, int failed);
+
+    [LoggerMessage(
+        2102,
+        LogLevel.Error,
+        "Booking {Reference} is paid, but its payment is missing, not applied or not its own. Left unchanged "
+        + "rather than ended with the refund it owes unrecorded; a human must look.")]
+    private static partial void LogPaymentUnusable(ILogger logger, string reference);
+
+    [LoggerMessage(
+        2103,
+        LogLevel.Error,
+        "The deposit of booking {Reference} is due back to the customer, but its payment refused the refund ({Code}). "
+        + "Left for the next pass; a human must look.")]
+    private static partial void LogReleaseRefused(ILogger logger, string reference, string code);
 
     [LoggerMessage(
         2101,

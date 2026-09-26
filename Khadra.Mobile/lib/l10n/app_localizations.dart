@@ -2192,6 +2192,108 @@ abstract class AppLocalizations {
   /// **'The refund of {amount} from your payment is still owed to you. It is taking longer than usual, and we are retrying it automatically.'**
   String bookingRefundDelayedPaymentText(String amount);
 
+  /// No description provided for @bookingRefundAboveDepositInitiatedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything you paid above the deposit, {amount}, is being refunded to your original payment method. We started the refund on {date}; your bank may take additional time to show it.'**
+  String bookingRefundAboveDepositInitiatedText(String amount, String date);
+
+  /// No description provided for @bookingRefundAboveDepositRefundedText.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything you paid above the deposit, {amount}, was refunded to your original payment method on {date}. Your bank may take additional time to show it.'**
+  String bookingRefundAboveDepositRefundedText(String amount, String date);
+
+  /// No description provided for @bookingRefundAboveDepositDelayedText.
+  ///
+  /// In en, this message translates to:
+  /// **'The refund of {amount} you paid above the deposit is still owed to you. It is taking longer than usual, and we are retrying it automatically.'**
+  String bookingRefundAboveDepositDelayedText(String amount);
+
+  /// No description provided for @bookingRefundsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunds'**
+  String get bookingRefundsTitle;
+
+  /// No description provided for @bookingRefundedTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded to you'**
+  String get bookingRefundedTotal;
+
+  /// No description provided for @bookingRefundOutstanding.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund in progress'**
+  String get bookingRefundOutstanding;
+
+  /// No description provided for @refundReasonFreeCancellation.
+  ///
+  /// In en, this message translates to:
+  /// **'Free cancellation'**
+  String get refundReasonFreeCancellation;
+
+  /// No description provided for @refundReasonPlatformCancellation.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled by Khadra'**
+  String get refundReasonPlatformCancellation;
+
+  /// No description provided for @refundReasonEndedBeforePickup.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid above the deposit'**
+  String get refundReasonEndedBeforePickup;
+
+  /// No description provided for @refundReasonDisputeWindowClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Deposit returned'**
+  String get refundReasonDisputeWindowClosed;
+
+  /// No description provided for @refundReasonDisputeResolution.
+  ///
+  /// In en, this message translates to:
+  /// **'Dispute decision'**
+  String get refundReasonDisputeResolution;
+
+  /// No description provided for @refundReasonOrphanedCapture.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment that could not be used'**
+  String get refundReasonOrphanedCapture;
+
+  /// No description provided for @refundReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get refundReasonOther;
+
+  /// No description provided for @cancelRefundAboveDeposit.
+  ///
+  /// In en, this message translates to:
+  /// **'You will get {amount} back to your original payment method: everything you paid above the deposit. We will initiate the refund immediately, but your bank may take additional time to show it.'**
+  String cancelRefundAboveDeposit(String amount);
+
+  /// No description provided for @cancelRefundChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'What you would get back has changed to {amount}. Please review it and confirm again.'**
+  String cancelRefundChanged(String amount);
+
+  /// No description provided for @cancelRefundChangedNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelling now would no longer give any money back. Please review it and confirm again.'**
+  String get cancelRefundChangedNone;
+
+  /// No description provided for @notificationYourPartialRefundSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'{actor}: part of your payment has been refunded'**
+  String notificationYourPartialRefundSettled(String actor);
+
   /// No description provided for @notificationYourDepositRefunded.
   ///
   /// In en, this message translates to:

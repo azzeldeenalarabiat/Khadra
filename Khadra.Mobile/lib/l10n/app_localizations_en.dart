@@ -1302,6 +1302,70 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String bookingRefundAboveDepositInitiatedText(String amount, String date) {
+    return 'Everything you paid above the deposit, $amount, is being refunded to your original payment method. We started the refund on $date; your bank may take additional time to show it.';
+  }
+
+  @override
+  String bookingRefundAboveDepositRefundedText(String amount, String date) {
+    return 'Everything you paid above the deposit, $amount, was refunded to your original payment method on $date. Your bank may take additional time to show it.';
+  }
+
+  @override
+  String bookingRefundAboveDepositDelayedText(String amount) {
+    return 'The refund of $amount you paid above the deposit is still owed to you. It is taking longer than usual, and we are retrying it automatically.';
+  }
+
+  @override
+  String get bookingRefundsTitle => 'Refunds';
+
+  @override
+  String get bookingRefundedTotal => 'Refunded to you';
+
+  @override
+  String get bookingRefundOutstanding => 'Refund in progress';
+
+  @override
+  String get refundReasonFreeCancellation => 'Free cancellation';
+
+  @override
+  String get refundReasonPlatformCancellation => 'Cancelled by Khadra';
+
+  @override
+  String get refundReasonEndedBeforePickup => 'Paid above the deposit';
+
+  @override
+  String get refundReasonDisputeWindowClosed => 'Deposit returned';
+
+  @override
+  String get refundReasonDisputeResolution => 'Dispute decision';
+
+  @override
+  String get refundReasonOrphanedCapture => 'Payment that could not be used';
+
+  @override
+  String get refundReasonOther => 'Refund';
+
+  @override
+  String cancelRefundAboveDeposit(String amount) {
+    return 'You will get $amount back to your original payment method: everything you paid above the deposit. We will initiate the refund immediately, but your bank may take additional time to show it.';
+  }
+
+  @override
+  String cancelRefundChanged(String amount) {
+    return 'What you would get back has changed to $amount. Please review it and confirm again.';
+  }
+
+  @override
+  String get cancelRefundChangedNone =>
+      'Cancelling now would no longer give any money back. Please review it and confirm again.';
+
+  @override
+  String notificationYourPartialRefundSettled(String actor) {
+    return '$actor: part of your payment has been refunded';
+  }
+
+  @override
   String notificationYourDepositRefunded(String actor) {
     return '$actor: your payment has been refunded';
   }

@@ -61,41 +61,46 @@ internal sealed partial class BookingSettlementService(
 
     private async Task RunOnceAsync(CancellationToken cancellationToken)
     {
+        // A scope — and so a DbContext — PER COMMAND. Settlement swallows a concurrency conflict on
+        // one booking and moves on, which leaves that booking tracked with a stale token; in a shared
+        // context every later save in the pass would re-issue it and fail, and one dealer clicking at
+        // the wrong instant would cancel a minute of payments and reminders.
+        //
+        // And a FAILURE per command (Phase 3, 2026-09-26). The booking pass now records money owed —
+        // a no-show's refund, a deposit released when its window closes — and a query the database
+        // refused there used to end the whole tick: no refund sent, no reminder staged, every minute.
+        // Each command now fails on its own, logged with its name, and the next one still runs.
+        await RunAsync(new SettleDueBookingsCommand(), cancellationToken);
+
+        // Payments after bookings, and in the same pass rather than on a timer of their own. The
+        // order matters: expiring an unpaid booking is what makes its open checkout pointless, and
+        // sweeping in that order closes the attempt on the same tick rather than the next. A second
+        // timer would buy nothing and give two schedules to reason about.
+        await RunAsync(new SettlePaymentsCommand(), cancellationToken);
+
+        // Reminders LAST, after both sweeps: a booking whose payment window has just closed is expired
+        // above, so it is never reminded to pay for something that is already gone. The reminders only
+        // stage notifications; the outbox dispatcher sends them within seconds.
+        await RunAsync(new SendDueRemindersCommand(), cancellationToken);
+    }
+
+    private async Task RunAsync<TResponse>(IRequest<TResponse> command, CancellationToken cancellationToken)
+    {
         try
         {
-            // A scope — and so a DbContext — PER COMMAND. Settlement swallows a concurrency conflict
-            // on one booking and moves on, which leaves that booking tracked with a stale token; in a
-            // shared context every later save in the pass would re-issue it and fail, and one dealer
-            // clicking at the wrong instant would cancel a minute of payments and reminders.
-            await SendAsync(new SettleDueBookingsCommand(), cancellationToken);
-
-            // Payments after bookings, and in the same pass rather than on a timer of their own.
-            // The order matters: expiring an unpaid booking is what makes its open checkout pointless,
-            // and sweeping in that order closes the attempt on the same tick rather than the next.
-            // A second timer would buy nothing and give two schedules to reason about.
-            await SendAsync(new SettlePaymentsCommand(), cancellationToken);
-
-            // Reminders LAST, after both sweeps: a booking whose payment window has just closed is
-            // expired above, so it is never reminded to pay for something that is already gone. The
-            // reminders only stage notifications; the outbox dispatcher sends them within seconds.
-            await SendAsync(new SendDueRemindersCommand(), cancellationToken);
+            using var scope = scopes.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<ISender>().Send(command, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             // Shutting down. Not a failure.
         }
-#pragma warning disable CA1031 // A pass that fails must not take the service down with it.
+#pragma warning disable CA1031 // A pass that fails must not take the service, or the next pass, down with it.
         catch (Exception exception)
 #pragma warning restore CA1031
         {
-            LogPassFailed(logger, exception);
+            LogPassFailed(logger, command.GetType().Name, exception);
         }
-    }
-
-    private async Task SendAsync<TResponse>(IRequest<TResponse> command, CancellationToken cancellationToken)
-    {
-        using var scope = scopes.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<ISender>().Send(command, cancellationToken);
     }
 
     [LoggerMessage(
@@ -107,8 +112,8 @@ internal sealed partial class BookingSettlementService(
     [LoggerMessage(2201, LogLevel.Information, "Booking settlement running every {Interval}.")]
     private static partial void LogStarted(ILogger logger, TimeSpan interval);
 
-    [LoggerMessage(2202, LogLevel.Error, "A booking settlement pass failed. The next pass will retry.")]
-    private static partial void LogPassFailed(ILogger logger, Exception exception);
+    [LoggerMessage(2202, LogLevel.Error, "The {Pass} settlement pass failed. The other passes still ran; the next tick will retry.")]
+    private static partial void LogPassFailed(ILogger logger, string pass, Exception exception);
 
     private static async Task<bool> SafeWaitAsync(PeriodicTimer timer, CancellationToken cancellationToken)
     {

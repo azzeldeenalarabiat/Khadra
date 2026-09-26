@@ -195,7 +195,7 @@ public sealed partial class ReceiveProviderEventHandler(
         {
             ProviderEventKind.Captured => await CaptureAsync(payment, notification, now, cancellationToken),
             ProviderEventKind.Failed => Fail(payment, notification, now),
-            ProviderEventKind.RefundSettled => await SettleRefundAsync(payment, now, cancellationToken),
+            ProviderEventKind.RefundSettled => await SettleRefundAsync(payment, notification, now, cancellationToken),
             ProviderEventKind.RefundFailed => FailRefund(payment, notification, now),
             _ => ProviderEventOutcome.Ignored
         };
@@ -297,51 +297,98 @@ public sealed partial class ReceiveProviderEventHandler(
     /// A refund this platform sent has reached the customer.
     /// </summary>
     /// <remarks>
-    /// A free cancellation's refund also tells the customer (owner, 2026-09-24), staged in this same
-    /// save so the message can never describe a settlement that rolled back, and sent once: a
-    /// replayed delivery is refused at the receipt before reaching here, and a second, different
-    /// delivery finds no refund still Sent.
+    /// <para>
+    /// WHICH refund is read from the provider's own refund reference (Phase 3, 2026-09-26; pre-launch
+    /// item 159). A payment can now owe several at once — the money above the deposit when the booking
+    /// ends, the deposit when its window closes cleanly, a dispute's share — and settling "the first
+    /// one still sent", as this once did, would mark the wrong row settled whenever two were in flight.
+    /// </para>
+    /// <para>
+    /// The customer is told on SETTLEMENT — every refund now, not only a free cancellation's — staged
+    /// in this same save so the message can never describe a settlement that rolled back, and sent
+    /// once: a replayed delivery is refused at the receipt before reaching here, and a second,
+    /// different delivery finds the refund already settled. "Your payment has been refunded" once
+    /// everything this payment will ever return is back; "part of your payment" before that.
+    /// </para>
     /// </remarks>
     private async Task<ProviderEventOutcome> SettleRefundAsync(
         Payment payment,
+        ProviderEvent notification,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var outstanding = payment.Refunds.FirstOrDefault(refund => refund.Status == RefundStatus.Sent);
-        if (outstanding is null)
+        var refund = RefundNamedBy(payment, notification);
+        if (refund is null)
+            return ProviderEventOutcome.Unmatched;
+        if (refund.Status == RefundStatus.Settled)
             return ProviderEventOutcome.Ignored;
 
-        outstanding.MarkSettled(now);
+        refund.MarkSettled(now);
 
-        if (outstanding.Reason == RefundReason.FreeCancellation)
+        // The gallery is only the actor's name on the notice; a gallery that has since left the
+        // platform must not cost the customer the news that their money is back.
+        var booking = await bookings.GetByIdAsync(payment.BookingId, cancellationToken);
+        if (booking is not null)
         {
-            // The gallery is only the actor's name on the notice; a gallery that has since left the
-            // platform must not cost the customer the news that their money is back.
-            var booking = await bookings.GetByIdAsync(payment.BookingId, cancellationToken);
-            if (booking is not null)
-            {
-                var dealer = await dealers.GetByIdAsync(booking.DealerId, cancellationToken);
-                await team.NotifyCustomerAsync(
-                    booking.CustomerId,
-                    dealer?.BusinessName.Value ?? string.Empty,
-                    NotificationKind.YourDepositRefunded,
-                    now,
-                    booking.Id,
-                    booking.Reference.Value);
-            }
+            var dealer = await dealers.GetByIdAsync(booking.DealerId, cancellationToken);
+            await team.NotifyCustomerAsync(
+                booking.CustomerId,
+                dealer?.BusinessName.Value ?? string.Empty,
+                payment.IsRefundedInFull ? NotificationKind.YourDepositRefunded : NotificationKind.YourPartialRefundSettled,
+                now,
+                booking.Id,
+                booking.Reference.Value);
         }
 
         return ProviderEventOutcome.Acted;
     }
 
-    private static ProviderEventOutcome FailRefund(Payment payment, ProviderEvent notification, DateTimeOffset now)
+    /// <summary>The provider refused a refund. It stays owed, and the payment sweep sends it again.</summary>
+    private ProviderEventOutcome FailRefund(Payment payment, ProviderEvent notification, DateTimeOffset now)
     {
-        var outstanding = payment.Refunds.FirstOrDefault(refund => refund.Status == RefundStatus.Sent);
-        if (outstanding is null)
+        var refund = RefundNamedBy(payment, notification);
+        if (refund is null)
+            return ProviderEventOutcome.Unmatched;
+        // A refusal after the money arrived contradicts the provider's own settlement; the settlement
+        // stands, because the customer has the money.
+        if (refund.Status == RefundStatus.Settled)
             return ProviderEventOutcome.Ignored;
 
-        outstanding.MarkFailed(notification.FailureCode ?? "provider_refused", now);
+        refund.MarkFailed(notification.FailureCode ?? "provider_refused", now);
         return ProviderEventOutcome.Acted;
+    }
+
+    /// <summary>
+    /// The ONE refund a refund event is about, or null when that cannot be told without guessing.
+    /// </summary>
+    /// <remarks>
+    /// Named by the provider's refund reference whenever the event carries one, and then only that
+    /// refund: a reference this payment never sent is not "probably the other one". An event that names
+    /// none is accepted only when it cannot be anyone else's — exactly one refund out with the provider
+    /// for exactly the amount the event carries. Either way, a miss is logged for a human and recorded
+    /// on the receipt as <see cref="ProviderEventOutcome.Unmatched"/>.
+    /// </remarks>
+    private Refund? RefundNamedBy(Payment payment, ProviderEvent notification)
+    {
+        if (!string.IsNullOrWhiteSpace(notification.RefundReference))
+        {
+            var named = payment.RefundWithProviderReference(notification.RefundReference);
+            if (named is null)
+                LogRefundUnmatched(logger, notification.ProviderEventId, payment.Id.Value, notification.RefundReference);
+            return named;
+        }
+
+        var candidates = notification.Amount is { } amount
+            ? payment.Refunds
+                .Where(refund => refund.Status == RefundStatus.Sent && refund.Amount == amount)
+                .Take(2)
+                .ToList()
+            : [];
+        if (candidates.Count == 1)
+            return candidates[0];
+
+        LogRefundUnnamed(logger, notification.ProviderEventId, payment.Id.Value, candidates.Count);
+        return null;
     }
 
     /// <summary>
@@ -444,5 +491,19 @@ public sealed partial class ReceiveProviderEventHandler(
         "Payment {PaymentId} captured {Amount} {Currency} that no booking could take ({Reason}); a refund is recorded.")]
     private static partial void LogOrphaned(
         ILogger logger, Guid paymentId, decimal amount, string currency, string reason);
+
+    [LoggerMessage(
+        2307,
+        LogLevel.Error,
+        "Refund event {EventId} named refund {RefundReference}, which payment {PaymentId} never sent. "
+        + "Recorded as unmatched and NOT applied; a human must reconcile it with the provider.")]
+    private static partial void LogRefundUnmatched(ILogger logger, string eventId, Guid paymentId, string refundReference);
+
+    [LoggerMessage(
+        2308,
+        LogLevel.Error,
+        "Refund event {EventId} for payment {PaymentId} named no refund, and {Candidates} refund(s) could be the one "
+        + "it meant. Recorded as unmatched and NOT applied; a human must reconcile it with the provider.")]
+    private static partial void LogRefundUnnamed(ILogger logger, string eventId, Guid paymentId, int candidates);
 }
 

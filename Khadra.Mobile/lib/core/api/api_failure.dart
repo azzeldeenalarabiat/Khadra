@@ -20,6 +20,7 @@ final class ApiFailure implements Exception {
     this.traceId,
     this.statusCode,
     this.fieldErrors = const <String, List<String>>{},
+    this.extensions = const <String, Object?>{},
   });
 
   final ApiFailureKind kind;
@@ -37,6 +38,11 @@ final class ApiFailure implements Exception {
 
   /// FluentValidation's per-field messages, keyed by field name.
   final Map<String, List<String>> fieldErrors;
+
+  /// The rest of the ProblemDetails body, as the server sent it: a refusal that
+  /// carries the figure that changed (`currentRefund` on
+  /// `booking.refund_changed`) puts it here.
+  final Map<String, Object?> extensions;
 
   bool get isUnauthorized => kind == ApiFailureKind.unauthorized;
   bool get isNotFound => kind == ApiFailureKind.notFound;
@@ -96,8 +102,12 @@ final class ApiFailure implements Exception {
     String? title;
     String? traceId;
     final fields = <String, List<String>>{};
+    final extensions = <String, Object?>{};
 
     if (body is Map) {
+      body.forEach((key, value) {
+        if (key is String) extensions[key] = value;
+      });
       code = body['code'] as String?;
       title = body['title'] as String?;
       traceId = body['traceId'] as String?;
@@ -125,6 +135,7 @@ final class ApiFailure implements Exception {
       traceId: traceId,
       statusCode: status,
       fieldErrors: fields,
+      extensions: extensions,
     );
   }
 

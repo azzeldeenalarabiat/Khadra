@@ -42,6 +42,13 @@ public interface IBookingRepository
     Task<IReadOnlyList<Booking>> ListDueForSettlementAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Paid bookings that ended before pickup whose deposit nothing has decided yet: candidates for
+    /// the clean-close release (owner, 2026-09-26). The aggregate judges each against its own frozen
+    /// window (<c>Booking.DepositReleasedOnCleanClose</c>).
+    /// </summary>
+    Task<IReadOnlyList<Booking>> ListDueForDepositReleaseAsync(DateTimeOffset now, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Bookings on one vehicle, overlapping one candidate window, whose hold has run out but whose
     /// status has not caught up.
     /// </summary>

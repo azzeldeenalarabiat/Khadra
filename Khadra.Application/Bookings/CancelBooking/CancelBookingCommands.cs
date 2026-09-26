@@ -26,17 +26,22 @@ namespace Khadra.Application.Bookings.CancelBooking;
 /// </remarks>
 /// <param name="ReasonCode">One of <see cref="BookingCancellationReason"/>, published on /app-config.</param>
 /// <param name="Details">The customer's own words. Optional; the code is what the platform counts.</param>
-public sealed record CancelMyBookingCommand(Id CustomerUserId, Id BookingId, string ReasonCode, string? Details)
+/// <param name="ExpectedRefund">
+/// The refund the customer was shown, in the booking's currency (owner, 2026-09-26). When it no
+/// longer matches what cancelling returns — the free window closed while the sheet was open — the
+/// cancellation is refused with <c>booking.refund_changed</c> and the current figure, and nothing is
+/// cancelled. Optional: an installed app that does not send it is not guarded.
+/// </param>
+public sealed record CancelMyBookingCommand(Id CustomerUserId, Id BookingId, string ReasonCode, string? Details, decimal? ExpectedRefund = null)
     : ICommand<Result<BookingDto, Error>>;
 
 /// <summary>
 /// A customer reporting that the gallery never handed the car over (spec 5.5).
 /// </summary>
 /// <remarks>
-/// NOT REACHABLE END TO END. It requires a Confirmed booking, and Confirmed requires a cleared
-/// deposit, which requires the Payments context — unbuilt and blocked on owner decisions. The command
-/// and its guards exist so the aggregate rule is enforced and tested wherever it is asked; the app
-/// gates the screen on the booking's own status, so a customer never sees a button that cannot work.
+/// It needs a Confirmed booking, which now exists end to end (Sandbox payments). The penalty is
+/// assessed against the OFFICE; the customer's money above the deposit goes back at once, in the same
+/// save (Phase 3), and the deposit follows the dispute rules.
 /// </remarks>
 public sealed record ReportNonDeliveryCommand(Id CustomerUserId, Id BookingId, string Details)
     : ICommand<Result<BookingDto, Error>>;
@@ -49,6 +54,11 @@ public sealed class CancelMyBookingCommandValidator : AbstractValidator<CancelMy
             .Must(BookingCancellationReason.IsKnown)
             .WithMessage("Choose one of the listed reasons.");
         RuleFor(command => command.Details).MaximumLength(500);
+        RuleFor(command => command.ExpectedRefund!.Value)
+            .GreaterThanOrEqualTo(0m)
+            .When(command => command.ExpectedRefund is not null)
+            .WithName("ExpectedRefund")
+            .WithMessage("The expected refund cannot be negative.");
     }
 }
 
@@ -123,19 +133,32 @@ public sealed class CancelBookingHandlers(
         var reasonCode = Enumeration.GetAll<BookingCancellationReason>()
             .First(reason => string.Equals(reason.Name, request.ReasonCode, StringComparison.Ordinal));
 
+        // The refund the customer was shown must still be the refund (owner, 2026-09-26). Checked
+        // AFTER the retry and lapse branches above, so a retried cancellation that already succeeded
+        // is never refused as a change, and only while the booking can be cancelled at all, so a
+        // booking past cancelling answers with the aggregate's own reason. Compared as money in the
+        // booking's currency, rounded as money is; a promise of something that now returns nothing is
+        // a change too.
+        if (request.ExpectedRefund is { } expected && booking.CanBeCancelled(now))
+        {
+            var confirming = booking.DepositPaymentId is { } paymentId
+                ? await payments.GetByIdAsync(paymentId, cancellationToken)
+                : null;
+            var current = BookingEndingRefunds.PreviewForCustomer(booking, confirming, now)
+                ?? Money.ZeroIn(booking.Pricing.CurrencyCode);
+            if (Money.Create(expected, current.CurrencyCode) != current)
+                return BookingErrors.RefundChanged(current);
+        }
+
         var cancelled = booking.Cancel(BookingParty.Customer, request.CustomerUserId, request.Details, now, reasonCode);
         if (cancelled.IsFailure)
             return cancelled.Error;
 
-        // A paid booking cancelled inside its free window returns the whole deposit (owner,
-        // 2026-09-24), recorded in THIS save so the cancellation and the refund it owes commit
-        // together or not at all. The retry branch above deliberately does not do this: a refund is
-        // only ever created by the cancellation that owes it, never by tapping cancel again.
-        if (booking.ReturnsDepositOnCancellation)
-        {
-            var payment = await payments.GetByIdAsync(booking.DepositPaymentId!.Value, cancellationToken);
-            DepositRefundSettlement.RefundForFreeCancellation(booking, payment, now);
-        }
+        // The refund this ending owes — the whole payment inside the free window (owner, 2026-09-24),
+        // everything above the deposit after it (Phase 3) — recorded in THIS save so the cancellation
+        // and the refund commit together or not at all. The retry branch above deliberately does not
+        // do this: a refund is only ever created by the ending that owes it, never by tapping again.
+        await BookingEndingRefunds.RecordAsync(booking, payments, now, cancellationToken);
 
         await NotifyGalleryAsync(booking, NotificationKind.BookingCancelledByCustomer, now, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -158,6 +181,10 @@ public sealed class CancelBookingHandlers(
         var reported = booking.ReportDealerNonDelivery(request.CustomerUserId, request.Details, now);
         if (reported.IsFailure)
             return reported.Error;
+
+        // The car never came: everything the customer paid above the deposit goes back now (Phase 3),
+        // in this save. The deposit follows the dispute rules.
+        await BookingEndingRefunds.RecordAsync(booking, payments, now, cancellationToken);
 
         await NotifyGalleryAsync(booking, NotificationKind.BookingNonDeliveryReported, now, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);

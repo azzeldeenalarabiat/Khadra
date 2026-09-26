@@ -21,6 +21,7 @@ const CUSTOMER_KINDS = [
   'YourBookingPickedUp',
   'YourBookingReturned',
   'YourDepositRefunded',
+  'YourPartialRefundSettled',
 ];
 
 describe('notificationTarget', () => {

@@ -155,7 +155,7 @@ public sealed class PaymentLifecycleTests
         Assert.Equal(Money.Jod(18m), refund.Amount);
         // Nobody decided it, so no ticket ordered it.
         Assert.Null(refund.DisputeTicketId);
-        Assert.Equal(Money.Jod(18m), payment.RefundedTotal);
+        Assert.Equal(Money.Jod(18m), payment.RefundedOrOwed);
 
         Assert.Single(payment.DomainEvents.OfType<PaymentOrphaned>());
     }
@@ -182,7 +182,7 @@ public sealed class PaymentLifecycleTests
         Assert.Same(PaymentStatus.Orphaned, payment.Status);
         // What the provider TOOK, never what this row asked for.
         Assert.Equal(Money.Jod(captured), Assert.Single(payment.Refunds).Amount);
-        Assert.Equal(Money.Jod(captured), payment.RefundedTotal);
+        Assert.Equal(Money.Jod(captured), payment.RefundedOrOwed);
     }
 
     /// <summary>The same, in a currency this platform does not price in.</summary>
@@ -194,9 +194,9 @@ public sealed class PaymentLifecycleTests
 
         Assert.True(payment.Orphan(wrong, Now, "payments.amount_mismatch", Now).IsSuccess);
 
-        // RefundedTotal must not try to add USD to a JOD zero and throw on the very row somebody is
+        // RefundedOrOwed must not try to add USD to a JOD zero and throw on the very row somebody is
         // investigating.
-        Assert.Equal(wrong, payment.RefundedTotal);
+        Assert.Equal(wrong, payment.RefundedOrOwed);
     }
 
     [Fact]
@@ -241,7 +241,7 @@ public sealed class PaymentLifecycleTests
 
         // Six more is exactly the rest, and is allowed.
         Assert.True(payment.RequestRefund(Money.Jod(6m), ticket, Now).IsSuccess);
-        Assert.Equal(Money.Jod(18m), payment.RefundedTotal);
+        Assert.Equal(Money.Jod(18m), payment.RefundedOrOwed);
 
         // A single fils more is not.
         Assert.Equal(
@@ -263,7 +263,7 @@ public sealed class PaymentLifecycleTests
 
     /// <summary>
     /// A refused refund still counts as owed, so the ceiling does not quietly rise when a provider
-    /// says no and an admin tries again.
+    /// says no: the sweep re-sends THAT refund, and nothing else may be promised on top of it.
     /// </summary>
     [Fact]
     public void A_failed_refund_is_still_owed()
@@ -273,13 +273,14 @@ public sealed class PaymentLifecycleTests
         var refund = payment.RequestRefund(Money.Jod(18m), null, Now).Value;
 
         refund.MarkSent("rf_1", Now);
-        Assert.Equal(Money.Jod(18m), payment.RefundedTotal);
+        Assert.Equal(Money.Jod(18m), payment.RefundedOrOwed);
 
         refund.MarkFailed("insufficient_funds", Now.AddMinutes(1));
         Assert.Same(RefundStatus.Failed, refund.Status);
-        // It left the outstanding total, which is what lets the sweep pick it up again -- and what
-        // stops a retry being refused as if the money had already gone back.
-        Assert.Equal(Money.Jod(0m), payment.RefundedTotal);
+        // Still owed: the sweep re-sends this same refund under its own id. Counting it (Phase 3,
+        // 2026-09-26) is what stops a SECOND refund being promised on top of one that is still owed.
+        Assert.Equal(Money.Jod(18m), payment.RefundedOrOwed);
+        Assert.Equal("payments.refund_exceeds_capture", payment.RequestRefund(Money.Jod(1m), null, Now).Error.Code);
 
         refund.MarkSent("rf_2", Now.AddMinutes(2));
         Assert.Null(refund.FailureCode);

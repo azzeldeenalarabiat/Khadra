@@ -355,14 +355,23 @@ class KhadraApi {
   /// Can answer with an EXPIRED booking rather than a cancelled one, when the
   /// window closed while the customer was deciding. The screen renders whatever
   /// status comes back rather than assuming the one it asked for.
+  ///
+  /// [expectedRefund] is the refund the sheet showed (Phase 3). When it no longer
+  /// matches, the server cancels nothing and answers 409 `booking.refund_changed`
+  /// with the new figure in `currentRefund`.
   Future<Booking> cancelBooking(
     String bookingId, {
     required String reasonCode,
     String? details,
+    num? expectedRefund,
   }) async =>
       Booking.fromJson(_object(await _client.post<dynamic>(
         '/api/v1/bookings/$bookingId/cancel',
-        body: {'reasonCode': reasonCode, 'details': details},
+        body: {
+          'reasonCode': reasonCode,
+          'details': details,
+          if (expectedRefund != null) 'expectedRefund': expectedRefund,
+        },
       )));
 
   /// Starts, resumes or replaces the checkout for this booking's deposit.

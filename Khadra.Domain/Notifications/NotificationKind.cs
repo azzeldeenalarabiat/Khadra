@@ -96,6 +96,12 @@ public sealed class NotificationKind : Enumeration
     // the customer is waiting for. By email too, because a refund is a record people keep.
     public static readonly NotificationKind YourDepositRefunded = new(30, "YourDepositRefunded", PushAndEmail);
 
+    // A refund has reached the customer and more of the payment is still out or held (Phase 3,
+    // 2026-09-26): the money above the deposit when a booking ended before pickup, a dispute's share.
+    // YourDepositRefunded is kept for the moment EVERYTHING the payment will return is back, so a
+    // customer is never told "your payment has been refunded" while part of it is still held.
+    public static readonly NotificationKind YourPartialRefundSettled = new(31, "YourPartialRefundSettled", PushAndEmail);
+
     // Changes to one person's own standing (EmployeeHandlers).
     public static readonly NotificationKind StaffReactivated = new(10, "StaffReactivated");
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");
@@ -117,7 +123,7 @@ public sealed class NotificationKind : Enumeration
     //                       Add it when a provider exists, not before.
     //   YourRefundIssued  — superseded on 2026-09-24 by YourDepositRefunded, which is sent only when a
     //                       provider SETTLES the refund, so it is never a promise the platform cannot
-    //                       keep. Refunds from a dispute or an orphaned capture still send nothing.
+    //                       keep. Since Phase 3 every settled refund sends one of the two refund kinds.
 
     private readonly NotificationChannel[] _channels;
 

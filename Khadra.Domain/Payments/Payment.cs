@@ -64,6 +64,12 @@ public sealed class Payment : AggregateRoot
     /// <summary>What this payment puts towards the booking itself: <see cref="Amount"/> less the fee.</summary>
     public Money AppliedToBooking => Amount.Subtract(ProcessingFee);
 
+    /// <summary>
+    /// The processing fee that goes back when this payment's booking money does: the whole fee when
+    /// the payment froze it as refundable, nothing otherwise.
+    /// </summary>
+    public Money RefundableFee => FeeRefundable ? ProcessingFee : Money.ZeroIn(Amount.CurrencyCode);
+
     public PaymentStatus Status { get; private set; } = null!;
 
     /// <summary>
@@ -143,12 +149,38 @@ public sealed class Payment : AggregateRoot
     /// another currency, which is one of the reasons it was orphaned. Starting from the asked-for
     /// currency there would make this property throw on exactly the rows somebody is investigating.
     /// </remarks>
-    public Money RefundedTotal =>
+    /// <para>
+    /// EVERY refund counts, whatever its status. A FAILED refund is still owed — the sweep re-sends it
+    /// under its own id — so leaving it out (as this total once did) let a second refund be promised
+    /// on top of it, and the two could together exceed the capture. No refund row is ever withdrawn:
+    /// each one is money the platform has promised back.
+    /// </para>
+    public Money RefundedOrOwed =>
+        _refunds.Aggregate(
+            Money.ZeroIn((AmountCaptured ?? Amount).CurrencyCode),
+            (total, refund) => total.Add(refund.Amount));
+
+    /// <summary>What has actually reached the customer: the SETTLED refunds, and nothing else.</summary>
+    public Money RefundSettled =>
         _refunds
-            .Where(refund => refund.Status.IsOutstanding || refund.Status == RefundStatus.Settled)
+            .Where(refund => refund.Status == RefundStatus.Settled)
             .Aggregate(
                 Money.ZeroIn((AmountCaptured ?? Amount).CurrencyCode),
                 (total, refund) => total.Add(refund.Amount));
+
+    /// <summary>
+    /// Whether everything this payment will ever give back has now reached the customer: the whole
+    /// capture, less a processing fee it froze as non-refundable (Phase 3). What decides "your payment
+    /// has been refunded" against "part of your payment has been refunded".
+    /// </summary>
+    /// <remarks>
+    /// At least, not exactly: an orphaned capture goes back whole, fee included, which is more than a
+    /// booking's ending would ever return.
+    /// </remarks>
+    public bool IsRefundedInFull =>
+        WholePaymentRefundAmount is { } whole &&
+        !whole.IsZero &&
+        !whole.IsGreaterThan(RefundSettled);
 
     private Payment()
     {
@@ -343,15 +375,79 @@ public sealed class Payment : AggregateRoot
     /// would be a bug, and quietly refunding the remainder would hide it. The shared guard refuses it.
     /// </para>
     /// </remarks>
-    public Result<Refund, Error> RefundForFreeCancellation(DateTimeOffset now)
+    public Result<Refund, Error> RefundForFreeCancellation(DateTimeOffset now) =>
+        RefundWholePayment(RefundReason.FreeCancellation, now);
+
+    /// <summary>
+    /// Returns the WHOLE payment because the booking ended with nothing held against the customer: a
+    /// customer's free cancellation, or an administrator's cancellation before pickup (owner,
+    /// 2026-09-26). Idempotent the same way as a free cancellation always was: a second call returns
+    /// the refund the first one recorded, whatever has become of it.
+    /// </summary>
+    public Result<Refund, Error> RefundWholePayment(RefundReason reason, DateTimeOffset now)
     {
+        ArgumentNullException.ThrowIfNull(reason);
+        if (!reason.ReturnsWholePayment)
+            throw new DomainException($"{reason.Name} does not return the whole payment.");
         if (Status != PaymentStatus.Applied)
             return PaymentErrors.NotLive;
 
-        if (FreeCancellationRefund is { } existing)
+        if (WholePaymentRefund is { } existing)
             return existing;
 
-        return AddRefund(FreeCancellationRefundAmount!, RefundReason.FreeCancellation, disputeTicketId: null, now);
+        return AddRefund(WholePaymentRefundAmount!, reason, disputeTicketId: null, now);
+    }
+
+    /// <summary>
+    /// Returns everything above the deposit because a PAID booking ended before the car was
+    /// collected (owner, 2026-09-24): the booking money above <paramref name="deposit"/>, plus the
+    /// processing fee when this payment's fee was refundable. Null when nothing is above the deposit
+    /// — every deposit-only payment — so no empty refund row is ever minted.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent: a second call returns the refund the first one recorded. The deposit is never part
+    /// of it; penalties and disputes stay deposit-based.
+    /// </remarks>
+    public Result<Refund?, Error> RefundAboveDeposit(Money bookingPart, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(bookingPart);
+        if (Status != PaymentStatus.Applied)
+            return PaymentErrors.NotLive;
+
+        if (RefundFor(RefundReason.EndedBeforePickup) is { } existing)
+            return existing;
+
+        // Nothing above the deposit, nothing to return: the fee only ever goes back WITH that money,
+        // and a deposit-only payment never carries one (Khadra absorbs the deposit's processing cost).
+        if (bookingPart.IsZero)
+            return (Refund?)null;
+
+        var amount = AmountReturnedFor(bookingPart);
+        if (amount is null || amount.IsZero)
+            return (Refund?)null;
+
+        return AddRefund(amount, RefundReason.EndedBeforePickup, disputeTicketId: null, now).Map(refund => (Refund?)refund);
+    }
+
+    /// <summary>
+    /// Returns the deposit a booking held, because its dispute window closed cleanly (owner,
+    /// 2026-09-26). The booking part only: a refundable processing fee already went back with the
+    /// money above the deposit, and a deposit-only payment carries none. Idempotent.
+    /// </summary>
+    public Result<Refund?, Error> RefundHeldDeposit(Money deposit, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        if (Status != PaymentStatus.Applied)
+            return PaymentErrors.NotLive;
+
+        if (RefundFor(RefundReason.DisputeWindowClosed) is { } existing)
+            return existing;
+
+        var amount = HeldDepositRefundAmount(deposit);
+        if (amount is null || amount.IsZero)
+            return (Refund?)null;
+
+        return AddRefund(amount, RefundReason.DisputeWindowClosed, disputeTicketId: null, now).Map(refund => (Refund?)refund);
     }
 
     /// <summary>
@@ -364,17 +460,48 @@ public sealed class Payment : AggregateRoot
     /// state the figure BEFORE the customer cancels, so the promise and the refund cannot disagree.
     /// A deposit-only payment returns the deposit; a full payment returns the whole booking.
     /// </remarks>
-    public Money? FreeCancellationRefundAmount =>
+    public Money? WholePaymentRefundAmount =>
         AmountCaptured is null
             ? null
             : FeeRefundable || ProcessingFee.IsZero
                 ? AmountCaptured
                 : AmountCaptured.Subtract(ProcessingFee);
 
+    /// <summary>
+    /// What returning <paramref name="bookingPart"/> of the booking's money takes back from this
+    /// payment: that part, plus the processing fee when this payment froze its fee as refundable.
+    /// Null until something was captured.
+    /// </summary>
+    /// <remarks>
+    /// The BOOKING decides the part (<c>Booking.RefundableAboveDeposit</c>); the payment only adds the
+    /// fee rule it froze. The fee goes back once, with the money above the deposit — a deposit-only
+    /// payment never carries one. With the deposit it keeps and a fee it keeps, it is exactly the
+    /// capture: <c>returned + deposit + keptFee == AmountCaptured</c>.
+    /// </remarks>
+    public Money? AmountReturnedFor(Money bookingPart)
+    {
+        ArgumentNullException.ThrowIfNull(bookingPart);
+        if (AmountCaptured is null)
+            return null;
+
+        return Money.Create(bookingPart.Amount, bookingPart.CurrencyCode).Add(RefundableFee);
+    }
+
+    /// <summary>The deposit a clean dispute-window close returns: the booking part, never more than was applied.</summary>
+    public Money? HeldDepositRefundAmount(Money deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        if (AmountCaptured is null)
+            return null;
+
+        var applied = AppliedToBooking;
+        return applied.IsGreaterThan(deposit) ? Money.Create(deposit.Amount, deposit.CurrencyCode) : applied;
+    }
+
     /// <summary>The one way money is promised back on an applied payment: never beyond what was taken.</summary>
     private Result<Refund, Error> AddRefund(Money amount, RefundReason reason, Id? disputeTicketId, DateTimeOffset now)
     {
-        var wouldBe = RefundedTotal.Add(amount);
+        var wouldBe = RefundedOrOwed.Add(amount);
         if (wouldBe.IsGreaterThan(AmountCaptured!))
             return PaymentErrors.RefundExceedsCapture;
 
@@ -386,8 +513,22 @@ public sealed class Payment : AggregateRoot
     }
 
     /// <summary>The refund a free cancellation recorded, if there is one.</summary>
-    public Refund? FreeCancellationRefund =>
-        _refunds.FirstOrDefault(refund => refund.Reason == RefundReason.FreeCancellation);
+    public Refund? FreeCancellationRefund => RefundFor(RefundReason.FreeCancellation);
+
+    /// <summary>The refund that returned the whole payment (a free or an administrator's cancellation), if any.</summary>
+    public Refund? WholePaymentRefund => _refunds.FirstOrDefault(refund => refund.Reason.ReturnsWholePayment);
+
+    /// <summary>The refund recorded for <paramref name="reason"/>, if there is one.</summary>
+    public Refund? RefundFor(RefundReason reason) => _refunds.FirstOrDefault(refund => refund.Reason == reason);
+
+    /// <summary>
+    /// The refund a provider's notice names by the reference the provider gave it when it was sent —
+    /// what a real provider's refund webhook carries (pre-launch item 159).
+    /// </summary>
+    public Refund? RefundWithProviderReference(string providerReference) =>
+        string.IsNullOrWhiteSpace(providerReference)
+            ? null
+            : _refunds.FirstOrDefault(refund => string.Equals(refund.ProviderReference, providerReference, StringComparison.Ordinal));
 
     /// <summary>Whether this attempt is still one a customer could pay through, at this instant.</summary>
     public bool IsUsable(DateTimeOffset now) => Status.IsLive && now < ExpiresAt;

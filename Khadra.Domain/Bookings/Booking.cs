@@ -424,6 +424,115 @@ public sealed class Booking : AggregateRoot
         Penalty?.ReasonCode == PenaltyReason.CancelledInFreeWindow;
 
     /// <summary>
+    /// Whether this booking ended returning the WHOLE payment, deposit included: the customer
+    /// cancelled inside the free window (owner, 2026-09-24), or an administrator cancelled it before
+    /// pickup with no penalty on the customer (owner, 2026-09-26).
+    /// </summary>
+    /// <remarks>
+    /// Read from the state the cancellation FROZE — who cancelled, the penalty assessed, whether the
+    /// car was ever collected — so it stays true after the fact, whatever the provider has since said
+    /// about the refund. A gallery cancelling is not an administrator cancelling, and a non-delivery
+    /// report (the customer's own cancellation with the penalty on the office) is not a free one.
+    /// </remarks>
+    public bool ReturnsWholePayment =>
+        Status == BookingStatus.Cancelled &&
+        DepositPaymentId is not null &&
+        PickedUpAt is null &&
+        (ReturnsDepositOnCancellation ||
+         (CancelledBy == BookingParty.Admin && Penalty?.AttributedTo != BookingParty.Customer));
+
+    /// <summary>
+    /// The booking money this booking owes back ABOVE its deposit because it ended before the car was
+    /// collected (owner, 2026-09-24): a cancellation after the free window, a no-show, the office never
+    /// handing the car over. Zero for every deposit-only booking, for one that returns the whole
+    /// payment instead, and for any booking that has not ended or whose rental happened.
+    /// </summary>
+    /// <remarks>
+    /// Decided HERE, by state, rather than by whichever command ended the booking, so a way of ending a
+    /// booking added later cannot forget it (Phase 3, 2026-09-26). The deposit is never part of it:
+    /// penalties and disputes stay deposit-based, and full online payment must not turn the office's
+    /// rental revenue into a disputable deposit. The payment adds its own processing-fee rule on top.
+    /// </remarks>
+    public Money RefundableAboveDeposit =>
+        (Status == BookingStatus.Cancelled || Status == BookingStatus.NoShow) &&
+        PickedUpAt is null &&
+        !ReturnsWholePayment
+            ? PaidAboveDeposit
+            : Money.ZeroIn(Pricing.CurrencyCode);
+
+    /// <summary>
+    /// What the customer paid online ABOVE the frozen deposit, whatever has happened since: the rest
+    /// of the total for a booking paid in full, zero for a deposit-only one.
+    /// </summary>
+    /// <remarks>
+    /// Asked BEFORE a booking ends as well as after — the settlement sweep uses it to know that marking
+    /// a no-show will owe a refund, and so must find the payment first.
+    /// </remarks>
+    public Money PaidAboveDeposit =>
+        DepositPaymentId is not null && _onlinePaid > Pricing.DepositAmount.Amount
+            ? Money.Create(_onlinePaid - Pricing.DepositAmount.Amount, Pricing.CurrencyCode)
+            : Money.ZeroIn(Pricing.CurrencyCode);
+
+    /// <summary>
+    /// The deposit this booking holds that its dispute window has now released CLEANLY (owner,
+    /// 2026-09-26; spec 3.3: with no ticket, no penalty applies). Zero otherwise — including while the
+    /// frozen window is still open.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Released only when ALL hold: a paid booking that ended before the car was collected; it did not
+    /// already return its whole payment; nothing claims its deposit (<paramref name="depositClaimed"/>:
+    /// a dispute that was not withdrawn, which the Disputes context answers — a withdrawn ticket
+    /// settles the booking "as if no dispute was raised", and a resolved one already decided the
+    /// deposit, including by keeping it); no penalty is assessed against the CUSTOMER; and the
+    /// booking's own frozen dispute window has closed.
+    /// </para>
+    /// <para>
+    /// "No penalty" is read as no CUSTOMER-attributable penalty — the owner's own wording for the
+    /// administrator's cancellation. A penalty against the office (it never handed the car over; it
+    /// cancelled late) is a claim against the office, never against the customer's deposit, and
+    /// holding the deposit for it would strand the money of the customer who was let down.
+    /// </para>
+    /// </remarks>
+    public Money DepositReleasedOnCleanClose(DateTimeOffset now, bool depositClaimed) =>
+        (Status == BookingStatus.Cancelled || Status == BookingStatus.NoShow) &&
+        PickedUpAt is null &&
+        DepositPaymentId is not null &&
+        !ReturnsWholePayment &&
+        !depositClaimed &&
+        (Penalty is null || Penalty.IsNothingOwed || Penalty.AttributedTo != BookingParty.Customer) &&
+        FinishedAt is not null &&
+        now >= FinishedAt.Value.Add(Terms.PostReturnSettlementWindow)
+            ? Money.Create(Math.Min(Pricing.DepositAmount.Amount, _onlinePaid), Pricing.CurrencyCode)
+            : Money.ZeroIn(Pricing.CurrencyCode);
+
+    /// <summary>
+    /// The booking money cancelling RIGHT NOW would return, as <paramref name="cancelledBy"/>, and
+    /// whether it would be the whole payment. Nothing when the booking is unpaid or can no longer be
+    /// cancelled. The same rules the cancellation applies, asked before the fact, so the figure on the
+    /// cancel sheet — and the <c>expectedRefund</c> a client sends back — cannot disagree with the
+    /// refund recorded.
+    /// </summary>
+    public RefundOnCancellation PreviewRefundOnCancellation(BookingParty cancelledBy, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(cancelledBy);
+        var none = new RefundOnCancellation(Money.ZeroIn(Pricing.CurrencyCode), WholePayment: false);
+        if (DepositPaymentId is null || !CanBeCancelled(now) || PickedUpAt is not null)
+            return none;
+
+        var assessment = AssessCancellation(cancelledBy, now);
+        var whole =
+            (cancelledBy == BookingParty.Customer && assessment.ReasonCode == PenaltyReason.CancelledInFreeWindow) ||
+            (cancelledBy == BookingParty.Admin && assessment.AttributedTo != BookingParty.Customer);
+        if (whole)
+            return new RefundOnCancellation(Money.Create(_onlinePaid, Pricing.CurrencyCode), WholePayment: true);
+
+        return _onlinePaid > Pricing.DepositAmount.Amount
+            ? new RefundOnCancellation(Money.Create(_onlinePaid - Pricing.DepositAmount.Amount, Pricing.CurrencyCode), WholePayment: false)
+            : none;
+    }
+
+    /// <summary>
     /// Whether cancelling right now, as the named party, would return the paid deposit in full. The
     /// same rule as <see cref="ReturnsDepositOnCancellation"/>, asked before the fact, so the promise on
     /// the confirmation sheet and the refund the cancellation records cannot disagree.

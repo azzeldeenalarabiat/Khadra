@@ -12,6 +12,8 @@ using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.Payments;
+using Khadra.Domain.Payments.Repositories;
 using Khadra.Tests.Support;
 using NSubstitute;
 
@@ -31,6 +33,7 @@ public sealed class AdminBookingActionTests
     private sealed class Context
     {
         public IBookingRepository Bookings { get; } = Substitute.For<IBookingRepository>();
+        public IPaymentRepository Payments { get; } = Substitute.For<IPaymentRepository>();
         public IBookingReader Reader { get; } = Substitute.For<IBookingReader>();
         public IUnitOfWork UnitOfWork { get; } = Substitute.For<IUnitOfWork>();
         public IAuditTrail AuditTrail { get; } = Substitute.For<IAuditTrail>();
@@ -57,6 +60,15 @@ public sealed class AdminBookingActionTests
             return booking;
         }
 
+        /// <summary>A booking paid against a real payment the repository answers for.</summary>
+        public Booking GivenPaid(out Payment payment, bool inFull = false, decimal fee = 0m, bool feeRefundable = true)
+        {
+            var (booking, paid) = Build.PaidBooking(inFull, fee, feeRefundable);
+            payment = paid;
+            Payments.GetByIdAsync(paid.Id, Arg.Any<CancellationToken>()).Returns(paid);
+            return Given(booking);
+        }
+
         public void At(DateTimeOffset now) => Clock.UtcNow = now;
 
         public INotifier Notifier { get; } = Substitute.For<INotifier>();
@@ -68,6 +80,7 @@ public sealed class AdminBookingActionTests
             Notifier.When(n => n.Raise(Arg.Any<Notification>())).Do(call => Told.Add(call.Arg<Notification>()));
             return new(
             Bookings,
+            Payments,
             Reader,
             new AdminActionRecorder(AuditTrail, Actor, Clock),
             new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()),
@@ -83,7 +96,7 @@ public sealed class AdminBookingActionTests
         var context = new Context();
         // Approved and past its free-cancellation window: cancelled BY the customer here, the
         // aggregate would assess the whole deposit against them.
-        var booking = context.Given(Build.ConfirmedBooking());
+        var booking = context.GivenPaid(out _);
         context.At(Build.Now.AddDays(3));
 
         var result = await context.Handlers().Handle(
@@ -121,7 +134,7 @@ public sealed class AdminBookingActionTests
     public async Task The_cancellation_reason_and_the_status_change_reach_the_audit_log()
     {
         var context = new Context();
-        var booking = context.Given(Build.ConfirmedBooking());
+        var booking = context.GivenPaid(out _);
         context.At(Build.Now.AddDays(3));
 
         await context.Handlers().Handle(
@@ -236,6 +249,103 @@ public sealed class AdminBookingActionTests
         Assert.False(booking.Penalty!.IsNothingOwed);
         Assert.Same(BookingParty.Customer, booking.Penalty.AttributedTo);
         Assert.Equal(booking.Pricing.DepositAmount.Amount, booking.Penalty.MaxAmount.Amount);
+    }
+
+    // ---------------------------------------------------------------- the refund an ending owes (Phase 3, 2026-09-26)
+
+    /// <summary>
+    /// Owner, 2026-09-26: an administrator's cancellation of a paid booking before pickup, with no
+    /// penalty on the customer, returns the WHOLE payment — the deposit included — in the same save.
+    /// </summary>
+    [Fact]
+    public async Task An_admin_cancellation_of_a_paid_booking_refunds_the_whole_deposit_in_the_same_save()
+    {
+        var context = new Context();
+        var booking = context.GivenPaid(out var payment);
+        context.At(Build.Now.AddDays(3));
+
+        var result = await context.Handlers().Handle(
+            new CancelBookingAsAdminCommand(booking.Id, "The office lost its licence."),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.True(booking.ReturnsWholePayment);
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.PlatformCancellation, refund.Reason);
+        Assert.Same(RefundStatus.Requested, refund.Status);
+        Assert.Equal(payment.AmountCaptured, refund.Amount);
+        await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>90 paid for the booking and a 4.5 fee on top: the fee goes back only if the payment froze it refundable.</summary>
+    [Theory]
+    [InlineData(true, 94.5)]
+    [InlineData(false, 90)]
+    public async Task An_admin_cancellation_of_a_booking_paid_in_full_returns_the_fee_only_when_it_was_refundable(
+        bool feeRefundable, decimal expected)
+    {
+        var context = new Context();
+        var booking = context.GivenPaid(out var payment, inFull: true, fee: 4.5m, feeRefundable: feeRefundable);
+        context.At(Build.Now.AddDays(3));
+
+        await context.Handlers().Handle(new CancelBookingAsAdminCommand(booking.Id, "Fraud check."), CancellationToken.None);
+
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.PlatformCancellation, refund.Reason);
+        Assert.Equal(Money.Jod(expected), refund.Amount);
+    }
+
+    /// <summary>
+    /// A no-show keeps the deposit held — the penalty is assessed against it — and returns everything
+    /// the customer paid above it (Phase 3), with a refundable fee.
+    /// </summary>
+    [Fact]
+    public async Task An_admin_no_show_of_a_booking_paid_in_full_returns_everything_above_the_deposit()
+    {
+        var context = new Context();
+        var booking = context.GivenPaid(out var payment, inFull: true, fee: 4.5m);
+        context.At(booking.Period.Start.Add(booking.Terms.NoShowTimeout).AddMinutes(1));
+
+        var result = await context.Handlers().Handle(new MarkBookingNoShowAsAdminCommand(booking.Id), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Same(BookingStatus.NoShow, booking.Status);
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.EndedBeforePickup, refund.Reason);
+        // 90 paid for the booking, 18 of it the deposit, plus the 4.5 fee that goes back with the rest.
+        Assert.Equal(Money.Jod(76.5m), refund.Amount);
+    }
+
+    [Fact]
+    public async Task An_admin_no_show_of_a_deposit_only_booking_records_no_refund_and_never_asks_for_the_payment()
+    {
+        var context = new Context();
+        var booking = context.GivenPaid(out var payment);
+        context.At(booking.Period.Start.Add(booking.Terms.NoShowTimeout).AddMinutes(1));
+
+        await context.Handlers().Handle(new MarkBookingNoShowAsAdminCommand(booking.Id), CancellationToken.None);
+
+        Assert.Same(BookingStatus.NoShow, booking.Status);
+        Assert.Empty(payment.Refunds);
+        await context.Payments.DidNotReceiveWithAnyArgs().GetByIdAsync(default, default);
+    }
+
+    /// <summary>
+    /// A paid booking whose payment cannot be found is a programming error, not a business outcome:
+    /// the whole request fails, so the cancellation never commits with the money it owes unrecorded.
+    /// </summary>
+    [Fact]
+    public async Task An_admin_cancellation_whose_payment_is_missing_fails_whole_rather_than_ending_without_the_refund()
+    {
+        var context = new Context();
+        var booking = context.Given(Build.ConfirmedBooking());
+        context.At(Build.Now.AddDays(3));
+
+        await Assert.ThrowsAsync<DomainException>(() => context.Handlers().Handle(
+            new CancelBookingAsAdminCommand(booking.Id, "Anything."),
+            CancellationToken.None));
+
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
