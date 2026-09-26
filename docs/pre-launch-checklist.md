@@ -4191,6 +4191,12 @@ removed. **To close:** an additive redaction in the dispute view for non-admin c
 name in `AuthorName` for a dealer statement, null admin ids and names, and no platform split — with a
 test per party.
 
+**Who sees which dispute share, decided 2026-09-26** (`docs/payments-programme.md`): the customer only their
+own share; the rental office its own share and any charge assessed to it; the administrator every share.
+The booking's financial views follow it from payments Phase 4. The dispute pages do not yet: the
+customer's payload carries the office's and the platform's shares (above), and the office's dispute
+page shows the customer's refund and the platform's share. Closing this item brings both into line.
+
 ### 152. A free cancellation says "costs you nothing" while the deposit stays held
 
 **Status:** closed · **Closed:** 2026-09-24 — the paid free cancellation now refunds the deposit, and every screen says so.
@@ -4326,6 +4332,11 @@ marked settled while a refund or dispute on the booking is open, paid by hand, m
 administrator with an audit entry. **To close:** that ledger (payments phase 8). Until then, no real
 money may move — which item 76 already guarantees, since there is no merchant account.
 
+**Commission, decided 2026-09-26 for Phase 4** (`docs/payments-programme.md`): earned at `Completed`
+when no dispute or refund affects settlement; not earned when the whole payment is refunded; and two
+cases are left **Undecided** for this ledger to settle — a booking that completed through a dispute
+resolution, and a deposit held for a customer penalty (Phase 4 takes no commission from it).
+
 ### 163. A refund event can arrive before the platform has recorded the refund as sent
 
 **Status:** open · **Raised:** 2026-09-26 (Fable advisor review) · **Belongs with item 76**
@@ -4348,6 +4359,11 @@ no path to the office or back to the customer. The dealer console says "Held pen
 which is true and open-ended. **To close:** the owner decides what a closed window with an assessed,
 undisputed customer penalty means for the money — it belongs with the office payables ledger (item
 162, payments Phase 8).
+
+**What the customer reads meanwhile, decided 2026-09-26:** factual and neutral, promising nothing to
+either side — "Your deposit remains held because a customer penalty was assessed and no dispute was
+opened. Final settlement is still pending." / "لا يزال عربونك محتجزًا لأنّ غرامةً قُدِّرت على العميل
+ولم يُفتح أيّ نزاع. التسوية النهائية لا تزال معلّقة." Phase 4 shows it; the outcome is still this item's.
 
 ### 165. Bookings that ended before Phase 3 are settled by today's rule when it deploys
 
@@ -4452,3 +4468,17 @@ other resolved ticket; for a resolved one read what earlier disputes decided as 
 subtracted from the deposit on the booking — and add a plain index on `dispute_tickets.booking_id`
 (the only one today is the partial index for live rows), which `ListResolvedForBookingAsync` and
 `HasClaimOnDepositAsync` both scan without. The index needs a migration; the table is small.
+
+### 172. Invoices and receipts must reach the customer — the required scope of payments Phases 5–7
+
+**Status:** open · **Raised:** 2026-09-26 (owner) · **Required scope — may not be dropped or narrowed without the owner**
+
+Issued financial documents are not a backend-only feature. The owner recorded the customer
+experience Phases 5–7 must deliver (`docs/payments-programme.md`, "Required scope for Phases 5–7"):
+a dedicated **Invoices / الفواتير** area in the Flutter app; every earlier invoice and receipt available
+permanently from the customer's account; the related receipt or invoice reachable from Booking
+Details; immutable payment receipts, refund receipts and booking statements; PDF viewing and download;
+email delivery of each issued document; English and Arabic document and email content; refunds as
+linked records that never overwrite the original payment receipt; and email delivery status and
+history the administrator can see (queued, sent, failed). **To close:** all of it built and verified
+end to end on both customer clients, in both languages — not the backend alone.

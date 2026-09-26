@@ -88,6 +88,13 @@ Every response and request the customer app reads is a contract with every build
 and must be closed before real users, real bookings or real money. Add to it whenever you leave
 something for later; an item comes off only by being fixed.
 
+**The payments programme** (phases 1–8 on `feature/payments-receipts`) keeps its owner decisions,
+with dates, in `docs/payments-programme.md` — read it before touching payments, refunds, commission,
+receipts or invoices. Its Phases 5–7 carry REQUIRED customer scope recorded by the owner on
+2026-09-26 (an Invoices / الفواتير area in the app, permanent access to past documents, PDFs, emails
+with an administrator-visible delivery history, English and Arabic): pre-launch item 172. Never drop
+or narrow it without the owner.
+
 ## Open business decisions (spec §2.2)
 
 Dealer non-delivery penalty tier (flat 25% / 50% / tiered), quick-cancellation processing fee, insurance and mileage/fuel policy defaults, IDP requirement for foreigners. Ask the owner before coding anything that depends on these.
