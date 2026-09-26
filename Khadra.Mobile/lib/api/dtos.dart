@@ -1282,6 +1282,7 @@ class PenaltyAssessment {
     required this.isNothingOwed,
     required this.requiresTicketToEnforce,
     required this.reason,
+    this.state,
   });
 
   final String attributedTo;
@@ -1291,6 +1292,12 @@ class PenaltyAssessment {
   final bool isNothingOwed;
   final bool requiresTicketToEnforce;
   final String reason;
+
+  /// Where the penalty stands, as the server reads its own dispute records
+  /// (pre-launch item 173): "Assessed" (nothing charged yet) or
+  /// "ResolvedByDispute". Null on a cancellation preview, and from an API that
+  /// does not send it.
+  final String? state;
 
   static PenaltyAssessment? maybe(dynamic json) => json is Map<String, dynamic>
       ? PenaltyAssessment(
@@ -1304,6 +1311,7 @@ class PenaltyAssessment {
           requiresTicketToEnforce:
               json['requiresTicketToEnforce'] as bool? ?? true,
           reason: json['reason'] as String? ?? '',
+          state: json['state'] as String?,
         )
       : null;
 }

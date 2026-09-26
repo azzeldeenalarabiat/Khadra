@@ -1178,6 +1178,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Nothing has been charged. An assessment only becomes money if a dispute is opened and Khadra settles it.';
 
   @override
+  String get bookingPenaltyStateAssessed =>
+      'A penalty has been assessed, but no amount has been charged yet.';
+
+  @override
+  String get bookingPenaltyStateResolvedByDispute =>
+      'This penalty was resolved through a dispute. See Payments for the final amount.';
+
+  @override
   String get bookingPartyCustomer => 'you';
 
   @override

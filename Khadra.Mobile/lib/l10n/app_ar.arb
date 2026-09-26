@@ -384,6 +384,8 @@
     "placeholders": { "min": { "type": "String" }, "max": { "type": "String" }, "party": { "type": "String" } }
   },
   "bookingPenaltyNotCharged": "لم يُخصم شيء. لا يتحول التقدير إلى مبلغ فعلي إلا بفتح نزاع وتسويته من قِبل خضرا.",
+  "bookingPenaltyStateAssessed": "تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.",
+  "bookingPenaltyStateResolvedByDispute": "تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.",
   "bookingPartyCustomer": "عليك",
   "bookingPartyDealer": "مكتب التأجير",
   "bookingPartyAdmin": "خضرا",

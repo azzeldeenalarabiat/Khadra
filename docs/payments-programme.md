@@ -85,6 +85,18 @@ deliver is written down so it cannot be dropped. The rules already in force are 
    for now.
 8. **Rental offices never see processing fees.**
 
+### 2026-09-26 — the penalty notice (pre-launch item 173)
+
+The notice on a booking with an assessed penalty states where the penalty stands, from the server's
+state (`penalty.state`), never from a guess in the client:
+
+- Before a dispute is resolved (`Assessed`):
+  - English: "A penalty has been assessed, but no amount has been charged yet."
+  - Arabic: "تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد."
+- After a dispute is resolved (`ResolvedByDispute`):
+  - English: "This penalty was resolved through a dispute. See Payments for the final amount."
+  - Arabic: "تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي."
+
 ## Required scope for Phases 5–7: invoices and receipts reach the customer
 
 Recorded 2026-09-26 as REQUIRED scope, not an option (pre-launch item 172). Invoices and receipts are

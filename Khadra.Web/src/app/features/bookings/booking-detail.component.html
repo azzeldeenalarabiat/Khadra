@@ -182,7 +182,7 @@
             <p>{{ b.penalty.isRange
               ? i18n.t('booking.penaltyRange', { min: format.money(b.penalty.minAmount), max: format.money(b.penalty.maxAmount), party: party(b.penalty.attributedTo) })
               : i18n.t('booking.penalty', { amount: format.money(b.penalty.maxAmount), party: party(b.penalty.attributedTo) }) }}</p>
-            <p class="small">{{ i18n.t('booking.penaltyNotCharged') }}</p>
+            @if (penaltyNote(b.penalty); as note) { <p class="small">{{ note }}</p> }
           </div></div>
       }
       @if (b.liveDisputeId) {

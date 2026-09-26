@@ -597,6 +597,46 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     return { http, page, dialog, settle };
   }
 
+  /** Pre-launch item 173: the penalty notice states where the penalty stands, from the server's state. */
+  const withPenaltyState = (state: string | null) => ({ ...lateCancelled, penalty: { ...PAST_WINDOW_PENALTY, state } });
+
+  it('says an assessed penalty has charged nothing yet, and a resolved one where its final amount is, in both languages', async () => {
+    const assessed = await render(withPenaltyState('Assessed'), 'en');
+    expect(assessed.text).toContain('A penalty has been assessed, but no amount has been charged yet.');
+    expect(assessed.text).not.toContain('resolved through a dispute');
+    TestBed.resetTestingModule();
+
+    const resolved = await render(withPenaltyState('ResolvedByDispute'), 'en');
+    expect(resolved.text).toContain('This penalty was resolved through a dispute. See Payments for the final amount.');
+    expect(resolved.text).not.toContain('no amount has been charged yet');
+    TestBed.resetTestingModule();
+
+    const arabicAssessed = await render(withPenaltyState('Assessed'), 'ar');
+    expect(arabicAssessed.text).toContain('تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.');
+    expect(arabicAssessed.text).not.toContain('تم حسم هذا الجزاء');
+    TestBed.resetTestingModule();
+
+    const arabicResolved = await render(withPenaltyState('ResolvedByDispute'), 'ar');
+    expect(arabicResolved.text).toContain('تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.');
+    expect(arabicResolved.text).not.toContain('لم يتم خصم أي مبلغ بعد');
+  });
+
+  it('never again says nothing has been charged, and says nothing under a penalty state it does not know', async () => {
+    const unknown = await render(withPenaltyState('SomethingNewer'), 'en');
+    const missing = { ...lateCancelled, penalty: PAST_WINDOW_PENALTY };
+
+    // The assessment itself is still stated; only the sentence about where it stands is left out.
+    expect(unknown.text).toMatch(amount('18'));
+    expect(unknown.text).not.toContain('Nothing has been charged');
+    expect(unknown.text).not.toContain('no amount has been charged yet');
+    expect(unknown.text).not.toContain('resolved through a dispute');
+    TestBed.resetTestingModule();
+
+    const olderApi = await render(missing, 'ar');
+    expect(olderApi.text).not.toContain('لم يُخصم شيء');
+    expect(olderApi.text).not.toContain('لم يتم خصم أي مبلغ بعد');
+  });
+
   it('tells a customer cancelling a full payment late what comes back above the deposit, in both languages', async () => {
     const english = await openSheet(lateCancellable, 'en');
     expect(english.dialog.textContent).toMatch(new RegExp(`You will get ${amount('84.75').source} back to your original payment method: everything you paid above the deposit`));

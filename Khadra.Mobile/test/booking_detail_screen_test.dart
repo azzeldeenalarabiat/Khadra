@@ -720,6 +720,69 @@ void main() {
     });
   });
 
+  // Pre-launch item 173: the penalty notice states where the penalty stands,
+  // from the server's own state and in the owner's words.
+  group('the penalty notice', () {
+    Map<String, dynamic> penaltyJson(String? state) => {
+          'attributedTo': 'Customer',
+          'minAmount': {'amount': 33, 'currency': 'JOD'},
+          'maxAmount': {'amount': 33, 'currency': 'JOD'},
+          'isRange': false,
+          'isNothingOwed': false,
+          'requiresTicketToEnforce': true,
+          'reason': '',
+          'state': ?state,
+        };
+    Booking cancelledWith(String? state) => bookingOf(
+          status: 'Cancelled',
+          history: [
+            ...pathTo('Confirmed'),
+            changeJson('Cancelled', now.add(const Duration(hours: 3)), from: 'Confirmed'),
+          ],
+          depositPaid: true,
+          penalty: penaltyJson(state),
+        );
+
+    test('carries the owner\'s exact sentences in both languages', () {
+      expect(en.bookingPenaltyStateAssessed, 'A penalty has been assessed, but no amount has been charged yet.');
+      expect(en.bookingPenaltyStateResolvedByDispute,
+          'This penalty was resolved through a dispute. See Payments for the final amount.');
+      expect(ar.bookingPenaltyStateAssessed, 'تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.');
+      expect(ar.bookingPenaltyStateResolvedByDispute,
+          'تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.');
+    });
+
+    for (final (locale, l10n) in [(const Locale('en'), en), (const Locale('ar'), ar)]) {
+      final tag = locale.languageCode;
+
+      screenTest('an assessed penalty says nothing has been charged yet ($tag)', (tester) async {
+        await pump(tester, cancelledWith('Assessed'), locale: locale);
+
+        expect(find.text(l10n.bookingPenaltyStateAssessed), findsOneWidget);
+        expect(find.text(l10n.bookingPenaltyStateResolvedByDispute), findsNothing);
+        expect(find.text(l10n.bookingPenaltyNotCharged), findsNothing);
+      });
+
+      screenTest('a penalty a dispute resolved points to Payments ($tag)', (tester) async {
+        await pump(tester, cancelledWith('ResolvedByDispute'), locale: locale);
+
+        expect(find.text(l10n.bookingPenaltyStateResolvedByDispute), findsOneWidget);
+        expect(find.text(l10n.bookingPenaltyStateAssessed), findsNothing);
+        expect(find.text(l10n.bookingPenaltyNotCharged), findsNothing);
+      });
+    }
+
+    for (final (label, state) in [('a state this build does not know', 'SomethingNewer'), ('an API that sends no state', null)]) {
+      screenTest('$label gets no sentence under the penalty', (tester) async {
+        await pump(tester, cancelledWith(state));
+
+        expect(find.text(en.bookingPenaltyStateAssessed), findsNothing);
+        expect(find.text(en.bookingPenaltyStateResolvedByDispute), findsNothing);
+        expect(find.text(en.bookingPenaltyNotCharged), findsNothing);
+      });
+    }
+  });
+
   group('the handover code button', () {
     for (final (status, label) in [
       ('Confirmed', 'pickup'),

@@ -354,6 +354,54 @@ public sealed class BookingReaderTests : IDisposable
     /// The deposit a free cancellation returned (owner, 2026-09-24) reaches every reader of the
     /// booking with the refund's own status, and follows it as the provider answers.
     /// </summary>
+    /// <summary>
+    /// "Has a dispute resolved this booking's penalty" is read from the tickets themselves (pre-launch
+    /// item 173): only a RESOLVED ticket counts. An open or under-review one has not decided yet, and a
+    /// withdrawn one decided nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("None", false)]
+    [InlineData("Open", false)]
+    [InlineData("UnderReview", false)]
+    [InlineData("Withdrawn", false)]
+    [InlineData("Resolved", true)]
+    public async Task Only_a_resolved_dispute_counts_as_having_resolved_the_booking(string ticketState, bool expected)
+    {
+        var booking = Build.ConfirmedBooking(dealerId: _dealerId);
+        var cancelledAt = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+        Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, "Changed plans.", cancelledAt).IsSuccess);
+        var ticket = ticketState == "None"
+            ? null
+            : DisputeTicket.Open(booking.Id, booking.CustomerId, BookingParty.Customer, "The penalty is wrong.", TimeSpan.FromHours(48), cancelledAt.AddHours(1)).Value;
+        switch (ticketState)
+        {
+            case "UnderReview":
+                Assert.True(ticket!.AssignToAdmin(Id.New()).IsSuccess);
+                break;
+            case "Withdrawn":
+                Assert.True(ticket!.Withdraw(booking.CustomerId, cancelledAt.AddHours(2)).IsSuccess);
+                break;
+            case "Resolved":
+                Assert.True(ticket!.Resolve(DisputeResolution.Create(
+                    DepositDisposition.RefundEverything(Money.Create(booking.Pricing.DepositAmount.Amount, booking.Pricing.CurrencyCode)).Value,
+                    null, null, "Refunded.", Id.New(), cancelledAt.AddHours(3)).Value).IsSuccess);
+                break;
+        }
+
+        await using (var write = NewContext())
+        {
+            write.Bookings.Add(booking);
+            if (ticket is not null)
+                write.DisputeTickets.Add(ticket);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = NewContext();
+        var context = await new BookingReader(read).ContextAsync(booking.Id);
+
+        Assert.Equal(expected, context.HasResolvedDispute);
+    }
+
     [Fact]
     public async Task A_free_cancellations_refund_is_read_with_its_status_and_follows_it()
     {

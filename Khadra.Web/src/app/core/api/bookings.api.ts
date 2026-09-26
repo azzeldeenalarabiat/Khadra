@@ -75,6 +75,11 @@ export interface PenaltyAssessment {
   readonly reason: string;
   readonly reasonCode: string | null;
   readonly assessedAt: string;
+  /**
+   * Where the penalty stands, as the server reads its own dispute records (pre-launch item 173):
+   * "Assessed" (nothing charged yet) or "ResolvedByDispute". Absent on a cancellation preview.
+   */
+  readonly state?: string | null;
 }
 
 export interface PaymentAttempt {

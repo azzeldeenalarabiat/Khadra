@@ -189,7 +189,7 @@ public sealed record BookingDto(
             BookingPricingDto.From(booking.Pricing) with { BalanceDue = MoneyDto.From(booking.RemainingBalance) },
             BookingTermsDto.From(booking.Terms),
             MoneyDto.From(booking.Pricing.CommissionAmount),
-            PenaltyAssessmentDto.From(booking.Penalty),
+            PenaltyOf(booking.Penalty, context),
             booking.CancelledBy?.Name,
             booking.CancellationReasonCode,
             booking.CancellationReason,
@@ -232,6 +232,20 @@ public sealed record BookingDto(
             RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: true),
             RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: false));
     }
+
+    /// <summary>
+    /// The booking's penalty with where it stands (pre-launch item 173, owner 2026-09-26): assessed
+    /// and not charged, or resolved through a dispute — read from the booking's own dispute records
+    /// here, so no client works it out for itself.
+    /// </summary>
+    /// <remarks>
+    /// <c>RequiresTicketToEnforce</c> is always true today, which is what makes "no resolved dispute"
+    /// mean "nothing charged". A penalty that could be enforced without one would need a state of its own.
+    /// </remarks>
+    private static PenaltyAssessmentDto? PenaltyOf(PenaltyAssessment? penalty, BookingContext context) =>
+        PenaltyAssessmentDto.From(penalty) is { } assessed
+            ? assessed with { State = context.HasResolvedDispute ? PenaltyStates.ResolvedByDispute : PenaltyStates.Assessed }
+            : null;
 
     /// <summary>
     /// What cancelling right now would return to the customer's card: the figure the cancel sheet
@@ -373,7 +387,13 @@ public sealed record PenaltyAssessmentDto(
     /// back to it rather than guessing a code from the text.
     /// </remarks>
     string? ReasonCode,
-    DateTimeOffset AssessedAt)
+    DateTimeOffset AssessedAt,
+    /// <summary>
+    /// Where the penalty stands (<see cref="PenaltyStates"/>): assessed and not charged, or resolved
+    /// through a dispute. Null on a cancellation PREVIEW, whose penalty is not assessed yet. Added
+    /// 2026-09-26 (pre-launch item 173), last; installed apps do not read it.
+    /// </summary>
+    string? State = null)
 {
     public static PenaltyAssessmentDto? From(PenaltyAssessment? penalty) =>
         penalty is null
@@ -390,6 +410,20 @@ public sealed record PenaltyAssessmentDto(
                 penalty.Reason,
                 penalty.ReasonCode?.Name,
                 penalty.AssessedAt);
+}
+
+/// <summary>
+/// Where an assessed penalty stands, as the server reads its own dispute records (pre-launch item 173,
+/// owner 2026-09-26). Codes a client words in its reader's language; one it does not know, it leaves
+/// unsaid.
+/// </summary>
+public static class PenaltyStates
+{
+    /// <summary>Assessed, and nothing charged: no dispute has resolved it, and without one none can (spec 3.3).</summary>
+    public const string Assessed = "Assessed";
+
+    /// <summary>A dispute on the booking was resolved: its decision is what the assessment became.</summary>
+    public const string ResolvedByDispute = "ResolvedByDispute";
 }
 
 public sealed record HandoverDto(

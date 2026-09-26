@@ -427,6 +427,10 @@
     "placeholders": { "min": { "type": "String" }, "max": { "type": "String" }, "party": { "type": "String" } }
   },
   "bookingPenaltyNotCharged": "Nothing has been charged. An assessment only becomes money if a dispute is opened and Khadra settles it.",
+  "bookingPenaltyStateAssessed": "A penalty has been assessed, but no amount has been charged yet.",
+  "@bookingPenaltyStateAssessed": { "description": "Pre-launch item 173, the owner's words (2026-09-26): an assessed penalty no dispute has resolved." },
+  "bookingPenaltyStateResolvedByDispute": "This penalty was resolved through a dispute. See Payments for the final amount.",
+  "@bookingPenaltyStateResolvedByDispute": { "description": "Pre-launch item 173, the owner's words (2026-09-26): a penalty a resolved dispute settled." },
   "bookingPartyCustomer": "you",
   "bookingPartyDealer": "the rental office",
   "bookingPartyAdmin": "Khadra",

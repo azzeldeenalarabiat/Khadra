@@ -4485,7 +4485,7 @@ end to end on both customer clients, in both languages — not the backend alone
 
 ### 173. The penalty notice still says "Nothing has been charged" after a dispute settled the penalty
 
-**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 4a browser run; not part of 4a) · **Wording for the owner**
+**Status:** closed · **Raised:** 2026-09-26 (found in the payments Phase 4a browser run) · **Closed:** 2026-09-26 — the notice words the server's `penalty.state` in the owner's two sentences.
 
 A booking with an assessed penalty carries a notice on the website (`booking.penaltyNotCharged` in
 `booking-detail.component.html`, whenever the penalty is not "nothing owed") and in the app
@@ -4496,3 +4496,13 @@ as the penalty exists — also after a dispute has settled it. On KH-NY8AHLNK, w
 section stating that decision and contradicts it. **To close:** once a dispute has decided the deposit
 (the financial state's `DecidedByDispute`), the notice says so instead, in wording the owner approves,
 on the website and in the app, in both languages, with tests.
+
+**How it closed.** The owner gave the two sentences (`docs/payments-programme.md`, "the penalty
+notice"). The booking answer now carries `penalty.state` — `Assessed` until a dispute on the booking
+is RESOLVED, then `ResolvedByDispute` — read by the server from the booking's own dispute tickets
+(`BookingContext.HasResolvedDispute`); a withdrawn ticket decided nothing and an open one has not
+decided yet. The website and app 1.3.0 word only those two states and leave any other unsaid. The app's
+dispute screen also ended its resolution card with the old sentence, written for the time before
+Payments existed; that line is gone, as the website never had it. Installed 1.1.0/1.2.x keep the old
+sentence until they update: production takes no payments, so no dispute there can have settled a
+penalty before then.

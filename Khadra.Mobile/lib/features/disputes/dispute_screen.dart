@@ -321,9 +321,10 @@ class _Statement extends StatelessWidget {
 
 /// The decision, as money.
 ///
-/// Every figure is the server's split of the deposit it actually holds. The line
-/// saying nothing has moved is not decoration: until Payments exists, a resolution
-/// is a record of a decision and no funds change hands.
+/// Every figure is the server's split of the deposit it actually holds. It used
+/// to end by saying nothing had been charged, which was true only until Payments
+/// existed: a resolution now moves money, and the booking's Payments section says
+/// where it is (pre-launch item 173).
 class _Resolution extends StatelessWidget {
   const _Resolution({
     required this.resolution,
@@ -380,11 +381,6 @@ class _Resolution extends StatelessWidget {
               style: const TextStyle(fontSize: 13, height: 1.5),
             ),
           ],
-          const SizedBox(height: Space.md),
-          KhadraNotice(
-            title: l10n.bookingPenaltyNotCharged,
-            tone: NoticeTone.neutral,
-          ),
         ],
       ),
     );

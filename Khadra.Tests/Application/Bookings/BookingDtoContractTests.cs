@@ -151,6 +151,45 @@ public sealed class BookingDtoContractTests
     }
 
     /// <summary>
+    /// Where a penalty stands travels with it (pre-launch item 173, owner 2026-09-26): assessed and not
+    /// charged until a dispute on the booking is RESOLVED, then resolved through that dispute. The
+    /// server reads its own dispute records; no client works it out for itself.
+    /// </summary>
+    [Theory]
+    [InlineData(false, "Assessed")]
+    [InlineData(true, "ResolvedByDispute")]
+    public void A_penalty_says_whether_a_dispute_has_resolved_it(bool resolved, string state)
+    {
+        var booking = Build.ConfirmedBooking();
+        Assert.True(booking
+            .Cancel(BookingParty.Customer, Id.New(), "Changed plans.", booking.FreeCancellationDeadline!.Value.AddMinutes(1))
+            .IsSuccess);
+
+        var dto = BookingDto.From(booking, Context(false, false) with { HasResolvedDispute = resolved }, Build.Now);
+
+        Assert.Equal(state, dto.Penalty!.State);
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(dto, WireOptions));
+        Assert.Equal(state, json.RootElement.GetProperty("penalty").GetProperty("state").GetString());
+    }
+
+    /// <summary>
+    /// A cancellation PREVIEW's penalty is not assessed yet, so it carries no state — and a booking with
+    /// no penalty sends none, whatever its disputes.
+    /// </summary>
+    [Fact]
+    public void A_cancellation_preview_carries_no_penalty_state_and_no_penalty_sends_none()
+    {
+        var booking = Build.ConfirmedBooking();
+        var afterFreeWindow = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+
+        var dto = BookingDto.From(booking, Context(false, false) with { HasResolvedDispute = true }, afterFreeWindow);
+
+        Assert.Null(dto.Penalty);
+        Assert.False(dto.Cancellation.IsFree);
+        Assert.Null(dto.Cancellation.Penalty.State);
+    }
+
+    /// <summary>
     /// How a booking was paid, on the wire (owner, 2026-09-25). The website, the app and the console
     /// all read these names; a renamed one would compile everywhere and quietly put deposit wording
     /// back on a booking paid in full.

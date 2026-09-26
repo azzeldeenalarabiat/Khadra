@@ -321,6 +321,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
     {
         var open = DisputeStatus.Open;
         var underReview = DisputeStatus.UnderReview;
+        var resolved = DisputeStatus.Resolved;
         var customerRatesDealer = ReviewDirection.CustomerRatesDealer;
 
         // Each party's name is read once, as null when it no longer resolves, and the flag and the
@@ -361,6 +362,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                         (ticket.Status == open || ticket.Status == underReview))
                     .Select(ticket => (Guid?)ticket.Id.Value)
                     .FirstOrDefault(),
+                // A withdrawn ticket decided nothing, and an open one has not decided yet.
+                context.DisputeTickets.Any(ticket => ticket.BookingId == booking.Id && ticket.Status == resolved),
                 context.Reviews
                     .Where(review =>
                         review.BookingId == booking.Id &&
@@ -387,7 +390,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             found.MyReviewId,
             DepositRefund: DepositRefundOf(refunds),
             ConfirmingPayment: await ConfirmingPaymentAsync(bookingId, cancellationToken),
-            Refunds: refunds);
+            Refunds: refunds,
+            HasResolvedDispute: found.HasResolvedDispute);
     }
 
     /// <summary>
@@ -503,5 +507,6 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         DealerLabel? Dealer,
         string? CustomerName,
         Guid? LiveDisputeId,
+        bool HasResolvedDispute,
         Guid? MyReviewId);
 }

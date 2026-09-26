@@ -102,7 +102,13 @@ public sealed record BookingContext(
     /// reason, amount and status, the same list for the customer, the gallery and the administrator.
     /// Null only where nobody composed it.
     /// </summary>
-    IReadOnlyList<RefundDto>? Refunds = null);
+    IReadOnlyList<RefundDto>? Refunds = null,
+    /// <summary>
+    /// Whether a dispute on this booking has been RESOLVED — not withdrawn, not still open: the
+    /// server's own answer to "has a dispute settled what was assessed here", which the penalty's
+    /// state is read from (pre-launch item 173, owner 2026-09-26).
+    /// </summary>
+    bool HasResolvedDispute = false);
 
 /// <summary>
 /// One refund, as every screen shows it (Phase 3, 2026-09-26): WHY it is owed, HOW MUCH, and WHERE it

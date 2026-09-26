@@ -2006,6 +2006,18 @@ abstract class AppLocalizations {
   /// **'Nothing has been charged. An assessment only becomes money if a dispute is opened and Khadra settles it.'**
   String get bookingPenaltyNotCharged;
 
+  /// Pre-launch item 173, the owner's words (2026-09-26): an assessed penalty no dispute has resolved.
+  ///
+  /// In en, this message translates to:
+  /// **'A penalty has been assessed, but no amount has been charged yet.'**
+  String get bookingPenaltyStateAssessed;
+
+  /// Pre-launch item 173, the owner's words (2026-09-26): a penalty a resolved dispute settled.
+  ///
+  /// In en, this message translates to:
+  /// **'This penalty was resolved through a dispute. See Payments for the final amount.'**
+  String get bookingPenaltyStateResolvedByDispute;
+
   /// No description provided for @bookingPartyCustomer.
   ///
   /// In en, this message translates to:

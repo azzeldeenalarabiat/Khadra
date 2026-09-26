@@ -16,7 +16,7 @@ import {
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { Booking, DepositRefund, PaymentAttempt, PaymentOption, PaymentPurpose, Refund } from '../../core/api/bookings.api';
+import { Booking, DepositRefund, PaymentAttempt, PaymentOption, PaymentPurpose, PenaltyAssessment, Refund } from '../../core/api/bookings.api';
 import { Money } from '../../core/api/common.api';
 import { vocabularyLabel } from '../../core/api/app-config.api';
 import { AppConfigService } from '../../core/config/app-config.service';
@@ -331,6 +331,16 @@ export class BookingDetailComponent {
 
   protected party(party: string | null): string {
     return partyLabel(this.t, party);
+  }
+
+  /**
+   * Where an assessed penalty stands, in the owner's words (pre-launch item 173): the server's state,
+   * never one worked out here. A state this site does not know is left unsaid.
+   */
+  protected penaltyNote(penalty: PenaltyAssessment): string | null {
+    return penalty.state === 'Assessed' || penalty.state === 'ResolvedByDispute'
+      ? this.t(`booking.penaltyState.${penalty.state}` as TranslationKey)
+      : null;
   }
 
   /** How a recorded handover was proved (Code, Unverified, NotRequired); nothing for older records. */

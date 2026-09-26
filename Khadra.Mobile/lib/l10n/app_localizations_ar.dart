@@ -1215,6 +1215,14 @@ class AppLocalizationsAr extends AppLocalizations {
       'لم يُخصم شيء. لا يتحول التقدير إلى مبلغ فعلي إلا بفتح نزاع وتسويته من قِبل خضرا.';
 
   @override
+  String get bookingPenaltyStateAssessed =>
+      'تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.';
+
+  @override
+  String get bookingPenaltyStateResolvedByDispute =>
+      'تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.';
+
+  @override
   String get bookingPartyCustomer => 'عليك';
 
   @override

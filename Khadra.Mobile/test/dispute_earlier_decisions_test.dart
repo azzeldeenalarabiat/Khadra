@@ -253,6 +253,8 @@ void main() {
         expect(find.text(l10n.disputeDecidedEarlier), findsOneWidget);
         // A closed ticket is deciding nothing now: no notice.
         expect(find.textContaining(tag == 'en' ? 'nothing left to split' : 'فلم يبقَ منه'), findsNothing);
+        // Pre-launch item 173: a resolution moves money, so its card never says nothing was charged.
+        expect(find.text(l10n.bookingPenaltyNotCharged), findsNothing);
       });
     }
   });

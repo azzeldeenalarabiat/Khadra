@@ -1775,9 +1775,10 @@ class _BlockLabel extends StatelessWidget {
 
 /// A penalty as an ASSESSMENT.
 ///
-/// Spec 3.3: with no dispute ticket, nothing is applied at all. The sentence
-/// saying so is conditional on the server's own `requiresTicketToEnforce` rather
-/// than typed in beside the amount as a promise the app is making by itself.
+/// Spec 3.3: with no dispute ticket, nothing is applied at all. Where it stands
+/// — assessed and not charged, or resolved through a dispute — is the server's
+/// `state`, worded in the owner's sentences (pre-launch item 173) rather than
+/// worked out here; a state this build does not know is left unsaid.
 class _Penalty extends StatelessWidget {
   const _Penalty({required this.penalty, required this.formats});
 
@@ -1807,9 +1808,11 @@ class _Penalty extends StatelessWidget {
           : (onCustomer
               ? l10n.bookingPenaltyAssessedOnYou(formats.money(penalty.maxAmount))
               : l10n.bookingPenaltyAssessed(formats.money(penalty.maxAmount), party)),
-      body: penalty.requiresTicketToEnforce
-          ? l10n.bookingPenaltyNotCharged
-          : null,
+      body: switch (penalty.state) {
+        'Assessed' => l10n.bookingPenaltyStateAssessed,
+        'ResolvedByDispute' => l10n.bookingPenaltyStateResolvedByDispute,
+        _ => null,
+      },
       tone: NoticeTone.warn,
       icon: Icons.balance_outlined,
     );

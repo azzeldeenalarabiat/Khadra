@@ -604,7 +604,9 @@ export const AR: Record<TranslationKey, Message> = {
   'booking.pickedUpText': 'أعِدها قبل {when}.',
   'booking.penalty': 'قُدِّر مبلغ {amount} على {party}.',
   'booking.penaltyRange': 'قُدِّر مبلغ بين {min} و{max} على {party}.',
-  'booking.penaltyNotCharged': 'لم يُخصم شيء. لا يتحول التقدير إلى مبلغ فعلي إلا بفتح نزاع وتسويته من قِبل خضرا.',
+  // Pre-launch item 173, the owner's words (2026-09-26): where an assessed penalty stands.
+  'booking.penaltyState.Assessed': 'تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.',
+  'booking.penaltyState.ResolvedByDispute': 'تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.',
   'booking.rentalCost': 'تكلفة الإيجار',
   'booking.howPaid': 'طريقة الدفع',
   'booking.depositPaid': 'مدفوع',
