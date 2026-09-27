@@ -39,9 +39,10 @@
         <kh-icon name="file-x" />
         <div class="stack stack-9">
           <div>{{ t('financialDocuments.voidedOn', { when: voided.when, by: voided.by }) }}</div>
-          <div>
+          <div class="fdoc-void-reason">
             <span class="td-sub">{{ t('financialDocuments.voidReason') }}</span>
-            <span class="user-text">{{ voided.reason }}</span>
+            <!-- Typed by an administrator, in either language: it takes its own direction, not the page's. -->
+            <span class="user-text" dir="auto">{{ voided.reason }}</span>
           </div>
           @if (voided.replacement; as replacement) {
             <div>

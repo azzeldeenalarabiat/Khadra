@@ -8,6 +8,13 @@
   white-space: nowrap;
 }
 
+// A void's reason after its label, flowing and wrapping as one sentence. The margin is the space
+// between them: Angular drops the whitespace between two elements in a template, which ran "Reason:"
+// into the reason itself.
+.fdoc-void-reason .td-sub {
+  margin-inline-end: 6px;
+}
+
 // The page: the document beside its details, links and proof; one column on a narrow screen.
 .fdoc-layout {
   display: grid;
