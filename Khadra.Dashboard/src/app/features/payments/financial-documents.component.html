@@ -1,0 +1,147 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('nav.payments') }}</h1>
+      <div class="page-sub">{{ t('payments.subtitle') }}</div>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    <div class="tabs" role="tablist">
+      <a class="tab" role="tab" routerLink="/payments" [attr.aria-selected]="false">{{ t('payments.tabPayments') }}</a>
+      <a class="tab" role="tab" routerLink="/payments/refunds" [attr.aria-selected]="false">{{ t('payments.tabRefunds') }}</a>
+      <a class="tab is-active" role="tab" routerLink="/payments/financial-documents" aria-selected="true">{{ t('financialDocuments.tab') }}</a>
+    </div>
+    <div class="tabs" role="tablist">
+      <a class="tab is-active" role="tab" routerLink="/payments/financial-documents" aria-selected="true">{{ t('financialDocuments.viewAll') }}</a>
+      <a class="tab" role="tab" routerLink="/payments/financial-documents/holds" [attr.aria-selected]="false">{{ t('financialDocuments.viewHolds') }}</a>
+    </div>
+
+    <!-- Every option comes from /admin/financial-documents/vocabulary: the console keeps no list of the domain's words. -->
+    <div class="list-toolbar filters-row">
+      <label class="field-inline">
+        <span class="k">{{ t('financialDocuments.filterType') }}</span>
+        <select class="input input-sm" (change)="setFilter('type', $event)">
+          <option value="" [selected]="!filters().type">{{ t('payments.filterAll') }}</option>
+          @for (option of typeOptions(); track option.name) {
+            <option [value]="option.name" [selected]="filters().type === option.name">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="field-inline">
+        <span class="k">{{ t('financialDocuments.filterStanding') }}</span>
+        <select class="input input-sm" (change)="setFilter('status', $event)">
+          <option value="" [selected]="!filters().status">{{ t('payments.filterAll') }}</option>
+          @for (option of statusOptions(); track option.name) {
+            <option [value]="option.name" [selected]="filters().status === option.name">{{ option.label }}</option>
+          }
+        </select>
+      </label>
+      <label class="field-inline">
+        <span class="k">{{ t('financialDocuments.filterNumber') }}</span>
+        <input class="input input-sm ltr" [value]="filters().number" (change)="setFilter('number', $event)" />
+      </label>
+      <label class="field-inline">
+        <span class="k">{{ t('payments.filterReference') }}</span>
+        <input class="input input-sm ltr" [value]="filters().reference" (change)="setFilter('reference', $event)" />
+      </label>
+      <label class="field-inline">
+        <span class="k">{{ t('financialDocuments.filterIssuedFrom') }}</span>
+        <input class="input input-sm" type="date" [value]="filters().from" (change)="setFilter('from', $event)" />
+      </label>
+      <label class="field-inline">
+        <span class="k">{{ t('financialDocuments.filterIssuedTo') }}</span>
+        <input class="input input-sm" type="date" [value]="filters().to" (change)="setFilter('to', $event)" />
+      </label>
+      @if (filtered()) {
+        <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+          {{ t('payments.clearFilters') }}
+        </button>
+      }
+    </div>
+
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('financialDocuments.loadFailed') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    } @else if (resource.isLoading() && rows().length === 0) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="receipt" /></div>
+        <div class="state-title">{{ filtered() ? t('financialDocuments.empty') : t('financialDocuments.emptyAll') }}</div>
+        @if (filtered()) {
+          <div class="state-actions">
+            <button type="button" class="btn btn-secondary btn-sm" (click)="clearFilters()">
+              {{ t('payments.clearFilters') }}
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>{{ t('financialDocuments.colDocument') }}</th>
+              <th>{{ t('financialDocuments.colStanding') }}</th>
+              <th class="td-num">{{ t('financialDocuments.colVersion') }}</th>
+              <th>{{ t('payments.colBooking') }}</th>
+              <th class="td-num">{{ t('financialDocuments.colAmount') }}</th>
+              <th>{{ t('financialDocuments.colIssued') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr class="rowlink" (click)="open(row.id)">
+                <td class="td">
+                  <div class="row row-gap-8 row-wrap">
+                    <a class="row-link mono ltr fdoc-number" [routerLink]="['/payments/financial-documents', row.id]" (click)="$event.stopPropagation()">{{ row.number }}</a>
+                    @if (row.isTest) {
+                      <span class="pill s-warn">{{ t('payments.test') }}</span>
+                    }
+                  </div>
+                  <div class="td-sub">{{ row.title }}</div>
+                </td>
+                <td class="td">
+                  <span class="pill" [class]="'s-' + row.standing.tone">{{ row.standing.label }}</span>
+                </td>
+                <td class="td td-num num">{{ row.version }}</td>
+                <td class="td">
+                  <a class="row-link mono ltr" [routerLink]="['/bookings', row.bookingId]" (click)="$event.stopPropagation()">{{ row.reference }}</a>
+                </td>
+                <td class="td td-num">
+                  <div class="num">{{ row.headline }}</div>
+                  <div class="td-sub">{{ row.headlineLabel }}</div>
+                </td>
+                <td class="td">{{ row.issued }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="pager-count">{{ t('financialDocuments.shownOf', { shown: rows().length, count: total() }) }}</span>
+        <div class="pager-nav">
+          <button type="button" class="btn btn-secondary btn-page" [disabled]="page() <= 1" (click)="goTo(page() - 1)">
+            {{ t('common.previous') }}
+          </button>
+          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: pages() }) }}</span>
+          <button type="button" class="btn btn-secondary btn-page" [disabled]="page() >= pages()" (click)="goTo(page() + 1)">
+            {{ t('common.next') }}
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+</div>

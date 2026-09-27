@@ -1,6 +1,7 @@
 import { Injectable, computed, inject } from '@angular/core';
+import { formatFrozenLocal } from './date-format';
 import { I18nService } from './i18n.service';
-import { formatAmount, formatNumber, formatPercent, formatPercentRange } from './number-format';
+import { formatAmount, formatNumber, formatPercent, formatPercentRange, formatStoredAmount } from './number-format';
 import {
   ClockReading,
   deadlineReading,
@@ -341,6 +342,37 @@ export class FormatService {
     if (amount === null || amount === undefined || !Number.isFinite(amount)) return '—';
     const formatted = formatAmount(amount, this.locale(), this.currencyMinorUnits);
     return this.isolate(currency ? `${formatted} ${currency}` : formatted);
+  }
+
+  /**
+   * An amount as an issued document STORED it — its own currency, its digits exactly as held — laid out
+   * like every other amount here (payments Phase 5b).
+   *
+   * Never through a float and never at today's scale: `money` pads to the scale `/app-config` names now,
+   * which is right for a live figure and wrong for a record. An amount off the stored pattern is printed
+   * as it is, isolated, rather than hidden.
+   */
+  storedMoney(amount: string, currency: string): string {
+    const digits = formatStoredAmount(amount, this.locale()) ?? amount;
+    return this.isolate(`${digits} ${currency}`);
+  }
+
+  /**
+   * A wall time an issued document froze, `"2026-09-27 11:17"` in Amman, printed as that wall time in the
+   * shape `dateTime` uses — never moved through a zone, never re-derived from its UTC instant. Text that
+   * is not such a time is printed as it is, isolated.
+   */
+  frozenTime(local: string): string {
+    return this.isolate(
+      formatFrozenLocal(local, this.locale(), {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      }) ?? local,
+    );
   }
 
   /**

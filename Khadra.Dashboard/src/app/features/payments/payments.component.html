@@ -12,6 +12,7 @@
          [attr.aria-selected]="view === 'payments'">{{ t('payments.tabPayments') }}</a>
       <a class="tab" role="tab" routerLink="/payments/refunds" [class.is-active]="view === 'refunds'"
          [attr.aria-selected]="view === 'refunds'">{{ t('payments.tabRefunds') }}</a>
+      <a class="tab" role="tab" routerLink="/payments/financial-documents" [attr.aria-selected]="false">{{ t('financialDocuments.tab') }}</a>
     </div>
 
     @if (view === 'payments') {

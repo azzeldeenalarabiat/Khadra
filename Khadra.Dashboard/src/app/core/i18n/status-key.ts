@@ -9,8 +9,10 @@ import { EN, TranslationKey } from './en';
  *   "Pending" to the office that has to answer it, and `PickedUp` is an "Active" rental.
  * - `vehicle`: a car in a fleet — `Active` is "Published" (customers can find it), `Maintenance` is
  *   "Off the road"; an `Active` dealership or account is a different word.
+ * - `financialDocument`: an issued document's standing (payments Phase 5b) — `Current`, `Superseded`
+ *   ("Earlier version") and `Voided`, words no other record uses.
  */
-export type StatusScope = 'booking' | 'dealerBooking' | 'vehicle';
+export type StatusScope = 'booking' | 'dealerBooking' | 'vehicle' | 'financialDocument';
 
 /**
  * The dictionary key for a server status name, most specific scope first.
@@ -28,7 +30,9 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
         ? [`status.${camel}Booking`, `status.${camel}`]
         : scope === 'vehicle'
           ? [`status.${camel}Vehicle`, `status.${camel}`]
-          : [`status.${camel}`];
+          : scope === 'financialDocument'
+            ? [`status.${camel}FinancialDocument`, `status.${camel}`]
+            : [`status.${camel}`];
   const key = chain.find((candidate) => candidate in EN);
   return key === undefined ? null : (key as TranslationKey);
 }
@@ -43,6 +47,8 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
  * - The Payments context (payments Phase 4b): a payment's status and purpose, a refund's status, the
  *   refund progress of a payment, Khadra's commission state, what became of a provider event, the
  *   contradictions a booking's records can show, and the platform's payment mode.
+ * - Issued financial documents (payments Phase 5b): a document's type, what issued it, and why a
+ *   document owed is on hold.
  */
 export type EnumFamily =
   | 'party'
@@ -55,7 +61,10 @@ export type EnumFamily =
   | 'commissionState'
   | 'providerEventOutcome'
   | 'financialIssue'
-  | 'paymentMode';
+  | 'paymentMode'
+  | 'financialDocumentType'
+  | 'financialDocumentCause'
+  | 'financialDocumentHoldReason';
 
 /** The dictionary key for a server enum name within its family, or null when this build has none. */
 export function enumKey(family: EnumFamily, name: string): TranslationKey | null {

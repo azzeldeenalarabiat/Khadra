@@ -1,0 +1,356 @@
+import { describe, expect, it } from 'vitest';
+import fixtureJson from '../../../../../docs/contracts/financial-documents-v1.json';
+import { AR } from '../../core/i18n/ar';
+import { EN, TranslationKey } from '../../core/i18n/en';
+import { MessageParams } from '../../core/i18n/language';
+import { problemMessage, snapshotProblem } from '../../core/i18n/problem';
+import { resolveMessage } from '../../core/i18n/resolve';
+import { EnumFamily, StatusScope, enumKey, spellEnumName, statusKey } from '../../core/i18n/status-key';
+import {
+  AdminFinancialDocument,
+  AdminFinancialDocumentListItem,
+  FinancialDocument,
+  FinancialDocumentHold,
+} from '../../core/models/financial-documents.api';
+import { Money } from '../../core/models/fleet.api';
+import { readDocumentContent } from './financial-document-content';
+import {
+  DocumentBlock,
+  DocumentFormat,
+  DocumentWords,
+  directionOf,
+  documentPage,
+  documentRow,
+  holdRow,
+  preparingRow,
+  voidDialogWords,
+  voidRefusalIsFinal,
+  voidedToast,
+} from './financial-documents.presenter';
+
+/**
+ * The administrator's financial documents in words (payments Phase 5b), against the REAL dictionaries and
+ * the SHARED contract fixture the server writes — the same file the website's and the app's tests read.
+ * The formatter shows exactly what it was handed, so these prove the presenter hands it the stored string
+ * and the frozen wall time, never a float or a UTC instant.
+ */
+interface ContractFixture {
+  readonly documents: readonly { readonly name: string; readonly page: FinancialDocument }[];
+  readonly myDocuments: { readonly items: readonly AdminFinancialDocumentListItem[] };
+}
+const fixture = fixtureJson as unknown as ContractFixture;
+const page = (name: string): FinancialDocument => structuredClone(fixture.documents.find((entry) => entry.name === name)!.page);
+
+type Tr = (key: TranslationKey, params?: MessageParams) => string;
+const en: Tr = (key, params) => resolveMessage(EN[key], params, 'en-GB', false) ?? key;
+// Arabic wraps every value in zero-width direction isolates (resolve.ts); compare the visible words.
+const ar: Tr = (key, params) =>
+  (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[⁨⁩]/g, '');
+
+const wordsWith = (t: Tr, arabic: boolean): DocumentWords => ({
+  t,
+  arabic,
+  enumLabel: (family: EnumFamily, name: string | null | undefined) => {
+    const key = enumKey(family, name ?? '');
+    return key ? t(key) : spellEnumName(name ?? '');
+  },
+  statusLabel: (name: string | null | undefined, scope?: StatusScope) => {
+    const key = statusKey(name ?? '', scope);
+    return key ? t(key) : spellEnumName(name ?? '');
+  },
+});
+const english = wordsWith(en, false);
+const arabic = wordsWith(ar, true);
+
+const format: DocumentFormat = {
+  money: (value: Money) => `live ${value.amount} ${value.currency}`,
+  when: (iso) => iso.slice(0, 16),
+  relative: (iso) => `relative ${iso.slice(0, 16)}`,
+  storedMoney: (amount, currency) => `[${amount} ${currency}]`,
+  frozenTime: (local) => `<${local}>`,
+};
+
+/** The administrator's page around a customer page from the fixture. */
+const adminPage = (name: string, over: Partial<AdminFinancialDocument> = {}): AdminFinancialDocument => ({
+  document: page(name),
+  customerId: 'c-1',
+  dealerId: 'd-1',
+  provider: 'SANDBOX',
+  isTest: true,
+  contentSha256: 'a3f1c2d4e5b6978800112233445566778899aabbccddeeff0011223344556677',
+  coversThrough: null,
+  checkpointFingerprint: null,
+  void: null,
+  ...over,
+});
+
+const linesOf = (blocks: readonly DocumentBlock[]) => blocks.flatMap((block) => (block.kind === 'lines' ? block.lines : []));
+
+describe('the version 1 reader, on every document the server composes', () => {
+  it('reads each whole, sections and lines in their stored order', () => {
+    for (const entry of fixture.documents) {
+      const content = readDocumentContent(entry.page.snapshotSchemaVersion, entry.page.snapshot);
+      expect(content, entry.name).not.toBeNull();
+      const stored = (entry.page.snapshot as { content: { sections: { key: string }[] } }).content.sections;
+      expect(content!.sections.map((section) => section.key), entry.name).toEqual(stored.map((section) => section.key));
+    }
+  });
+
+  it('refuses a schema version it does not know, gating on the page and never on the snapshot', () => {
+    const document = page('payment-receipt-paid-in-full');
+    expect(readDocumentContent(2, document.snapshot)).toBeNull();
+    (document.snapshot as Record<string, unknown>)['schemaVersion'] = 99;
+    expect(readDocumentContent(1, document.snapshot)).not.toBeNull();
+  });
+
+  it('refuses a document with a line missing its value, or holding two', () => {
+    const none = page('refund-receipt-free-cancellation').snapshot as { content: { sections: { lines: Record<string, unknown>[] }[] } };
+    const line = none.content.sections[0]!.lines[0]!;
+    for (const kind of ['money', 'instant', 'text', 'plain']) delete line[kind];
+    expect(readDocumentContent(1, none)).toBeNull();
+
+    const two = page('refund-receipt-free-cancellation').snapshot as { content: { sections: { lines: Record<string, unknown>[] }[] } };
+    two.content.sections[0]!.lines[0]!['plain'] = 'x';
+    two.content.sections[0]!.lines[0]!['text'] = { en: 'x', ar: 'س' };
+    expect(readDocumentContent(1, two)).toBeNull();
+  });
+});
+
+describe('a document, rendered exactly as it was issued', () => {
+  it('shows the stored title and figure, the figure as the stored string through storedMoney', () => {
+    const view = documentPage(adminPage('payment-receipt-paid-in-full'), english, format).body!;
+    expect(view.title).toBe('Payment receipt');
+    expect(view.headlineLabel).toBe('Amount paid');
+    expect(view.headline).toBe('[94.500 JOD]');
+  });
+
+  it('prints every time from its frozen Amman wall time, never the UTC instant', () => {
+    const view = documentPage(adminPage('payment-receipt-paid-in-full'), english, format).body!;
+    const issued = view.sections.flatMap((section) => linesOf(section.blocks)).find((line) => line.key.endsWith(':issuedAt'))!;
+    expect(issued.value).toBe('<2026-09-03 15:01>');
+  });
+
+  it('keeps an unlabelled line as a value of its own, in its place', () => {
+    const view = documentPage(adminPage('payment-receipt-paid-in-full'), english, format).body!;
+    const position = view.sections.find((section) => section.key.endsWith(':bookingPosition'))!;
+    expect(position.blocks.map((block) => block.kind)).toEqual(['lines', 'alone']);
+  });
+
+  it('keeps a Latin literal left to right and lets a name in Arabic take its own direction', () => {
+    const view = documentPage(adminPage('payment-receipt-paid-in-full'), english, format).body!;
+    const lines = view.sections.flatMap((section) => linesOf(section.blocks));
+    expect(lines.find((line) => line.key.endsWith(':number'))!.direction).toBe('ltr');
+    expect(lines.find((line) => line.key.endsWith(':amountPaid'))!.direction).toBeNull();
+    expect(directionOf({ kind: 'plain', plain: 'أوتو رنت (Auto Rent)' })).toBe('auto');
+  });
+
+  it('says what the document says in Arabic, from the same answer', () => {
+    const view = documentPage(adminPage('payment-receipt-paid-in-full'), arabic, format).body!;
+    expect(view.title).toBe('إيصال دفع');
+    expect(view.notice).toBe('هذا المستند ليس فاتورة ضريبية.');
+  });
+
+  it('cannot show a schema version it does not know, and keeps the facts the page carries', () => {
+    const unknown = adminPage('payment-receipt-paid-in-full');
+    const view = documentPage({ ...unknown, document: { ...unknown.document, snapshotSchemaVersion: 2 } }, english, format);
+    expect(view.body).toBeNull();
+    expect(view.headlineLabel).toBe('Amount paid');
+    expect(view.headline).toBe('live 94.5 JOD');
+    // The recorded facts are still the administrator's evidence.
+    expect(view.facts).toContain('"purpose"');
+  });
+});
+
+describe("a document's page", () => {
+  it('names its standing always, the current one included, in both languages', () => {
+    const current = documentPage(adminPage('payment-receipt-deposit-correction'), english, format);
+    expect(current.standing).toEqual({ label: 'Current version', tone: 'ok' });
+    expect(documentPage(adminPage('payment-receipt-deposit-voided'), arabic, format).standing).toEqual({ label: 'ملغى', tone: 'bad' });
+    expect(documentPage(adminPage('booking-statement-superseded'), english, format).standing.label).toBe('Earlier version');
+  });
+
+  it('spells out a standing this build does not know rather than presenting the document as current', () => {
+    const withdrawn = adminPage('payment-receipt-paid-in-full');
+    const view = documentPage({ ...withdrawn, document: { ...withdrawn.document, status: 'Withdrawn' } }, english, format);
+    expect(view.standing).toEqual({ label: 'Withdrawn', tone: 'dim' });
+    expect(view.canVoid).toBe(false);
+  });
+
+  it('links an earlier version to the NEWEST — the highest of the versions, never merely the next', () => {
+    const statement = adminPage('booking-statement-superseded');
+    const member = statement.document.links.versions[0]!;
+    const link = (version: number, status: string) => ({ ...member, documentId: `v${version}`, number: `STM-${version}`, version, status });
+    const chain: AdminFinancialDocument = {
+      ...statement,
+      document: {
+        ...statement.document,
+        documentId: 'v1',
+        links: {
+          ...statement.document.links,
+          versions: [link(1, 'Superseded'), link(3, 'Current'), link(2, 'Voided')],
+          nextVersion: link(2, 'Voided'),
+        },
+      },
+    };
+    const view = documentPage(chain, english, format);
+    expect(view.newer).toMatchObject({ id: 'v3', number: 'STM-3', detail: 'Version 3' });
+    expect(view.versions.map((version) => [version.number, version.here, version.standing.label])).toEqual([
+      ['STM-1', true, 'Earlier version'],
+      ['STM-2', false, 'Voided'],
+      ['STM-3', false, 'Current version'],
+    ]);
+    expect(view.versionOf).toBe('Version 1 of 3');
+  });
+
+  it('offers the void on a current document only', () => {
+    expect(documentPage(adminPage('payment-receipt-deposit-correction'), english, format).canVoid).toBe(true);
+    expect(documentPage(adminPage('payment-receipt-deposit-voided'), english, format).canVoid).toBe(false);
+    expect(documentPage(adminPage('booking-statement-superseded'), english, format).canVoid).toBe(false);
+  });
+
+  it('shows a void with who, when, the reason as typed, and the correction', () => {
+    const voided = adminPage('payment-receipt-deposit-voided');
+    const replacedBy = voided.document.voided!.replacedBy!;
+    const view = documentPage(
+      { ...voided, void: { voidedAt: '2026-09-04T10:00:00Z', voidedByAdminId: 'a-1', voidedByName: 'Rania Haddad', reason: 'Wrong office location', replacedBy } },
+      english,
+      format,
+    );
+    expect(view.voided).toEqual({
+      when: '2026-09-04T10:00',
+      by: 'Rania Haddad',
+      reason: 'Wrong office location',
+      replacement: expect.objectContaining({ number: 'TEST-PAY-2026-000005', detail: 'Version 2' }),
+    });
+    const gone = documentPage(
+      { ...voided, void: { voidedAt: '2026-09-04T10:00:00Z', voidedByAdminId: 'a-1', voidedByName: null, reason: 'Wrong office location', replacedBy } },
+      arabic,
+      format,
+    );
+    expect(gone.voided!.by).toBe('مشرف لم يعد على المنصّة');
+  });
+
+  it('states its proof, with the machine values marked as code', () => {
+    const view = documentPage(
+      adminPage('booking-statement-cash-at-handover', { coversThrough: '2026-09-25T17:57:00Z', checkpointFingerprint: 'f00d' }),
+      english,
+      format,
+    );
+    expect(view.proof).toEqual([
+      { k: 'Payment provider', v: 'SANDBOX', code: true },
+      { k: 'Content hash (SHA-256)', v: expect.stringMatching(/^[0-9a-f]{64}$/), code: true },
+      { k: 'Covers money movements up to', v: '2026-09-25T17:57', code: false },
+      { k: 'Checkpoint fingerprint', v: 'f00d', code: true },
+    ]);
+  });
+
+  it('links a refund receipt to its payment receipt, and a payment receipt to its refunds', () => {
+    expect(documentPage(adminPage('refund-receipt-free-cancellation'), english, format).paymentReceipt).toMatchObject({
+      number: 'TEST-PAY-2026-000002',
+      detail: 'Payment receipt',
+    });
+    expect(documentPage(adminPage('payment-receipt-paid-in-full'), arabic, format).refundReceipts.map((link) => [link.number, link.detail])).toEqual([
+      ['TEST-RFD-2026-000001', 'إيصال استرداد'],
+    ]);
+  });
+
+  it('names its type and cause in the words the document itself uses', () => {
+    const view = documentPage(adminPage('booking-statement-dispute-decided'), english, format);
+    expect(view.type).toBe('Booking statement');
+    expect(view.cause).toBe('Dispute decided');
+    expect(documentPage(adminPage('booking-statement-dispute-decided'), arabic, format).cause).toBe('حسم نزاع');
+  });
+});
+
+describe('the lists', () => {
+  const rows = fixture.myDocuments.items.map((item) => ({ ...item, customerId: 'c-1', dealerId: 'd-1', isTest: true }));
+
+  it('shows a row by its stored title and number, the figure through the LIVE formatter', () => {
+    const row = documentRow(rows.find((item) => item.number === 'TEST-PAY-2026-000005')!, english, format);
+    expect(row).toMatchObject({
+      number: 'TEST-PAY-2026-000005',
+      title: 'Payment receipt',
+      version: 2,
+      isTest: true,
+      headlineLabel: 'Amount paid',
+      headline: 'live 19.5 JOD',
+      standing: { label: 'Current version', tone: 'ok' },
+    });
+    expect(documentRow(rows.find((item) => item.number === 'TEST-PAY-2026-000001')!, arabic, format).standing.label).toBe('ملغى');
+  });
+
+  it('words a hold by its kind and reason, in both languages, and spells out a reason it does not know', () => {
+    const hold: FinancialDocumentHold = {
+      holdId: 'h-1',
+      documentType: 'BookingStatement',
+      subjectId: 'b-1',
+      bookingId: 'b-1',
+      bookingReference: 'KH-95JGHJQZ',
+      reason: 'RecordsNeedReview',
+      attempts: 7,
+      firstFailedAt: '2026-09-24T00:00:00Z',
+      lastFailedAt: '2026-09-27T08:00:00Z',
+      nextAttemptAt: '2026-09-27T09:00:00Z',
+      lastError: 'EndingRefundMissing',
+    };
+    expect(holdRow(hold, english, format)).toMatchObject({
+      type: 'Booking statement',
+      reason: "The booking's records need review",
+      attempts: 7,
+      nextAttempt: 'relative 2026-09-27T09:00',
+      lastError: 'EndingRefundMissing',
+    });
+    expect(holdRow(hold, arabic, format).reason).toBe('سجلات الحجز تحتاج إلى مراجعة');
+    expect(holdRow({ ...hold, reason: 'ProviderUnreachable' }, english, format).reason).toBe('Provider unreachable');
+  });
+
+  it('words what is being prepared by kind, and a kind this build does not know plainly', () => {
+    const pending = (type: string) => ({ type, subjectId: 's-1', occurredAt: '2026-09-03T12:32:00Z' });
+    expect(preparingRow(pending('PaymentReceipt'), english, format).label).toBe('Payment receipt — being prepared');
+    expect(preparingRow(pending('BookingStatement'), arabic, format).label).toBe('كشف حساب الحجز — قيد الإعداد');
+    expect(preparingRow(pending('PayablesStatement'), english, format).label).toBe('A document — being prepared');
+  });
+});
+
+describe('voiding a document', () => {
+  it('states the consequence first, in both languages', () => {
+    const words = voidDialogWords('TEST-PAY-2026-000005', en);
+    expect(words.title).toBe('Void TEST-PAY-2026-000005 and issue its correction?');
+    expect(words.body).toContain('permanent');
+    expect(words.body).toContain('never your reason');
+    expect(voidDialogWords('TEST-PAY-2026-000005', ar).title).toBe('إلغاء TEST-PAY-2026-000005 وإصدار تصحيحه؟');
+  });
+
+  it('reports what the void did as the server reported it', () => {
+    expect(voidedToast('TEST-PAY-2026-000001', 'TEST-PAY-2026-000005', en)).toEqual({
+      title: 'Document voided',
+      body: 'Voided TEST-PAY-2026-000001. Issued TEST-PAY-2026-000005.',
+    });
+  });
+
+  it('closes the dialog only on a refusal after which the document can never be current again', () => {
+    expect(voidRefusalIsFinal('financial_documents.not_current')).toBe(true);
+    expect(voidRefusalIsFinal('financial_documents.already_voided')).toBe(true);
+    for (const code of [
+      'financial_documents.correction_records_need_review',
+      'financial_documents.correction_issuer_not_configured',
+      'financial_documents.correction_failed',
+      null,
+    ]) {
+      expect(voidRefusalIsFinal(code)).toBe(false);
+    }
+  });
+
+  it('words each refusal itself, in both languages, and a reason refused without naming any limit', () => {
+    const refused = (code: string, status = 409) => snapshotProblem({ status, error: { code, title: 'server words' } });
+    expect(problemMessage(refused('financial_documents.correction_records_need_review'), 'en', en)).toContain('Nothing was voided');
+    expect(problemMessage(refused('financial_documents.correction_issuer_not_configured'), 'ar', ar)).toContain('لم يُلغَ شيء');
+    expect(problemMessage(refused('financial_documents.correction_failed', 422), 'en', en)).toContain('has been logged');
+    expect(problemMessage(refused('financial_documents.not_current'), 'ar', ar)).toContain('النسخة الحالية');
+    expect(problemMessage(refused('financial_documents.already_voided'), 'en', en)).toContain('already been voided');
+
+    const reason = snapshotProblem({ status: 400, error: { title: 'One or more validation errors occurred.', errors: { reason: ['The field Reason must be ...'] } } });
+    expect(problemMessage(reason, 'en', en)).toBe('Check the reason: it is missing, or longer than the platform allows.');
+    expect(problemMessage(reason, 'en', en)).not.toMatch(/\d/);
+  });
+});

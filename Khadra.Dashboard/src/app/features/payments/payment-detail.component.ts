@@ -8,6 +8,7 @@ import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { AdminPaymentsService } from '../../core/services/admin-payments.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { DocumentFormat, DocumentWords, documentRow } from './financial-documents.presenter';
 import { paymentPage } from './payment-detail.presenter';
 
 /**
@@ -49,6 +50,29 @@ export class PaymentDetailComponent {
           when: (iso) => this.formats.dateTimeSeconds(iso),
         })
       : null;
+  });
+
+  /**
+   * The payment's receipts, every version (payments Phase 5b), each opening its own page. Null — and
+   * nothing said — when the API sent none at all, as one without documents does.
+   */
+  protected readonly documents = computed(() => {
+    const documents = this.data()?.documents;
+    if (!documents) return null;
+    const words: DocumentWords = {
+      t: this.t,
+      enumLabel: this.i18n.enumLabel,
+      statusLabel: this.i18n.statusLabel,
+      arabic: this.i18n.lang() === 'ar',
+    };
+    const format: DocumentFormat = {
+      money: (value) => this.formats.money(value.amount, value.currency),
+      when: (iso) => this.formats.dateTime(iso),
+      relative: (iso) => this.formats.relative(iso),
+      storedMoney: (amount, currency) => this.formats.storedMoney(amount, currency),
+      frozenTime: (local) => this.formats.frozenTime(local),
+    };
+    return documents.map((row) => documentRow(row, words, format));
   });
 
   /** A failed load: "no such payment" for a 404, the server's sentence or a plain one otherwise. */

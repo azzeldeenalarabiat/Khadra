@@ -9,5 +9,6 @@
 @use 'styles/layout';
 @use 'styles/screens';
 @use 'styles/dealer';
+@use 'styles/financial-documents';
 // Last, so its :lang(ar) and [dir=rtl] rules win over the direction-agnostic ones above.
 @use 'styles/rtl';

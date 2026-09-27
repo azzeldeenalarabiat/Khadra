@@ -118,8 +118,13 @@ export class AdminTopbarComponent {
     const trail: Crumb[] = [
       { label: areaLabel(user?.role, this.t), route: homeRouteFor(user), last: false },
     ];
-    const parent = SCREEN_PARENTS[key];
-    if (parent) {
+    // Up the chain, nearest parent last: a document is Payments › Financial documents › Document. The
+    // bound stops a table that ever named a cycle from hanging the bar.
+    const parents: string[] = [];
+    for (let parent = SCREEN_PARENTS[key]; parent && parents.length < 4; parent = SCREEN_PARENTS[parent]) {
+      parents.unshift(parent);
+    }
+    for (const parent of parents) {
       trail.push({ label: this.titleOf(parent, parent), route: `/${parent}`, last: false });
     }
     trail.push({ label: this.titleOf(key), route: `/${key}`, last: true });

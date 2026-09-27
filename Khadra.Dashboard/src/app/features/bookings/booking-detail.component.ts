@@ -22,6 +22,13 @@ import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyFormat } from '../../core/i18n/money-words';
 import { adminMoney } from './admin-money.presenter';
+import {
+  DocumentFormat,
+  DocumentWords,
+  documentRow,
+  holdRow,
+  preparingRow,
+} from '../payments/financial-documents.presenter';
 
 /**
  * One booking as the platform sees it.
@@ -86,6 +93,36 @@ export class AdminBookingDetailComponent {
     percent: (value) => this.formats.percent(value),
     dateTime: (iso) => this.formats.dateTime(iso),
   };
+
+  /**
+   * The booking's issued documents, what is being prepared, and what is on hold (payments Phase 5b), each
+   * document opening its own page. Their own resource and their own states: a failure here never hides
+   * the money above it.
+   */
+  protected readonly documentsResource = this.service.financialDocuments;
+  private readonly documentsData = loaded(this.documentsResource);
+  protected readonly documentsView = computed(() => {
+    const data = this.documentsData();
+    if (!data) return null;
+    const words: DocumentWords = {
+      t: this.t,
+      enumLabel: this.enumLabel,
+      statusLabel: this.i18n.statusLabel,
+      arabic: this.i18n.lang() === 'ar',
+    };
+    const format: DocumentFormat = {
+      money: (value) => this.money(value),
+      when: (iso) => this.formats.dateTime(iso),
+      relative: (iso) => this.formats.relative(iso),
+      storedMoney: (amount, currency) => this.formats.storedMoney(amount, currency),
+      frozenTime: (local) => this.formats.frozenTime(local),
+    };
+    return {
+      documents: data.documents.map((row) => documentRow(row, words, format)),
+      preparing: data.beingPrepared.map((pending) => preparingRow(pending, words, format)),
+      holds: data.holds.map((hold) => holdRow(hold, words, format)),
+    };
+  });
 
   protected readonly financialsResource = this.service.financials;
   /** Guarded like the booking: `value()` throws in the error state. */

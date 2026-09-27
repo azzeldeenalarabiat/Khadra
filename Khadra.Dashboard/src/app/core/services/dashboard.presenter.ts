@@ -177,6 +177,10 @@ const kindTarget = (
       return { route: '/payments', action: 'queue.actionOpen', filter: { key: 'status', value: 'Orphaned' } };
     case 'DepositAwaitingDecision':
       return { route: only ? `/bookings/${only}` : '/bookings', action: 'queue.actionOpen' };
+    // Documents owed and not issued (payments Phase 5b) open their holds — by PATH alone, because the
+    // topbar bell reuses these rows and drops query parameters.
+    case 'FinancialDocumentsOnHold':
+      return { route: '/payments/financial-documents/holds', action: 'queue.actionOpen' };
     default:
       return { route: '/dashboard', action: 'queue.actionOpen' };
   }
@@ -235,6 +239,7 @@ const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
   if (item.kind === 'RefundFailed') return t('queue.refundsRefused', { count: item.count });
   if (item.kind === 'OrphanedCaptureOwed') return t('queue.capturesBeingRefunded', { count: item.count });
   if (item.kind === 'DepositAwaitingDecision') return t('queue.depositAwaitingDecision');
+  if (item.kind === 'FinancialDocumentsOnHold') return t('queue.documentsOnHold', { count: item.count });
 
   const ageHours = Math.max(0, Math.round((now - Date.parse(item.slaStartedAt)) / 3_600_000));
   if (item.kind === 'DisputeOverdue' || item.kind === 'DisputeOpen') {
@@ -365,6 +370,7 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   LookupRenamed: 'pencil-simple',
   LookupRetired: 'toggle-left',
   LookupRestored: 'toggle-right',
+  FinancialDocumentVoided: 'file-x',
 };
 
 /**
@@ -400,6 +406,8 @@ const ACTIVITY_SENTENCES: Readonly<Record<string, TranslationKey>> = {
   HandoverVerified: 'activity.handoverVerified',
   HandoverUnverified: 'activity.handoverUnverified',
   HandoverCodeLocked: 'activity.handoverCodeLocked',
+  // Labelled by the document's NUMBER, never a customer: an audit entry can never be erased.
+  FinancialDocumentVoided: 'activity.financialDocumentVoided',
 };
 
 /** The lookup actions are shared by both lists; the entry's type says which one changed. */

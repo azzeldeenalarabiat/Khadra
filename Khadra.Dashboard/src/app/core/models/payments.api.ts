@@ -1,3 +1,4 @@
+import { AdminFinancialDocumentListItem } from './financial-documents.api';
 import { FinancialPayment } from './financials.api';
 import { Money } from './fleet.api';
 
@@ -86,6 +87,11 @@ export interface AdminPayment {
   readonly payment: FinancialPayment;
   readonly booking: PaymentBookingLink | null;
   readonly providerEvents: readonly ProviderEvent[];
+  /**
+   * The payment's receipts, every version (payments Phase 5b). Optional, as the API made it: an API
+   * without documents sends none, and the page says nothing about them.
+   */
+  readonly documents?: readonly AdminFinancialDocumentListItem[] | null;
 }
 
 /** The words the payments screens filter on, from the domain's own enumerations: the console keeps no list. */

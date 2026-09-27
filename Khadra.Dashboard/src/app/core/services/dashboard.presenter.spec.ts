@@ -189,6 +189,34 @@ describe('toQueueItems, the money rows', () => {
     expect(row.queryParams).toBeUndefined();
   });
 
+  it('opens documents on hold by path alone — the bell drops query parameters — counted in every Arabic form', () => {
+    const onHold = (count: number) =>
+      money({
+        id: 'financial-documents-on-hold',
+        kind: 'FinancialDocumentsOnHold',
+        count,
+        subjectIds: ['h1'],
+        subtitle: 'KH-95JGHJQZ',
+      });
+    const [row] = toQueueItems(queue(onHold(2)), now, t);
+
+    expect(row.title).toBe('2 financial documents on hold — owed and not issued');
+    expect(toQueueItems(queue(onHold(1)), now, t)[0].title).toBe('1 financial document on hold — owed and not issued');
+    expect(row.route).toBe('/payments/financial-documents/holds');
+    expect(row.queryParams).toBeUndefined();
+    expect(row.hasClock).toBe(false);
+    expect(row.entity).toBe('KH-95JGHJQZ');
+
+    const tAr: Translate = (key, params) =>
+      (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[⁨⁩]/g, '');
+    const arabic = (count: number) => toQueueItems(queue(onHold(count)), now, tAr)[0].title;
+    expect(arabic(1)).toBe('مستند مالي واحد معلّق — مستحق ولم يصدر');
+    expect(arabic(2)).toBe('مستندان ماليان معلّقان — مستحقان ولم يصدرا');
+    expect(arabic(3)).toBe('3 مستندات مالية معلّقة — مستحقة ولم تصدر');
+    expect(arabic(11)).toBe('11 مستندًا ماليًا معلّقًا — مستحقة ولم تصدر');
+    expect(arabic(100)).toBe('100 مستند مالي معلّق — مستحق ولم يصدر');
+  });
+
   it('keeps a clock and a meter on the rows that have a deadline', () => {
     const [row] = toQueueItems(
       queue(money({ id: 'dispute:t1', kind: 'DisputeOpen', severity: 'Info', count: 1, subjectIds: ['t1'], slaDeadlineAt: '2026-09-27T12:00:00Z' })),
@@ -403,5 +431,18 @@ describe('toActivityRows', () => {
     const icons = actions.map((action) => toActivityRows([entry({ action })], now, t, 'en-GB')[0].icon);
 
     expect(icons).not.toContain('info');
+  });
+
+  it('words a void by the document number it was recorded with — never a customer', () => {
+    const voided: Partial<ActivityEntry> = {
+      action: 'FinancialDocumentVoided',
+      entityType: 'FinancialDocument',
+      subjectLabel: 'TEST-PAY-2026-000001',
+      bookingReference: null,
+    };
+
+    expect(english(voided)).toBe('Azzeldeen Al-Arabiat voided document TEST-PAY-2026-000001');
+    expect(arabic(voided)).toBe('أُلغي المستند TEST-PAY-2026-000001 من قِبل Azzeldeen Al-Arabiat');
+    expect(toActivityRows([entry(voided)], now, t, 'en-GB')[0].icon).toBe('file-x');
   });
 });

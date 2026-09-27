@@ -48,6 +48,7 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   HandoverVerified: 'auditLog.actionHandoverVerified',
   HandoverUnverified: 'auditLog.actionHandoverUnverified',
   HandoverCodeLocked: 'auditLog.actionHandoverCodeLocked',
+  FinancialDocumentVoided: 'auditLog.actionFinancialDocumentVoided',
 };
 
 /** The server's audit record types (`AuditEntityType`), worded the same way as the actions. */
@@ -61,6 +62,7 @@ const ENTITY_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
   AdminUser: 'auditLog.entityAdminUser',
   City: 'auditLog.entityCity',
   CarType: 'auditLog.entityCarType',
+  FinancialDocument: 'auditLog.entityFinancialDocument',
 };
 
 /**
@@ -295,7 +297,7 @@ export class AuditLogComponent {
    * rather than absent, so a new verb still renders.
    */
   protected tone(action: string): Tone {
-    if (/Rejected|Suspended|Deactivated|Hidden|Cancelled|NoShow|Expired/.test(action)) return 'bad';
+    if (/Rejected|Suspended|Deactivated|Hidden|Cancelled|NoShow|Expired|Voided/.test(action)) return 'bad';
     if (/Approved|Reactivated|Restored|Resolved/.test(action)) return 'ok';
     if (/Clarification|Opened|Assigned/.test(action)) return 'warn';
     return 'dim';

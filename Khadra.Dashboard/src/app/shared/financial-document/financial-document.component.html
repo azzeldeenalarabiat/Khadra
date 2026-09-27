@@ -1,0 +1,46 @@
+@let v = body();
+<article class="fdoc" aria-labelledby="fdoc-title">
+  <header class="fdoc-head">
+    <h2 id="fdoc-title" class="fdoc-title">{{ v.title }}</h2>
+    <p class="fdoc-headline"><span class="fdoc-faint">{{ v.headlineLabel }}</span> <strong class="num">{{ v.headline }}</strong></p>
+  </header>
+
+  @for (section of v.sections; track section.key) {
+    <section class="fdoc-section">
+      <h3 class="fdoc-heading">{{ section.heading }}</h3>
+      @for (block of section.blocks; track block.key) {
+        @if (block.kind === 'lines') {
+          <dl class="fdoc-lines">
+            @for (line of block.lines; track line.key) {
+              <div class="fdoc-line">
+                <dt>{{ line.label }}</dt>
+                <dd>
+                  @switch (line.direction) {
+                    @case ('ltr') { <span class="ltr">{{ line.value }}</span> }
+                    @case ('auto') { <bdi>{{ line.value }}</bdi> }
+                    @default { {{ line.value }} }
+                  }
+                </dd>
+              </div>
+            }
+          </dl>
+        } @else {
+          <p class="fdoc-alone">
+            @switch (block.direction) {
+              @case ('ltr') { <span class="ltr">{{ block.text }}</span> }
+              @case ('auto') { <bdi>{{ block.text }}</bdi> }
+              @default { {{ block.text }} }
+            }
+          </p>
+        }
+      }
+    </section>
+  }
+
+  @if (v.timeNote) {
+    <p class="fdoc-time-note">{{ v.timeNote }}</p>
+  }
+  @if (v.notice) {
+    <p class="fdoc-notice">{{ v.notice }}</p>
+  }
+</article>

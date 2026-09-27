@@ -179,6 +179,30 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/payments/payments.component').then((m) => m.PaymentsComponent),
           },
+          // Issued financial documents (payments Phase 5b): a third tab of Payments. Before
+          // `payments/:paymentId`, which would otherwise take them, and `holds` before `:documentId`.
+          {
+            path: 'payments/financial-documents',
+            title: title('screen.financialDocuments'),
+            loadComponent: () =>
+              import('./features/payments/financial-documents.component').then((m) => m.FinancialDocumentsComponent),
+          },
+          {
+            path: 'payments/financial-documents/holds',
+            title: title('screen.financialDocumentHolds'),
+            loadComponent: () =>
+              import('./features/payments/financial-document-holds.component').then(
+                (m) => m.FinancialDocumentHoldsComponent,
+              ),
+          },
+          {
+            path: 'payments/financial-documents/:documentId',
+            title: title('screen.financialDocument'),
+            loadComponent: () =>
+              import('./features/payments/financial-document-page.component').then(
+                (m) => m.FinancialDocumentPageComponent,
+              ),
+          },
           {
             path: 'payments/:paymentId',
             title: title('screen.paymentDetails'),

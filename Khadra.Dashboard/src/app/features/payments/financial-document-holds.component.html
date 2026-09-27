@@ -1,0 +1,102 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('nav.payments') }}</h1>
+      <div class="page-sub">{{ t('payments.subtitle') }}</div>
+    </div>
+  </div>
+
+  <section class="sect sect-clip">
+    <div class="tabs" role="tablist">
+      <a class="tab" role="tab" routerLink="/payments" [attr.aria-selected]="false">{{ t('payments.tabPayments') }}</a>
+      <a class="tab" role="tab" routerLink="/payments/refunds" [attr.aria-selected]="false">{{ t('payments.tabRefunds') }}</a>
+      <a class="tab is-active" role="tab" routerLink="/payments/financial-documents" aria-selected="true">{{ t('financialDocuments.tab') }}</a>
+    </div>
+    <div class="tabs" role="tablist">
+      <a class="tab" role="tab" routerLink="/payments/financial-documents" [attr.aria-selected]="false">{{ t('financialDocuments.viewAll') }}</a>
+      <a class="tab is-active" role="tab" routerLink="/payments/financial-documents/holds" aria-selected="true">{{ t('financialDocuments.viewHolds') }}</a>
+    </div>
+    <div class="sect-pad">
+      <div class="note-box">
+        <kh-icon name="info" />
+        {{ t('financialDocuments.holdsNote') }}
+      </div>
+    </div>
+
+    @if (failure(); as message) {
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('financialDocuments.holdsLoadFailed') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    } @else if (resource.isLoading() && rows().length === 0) {
+      <div class="sect-pad" aria-busy="true" aria-live="polite">
+        @for (row of [0, 1, 2, 3]; track row) {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="state-block is-empty">
+        <div class="state-icon is-outline"><kh-icon name="receipt" /></div>
+        <div class="state-title">{{ t('financialDocuments.holdsEmpty') }}</div>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>{{ t('financialDocuments.colOwed') }}</th>
+              <th>{{ t('payments.colBooking') }}</th>
+              <th>{{ t('financialDocuments.colReason') }}</th>
+              <th class="td-num">{{ t('financialDocuments.colAttempts') }}</th>
+              <th>{{ t('financialDocuments.colFailures') }}</th>
+              <th>{{ t('financialDocuments.colNextAttempt') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.id) {
+              <tr>
+                <td class="td">{{ row.type }}</td>
+                <td class="td">
+                  @if (row.reference) {
+                    <a class="row-link mono ltr" [routerLink]="['/bookings', row.bookingId]">{{ row.reference }}</a>
+                  } @else {
+                    <a class="row-link" [routerLink]="['/bookings', row.bookingId]">{{ t('financialDocuments.openBooking') }}</a>
+                  }
+                </td>
+                <td class="td">
+                  <div>{{ row.reason }}</div>
+                  @if (row.lastError) {
+                    <div class="td-sub mono ltr fdoc-error">{{ row.lastError }}</div>
+                  }
+                </td>
+                <td class="td td-num num">{{ row.attempts }}</td>
+                <td class="td">
+                  <div class="td-sub">{{ t('financialDocuments.firstFailed', { when: row.firstFailed }) }}</div>
+                  <div class="td-sub">{{ t('financialDocuments.lastFailed', { when: row.lastFailed }) }}</div>
+                </td>
+                <td class="td">{{ row.nextAttempt }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pager">
+        <span class="pager-count">{{ t('financialDocuments.holdsShownOf', { shown: rows().length, count: total() }) }}</span>
+        <div class="pager-nav">
+          <button type="button" class="btn btn-secondary btn-page" [disabled]="page() <= 1" (click)="goTo(page() - 1)">
+            {{ t('common.previous') }}
+          </button>
+          <span class="pager-count">{{ t('common.pageOf', { page: page(), total: pages() }) }}</span>
+          <button type="button" class="btn btn-secondary btn-page" [disabled]="page() >= pages()" (click)="goTo(page() + 1)">
+            {{ t('common.next') }}
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+</div>

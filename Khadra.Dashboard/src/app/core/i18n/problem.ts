@@ -82,6 +82,16 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'admin.invitation_accepted': 'problem.invitationAccepted',
   'admin.invitation_target_inactive': 'problem.invitationTargetInactive',
   'admin.invitation_email_not_sent': 'problem.invitationEmailNotSent',
+  // Voiding an issued document (payments Phase 5b). The first two mean the document can never be
+  // current again, so the screen closes the dialog and reloads; the other three leave it as it was, and
+  // nothing was voided.
+  'financial_documents.not_current': 'problem.documentNotCurrent',
+  'financial_documents.already_voided': 'problem.documentAlreadyVoided',
+  'financial_documents.correction_records_need_review': 'problem.correctionRecordsNeedReview',
+  'financial_documents.correction_issuer_not_configured': 'problem.correctionIssuerNotConfigured',
+  'financial_documents.correction_failed': 'problem.correctionFailed',
+  'financial_documents.void_reason_required': 'problem.reasonRejected',
+  'financial_documents.void_reason_too_long': 'problem.reasonRejected',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */
@@ -89,6 +99,9 @@ const WORDED_FIELDS: Readonly<Record<string, TranslationKey>> = {
   email: 'problem.invalidEmail',
   phone: 'problem.invalidPhone',
   fullname: 'problem.invalidName',
+  // Every reason an administrator types is required and has a length the SERVER sets; the sentence
+  // names neither figure, so no limit is written into the console.
+  reason: 'problem.reasonRejected',
 };
 
 /** What a bare status means, when nothing more specific is available. */

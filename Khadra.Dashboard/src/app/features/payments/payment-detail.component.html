@@ -99,6 +99,38 @@
       </div>
     </section>
 
+    @if (documents(); as documents) {
+      <section class="sect">
+        <div class="sect-h">
+          <kh-icon name="receipt" class="kpi-icon" />
+          <span class="sect-t">{{ t('financialDocuments.paymentReceipts') }}</span>
+        </div>
+        <div class="kv-body">
+          @for (row of documents; track row.id) {
+            <div class="kv-split">
+              <div class="kv-key">
+                <div class="row row-gap-8 row-wrap">
+                  <a class="row-link mono ltr fdoc-number" [routerLink]="['/payments/financial-documents', row.id]">{{ row.number }}</a>
+                  @if (row.isTest) {
+                    <span class="pill s-warn">{{ t('payments.test') }}</span>
+                  }
+                </div>
+                <div class="td-sub">{{ row.title }} · {{ row.issued }}</div>
+              </div>
+              <div class="kv-val">
+                <div class="row row-gap-8 row-wrap row-end">
+                  <span class="num">{{ row.headline }}</span>
+                  <span class="pill" [class]="'s-' + row.standing.tone">{{ row.standing.label }}</span>
+                </div>
+              </div>
+            </div>
+          } @empty {
+            <div class="state-text">{{ t('financialDocuments.noPaymentReceipt') }}</div>
+          }
+        </div>
+      </section>
+    }
+
     <section class="sect">
       <div class="sect-h">
         <kh-icon name="receipt" class="kpi-icon" />

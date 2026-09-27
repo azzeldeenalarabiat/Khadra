@@ -4,6 +4,7 @@ import {
   formatNumber,
   formatPercent,
   formatPercentRange,
+  formatStoredAmount,
   withoutNegativeZero,
 } from './number-format';
 
@@ -91,5 +92,42 @@ describe('formatPercentRange', () => {
 
   it('never prints a negative zero', () => {
     expect(formatPercentRange(-0, 10, 'en-GB')).toBe('0–10%');
+  });
+});
+
+/**
+ * An amount as an issued document STORED it (payments Phase 5b): the digits a record holds, never a
+ * float and never re-scaled; the same cases the website pins.
+ */
+describe('formatStoredAmount', () => {
+  it('keeps every stored digit, the fraction exactly as stored', () => {
+    expect(formatStoredAmount('0.000', EN)).toBe('0.000');
+    expect(formatStoredAmount('12.750', EN)).toBe('12.750');
+    expect(formatStoredAmount('94.5', EN)).toBe('94.5');
+    expect(formatStoredAmount('7', EN)).toBe('7');
+  });
+
+  it('groups the whole part as every other figure is grouped, in both languages, with Latin digits', () => {
+    expect(formatStoredAmount('1234567.890', EN)).toBe('1,234,567.890');
+    expect(formatStoredAmount('1234567.890', AR)).toBe(formatAmount(1234567.89, AR, 3));
+    expect(formatStoredAmount('1234567.890', AR)).toMatch(/^[0-9.,٫٬]+$/);
+  });
+
+  it('never loses a digit a float would round away', () => {
+    // 2^53 + 1 cannot be held by a double; a record must still print it whole.
+    expect(formatStoredAmount('9007199254740993.125', EN)).toBe('9,007,199,254,740,993.125');
+  });
+
+  it('keeps a real sign and drops a sign on zero', () => {
+    expect(formatStoredAmount('-12.500', EN)).toMatch(/^[-−]12\.500$/);
+    expect(formatStoredAmount('-0.000', EN)).toBe('0.000');
+    expect(formatStoredAmount('-0.000', AR)).not.toMatch(SIGN);
+  });
+
+  it('answers null for text that is not an amount, for the caller to print as it is', () => {
+    expect(formatStoredAmount('12,5', EN)).toBeNull();
+    expect(formatStoredAmount('', EN)).toBeNull();
+    expect(formatStoredAmount('1e3', EN)).toBeNull();
+    expect(formatStoredAmount(' 12.000', EN)).toBeNull();
   });
 });

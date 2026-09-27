@@ -1,0 +1,225 @@
+@if (failure(); as message) {
+  <section class="sect">
+    <div class="state-block">
+      <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+      <div class="state-title">{{ t('financialDocuments.pageLoadFailed') }}</div>
+      <div class="state-text">{{ message }}</div>
+      <div class="state-actions">
+        <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        <a class="btn btn-secondary btn-sm" routerLink="/payments/financial-documents">{{ t('financialDocuments.tab') }}</a>
+      </div>
+    </div>
+  </section>
+} @else if (page(); as p) {
+  <div class="stack stack-14">
+    <div class="dc-head">
+      <div>
+        <!-- The number leads: it is what a customer quotes and what the audit log names. -->
+        <div class="row row-gap-9 row-wrap">
+          <h1 class="page-title ltr">{{ p.number }}</h1>
+          <span class="pill" [class]="'s-' + p.standing.tone">{{ p.standing.label }}</span>
+          @if (p.isTest) {
+            <span class="pill s-warn">{{ t('payments.test') }}</span>
+          }
+        </div>
+        <div class="page-sub">{{ p.title }} · {{ p.versionOf }}</div>
+      </div>
+      <div class="dc-head-actions">
+        @if (p.canVoid) {
+          <button type="button" class="btn btn-danger btn-sm" (click)="voidDocument()">
+            <kh-icon name="file-x" />
+            {{ t('financialDocuments.voidAction') }}
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (p.voided; as voided) {
+      <div class="banner s-bad">
+        <kh-icon name="file-x" />
+        <div class="stack stack-9">
+          <div>{{ t('financialDocuments.voidedOn', { when: voided.when, by: voided.by }) }}</div>
+          <div>
+            <span class="td-sub">{{ t('financialDocuments.voidReason') }}</span>
+            <span class="user-text">{{ voided.reason }}</span>
+          </div>
+          @if (voided.replacement; as replacement) {
+            <div>
+              {{ t('financialDocuments.replacedBy') }}
+              <a class="row-link mono ltr fdoc-number" [routerLink]="['/payments/financial-documents', replacement.id]">{{ replacement.number }}</a>
+            </div>
+          }
+        </div>
+      </div>
+    }
+    @if (p.newer; as newer) {
+      <div class="banner s-warn">
+        <kh-icon name="clock-counter-clockwise" />
+        <div>
+          {{ t('financialDocuments.newerVersion') }}
+          <a class="row-link mono ltr fdoc-number" [routerLink]="['/payments/financial-documents', newer.id]">{{ newer.number }}</a>
+        </div>
+      </div>
+    }
+
+    <div class="fdoc-layout">
+      <div class="stack stack-14">
+        @if (p.body; as body) {
+          <section class="sect sect-pad">
+            <kh-financial-document [body]="body" />
+          </section>
+        } @else {
+          <!-- A schema version this console cannot show whole: the facts the page carries, never a partial record. -->
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="receipt" class="kpi-icon" />
+              <span class="sect-t">{{ p.title }}</span>
+            </div>
+            <div class="kv-body">
+              <div class="kv-split">
+                <div class="kv-key">{{ p.headlineLabel }}</div>
+                <div class="kv-val num">{{ p.headline }}</div>
+              </div>
+              <div class="kv-split">
+                <div class="kv-key">{{ t('financialDocuments.issued') }}</div>
+                <div class="kv-val">{{ p.issued }}</div>
+              </div>
+            </div>
+            <div class="sect-pad">
+              <div class="banner s-warn">
+                <kh-icon name="warning" />
+                <div>{{ t('financialDocuments.cannotShow') }}</div>
+              </div>
+            </div>
+          </section>
+        }
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="list-magnifying-glass" class="kpi-icon" />
+            <span class="sect-t">{{ t('financialDocuments.recordedFacts') }}</span>
+            <span class="sect-hint">{{ t('financialDocuments.recordedFactsHint') }}</span>
+          </div>
+          @if (p.facts; as facts) {
+            <pre class="fdoc-facts ltr">{{ facts }}</pre>
+          } @else {
+            <div class="sect-pad"><div class="state-text">{{ t('financialDocuments.noFacts') }}</div></div>
+          }
+        </section>
+      </div>
+
+      <div class="stack stack-14">
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="receipt" class="kpi-icon" />
+            <span class="sect-t">{{ t('financialDocuments.details') }}</span>
+          </div>
+          <div class="kv-body">
+            <div class="kv-split">
+              <div class="kv-key">{{ t('financialDocuments.type') }}</div>
+              <div class="kv-val">{{ p.type }}</div>
+            </div>
+            <div class="kv-split">
+              <div class="kv-key">{{ t('financialDocuments.cause') }}</div>
+              <div class="kv-val">{{ p.cause }}</div>
+            </div>
+            <div class="kv-split">
+              <div class="kv-key">{{ t('financialDocuments.occurred') }}</div>
+              <div class="kv-val">{{ p.occurred }}</div>
+            </div>
+            <div class="kv-split">
+              <div class="kv-key">{{ t('financialDocuments.issued') }}</div>
+              <div class="kv-val">{{ p.issued }}</div>
+            </div>
+          </div>
+          <div class="sect-pad fdoc-links">
+            <a class="btn btn-secondary btn-sm" [routerLink]="['/bookings', p.bookingId]">
+              {{ t('financialDocuments.booking') }} <span class="mono ltr">{{ p.reference }}</span>
+            </a>
+            <a class="btn btn-secondary btn-sm" [routerLink]="['/dealers', p.dealerId]">{{ t('financialDocuments.office') }}</a>
+            <a class="btn btn-secondary btn-sm" [routerLink]="['/customers', p.customerId]">{{ t('financialDocuments.customer') }}</a>
+            <a class="btn btn-secondary btn-sm" routerLink="/audit-logs" [queryParams]="{ entityType: 'FinancialDocument', entityId: p.id }">
+              {{ t('financialDocuments.auditLog') }}
+            </a>
+          </div>
+        </section>
+
+        @if (p.versions.length || p.paymentReceipt || p.refundReceipts.length) {
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="clock-counter-clockwise" class="kpi-icon" />
+              <span class="sect-t">{{ t('financialDocuments.family') }}</span>
+            </div>
+            <div class="kv-body">
+              @if (p.versions.length) {
+                <div class="td-sub">{{ t('financialDocuments.versions') }}</div>
+                @for (link of p.versions; track link.id) {
+                  <div class="kv-split">
+                    <div class="kv-key">
+                      @if (link.here) {
+                        <span class="mono ltr fdoc-number" aria-current="page">{{ link.number }}</span>
+                      } @else {
+                        <a class="row-link mono ltr fdoc-number" [routerLink]="['/payments/financial-documents', link.id]">{{ link.number }}</a>
+                      }
+                      <div class="td-sub">{{ link.detail }}</div>
+                    </div>
+                    <div class="kv-val">
+                      <span class="pill" [class]="'s-' + link.standing.tone">{{ link.standing.label }}</span>
+                    </div>
+                  </div>
+                }
+              }
+              @if (p.paymentReceipt; as receipt) {
+                <div class="td-sub">{{ t('financialDocuments.issuedAgainst') }}</div>
+                <div class="kv-split">
+                  <div class="kv-key">
+                    <a class="row-link mono ltr fdoc-number" [routerLink]="['/payments/financial-documents', receipt.id]">{{ receipt.number }}</a>
+                    <div class="td-sub">{{ receipt.detail }}</div>
+                  </div>
+                  <div class="kv-val">
+                    <span class="pill" [class]="'s-' + receipt.standing.tone">{{ receipt.standing.label }}</span>
+                  </div>
+                </div>
+              }
+              @if (p.refundReceipts.length) {
+                <div class="td-sub">{{ t('financialDocuments.refundsFromPayment') }}</div>
+                @for (link of p.refundReceipts; track link.id) {
+                  <div class="kv-split">
+                    <div class="kv-key">
+                      <a class="row-link mono ltr fdoc-number" [routerLink]="['/payments/financial-documents', link.id]">{{ link.number }}</a>
+                      <div class="td-sub">{{ link.detail }}</div>
+                    </div>
+                    <div class="kv-val">
+                      <span class="pill" [class]="'s-' + link.standing.tone">{{ link.standing.label }}</span>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+          </section>
+        }
+
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="shield-check" class="kpi-icon" />
+            <span class="sect-t">{{ t('financialDocuments.proof') }}</span>
+          </div>
+          <div class="kv-body">
+            @for (row of p.proof; track row.k) {
+              <div class="kv-split">
+                <div class="kv-key">{{ row.k }}</div>
+                <div class="kv-val" [class.mono]="row.code" [class.ltr]="row.code" [class.fdoc-proof]="row.code">{{ row.v }}</div>
+              </div>
+            }
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+} @else {
+  <section class="sect sect-pad" aria-busy="true">
+    @for (row of [0, 1, 2, 3, 4, 5]; track row) {
+      <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+    }
+  </section>
+}
