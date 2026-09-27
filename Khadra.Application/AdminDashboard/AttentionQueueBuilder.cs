@@ -2,6 +2,7 @@ using System.Globalization;
 using Khadra.Application.AdminDashboard.Dtos;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
 
@@ -35,6 +36,9 @@ public static class AttentionQueueBuilder
 
         /// <summary>A deposit held for a penalty against the customer with no dispute (pre-launch item 164).</summary>
         public const string DepositAwaitingDecision = "DepositAwaitingDecision";
+
+        /// <summary>Financial documents owed and not issued, and why: never silence (payments Phase 5).</summary>
+        public const string FinancialDocumentsOnHold = "FinancialDocumentsOnHold";
     }
 
     public static class Severities
@@ -56,7 +60,8 @@ public static class AttentionQueueBuilder
         decimal slaWarningThreshold,
         int slaHours,
         DateTimeOffset now,
-        MoneyAttention? money = null)
+        MoneyAttention? money = null,
+        FinancialDocumentHoldsSummary? documentsOnHold = null)
     {
         ArgumentNullException.ThrowIfNull(liveDisputes);
         ArgumentNullException.ThrowIfNull(disputeSubtitles);
@@ -110,6 +115,7 @@ public static class AttentionQueueBuilder
         }
 
         AddMoney(items, money ?? MoneyAttention.None);
+        AddDocumentsOnHold(items, documentsOnHold ?? FinancialDocumentHoldsSummary.None);
 
         // Overdue work first; then whatever runs out of time soonest, because each of those is a promise
         // the platform made and can still keep; then money a human has to look at, which has no clock —
@@ -186,6 +192,30 @@ public static class AttentionQueueBuilder
                 SlaDeadlineAt: null,
                 IsOverdue: false));
         }
+    }
+
+    /// <summary>
+    /// ONE row for every document family on hold (payments Phase 5): "N financial documents are on hold",
+    /// opening the holds with their reasons. No deadline — nobody has frozen one — but never merely watched:
+    /// a document owed and not issued is something a human has to look at, whether the records need putting
+    /// right, the issuer's identity is missing, or composition failed.
+    /// </summary>
+    private static void AddDocumentsOnHold(List<AttentionItemDto> items, FinancialDocumentHoldsSummary holds)
+    {
+        if (holds.Count == 0 || holds.OldestFailedAt is not { } oldest)
+            return;
+
+        items.Add(new AttentionItemDto(
+            Id: "financial-documents-on-hold",
+            Kind: Kinds.FinancialDocumentsOnHold,
+            Severity: Severities.Warning,
+            Count: holds.Count,
+            SubjectIds: [.. holds.HoldIds.Select(id => id.Value)],
+            Subtitle: References(holds.BookingReferences),
+            Description: null,
+            SlaStartedAt: oldest,
+            SlaDeadlineAt: null,
+            IsOverdue: false));
     }
 
     /// <summary>Up to three booking references, the ones a human reads first; the console states the count.</summary>

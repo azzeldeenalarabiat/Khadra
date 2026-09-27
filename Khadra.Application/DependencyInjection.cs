@@ -40,6 +40,10 @@ public static class DependencyInjection
         services.AddScoped<Bookings.Handover.HandoverVerifier>();
         services.AddScoped<AuthEmailDispatcher>();
         services.AddScoped<Bookings.BookingEmailDispatcher>();
+        // Issued financial documents (payments Phase 5): the composer is pure, the other two share the scope.
+        services.AddSingleton<FinancialDocuments.Composition.FinancialDocumentComposer>();
+        services.AddScoped<FinancialDocuments.Issuance.DocumentPreparation>();
+        services.AddScoped<FinancialDocuments.Issuance.FinancialDocumentIssuing>();
 
         var eventHandlerRegistrations = assembly
             .DefinedTypes

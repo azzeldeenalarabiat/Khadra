@@ -121,6 +121,19 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         });
         entity.Navigation(refund => refund.Amount).IsRequired();
 
+        // The stored split (owner, 2026-09-26; payments Phase 5), in the refund's own currency. The
+        // migration that added these filled every earlier refund by Payment.FeeFor's rule, and adds a
+        // PostgreSQL CHECK that the parts sum to the amount (not modelled here: SQLite, which the tests
+        // run on, would compare decimals as floating point).
+        entity.Property<decimal>("_bookingPart")
+            .HasColumnName("booking_part")
+            .HasPrecision(18, 3)
+            .IsRequired();
+        entity.Property<decimal>("_feePart")
+            .HasColumnName("fee_part")
+            .HasPrecision(18, 3)
+            .IsRequired();
+
         ConfigureEnumeration(entity.Property(refund => refund.Reason), 30);
         ConfigureEnumeration(entity.Property(refund => refund.Status), 20);
         ConfigureId(entity.Property(refund => refund.DisputeTicketId));

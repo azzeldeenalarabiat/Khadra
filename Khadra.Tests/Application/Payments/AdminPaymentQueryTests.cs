@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.Payments.AdminPayments;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
@@ -24,6 +25,7 @@ public sealed class AdminPaymentQueryTests
     private readonly IPaymentAdminReader _reader = Substitute.For<IPaymentAdminReader>();
     private readonly IPaymentRepository _payments = Substitute.For<IPaymentRepository>();
     private readonly IReportingCalendar _calendar = Substitute.For<IReportingCalendar>();
+    private readonly IFinancialDocumentReader _documents = Substitute.For<IFinancialDocumentReader>();
 
     public AdminPaymentQueryTests()
     {
@@ -34,9 +36,11 @@ public sealed class AdminPaymentQueryTests
             .Returns(PagedResult.Empty<AdminPaymentListItem>(1, 20));
         _reader.ListRefundsAsync(Arg.Any<AdminRefundFilter>(), Arg.Any<PageRequest>(), Arg.Any<CancellationToken>())
             .Returns(PagedResult.Empty<AdminRefundListItem>(1, 20));
+        _documents.ListForPaymentAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<FinancialDocumentRecord>>([]));
     }
 
-    private AdminPaymentQueryHandlers Handlers() => new(_reader, _payments, _calendar);
+    private AdminPaymentQueryHandlers Handlers() => new(_reader, _payments, _documents, _calendar);
 
     [Fact]
     public void Unknown_filter_words_and_a_backwards_range_are_refused()

@@ -16,6 +16,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Platform Settings | done | pending (configuration-backed) | pending |
 | Payments | done | done | **deposit checkout + provider webhook done**; NO PROVIDER CONFIGURED |
 | Shortlist | done | done | **save / forget / list / membership done** |
+| Financial Documents | done | done | **issued by the settlement pass, with holds; customer and administrator endpoints; void and correct** (payments Phase 5a). Clients are Phase 5b |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
@@ -35,6 +36,7 @@ Bookings ──events (Approved, PickedUp, Cancelled, NoShow, Completed)──�
 Disputes ──resolution (money instructions)──▶ Payments, Bookings
 Platform Settings ──IBusinessRulesProvider──▶ Bookings (frozen onto each booking as BookingTerms), Shortlist (the cap)
 Shortlist ──(VehicleId only)──▶ reads Fleet's catalogue; Fleet learns nothing about customers
+Financial Documents ──reads, by id only, never writes──▶ Bookings, Payments, Disputes, Dealers, Fleet, Identity (names), Platform Settings (lookups)
 ```
 
 Communication is by `Id`, by explicit application contracts, or by domain events. A context never mutates another context's aggregate, and there are no navigation properties across contexts.
@@ -276,6 +278,48 @@ apart.
 
 The cap is `BusinessRules:MaxShortlistEntries`, configured rather than constant, settled by the owner
 at 100 on 2026-09-11.
+
+## 10. Financial Documents
+
+The receipts and statements the platform issues about a customer's money (payments Phase 5, owner
+2026-09-27; the full design and the owner's decisions are in `docs/payments-phase5-plan.md`). Three
+documents, none of them a tax invoice and each saying so: a **Payment Receipt** when money is captured, a
+**Refund Receipt** when a refund settles, and a **Booking Statement**, versioned each time money moves.
+
+**The row and its snapshot are the official record.** `FinancialDocument` is append-only twice over (the
+`IAppendOnly` guard and the database's `khadra_table_is_append_only()` triggers), and everything it shows —
+parties, figures, and every word in English and Arabic — is frozen into one canonical JSON snapshot with
+its SHA-256 beside it. A PDF (Phase 6) and an email (Phase 7) are representations of it. A wrong document
+is voided and corrected in ONE transaction (`FinancialDocumentVoid`), audited in the same one; its
+standing — current, superseded, voided — is derived when read, never stored.
+
+**Its own context, reading everything, writing nothing elsewhere.** It references bookings, payments,
+refunds, tickets, offices, cars and customers by id, reads them as COMMITTED (never through the
+clock-settling booking repository, whose in-memory lapse stamps an ending with the current instant), and
+reads the office and the car past the soft-delete filter so a document still names them after they leave.
+Statements are composed from `BookingFinancialsDto.For(financials, Customer)` alone — the customer's
+projection — so nothing a customer may not see can reach an append-only record.
+
+**The facts are the queue.** No row records that a document is due. The settlement pass, right after the
+payment sweep, asks: which captured payment has no receipt row, which settled refund has none, which
+booking's checkpoints — a capture, a settled refund, a resolved dispute, the ending, cash at a handover,
+and nothing else — are newer than its latest statement (or were committed just after it, inside
+`LateCommitMarginMinutes`), with the checkpoint fingerprint deciding. Each document is issued in its own
+scope and transaction: compose, take the number from its series row (`INSERT … ON CONFLICT … RETURNING`,
+so a rollback returns it and a series has no gaps), insert. What cannot be issued goes on HOLD
+(`RecordsNeedReview`, `IssuerNotConfigured`, `SnapshotFailed`) with a growing retry delay, shown on the
+administrator's work queue and in the boot log — never silence.
+
+**Test money is marked by the money itself.** `provider` on the document is a frozen copy of
+`payments.provider`; sandbox documents are numbered `TEST-PAY-…`, `TEST-RFD-…`, `TEST-STM-…`. No document is
+issued without Khadra's legal identity (`FinancialDocuments:Issuer`, all or nothing); a clearly marked test
+identity exists for local sandbox testing only and `Program.cs` refuses it anywhere else.
+
+**Who sees what.** The customer: their own documents (`/customers/me/financial-documents`,
+`/financial-documents/{id}`, and a booking's under `/bookings/{id}/financial-documents` with what is still
+being prepared); anyone else's is 404. The rental office: nothing in Phase 5 — an empty list. The
+administrator: everything, with the provider, the proof hash, holds and the void's reason, under
+`/admin/financial-documents`.
 
 ## Owner decisions required
 

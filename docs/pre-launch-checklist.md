@@ -4564,3 +4564,51 @@ dispute screen also ended its resolution card with the old sentence, written for
 Payments existed; that line is gone, as the website never had it. Installed 1.1.0/1.2.x keep the old
 sentence until they update: production takes no payments, so no dispute there can have settled a
 penalty before then.
+
+## Issued financial documents (payments Phase 5a, 2026-09-27)
+
+The backend of the receipts and statements in `docs/payments-phase5-plan.md`, and what it knowingly
+leaves for later.
+
+### 177. A customer's name is frozen into financial documents that nothing can erase
+
+**Status:** open · **Raised:** 2026-09-27 (plan §3.13) · **Owner decision** · **Before real customers**
+
+Every issued document freezes the customer's name into `financial_documents.snapshot`, which the
+database refuses to update, delete or truncate (the same `khadra_table_is_append_only()` guard as the
+audit trail). That is right for a financial record — a receipt must say whom it was issued to — and it
+is also personal data with no erasure path: `User.Delete` is a soft delete and never touches a document.
+The snapshot carries the minimum on purpose (the owner, 2026-09-27: the name only — no email, no phone;
+addresses and delivery attempts belong to the Phase 7 delivery history). **To close:** the owner
+states the legal basis for keeping issued documents and for how long (Jordan's record-keeping rules for
+the business), and the privacy notice says so, before the first real customer's document is issued.
+
+### 178. Khadra's legal identity must be configured before any real document is issued
+
+**Status:** open · **Raised:** 2026-09-27 (owner decision 1 of Phase 5) · **Before real money**
+
+No permanent financial document is issued with placeholder or incomplete issuer information (owner,
+2026-09-27). Until `FinancialDocuments:Issuer` holds Khadra's real legal name (English and Arabic),
+commercial registration, address (English and Arabic), support email and phone, every document owed
+waits on hold (`IssuerNotConfigured`), the boot log says FINANCIAL DOCUMENTS ARE NOT ISSUED, and the
+administrator's work queue lists them. A half-configured identity refuses to start and names what is
+missing. A clearly marked TEST identity (`TestIdentity` true) exists for local sandbox testing only:
+`Program.cs` refuses it in any environment but Development and with any payment provider but
+`SANDBOX` — Staging included — and the issuer never lets it sign real money. **To close:** the owner
+gives the identity; it is set in Production's environment with `TestIdentity` false, and the boot log
+reads "Financial documents issued as …".
+
+### 179. Two known bounds of statement issuing
+
+**Status:** open · **Raised:** 2026-09-27 (architecture review of payments Phase 5a)
+
+Two cases the issuing sweep does not handle, both unreachable today, recorded so they are not rediscovered.
+**A booking whose captured payments name two providers** is held (`SnapshotFailed`) and gets no statement:
+a statement cannot say which kind of money it is about. Today one database holds one kind of money
+(`PaymentsStartupCheck`), but the day a real adapter replaces the sandbox (item 76), a booking that paid its
+deposit under one provider and the rest under the other would be held for good. **Clock skew between API
+instances** larger than `FinancialDocuments:LateCommitMarginMinutes` could let a fact committed just after a
+statement, and stamped earlier than it, go unnoticed until the booking's next checkpoint; it belongs with the
+single-instance assumption of the settlement pass. **To close:** decide how a statement names a booking paid
+under two providers before a real adapter lands; keep the instances' clocks synchronised (or run the pass on
+one instance) when the API scales out.

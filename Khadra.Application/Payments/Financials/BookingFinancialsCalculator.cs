@@ -107,7 +107,10 @@ public static class BookingFinancialsCalculator
             payment.Status == PaymentStatus.Applied
                 ? RefundProgress.Of(officeRefunds, BookingMoneyReturned(payment, officeRefunds))
                 : RefundProgress.None,
-            payment.AppliedAt ?? payment.CapturedAt ?? payment.FailedAt ?? payment.CreatedAt,
+            // When the money was RECORDED — applied, or captured and not applied — the one instant an issued
+            // receipt, its statement and their checkpoints use too (payments Phase 5), so a document and
+            // this page never state two times for one payment.
+            payment.AppliedAt ?? payment.OrphanedAt ?? payment.CapturedAt ?? payment.FailedAt ?? payment.CreatedAt,
             payment.CreatedAt,
             Fresh(payment.AmountCaptured ?? payment.Amount),
             Fresh(payment.ProcessingFee),

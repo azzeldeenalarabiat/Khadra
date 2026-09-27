@@ -6,6 +6,7 @@ using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Bookings.Handover;
 using Khadra.Application.Bookings.ReadBookings;
 using Khadra.Application.Common;
+using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -108,6 +109,19 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
             cancellationToken);
         return FromResult(result);
     }
+
+    /// <summary>
+    /// The booking's issued financial documents and what is still being prepared (payments Phase 5), for
+    /// Booking Details. The customer's; the rental office gets both lists empty — it sees no customer
+    /// document in Phase 5 — and a stranger is told the booking does not exist.
+    /// </summary>
+    [HttpGet("{bookingId:guid}/financial-documents")]
+    [ProducesResponseType<BookingFinancialDocumentsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult> GetFinancialDocuments(Guid bookingId, CancellationToken cancellationToken) =>
+        FromResult(await Mediator.Send(
+            new GetBookingFinancialDocumentsQuery(actor.UserId!.Value, Id.From(bookingId)),
+            cancellationToken));
 
     /// <summary>What a customer sends to ask a gallery for a car.</summary>
     /// <remarks>

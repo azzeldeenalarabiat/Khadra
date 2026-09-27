@@ -5,6 +5,7 @@ using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
+using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.Payments.ReadModels;
@@ -16,6 +17,7 @@ using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes.Repositories;
+using Khadra.Domain.FinancialDocuments.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
@@ -239,6 +241,16 @@ public static class DependencyInjection
             .Validate(options => options.MaxShortlistEntries is > 0,
                 "BusinessRules: MaxShortlistEntries must be set to a positive number of cars.")
             .ValidateOnStart();
+        services.AddOptions<FinancialDocumentOptions>()
+            .Bind(configuration.GetSection(FinancialDocumentOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(options => options.RetryMaxSeconds >= options.RetryInitialSeconds,
+                "FinancialDocuments: RetryMaxSeconds must be at least RetryInitialSeconds.")
+            .ValidateOnStart();
+        // Khadra's identity is all or nothing (owner, 2026-09-27): a half-filled one is refused at boot,
+        // naming the settings that are missing, rather than holding every document for a reason nobody reads.
+        services.AddSingleton<IValidateOptions<FinancialDocumentOptions>, FinancialDocumentIssuerValidator>();
+        services.AddSingleton<IFinancialDocumentSettings, FinancialDocumentSettings>();
         services.AddOptions<MobileAppOptions>()
             .Bind(configuration.GetSection(MobileAppOptions.SectionName))
             // Refused at startup rather than read as "no minimum": a typo in the one setting that
@@ -333,6 +345,11 @@ public static class DependencyInjection
         services.AddScoped<IShortlistRepository, ShortlistRepository>();
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IProviderEventReceiptRepository, ProviderEventReceiptRepository>();
+        // Issued financial documents (payments Phase 5): append-only documents and voids, the holds on
+        // families owed one, and the gapless number counters.
+        services.AddScoped<IFinancialDocumentRepository, FinancialDocumentRepository>();
+        services.AddScoped<IFinancialDocumentIssuanceHoldRepository, FinancialDocumentIssuanceHoldRepository>();
+        services.AddScoped<IFinancialDocumentSeries, FinancialDocumentSeriesCounter>();
         services.AddScoped<INotifier, Notifier>();
         services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
 
@@ -372,6 +389,11 @@ public static class DependencyInjection
         // seven-row feed, and a filtered, paged log. Two readers, deliberately.
         services.AddScoped<IAuditLogReader, AuditLogReader>();
         services.AddScoped<IAuditActorReader, AuditActorReader>();
+        // Issued financial documents (payments Phase 5): what they are composed from, what is owed one, and
+        // the customer's and the administrator's readings of them.
+        services.AddScoped<IFinancialDocumentFactsReader, FinancialDocumentFactsReader>();
+        services.AddScoped<IFinancialDocumentCandidateReader, FinancialDocumentCandidateReader>();
+        services.AddScoped<IFinancialDocumentReader, FinancialDocumentReader>();
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();

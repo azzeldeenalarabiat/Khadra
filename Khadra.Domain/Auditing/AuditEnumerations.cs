@@ -51,6 +51,10 @@ public sealed class AuditAction : Enumeration
     // Enough wrong codes were typed for one booking to lock the customer's code.
     public static readonly AuditAction HandoverCodeLocked = new(27, "HandoverCodeLocked");
 
+    // An administrator voided an issued financial document (payments Phase 5). The void and its
+    // correction are one transaction with this entry; the previous and new values are the two numbers.
+    public static readonly AuditAction FinancialDocumentVoided = new(28, "FinancialDocumentVoided");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }
@@ -71,6 +75,9 @@ public sealed class AuditEntityType : Enumeration
     // list" has to be answerable without reading labels.
     public static readonly AuditEntityType City = new(8, "City");
     public static readonly AuditEntityType CarType = new(9, "CarType");
+
+    // A receipt or a booking statement (payments Phase 5), recorded by its id and labelled by its number.
+    public static readonly AuditEntityType FinancialDocument = new(10, "FinancialDocument");
 
     private AuditEntityType(int id, string name) : base(id, name)
     {

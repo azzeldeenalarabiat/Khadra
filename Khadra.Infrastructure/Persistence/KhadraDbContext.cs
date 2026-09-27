@@ -3,6 +3,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.FinancialDocuments;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Notifications;
@@ -38,6 +39,10 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<CustomerShortlist> Shortlists => Set<CustomerShortlist>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<ProviderEventReceipt> ProviderEventReceipts => Set<ProviderEventReceipt>();
+    public DbSet<FinancialDocument> FinancialDocuments => Set<FinancialDocument>();
+    public DbSet<FinancialDocumentVoid> FinancialDocumentVoids => Set<FinancialDocumentVoid>();
+    public DbSet<FinancialDocumentIssuanceHold> FinancialDocumentIssuanceHolds => Set<FinancialDocumentIssuanceHold>();
+    internal DbSet<FinancialDocumentSeries> FinancialDocumentSeries => Set<FinancialDocumentSeries>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

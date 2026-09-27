@@ -15,8 +15,8 @@ deliver is written down so it cannot be dropped. The rules already in force are 
 | 2 | Payment purpose and processing fee, the amount paid online, deposit or full payment on the website and in the app | done (`43f4128`, `e04a55f`, `de384c5`) |
 | 3 | Refunds generalised: what a paid booking owes back when it ends before pickup, the clean-close release, named refund events | done (`82a66e7`); items 169/170 (`b7c9db0`, `43b3707`) |
 | 4a | One server calculator of a booking's financial state; `GET /bookings/{id}/financials` and its admin twin; the "Payments" section on the website and in app 1.3.0 | done (`c50ab9b`); item 173 (`673c586`) |
-| 4b | The consoles: the office's Financial section and the admin's Money section from the calculator; the admin Payments and Refunds screens; the dashboard's money panel | done (2026-09-27) |
-| 5 | Issued documents: payment receipts, refund receipts and booking statement versions, with numbering and immutable snapshots | not started |
+| 4b | The consoles: the office's Financial section and the admin's Money section from the calculator; the admin Payments and Refunds screens; the dashboard's money panel | done (`8a0eed0`) |
+| 5 | Issued documents: payment receipts, refund receipts and booking statement versions, with numbering and immutable snapshots | plan approved 2026-09-27 (`docs/payments-phase5-plan.md`); SQL approved and applied locally only (scratch proof 35/35, then `khadra_web_it`); **5a, the backend, built** — issued by the settlement pass with holds, customer and administrator endpoints, void and correct; 5b (website, app, console) next; Staging not migrated |
 | 6 | PDF rendering and secure download | not started (QuestPDF only if its Community licence applies) |
 | 7 | Receipt and invoice email | not started |
 | 8 | The office payables ledger (manual settlement) | not started |
@@ -103,6 +103,31 @@ state (`penalty.state`), never from a guess in the client:
 - After a dispute is resolved (`ResolvedByDispute`):
   - English: "This penalty was resolved through a dispute. See Payments for the final amount."
   - Arabic: "تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي."
+
+### 2026-09-27 — Phase 5, issued financial documents
+
+The plan in `docs/payments-phase5-plan.md` is approved, with these decisions:
+
+1. **The record.** The database financial-document row and its immutable snapshot are the official
+   record. A PDF (Phase 6) and an email (Phase 7) are representations and deliveries derived from that
+   record, never the record.
+2. **Khadra's legal identity.** No permanent financial document is issued with placeholder or incomplete
+   issuer information. Until the real legal identity is configured, issuance stays on hold.
+3. **Sandbox numbering.** Documents about sandbox money are numbered `TEST-PAY-2026-000001`,
+   `TEST-RFD-2026-000001`, `TEST-STM-2026-000001`: a test document must never be confused with a
+   real one. The existing sandbox history receives `TEST-` documents when the history is issued.
+4. **The customer on a document: the name only.** No email address in the immutable snapshot; addresses
+   and delivery attempts belong to the delivery history (Phase 7).
+5. **Cash recorded at a handover** is a financial event, and issues a new Booking Statement version.
+6. **The customer area is "Invoices & Receipts" / «الفواتير والإيصالات»**, under My Account, not a new
+   bottom-navigation tab. Inside it the documents keep their accurate names — Payment Receipt, Refund
+   Receipt, Booking Statement — and no issued document is called a "Tax Invoice" until the legal and tax
+   requirements for that term are implemented; each one states that it is not a tax invoice.
+7. **Also approved:** rental offices see no financial documents in Phase 5; voids and corrections are
+   append-only and preserve the original document; the app's changes ship in the unreleased 1.3.0; PDF
+   stays Phase 6, document email Phase 7, payables and office settlement Phase 8.
+8. **The SQL first.** The final schema and the exact generated migration SQL are shown to the owner before
+   implementation continues, and no migration is applied to any database until the owner approves that SQL.
 
 ## Required scope for Phases 5–7: invoices and receipts reach the customer
 

@@ -19,6 +19,19 @@ public sealed class Refund : Entity
     public Money Amount { get; private set; } = null!;
     public RefundReason Reason { get; private set; } = null!;
 
+    // The split of Amount into the booking's own money and the processing fee (owner, 2026-09-26:
+    // stored in Phase 5). Written ONCE, by the payment that records the refund, from the fee rule the
+    // payment froze; never recomputed. Bare figures in the refund's own currency, as the payment's fee
+    // is: a second currency column could only agree with the first, or be wrong.
+    private decimal _bookingPart;
+    private decimal _feePart;
+
+    /// <summary>What this refund returns of the booking's own money.</summary>
+    public Money BookingPart => Money.Create(_bookingPart, Amount.CurrencyCode);
+
+    /// <summary>What this refund returns of the payment's processing fee.</summary>
+    public Money FeePart => Money.Create(_feePart, Amount.CurrencyCode);
+
     /// <summary>
     /// The ticket whose resolution ordered this, for a refund that came from one. Null for an
     /// orphaned capture, which nobody decided: it was owed the moment the money landed.
@@ -46,17 +59,27 @@ public sealed class Refund : Entity
     {
     }
 
+    /// <param name="feePart">
+    /// The processing fee inside <paramref name="amount"/>, by the payment's frozen rule
+    /// (<c>Payment.FeeFor</c>); the rest is booking money.
+    /// </param>
     internal static Refund Request(
         Id paymentId,
         Money amount,
         RefundReason reason,
         Id? disputeTicketId,
+        Money feePart,
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(amount);
         ArgumentNullException.ThrowIfNull(reason);
+        ArgumentNullException.ThrowIfNull(feePart);
         if (paymentId.IsEmpty)
             throw new DomainException("A refund requires a payment.");
+        if (!string.Equals(feePart.CurrencyCode, amount.CurrencyCode, StringComparison.Ordinal)
+            || feePart.Amount < 0m
+            || feePart.Amount > amount.Amount)
+            throw new DomainException("A refund's fee part is in its own currency and never more than the refund.");
 
         return new Refund(Id.New())
         {
@@ -64,6 +87,8 @@ public sealed class Refund : Entity
             Amount = amount,
             Reason = reason,
             DisputeTicketId = disputeTicketId,
+            _feePart = feePart.Amount,
+            _bookingPart = amount.Amount - feePart.Amount,
             Status = RefundStatus.Requested,
             RequestedAt = now
         };

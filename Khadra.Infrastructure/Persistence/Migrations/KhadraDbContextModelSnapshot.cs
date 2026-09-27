@@ -949,6 +949,264 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.ToTable("dispute_tickets", (string)null);
                 });
 
+            modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<string>("BookingReference")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("booking_reference");
+
+                    b.Property<int>("CalculatorVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("calculator_version");
+
+                    b.Property<string>("Cause")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cause");
+
+                    b.Property<string>("CheckpointFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("checkpoint_fingerprint")
+                        .IsFixedLength();
+
+                    b.Property<string>("ContentSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("content_sha256")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset?>("CoversThrough")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("covers_through");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("document_number");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id");
+
+                    b.Property<Guid?>("PreviousVersionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("previous_version_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid?>("RefundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("refund_id");
+
+                    b.Property<Guid?>("RelatedDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("related_document_id");
+
+                    b.Property<string>("Snapshot")
+                        .IsRequired()
+                        .HasColumnType("json")
+                        .HasColumnName("snapshot");
+
+                    b.Property<int>("SnapshotSchemaVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("snapshot_schema_version");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("document_type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_financial_documents");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_financial_documents_document_number");
+
+                    b.HasIndex("PaymentId")
+                        .HasDatabaseName("ix_financial_documents_payment_id")
+                        .HasFilter("payment_id IS NOT NULL");
+
+                    b.HasIndex("PreviousVersionId")
+                        .HasDatabaseName("ix_financial_documents_previous_version_id");
+
+                    b.HasIndex("RelatedDocumentId")
+                        .HasDatabaseName("ix_financial_documents_related_document_id");
+
+                    b.HasIndex("IssuedAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_financial_documents_issued_at_id");
+
+                    b.HasIndex("BookingId", "IssuedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_financial_documents_booking_id_issued_at_id");
+
+                    b.HasIndex("CustomerId", "IssuedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_financial_documents_customer_id_issued_at_id");
+
+                    b.HasIndex("Type", "SubjectId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_financial_documents_document_type_subject_id_version");
+
+                    b.ToTable("financial_documents", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_financial_documents_previous", "(version = 1) = (previous_version_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_financial_documents_statement_coverage", "(document_type = 'BookingStatement') = (covers_through IS NOT NULL AND checkpoint_fingerprint IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_financial_documents_subject", "(document_type = 'PaymentReceipt' AND payment_id IS NOT NULL AND refund_id IS NULL AND subject_id = payment_id) OR (document_type = 'RefundReceipt' AND payment_id IS NOT NULL AND refund_id IS NOT NULL AND subject_id = refund_id) OR (document_type = 'BookingStatement' AND refund_id IS NULL AND subject_id = booking_id)");
+
+                            t.HasCheckConstraint("ck_financial_documents_version", "version >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocumentIssuanceHold", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("document_type");
+
+                    b.Property<DateTimeOffset>("FirstFailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_failed_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset>("LastFailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_failed_at");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_financial_document_issuance_holds");
+
+                    b.HasIndex("NextAttemptAt")
+                        .HasDatabaseName("ix_financial_document_issuance_holds_next_attempt_at")
+                        .HasFilter("resolved_at IS NULL");
+
+                    b.HasIndex("DocumentType", "SubjectId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_financial_document_issuance_holds_document_type_subject_id");
+
+                    b.ToTable("financial_document_issuance_holds", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocumentVoid", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
+                    b.Property<Guid>("VoidedByAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voided_by_admin_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_financial_document_voids");
+
+                    b.ToTable("financial_document_voids", (string)null);
+                });
+
             modelBuilder.Entity("Khadra.Domain.Fleet.Vehicle", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1802,6 +2060,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<decimal>("_bookingPart")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("booking_part");
+
+                    b.Property<decimal>("_feePart")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("fee_part");
+
                     b.HasKey("Id")
                         .HasName("pk_payment_refunds");
 
@@ -2012,6 +2280,30 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_shortlist_entries_shortlist_id_vehicle_id");
 
                     b.ToTable("shortlist_entries", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Infrastructure.Persistence.FinancialDocumentSeries", b =>
+                {
+                    b.Property<string>("SeriesKey")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("series_key");
+
+                    b.Property<long>("LastNumber")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_number");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("SeriesKey")
+                        .HasName("pk_financial_document_series");
+
+                    b.ToTable("financial_document_series", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_financial_document_series_last_number", "last_number >= 1");
+                        });
                 });
 
             modelBuilder.Entity("Khadra.Domain.Bookings.Booking", b =>
@@ -3071,6 +3363,60 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Resolution");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocument", b =>
+                {
+                    b.HasOne("Khadra.Domain.FinancialDocuments.FinancialDocument", null)
+                        .WithMany()
+                        .HasForeignKey("PreviousVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_financial_documents_financial_documents_previous_version_id");
+
+                    b.HasOne("Khadra.Domain.FinancialDocuments.FinancialDocument", null)
+                        .WithMany()
+                        .HasForeignKey("RelatedDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_financial_documents_financial_documents_related_document_id");
+
+                    b.OwnsOne("Khadra.Domain.Common.Money", "HeadlineAmount", b1 =>
+                        {
+                            b1.Property<Guid>("FinancialDocumentId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("Amount")
+                                .HasPrecision(18, 3)
+                                .HasColumnType("numeric(18,3)")
+                                .HasColumnName("headline_amount");
+
+                            b1.Property<string>("CurrencyCode")
+                                .IsRequired()
+                                .HasMaxLength(3)
+                                .HasColumnType("character varying(3)")
+                                .HasColumnName("currency");
+
+                            b1.HasKey("FinancialDocumentId");
+
+                            b1.ToTable("financial_documents");
+
+                            b1.WithOwner()
+                                .HasForeignKey("FinancialDocumentId")
+                                .HasConstraintName("fk_financial_documents_financial_documents_id");
+                        });
+
+                    b.Navigation("HeadlineAmount")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Khadra.Domain.FinancialDocuments.FinancialDocumentVoid", b =>
+                {
+                    b.HasOne("Khadra.Domain.FinancialDocuments.FinancialDocument", null)
+                        .WithOne()
+                        .HasForeignKey("Khadra.Domain.FinancialDocuments.FinancialDocumentVoid", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_financial_document_voids_financial_documents_document_id");
                 });
 
             modelBuilder.Entity("Khadra.Domain.Fleet.Vehicle", b =>

@@ -346,7 +346,8 @@ public sealed class Payment : AggregateRoot
         // capture cannot be used is orphaned, and must not also carry the reason the sweep gave.
         // Money moved; OrphanReason is what explains this row now.
         FailureCode = null;
-        _refunds.Add(Refund.Request(Id, captured, RefundReason.OrphanedCapture, disputeTicketId: null, now));
+        _refunds.Add(Refund.Request(
+            Id, captured, RefundReason.OrphanedCapture, disputeTicketId: null, FeeFor(captured, RefundReason.OrphanedCapture), now));
         AddDomainEvent(new PaymentOrphaned(
             Id, BookingId, CustomerId, captured.Amount, captured.CurrencyCode, reason, now));
         return UnitResult.Success<Error>();
@@ -511,8 +512,18 @@ public sealed class Payment : AggregateRoot
     }
 
     /// <summary>
-    /// The part of <paramref name="refund"/> that returns this payment's processing fee, by the rule
-    /// the refund was recorded under — never a figure a screen works out.
+    /// The part of <paramref name="refund"/> that returns this payment's processing fee: the split
+    /// STORED on the refund when it was recorded (owner, 2026-09-26; payments Phase 5) — never a figure
+    /// a screen, or a later rule, works out again.
+    /// </summary>
+    public Money FeeInside(Refund refund) => Own(refund).FeePart;
+
+    /// <summary>What <paramref name="refund"/> returns of the booking's own money: the stored split's other part.</summary>
+    public Money BookingMoneyIn(Refund refund) => Own(refund).BookingPart;
+
+    /// <summary>
+    /// The processing fee inside a refund of <paramref name="amount"/> for <paramref name="reason"/> — the
+    /// ONE rule the split is written by, applied once, when the refund is recorded.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -524,36 +535,34 @@ public sealed class Payment : AggregateRoot
     /// capture goes back whole, so it carries the fee the attempt asked for, up to what it returns.
     /// </para>
     /// <para>
-    /// Every input is frozen on the payment (the fee and whether it is refundable), so the split can
-    /// never change after the refund is recorded. Phase 5 stores it on the refund (owner, 2026-09-26);
-    /// until then this is where it is read.
+    /// Every input is frozen on the payment (the fee and whether it is refundable), so the split can never
+    /// change after the refund is recorded. The migration that introduced the stored split filled the
+    /// refunds that existed before it with this same rule, written in SQL; a PostgreSQL test proves the
+    /// two agree.
     /// </para>
     /// </remarks>
-    public Money FeeInside(Refund refund)
+    private Money FeeFor(Money amount, RefundReason reason)
     {
-        ArgumentNullException.ThrowIfNull(refund);
-        if (refund.PaymentId != Id)
-            throw new DomainException($"Refund {refund.Id} does not belong to payment {Id}.");
-
-        var currency = refund.Amount.CurrencyCode;
+        var currency = amount.CurrencyCode;
         // A refund in another currency can only be an orphaned capture the provider took in the wrong
         // one; the fee was asked for in this payment's currency, so none of it is inside.
         if (_processingFee == 0m || !string.Equals(currency, Amount.CurrencyCode, StringComparison.Ordinal))
             return Money.ZeroIn(currency);
 
-        var fee = refund.Reason == RefundReason.OrphanedCapture
+        var fee = reason == RefundReason.OrphanedCapture
             ? _processingFee
-            : refund.Reason.ReturnsWholePayment || refund.Reason == RefundReason.EndedBeforePickup
+            : reason.ReturnsWholePayment || reason == RefundReason.EndedBeforePickup
                 ? RefundableFee.Amount
                 : 0m;
-        return Money.Create(Math.Min(fee, refund.Amount.Amount), currency);
+        return Money.Create(Math.Min(fee, amount.Amount), currency);
     }
 
-    /// <summary>What <paramref name="refund"/> returns of the booking's own money: its amount less the fee inside it.</summary>
-    public Money BookingMoneyIn(Refund refund)
+    private Refund Own(Refund refund)
     {
         ArgumentNullException.ThrowIfNull(refund);
-        return refund.Amount.Subtract(FeeInside(refund));
+        if (refund.PaymentId != Id)
+            throw new DomainException($"Refund {refund.Id} does not belong to payment {Id}.");
+        return refund;
     }
 
     /// <summary>The one way money is promised back on an applied payment: never beyond what was taken.</summary>
@@ -565,7 +574,8 @@ public sealed class Payment : AggregateRoot
 
         // A fresh Money, never the payment's own tracked instance: EF tracks owned values by
         // reference, and one instance owned by two rows is the pattern the architecture rules forbid.
-        var refund = Refund.Request(Id, Money.Create(amount.Amount, amount.CurrencyCode), reason, disputeTicketId, now);
+        var fresh = Money.Create(amount.Amount, amount.CurrencyCode);
+        var refund = Refund.Request(Id, fresh, reason, disputeTicketId, FeeFor(fresh, reason), now);
         _refunds.Add(refund);
         return refund;
     }

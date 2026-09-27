@@ -437,6 +437,26 @@ if (app.Environment.IsProduction())
     }
 }
 
+// A TEST issuer identity signs documents on this machine's sandbox and nowhere else (owner, 2026-09-27).
+//
+// It exists so issued documents can be clicked through locally before Khadra's real legal identity is
+// decided. What keeps it there is this line, not an intention: any environment but Development, or any
+// payment provider but SANDBOX, refuses to start with it — Staging included, which is sandbox too. The
+// issuer itself is the second lock: a test identity never signs real money (DocumentPreparation), and
+// sandbox money is always numbered TEST-.
+if (builder.Configuration.GetValue<bool>($"{FinancialDocumentOptions.SectionName}:Issuer:TestIdentity"))
+{
+    var provider = builder.Configuration[$"{PaymentOptions.SectionName}:Provider"]?.Trim();
+    if (!app.Environment.IsDevelopment()
+        || !string.Equals(provider, PaymentOptions.SandboxProvider, StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "FinancialDocuments:Issuer:TestIdentity is set, which signs documents with a test identity. It is " +
+            "allowed only in Development with Payments:Provider 'SANDBOX'. Remove the test identity, or " +
+            "configure Khadra's real legal identity with TestIdentity false.");
+    }
+}
+
 // Report the forwarding facts for the requests that can actually tell us something.
 //
 // Registered BEFORE UseForwardedHeaders, which is the whole point: that middleware CONSUMES the
@@ -602,6 +622,9 @@ await DocumentStoreStartupCheck.ReportAsync(app.Services);
 // And whether a deposit can be taken. Today the answer is always no, because no provider is
 // configured; the point of the line is that nobody has to discover it from a customer.
 await PaymentsStartupCheck.ReportAsync(app.Services);
+
+// And whether financial documents can be issued, and how many wait on hold (payments Phase 5).
+await FinancialDocumentsStartupCheck.ReportAsync(app.Services);
 
 // And whether a customer's phone can be woken for a booking update or a reminder.
 PushStartupCheck.Report(app.Services);

@@ -5,6 +5,7 @@ using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.Payments.Financials;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
@@ -30,6 +31,7 @@ public sealed class GetAttentionQueueHandler(
     IDealerDashboardReader dealers,
     IBookingDashboardReader bookings,
     IPaymentDashboardReader payments,
+    IFinancialDocumentReader financialDocuments,
     HeldDepositFinder heldDeposits,
     IBusinessRulesProvider businessRules,
     IAdminDashboardSettings settings,
@@ -51,6 +53,7 @@ public sealed class GetAttentionQueueHandler(
         var failedRefunds = await payments.FailedRefundsAsync(cancellationToken);
         var owedOrphans = await payments.OwedOrphansAsync(cancellationToken);
         var held = await heldDeposits.FindAsync(now, cancellationToken);
+        var documentsOnHold = await financialDocuments.OpenHoldsSummaryAsync(cancellationToken);
         var labels = await ResolveBookingLabelsAsync(
             [.. live.Select(dispute => dispute.BookingId), .. held.Select(deposit => deposit.BookingId)],
             cancellationToken);
@@ -75,7 +78,8 @@ public sealed class GetAttentionQueueHandler(
                 [.. held.Select(deposit => new HeldDepositRow(
                     deposit.BookingId.Value,
                     labels.GetValueOrDefault(deposit.BookingId),
-                    deposit.HeldSince))]));
+                    deposit.HeldSince))]),
+            documentsOnHold);
     }
 
     /// <summary>

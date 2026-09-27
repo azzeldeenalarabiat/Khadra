@@ -58,6 +58,12 @@ internal static class TestHostConfiguration
         // developer's user-secrets, so a Development-environment test host would otherwise start by
         // asking the developer's own database whether it has an administrator.
         Environment.SetEnvironmentVariable("Admin__Bootstrap__Email", string.Empty);
+
+        // And no test issuer identity (payments Phase 5). A developer may keep one in user-secrets to
+        // issue local sandbox documents (owner, 2026-09-27); a Development-environment test host would
+        // load it, and Program.cs refuses to start any host that is not on the sandbox with one. "false"
+        // rather than empty: an empty value deletes the variable on Windows instead of overriding.
+        Environment.SetEnvironmentVariable("FinancialDocuments__Issuer__TestIdentity", "false");
     }
 
     /// <summary>The same two settings again, for whatever a host reads after it has started.</summary>

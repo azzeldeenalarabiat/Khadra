@@ -298,7 +298,8 @@ internal sealed class PaymentAdminReader(KhadraDbContext context) : IPaymentAdmi
             payment.FailureCode,
             payment.OrphanReason,
             payment.CreatedAt,
-            payment.AppliedAt ?? payment.CapturedAt ?? payment.FailedAt ?? payment.CreatedAt);
+            // The same instant as the payment's own page and its documents: when the money was recorded.
+            payment.AppliedAt ?? payment.OrphanedAt ?? payment.CapturedAt ?? payment.FailedAt ?? payment.CreatedAt);
     }
 
     /// <summary>The bookings, dealerships and customers a page names, each read once.</summary>

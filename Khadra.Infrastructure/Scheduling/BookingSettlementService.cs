@@ -1,5 +1,6 @@
 using Khadra.Application.Bookings.Reminders;
 using Khadra.Application.Bookings.SettleBookings;
+using Khadra.Application.FinancialDocuments.Issuance;
 using Khadra.Application.Payments.SettlePayments;
 using Khadra.Infrastructure.Configuration;
 using MediatR;
@@ -78,18 +79,53 @@ internal sealed partial class BookingSettlementService(
         // timer would buy nothing and give two schedules to reason about.
         await RunAsync(new SettlePaymentsCommand(), cancellationToken);
 
+        // Financial documents right after the money (payments Phase 5), so a refund settled in this pass
+        // gets its receipt in this pass (when its payment already has one). The money never waits for its
+        // paperwork: issuing runs after the money is recorded, never inside the transaction that records it.
+        await IssueFinancialDocumentsAsync(cancellationToken);
+
         // Reminders LAST, after both sweeps: a booking whose payment window has just closed is expired
         // above, so it is never reminded to pay for something that is already gone. The reminders only
         // stage notifications; the outbox dispatcher sends them within seconds.
         await RunAsync(new SendDueRemindersCommand(), cancellationToken);
     }
 
-    private async Task RunAsync<TResponse>(IRequest<TResponse> command, CancellationToken cancellationToken)
+    /// <summary>
+    /// Issues every document owed (payments Phase 5): one query for the work, then one scope — and so one
+    /// context and one transaction — PER DOCUMENT, which is what keeps each number and its document
+    /// together and a series gapless. A document that cannot be issued puts its family on hold, recorded in
+    /// a scope of its own: the issuing scope's context still holds the row that was not inserted. A step
+    /// that throws is logged and the next one runs, as every pass here does.
+    /// </summary>
+    private async Task IssueFinancialDocumentsAsync(CancellationToken cancellationToken)
+    {
+        var work = await RunAsync(new ListFinancialDocumentWorkQuery(), cancellationToken);
+        if (work is null)
+            return;
+
+        foreach (var candidate in work)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            var outcome = await RunAsync(
+                new IssueFinancialDocumentCommand(candidate.Type, candidate.SubjectId, candidate.BookingId),
+                cancellationToken);
+            if (outcome?.Hold is { } hold)
+            {
+                await RunAsync(
+                    new RecordFinancialDocumentHoldCommand(candidate.Type, candidate.SubjectId, candidate.BookingId, hold.Reason, hold.Error),
+                    cancellationToken);
+            }
+        }
+    }
+
+    private async Task<TResponse?> RunAsync<TResponse>(IRequest<TResponse> command, CancellationToken cancellationToken)
     {
         try
         {
             using var scope = scopes.CreateScope();
-            await scope.ServiceProvider.GetRequiredService<ISender>().Send(command, cancellationToken);
+            return await scope.ServiceProvider.GetRequiredService<ISender>().Send(command, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -101,6 +137,8 @@ internal sealed partial class BookingSettlementService(
         {
             LogPassFailed(logger, command.GetType().Name, exception);
         }
+
+        return default;
     }
 
     [LoggerMessage(
