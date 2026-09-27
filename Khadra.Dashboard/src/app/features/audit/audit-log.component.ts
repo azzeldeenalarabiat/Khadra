@@ -11,6 +11,7 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { spellEnumName } from '../../core/i18n/status-key';
+import { auditSubject, subjectValue } from '../../core/services/audit-subject';
 
 /**
  * The server's audit actions (`AuditAction`), each with the key that words it.
@@ -249,6 +250,35 @@ export class AuditLogComponent {
   protected entityTypeLabel(name: string): string {
     const key = ENTITY_TYPE_LABELS[name];
     return key ? this.t(key) : spellEnumName(name);
+  }
+
+  /**
+   * What the entry was taken on, in the reader's language.
+   *
+   * A dispute and a customer are worded from facts the entry carries (`auditSubject`): their stored
+   * labels are the English sentences "Dispute on KH-…" and "Customer 0198abcd", which the table can
+   * never have rewritten. Anything else is shown as it was recorded.
+   */
+  protected subjectText(entry: AuditLogEntry): string {
+    const subject = auditSubject(entry);
+    switch (subject.kind) {
+      case 'dispute':
+        return this.t('auditLog.subjectDispute', { reference: subject.reference });
+      case 'customer':
+        return this.t('auditLog.subjectCustomer', { reference: subject.reference });
+      default:
+        return subjectValue(subject);
+    }
+  }
+
+  /**
+   * How the subject keeps its own direction in a right-to-left row: a booking reference runs left to
+   * right, and a name somebody typed, in either language, decides for itself. The two worded kinds
+   * need neither — the message isolates the reference it carries.
+   */
+  protected subjectClass(entry: AuditLogEntry): string {
+    const kind = auditSubject(entry).kind;
+    return kind === 'booking' ? 'ltr' : kind === 'label' ? 'user-text' : '';
   }
 
   /** The role the actor held at the time, in words; the raw name only for a role this build lacks. */

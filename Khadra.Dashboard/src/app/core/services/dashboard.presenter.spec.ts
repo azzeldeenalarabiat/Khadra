@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { AttentionItem, AttentionQueue, BookingTrend } from '../models/dashboard.api';
-import { busiestDay, toQueueItems, toTrendBars } from './dashboard.presenter';
+import { ActivityEntry, AttentionItem, AttentionQueue, BookingTrend } from '../models/dashboard.api';
+import { busiestDay, toActivityRows, toQueueItems, toTrendBars } from './dashboard.presenter';
+import { AR } from '../i18n/ar';
 import { EN } from '../i18n/en';
 import { resolveMessage } from '../i18n/resolve';
 import { Translate } from './dashboard.presenter';
@@ -262,5 +263,145 @@ describe('toTrendBars', () => {
 
   it('reports the busiest day, which is what the scale is stated against', () => {
     expect(busiestDay(trend([4, 19, 7]))).toBe(19);
+  });
+});
+
+/**
+ * The activity strip, in both languages (owner, 2026-09-27).
+ *
+ * The owner found "Azzeldeen Al-Arabiat حسم النزاع Dispute on KH-NY8AHLNK": a dispute's stored label
+ * was an English sentence, which the table can never have rewritten, glued after an Arabic verb. Each
+ * line is now one sentence with the actor and the subject as parameters, and a dispute's subject is
+ * the booking reference the server reads through the ticket.
+ */
+describe('toActivityRows', () => {
+  const now = Date.parse('2026-09-27T09:00:00Z');
+  // Resolved the way the console resolves Arabic: every value isolated from the words around it.
+  const tAr: Translate = (key, params) =>
+    resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key;
+  const visible = (text: string) => text.replace(/[⁨⁩]/g, '');
+
+  const entry = (over: Partial<ActivityEntry>): ActivityEntry => ({
+    id: 'e1',
+    occurredAt: '2026-09-27T08:00:00Z',
+    actorName: 'Azzeldeen Al-Arabiat',
+    action: 'DisputeResolved',
+    entityType: 'Dispute',
+    subjectLabel: 'Dispute on KH-NY8AHLNK',
+    entityId: '0198f2c4-5b7e-7a10-9c3d-2e4f6a8b0c1d',
+    bookingReference: 'KH-NY8AHLNK',
+    ...over,
+  });
+
+  const english = (over: Partial<ActivityEntry>) =>
+    toActivityRows([entry(over)], now, t, 'en-GB')[0].text;
+  const arabic = (over: Partial<ActivityEntry>) =>
+    visible(toActivityRows([entry(over)], now, tAr, 'ar-JO-u-nu-latn')[0].text);
+
+  it('words a dispute from its booking, not from the English label it was stored with', () => {
+    expect(english({})).toBe('Azzeldeen Al-Arabiat resolved the dispute on booking KH-NY8AHLNK');
+    expect(arabic({})).toBe('حُسم النزاع على الحجز KH-NY8AHLNK من قِبل Azzeldeen Al-Arabiat');
+    expect(arabic({})).not.toContain('Dispute');
+  });
+
+  it('reads the same for a dispute stored with the bare reference', () => {
+    expect(arabic({ subjectLabel: 'KH-NY8AHLNK' })).toBe(
+      'حُسم النزاع على الحجز KH-NY8AHLNK من قِبل Azzeldeen Al-Arabiat',
+    );
+  });
+
+  it('keeps each Latin value in its own isolate inside an Arabic line', () => {
+    const raw = toActivityRows([entry({})], now, tAr, 'ar-JO-u-nu-latn')[0].text;
+
+    expect(raw).toContain('⁨KH-NY8AHLNK⁩');
+    expect(raw).toContain('⁨Azzeldeen Al-Arabiat⁩');
+  });
+
+  it('names a customer by the short reference, and says "customer" once', () => {
+    const suspended: Partial<ActivityEntry> = {
+      action: 'CustomerSuspended',
+      entityType: 'Customer',
+      subjectLabel: 'Customer 0198abcd',
+      entityId: '0198abcd-1234-7def-8abc-0123456789ab',
+      bookingReference: null,
+      actorName: 'Omar Haddad',
+    };
+
+    expect(english(suspended)).toBe('Omar Haddad suspended customer 0198abcd');
+    expect(arabic(suspended)).toBe('أُوقف حساب العميل 0198abcd من قِبل Omar Haddad');
+  });
+
+  it('leaves the English of every other line as it read before', () => {
+    const approved: Partial<ActivityEntry> = {
+      action: 'DealerApproved',
+      entityType: 'Dealer',
+      subjectLabel: 'Aqaba Coast Cars',
+      bookingReference: null,
+      actorName: 'Rania Haddad',
+    };
+    const cancelled: Partial<ActivityEntry> = {
+      action: 'BookingCancelledByAdmin',
+      entityType: 'Booking',
+      subjectLabel: 'KH-XE5NTW3U',
+      bookingReference: 'KH-XE5NTW3U',
+      actorName: 'Rania Haddad',
+    };
+
+    expect(english(approved)).toBe('Rania Haddad approved dealer Aqaba Coast Cars');
+    expect(arabic(approved)).toBe('اعتُمد المكتب Aqaba Coast Cars من قِبل Rania Haddad');
+    expect(english(cancelled)).toBe('Rania Haddad cancelled booking KH-XE5NTW3U');
+    expect(arabic(cancelled)).toBe('أُلغي الحجز KH-XE5NTW3U من قِبل Rania Haddad');
+  });
+
+  it('words the actions that used to print their raw names', () => {
+    const reactivated: Partial<ActivityEntry> = {
+      action: 'AdminReactivated',
+      entityType: 'AdminUser',
+      subjectLabel: 'Omar Haddad',
+      bookingReference: null,
+    };
+    const city: Partial<ActivityEntry> = {
+      action: 'LookupCreated',
+      entityType: 'City',
+      subjectLabel: 'Madaba',
+      bookingReference: null,
+    };
+    const carType: Partial<ActivityEntry> = {
+      action: 'LookupRetired',
+      entityType: 'CarType',
+      subjectLabel: 'Pickup',
+      bookingReference: null,
+    };
+
+    expect(english(reactivated)).toBe('Azzeldeen Al-Arabiat reactivated admin Omar Haddad');
+    expect(arabic(reactivated)).toBe(
+      'أُعيد تفعيل حساب المشرف Omar Haddad من قِبل Azzeldeen Al-Arabiat',
+    );
+    expect(english(city)).toBe('Azzeldeen Al-Arabiat added city Madaba');
+    expect(arabic(city)).toBe('أُضيفت المدينة Madaba من قِبل Azzeldeen Al-Arabiat');
+    expect(english(carType)).toBe('Azzeldeen Al-Arabiat retired car type Pickup');
+    expect(arabic(carType)).toBe('أُوقف نوع السيارة Pickup من قِبل Azzeldeen Al-Arabiat');
+  });
+
+  it('spells out an action this build has no sentence for, rather than printing an empty line', () => {
+    const unknown: Partial<ActivityEntry> = {
+      action: 'PayoutSent',
+      entityType: 'Dealer',
+      subjectLabel: 'Aqaba Coast Cars',
+      bookingReference: null,
+    };
+    // A lookup action on a list this build does not know is the same case.
+    const newList: Partial<ActivityEntry> = { ...unknown, action: 'LookupCreated', entityType: 'Region' };
+
+    expect(english(unknown)).toBe('Azzeldeen Al-Arabiat: Payout sent, Aqaba Coast Cars');
+    expect(arabic(unknown)).toBe('Payout sent: Aqaba Coast Cars، من قِبل Azzeldeen Al-Arabiat');
+    expect(english(newList)).toBe('Azzeldeen Al-Arabiat: Lookup created, Aqaba Coast Cars');
+  });
+
+  it('gives the actions that had no icon one of their own', () => {
+    const actions = ['AdminReactivated', 'LookupCreated', 'LookupRenamed', 'LookupRetired', 'LookupRestored'];
+    const icons = actions.map((action) => toActivityRows([entry({ action })], now, t, 'en-GB')[0].icon);
+
+    expect(icons).not.toContain('info');
   });
 });

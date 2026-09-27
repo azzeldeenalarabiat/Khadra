@@ -38,7 +38,11 @@ public sealed record AuditLogEntry(
     string? Reason,
     // Everything one request did shares this, so a support question about one incident can be
     // followed across the entries it produced.
-    string? CorrelationId);
+    string? CorrelationId,
+    // The booking the entry is about: a Booking entry's own, a Dispute entry's disputed one, null
+    // otherwise. A fact beside the label, because disputes used to be labelled "Dispute on KH-…" in
+    // English, and those rows can never be rewritten; see ActivityEntry.
+    string? BookingReference);
 
 /// <summary>
 /// Which slice of the log an admin is looking at.

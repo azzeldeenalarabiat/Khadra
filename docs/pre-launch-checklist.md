@@ -4565,6 +4565,52 @@ Payments existed; that line is gone, as the website never had it. Installed 1.1.
 sentence until they update: production takes no payments, so no dispute there can have settled a
 penalty before then.
 
+## Audit subjects in the Arabic console (2026-09-27)
+
+The dashboard's activity strip read "Azzeldeen Al-Arabiat حسم النزاع Dispute on KH-NY8AHLNK": a
+dispute's audit label was the English sentence "Dispute on KH-…", in a table that refuses UPDATE.
+Fixed the same day: the feed and the audit log now carry `entityId` and `bookingReference` beside
+the label, read through the ticket, and the console words a dispute and a customer from those facts,
+old rows included (`AuditRows`, `audit-subject.ts`). New dispute rows store the bare reference. The
+feed is one whole sentence per action, passive in Arabic. These three were found while doing it and
+left for later.
+
+### 174. The audit log's Change column prints stored English on the Arabic screen
+
+**Status:** open · **Raised:** 2026-09-27 (while wording the audit subjects)
+
+`previous_value` and `new_value` are printed as stored, in the row and in its expanded detail. Most
+are enum names — "Open", "Suspended", "PendingReview", "Admin" — which the console could word the
+way it words every other status, but nothing maps them yet. Some are English composed on the server
+and can only be shown as they are: the dispute resolution summary ("Resolved: of 18.000 JOD held,
+refund …", item 50), the handover line ("PickedUp (Pickup, Code)"), the code lock ("Pickup code
+locked after 5 wrong tries") and a lookup's "Amman / عمّان · Offered". **To close:** word the enum
+values through `statusLabel`/`enumLabel` by the entry's type; store parts rather than sentences for
+new rows (item 50 for disputes; the handover and lookup writers too); show what old rows hold in an
+`.ltr` run, as a penalty assessed before reason codes does.
+
+### 175. "System" is English on the Arabic console
+
+**Status:** open · **Raised:** 2026-09-27
+
+An entry recorded with no actor (the bootstrap administrator's invitation, and any recorder that
+finds no signed-in admin) carries `AuditEntry.SystemActorName`, "System", as its actor name. The
+audit log prints it in the Who column (its role line is translated); the activity strip prints it in
+the sentence, "دُعي المشرف … من قِبل System". The feed cannot tell that entry from a person named
+System, because it does not carry `actorUserId`. **To close:** add `actorUserId` to the feed entry
+(additive; only the console reads it) and word the system actor from a key on both screens.
+
+### 176. A city or car type is recorded in the audit trail by its English name only
+
+**Status:** open · **Raised:** 2026-09-27 · **Owner decision**
+
+`LookupUseCases` writes `NameEn` as the subject label, so the Arabic strip reads "أُضيفت المدينة
+Madaba من قِبل …". The label is a snapshot on purpose: the entry has to say what the city was called
+when it was changed, and reading today's Arabic name would restate a renamed entry's history. Related
+to item 161 (an office's name has no Arabic form). **To close, if the owner wants it:** snapshot the
+Arabic name as well for new rows and word the subject in the reader's language; old rows keep their
+English name.
+
 ## Issued financial documents (payments Phase 5a, 2026-09-27)
 
 The backend of the receipts and statements in `docs/payments-phase5-plan.md`, and what it knowingly

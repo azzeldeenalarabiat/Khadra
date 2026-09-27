@@ -30,6 +30,8 @@ export interface AuditLogEntry {
   readonly reason: string | null;
   /** Everything one request did shares this, so an incident can be followed across its entries. */
   readonly correlationId: string | null;
+  /** The booking the entry is about: a Booking entry's own, a Dispute entry's disputed one, else null. */
+  readonly bookingReference: string | null;
 }
 
 /**

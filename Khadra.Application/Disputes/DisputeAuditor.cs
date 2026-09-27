@@ -31,8 +31,12 @@ public sealed class DisputeAuditor(IAuditTrail auditTrail, ICurrentActor actor, 
         ArgumentNullException.ThrowIfNull(action);
 
         // The booking reference is the label an admin would search the log by; a ticket id is not
-        // something anyone remembers.
-        var subject = $"Dispute on {booking.Reference.Value}";
+        // something anyone remembers. It is stored bare, as every other writer stores a reference or a
+        // name, and the console words it from the entry's type ("Dispute on KH-…", "نزاع على الحجز
+        // KH-…"). Entries written before 2026-09-27 hold the English sentence "Dispute on KH-…" and
+        // always will, since the table refuses UPDATE; the readers send the booking reference beside
+        // the label as its own fact, so the console never has to read it back out of either shape.
+        var subject = booking.Reference.Value;
 
         var entry = actor.UserId is { } actorId && actor.Role is { } role
             ? AuditEntry.By(

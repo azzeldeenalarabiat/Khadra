@@ -95,9 +95,10 @@ internal sealed class AuditLogReader(KhadraDbContext context) : IAuditLogReader
         if (total == 0)
             return PagedResult.Empty<AuditLogEntry>(page.Page, page.PageSize);
 
-        // Selected to an anonymous type, with the nullable Ids unwrapped afterwards. Calling
-        // .Value.Value on a nullable value object behind a converter compiles and then throws at
-        // runtime: EF cannot translate it. Everything expensive still happens in SQL.
+        // Selected through the projection the activity feed shares (AuditRows), with the nullable Ids
+        // unwrapped afterwards. Calling .Value.Value on a nullable value object behind a converter
+        // compiles and then throws at runtime: EF cannot translate it. Everything expensive, the
+        // booking-reference lookup included, still happens in SQL.
         var rows = await query
             // Newest first, and TOTAL: see IAuditLogReader. Ties on occurred_at are broken by a
             // UUIDv7 id, which is unique and agrees with time order, so a page boundary cannot drop
@@ -106,23 +107,7 @@ internal sealed class AuditLogReader(KhadraDbContext context) : IAuditLogReader
             .ThenByDescending(entry => entry.Id)
             .Skip(page.Skip)
             .Take(page.PageSize)
-            .Select(entry => new
-            {
-                entry.Id,
-                entry.OccurredAt,
-                entry.ActorUserId,
-                entry.ActorName,
-                // Null for a background job. The client renders that as "System", not as a blank.
-                ActorRole = entry.ActorRole == null ? null : entry.ActorRole.Name,
-                Action = entry.Action.Name,
-                EntityType = entry.EntityType.Name,
-                entry.EntityId,
-                entry.SubjectLabel,
-                entry.PreviousValue,
-                entry.NewValue,
-                entry.Reason,
-                entry.CorrelationId,
-            })
+            .SelectRows(context)
             .ToListAsync(cancellationToken);
 
         var items = rows
@@ -139,7 +124,8 @@ internal sealed class AuditLogReader(KhadraDbContext context) : IAuditLogReader
                 row.PreviousValue,
                 row.NewValue,
                 row.Reason,
-                row.CorrelationId))
+                row.CorrelationId,
+                row.Booking?.Value))
             .ToList();
 
         return new PagedResult<AuditLogEntry>(items, page.Page, page.PageSize, total);

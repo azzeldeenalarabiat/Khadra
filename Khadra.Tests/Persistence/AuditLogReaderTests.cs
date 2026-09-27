@@ -1,10 +1,13 @@
 using Khadra.Application.Auditing.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Domain.Auditing;
+using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
+using Khadra.Domain.Disputes;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Reporting;
+using Khadra.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,14 +43,15 @@ public sealed class AuditLogReaderTests : IDisposable
         DateTimeOffset occurredAt,
         AuditAction? action = null,
         AuditEntityType? entityType = null,
-        string subject = "Aqaba Coast Cars") =>
+        string subject = "Aqaba Coast Cars",
+        Id? entityId = null) =>
         AuditEntry.By(
             AdminId,
             "Rania Haddad",
             UserRole.Admin,
             action ?? AuditAction.DealerApproved,
             entityType ?? AuditEntityType.Dealer,
-            Id.New(),
+            entityId ?? Id.New(),
             subject,
             occurredAt,
             previousValue: "PendingReview",
@@ -320,5 +324,126 @@ public sealed class AuditLogReaderTests : IDisposable
         Assert.Equal("PendingReview", entry.PreviousValue);
         Assert.Equal("Approved", entry.NewValue);
         Assert.Equal(nameof(UserRole.Admin), entry.ActorRole);
+    }
+
+    // ── The booking an entry is about ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A dispute entry names the booking it disputes, whichever way its label was written.
+    ///
+    /// Until 2026-09-27 a dispute was labelled with the English sentence "Dispute on KH-…"; since then
+    /// with the bare reference. Neither kind of row can be rewritten and the console has to word both
+    /// in Arabic, so the reference comes from the ticket's own booking — never out of the label.
+    /// </summary>
+    [Fact]
+    public async Task A_dispute_entry_names_the_booking_it_disputes_whichever_way_its_label_was_written()
+    {
+        var (booking, ticket) = await GivenDisputedBookingAsync();
+        var reference = booking.Reference.Value;
+        await GivenAsync(
+            Entry(Noon, AuditAction.DisputeResolved, AuditEntityType.Dispute, $"Dispute on {reference}", ticket.Id),
+            Entry(Noon.AddMinutes(-1), AuditAction.DisputeAssigned, AuditEntityType.Dispute, reference, ticket.Id));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var result = await Reader(context).ListAsync(new AuditLogFilter(), new PageRequest(1, 10));
+
+        Assert.Equal(2, result.Items.Count);
+        Assert.All(result.Items, item => Assert.Equal(reference, item.BookingReference));
+    }
+
+    [Fact]
+    public async Task A_booking_entry_names_its_own_booking()
+    {
+        var (booking, _) = await GivenDisputedBookingAsync();
+        await GivenAsync(Entry(
+            Noon, AuditAction.BookingCancelledByAdmin, AuditEntityType.Booking, booking.Reference.Value, booking.Id));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var result = await Reader(context).ListAsync(new AuditLogFilter(), new PageRequest(1, 10));
+
+        Assert.Equal(booking.Reference.Value, Assert.Single(result.Items).BookingReference);
+    }
+
+    /// <summary>
+    /// Only a booking or a dispute has a booking, and the entry's TYPE decides which lookup runs.
+    ///
+    /// A dealer entry whose id happens to equal a booking's must not borrow that booking's reference,
+    /// and an id that resolves to nothing — or no id at all — reads as no reference rather than as a
+    /// failed page: the console then words the entry from its label, as it always did.
+    /// </summary>
+    [Fact]
+    public async Task Other_kinds_and_unresolved_records_carry_no_booking_reference()
+    {
+        var (booking, ticket) = await GivenDisputedBookingAsync();
+        await GivenAsync(
+            Entry(Noon, AuditAction.DealerApproved, AuditEntityType.Dealer, "Aqaba Coast Cars", booking.Id),
+            Entry(Noon.AddMinutes(-1), AuditAction.CustomerSuspended, AuditEntityType.Customer, "Customer 0198abcd", ticket.Id),
+            Entry(Noon.AddMinutes(-2), AuditAction.DisputeResolved, AuditEntityType.Dispute, "Dispute on KH-NOTICKET"),
+            Entry(Noon.AddMinutes(-3), AuditAction.BookingExpired, AuditEntityType.Booking, "KH-NOBOOKNG"),
+            AuditEntry.BySystem(
+                AuditAction.DisputeResolved, AuditEntityType.Dispute, null, "Dispute on KH-NORECORD", Noon.AddMinutes(-4)));
+
+        await using var context = new KhadraDbContext(_options);
+
+        var result = await Reader(context).ListAsync(new AuditLogFilter(), new PageRequest(1, 10));
+
+        Assert.Equal(5, result.Items.Count);
+        Assert.All(result.Items, item => Assert.Null(item.BookingReference));
+    }
+
+    /// <summary>
+    /// The booking lookup translates for the engine production runs.
+    ///
+    /// The tests above prove what it MEANS, on SQLite; this proves Npgsql can say it. It is a CASE on
+    /// the entry's type with a correlated subquery through a nullable converted id in each branch —
+    /// the shape that compiles and then fails at runtime — and it sits under both the dashboard's
+    /// activity strip and the whole audit log. No connection is opened.
+    /// </summary>
+    [Fact]
+    public void The_booking_lookup_translates_for_postgresql()
+    {
+        var options = new DbContextOptionsBuilder<KhadraDbContext>()
+            .UseNpgsql(TestHostConfiguration.UnreachableConnection)
+            .UseSnakeCaseNamingConvention()
+            .Options;
+        using var context = new KhadraDbContext(options);
+
+        var sql = context.AuditEntries
+            .OrderByDescending(entry => entry.OccurredAt)
+            .ThenByDescending(entry => entry.Id)
+            .Skip(25)
+            .Take(25)
+            .SelectRows(context)
+            .ToQueryString();
+
+        Assert.Contains("dispute_tickets", sql, StringComparison.Ordinal);
+        Assert.Contains("bookings", sql, StringComparison.Ordinal);
+        // One primary-key lookup per row, decided in SQL. Selecting Reference.Value — a property stored
+        // through a converter — made EF evaluate the lookup on the client instead, as a join over a
+        // ROW_NUMBER() window across every booking, on every read of every page.
+        Assert.Contains("CASE", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("ROW_NUMBER", sql, StringComparison.Ordinal);
+        // Still the TOTAL order the page boundary depends on, not lost to the projection.
+        Assert.Contains("ORDER BY", sql, StringComparison.Ordinal);
+    }
+
+    private async Task<(Booking Booking, DisputeTicket Ticket)> GivenDisputedBookingAsync()
+    {
+        var booking = Build.Booking();
+        var ticket = DisputeTicket.Open(
+            booking.Id,
+            booking.CustomerId,
+            BookingParty.Customer,
+            "The car was never delivered.",
+            TimeSpan.FromHours(48),
+            Build.Now).Value;
+
+        await using var context = new KhadraDbContext(_options);
+        context.Bookings.Add(booking);
+        context.DisputeTickets.Add(ticket);
+        await context.SaveChangesAsync();
+        return (booking, ticket);
     }
 }

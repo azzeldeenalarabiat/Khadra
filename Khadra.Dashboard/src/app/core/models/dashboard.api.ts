@@ -108,7 +108,12 @@ export interface ActivityEntry {
   readonly actorName: string;
   readonly action: string;
   readonly entityType: string;
+  /** As it was recorded. For a dispute or a customer the console words the subject from the facts below. */
   readonly subjectLabel: string;
+  /** The record acted on. */
+  readonly entityId: string | null;
+  /** The booking the entry is about: a Booking entry's own, a Dispute entry's disputed one, else null. */
+  readonly bookingReference: string | null;
 }
 
 export interface ActivityFeed extends PanelResponse {

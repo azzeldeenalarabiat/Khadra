@@ -128,13 +128,17 @@ public sealed record ActivityFeedDto(
     DateTimeOffset GeneratedAt,
     IReadOnlyList<ActivityEntryDto> Entries);
 
+/// <param name="EntityId">The record acted on.</param>
+/// <param name="BookingReference">The booking the entry is about, for Booking and Dispute entries; see <c>ActivityEntry</c>.</param>
 public sealed record ActivityEntryDto(
     Guid Id,
     DateTimeOffset OccurredAt,
     string ActorName,
     string Action,
     string EntityType,
-    string SubjectLabel);
+    string SubjectLabel,
+    Guid? EntityId,
+    string? BookingReference);
 
 /// <summary>
 /// "Money in motion" (payments Phase 4b): what moved through the platform this Amman month, and what is

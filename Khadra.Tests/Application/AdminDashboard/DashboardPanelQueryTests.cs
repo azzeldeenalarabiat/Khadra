@@ -1,6 +1,7 @@
 using Khadra.Application.AdminDashboard.GetAdminWorkload;
 using Khadra.Application.AdminDashboard.GetBookingCounts;
 using Khadra.Application.AdminDashboard.GetDisputeCounts;
+using Khadra.Application.AdminDashboard.GetRecentActivity;
 using Khadra.Application.Auditing.ReadModels;
 using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common.Ports;
@@ -109,5 +110,37 @@ public sealed class DashboardPanelQueryTests
         Assert.Equal(2, result.Value.DealerApplicationsAwaitingReview);
         Assert.Equal(6, result.Value.LiveDisputes);
         Assert.Equal(Now, result.Value.GeneratedAt);
+    }
+
+    /// <summary>
+    /// The feed carries the facts a subject is worded from, not only the label that was stored.
+    ///
+    /// Disputes used to be labelled with the English sentence "Dispute on KH-…", in a table that can
+    /// never be rewritten. The console words those in Arabic from the booking reference, and a customer
+    /// from the record id, so both have to reach it — the id as a plain guid, like every id on the wire.
+    /// </summary>
+    [Fact]
+    public async Task The_feed_carries_the_record_and_its_booking_beside_the_stored_label()
+    {
+        var ticketId = Id.New();
+        IReadOnlyList<ActivityEntry> entries =
+        [
+            new(Id.New(), Now, "Azzeldeen Al-Arabiat", "DisputeResolved", "Dispute", "Dispute on KH-NY8AHLNK", ticketId, "KH-NY8AHLNK"),
+            new(Id.New(), Now.AddMinutes(-5), "Rania Haddad", "DealerApproved", "Dealer", "Aqaba Coast Cars", Id.New(), null),
+        ];
+        var feed = Substitute.For<IAuditFeedReader>();
+        feed.RecentAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(entries);
+
+        var result = await new GetRecentActivityHandler(feed, Settings(), new TestClock(Now))
+            .Handle(new GetRecentActivityQuery(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var dispute = result.Value.Entries[0];
+        Assert.Equal(ticketId.Value, dispute.EntityId);
+        Assert.Equal("KH-NY8AHLNK", dispute.BookingReference);
+        Assert.Equal("Dispute on KH-NY8AHLNK", dispute.SubjectLabel);
+        Assert.Null(result.Value.Entries[1].BookingReference);
+        // Sized by AdminDashboard:ActivityFeedSize, never by a number in the handler.
+        await feed.Received(1).RecentAsync(7, Arg.Any<CancellationToken>());
     }
 }

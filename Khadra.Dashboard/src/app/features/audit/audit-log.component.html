@@ -31,7 +31,9 @@
         >
           <option value="" [selected]="!entityType()">{{ t('auditLog.allRecords') }}</option>
           @for (name of vocabularyData()?.entityTypes ?? []; track name) {
-            <option [value]="name" [selected]="entityType() === name">{{ name }}</option>
+            <option [value]="name" [selected]="entityType() === name">
+              {{ entityTypeLabel(name) }}
+            </option>
           }
         </select>
       </label>
@@ -198,12 +200,20 @@
                   }}</span>
                 </td>
                 <td class="td td-clip-320">
-                  <div class="entity-name">{{ row.subjectLabel }}</div>
+                  <!-- Worded from facts for a dispute and a customer, whose stored labels are
+                       English sentences; see subjectText. -->
+                  <div class="entity-name">
+                    <span [class]="subjectClass(row)">{{ subjectText(row) }}</span>
+                  </div>
                   <!-- The reason is inline, clipped, not only behind the expander. It is the field
                        that settles the argument, and an auditor scanning for "why" should not have
                        to open every row to find out which ones have one. -->
                   <div class="td-sub">
-                    {{ row.reason ?? row.entityType }}
+                    @if (row.reason) {
+                      <span class="user-text">{{ row.reason }}</span>
+                    } @else {
+                      {{ entityTypeLabel(row.entityType) }}
+                    }
                   </div>
                 </td>
                 <td class="td">

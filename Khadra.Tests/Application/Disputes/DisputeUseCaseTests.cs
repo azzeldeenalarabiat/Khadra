@@ -333,7 +333,11 @@ public sealed class DisputeUseCaseTests
         Assert.Equal("Open", entry.PreviousValue);
         Assert.Contains($"of {held} JOD held", entry.NewValue, StringComparison.Ordinal);
         Assert.Equal("Split the difference; both sides partly at fault.", entry.Reason);
-        Assert.Equal($"Dispute on {booking.Reference.Value}", entry.SubjectLabel);
+        // The bare reference, never a sentence: the table can never be rewritten, so English written
+        // into it stays English on every screen that reads it, in every language, for ever.
+        Assert.Equal(booking.Reference.Value, entry.SubjectLabel);
+        Assert.Same(AuditEntityType.Dispute, entry.EntityType);
+        Assert.Equal(ticket.Id, entry.EntityId);
         // One commit for the ticket, the booking and the audit entry together.
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }

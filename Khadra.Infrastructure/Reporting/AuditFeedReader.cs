@@ -13,19 +13,27 @@ internal sealed class AuditFeedReader(KhadraDbContext context) : IAuditFeedReade
         if (count <= 0)
             return [];
 
-        // Smart enums are stored by name, and the feed wants exactly that name so the client can map
-        // it to an icon and a verb. Projecting the enumeration object would materialise it only to
-        // read .Name back off it.
-        return await context.AuditEntries
+        // Through the projection the audit log reads too (AuditRows), so the two cannot disagree about
+        // which booking an entry is about. Smart enums come back by their stored name, which is exactly
+        // what the client maps to an icon and a sentence.
+        var rows = await context.AuditEntries
+            // The audit log's TOTAL order (see IAuditLogReader). A handler writes its action and its
+            // audit line off one clock read, so two entries can share an instant, and ordering on
+            // the instant alone let the strip's last row change between two refreshes.
             .OrderByDescending(entry => entry.OccurredAt)
+            .ThenByDescending(entry => entry.Id)
             .Take(count)
-            .Select(entry => new ActivityEntry(
-                entry.Id,
-                entry.OccurredAt,
-                entry.ActorName,
-                entry.Action.Name,
-                entry.EntityType.Name,
-                entry.SubjectLabel))
+            .SelectRows(context)
             .ToListAsync(cancellationToken);
+
+        return [.. rows.Select(row => new ActivityEntry(
+            row.Id,
+            row.OccurredAt,
+            row.ActorName,
+            row.Action,
+            row.EntityType,
+            row.SubjectLabel,
+            row.EntityId,
+            row.Booking?.Value))];
     }
 }

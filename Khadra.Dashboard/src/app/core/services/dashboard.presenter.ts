@@ -15,7 +15,9 @@ import { MessageParams } from '../i18n/language';
 import { formatCalendarDate } from '../i18n/date-format';
 import { formatNumber } from '../i18n/number-format';
 import { clockDuration, relativeTime, slaReading } from '../i18n/relative-time';
+import { spellEnumName } from '../i18n/status-key';
 import { KpiCard, QueueItem } from '../data/dashboard.data';
+import { auditSubject, subjectValue } from './audit-subject';
 
 /** Passed in rather than injected: these are pure functions, and their spec calls them directly. */
 export type Translate = (key: TranslationKey, params?: MessageParams) => string;
@@ -352,17 +354,29 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   AdminInvited: 'shield-check',
   AdminInvitationResent: 'arrow-counter-clockwise',
   AdminDeactivated: 'user-minus',
+  AdminReactivated: 'user-plus',
   BookingCancelledByAdmin: 'calendar-blank',
   BookingExpired: 'calendar-blank',
   BookingMarkedNoShow: 'warning-circle',
   HandoverVerified: 'key',
   HandoverUnverified: 'warning',
   HandoverCodeLocked: 'warning',
+  LookupCreated: 'plus-circle',
+  LookupRenamed: 'pencil-simple',
+  LookupRetired: 'toggle-left',
+  LookupRestored: 'toggle-right',
 };
 
-// The sentence is composed here rather than on the server, so the wording (and one day the language)
-// stays with the interface that shows it.
-const ACTIVITY_VERBS: Readonly<Record<string, TranslationKey>> = {
+/**
+ * One whole sentence per action, with the actor and the subject as its parameters (owner, 2026-09-27).
+ *
+ * Composed here rather than on the server, so the wording stays with the interface that shows it. It
+ * used to be a verb glued between two stored strings, which doubled the noun in English ("resolved
+ * dispute Dispute on KH-…"), could not reorder anything for Arabic, and left a Latin name loose in
+ * a right-to-left line. As parameters, each value is isolated from the words around it, and Arabic
+ * reads the action in the passive — "… من قِبل {actor}" — which agrees with any actor.
+ */
+const ACTIVITY_SENTENCES: Readonly<Record<string, TranslationKey>> = {
   DealerApproved: 'activity.dealerApproved',
   DealerRejected: 'activity.dealerRejected',
   DealerClarificationRequested: 'activity.dealerClarification',
@@ -379,12 +393,21 @@ const ACTIVITY_VERBS: Readonly<Record<string, TranslationKey>> = {
   AdminInvited: 'activity.adminInvited',
   AdminInvitationResent: 'activity.adminInvitationResent',
   AdminDeactivated: 'activity.adminDeactivated',
+  AdminReactivated: 'activity.adminReactivated',
   BookingCancelledByAdmin: 'activity.bookingCancelled',
   BookingExpired: 'activity.bookingExpired',
   BookingMarkedNoShow: 'activity.bookingNoShow',
   HandoverVerified: 'activity.handoverVerified',
   HandoverUnverified: 'activity.handoverUnverified',
   HandoverCodeLocked: 'activity.handoverCodeLocked',
+};
+
+/** The lookup actions are shared by both lists; the entry's type says which one changed. */
+const LOOKUP_SENTENCES: Readonly<Record<string, Readonly<Record<string, TranslationKey>>>> = {
+  LookupCreated: { City: 'activity.cityAdded', CarType: 'activity.carTypeAdded' },
+  LookupRenamed: { City: 'activity.cityRenamed', CarType: 'activity.carTypeRenamed' },
+  LookupRetired: { City: 'activity.cityRetired', CarType: 'activity.carTypeRetired' },
+  LookupRestored: { City: 'activity.cityRestored', CarType: 'activity.carTypeRestored' },
 };
 
 export interface ActivityRow {
@@ -401,17 +424,21 @@ export function toActivityRows(
 ): readonly ActivityRow[] {
   return entries.map((entry) => ({
     icon: ACTIVITY_ICONS[entry.action] ?? 'info',
-    // An unmapped action still reads sensibly: the raw name is better than an empty line.
-    text: `${entry.actorName} ${verb(entry.action, t)} ${entry.subjectLabel}`,
+    text: activityText(entry, t),
     ts: relativeTime(entry.occurredAt, now, localeTag),
   }));
 }
 
-/** An unmapped action still reads sensibly: the raw name beats an empty line. */
-const verb = (action: string, t: Translate): string => {
-  const key = ACTIVITY_VERBS[action];
-  return key ? t(key) : action;
-};
+/**
+ * One entry as its sentence. The subject is a fact wherever the entry carries one (`auditSubject`),
+ * so a dispute recorded as "Dispute on KH-…" reads in Arabic too. An action this build has no
+ * sentence for still reads: its name spelled out, which beats an empty line.
+ */
+function activityText(entry: ActivityEntry, t: Translate): string {
+  const params = { actor: entry.actorName, subject: subjectValue(auditSubject(entry)) };
+  const key = LOOKUP_SENTENCES[entry.action]?.[entry.entityType] ?? ACTIVITY_SENTENCES[entry.action];
+  return key ? t(key, params) : t('activity.other', { ...params, action: spellEnumName(entry.action) });
+}
 
 /**
  * "+3.2%" against the previous window. Through `formatNumber`, so a change that rounds to nothing
