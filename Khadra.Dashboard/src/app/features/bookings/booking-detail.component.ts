@@ -271,7 +271,9 @@ export class AdminBookingDetailComponent {
           : this.t('adminBooking.cancelRefundsWholePayment'),
         fields: [
           {
-            name: this.t('myBooking.reason'),
+            // A KEY, never a translation: the dialog hands the values back by `name`, and the handler
+            // below reads `reason`. Translated, an Arabic administrator's reason never left the dialog.
+            name: 'reason',
             label: this.t('dealerDecide.reject.reasonLabel'),
             type: 'text',
             placeholder: this.t('adminBooking.whyIsThePlatform'),
