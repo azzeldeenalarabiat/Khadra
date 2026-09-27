@@ -12,7 +12,8 @@ namespace Khadra.WebAPI.Controllers;
 /// </summary>
 /// <remarks>
 /// Keyed on the ACTOR: there is no customer id in any path here. A document of anyone else's answers 404,
-/// never a hint that it exists. New endpoints only; nothing an installed app reads has changed.
+/// never a hint that it exists. New endpoints only; nothing an installed app reads has changed. Every answer
+/// is kept out of caches: a document is the customer's record, with their name on it.
 /// </remarks>
 [Route("api/v1")]
 [Authorize(Policy = SecurityPolicies.Customer)]
@@ -26,10 +27,13 @@ public sealed class FinancialDocumentsController(ICurrentActor actor) : ApiContr
         [FromQuery] string? type,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        FromResult(await Mediator.Send(
+        CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(
             new ListMyFinancialDocumentsQuery(actor.UserId!.Value, type, page, pageSize),
             cancellationToken));
+    }
 
     /// <summary>
     /// One document exactly as issued — its stored snapshot, in English and Arabic — with its standing and
@@ -38,8 +42,11 @@ public sealed class FinancialDocumentsController(ICurrentActor actor) : ApiContr
     [HttpGet("financial-documents/{documentId:guid}")]
     [ProducesResponseType<FinancialDocumentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> Document(Guid documentId, CancellationToken cancellationToken) =>
-        FromResult(await Mediator.Send(
+    public async Task<ActionResult> Document(Guid documentId, CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(
             new GetMyFinancialDocumentQuery(actor.UserId!.Value, Id.From(documentId)),
             cancellationToken));
+    }
 }

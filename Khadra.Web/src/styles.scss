@@ -8,3 +8,6 @@
 @use 'styles/components';
 @use 'styles/pages';
 @use 'styles/bookings';
+@use 'styles/invoices';
+// Last, so printing a document's page overrides whatever the screen rules above set.
+@use 'styles/print';

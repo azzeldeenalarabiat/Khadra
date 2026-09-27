@@ -142,6 +142,78 @@ minimum is ignored by the app, which then defers to the server.
 A minimum raised before step 1 refuses every customer with nothing to update to. That order has no
 test: it is the rule.
 
+## Issued financial documents: the reader's contract
+
+A financial document's `snapshot` (payments Phase 5; `GET /api/v1/financial-documents/{id}`) is a
+permanent record, rendered exactly as stored by the website, the app and the console. Its content
+grammar is a contract with every installed app, and one the wire cannot show: a new snapshot version
+changes no field of the DTO and fires no 426. So both halves are written down here, and one fixture
+proves them (payments Phase 5b; the plan's §3.3).
+
+**The grammar, version 1.** `content { title, headline { label, money }, sections[] { key, heading,
+lines[] }, timeNote, notice }`; a line is `{ key, label | null }` plus exactly one of `money { amount,
+currency }`, `instant { utc, local }`, `text { en, ar }` or `plain`; every label, heading, text, note and
+notice is `{ en, ar }`.
+
+**What a reader does.**
+
+- **It gates on the DTO's `snapshotSchemaVersion`**, never on the snapshot's own `schemaVersion`, and
+  renders only the versions it knows.
+- **It ignores** a key it does not know, anywhere; renders sections and lines **in the order given**,
+  never picking one out by its `key` (keys are for tests and for the Phase 6 layout); reads a line's
+  ABSENT `label` as null (the value stands alone); and reads an absent `timeNote` or `notice` as nothing
+  to show — a client never writes the tax-invoice sentence itself.
+- **It fails closed** — no partial rendering; the page shows the facts the DTO carries outside the
+  snapshot (title, number, version, standing, headline, dates) and says the document cannot be shown
+  here, the app with its update action — on: a schema version it does not know; a missing `title`,
+  headline `label` or `money`, a section's `heading` or `lines`, or a line's `key`; a line with no value
+  or with more than one (a value key holding `null` counts as no value); a text that is not two strings;
+  a known key of another type (an `amount` or a `plain` that is not a string). A financial record shown
+  with a line quietly missing is worse than none on screen.
+- **It degrades, never fails,** on a value it recognises but cannot format: an `amount` that does not
+  match `^-?\d+(\.\d+)?$`, or a `local` that is not a real `yyyy-MM-dd HH:mm`, is printed as stored,
+  isolated.
+- **It reports a refusal with the document's id and schema version only** — never the snapshot, which
+  holds a customer's name and their money.
+
+**How a value is shown.** `money`: from the stored string — the whole part grouped for the reader, the
+fraction exactly as stored, the value's own currency placed and isolated as every other amount is —
+never through a floating-point number and never re-scaled by today's `/app-config`. `instant`: its
+`local` Amman wall time, never moved through the device's zone or re-derived from `utc`. `text`: the
+screen's language. `plain`, a literal as registered: **left to right** when it is Latin (a number, a
+reference, a plate, an e-mail, a phone — "+962 6 000 0000" has no strong character and would be
+reordered on an Arabic page), and **in its own direction** (a first-strong isolate: `<bdi>`, U+2068)
+when it contains an Arabic or Hebrew letter — a customer's or an office's name as registered. A LIST row
+is a live screen, not the record: its `headline.amount` is a plain number with no scale of its own, so
+it goes through the live money formatter.
+
+**What the server may do within version 1**: add keys to any object; add, remove or reorder sections
+and lines; use new section or line keys; change any wording; leave `previous` null; send a `type`,
+`status` or `cause` no client has seen (clients word an unknown standing as the server's own name
+rather than say nothing, which would present the document as current).
+
+**What forces a new schema version**: a known key changing type or meaning; a fifth kind of line value,
+or "exactly one of `money`, `instant`, `text`, `plain`" no longer holding; a change to the `amount` or
+instant formats; a required element that may be absent.
+
+**Publish first.** The composer writes a new schema version only **after an app build that renders it
+is published and confirmed working** — the order of `MobileApp:MinimumSupportedVersion` above, for the
+same reason and more so, because documents are permanent and issued on the server's own schedule.
+Every client keeps each older renderer for good: version 1's reader stays beside any later one.
+
+**The shared fixture.** [financial-documents-v1.json](financial-documents-v1.json) holds customer pages
+of every shape version 1 has — a voided receipt and its correction, a superseded statement, cash
+recorded at handover, a payment in full, a free cancellation's refund, a capture never applied, a
+dispute's refund and the statement it decided — composed by the server's own composer, linked by its
+own page builder and serialised as the endpoint serialises them, with ids and booking references
+renumbered. `FinancialDocumentFixtureTests` fails when the composer writes anything else; a change to
+the words of a permanent record is meant to show as a diff in review. Regenerate with
+`KHADRA_REGENERATE_CONTRACT_FIXTURES=1 dotnet test --filter FinancialDocumentFixtureTests` (PowerShell:
+`$env:KHADRA_REGENERATE_CONTRACT_FIXTURES='1'; dotnet test --filter FinancialDocumentFixtureTests`, then
+`Remove-Item env:KHADRA_REGENERATE_CONTRACT_FIXTURES`). A new grammar is a NEW file beside this one,
+never an edit to it. The website's reader and renderer specs read it (Phase 5b, slice 1); the app's
+parser test and the console's presenter spec read the same file.
+
 ## Additive changes on record
 
 Changes that needed no raised minimum, because no installed build reads or sends anything different:

@@ -57,6 +57,7 @@
               <div class="menu__panel" id="account-menu" role="menu">
                 <a role="menuitem" [routerLink]="i18n.link('profile')">{{ i18n.t('nav.account') }}</a>
                 <a role="menuitem" [routerLink]="i18n.link('bookings')">{{ i18n.t('nav.bookings') }}</a>
+                <a role="menuitem" [routerLink]="i18n.link('invoices')">{{ i18n.t('nav.invoices') }}</a>
                 <a role="menuitem" [routerLink]="i18n.link('saved')">{{ i18n.t('nav.saved') }}</a>
                 <a role="menuitem" [routerLink]="i18n.link('notifications')">{{ i18n.t('nav.notifications') }}</a>
                 <button type="button" role="menuitem" (click)="signOut()">{{ i18n.t('nav.signOut') }}</button>
@@ -80,6 +81,7 @@
       <a [routerLink]="i18n.link('dealers')">{{ i18n.t('nav.offices') }}</a>
       @if (session.isSignedIn()) {
         <a [routerLink]="i18n.link('bookings')">{{ i18n.t('nav.bookings') }}</a>
+        <a [routerLink]="i18n.link('invoices')">{{ i18n.t('nav.invoices') }}</a>
         <a [routerLink]="i18n.link('saved')">{{ i18n.t('nav.saved') }}</a>
         <a [routerLink]="i18n.link('notifications')">{{ i18n.t('nav.notifications') }}</a>
         <a [routerLink]="i18n.link('profile')">{{ i18n.t('nav.account') }}</a>

@@ -45,11 +45,20 @@ public abstract class ApiControllerBase : ControllerBase
     protected FileStreamResult PrivateDocument(Stream content, string contentType)
     {
         // An identity document must not linger in a shared proxy or the browser's disk cache.
-        Response.Headers.CacheControl = "no-store, private";
+        KeepOutOfCaches();
         // Belt and braces on a body the caller did not name: nothing here is ever a page.
         Response.Headers["X-Content-Type-Options"] = "nosniff";
         return File(content, contentType);
     }
+
+    /// <summary>
+    /// Keeps this answer out of every cache — a shared proxy's and the browser's own disk — for a body that
+    /// IS somebody's private record: an identity document's bytes, the list of a renter's documents, or a
+    /// customer's financial documents, which carry their name and their money (payments Phase 5b; owner,
+    /// 2026-09-27). One place, so they can never drift apart. Called before the handler runs, so refusals
+    /// carry it too.
+    /// </summary>
+    protected void KeepOutOfCaches() => Response.Headers.CacheControl = "no-store, private";
 
     // RFC 9457 ProblemDetails with a stable machine `code`; validation details go under `errors`.
     protected ObjectResult Failure(Error error)

@@ -2,13 +2,22 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
+using CSharpFunctionalExtensions;
+using Khadra.Application.Common;
+using Khadra.Application.FinancialDocuments.Queries;
+using Khadra.Domain.Common;
+using Khadra.Domain.FinancialDocuments;
 using Khadra.Tests.Support;
 using Khadra.WebAPI;
 using Khadra.WebAPI.Controllers;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace Khadra.Tests.Security;
 
@@ -90,5 +99,69 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
         // No role policy on the action: customers and office staff both reach it; the office gets an empty list.
         Assert.Null(action.GetCustomAttribute<AuthorizeAttribute>());
         Assert.Equal("{bookingId:guid}/financial-documents", action.GetCustomAttribute<HttpGetAttribute>()!.Template);
+    }
+
+    // ── Nothing of a customer's documents is left in a cache (owner, 2026-09-27, decision D6) ─────────
+
+    private const string NoStore = "no-store, private";
+
+    [Fact]
+    public async Task The_customers_list_of_documents_is_kept_out_of_caches()
+    {
+        var mediator = Substitute.For<ISender>();
+        mediator.Send(Arg.Any<ListMyFinancialDocumentsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success<PagedResult<FinancialDocumentListItem>, Error>(PagedResult.Empty<FinancialDocumentListItem>(1, 20)));
+        var controller = Over(new FinancialDocumentsController(Customer()), mediator);
+
+        await controller.Mine(null, null, null, CancellationToken.None);
+
+        Assert.Equal(NoStore, controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task A_document_is_kept_out_of_caches_and_so_is_the_answer_that_it_does_not_exist()
+    {
+        var mediator = Substitute.For<ISender>();
+        mediator.Send(Arg.Any<GetMyFinancialDocumentQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<FinancialDocumentDto, Error>(FinancialDocumentErrors.NotFound));
+        var controller = Over(new FinancialDocumentsController(Customer()), mediator);
+
+        var answer = await controller.Document(SomeId, CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status404NotFound, Assert.IsType<ObjectResult>(answer).StatusCode);
+        Assert.Equal(NoStore, controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task A_bookings_documents_are_kept_out_of_caches()
+    {
+        var mediator = Substitute.For<ISender>();
+        mediator.Send(Arg.Any<GetBookingFinancialDocumentsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success<BookingFinancialDocumentsDto, Error>(new BookingFinancialDocumentsDto(SomeId, [], [])));
+        var controller = Over(new BookingsController(Customer()), mediator);
+
+        await controller.GetFinancialDocuments(SomeId, CancellationToken.None);
+
+        Assert.Equal(NoStore, controller.Response.Headers.CacheControl.ToString());
+    }
+
+    private static ICurrentActor Customer()
+    {
+        var actor = Substitute.For<ICurrentActor>();
+        actor.UserId.Returns(Id.New());
+        return actor;
+    }
+
+    /// <summary>The real controller over a substituted mediator, with a response to write headers on.</summary>
+    private static TController Over<TController>(TController controller, ISender mediator)
+        where TController : ControllerBase
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton(mediator);
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() },
+        };
+        return controller;
     }
 }

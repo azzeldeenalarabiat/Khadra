@@ -1,0 +1,164 @@
+// Invoices & Receipts: the list, one document's page, and the document itself (payments Phase 5b).
+// Every word and figure inside a document is the stored document's; these rules only lay it out.
+// Logical properties throughout, so Arabic reads from the right exactly as English reads from the left.
+$sm: 767px;
+
+.invoice-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.invoice-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  &:hover {
+    box-shadow: var(--shadow-float);
+  }
+  .ltr {
+    white-space: nowrap;
+  }
+  // A phone: the figure under the details, never squeezed beside them.
+  @media (max-width: $sm) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-2);
+  }
+}
+.invoice-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-inline-size: 0;
+}
+.invoice-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.invoice-row__figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: end;
+  strong {
+    color: var(--price);
+  }
+  @media (max-width: $sm) {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+}
+
+// The booking's documents, inside its "Payments & Invoices" card.
+.booking-invoices__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px var(--s-3);
+  inline-size: 100%;
+  color: inherit;
+  text-decoration: none;
+  &:hover strong {
+    text-decoration: underline;
+  }
+}
+.booking-invoices__preparing {
+  align-items: center;
+}
+
+// One document's page.
+.invoice-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-block-end: var(--s-3);
+}
+.invoice-page__head {
+  align-items: flex-start;
+}
+.invoice-page__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px var(--s-2);
+  margin: var(--s-1) 0 0;
+}
+.invoice-page__notice {
+  margin-block-end: var(--s-3);
+}
+.invoice-page__document {
+  display: block;
+  margin-block-end: var(--s-4);
+}
+.invoice-page__related {
+  margin-block-end: var(--s-4);
+}
+
+// The document itself.
+.invoice__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-2) var(--s-4);
+  padding-block-end: var(--s-3);
+  border-block-end: 2px solid var(--divider);
+}
+.invoice__title {
+  margin: 0;
+  font-size: 20px;
+}
+.invoice__headline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: 0;
+  strong {
+    font-size: 20px;
+    color: var(--price);
+  }
+}
+.invoice__section {
+  margin-block-start: var(--s-4);
+}
+.invoice__heading {
+  margin: 0 0 var(--s-1);
+  font-size: 15px;
+  font-weight: 800;
+}
+.invoice__lines dd {
+  overflow-wrap: anywhere;
+}
+// A phone: each label above its value, so a document number, a name as registered or an address gets
+// the whole width instead of being split across lines beside a squeezed label.
+@media (max-width: $sm) {
+  .invoice__lines > div {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .invoice__lines dd {
+    text-align: start;
+  }
+}
+.invoice__alone {
+  margin: var(--s-2) 0;
+  font-weight: 700;
+}
+.invoice__time-note {
+  margin: var(--s-4) 0 0;
+}
+.invoice__notice {
+  margin: var(--s-2) 0 0;
+  padding-block-start: var(--s-3);
+  border-block-start: 1px solid var(--divider);
+  font-weight: 700;
+}

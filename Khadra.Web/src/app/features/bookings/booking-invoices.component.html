@@ -1,0 +1,26 @@
+@if (problem(); as failure) {
+  <kh-state-panel kind="error" [compact]="true" [problem]="failure" (action)="documents.reload()" />
+} @else if (documents.value()) {
+  @if (rows().length || preparing().length) {
+    <h3 class="payments__heading">{{ i18n.t('invoices.title') }}</h3>
+    <ul class="history payments__list booking-invoices">
+      @for (row of rows(); track row.id) {
+        <li>
+          <a class="booking-invoices__row" [routerLink]="i18n.link('invoices', row.id)">
+            <span><strong>{{ row.title }}</strong>&ngsp;@if (row.standing; as chip) {<span class="badge {{ chip.tone }}" [class.ltr]="chip.unknown">{{ chip.label }}</span>&ngsp;}<span class="faint small">· <span class="ltr">{{ row.number }}</span>
+                @if (row.version) { · {{ row.version }} } · {{ row.issued }}</span></span>
+            <span>{{ row.headline }}</span>
+          </a>
+        </li>
+      }
+      @for (pending of preparing(); track pending.key) {
+        <li class="booking-invoices__preparing">
+          <span>{{ pending.label }} <span class="faint small">· {{ pending.date }}</span></span>
+          <button type="button" class="btn btn--ghost btn--sm" (click)="documents.reload()">{{ i18n.t('invoices.checkAgain') }}</button>
+        </li>
+      }
+    </ul>
+  }
+} @else {
+  <div class="skeleton skeleton--text" aria-busy="true"></div>
+}

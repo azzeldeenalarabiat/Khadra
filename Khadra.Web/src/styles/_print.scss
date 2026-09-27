@@ -1,0 +1,36 @@
+// Printing a document's page (payments Phase 5b), until Phase 6 brings the PDF: the document and its
+// standing, nothing else. What is marked `no-print` is the page's own furniture — the way back, Print,
+// the links to other documents. The standing chip and the void or newer-version notice are NOT: a printed
+// voided receipt without its notice would read as a valid one. (`invoice-page.component.spec.ts` pins
+// which parts carry `no-print`.) Black on white, whatever the screen's colours; nothing split across pages.
+@media print {
+  .skip-link,
+  kh-site-header,
+  kh-site-footer,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #999;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .invoice__head,
+  .invoice__section,
+  .invoice__notice,
+  .lines > div,
+  .notice {
+    break-inside: avoid;
+  }
+}

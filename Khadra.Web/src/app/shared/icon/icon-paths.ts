@@ -78,6 +78,7 @@ export type IconName =
   | 'prohibit'
   | 'question'
   | 'receipt'
+  | 'printer'
   | 'scales'
   | 'shield-check'
   | 'sign-out'
@@ -158,6 +159,9 @@ export const ICON_PATHS: Readonly<Record<IconName, string>> = Object.freeze({
   question:
     '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.9M12 16.6v.1"/>',
   receipt: '<path d="M6 3.5h12v17l-3-1.6-3 1.6-3-1.6-3 1.6z"/><path d="M9 8h6M9 12h6"/>',
+  // Printing a document's page (payments Phase 5b).
+  printer:
+    '<path d="M7 8V3.5h10V8"/><path d="M7 16.5H5.5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1H17"/><path d="M7 13.5h10v7H7z"/>',
   scales:
     '<path d="M12 4v16M7 20h10M4 8h16M4 8 1.5 14h5zM20 8l2.5 6h-5z"/><circle cx="12" cy="4.5" r="1.3"/>',
   'shield-check':

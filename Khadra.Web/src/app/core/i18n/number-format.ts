@@ -41,6 +41,28 @@ export function formatAmount(
   }).format(withoutNegativeZero(amount, maximumFractionDigits));
 }
 
+/**
+ * An amount as a DOCUMENT stored it — "1234567.890" — in the reader's grouping, its fraction exactly as
+ * stored (payments Phase 5b).
+ *
+ * Never through a floating-point number and never at today's scale: an issued receipt is a record, so
+ * the digits it shows are the digits it holds, whatever `/app-config` says now. The whole part is
+ * grouped by `Intl` as a BigInt; the separators come from the locale, so Arabic reads as every other
+ * figure on the site. Answers null for text that is not an amount, which the caller prints as it is.
+ */
+export function formatStoredAmount(amount: string, localeTag: string): string | null {
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(amount);
+  if (!match) return null;
+  const [, sign, whole, fraction] = match;
+  const parts = new Intl.NumberFormat(localeTag).formatToParts(-1.5);
+  const decimal = parts.find((part) => part.type === 'decimal')?.value ?? '.';
+  const minus = parts.find((part) => part.type === 'minusSign')?.value ?? '-';
+  const grouped = new Intl.NumberFormat(localeTag, { maximumFractionDigits: 0 }).format(BigInt(whole));
+  // A stored "-0.000" is zero: no figure on this site reads "−0" (see withoutNegativeZero).
+  const negative = sign === '-' && /[1-9]/.test(`${whole}${fraction ?? ''}`);
+  return `${negative ? minus : ''}${grouped}${fraction === undefined ? '' : `${decimal}${fraction}`}`;
+}
+
 /** A plain figure, at a fixed number of places when one is given and up to three otherwise. */
 export function formatNumber(value: number, localeTag: string, fractionDigits?: number): string {
   const maximumFractionDigits = fractionDigits ?? 3;

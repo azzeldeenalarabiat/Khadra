@@ -1,0 +1,56 @@
+<div class="container page">
+  <div class="page-head"><h1>{{ i18n.t('invoices.title') }}</h1></div>
+
+  <nav class="tabs" role="tablist" [attr.aria-label]="i18n.t('invoices.title')">
+    @for (item of filters; track item) {
+      <a role="tab" [routerLink]="[]" [queryParams]="filterParams(item)" [attr.aria-selected]="filter() === item">{{ filterLabel(item) }}</a>
+    }
+  </nav>
+
+  @if (problem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="documents.reload()" />
+  } @else if (documents.value(); as page) {
+    @if (page.items.length === 0) {
+      <kh-state-panel icon="receipt" [title]="i18n.t(filter() === 'all' ? 'invoices.empty' : 'invoices.emptyFilter')" />
+    } @else {
+      <ul class="invoice-list">
+        @for (row of rows(); track row.id) {
+          <li>
+            <a class="invoice-row card" [routerLink]="i18n.link('invoices', row.id)">
+              <span class="invoice-row__body">
+                <span class="invoice-row__title">
+                  <strong>{{ row.title }}</strong>
+                  @if (row.standing; as chip) { <span class="badge {{ chip.tone }}" [class.ltr]="chip.unknown">{{ chip.label }}</span> }
+                </span>
+                <span class="faint small"><span class="ltr">{{ row.number }}</span>
+                  @if (row.version) { · {{ row.version }} }
+                  · {{ i18n.t('booking.reference') }} <span class="ltr">{{ row.bookingReference }}</span></span>
+                <span class="faint small">{{ row.issued }}</span>
+              </span>
+              <span class="invoice-row__figure">
+                <span class="faint small">{{ row.headlineLabel }}</span>
+                <strong>{{ row.headline }}</strong>
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+      @if (page.totalPages > 1) {
+        <nav class="pager" [attr.aria-label]="i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages })">
+          @if (page.hasPrevious) {
+            <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page - 1)">{{ i18n.t('cars.previous') }}</a>
+          }
+          <span class="faint small">{{ i18n.t('cars.pageOf', { page: page.page, pages: page.totalPages }) }}</span>
+          @if (page.hasNext) {
+            <a class="btn btn--secondary btn--sm" [routerLink]="[]" [queryParams]="pageParams(page.page + 1)">{{ i18n.t('cars.next') }}</a>
+          }
+        </nav>
+      }
+    }
+  } @else {
+    <div class="stack" aria-busy="true">
+      <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+      <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+    </div>
+  }
+</div>

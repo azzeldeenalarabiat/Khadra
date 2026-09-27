@@ -5,20 +5,23 @@ import { snapshotProblem } from '../../core/http/problem';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
+import { BookingInvoicesComponent } from './booking-invoices.component';
 import { paymentsView } from './payments-presentation';
 
 /**
- * A booking's "Payments" section (payments Phase 4): what was paid online, what went back and where
- * it is, the balance and the deposit as the server states them, and every payment with its refunds.
- * Read from `GET /api/v1/bookings/{id}/financials` — the page computes no figure of its own.
+ * A booking's "Payments & Invoices" section (payments Phases 4 and 5): what was paid online, what went
+ * back and where it is, the balance and the deposit as the server states them, every payment with its
+ * refunds — read from `GET /api/v1/bookings/{id}/financials`, the page computing no figure of its own —
+ * and, beneath them, the booking's issued receipts and statements (`kh-booking-invoices`), which read
+ * their own endpoint and fail on their own.
  *
- * Named "Payments" until issued invoices exist; Phase 5 renames it "Payments & Invoices" (owner,
- * 2026-09-26).
+ * Named "Payments" in Phase 4 and "Payments & Invoices" once documents exist (owner decision 6,
+ * confirmed 2026-09-27).
  */
 @Component({
   selector: 'kh-booking-payments',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [StatePanelComponent],
+  imports: [StatePanelComponent, BookingInvoicesComponent],
   templateUrl: './booking-payments.component.html',
 })
 export class BookingPaymentsComponent {

@@ -1,0 +1,100 @@
+<div class="container page invoice-page">
+  @if (notFound()) {
+    <kh-state-panel icon="file-text" [title]="i18n.t('invoices.notAvailable')">
+      <div class="row-actions">
+        <a class="btn btn--secondary" [routerLink]="i18n.link('invoices')">{{ i18n.t('invoices.backToList') }}</a>
+      </div>
+    </kh-state-panel>
+  } @else if (problem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="invoice.reload()" />
+  } @else if (view(); as v) {
+    <a class="invoice-page__back small no-print" [routerLink]="i18n.link('invoices')">
+      <kh-icon [name]="i18n.isArabic() ? 'caret-right' : 'caret-left'" />{{ i18n.t('invoices.title') }}</a>
+
+    <div class="page-head invoice-page__head">
+      <div>
+        <h1>{{ v.title }}</h1>
+        <p class="invoice-page__meta">
+          <span class="ltr">{{ v.number }}</span>
+          @if (v.standing; as chip) {
+            <span class="badge {{ chip.tone }}" [class.ltr]="chip.unknown">{{ chip.label }}</span>
+          }
+          <span class="faint small">{{ v.versionOf }}</span>
+        </p>
+        <p class="small no-print"><a [routerLink]="i18n.link('bookings', v.bookingId)">{{ v.booking }}</a></p>
+      </div>
+      <div class="row-actions no-print">
+        <button type="button" class="btn btn--secondary btn--sm" (click)="print()">
+          <kh-icon name="printer" />{{ i18n.t('invoices.print') }}
+        </button>
+      </div>
+    </div>
+
+    @if (v.voided; as voided) {
+      <p class="notice notice--bad invoice-page__notice" role="status">
+        <span>{{ voided.text }}
+          @if (voided.replacement; as replacement) {
+            <a [routerLink]="i18n.link('invoices', replacement.id)">{{ replacement.text }}</a>
+          }
+        </span>
+      </p>
+    }
+    @if (v.newer; as newer) {
+      <p class="notice notice--warn invoice-page__notice" role="status">
+        <a [routerLink]="i18n.link('invoices', newer.id)">{{ newer.text }}</a>
+      </p>
+    }
+
+    @if (v.body; as body) {
+      <kh-invoice-content class="card card--pad invoice-page__document" [body]="body" />
+    } @else {
+      <section class="card card--pad invoice-page__document" aria-labelledby="invoice-summary">
+        <h2 id="invoice-summary" class="card__title">{{ v.title }}</h2>
+        <dl class="lines">
+          <div><dt>{{ v.headlineLabel }}</dt><dd>{{ v.headline }}</dd></div>
+        </dl>
+        <p class="faint small">{{ v.issued }}</p>
+        <p class="notice notice--warn">{{ i18n.t('invoices.cannotShow') }}</p>
+      </section>
+    }
+
+    @if (v.paymentReceipt || v.refundReceipts.length || v.versions.length) {
+      <section class="card card--pad invoice-page__related no-print">
+        @if (v.paymentReceipt; as receipt) {
+          <p><a [routerLink]="i18n.link('invoices', receipt.id)">{{ receipt.text }}</a></p>
+        }
+        @if (v.refundReceipts.length) {
+          <h3 class="payments__heading">{{ i18n.t('invoices.refundsFromPayment') }}</h3>
+          <ul class="history">
+            @for (link of v.refundReceipts; track link.id) {
+              <li>
+                <a [routerLink]="i18n.link('invoices', link.id)"><span class="ltr">{{ link.number }}</span></a>
+                @if (link.standing; as chip) { <span class="badge {{ chip.tone }}" [class.ltr]="chip.unknown">{{ chip.label }}</span> }
+              </li>
+            }
+          </ul>
+        }
+        @if (v.versions.length) {
+          <h3 class="payments__heading">{{ i18n.t('invoices.versions') }}</h3>
+          <ul class="history">
+            @for (link of v.versions; track link.id) {
+              <li>
+                @if (link.here) {
+                  <span aria-current="page"><span class="ltr">{{ link.number }}</span> · {{ link.detail }}</span>
+                } @else {
+                  <a [routerLink]="i18n.link('invoices', link.id)"><span class="ltr">{{ link.number }}</span> · {{ link.detail }}</a>
+                }
+                @if (link.standing; as chip) { <span class="badge {{ chip.tone }}" [class.ltr]="chip.unknown">{{ chip.label }}</span> }
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+  } @else {
+    <div class="stack" aria-busy="true">
+      <div class="card card--pad"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+      <div class="card card--pad"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div></div>
+    </div>
+  }
+</div>

@@ -2,6 +2,7 @@
   <section class="card card--pad" aria-labelledby="payments-title">
     <h2 id="payments-title" class="card__title">{{ i18n.t('payments.title') }}</h2>
     <kh-state-panel kind="error" [compact]="true" [problem]="failure" (action)="financials.reload()" />
+    <kh-booking-invoices [bookingId]="bookingId()" [version]="version()" />
   </section>
 } @else if (view(); as v) {
   @if (v.visible) {
@@ -56,6 +57,8 @@
           }
         </ul>
       }
+
+      <kh-booking-invoices [bookingId]="bookingId()" [version]="version()" />
     </section>
   }
 }

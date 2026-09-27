@@ -2,8 +2,8 @@ import { Injectable, computed, inject } from '@angular/core';
 import { AppConfigService } from '../config/app-config.service';
 import { Money } from '../api/common.api';
 import { I18nService } from './i18n.service';
-import { formatCalendarDate } from './date-format';
-import { formatAmount, formatNumber } from './number-format';
+import { formatCalendarDate, formatFrozenLocal } from './date-format';
+import { formatAmount, formatNumber, formatStoredAmount } from './number-format';
 
 const FSI = '⁨';
 const PDI = '⁩';
@@ -33,6 +33,33 @@ export class FormatService {
     const minorUnits = config && config.currency.code === value.currency ? config.currency.minorUnits : undefined;
     const digits = formatAmount(value.amount, this.locale(), minorUnits);
     return this.isolate(this.i18n.isArabic() ? `${digits} ${value.currency}` : `${value.currency} ${digits}`);
+  }
+
+  /**
+   * An amount as an issued DOCUMENT stored it (payments Phase 5b): its own digits, grouped for the
+   * reader, with its own currency placed as every other amount is — never re-scaled by today's
+   * `/app-config` and never through a float. Text that is not an amount is printed as it is.
+   */
+  storedMoney(amount: string, currency: string): string {
+    const digits = formatStoredAmount(amount, this.locale()) ?? amount;
+    return this.isolate(this.i18n.isArabic() ? `${digits} ${currency}` : `${currency} ${digits}`);
+  }
+
+  /**
+   * A wall time an issued DOCUMENT froze in Amman ("2026-09-27 11:17"): 27 Sept 2026, 11:17 — never
+   * moved through a zone. Text that is not such a time is printed as it is.
+   */
+  frozenTime(local: string): string {
+    return (
+      formatFrozenLocal(local, this.locale(), {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      }) ?? this.isolate(local)
+    );
   }
 
   number(value: number, fractionDigits?: number): string {

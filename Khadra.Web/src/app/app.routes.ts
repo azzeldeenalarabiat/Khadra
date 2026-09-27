@@ -67,6 +67,17 @@ const pages: Routes = [
     canActivate: [signedInGuard],
     loadComponent: () => import('./features/bookings/booking-detail.component').then((m) => m.BookingDetailComponent),
   },
+  // Invoices & Receipts (payments Phase 5b). The addresses are permanent: Phase 7 will email them.
+  {
+    path: 'invoices',
+    canActivate: [signedInGuard],
+    loadComponent: () => import('./features/invoices/invoices.component').then((m) => m.InvoicesComponent),
+  },
+  {
+    path: 'invoices/:documentId',
+    canActivate: [signedInGuard],
+    loadComponent: () => import('./features/invoices/invoice-page.component').then((m) => m.InvoicePageComponent),
+  },
   {
     path: 'disputes/:ticketId',
     canActivate: [signedInGuard],

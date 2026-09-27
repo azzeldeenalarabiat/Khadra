@@ -63,7 +63,7 @@ public sealed class RenterDocumentsController(ICurrentActor actor) : ApiControll
         // shared proxy or survive the gallery signing out. Set before the result, so it is on the
         // refusals too — a cached 409 would keep saying "your window has closed" after a booking was
         // reinstated.
-        Response.Headers.CacheControl = "no-store, private";
+        KeepOutOfCaches();
 
         var result = await Mediator.Send(
             new ViewRenterDocumentsQuery(actor.UserId!.Value, Id.From(bookingId)),
@@ -124,7 +124,7 @@ public sealed class RenterDocumentsController(ICurrentActor actor) : ApiControll
     {
         // Private data on the way back out, exactly as the listing is: this body names a document and
         // who at the gallery looked at it.
-        Response.Headers.CacheControl = "no-store, private";
+        KeepOutOfCaches();
 
         var result = await Mediator.Send(
             new RecordRenterDocumentReviewCommand(actor.UserId!.Value, Id.From(bookingId), Id.From(documentId)),

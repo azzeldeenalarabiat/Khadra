@@ -1,0 +1,46 @@
+@let v = body();
+<article class="invoice" aria-labelledby="invoice-title">
+  <header class="invoice__head">
+    <h2 id="invoice-title" class="invoice__title">{{ v.title }}</h2>
+    <p class="invoice__headline"><span class="faint">{{ v.headlineLabel }}</span> <strong>{{ v.headline }}</strong></p>
+  </header>
+
+  @for (section of v.sections; track section.key) {
+    <section class="invoice__section">
+      <h3 class="invoice__heading">{{ section.heading }}</h3>
+      @for (block of section.blocks; track block.key) {
+        @if (block.kind === 'lines') {
+          <dl class="lines invoice__lines">
+            @for (line of block.lines; track line.key) {
+              <div>
+                <dt>{{ line.label }}</dt>
+                <dd>
+                  @switch (line.direction) {
+                    @case ('ltr') { <span class="ltr">{{ line.value }}</span> }
+                    @case ('auto') { <bdi>{{ line.value }}</bdi> }
+                    @default { {{ line.value }} }
+                  }
+                </dd>
+              </div>
+            }
+          </dl>
+        } @else {
+          <p class="invoice__alone">
+            @switch (block.direction) {
+              @case ('ltr') { <span class="ltr">{{ block.text }}</span> }
+              @case ('auto') { <bdi>{{ block.text }}</bdi> }
+              @default { {{ block.text }} }
+            }
+          </p>
+        }
+      }
+    </section>
+  }
+
+  @if (v.timeNote) {
+    <p class="invoice__time-note faint small">{{ v.timeNote }}</p>
+  }
+  @if (v.notice) {
+    <p class="invoice__notice">{{ v.notice }}</p>
+  }
+</article>
