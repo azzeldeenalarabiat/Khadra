@@ -34,14 +34,14 @@
       <p class="notice notice--bad invoice-page__notice" role="status">
         <span>{{ voided.text }}
           @if (voided.replacement; as replacement) {
-            <a [routerLink]="i18n.link('invoices', replacement.id)">{{ replacement.text }}</a>
+            <a [routerLink]="i18n.link('invoices', replacement.id)">{{ replacement.before }}<span class="ltr">{{ replacement.number }}</span>{{ replacement.after }}</a>
           }
         </span>
       </p>
     }
     @if (v.newer; as newer) {
       <p class="notice notice--warn invoice-page__notice" role="status">
-        <a [routerLink]="i18n.link('invoices', newer.id)">{{ newer.text }}</a>
+        <a [routerLink]="i18n.link('invoices', newer.id)">{{ newer.before }}<span class="ltr">{{ newer.number }}</span>{{ newer.after }}</a>
       </p>
     }
 
@@ -61,7 +61,7 @@
     @if (v.paymentReceipt || v.refundReceipts.length || v.versions.length) {
       <section class="card card--pad invoice-page__related no-print">
         @if (v.paymentReceipt; as receipt) {
-          <p><a [routerLink]="i18n.link('invoices', receipt.id)">{{ receipt.text }}</a></p>
+          <p><a [routerLink]="i18n.link('invoices', receipt.id)">{{ receipt.before }}<span class="ltr">{{ receipt.number }}</span>{{ receipt.after }}</a></p>
         }
         @if (v.refundReceipts.length) {
           <h3 class="payments__heading">{{ i18n.t('invoices.refundsFromPayment') }}</h3>

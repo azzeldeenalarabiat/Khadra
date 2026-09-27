@@ -92,6 +92,24 @@ describe('InvoicePageComponent', () => {
     expect(element.querySelector('.invoice-page__notice a')!.textContent).toContain('A newer version exists: TEST-STM-2026-000003');
   });
 
+  // Left to wrap with its sentence, a number broke at a hyphen on a phone ("TEST-PAY-" / "2026-000005"):
+  // each is now a span of its own, which the stylesheet keeps from wrapping.
+  it('keeps the payment receipt number whole in "Issued against payment receipt …"', async () => {
+    const { element } = await show(page('refund-receipt-free-cancellation'));
+    expect(element.querySelector('.invoice-page__related a .ltr')!.textContent).toBe('TEST-PAY-2026-000002');
+    expect(element.querySelector('.invoice-page__related a')!.textContent).toBe('Issued against payment receipt TEST-PAY-2026-000002');
+  });
+
+  it('keeps the correction number whole in "Replaced by …"', async () => {
+    const { element } = await show(page('payment-receipt-deposit-voided'));
+    expect(element.querySelector('.invoice-page__notice a .ltr')!.textContent).toBe('TEST-PAY-2026-000005');
+  });
+
+  it('keeps the newest number whole in "A newer version exists: …"', async () => {
+    const { element } = await show(page('booking-statement-superseded'));
+    expect(element.querySelector('.invoice-page__notice a .ltr')!.textContent).toBe('TEST-STM-2026-000003');
+  });
+
   it('says a document is not available, and nothing more, when the server does not find it', async () => {
     const id = '00000000-0000-4000-8000-000000000999';
     const { http, settle, element } = await render(id);

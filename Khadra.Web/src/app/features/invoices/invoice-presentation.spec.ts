@@ -107,7 +107,28 @@ describe('what surrounds a document', () => {
       links: { ...statement.links, versions: [link(1, 'Superseded'), link(3, 'Current'), link(2, 'Voided')], nextVersion: link(2, 'Voided') },
       documentId: 'v1',
     };
-    expect(invoicePage(chain, false, en, format).newer).toEqual({ id: 'v3', text: 'A newer version exists: STM-3' });
+    expect(invoicePage(chain, false, en, format).newer).toEqual({
+      id: 'v3',
+      text: 'A newer version exists: STM-3',
+      before: 'A newer version exists: ',
+      number: 'STM-3',
+      after: '',
+    });
+  });
+
+  it('parts each link sentence around its number, so the page can keep the number whole', () => {
+    // The real Arabic resolver, isolates and all: the number's own span isolates it, so none are left
+    // stranded on either side of it.
+    const arabic = (key: TranslationKey, params?: MessageParams) => resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key;
+
+    const receipt = invoicePage(page('refund-receipt-free-cancellation'), false, en, format).paymentReceipt!;
+    expect([receipt.before, receipt.number, receipt.after]).toEqual(['Issued against payment receipt ', 'TEST-PAY-2026-000002', '']);
+
+    const replaced = invoicePage(page('payment-receipt-deposit-voided'), true, arabic, format).voided!.replacement!;
+    expect([replaced.before, replaced.number, replaced.after]).toEqual(['وحلّ محلّه ', 'TEST-PAY-2026-000005', '.']);
+
+    const newer = invoicePage(page('booking-statement-superseded'), true, arabic, format).newer!;
+    expect([newer.before, newer.number, newer.after]).toEqual(['توجد نسخة أحدث: ', 'TEST-STM-2026-000003', '']);
   });
 
   it('says a voided document was voided and what replaced it — never why — in the approved words', () => {

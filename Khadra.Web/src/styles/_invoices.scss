@@ -95,6 +95,13 @@ $sm: 767px;
 .invoice-page__notice {
   margin-block-end: var(--s-3);
 }
+// A document number in one of the page's own sentences never breaks at one of its hyphens: the words
+// wrap, the number moves down whole. Only here — a Latin literal inside the document, an address, must
+// still wrap.
+.invoice-page__notice .ltr,
+.invoice-page__related .ltr {
+  white-space: nowrap;
+}
 .invoice-page__document {
   display: block;
   margin-block-end: var(--s-4);

@@ -216,6 +216,39 @@ export interface LinkView {
   readonly here: boolean;
 }
 
+/**
+ * A link worded as a sentence that names a document number, with the sentence also parted around the
+ * number so the page can keep the number in one piece. Left to wrap on its own, "Issued against payment
+ * receipt TEST-PAY-2026-000005" broke at a hyphen inside the number on a phone ("TEST-PAY-" /
+ * "2026-000005"). `text` stays the whole sentence; `before` keeps the space that precedes the number.
+ */
+export interface NumberedLink {
+  readonly id: string;
+  readonly text: string;
+  readonly before: string;
+  readonly number: string;
+  readonly after: string;
+}
+
+const FSI = String.fromCharCode(0x2068);
+const PDI = String.fromCharCode(0x2069);
+
+function numberedLink(id: string, text: string, number: string): NumberedLink {
+  const at = text.indexOf(number);
+  if (at < 0) return { id, text, before: text, number: '', after: '' };
+  // An Arabic sentence carries the number between direction isolates; the span the page puts the number
+  // in isolates it itself, so the isolates stay with the sentence's words rather than doubling up.
+  const before = text.slice(0, at);
+  const after = text.slice(at + number.length);
+  return {
+    id,
+    text,
+    before: before.endsWith(FSI) ? before.slice(0, -1) : before,
+    number,
+    after: after.startsWith(PDI) ? after.slice(1) : after,
+  };
+}
+
 export interface InvoicePageView {
   readonly title: string;
   readonly number: string;
@@ -224,9 +257,9 @@ export interface InvoicePageView {
   readonly bookingId: string;
   readonly booking: string;
   /** "Voided on …" — and, as a link to the correction, "Replaced by …". */
-  readonly voided: { readonly text: string; readonly replacement: { readonly id: string; readonly text: string } | null } | null;
+  readonly voided: { readonly text: string; readonly replacement: NumberedLink | null } | null;
   /** On an earlier version: the newest version, linked. */
-  readonly newer: { readonly id: string; readonly text: string } | null;
+  readonly newer: NumberedLink | null;
   /** The document itself, or null when this site cannot show it whole. */
   readonly body: DocumentBodyView | null;
   /** What the page still states when it cannot show the document: its figure and when it was issued. */
@@ -235,7 +268,7 @@ export interface InvoicePageView {
   readonly issued: string;
   readonly versions: readonly LinkView[];
   /** On a refund receipt: the payment receipt it was issued against, linked. */
-  readonly paymentReceipt: { readonly id: string; readonly text: string } | null;
+  readonly paymentReceipt: NumberedLink | null;
   readonly refundReceipts: readonly LinkView[];
 }
 
@@ -258,13 +291,13 @@ export function invoicePage(page: FinancialDocumentPage, arabic: boolean, t: Tra
       ? {
           text: t(replacement ? 'invoices.voidedOnAnd' : 'invoices.voidedOn', { date: format.date(page.voided.voidedAt) }),
           replacement: replacement
-            ? { id: replacement.documentId, text: t('invoices.replacedBy', { number: replacement.number }) }
+            ? numberedLink(replacement.documentId, t('invoices.replacedBy', { number: replacement.number }), replacement.number)
             : null,
         }
       : null,
     newer:
       page.status === 'Superseded' && newest && newest.documentId !== page.documentId
-        ? { id: newest.documentId, text: t('invoices.newerVersion', { number: newest.number }) }
+        ? numberedLink(newest.documentId, t('invoices.newerVersion', { number: newest.number }), newest.number)
         : null,
     body: content ? documentBody(content, arabic, format) : null,
     headlineLabel: pick(page.headline.label, arabic),
@@ -272,7 +305,11 @@ export function invoicePage(page: FinancialDocumentPage, arabic: boolean, t: Tra
     issued: t('invoices.issued', { date: format.date(page.issuedAt) }),
     versions: versions.length > 1 ? versions.map((link) => linkView(link, page.documentId, t, true)) : [],
     paymentReceipt: page.links.paymentReceipt
-      ? { id: page.links.paymentReceipt.documentId, text: t('invoices.issuedAgainst', { number: page.links.paymentReceipt.number }) }
+      ? numberedLink(
+          page.links.paymentReceipt.documentId,
+          t('invoices.issuedAgainst', { number: page.links.paymentReceipt.number }),
+          page.links.paymentReceipt.number,
+        )
       : null,
     refundReceipts: page.links.refundReceipts.map((link) => linkView(link, page.documentId, t, false)),
   };
