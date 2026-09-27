@@ -189,6 +189,14 @@ final bookingFinancialsProvider = FutureProvider.autoDispose
   return ref.watch(apiProvider).bookingFinancials(bookingId);
 });
 
+/// The booking's issued documents and what is still being prepared (payments
+/// Phase 5b), or null from an API without them. Read on its own, so a failure
+/// here never takes the payment figures with it.
+final bookingFinancialDocumentsProvider = FutureProvider.autoDispose
+    .family<BookingFinancialDocuments?, String>((ref, bookingId) async {
+  return ref.watch(apiProvider).bookingFinancialDocuments(bookingId);
+});
+
 /// The caller's own review of a booking, or null if they have not left one.
 ///
 /// Null is a legitimate answer about a booking that exists, which is why the API
@@ -224,6 +232,7 @@ void invalidateBookings(WidgetRef ref, {String? bookingId}) {
   if (bookingId != null) {
     ref.invalidate(bookingProvider(bookingId));
     ref.invalidate(bookingFinancialsProvider(bookingId));
+    ref.invalidate(bookingFinancialDocumentsProvider(bookingId));
     ref.invalidate(myReviewProvider(bookingId));
   }
   ref.invalidate(bookingTabCountsProvider);

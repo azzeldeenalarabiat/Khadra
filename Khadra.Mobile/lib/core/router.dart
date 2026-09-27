@@ -16,6 +16,8 @@ import '../features/catalogue/vehicle_screen.dart';
 import '../features/disputes/dispute_screen.dart';
 import '../features/disputes/open_dispute_screen.dart';
 import '../features/documents/documents_screen.dart';
+import '../features/invoices/invoice_screen.dart';
+import '../features/invoices/invoices_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/profile/edit_profile_screen.dart';
 import '../features/profile/change_password_screen.dart';
@@ -68,6 +70,12 @@ abstract final class Routes {
   /// One screen, two ways in, and they are genuinely different ways: this one is
   /// a step taken inside an account and returns to where it was taken from.
   static const shortlist = '/profile/saved';
+
+  /// Invoices & Receipts (payments Phase 5b; owner, 2026-09-27), entered from My
+  /// Account — not a tab — and guarded like every route that acts on an account.
+  /// Both addresses are permanent: Phase 7 will email them.
+  static const invoices = '/profile/invoices';
+  static String invoice(String documentId) => '/profile/invoices/$documentId';
 
   static String vehicle(String id) => '/vehicle/$id';
   static String gallery(String id) => '/gallery/$id';
@@ -126,9 +134,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         Routes.sessions,
         Routes.reputation,
         Routes.shortlist,
+        Routes.invoices,
       };
 
       final needsAccount = guarded.contains(location) ||
+          location.startsWith('${Routes.invoices}/') ||
           location.startsWith('/bookings/') ||
           location.startsWith('/disputes/') ||
           location.endsWith('/book');
@@ -332,6 +342,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.shortlist,
         builder: (_, __) => const ShortlistScreen(),
+      ),
+      GoRoute(path: Routes.invoices, builder: (_, __) => const InvoicesScreen()),
+      GoRoute(
+        path: '${Routes.invoices}/:documentId',
+        builder: (_, state) => InvoiceScreen(documentId: state.pathParameters['documentId']!),
       ),
     ],
   );

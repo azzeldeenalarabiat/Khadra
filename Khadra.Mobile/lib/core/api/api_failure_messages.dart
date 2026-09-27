@@ -107,6 +107,11 @@ extension ApiFailureMessages on ApiFailure {
         'booking.email_not_verified' => l10n.errorBookingEmailNotVerified,
         'booking.period_in_past' => l10n.errorBookingPeriodInPast,
         'booking.not_found' => l10n.errorBookingNotFound,
+        // Issued documents (payments Phase 5b). An unknown type is a request this
+        // build never sends; if one ever arrives it is a generic failure, never the
+        // server's English sentence in front of an Arabic reader.
+        'financial_documents.not_found' => l10n.invoicesNotAvailable,
+        'financial_documents.unknown_type' => l10n.errorGeneric,
         'booking.cannot_cancel' => l10n.errorBookingCannotCancel,
         'booking.non_delivery_too_early' => l10n.nonDeliveryTooEarly,
         'booking.account_cannot_book' => l10n.errorBookingAccountCannotBook,

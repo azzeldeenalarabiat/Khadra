@@ -1355,7 +1355,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refundReasonOther => 'Refund';
 
   @override
-  String get paymentsTitle => 'Payments';
+  String get paymentsTitle => 'Payments & Invoices';
 
   @override
   String get paymentsHistory => 'Payment history';
@@ -1463,6 +1463,115 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get paymentsReviewing =>
       'Khadra is reviewing the payments on this booking.';
+
+  @override
+  String get invoicesTitle => 'Invoices & Receipts';
+
+  @override
+  String get invoicesFilterAll => 'All';
+
+  @override
+  String get invoicesFilterPaymentReceipt => 'Payment receipts';
+
+  @override
+  String get invoicesFilterRefundReceipt => 'Refund receipts';
+
+  @override
+  String get invoicesFilterBookingStatement => 'Booking statements';
+
+  @override
+  String get invoicesEmpty => 'No receipts or statements yet.';
+
+  @override
+  String get invoicesEmptyFilter => 'Nothing of this kind yet.';
+
+  @override
+  String get invoicesStatusCurrent => 'Current version';
+
+  @override
+  String get invoicesStatusSuperseded => 'Earlier version';
+
+  @override
+  String get invoicesStatusVoided => 'Voided';
+
+  @override
+  String invoicesNewerVersion(String number) {
+    return 'A newer version exists: $number';
+  }
+
+  @override
+  String invoicesVoidedOn(String date) {
+    return 'Voided on $date.';
+  }
+
+  @override
+  String invoicesVoidedOnAnd(String date) {
+    return 'Voided on $date.';
+  }
+
+  @override
+  String invoicesReplacedBy(String number) {
+    return 'Replaced by $number.';
+  }
+
+  @override
+  String invoicesVersion(int n) {
+    return 'Version $n';
+  }
+
+  @override
+  String invoicesVersionOf(int n, int total) {
+    return 'Version $n of $total';
+  }
+
+  @override
+  String get invoicesVersions => 'Versions';
+
+  @override
+  String invoicesIssuedAgainst(String number) {
+    return 'Issued against payment receipt $number';
+  }
+
+  @override
+  String get invoicesRefundsFromPayment => 'Refunds from this payment';
+
+  @override
+  String get invoicesPreparingPaymentReceipt =>
+      'Payment receipt — being prepared';
+
+  @override
+  String get invoicesPreparingRefundReceipt =>
+      'Refund receipt — being prepared';
+
+  @override
+  String get invoicesPreparingBookingStatement =>
+      'Booking statement — being prepared';
+
+  @override
+  String get invoicesPreparingOther => 'A document — being prepared';
+
+  @override
+  String get invoicesCheckAgain => 'Check again';
+
+  @override
+  String get invoicesNotAvailable => 'This document isn\'t available.';
+
+  @override
+  String get invoicesBackToList => 'Back to Invoices & Receipts';
+
+  @override
+  String get invoicesCannotShowApp =>
+      'This document needs a newer version of the app.';
+
+  @override
+  String invoicesBooking(String reference) {
+    return 'Booking $reference';
+  }
+
+  @override
+  String invoicesIssued(String date) {
+    return 'Issued $date';
+  }
 
   @override
   String cancelRefundAboveDeposit(String amount) {

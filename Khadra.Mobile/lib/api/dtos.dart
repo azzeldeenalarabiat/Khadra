@@ -2719,3 +2719,282 @@ class FinancialPayment {
         refunds: Refund.listOrNull(json['refunds']) ?? const [],
       );
 }
+
+// ── Issued financial documents (payments Phase 5b) ────────────────────────────
+//
+// Payment receipts, refund receipts and booking statements, as
+// `GET /customers/me/financial-documents`, `GET /financial-documents/{id}` and
+// `GET /bookings/{id}/financial-documents` send them. None is a tax invoice. Named
+// "financial documents" throughout: in this app "documents" are the customer's
+// identity papers (`CustomerDocuments`, `/profile/documents`).
+//
+// These read the LIVE facts around a document leniently, as every model here does.
+// The document itself — `snapshot` — stays raw until `DocumentContent.tryParse`
+// accepts it whole: a record is never shown with a line quietly missing.
+
+/// A text a document stored in both languages.
+class BilingualText {
+  const BilingualText(this.en, this.ar);
+
+  final String en;
+  final String ar;
+
+  String of({required bool arabic}) => arabic ? ar : en;
+
+  static BilingualText fromJson(Map<String, dynamic> json) =>
+      BilingualText(json['en'] as String? ?? '', json['ar'] as String? ?? '');
+
+  static BilingualText? maybe(dynamic json) =>
+      json is Map<String, dynamic> ? fromJson(json) : null;
+}
+
+/// The three kinds the server names. A list can still carry one this build has
+/// never seen: it keeps its stored title, and nothing here keys on it.
+abstract final class FinancialDocumentTypes {
+  static const paymentReceipt = 'PaymentReceipt';
+  static const refundReceipt = 'RefundReceipt';
+  static const bookingStatement = 'BookingStatement';
+
+  static const known = <String>[paymentReceipt, refundReceipt, bookingStatement];
+}
+
+/// One document in a list: Invoices & Receipts, or a booking's documents.
+class FinancialDocumentRow {
+  const FinancialDocumentRow({
+    required this.documentId,
+    required this.type,
+    required this.number,
+    required this.version,
+    required this.status,
+    required this.bookingId,
+    required this.bookingReference,
+    required this.title,
+    required this.headlineLabel,
+    required this.headline,
+    required this.cause,
+    required this.occurredAt,
+    required this.issuedAt,
+  });
+
+  final String documentId;
+
+  /// `PaymentReceipt`, `RefundReceipt`, `BookingStatement` — or one this build
+  /// does not know yet.
+  final String type;
+  final String number;
+  final int version;
+
+  /// `Current`, `Superseded`, `Voided` — or a standing this build does not know.
+  final String status;
+  final String bookingId;
+  final String bookingReference;
+
+  /// Read by the server from the stored document, for every schema version.
+  final BilingualText title;
+  final BilingualText headlineLabel;
+
+  /// A live figure: a plain number with no scale of its own, shown through
+  /// `Formats.money` as every live figure is.
+  final Money headline;
+  final String cause;
+
+  /// When the money it records moved.
+  final DateTime? occurredAt;
+
+  /// When it was issued: a document issued late for older money shows both.
+  final DateTime? issuedAt;
+
+  static FinancialDocumentRow fromJson(Map<String, dynamic> json) {
+    final headline = json['headline'] is Map<String, dynamic>
+        ? json['headline'] as Map<String, dynamic>
+        : const <String, dynamic>{};
+    return FinancialDocumentRow(
+      documentId: json['documentId'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      number: json['number'] as String? ?? '',
+      version: _int(json['version'], 1),
+      status: json['status'] as String? ?? '',
+      bookingId: json['bookingId'] as String? ?? '',
+      bookingReference: json['bookingReference'] as String? ?? '',
+      title: BilingualText.maybe(json['title']) ?? const BilingualText('', ''),
+      headlineLabel: BilingualText.maybe(headline['label']) ?? const BilingualText('', ''),
+      headline: Money.maybe(headline['amount']) ?? const Money(0, ''),
+      cause: json['cause'] as String? ?? '',
+      occurredAt: _dateTime(json['occurredAt']),
+      issuedAt: _dateTime(json['issuedAt']),
+    );
+  }
+}
+
+/// Another document a document points at.
+class FinancialDocumentLink {
+  const FinancialDocumentLink({
+    required this.documentId,
+    required this.type,
+    required this.number,
+    required this.version,
+    required this.status,
+  });
+
+  final String documentId;
+  final String type;
+  final String number;
+  final int version;
+  final String status;
+
+  static FinancialDocumentLink fromJson(Map<String, dynamic> json) => FinancialDocumentLink(
+        documentId: json['documentId'] as String? ?? '',
+        type: json['type'] as String? ?? '',
+        number: json['number'] as String? ?? '',
+        version: _int(json['version'], 1),
+        status: json['status'] as String? ?? '',
+      );
+
+  static FinancialDocumentLink? maybe(dynamic json) =>
+      json is Map<String, dynamic> ? fromJson(json) : null;
+
+  static List<FinancialDocumentLink> list(dynamic json) => json is List<dynamic>
+      ? json.whereType<Map<String, dynamic>>().map(fromJson).toList()
+      : const [];
+}
+
+/// A document's place among the others.
+class FinancialDocumentLinks {
+  const FinancialDocumentLinks({
+    required this.versions,
+    required this.previousVersion,
+    required this.nextVersion,
+    required this.replacedBy,
+    required this.paymentReceipt,
+    required this.refundReceipts,
+  });
+
+  /// Every version of the family, oldest first, this one included.
+  final List<FinancialDocumentLink> versions;
+  final FinancialDocumentLink? previousVersion;
+
+  /// The NEXT member only — it can be a voided one. The newest is the highest
+  /// member of [versions].
+  final FinancialDocumentLink? nextVersion;
+  final FinancialDocumentLink? replacedBy;
+
+  /// On a refund receipt: the payment receipt it was issued against.
+  final FinancialDocumentLink? paymentReceipt;
+
+  /// On a payment receipt: the current receipt of each refund made from it.
+  final List<FinancialDocumentLink> refundReceipts;
+
+  static const none = FinancialDocumentLinks(
+    versions: [],
+    previousVersion: null,
+    nextVersion: null,
+    replacedBy: null,
+    paymentReceipt: null,
+    refundReceipts: [],
+  );
+
+  static FinancialDocumentLinks fromJson(Map<String, dynamic> json) => FinancialDocumentLinks(
+        versions: FinancialDocumentLink.list(json['versions']),
+        previousVersion: FinancialDocumentLink.maybe(json['previousVersion']),
+        nextVersion: FinancialDocumentLink.maybe(json['nextVersion']),
+        replacedBy: FinancialDocumentLink.maybe(json['replacedBy']),
+        paymentReceipt: FinancialDocumentLink.maybe(json['paymentReceipt']),
+        refundReceipts: FinancialDocumentLink.list(json['refundReceipts']),
+      );
+}
+
+/// That a document was voided, and what replaced it. The reason is the
+/// administrator's alone and never reaches this app.
+class FinancialDocumentVoidNotice {
+  const FinancialDocumentVoidNotice({required this.voidedAt, required this.replacedBy});
+
+  final DateTime? voidedAt;
+  final FinancialDocumentLink? replacedBy;
+
+  static FinancialDocumentVoidNotice? maybe(dynamic json) => json is Map<String, dynamic>
+      ? FinancialDocumentVoidNotice(
+          voidedAt: _dateTime(json['voidedAt']),
+          replacedBy: FinancialDocumentLink.maybe(json['replacedBy']),
+        )
+      : null;
+}
+
+/// One document's page: its row, the stored snapshot exactly as issued, and its
+/// links.
+class FinancialDocumentPage {
+  const FinancialDocumentPage({
+    required this.row,
+    required this.snapshotSchemaVersion,
+    required this.snapshot,
+    required this.links,
+    required this.voided,
+  });
+
+  final FinancialDocumentRow row;
+
+  /// Which reader may read [snapshot]. The snapshot's own `schemaVersion` is not
+  /// consulted (docs/contracts/README.md).
+  final int snapshotSchemaVersion;
+
+  /// The document itself, raw. Read only through `DocumentContent.tryParse`.
+  final Object? snapshot;
+  final FinancialDocumentLinks links;
+  final FinancialDocumentVoidNotice? voided;
+
+  static FinancialDocumentPage fromJson(Map<String, dynamic> json) => FinancialDocumentPage(
+        row: FinancialDocumentRow.fromJson(json),
+        snapshotSchemaVersion: _int(json['snapshotSchemaVersion']),
+        snapshot: json['snapshot'],
+        links: json['links'] is Map<String, dynamic>
+            ? FinancialDocumentLinks.fromJson(json['links'] as Map<String, dynamic>)
+            : FinancialDocumentLinks.none,
+        voided: FinancialDocumentVoidNotice.maybe(json['voided']),
+      );
+}
+
+/// A document owed and not issued yet: "being prepared".
+class PendingFinancialDocument {
+  const PendingFinancialDocument({required this.type, required this.subjectId, required this.occurredAt});
+
+  final String type;
+
+  /// The payment, refund or booking it will be about.
+  final String subjectId;
+
+  /// When the money it will record moved.
+  final DateTime? occurredAt;
+
+  static PendingFinancialDocument fromJson(Map<String, dynamic> json) => PendingFinancialDocument(
+        type: json['type'] as String? ?? '',
+        subjectId: json['subjectId'] as String? ?? '',
+        occurredAt: _dateTime(json['occurredAt']),
+      );
+}
+
+/// A booking's documents, and what is still being prepared, so the screen
+/// guesses nothing.
+class BookingFinancialDocuments {
+  const BookingFinancialDocuments({
+    required this.bookingId,
+    required this.documents,
+    required this.beingPrepared,
+  });
+
+  final String bookingId;
+  final List<FinancialDocumentRow> documents;
+  final List<PendingFinancialDocument> beingPrepared;
+
+  bool get isEmpty => documents.isEmpty && beingPrepared.isEmpty;
+
+  static BookingFinancialDocuments fromJson(Map<String, dynamic> json) => BookingFinancialDocuments(
+        bookingId: json['bookingId'] as String? ?? '',
+        documents: (json['documents'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(FinancialDocumentRow.fromJson)
+            .toList(),
+        beingPrepared: (json['beingPrepared'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(PendingFinancialDocument.fromJson)
+            .toList(),
+      );
+}

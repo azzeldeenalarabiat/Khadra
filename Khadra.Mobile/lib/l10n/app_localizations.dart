@@ -2282,10 +2282,10 @@ abstract class AppLocalizations {
   /// **'Refund'**
   String get refundReasonOther;
 
-  /// The booking's Payments section (payments Phase 4). Renamed Payments & Invoices once invoices exist.
+  /// The booking's Payments & Invoices section: Payments in Phase 4, renamed once issued documents exist (owner decision 6, confirmed 2026-09-27).
   ///
   /// In en, this message translates to:
-  /// **'Payments'**
+  /// **'Payments & Invoices'**
   String get paymentsTitle;
 
   /// No description provided for @paymentsHistory.
@@ -2449,6 +2449,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Khadra is reviewing the payments on this booking.'**
   String get paymentsReviewing;
+
+  /// The customer's issued financial documents (payments Phase 5b; owner, 2026-09-27). Only what SURROUNDS a document is worded in these strings: everything inside one is the stored document itself.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices & Receipts'**
+  String get invoicesTitle;
+
+  /// No description provided for @invoicesFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get invoicesFilterAll;
+
+  /// No description provided for @invoicesFilterPaymentReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment receipts'**
+  String get invoicesFilterPaymentReceipt;
+
+  /// No description provided for @invoicesFilterRefundReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund receipts'**
+  String get invoicesFilterRefundReceipt;
+
+  /// No description provided for @invoicesFilterBookingStatement.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking statements'**
+  String get invoicesFilterBookingStatement;
+
+  /// Promises nothing about when documents appear: one is issued a pass after the money, or later while on hold.
+  ///
+  /// In en, this message translates to:
+  /// **'No receipts or statements yet.'**
+  String get invoicesEmpty;
+
+  /// No description provided for @invoicesEmptyFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing of this kind yet.'**
+  String get invoicesEmptyFilter;
+
+  /// No description provided for @invoicesStatusCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current version'**
+  String get invoicesStatusCurrent;
+
+  /// No description provided for @invoicesStatusSuperseded.
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier version'**
+  String get invoicesStatusSuperseded;
+
+  /// No description provided for @invoicesStatusVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided'**
+  String get invoicesStatusVoided;
+
+  /// No description provided for @invoicesNewerVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'A newer version exists: {number}'**
+  String invoicesNewerVersion(String number);
+
+  /// A void with no replacement to name.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided on {date}.'**
+  String invoicesVoidedOn(String date);
+
+  /// The first half of the void notice, followed by invoicesReplacedBy as a link. In Arabic it ends with a comma.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided on {date}.'**
+  String invoicesVoidedOnAnd(String date);
+
+  /// No description provided for @invoicesReplacedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Replaced by {number}.'**
+  String invoicesReplacedBy(String number);
+
+  /// No description provided for @invoicesVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {n}'**
+  String invoicesVersion(int n);
+
+  /// No description provided for @invoicesVersionOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {n} of {total}'**
+  String invoicesVersionOf(int n, int total);
+
+  /// No description provided for @invoicesVersions.
+  ///
+  /// In en, this message translates to:
+  /// **'Versions'**
+  String get invoicesVersions;
+
+  /// No description provided for @invoicesIssuedAgainst.
+  ///
+  /// In en, this message translates to:
+  /// **'Issued against payment receipt {number}'**
+  String invoicesIssuedAgainst(String number);
+
+  /// No description provided for @invoicesRefundsFromPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunds from this payment'**
+  String get invoicesRefundsFromPayment;
+
+  /// No description provided for @invoicesPreparingPaymentReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment receipt — being prepared'**
+  String get invoicesPreparingPaymentReceipt;
+
+  /// No description provided for @invoicesPreparingRefundReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund receipt — being prepared'**
+  String get invoicesPreparingRefundReceipt;
+
+  /// No description provided for @invoicesPreparingBookingStatement.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking statement — being prepared'**
+  String get invoicesPreparingBookingStatement;
+
+  /// No description provided for @invoicesPreparingOther.
+  ///
+  /// In en, this message translates to:
+  /// **'A document — being prepared'**
+  String get invoicesPreparingOther;
+
+  /// No description provided for @invoicesCheckAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Check again'**
+  String get invoicesCheckAgain;
+
+  /// No description provided for @invoicesNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This document isn\'t available.'**
+  String get invoicesNotAvailable;
+
+  /// No description provided for @invoicesBackToList.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Invoices & Receipts'**
+  String get invoicesBackToList;
+
+  /// No description provided for @invoicesCannotShowApp.
+  ///
+  /// In en, this message translates to:
+  /// **'This document needs a newer version of the app.'**
+  String get invoicesCannotShowApp;
+
+  /// No description provided for @invoicesBooking.
+  ///
+  /// In en, this message translates to:
+  /// **'Booking {reference}'**
+  String invoicesBooking(String reference);
+
+  /// No description provided for @invoicesIssued.
+  ///
+  /// In en, this message translates to:
+  /// **'Issued {date}'**
+  String invoicesIssued(String date);
 
   /// No description provided for @cancelRefundAboveDeposit.
   ///

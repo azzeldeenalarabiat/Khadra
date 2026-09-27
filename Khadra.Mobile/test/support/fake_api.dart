@@ -271,6 +271,55 @@ class FakeApi extends KhadraApi {
     return financialsById;
   }
 
+  // ── Issued financial documents (payments Phase 5b) ───────────────────────────
+
+  /// The booking's documents. Null, the default, is an API without them: the
+  /// screen shows nothing, which keeps every older booking test as it was.
+  BookingFinancialDocuments? bookingDocumentsById;
+
+  /// When set, the booking's documents fail with it.
+  ApiFailure? bookingDocumentsFailure;
+
+  int bookingDocumentsReads = 0;
+
+  /// When set, a read of the booking's documents waits for it: how a test sees
+  /// the block while "Check again" is still reading.
+  Completer<void>? holdBookingDocuments;
+
+  @override
+  Future<BookingFinancialDocuments?> bookingFinancialDocuments(String bookingId) async {
+    bookingDocumentsReads++;
+    await holdBookingDocuments?.future;
+    final failure = bookingDocumentsFailure;
+    if (failure != null) throw failure;
+    return bookingDocumentsById;
+  }
+
+  /// Invoices & Receipts, paged as the server pages them. (Not `myDocuments`: that
+  /// is the customer's identity papers, here as everywhere.)
+  List<FinancialDocumentRow> myFinancialDocumentRows = const [];
+
+  /// The kind every list request asked for: null for every kind.
+  final List<String?> myFinancialDocumentTypes = [];
+
+  @override
+  Future<Paged<FinancialDocumentRow>> myFinancialDocuments({String? type, int page = 1, int pageSize = 20}) async {
+    myFinancialDocumentTypes.add(type);
+    final matching = [for (final row in myFinancialDocumentRows) if (type == null || row.type == type) row];
+    return Paged<FinancialDocumentRow>(
+      items: matching.skip((page - 1) * pageSize).take(pageSize).toList(),
+      page: page,
+      pageSize: pageSize,
+      totalCount: matching.length,
+    );
+  }
+
+  /// One document by id. An id not here answers null, as the server's 404 does.
+  Map<String, FinancialDocumentPage> documentsById = const {};
+
+  @override
+  Future<FinancialDocumentPage?> financialDocument(String documentId) async => documentsById[documentId];
+
   /// Every cancellation this phone sent: (reason code, details, expected refund).
   final List<(String, String?, num?)> cancellations = [];
 

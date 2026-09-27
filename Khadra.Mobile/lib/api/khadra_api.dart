@@ -346,6 +346,57 @@ class KhadraApi {
     }
   }
 
+  // ── Issued financial documents (payments Phase 5b) ──────────────────────────
+  //
+  // Read first by 1.3.0 (docs/contracts/README.md). Each degrades to "nothing to
+  // show" against an API without them, so this build can run against whatever is
+  // live when it is published.
+
+  /// Every issued document of the caller's, newest issued first, a page at a
+  /// time; [type] null for every kind.
+  Future<Paged<FinancialDocumentRow>> myFinancialDocuments({
+    String? type,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      return Paged.fromJson(
+        _object(await _client.get<dynamic>(
+          '/api/v1/customers/me/financial-documents',
+          query: {'type': type, 'page': page, 'pageSize': pageSize},
+        )),
+        FinancialDocumentRow.fromJson,
+      );
+    } on ApiFailure catch (failure) {
+      if (failure.isNotFound) return Paged.empty<FinancialDocumentRow>();
+      rethrow;
+    }
+  }
+
+  /// One document exactly as issued, or null when it is not there for this
+  /// customer — which reads the same whether it exists or not.
+  Future<FinancialDocumentPage?> financialDocument(String documentId) async {
+    try {
+      return FinancialDocumentPage.fromJson(
+          _object(await _client.get<dynamic>('/api/v1/financial-documents/$documentId')));
+    } on ApiFailure catch (failure) {
+      if (failure.isNotFound) return null;
+      rethrow;
+    }
+  }
+
+  /// A booking's documents and what is still being prepared, or null from an
+  /// API without them.
+  Future<BookingFinancialDocuments?> bookingFinancialDocuments(String bookingId) async {
+    try {
+      return BookingFinancialDocuments.fromJson(
+          _object(await _client.get<dynamic>('/api/v1/bookings/$bookingId/financial-documents')));
+    } on ApiFailure catch (failure) {
+      if (failure.isNotFound) return null;
+      rethrow;
+    }
+  }
+
   /// Asks a gallery for a car. NO PRICES travel: every figure on the resulting
   /// booking is computed and frozen server-side, because a client that could name
   /// a total could name a cheaper one.

@@ -559,7 +559,10 @@ owner restarts it when asked — a restart is not something this session may do)
 console on 4200 through the console BFF that the same script points at that API (the `bff` launch
 configuration is not), and **the app as a Flutter web build on 4300** against 5112
 (`--dart-define=KHADRA_API_BASE_URL=http://localhost:5112`; the development CORS policy already allows
-4300), added to `.claude/launch.json`. All of it in the browser pane: the website at desktop and 375
+4300), started by the owner with `flutter run -d web-server --web-hostname localhost --web-port 4300` in
+`Khadra.Mobile` — not from `.claude/launch.json`, as first planned: the preview tool reads the main
+checkout's launch configuration, not this worktree's, so an entry here could be neither used nor
+tested. All of it in the browser pane: the website at desktop and 375
 pixels, the app at 360 and 375, the console at desktop — each in English and Arabic.
 
 **Who signs in (D4).** The owner signs each role in when asked — two customers, a dealer, an

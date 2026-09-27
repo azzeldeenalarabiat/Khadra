@@ -17,6 +17,8 @@ import '../../core/theme/khadra_theme.dart';
 import '../../core/widgets/khadra_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../auth/auth_form_widgets.dart';
+import '../invoices/invoice_content.dart';
+import '../invoices/invoice_presentation.dart';
 import 'booking_providers.dart';
 import 'booking_timeline.dart';
 import 'checkout_screen.dart';
@@ -1543,9 +1545,11 @@ class _LegacyPaid extends StatelessWidget {
   }
 }
 
-/// The booking's Payments section (payments Phase 4, owner 2026-09-26), read
-/// from `GET /bookings/{id}/financials`. Named "Payments" until issued invoices
-/// exist; Phase 5 renames it "Payments & Invoices".
+/// The booking's Payments & Invoices section (payments Phases 4 and 5): the
+/// financial state from `GET /bookings/{id}/financials`, and beneath it the
+/// booking's issued receipts and statements, which read their own endpoint and
+/// fail on their own (`_Invoices`). Named "Payments" in Phase 4 and "Payments &
+/// Invoices" once documents exist (owner decision 6, confirmed 2026-09-27).
 class _Payments extends ConsumerWidget {
   const _Payments({required this.booking, required this.formats});
 
@@ -1565,32 +1569,40 @@ class _Payments extends ConsumerWidget {
       final after = next.valueOrNull;
       if (before != null && after != null && paymentsVersion(before) != paymentsVersion(after)) {
         ref.invalidate(bookingFinancialsProvider(id));
+        ref.invalidate(bookingFinancialDocumentsProvider(id));
       }
     });
 
     return switch (ref.watch(bookingFinancialsProvider(id))) {
       AsyncData(:final value) when value != null =>
-        value.hasContent ? _PaymentsSection(financials: value, formats: formats) : const SizedBox.shrink(),
+        value.hasContent ? _PaymentsSection(bookingId: id, financials: value, formats: formats) : const SizedBox.shrink(),
       // Null: an API without payments Phase 4. The booking still says what was paid.
       AsyncData() => _LegacyPaid(booking: booking, formats: formats),
-      AsyncError(:final error) => Padding(
-          padding: const EdgeInsets.only(top: Space.md),
-          child: KhadraCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _BlockLabel(l10n.paymentsTitle),
-                Text(
-                  ApiFailure.from(error).messageFor(l10n),
-                  style: const TextStyle(color: KhadraColors.neutral600, fontSize: 13, height: 1.45),
+      AsyncError(:final error) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: Space.md),
+              child: KhadraCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _BlockLabel(l10n.paymentsTitle),
+                    Text(
+                      ApiFailure.from(error).messageFor(l10n),
+                      style: const TextStyle(color: KhadraColors.neutral600, fontSize: 13, height: 1.45),
+                    ),
+                    TextButton(
+                      onPressed: () => ref.invalidate(bookingFinancialsProvider(id)),
+                      child: Text(l10n.actionRetry),
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: () => ref.invalidate(bookingFinancialsProvider(id)),
-                  child: Text(l10n.actionRetry),
-                ),
-              ],
+              ),
             ),
-          ),
+            // The documents read their own endpoint: one failure never hides the other.
+            _Invoices(bookingId: id, formats: formats),
+          ],
         ),
       _ => const SizedBox.shrink(),
     };
@@ -1598,8 +1610,12 @@ class _Payments extends ConsumerWidget {
 }
 
 class _PaymentsSection extends StatelessWidget {
-  const _PaymentsSection({required this.financials, required this.formats});
+  const _PaymentsSection({required this.bookingId, required this.financials, required this.formats});
 
+  /// The booking's own id, the key its payment listener and `invalidateBookings`
+  /// use — never the one echoed in the answer, so the documents block is the
+  /// provider those invalidate.
+  final String bookingId;
   final BookingFinancials financials;
   final Formats formats;
 
@@ -1678,7 +1694,150 @@ class _PaymentsSection extends StatelessWidget {
             ),
           ),
         ],
+        _Invoices(bookingId: bookingId, formats: formats),
       ],
+    );
+  }
+}
+
+/// The booking's issued documents (payments Phase 5b): each receipt and statement
+/// version, opening its own screen, and what the server says is still being
+/// prepared — dated, with "Check again". No timer: documents are issued on the
+/// server's own schedule, and a screen that promised "in a minute" would be
+/// printing a server setting. Nothing at all for a booking with nothing to list,
+/// or for an API without documents.
+class _Invoices extends ConsumerWidget {
+  const _Invoices({required this.bookingId, required this.formats});
+
+  final String bookingId;
+  final Formats formats;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final documents = ref.watch(bookingFinancialDocumentsProvider(bookingId));
+    // Null while a read is in flight, so a second tap cannot stack another.
+    final VoidCallback? checkAgain =
+        documents.isLoading ? null : () => ref.invalidate(bookingFinancialDocumentsProvider(bookingId));
+
+    // `when` keeps what is on screen while "Check again" re-reads, as the website
+    // does, instead of blinking the block out to a spinner and back; a failure
+    // still takes precedence over the list it could not refresh.
+    return documents.when(
+      data: (value) => value == null || value.isEmpty
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(top: Space.md),
+              child: KhadraCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _BlockLabel(l10n.invoicesTitle),
+                    for (final row in value.documents) _InvoiceLine(view: invoiceRow(row, l10n, formats)),
+                    for (final pending in value.beingPrepared)
+                      _PreparingLine(view: preparingRow(pending, l10n, formats), onCheckAgain: checkAgain),
+                  ],
+                ),
+              ),
+            ),
+      error: (error, _) => Padding(
+        padding: const EdgeInsets.only(top: Space.md),
+        child: KhadraCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BlockLabel(l10n.invoicesTitle),
+              Text(
+                ApiFailure.from(error).messageFor(l10n),
+                style: const TextStyle(color: KhadraColors.neutral600, fontSize: 13, height: 1.45),
+              ),
+              TextButton(onPressed: checkAgain, child: Text(l10n.actionRetry)),
+            ],
+          ),
+        ),
+      ),
+      loading: () => const Padding(
+        padding: EdgeInsets.only(top: Space.md),
+        child: KhadraLoading(compact: true),
+      ),
+    );
+  }
+}
+
+/// One document of the booking: its stored title and figure, number and issue
+/// date, opening the document.
+class _InvoiceLine extends StatelessWidget {
+  const _InvoiceLine({required this.view});
+
+  final InvoiceRowView view;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: () => context.push(Routes.invoice(view.id)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: Space.sm),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: Space.sm,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(view.title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                        if (view.standing case final standing?) StandingBadge(standing: standing),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Wrap(
+                      spacing: Space.sm,
+                      runSpacing: 2,
+                      children: [
+                        LatinRun(view.number, style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12)),
+                        if (view.version case final version?)
+                          Text(version, style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12)),
+                        Text(view.issued, style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: Space.sm),
+              Text(view.headline, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              const KhadraDisclosure(),
+            ],
+          ),
+        ),
+      );
+}
+
+/// A document owed and not issued yet, with the date of its money.
+class _PreparingLine extends StatelessWidget {
+  const _PreparingLine({required this.view, required this.onCheckAgain});
+
+  final PreparingView view;
+
+  /// Null while the list is being read again.
+  final VoidCallback? onCheckAgain;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Space.xs),
+      child: Wrap(
+        spacing: Space.sm,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(view.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          if (view.date.isNotEmpty) Text(view.date, style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12)),
+          TextButton(onPressed: onCheckAgain, child: Text(l10n.invoicesCheckAgain)),
+        ],
+      ),
     );
   }
 }

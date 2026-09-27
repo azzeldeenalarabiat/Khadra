@@ -1419,7 +1419,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get refundReasonOther => 'استرداد';
 
   @override
-  String get paymentsTitle => 'المدفوعات';
+  String get paymentsTitle => 'المدفوعات والفواتير';
 
   @override
   String get paymentsHistory => 'سجل المدفوعات';
@@ -1527,6 +1527,113 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get paymentsReviewing => 'تراجع خضرا المدفوعات على هذا الحجز.';
+
+  @override
+  String get invoicesTitle => 'الفواتير والإيصالات';
+
+  @override
+  String get invoicesFilterAll => 'الكل';
+
+  @override
+  String get invoicesFilterPaymentReceipt => 'إيصالات الدفع';
+
+  @override
+  String get invoicesFilterRefundReceipt => 'إيصالات الاسترداد';
+
+  @override
+  String get invoicesFilterBookingStatement => 'كشوف حساب الحجز';
+
+  @override
+  String get invoicesEmpty => 'لا توجد إيصالات أو كشوف حساب بعد.';
+
+  @override
+  String get invoicesEmptyFilter => 'لا يوجد شيء من هذا النوع بعد.';
+
+  @override
+  String get invoicesStatusCurrent => 'النسخة الحالية';
+
+  @override
+  String get invoicesStatusSuperseded => 'نسخة سابقة';
+
+  @override
+  String get invoicesStatusVoided => 'ملغى';
+
+  @override
+  String invoicesNewerVersion(String number) {
+    return 'توجد نسخة أحدث: $number';
+  }
+
+  @override
+  String invoicesVoidedOn(String date) {
+    return 'أُلغي في $date.';
+  }
+
+  @override
+  String invoicesVoidedOnAnd(String date) {
+    return 'أُلغي في $date،';
+  }
+
+  @override
+  String invoicesReplacedBy(String number) {
+    return 'وحلّ محلّه $number.';
+  }
+
+  @override
+  String invoicesVersion(int n) {
+    return 'النسخة $n';
+  }
+
+  @override
+  String invoicesVersionOf(int n, int total) {
+    return 'النسخة $n من $total';
+  }
+
+  @override
+  String get invoicesVersions => 'النسخ';
+
+  @override
+  String invoicesIssuedAgainst(String number) {
+    return 'صدر مقابل إيصال الدفع $number';
+  }
+
+  @override
+  String get invoicesRefundsFromPayment => 'المبالغ المستردة من هذه الدفعة';
+
+  @override
+  String get invoicesPreparingPaymentReceipt => 'إيصال دفع — قيد الإعداد';
+
+  @override
+  String get invoicesPreparingRefundReceipt => 'إيصال استرداد — قيد الإعداد';
+
+  @override
+  String get invoicesPreparingBookingStatement =>
+      'كشف حساب الحجز — قيد الإعداد';
+
+  @override
+  String get invoicesPreparingOther => 'مستند — قيد الإعداد';
+
+  @override
+  String get invoicesCheckAgain => 'تحقّق مجددًا';
+
+  @override
+  String get invoicesNotAvailable => 'هذا المستند غير متاح.';
+
+  @override
+  String get invoicesBackToList => 'العودة إلى الفواتير والإيصالات';
+
+  @override
+  String get invoicesCannotShowApp =>
+      'يحتاج هذا المستند إلى إصدار أحدث من التطبيق.';
+
+  @override
+  String invoicesBooking(String reference) {
+    return 'الحجز $reference';
+  }
+
+  @override
+  String invoicesIssued(String date) {
+    return 'صدر في $date';
+  }
 
   @override
   String cancelRefundAboveDeposit(String amount) {

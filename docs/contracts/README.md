@@ -211,8 +211,10 @@ the words of a permanent record is meant to show as a diff in review. Regenerate
 `KHADRA_REGENERATE_CONTRACT_FIXTURES=1 dotnet test --filter FinancialDocumentFixtureTests` (PowerShell:
 `$env:KHADRA_REGENERATE_CONTRACT_FIXTURES='1'; dotnet test --filter FinancialDocumentFixtureTests`, then
 `Remove-Item env:KHADRA_REGENERATE_CONTRACT_FIXTURES`). A new grammar is a NEW file beside this one,
-never an edit to it. The website's reader and renderer specs read it (Phase 5b, slice 1); the app's
-parser test and the console's presenter spec read the same file.
+never an edit to it. The website's reader and renderer specs read it (Phase 5b, slice 1), and so do the
+app's reader, presenter and screen tests (`financial_documents_contract_test.dart`,
+`invoice_presentation_test.dart`, `invoices_screen_test.dart`, `booking_payments_test.dart`; slice 2);
+the console's presenter spec will read the same file.
 
 ## Additive changes on record
 

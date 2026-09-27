@@ -51,6 +51,48 @@ class Formats {
 
   String moneyOf(num amount, String currencyCode) => _money(amount, currencyCode);
 
+  /// An amount as an issued DOCUMENT stored it (payments Phase 5b): its own
+  /// digits, grouped as every amount here is grouped, with its own currency placed
+  /// and isolated as [money] does — never re-scaled by today's `/app-config` and
+  /// never through a double. Text that is not an amount is printed as it is.
+  String storedMoney(String amount, String currencyCode) {
+    final digits = groupStoredAmount(amount) ?? amount;
+    return isolate(isArabic ? '$digits $currencyCode' : '$currencyCode $digits');
+  }
+
+  /// "1234567.890" as "1,234,567.890": the separators [money] prints in both
+  /// languages, the fraction exactly as stored. Null for text that is not an
+  /// amount. A stored "-0.000" is zero: nothing here reads "−0".
+  static String? groupStoredAmount(String amount) {
+    final match = RegExp(r'^(-?)(\d+)(?:\.(\d+))?$').firstMatch(amount);
+    if (match == null) return null;
+    final whole = match.group(2)!;
+    final fraction = match.group(3);
+    final grouped = whole.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+    final negative = match.group(1) == '-' && RegExp('[1-9]').hasMatch('$whole${fraction ?? ''}');
+    return '${negative ? '-' : ''}$grouped${fraction == null ? '' : '.$fraction'}';
+  }
+
+  /// A wall time an issued DOCUMENT froze in Amman — "2026-09-27 11:17" — printed
+  /// as that same wall time, never through [toAmman]: it is already Amman's, and
+  /// re-deriving it from the document's UTC instant would re-judge a record by
+  /// today's zone rules. Text that is not such a time, or names a time that does
+  /// not exist, is printed as it is rather than rolled over into another.
+  String frozenTime(String local) {
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$').firstMatch(local);
+    if (match == null) return isolate(local);
+    final parts = [for (var group = 1; group <= 5; group++) int.parse(match.group(group)!)];
+    final wall = DateTime.utc(parts[0], parts[1], parts[2], parts[3], parts[4]);
+    if (wall.year != parts[0] ||
+        wall.month != parts[1] ||
+        wall.day != parts[2] ||
+        wall.hour != parts[3] ||
+        wall.minute != parts[4]) {
+      return isolate(local);
+    }
+    return DateFormat.yMMMd(locale).add_Hm().format(wall);
+  }
+
   String _money(num amount, String currencyCode) {
     final digits = NumberFormat.decimalPatternDigits(
       locale: 'en',

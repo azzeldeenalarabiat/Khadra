@@ -5,8 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/router.dart';
+import 'package:khadra_mobile/core/widgets/khadra_widgets.dart';
 import 'package:khadra_mobile/features/auth/sign_in_screen.dart';
 import 'package:khadra_mobile/features/auth/verify_email_screen.dart';
+import 'package:khadra_mobile/features/invoices/invoice_screen.dart';
+import 'package:khadra_mobile/features/invoices/invoices_screen.dart';
 import 'package:khadra_mobile/features/shell/welcome_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -314,5 +317,48 @@ void main() {
     expect(container.read(isArabicProvider), isTrue);
     expect(find.byType(SignInScreen), findsOneWidget);
     expect(preferences.getString('khadra.locale'), 'ar');
+  });
+
+  // Invoices & Receipts (payments Phase 5b) is an account's own record, so both
+  // its list and a single document are guarded like documents and sessions: a
+  // link to either, opened by a guest, asks for the account and then arrives.
+  for (final destination in [
+    Routes.invoices,
+    Routes.invoice('00000000-0000-4000-8000-000000000001'),
+  ]) {
+    testWidgets('a guest opening $destination is asked to sign in, and the destination travels',
+        (tester) async {
+      final (router, _, _, _) = await launch(tester, chosen: true);
+
+      router.go(destination);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SignInScreen), findsOneWidget);
+      expect(find.byType(InvoicesScreen), findsNothing);
+      expect(find.byType(InvoiceScreen), findsNothing);
+      expect(where(router), Routes.signIn);
+      expect(at(router).queryParameters['next'], destination);
+    });
+  }
+
+  testWidgets('a customer reaches Invoices & Receipts from My Account, and back',
+      (tester) async {
+    final (router, _, _, api) = await launch(tester, signedIn: true);
+
+    router.go(Routes.profile);
+    await tester.pumpAndSettle();
+
+    final entry = find.text('Invoices & Receipts');
+    await tester.scrollUntilVisible(entry, 200, scrollable: find.byType(Scrollable).first);
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(InvoicesScreen), findsOneWidget);
+    // A pushed step, not a tab: the back arrow returns to the account it came from.
+    expect(api.myFinancialDocumentTypes, [null]);
+    await tester.tap(find.byType(KhadraBack));
+    await tester.pumpAndSettle();
+    expect(find.byType(InvoicesScreen), findsNothing);
+    expect(where(router), Routes.profile);
   });
 }

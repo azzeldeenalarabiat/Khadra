@@ -83,6 +83,13 @@ class ProfileScreen extends ConsumerWidget {
                     onTap: () => context.push(Routes.shortlist),
                   ),
                   _DocumentsRow(),
+                  // Invoices & Receipts (payments Phase 5b): under My Account, not
+                  // a sixth tab (owner, 2026-09-27).
+                  _Row(
+                    icon: Icons.receipt_long_outlined,
+                    label: l10n.invoicesTitle,
+                    onTap: () => context.push(Routes.invoices),
+                  ),
                 ],
               ),
               _Group(

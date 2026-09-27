@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +12,7 @@ import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/format/formats.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/theme/khadra_theme.dart';
+import 'package:khadra_mobile/core/widgets/khadra_widgets.dart';
 import 'package:khadra_mobile/features/bookings/booking_detail_screen.dart';
 import 'package:khadra_mobile/features/bookings/booking_providers.dart';
 import 'package:khadra_mobile/features/bookings/payments_presentation.dart';
@@ -298,6 +303,8 @@ void main() {
       ApiFailure? failure,
       double width = 412,
       Booking? booking,
+      BookingFinancialDocuments? documents,
+      ApiFailure? documentsFailure,
     }) async {
       tester.view.physicalSize = Size(width, 915);
       tester.view.devicePixelRatio = 1;
@@ -306,7 +313,9 @@ void main() {
       final api = FakeApi()
         ..bookingById = booking ?? bookingOf()
         ..financialsById = financials == null ? null : BookingFinancials.fromJson(financials)
-        ..financialsFailure = failure;
+        ..financialsFailure = failure
+        ..bookingDocumentsById = documents
+        ..bookingDocumentsFailure = documentsFailure;
       final container = ProviderContainer(overrides: [
         apiProvider.overrideWithValue(api),
         sessionStoreProvider.overrideWithValue(FakeSessionStore()),
@@ -413,6 +422,85 @@ void main() {
         await scrollTo(tester, find.text(l10n.bookingHowItIsPaid));
         expect(find.text(l10n.bookingHowItIsPaid), findsOneWidget);
         expect(find.text(l10n.paymentsTitle), findsNothing);
+      });
+
+      // ── The booking's issued documents (payments Phase 5b), from the shared fixture ──
+
+      final documents = BookingFinancialDocuments.fromJson((jsonDecode(
+        File('${Directory.current.parent.path}/docs/contracts/financial-documents-v1.json').readAsStringSync(),
+      ) as Map<String, dynamic>)['bookingDocuments'] as Map<String, dynamic>);
+
+      for (final width in [360.0, 375.0, 412.0]) {
+        screenTest('the booking’s documents and what is being prepared sit under its payments at ${width.toInt()} in $tag',
+            (tester) async {
+          await pump(tester, locale: locale, width: width, financials: financialsJson(), documents: documents);
+
+          await scrollTo(tester, find.text(l10n.invoicesPreparingBookingStatement));
+          expect(tester.takeException(), isNull, reason: 'overflow at $width in $tag');
+          expect(find.text(l10n.invoicesTitle), findsOneWidget);
+          for (final row in documents.documents) {
+            expect(find.text(row.number), findsOneWidget);
+          }
+          expect(find.text(l10n.invoicesCheckAgain), findsOneWidget);
+        });
+      }
+
+      screenTest('"Check again" reads the booking’s documents once more, and nothing else, in $tag', (tester) async {
+        final api = await pump(tester, locale: locale, financials: financialsJson(), documents: documents);
+        final documentReads = api.bookingDocumentsReads;
+        final financialReads = api.financialsReads;
+
+        await scrollTo(tester, find.text(l10n.invoicesCheckAgain));
+        await tester.tap(find.text(l10n.invoicesCheckAgain));
+        await tester.pumpAndSettle();
+
+        expect(api.bookingDocumentsReads, documentReads + 1);
+        expect(api.financialsReads, financialReads);
+      });
+
+      screenTest('while "Check again" reads, the documents stay on screen and it cannot be tapped twice, in $tag', (tester) async {
+        final api = await pump(tester, locale: locale, financials: financialsJson(), documents: documents);
+        await scrollTo(tester, find.text(l10n.invoicesCheckAgain));
+
+        final hold = Completer<void>();
+        api.holdBookingDocuments = hold;
+        await tester.tap(find.text(l10n.invoicesCheckAgain));
+        await tester.pump();
+
+        // Mid-read: the same rows, no spinner in their place, and the button off.
+        expect(find.text(documents.documents.first.number), findsOneWidget);
+        expect(find.byType(KhadraLoading), findsNothing);
+        final button = tester.widget<TextButton>(find.widgetWithText(TextButton, l10n.invoicesCheckAgain));
+        expect(button.onPressed, isNull);
+
+        hold.complete();
+        await tester.pumpAndSettle();
+        expect(
+          tester.widget<TextButton>(find.widgetWithText(TextButton, l10n.invoicesCheckAgain)).onPressed,
+          isNotNull,
+        );
+      });
+
+      screenTest('a failure listing the documents leaves the payment figures standing, in $tag', (tester) async {
+        await pump(
+          tester,
+          locale: locale,
+          financials: financialsJson(),
+          documentsFailure: const ApiFailure(kind: ApiFailureKind.server, statusCode: 503),
+        );
+
+        await scrollTo(tester, find.text(l10n.invoicesTitle));
+        expect(find.text(l10n.paymentsPaidOnline), findsOneWidget);
+        expect(find.text(l10n.invoicesTitle), findsOneWidget);
+        expect(find.text(l10n.actionRetry), findsOneWidget);
+      });
+
+      screenTest('an API without documents shows none and says nothing about them, in $tag', (tester) async {
+        final api = await pump(tester, locale: locale, financials: financialsJson());
+
+        await scrollTo(tester, find.text(l10n.paymentsHistory));
+        expect(api.bookingDocumentsReads, greaterThan(0));
+        expect(find.text(l10n.invoicesTitle), findsNothing);
       });
     }
 
