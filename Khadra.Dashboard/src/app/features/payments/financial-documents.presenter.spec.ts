@@ -23,6 +23,7 @@ import {
   documentRow,
   holdRow,
   preparingRow,
+  refusalReport,
   voidDialogWords,
   voidRefusalIsFinal,
   voidedToast,
@@ -158,6 +159,21 @@ describe('a document, rendered exactly as it was issued', () => {
     expect(view.headline).toBe('live 94.5 JOD');
     // The recorded facts are still the administrator's evidence.
     expect(view.facts).toContain('"purpose"');
+  });
+
+  it('reports a document it refused whole by its id and schema version only, and one it shows not at all', () => {
+    const shown = page('payment-receipt-paid-in-full');
+    expect(refusalReport(shown)).toBeNull();
+
+    const unknown = { ...shown, snapshotSchemaVersion: 2 };
+    expect(refusalReport(unknown)).toEqual({ documentId: shown.documentId, snapshotSchemaVersion: 2 });
+
+    // A structural break in a version it knows is refused, and reported, the same way.
+    const broken = { ...shown, snapshot: { content: {} } };
+    const report = refusalReport(broken);
+    expect(report).toEqual({ documentId: shown.documentId, snapshotSchemaVersion: 1 });
+    // Never the snapshot: a customer's name and their money go nowhere near a log.
+    expect(Object.keys(report!).sort()).toEqual(['documentId', 'snapshotSchemaVersion']);
   });
 });
 

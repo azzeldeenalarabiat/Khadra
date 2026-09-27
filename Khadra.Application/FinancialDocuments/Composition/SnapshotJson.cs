@@ -27,6 +27,14 @@ namespace Khadra.Application.FinancialDocuments.Composition;
 internal static class SnapshotJson
 {
     /// <summary>The snapshot schema this code writes. A stored snapshot is never migrated; readers support every version.</summary>
+    /// <remarks>
+    /// <b>Publish first.</b> Raise this only AFTER an app build that renders the new version is published and
+    /// confirmed working against the live API — and the website and the console deployed with their readers.
+    /// A new version changes no field of the DTO and fires no 426, so an installed app meets it as a document
+    /// it cannot show; documents are permanent and issued on the server's own schedule. The rule, and what
+    /// forces a new version, is in docs/contracts/README.md ("Issued financial documents: the reader's
+    /// contract"); a new grammar is a new fixture file beside financial-documents-v1.json, never an edit to it.
+    /// </remarks>
     public const int SchemaVersion = 1;
 
     // Qualified: inside this class, "Money" is the method below.

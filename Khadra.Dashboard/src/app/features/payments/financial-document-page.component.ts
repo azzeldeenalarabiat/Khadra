@@ -14,6 +14,7 @@ import {
   DocumentFormat,
   DocumentWords,
   documentPage,
+  refusalReport,
   voidDialogWords,
   voidRefusalIsFinal,
   voidedToast,
@@ -47,6 +48,17 @@ export class FinancialDocumentPageComponent {
 
   constructor() {
     effect(() => this.service.viewing.set(this.documentId()));
+
+    // A document the reader refused whole is reported once, for support — its id and its schema version,
+    // never the snapshot (refusalReport). The event name is for searching logs, not for a reader.
+    let reported: string | null = null;
+    effect(() => {
+      const data = this.data();
+      const report = data ? refusalReport(data.document) : null;
+      if (!report || report.documentId === reported) return;
+      reported = report.documentId;
+      console.warn('financial-document-unreadable', report);
+    });
   }
 
   protected readonly resource = this.service.document;

@@ -130,7 +130,7 @@ PreparingView preparingRow(PendingFinancialDocument pending, AppLocalizations l1
 ///   and its punctuation in order.
 enum LiteralDirection { ltr, auto }
 
-final _rtlLetter = RegExp('[֐-ࣿיִ-﷿ﹰ-﻿]');
+final _rtlLetter = RegExp('[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]');
 
 /// Null for every kind of value that is not a literal: the stored text or the
 /// formatter has already isolated it.

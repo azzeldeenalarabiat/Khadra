@@ -6,6 +6,7 @@ import {
   AdminFinancialDocument,
   AdminFinancialDocumentListItem,
   Bilingual,
+  FinancialDocument,
   FinancialDocumentHold,
   FinancialDocumentLink,
   PendingFinancialDocument,
@@ -305,6 +306,23 @@ export interface DocumentPageView {
   } | null;
   /** Only a CURRENT document can be voided; a superseded or voided one can never become current. */
   readonly canVoid: boolean;
+}
+
+/** What the console reports about a document its reader refused whole. */
+export interface RefusalReport {
+  readonly documentId: string;
+  readonly snapshotSchemaVersion: number;
+}
+
+/**
+ * A document the reader refused whole is reported with its id and its schema version only — never the
+ * snapshot, which holds a customer's name and their money (the reader's contract, docs/contracts/README.md).
+ * Null for a document it shows.
+ */
+export function refusalReport(document: FinancialDocument): RefusalReport | null {
+  return readDocumentContent(document.snapshotSchemaVersion, document.snapshot)
+    ? null
+    : { documentId: document.documentId, snapshotSchemaVersion: document.snapshotSchemaVersion };
 }
 
 export function documentPage(page: AdminFinancialDocument, words: DocumentWords, format: DocumentFormat): DocumentPageView {

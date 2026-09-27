@@ -220,6 +220,78 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
         Assert.Equal(1, hold.Attempts);
     }
 
+    [Fact]
+    public async Task A_hold_for_records_that_need_review_clears_once_they_are_put_right_and_the_statement_issues()
+    {
+        // The kind of hold the local database carries: records that contradict one another — here a free
+        // cancellation whose whole-payment refund was never recorded — and then the refund recorded.
+        var (booking, payment) = await _harness.PaidAsync(PaymentProviders.Sandbox, inFull: true);
+        await _harness.PassAsync();
+        await CancelWithoutItsRefundAsync(booking);
+
+        Assert.Equal(IssuanceHoldReason.RecordsNeedReview, Assert.Single(await _harness.PassAsync()).Hold!.Reason);
+        var hold = Assert.Single(await _harness.HoldsAsync());
+        Assert.False(hold.IsResolved);
+        Assert.Contains("EndingRefundMissing", hold.LastError, StringComparison.Ordinal);
+
+        await RecordTheEndingsRefundAsync(booking, payment);
+        _harness.Now = hold.NextAttemptAt.AddSeconds(1);
+
+        var outcomes = await _harness.PassAsync();
+
+        Assert.Equal("TEST-STM-2026-000002", Assert.Single(outcomes).Number);
+        Assert.True(Assert.Single(await _harness.HoldsAsync()).IsResolved);
+    }
+
+    [Fact]
+    public async Task A_hold_whose_statement_turns_out_unchanged_is_resolved_without_issuing_anything()
+    {
+        // The administrator's remedy for the same contradiction: the records put right and the statement
+        // voided. Its correction takes in the ending, so the family on hold is owed nothing more, and the next
+        // look resolves the hold without issuing a thing.
+        var (booking, payment) = await _harness.PaidAsync(PaymentProviders.Sandbox, inFull: true);
+        await _harness.PassAsync();
+        await CancelWithoutItsRefundAsync(booking);
+        Assert.Equal(IssuanceHoldReason.RecordsNeedReview, Assert.Single(await _harness.PassAsync()).Hold!.Reason);
+        var hold = Assert.Single(await _harness.HoldsAsync());
+
+        await RecordTheEndingsRefundAsync(booking, payment);
+        var statement = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.BookingStatement);
+        var voided = await _harness.VoidAsync(statement.Id, "It did not say the booking had ended.");
+        Assert.True(voided.IsSuccess, voided.IsFailure ? voided.Error.Code : null);
+        _harness.Now = hold.NextAttemptAt.AddSeconds(1);
+
+        var outcomes = await _harness.PassAsync();
+
+        var looked = Assert.Single(outcomes);
+        Assert.Null(looked.Number);
+        Assert.Equal("unchanged", looked.Skipped);
+        Assert.True(Assert.Single(await _harness.HoldsAsync()).IsResolved);
+        // The receipt, the voided statement and its correction: nothing more.
+        Assert.Equal(3, (await _harness.DocumentsAsync()).Count);
+    }
+
+    /// <summary>A customer's free cancellation saved WITHOUT the refund it owes: records that contradict one another.</summary>
+    private async Task CancelWithoutItsRefundAsync(Booking booking)
+    {
+        _harness.Now = _harness.Now.AddMinutes(1);
+        await _harness.ChangeAsync(async context =>
+        {
+            var tracked = await context.Bookings.Include(candidate => candidate.Handovers).SingleAsync(candidate => candidate.Id == booking.Id);
+            Assert.True(tracked.Cancel(BookingParty.Customer, tracked.CustomerId, null, _harness.Now).IsSuccess);
+        });
+        _harness.Now = _harness.Now.AddMinutes(1);
+    }
+
+    /// <summary>The records put right: the refund the ending owed, recorded.</summary>
+    private async Task RecordTheEndingsRefundAsync(Booking booking, Payment payment) =>
+        await _harness.ChangeAsync(async context =>
+        {
+            var tracked = await context.Bookings.Include(candidate => candidate.Handovers).SingleAsync(candidate => candidate.Id == booking.Id);
+            var paid = await context.Payments.Include(candidate => candidate.Refunds).SingleAsync(candidate => candidate.Id == payment.Id);
+            Assert.NotNull(BookingEndingRefunds.Record(tracked, paid, _harness.Now));
+        });
+
     // ── Being prepared ─────────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -473,6 +545,64 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
         Assert.Equal("Petra Rentals", snapshot.GetProperty("office").GetProperty("name").GetString());
         Assert.Equal("Corolla", snapshot.GetProperty("booking").GetProperty("vehicle").GetProperty("model").GetString());
         Assert.Equal(booking.Reference.Value, statement.BookingReference);
+    }
+
+    [Fact]
+    public async Task Editing_the_office_or_the_car_changes_no_issued_document_and_the_next_checkpoint_carries_it()
+    {
+        // The half of the browser scenario an office owner's login was needed for (docs/payments-phase5b-plan.md
+        // §13 scenario 6, §18): an office's location and a car edited after their documents were issued. The
+        // edit is not a checkpoint, so it issues nothing and changes nothing issued; the next version — issued
+        // here by cash recorded at pickup — names the office and the car as they stand then.
+        var (booking, _) = await _harness.PaidAsync(PaymentProviders.Sandbox);
+        await _harness.PassAsync();
+        var issued = await _harness.DocumentsAsync();
+        Assert.Equal(2, issued.Count);
+
+        await _harness.ChangeAsync(async context =>
+        {
+            var dealer = await context.Dealers.SingleAsync();
+            var vehicle = await context.Vehicles.SingleAsync();
+            Assert.True(dealer.UpdateProfile(
+                dealer.BusinessName, dealer.Location, dealer.OperatingHours, dealer.CityId,
+                DealerAddress.Create("Sweifieh", "Street 40").Value).IsSuccess);
+            Assert.True(vehicle.UpdateDetails(vehicle.CarTypeId, vehicle.Details, PlateNumber.Create("12-76543").Value).IsSuccess);
+        });
+        _harness.Now = _harness.Now.AddMinutes(20);
+
+        Assert.All(await _harness.PassAsync(), outcome => Assert.Null(outcome.Number));
+        var untouched = await _harness.DocumentsAsync();
+        Assert.Equal(issued.Count, untouched.Count);
+        var first = DocumentFixtures.Parse(untouched.Single(document => document.Type == FinancialDocumentType.BookingStatement).Snapshot);
+        Assert.Equal("Street 12", first.GetProperty("office").GetProperty("street").GetString());
+        // A plate is stored as its digits.
+        Assert.Equal(PlateNumber.Create("12-34567").Value.ToString(), first.GetProperty("booking").GetProperty("vehicle").GetProperty("plate").GetString());
+
+        await _harness.ChangeAsync(async context =>
+        {
+            var tracked = await context.Bookings.Include(candidate => candidate.Handovers).SingleAsync(candidate => candidate.Id == booking.Id);
+            var balance = Money.Create(tracked.Pricing.TotalPrice.Amount - tracked.Pricing.DepositAmount.Amount, tracked.Pricing.CurrencyCode);
+            Assert.True(tracked.RecordPickup(BookingParty.Dealer, Id.New(), _harness.Now, cashCollected: balance).IsSuccess);
+        });
+        _harness.Now = _harness.Now.AddMinutes(1);
+
+        var outcomes = await _harness.PassAsync();
+
+        var documents = await _harness.DocumentsAsync();
+        var next = documents.Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 2);
+        Assert.Contains(outcomes, outcome => outcome.Number == next.Number);
+        Assert.Equal(FinancialDocumentCause.CashRecorded, next.Cause);
+        var carried = DocumentFixtures.Parse(next.Snapshot);
+        Assert.Equal("Street 40", carried.GetProperty("office").GetProperty("street").GetString());
+        Assert.Equal(PlateNumber.Create("12-76543").Value.ToString(), carried.GetProperty("booking").GetProperty("vehicle").GetProperty("plate").GetString());
+
+        // What was issued before the edit is the same row, byte for byte.
+        foreach (var before in issued)
+        {
+            var row = documents.Single(document => document.Id == before.Id);
+            Assert.Equal(before.Snapshot, row.Snapshot);
+            Assert.Equal(before.ContentSha256, FinancialDocument.Sha256(row.Snapshot));
+        }
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show Bidi;
 
 import '../../core/format/formats.dart';
 import '../../core/theme/khadra_theme.dart';
@@ -195,8 +196,8 @@ class NumberRun extends StatelessWidget {
 
 /// A value of a document, kept apart from the text around it by the reader's
 /// rule: a Latin literal left to right ([LatinRun]), a name written in Arabic in
-/// its own direction ([UserText]), and anything else as the stored text or the
-/// formatter already isolated it.
+/// its own direction ([FirstStrongRun]), and anything else as the stored text or
+/// the formatter already isolated it.
 class DocumentValueText extends StatelessWidget {
   const DocumentValueText(this.text, {super.key, required this.direction, this.style});
 
@@ -207,7 +208,38 @@ class DocumentValueText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => switch (direction) {
         LiteralDirection.ltr => LatinRun(text, style: style),
-        LiteralDirection.auto => UserText(text, style: style),
+        LiteralDirection.auto => FirstStrongRun(text, style: style),
         null => Text(text, style: style),
       };
+}
+
+/// A name as registered, laid out in the direction of its FIRST strong character
+/// — the reader's contract (docs/contracts/README.md), and what the website's and
+/// the console's `<bdi>` do.
+///
+/// Not [UserText], which estimates a typed paragraph's direction from how many of
+/// its words are Arabic: «أوتو رنت — Auto Rent Jordan LLC» has more Latin words,
+/// so the estimate lays it out left to right and the phone would show its two
+/// halves in the opposite order to the website for the same stored name.
+class FirstStrongRun extends StatelessWidget {
+  const FirstStrongRun(this.text, {super.key, this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  /// The direction [text] is laid out in: right to left when its first strong
+  /// character is, otherwise left to right.
+  static TextDirection directionOf(String text) =>
+      // rtl-audit: allow — the direction comes from the stored name's first strong character.
+      Bidi.startsWithRtl(text) ? TextDirection.rtl : TextDirection.ltr;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: style,
+        // rtl-audit: allow — the direction comes from the stored name, not the interface.
+        textDirection: directionOf(text),
+        // Start, not left: it resolves against the name's own direction.
+        textAlign: TextAlign.start,
+      );
 }

@@ -70,6 +70,10 @@ $sm: 767px;
   &:hover strong {
     text-decoration: underline;
   }
+  // The number moves down whole rather than breaking at one of its hyphens, as it does in the list.
+  .ltr {
+    white-space: nowrap;
+  }
 }
 .booking-invoices__preparing {
   align-items: center;

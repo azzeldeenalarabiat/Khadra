@@ -123,7 +123,7 @@ export function preparingRow(pending: PendingFinancialDocument, t: Translate, fo
  */
 export type LiteralDirection = 'ltr' | 'auto' | null;
 
-const RTL_LETTER = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
+const RTL_LETTER = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
 
 export interface DocumentLineView {
   readonly key: string;
