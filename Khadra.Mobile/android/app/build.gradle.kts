@@ -117,4 +117,14 @@ dependencies {
 // still builds; the app then runs with push switched off and says so in its log.
 if (listOf("production", "staging").any { file("src/$it/google-services.json").exists() }) {
     apply(plugin = "com.google.gms.google-services")
+
+    // The two projects are not set up together: staging got its file on 2026-09-23 and production has
+    // none yet. At the plugin's default, one flavor's file makes it demand a file for EVERY flavor, and
+    // from that day the production build stopped at `processProductionDebugGoogleServices` — the
+    // customer app could not be built at all. WARN builds a flavor without a file exactly as a checkout
+    // with no file builds (push off), and still names the missing file in the build log.
+    extensions.configure<com.google.gms.googleservices.GoogleServicesPlugin.GoogleServicesPluginConfig> {
+        missingGoogleServicesStrategy =
+            com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy.WARN
+    }
 }
