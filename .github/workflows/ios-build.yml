@@ -1,0 +1,169 @@
+# The customer app built for iOS, unsigned, on a macOS runner.
+#
+# Khadra is developed on Windows, where Xcode does not exist, so this is where the iOS app is
+# compiled. It builds both flavors the way a release is built, checks that each app is what the
+# project says it is (Khadra.Mobile/tools/ci/check_ios_app.sh), and opens the staging app on an
+# iPhone simulator in English and in Arabic. Nothing is signed, uploaded or published: that needs
+# Apple Developer Program membership and belongs to a later phase (docs/production.md, "iOS").
+#
+# macOS minutes are the expensive ones, so this does not run on every commit: only when asked for
+# (Actions > iOS build > Run workflow, once this file is on the default branch), and on pushes to
+# an ios/** branch that change the app.
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'ios/**'
+    paths:
+      - 'Khadra.Mobile/**'
+      - '.github/workflows/ios-build.yml'
+
+# Reads the repository and nothing else. There are no secrets in this workflow: an unsigned build
+# needs none.
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Flutter this app is made with (Khadra.Mobile/.metadata). project.pbxproj, the Podfile and the
+  # Swift Package Manager integration are written for this tool, so it is pinned, not "stable".
+  FLUTTER_VERSION: 3.44.4
+  # The customer API, exactly as the Android release command passes it (docs/production.md). Public:
+  # it is in every APK already. The staging flavor takes no address; it has its own compiled in and
+  # refuses any other (AppEnvironment).
+  PRODUCTION_API: https://khadra.onrender.com
+
+jobs:
+  checks:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Khadra.Mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter --version
+
+      - run: flutter pub get
+
+      - name: Every English string has an Arabic one
+        run: |
+          flutter gen-l10n
+          if [ "$(tr -d '[:space:]' < l10n-untranslated.json)" != "{}" ]; then
+            echo "::error::lib/l10n/app_ar.arb is missing these keys:"
+            cat l10n-untranslated.json
+            exit 1
+          fi
+
+      - run: flutter analyze
+
+      # Includes test/ios_project_test.dart, which checks the Xcode project, the Podfile, the flavors
+      # and every plugin's minimum iOS without a Mac — so a broken project fails here, in minutes,
+      # before a macOS runner is spent on it.
+      - run: flutter test
+
+  ios:
+    name: iOS (unsigned) and simulator launch
+    needs: checks
+    runs-on: macos-26
+    timeout-minutes: 75
+    defaults:
+      run:
+        working-directory: Khadra.Mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          flutter --version
+          pod --version
+
+      - run: flutter pub get
+
+      - name: The Xcode project reads, and lists both flavors
+        run: |
+          plutil -lint ios/Runner.xcodeproj/project.pbxproj ios/Runner/Info.plist ios/Runner/Flavors/*/*.lproj/InfoPlist.strings
+          xcodebuild -list -project ios/Runner.xcodeproj
+
+      # Resolves the scheme and configuration for the flavor, writes Flutter's settings and runs
+      # `pod install` for the two plugins that are CocoaPods-only; the rest come through Swift
+      # Package Manager. A configuration mistake fails here, before anything compiles.
+      - name: Prepare the Xcode project and CocoaPods
+        run: |
+          flutter build ios --config-only --release --no-codesign --flavor production --dart-define=KHADRA_API_BASE_URL=$PRODUCTION_API
+          echo "--- ios/Podfile.lock, which only a successful pod install writes:"
+          sed -n '1,/^DEPENDENCIES:/p' ios/Podfile.lock
+
+      # Each build keeps its whole verbose log in the evidence artifact and lists every warning and
+      # error Xcode reported: Flutter shows none of Xcode's warnings on its own.
+      - name: Build production (release, unsigned)
+        run: sh tools/ci/build_ios.sh production "$RUNNER_TEMP/evidence" --release --no-codesign --flavor production --dart-define=KHADRA_API_BASE_URL=$PRODUCTION_API
+
+      # The address is a compile-time constant, so the app's Dart code carries it verbatim.
+      - name: Check the production app
+        run: |
+          sh tools/ci/check_ios_app.sh production build/ios/iphoneos/Runner.app
+          grep -a -F -q "$PRODUCTION_API" build/ios/iphoneos/Runner.app/Frameworks/App.framework/App \
+            && echo "ok      talks to $PRODUCTION_API" \
+            || { echo "::error::the production app does not carry $PRODUCTION_API"; exit 1; }
+
+      - name: Build staging (release, unsigned)
+        run: sh tools/ci/build_ios.sh staging "$RUNNER_TEMP/evidence" --release --no-codesign --flavor staging
+
+      # Only the absence proves anything here: EVERY build carries the staging address, because the
+      # production app keeps it in order to refuse it (AppEnvironment). What makes this app the staging
+      # one is its bundle id and name, which the script checks.
+      - name: Check the staging app
+        run: |
+          sh tools/ci/check_ios_app.sh staging build/ios/iphoneos/Runner.app
+          if grep -a -F -q "$PRODUCTION_API" build/ios/iphoneos/Runner.app/Frameworks/App.framework/App; then
+            echo "::error::the staging app carries the production API address"
+            exit 1
+          fi
+          echo "ok      does not carry $PRODUCTION_API"
+
+      # A simulator build needs no signing, so the app can be opened before any Apple account
+      # exists. Staging, because it talks to its own API over HTTPS with nothing to pass in.
+      - name: Build staging for the simulator (debug)
+        run: sh tools/ci/build_ios.sh simulator "$RUNNER_TEMP/evidence" --simulator --debug --flavor staging
+
+      - name: Open it on an iPhone simulator, in English and in Arabic
+        run: sh tools/ci/launch_on_simulator.sh build/ios/iphonesimulator/Runner.app "$RUNNER_TEMP/evidence/simulator"
+
+      # What the Mac changed in the checked-out project (CocoaPods integration, Podfile.lock), so it
+      # can be reviewed and committed from a machine that has no Mac.
+      - name: Keep the evidence
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/evidence"
+          git status --porcelain > "$RUNNER_TEMP/evidence/git-status.txt"
+          git diff > "$RUNNER_TEMP/evidence/tracked-changes.diff"
+          cp ios/Podfile.lock "$RUNNER_TEMP/evidence/" 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-build-evidence
+          path: ${{ runner.temp }}/evidence
+          retention-days: 14
