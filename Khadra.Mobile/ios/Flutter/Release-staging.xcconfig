@@ -1,0 +1,5 @@
+// The Release build of the staging flavor. Named <Mode>-<flavor> because that is the configuration
+// `flutter build ios --flavor staging` looks for; ios/Podfile says which of them are debug builds.
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release-staging.xcconfig"
+#include "Generated.xcconfig"
+#include "staging.xcconfig"

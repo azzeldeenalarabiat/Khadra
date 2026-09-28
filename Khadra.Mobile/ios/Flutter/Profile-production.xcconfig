@@ -1,0 +1,5 @@
+// The Profile build of the production flavor. Named <Mode>-<flavor> because that is the configuration
+// `flutter build ios --flavor production` looks for; ios/Podfile says which of them are debug builds.
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.profile-production.xcconfig"
+#include "Generated.xcconfig"
+#include "production.xcconfig"

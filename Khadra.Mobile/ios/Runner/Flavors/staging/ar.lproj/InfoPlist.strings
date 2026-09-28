@@ -1,0 +1,13 @@
+/*
+  The staging app ("Khadra TEST") in Arabic. Identical to the customer app's file except the name:
+  TEST stays Latin in Arabic too, because the launcher name is the one thing that marks this app
+  (owner, 2026-09-23). Matches android/app/src/staging/res/values-ar/strings.xml; the test checks it.
+*/
+"CFBundleDisplayName" = "خضرا TEST";
+"CFBundleName" = "خضرا TEST";
+
+/* The document picker's "take a photo": the licence and identity document, and a dispute's photos. */
+"NSCameraUsageDescription" = "يستخدم تطبيق خضرا الكاميرا لتصوير رخصة القيادة ووثيقة الهوية، أو لالتقاط صور عند فتح نزاع. يوجب القانون الأردني على مكتب التأجير التحقق من رخصة القيادة والهوية قبل تسليم السيارة.";
+
+/* The document picker's "choose a photo". */
+"NSPhotoLibraryUsageDescription" = "يحتاج تطبيق خضرا إلى مكتبة الصور لتتمكن من رفع رخصة القيادة أو وثيقة الهوية، أو صور عند فتح نزاع.";

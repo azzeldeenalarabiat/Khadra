@@ -1,0 +1,15 @@
+// "Khadra TEST", the staging app, bound to the staging API by AppEnvironment: the counterpart of
+// `productFlavors.staging` in android/app/build.gradle.kts. Included by Debug-, Profile- and
+// Release-staging.xcconfig.
+//
+// Nothing here may also be set in project.pbxproj: a value there overrides this file.
+KHADRA_FLAVOR = staging
+
+// The customer app's id plus Android's own `.staging` suffix: a different app, so a tester can hold
+// both and neither can ever update over the other.
+PRODUCT_BUNDLE_IDENTIFIER = com.khadra.app.staging
+
+// The launcher name is what marks this app, never anything inside it (owner, 2026-09-23). TEST stays
+// Latin in Arabic too: Runner/Flavors/staging/ar.lproj/InfoPlist.strings, matching
+// android/app/src/staging/res/values*/strings.xml.
+KHADRA_DISPLAY_NAME = Khadra TEST

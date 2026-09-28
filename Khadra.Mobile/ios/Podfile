@@ -1,0 +1,51 @@
+# iOS 15.0 because firebase_core and firebase_messaging require it (both their podspecs and their
+# Package.swift say so), and every plugin is linked into the app whether or not it runs on iOS.
+# project.pbxproj carries the same number; test/ios_project_test.dart keeps the two equal, and
+# checks it against every plugin's own minimum.
+platform :ios, '15.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+# Every configuration is a flavor: <Mode>-<flavor>, the names `flutter build ios --flavor <flavor>`
+# looks for. CocoaPods has to be told which are debug builds, or it treats them all as release.
+project 'Runner', {
+  'Debug-production' => :debug,
+  'Profile-production' => :release,
+  'Release-production' => :release,
+  'Debug-staging' => :debug,
+  'Profile-staging' => :release,
+  'Release-staging' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
+end

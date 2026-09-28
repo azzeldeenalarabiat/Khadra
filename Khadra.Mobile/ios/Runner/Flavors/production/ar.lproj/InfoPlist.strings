@@ -1,0 +1,17 @@
+/*
+  The customer app in Arabic: the name under the icon, and the text iOS shows when the app asks for
+  the camera or the photo library. English is in Info.plist itself.
+
+  Copied into the app by the Runner target's "Copy Flavor Localizations" build phase. It is per
+  flavor because the staging app must read "خضرا TEST" on an Arabic iPhone, and an ordinary
+  InfoPlist.strings is one file for every flavor. The name matches the Android launcher's
+  (res/values-ar/strings.xml) and the app's own appName; test/ios_project_test.dart checks both.
+*/
+"CFBundleDisplayName" = "خضرا";
+"CFBundleName" = "خضرا";
+
+/* The document picker's "take a photo": the licence and identity document, and a dispute's photos. */
+"NSCameraUsageDescription" = "يستخدم تطبيق خضرا الكاميرا لتصوير رخصة القيادة ووثيقة الهوية، أو لالتقاط صور عند فتح نزاع. يوجب القانون الأردني على مكتب التأجير التحقق من رخصة القيادة والهوية قبل تسليم السيارة.";
+
+/* The document picker's "choose a photo". */
+"NSPhotoLibraryUsageDescription" = "يحتاج تطبيق خضرا إلى مكتبة الصور لتتمكن من رفع رخصة القيادة أو وثيقة الهوية، أو صور عند فتح نزاع.";

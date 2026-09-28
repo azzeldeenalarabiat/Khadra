@@ -1,0 +1,14 @@
+// The customer app on iOS: the counterpart of `productFlavors.production` in
+// android/app/build.gradle.kts. Included by Debug-, Profile- and Release-production.xcconfig.
+//
+// Nothing here may also be set in project.pbxproj: a value there overrides this file, and the staging
+// app would quietly build as this one. test/ios_project_test.dart holds that line.
+KHADRA_FLAVOR = production
+
+// The app's identity to iOS, the App Store and every Apple service. Chosen by the owner on
+// 2026-09-28; free to change until an App Store Connect record exists, and permanent after that.
+PRODUCT_BUNDLE_IDENTIFIER = com.khadra.app
+
+// The name under the icon. Its Arabic is in Runner/Flavors/production/ar.lproj/InfoPlist.strings;
+// both must match the Android launcher's, in android/app/src/main/res/values*/strings.xml.
+KHADRA_DISPLAY_NAME = Khadra
