@@ -2537,7 +2537,10 @@ App Links and Universal Links are for.
    which is the usual reason this looks broken in testing.
 3. **iOS Universal Links.** Serve `/.well-known/apple-app-site-association` (JSON, no extension, no
    redirect, `application/json`) with the Team ID and bundle id; add the Associated Domains
-   entitlement `applinks:<host>`.
+   entitlement `applinks:<host>`. Per flavor since 2026-09-28: the file names
+   `<TEAMID>.com.khadra.app` (and `<TEAMID>.com.khadra.app.staging` on a staging host), and the
+   entitlement goes in each flavor's `.entitlements` file, named by `CODE_SIGN_ENTITLEMENTS` in
+   `ios/Flutter/<flavor>.xcconfig`. There is no Team ID until item 190's enrollment.
 4. **Routing in the app.** `go_router` already routes `/bookings/:id`; wire the incoming link to it
    and decide what an unauthenticated open does — the session-aware redirect should send them to
    sign-in and then ON to the booking, not drop them on the catalogue.
@@ -2637,6 +2640,10 @@ after sign-out `cache/khadra_documents` no longer exists.
 
 **Still open for iOS.** The whole path is unexercised there, and the first Mac build is also where
 the iOS 14 floor gets tested.
+
+*2026-09-28:* the iOS app now builds on a macOS runner and opens on a simulator, and the floor is
+15.0 (item 94). No document has been picked, uploaded or opened on iOS yet; that needs a signed build
+on a real iPhone (items 190 and 192).
 
 #### Run 1 -- Android emulator (Pixel, API 36), 2026-09-11, debug build
 
@@ -2762,6 +2769,12 @@ Three other things changed with it, each recorded because none is a version numb
 `IPHONEOS_DEPLOYMENT_TARGET` lines in the pbxproj were changed; this drops iOS 13 devices and is a
 product decision the owner should confirm before release. It cannot be verified from Windows -- the
 first Mac build is the test.
+
+**Raised again, to 15.0, on 2026-09-28:** `firebase_core` and `firebase_messaging` require it (their
+podspecs and Package.swift both say so), and with 14.0 the iOS build could not link them. iOS 15 runs
+on every device iOS 14 did, so nothing more is dropped. `test/ios_project_test.dart` now checks the
+project's floor against every plugin's own minimum on Windows, and the Mac build is
+`.github/workflows/ios-build.yml`.
 
 **A build setting was wrong independently of any of this.** `android/gradle.properties` asked for
 `-Xmx8G -XX:MaxMetaspaceSize=4G` on a machine with 8 GB of RAM. The daemon died mid-build with
@@ -2949,6 +2962,12 @@ is configured `ios: false` deliberately — nothing in this environment can look
 an iOS build, and a generated icon nobody has seen is worse than a placeholder
 somebody knows is a placeholder. The same two commands do iOS the day there is a
 device to check it on.
+
+*Done differently, 2026-09-28:* the iOS set is written by `tools/make_launcher_icons.dart`
+itself, from the flat legacy image, with no alpha channel (App Store Connect refuses
+one), and was looked at under an iOS-shaped mask before it was committed. Not by
+`flutter_launcher_icons`: tried once, its iOS path rewrote `project.pbxproj`, so it
+stays `ios: false`. It has still not been seen on a real home screen (item 192).
 
 ### 98. Arabic is rendered with Latin letter-spacing
 
@@ -3980,6 +3999,26 @@ The server sends APNs-compatible messages, but the iOS app is not registered wit
 `GoogleService-Info.plist`, no APNs key) and `PushMessaging` initialises only on Android. Close it
 with the first iOS release.
 
+**Still off on iOS after the iOS preparation (2026-09-28), deliberately:** no Firebase file, no Push
+capability (an account without the paid programme cannot sign one), no `aps-environment`, and
+`FirebasePushMessaging.initialize` still answers false off Android. `firebase_messaging` is linked into
+the iOS app all the same — harmlessly, since nothing configures Firebase there — and it is why the
+iOS floor is 15.0. **To close on iOS**, once item 190's membership exists:
+
+1. Register `com.khadra.app` in `khadra-prod` and `com.khadra.app.staging` in `khadra-staging`, and
+   upload an APNs authentication key to each project.
+2. Put each project's `GoogleService-Info.plist` in `ios/Runner/Flavors/<flavor>/` and have the "Copy
+   Flavor Localizations" build phase copy it too, so a flavor can never ship the other's.
+3. The Push Notifications capability: an `.entitlements` file per flavor carrying `aps-environment`,
+   named by `CODE_SIGN_ENTITLEMENTS` in `ios/Flutter/<flavor>.xcconfig`.
+4. In the app: let `initialize()` run on iOS, give `_local.initialize` its
+   `DarwinInitializationSettings`, decide how a push that arrives in front is shown (iOS can present
+   it itself, unlike Android), and send `platform: 'Ios'` — the API's `PushPlatform.Ios` — instead of
+   the literal `'Android'` in `PushCoordinator._register`. `UIBackgroundModes: remote-notification`
+   only if a data-only push is ever sent; today every push carries a notification block.
+5. On a real iPhone: the permission prompt, a push in front and in the background, and a tap that
+   opens its booking from a cold start (the app uses the UIScene lifecycle).
+
 ---
 
 ## Customer website (`Khadra.Web`, branch `feature/customer-website`, 2026-09-23)
@@ -4246,3 +4285,89 @@ a sheet that promised the deposit back; the response then shows the truth. The p
 always had the same race. **To close, if the owner wants it:** the client sends what it was promised
 (for example `expectFree: true`) and the server answers 409 when `CancellationWouldReturnDeposit` is
 no longer true, so the customer is asked again rather than surprised.
+
+---
+
+## iOS preparation (2026-09-28)
+
+The customer app builds for iOS, both flavors, unsigned, on a macOS runner (`.github/workflows/ios-build.yml`;
+docs/production.md, "iOS"). Numbered from 190 so they cannot collide with the payments work's items, which
+run to 189 on its own branch.
+
+### 190. The iOS app is built, but not signed, and cannot reach an iPhone
+
+**Status:** open · **Raised:** 2026-09-28 · **Blocks:** every iOS customer
+
+Everything past an unsigned build needs Apple Developer Program membership, which the owner has deliberately
+not taken yet. **To close, in order:**
+
+1. **Enroll** in the Apple Developer Program — as an organisation if Khadra is to be the seller on the store,
+   which needs a D-U-N-S number and takes days. Note the Team ID.
+2. **Register the two App IDs**, `com.khadra.app` and `com.khadra.app.staging`, each with only the
+   capabilities it uses (Push, item 138; Associated Domains, item 91).
+3. **Signing.** `DEVELOPMENT_TEAM` goes in `ios/Flutter/production.xcconfig` and `staging.xcconfig`, never in
+   `project.pbxproj`, which `test/ios_project_test.dart` keeps free of per-flavor settings. On CI: an App Store
+   Connect API key, a distribution certificate and a provisioning profile per app, as encrypted repository
+   secrets — never in the repository, never printed.
+4. **The App Store Connect record** for `com.khadra.app`, which is what makes the id permanent: names in
+   English and Arabic, primary language, SKU. The staging app gets its own record, for TestFlight only.
+5. **Decide before the first submission** — cheap now, awkward after review:
+   - **iPhone only, or iPad too.** The project declares both (`TARGETED_DEVICE_FAMILY = "1,2"`) with every
+     orientation on iPad, but the layouts are measured at phone widths (`bottom_nav_test.dart`). iPad means
+     iPad review and iPad screenshots.
+   - **Export compliance.** `ITSAppUsesNonExemptEncryption = false` in Info.plist describes this app (it uses
+     only the system's TLS), but it is the owner's legal statement, so it is not set yet.
+   - **Privacy.** An app-level `ios/Runner/PrivacyInfo.xcprivacy` (every plugin ships its own), and App Store
+     Connect's privacy answers: name, email, phone, identity documents and photos are collected, and payment
+     is taken on the provider's page.
+   - **How App Review signs in** — it needs a working account, and must not be able to make a real booking.
+6. **Build and upload:** `flutter build ipa --flavor production --dart-define=KHADRA_API_BASE_URL=…` with an
+   export options plist, then Transporter, `xcrun altool` or fastlane; the staging flavor the same way. Every
+   upload needs a higher build number (`+N` in pubspec.yaml). The first upload is also the first time Apple's
+   own checks read the icon, the plist and the signature.
+7. **TestFlight:** internal testers first (no review), then external testers (beta review), then App Store
+   review.
+
+### 191. An iPhone told to update is sent to an APK
+
+**Status:** open · **Raised:** 2026-09-28 · **Blocks:** the first iOS release
+
+`MobileApp:UpdateUrl` is ONE address for every platform, and in production it is the APK
+(`…/releases/latest/download/khadra.apk`). It reaches the app in `/app-config` and in every
+`426 app.update_required`, and two screens offer it: `UpdateRequiredScreen` and the invoice screen's "needs a
+newer version" notice. An iPhone below the minimum would be sent to an Android file.
+
+It is left alone today because there is no App Store address to send an iPhone to (item 190). **To close**, one
+of:
+
+- **Additive:** `mobileApp.updateUrls: { android, ios }` beside `updateUrl`, which installed builds keep
+  reading; the app chooses by platform. Additive, so no minimum is raised.
+- **No contract change:** `MobileApp:UpdateUrl` becomes a customer-website address (for example
+  `/get-the-app`) that sends each device to its own store. It fixes every installed build and keeps one source
+  of truth, but needs the customer host (items 91 and 140).
+
+**And the release order grows.** "Publish before raising the minimum" now includes App Review: a breaking API
+change waits until the iOS build is approved AND live, or the raised minimum refuses every iPhone with nothing
+to update to.
+
+### 192. The iOS app has never run on an iPhone
+
+**Status:** open · **Raised:** 2026-09-28
+
+CI opens it on a simulator, in English and in Arabic, and that is all. Every native path is unexercised on iOS
+and each needs a signed build on a real device (item 190): taking and choosing a photo (camera, photo picker),
+choosing a PDF (document picker) and opening a stored document (`open_filex`), the payment page in the WebView,
+the session surviving a restart and NOT surviving a reinstall (`khadra.session_owned`), the system sheets in
+Arabic, the map and "open in Maps", the icon and the name on a real home screen, and iOS 15 on the oldest
+device it allows. Item 93's five steps are the documents half of this.
+
+### 193. The iOS simulator cannot reach a development API
+
+**Status:** open · **Raised:** 2026-09-28 · Development only
+
+A build given no `KHADRA_API_BASE_URL` talks to `http://localhost:5012`, and iOS refuses plain HTTP (App
+Transport Security). Android keeps its development allowlist out of release builds with a debug-only network
+configuration; iOS has no equivalent yet, deliberately: nobody here has a Mac to use it, and an exception that
+leaked into a release plist would be worse than none. `tools/ci/check_ios_app.sh` fails any built app that
+carries one. **To close**, when someone develops on a Mac: `NSAppTransportSecurity > NSAllowsLocalNetworking`
+in the DEBUG configurations only.

@@ -517,7 +517,12 @@ committed. The service-account key is the secret, and it lives only in each API'
 push to a production phone even by mistake: FCM refuses it and the device is revoked.
 
 Without the JSON file the app builds and runs with push off. The Google services Gradle plugin is
-applied only when one of the two files exists.
+applied only when one of the two files exists, and is told to WARN rather than fail for a flavor that
+has none — which is production today. Left at the plugin's default, the staging file made it demand
+one for every flavor, and no production APK could be built from 2026-09-23 until that was found on
+2026-09-28.
+
+iOS has no Firebase configuration yet and runs with push off; see "iOS" below and pre-launch item 138.
 
 ### The handover code
 
@@ -568,3 +573,61 @@ must carry it, or the address breaks.
 The build is published BEFORE any API that raises the minimum supported version is
 deployed. CLAUDE.md, "The customer app's contract", and
 [contracts/README.md](contracts/README.md) give the order.
+
+### iOS
+
+The same Flutter project builds for iOS, from the same code and with the same two flavors. It is
+**built, unsigned, and on no store**: there is no Apple Developer Program membership yet, so nothing
+can be signed, installed on an iPhone, uploaded to App Store Connect or sent to TestFlight. What
+that takes, in order, is pre-launch item 190.
+
+| | Customer app (`production`) | Staging app (`staging`) |
+|---|---|---|
+| Bundle id | `com.khadra.app` (owner, 2026-09-28) | `com.khadra.app.staging` |
+| Name under the icon | Khadra · خضرا | Khadra TEST · خضرا TEST |
+| Talks to | the address passed with `--dart-define=KHADRA_API_BASE_URL` | `https://khadra-staging.onrender.com`, compiled in |
+| Minimum iOS | 15.0 — `firebase_core` and `firebase_messaging` require it | 15.0 |
+
+The bundle id is free to change until an App Store Connect record exists for it, and permanent
+after that. It does not have to match the Android package, and does not: iOS forbids the underscore.
+
+**How a flavor reaches Xcode.** Every build configuration is `<Debug|Profile|Release>-<flavor>`,
+each flavor has a shared scheme of its own name, and there is nothing unflavored — the flavor is the
+one selector, as it is on Android. A configuration takes everything that differs from
+`ios/Flutter/<flavor>.xcconfig` (bundle id, name, `KHADRA_FLAVOR`); `project.pbxproj` must never set
+those, because a value there overrides the file. The Arabic name and permission texts live per
+flavor in `ios/Runner/Flavors/<flavor>/ar.lproj/InfoPlist.strings`, installed by the target's "Copy
+Flavor Localizations" build phase: an ordinary `InfoPlist.strings` is one file for every flavor, and
+the staging app has to say TEST in Arabic too. `test/ios_project_test.dart` checks all of this on
+Windows, including that no plugin needs a newer iOS than the project targets.
+
+**Building it** needs a Mac with Xcode, or the workflow below:
+
+```bash
+cd Khadra.Mobile
+flutter build ios --release --no-codesign --flavor production --dart-define=KHADRA_API_BASE_URL=https://khadra.onrender.com
+flutter build ios --release --no-codesign --flavor staging
+```
+
+`--no-codesign` is what lets it build without an Apple account. The result is
+`build/ios/iphoneos/Runner.app`, which no iPhone will install until it is signed.
+
+**The workflow**, `.github/workflows/ios-build.yml`, runs on demand (Actions → iOS build → Run
+workflow, once the file is on the default branch) and on pushes to an `ios/**` branch that change the
+app — never on every commit, because macOS minutes are the expensive ones. A Linux job analyses and
+tests first; only then does a macOS job pin Flutter 3.44.4, run `pod install` (for the two
+CocoaPods-only plugins; the rest come through Swift Package Manager), build both flavors unsigned,
+check each built app against the project's files (`tools/ci/check_ios_app.sh`), and open the staging
+app on an iPhone simulator in English and in Arabic (`tools/ci/launch_on_simulator.sh`). Every build
+lists each warning and error Xcode reported, in its log and in the run's summary
+(`tools/ci/build_ios.sh`): Flutter discards Xcode's warnings from its own output, so this is the only
+place to read them. Its artifact, `ios-build-evidence`, holds each build's full log, the screenshots,
+what the app printed, and what the Mac changed in the project (`Podfile.lock`, CocoaPods' edits), so
+those can be reviewed and committed from Windows.
+
+**Icons.** `dart run tools/make_launcher_icons.dart` writes the iOS set from the same flat image as
+the Android legacy icon, without an alpha channel. Never switch `flutter_launcher_icons` to
+`ios: true`: its iOS path corrupts `project.pbxproj` (see the comment in `flutter_launcher_icons.yaml`).
+
+**Not on iOS yet:** push notifications (item 138), the update link (item 191 — `MobileApp:UpdateUrl`
+names the APK), Universal Links (item 91), and any run on a real iPhone (item 192).
