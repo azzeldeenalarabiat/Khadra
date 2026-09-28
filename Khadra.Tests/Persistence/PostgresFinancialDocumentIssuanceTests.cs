@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.Payments;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -8,6 +10,7 @@ using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Infrastructure.Reporting;
 using Khadra.Tests.Support;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Npgsql;
 
 namespace Khadra.Tests.Persistence;
@@ -15,9 +18,10 @@ namespace Khadra.Tests.Persistence;
 /// <summary>
 /// Issuing financial documents on PostgreSQL itself (payments Phase 5): the detection and reading queries
 /// translate, the number counter holds its row lock so two issuers never take one number and a rolled-back
-/// number comes back, and the <c>json</c> column returns the snapshot exactly as it was written. Opt-in: set
-/// <c>KHADRA_TEST_POSTGRES</c> to a scratch database. Each test gets a fresh database of its own, so every
-/// number it asserts is its own.
+/// number comes back, two administrators voiding one document at once — the overlap forced, not hoped for —
+/// leave one void, one correction and no gap, and the <c>json</c> column returns the snapshot exactly as it
+/// was written. Opt-in: set <c>KHADRA_TEST_POSTGRES</c> to a scratch database. Each test gets a fresh
+/// database of its own, so every number it asserts is its own.
 /// </summary>
 [Collection(PostgresTestDatabase.Collection)]
 public sealed class PostgresFinancialDocumentIssuanceTests
@@ -127,31 +131,83 @@ public sealed class PostgresFinancialDocumentIssuanceTests
         await thirdTransaction.CommitAsync();
     }
 
+    /// <summary>
+    /// Two administrators void one document at the same moment, and the overlap is FORCED rather than hoped
+    /// for (pre-launch item 182). The test holds the number series' row and lets go only once PostgreSQL
+    /// reports BOTH voids waiting on it: each is then past the "already voided?" and "still current?" checks
+    /// and inside its own transaction, so the one that takes a number second can no longer be turned away by
+    /// a check. Only the database can refuse it — the unique index its void or its correction collides with —
+    /// and that refusal is the handler's race branch.
+    /// </summary>
     [PostgresFact]
-    public async Task Two_administrators_voiding_one_document_at_once_leave_one_void_and_one_correction()
+    public async Task Two_administrators_voiding_one_document_at_once_leave_one_void_one_correction_and_no_gap()
     {
-        var harness = new IssuanceHarness((await FreshDatabaseAsync("void")).Options);
+        var scratch = await FreshDatabaseAsync("void");
+        var collisions = new UniqueViolationRecorder();
+        var harness = new IssuanceHarness(new DbContextOptionsBuilder<KhadraDbContext>()
+            .UseNpgsql(scratch.ConnectionString)
+            .UseSnakeCaseNamingConvention()
+            .AddInterceptors(collisions)
+            .Options);
         await harness.PaidAsync(PaymentProviders.Sandbox);
         await harness.PassAsync();
         var receipt = (await harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        Assert.Equal("TEST-PAY-2026-000001", receipt.Number);
+        const string series = "TEST-PAY-2026";
 
-        var results = await Task.WhenAll(
-            Task.Run(() => harness.VoidAsync(receipt.Id, "Wrong, says the first.")),
-            Task.Run(() => harness.VoidAsync(receipt.Id, "Wrong, says the second.")));
+        // The series row, held the way an issuer part-way through its own transaction holds it.
+        await using var holder = new NpgsqlConnection(scratch.ConnectionString);
+        await holder.OpenAsync();
+        await using var holding = await holder.BeginTransactionAsync();
+        Assert.Equal(1L, await LastNumberAsync(holder, series, holding));
 
+        string[] reasons = ["Wrong, says the first.", "Wrong, says the second."];
+        var voids = reasons.Select(reason => Task.Run(() => harness.VoidAsync(receipt.Id, reason))).ToArray();
+        await BothWaitForTheNumberAsync(scratch.ConnectionString, holder.ProcessID, voids);
+        Assert.Empty(collisions.Constraints);
+
+        // Let go: one takes number 2 and commits; the other then takes number 3 and collides with it.
+        await holding.RollbackAsync();
+        var results = await Task.WhenAll(voids).WaitAsync(TimeSpan.FromSeconds(30));
+
+        var winner = Array.FindIndex(results, result => result.IsSuccess);
         Assert.Single(results, result => result.IsSuccess);
         var refused = Assert.Single(results, result => result.IsFailure);
-        Assert.Contains(refused.Error.Code, new[] { FinancialDocumentErrors.AlreadyVoided.Code, FinancialDocumentErrors.NotCurrent.Code });
+        // Refused by the database, not by a check it had already passed: one unique violation, on an index
+        // the race branch maps to exactly the refusal the loser returned.
+        var collision = Assert.Single(collisions.Constraints);
+        Assert.Equal(
+            collision switch
+            {
+                "pk_financial_document_voids" => FinancialDocumentErrors.AlreadyVoided.Code,
+                "ix_financial_documents_document_type_subject_id_version" => FinancialDocumentErrors.NotCurrent.Code,
+                _ => $"(an index the race branch does not expect: {collision})",
+            },
+            refused.Error.Code);
 
         await using var context = harness.NewContext();
-        Assert.Single(await context.FinancialDocumentVoids.ToListAsync());
+        // One void — the winner's, of the receipt — and one audit entry.
+        var voided = Assert.Single(await context.FinancialDocumentVoids.ToListAsync());
+        Assert.Equal(receipt.Id, voided.DocumentId);
+        Assert.Equal(reasons[winner], voided.Reason);
         Assert.Single(await context.AuditEntries.ToListAsync());
+        // One correction: the receipt's family is the receipt and version 2, the document the winner reported.
         var family = await context.FinancialDocuments
             .Where(document => document.Type == FinancialDocumentType.PaymentReceipt && document.SubjectId == receipt.SubjectId)
             .ToListAsync();
         Assert.Equal([1, 2], family.Select(document => document.Version).Order().ToArray());
-        // The loser's number went back with its rollback: the correction is the next number, and no gap follows it.
-        Assert.Equal("TEST-PAY-2026-000002", family.Single(document => document.Version == 2).Number);
+        var correction = family.Single(document => document.Version == 2);
+        Assert.Equal(FinancialDocumentCause.Correction, correction.Cause);
+        Assert.Equal(results[winner].Value.ReplacementDocumentId, correction.Id.Value);
+        // No gap: the loser was holding number 3 when the index refused it, and its rollback gave it back.
+        Assert.Equal("TEST-PAY-2026-000002", correction.Number);
+        Assert.Equal(2L, await LastNumberAsync(holder, series, transaction: null));
+        Assert.Equal(
+            ["TEST-PAY-2026-000001", "TEST-PAY-2026-000002"],
+            (await context.FinancialDocuments.Select(document => document.Number).ToListAsync())
+                .Where(number => number.StartsWith(series, StringComparison.Ordinal))
+                .Order(StringComparer.Ordinal)
+                .ToArray());
     }
 
     [PostgresFact]
@@ -177,6 +233,107 @@ public sealed class PostgresFinancialDocumentIssuanceTests
             Assert.Equal(document.Snapshot, stored);
             Assert.StartsWith("""{"schemaVersion":1,"document":{"type":""", stored, StringComparison.Ordinal);
             Assert.Equal(FinancialDocument.Sha256(stored), row.GetString(1));
+        }
+    }
+
+    /// <summary>The series' last number; read under the row's lock when a transaction is given, as an issuer holds it.</summary>
+    private static async Task<long> LastNumberAsync(NpgsqlConnection connection, string series, NpgsqlTransaction? transaction)
+    {
+        await using var command = new NpgsqlCommand(
+            transaction is null
+                ? "SELECT last_number FROM financial_document_series WHERE series_key = @series"
+                : "SELECT last_number FROM financial_document_series WHERE series_key = @series FOR UPDATE",
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("series", series);
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
+    /// <summary>
+    /// Returns once PostgreSQL itself reports both voids waiting on a lock inside the number series' statement
+    /// — where a void stands once its checks have passed and its transaction has begun — with the holder at
+    /// the head of that queue. (The second waiter queues behind the first, so only one is blocked by the
+    /// holder directly.) A void that finishes first never waited, and the race would not have been forced:
+    /// the failure then says how it ended, because a void refused or broken before its transaction is a
+    /// different fault from a race that did not overlap.
+    /// </summary>
+    /// <remarks>
+    /// Matched on the table's name rather than the statement's text, so a reformatted upsert cannot turn this
+    /// into a timeout. Nothing else in the test waits on a lock with that name in its query: the holder sits
+    /// idle in its transaction, pooled connections idle on the client, and the observer is left out by pid.
+    /// </remarks>
+    private static async Task BothWaitForTheNumberAsync(
+        string connectionString,
+        int holder,
+        IReadOnlyList<Task<CSharpFunctionalExtensions.Result<VoidedFinancialDocumentDto, Error>>> voids)
+    {
+        await using var observer = new NpgsqlConnection(connectionString);
+        await observer.OpenAsync();
+        await using var waiting = new NpgsqlCommand(
+            """
+            SELECT count(*), count(*) FILTER (WHERE @holder = ANY (pg_blocking_pids(pid)))
+            FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND pid <> pg_backend_pid()
+              AND wait_event_type = 'Lock'
+              AND query LIKE '%financial_document_series%'
+            """,
+            observer);
+        waiting.Parameters.AddWithValue("holder", holder);
+
+        var (queued, behindHolder) = (0L, 0L);
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (voids.FirstOrDefault(task => task.IsCompleted) is { } finished)
+            {
+                // Awaited, so a void that faulted fails the test with its own exception.
+                var outcome = await finished;
+                Assert.Fail(
+                    $"A void finished ({(outcome.IsSuccess ? "voided" : outcome.Error.Code)}) before both reached the number series: the race was not forced.");
+            }
+
+            await using (var row = await waiting.ExecuteReaderAsync())
+            {
+                Assert.True(await row.ReadAsync());
+                (queued, behindHolder) = (row.GetInt64(0), row.GetInt64(1));
+            }
+
+            if (queued == 2 && behindHolder >= 1)
+                return;
+            await Task.Delay(TimeSpan.FromMilliseconds(25));
+        }
+
+        Assert.Fail($"In 30 seconds, {queued} of the two voids reached the number series ({behindHolder} behind the holder).");
+    }
+
+    /// <summary>
+    /// Every unique index PostgreSQL refused a save on, by name: the failure <c>UnitOfWork</c> turns into the
+    /// <c>UniqueConstraintConflictException</c> the void handler's race branch catches, seen before anything
+    /// translates it.
+    /// </summary>
+    private sealed class UniqueViolationRecorder : SaveChangesInterceptor
+    {
+        private readonly ConcurrentQueue<string> _constraints = new();
+
+        public IReadOnlyList<string> Constraints => [.. _constraints];
+
+        public override void SaveChangesFailed(DbContextErrorEventData eventData)
+        {
+            Record(eventData);
+            base.SaveChangesFailed(eventData);
+        }
+
+        public override Task SaveChangesFailedAsync(DbContextErrorEventData eventData, CancellationToken cancellationToken = default)
+        {
+            Record(eventData);
+            return base.SaveChangesFailedAsync(eventData, cancellationToken);
+        }
+
+        private void Record(DbContextErrorEventData eventData)
+        {
+            if (eventData.Exception is DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } violation })
+                _constraints.Enqueue(violation.ConstraintName ?? "(unnamed)");
         }
     }
 
