@@ -13,6 +13,15 @@
 // So the logo is trimmed to its own ink, scaled to fit that safe circle, and
 // centred — once, reproducibly, so a redrawn logo becomes one command rather than
 // eleven files cut by hand.
+//
+// The iOS icon set is written HERE, not by `flutter_launcher_icons`. Its iOS path
+// (0.14.4, `changeIosLauncherIcon`) rewrites every line of project.pbxproj that
+// mentions ASSETCATALOG after the first xcconfig reference, whatever the setting:
+// run once on 2026-09-28 it turned the project's
+// `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES` into
+// `= AppIcon`, silently, in two configurations. Writing fifteen PNGs needs no
+// project edit at all.
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -23,6 +32,10 @@ const _source = 'assets/brand/khadra-logo.png';
 
 const _foregroundOut = 'tools/launcher/foreground.png';
 const _legacyOut = 'tools/launcher/legacy.png';
+
+/// The iOS app icon set. Which files it holds, and at what size, is read from its
+/// own Contents.json, so the list exists once — where Xcode reads it.
+const _iosIconSet = 'ios/Runner/Assets.xcassets/AppIcon.appiconset';
 
 /// Android's adaptive canvas is 108dp and the guaranteed-visible area is the
 /// central 66dp. Everything outside that belongs to whatever mask the launcher
@@ -99,13 +112,48 @@ void main() {
   img.compositeImage(legacy, mark, dstX: offsetX, dstY: offsetY);
   File(_legacyOut).writeAsBytesSync(img.encodePng(legacy));
 
+  // iOS composes no layers either, and masks the icon to a rounded square of its
+  // own choosing — so it takes the same flat, painted image. WITHOUT an alpha
+  // channel: App Store Connect refuses an icon that has one (ITMS-90717), and a
+  // smaller size with transparency is shown on black.
+  final iosIcons = _writeIosIcons(legacy.convert(numChannels: 3));
+
   stdout
     ..writeln('source   ${source.width}x${source.height}')
     ..writeln('masked   ${content.width}x${content.height}')
     ..writeln('mark     ${mark.width}x${mark.height} on a $_canvas canvas '
         '(safe zone $safe)')
     ..writeln('wrote    $_foregroundOut')
-    ..writeln('wrote    $_legacyOut');
+    ..writeln('wrote    $_legacyOut')
+    ..writeln('wrote    $iosIcons iOS icons in $_iosIconSet');
+}
+
+/// Writes every image the iOS icon set's Contents.json names, at the pixel size it
+/// names (points × scale), and answers how many files that was — several entries
+/// share one file (an iPhone 40pt@2x and an iPad 40pt@2x are the same 80px image).
+///
+/// `average` rather than cubic because every one of these is a DOWNscale of a
+/// 1024 master, where cubic rings around the badge's edge.
+int _writeIosIcons(img.Image flat) {
+  final contents = jsonDecode(File('$_iosIconSet/Contents.json').readAsStringSync())
+      as Map<String, dynamic>;
+  final written = <String>{};
+  for (final entry in (contents['images'] as List).cast<Map<String, dynamic>>()) {
+    final name = entry['filename'] as String?;
+    if (name == null) continue;
+    final points = double.parse((entry['size'] as String).split('x').first);
+    final scale = int.parse((entry['scale'] as String).replaceAll('x', ''));
+    final pixels = (points * scale).round();
+    final icon = img.copyResize(
+      flat,
+      width: pixels,
+      height: pixels,
+      interpolation: img.Interpolation.average,
+    );
+    File('$_iosIconSet/$name').writeAsBytesSync(img.encodePng(icon));
+    written.add(name);
+  }
+  return written.length;
 }
 
 /// Clears everything outside the circle the image inscribes.

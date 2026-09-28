@@ -3,9 +3,13 @@
 #     dart run tools/make_launcher_icons.dart
 #     dart run flutter_launcher_icons
 #
-# ANDROID ONLY, deliberately. The iOS icon set is untouched because nothing here
-# can be checked on an iOS device today, and a generated icon nobody has looked at
-# is worse than the placeholder somebody knows is a placeholder.
+# ANDROID ONLY, and it must stay so. The iOS icon set is written by
+# `tools/make_launcher_icons.dart` itself, from the same flat image as the legacy
+# icon below: this package's iOS path rewrites every ASSETCATALOG line of
+# ios/Runner.xcodeproj/project.pbxproj after the first xcconfig it meets, and when
+# tried on 2026-09-28 it set ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS
+# to `AppIcon` in two configurations without a word. `ios: true` here would do
+# that on every regeneration.
 flutter_launcher_icons:
   android: true
   ios: false
