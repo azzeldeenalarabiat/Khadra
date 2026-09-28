@@ -19,9 +19,10 @@ namespace Khadra.Tests.Persistence;
 /// Issuing financial documents on PostgreSQL itself (payments Phase 5): the detection and reading queries
 /// translate, the number counter holds its row lock so two issuers never take one number and a rolled-back
 /// number comes back, two administrators voiding one document at once — the overlap forced, not hoped for —
-/// leave one void, one correction and no gap, and the <c>json</c> column returns the snapshot exactly as it
-/// was written. Opt-in: set <c>KHADRA_TEST_POSTGRES</c> to a scratch database. Each test gets a fresh
-/// database of its own, so every number it asserts is its own.
+/// leave one void, one correction and no gap, a receipt's correction brings the booking's statement one
+/// version, and the <c>json</c> column returns the snapshot exactly as it was written. Opt-in: set
+/// <c>KHADRA_TEST_POSTGRES</c> to a scratch database. Each test gets a fresh database of its own, so every
+/// number it asserts is its own.
 /// </summary>
 [Collection(PostgresTestDatabase.Collection)]
 public sealed class PostgresFinancialDocumentIssuanceTests
@@ -208,6 +209,49 @@ public sealed class PostgresFinancialDocumentIssuanceTests
                 .Where(number => number.StartsWith(series, StringComparison.Ordinal))
                 .Order(StringComparer.Ordinal)
                 .ToArray());
+    }
+
+    /// <summary>
+    /// A receipt's correction brings the booking's statement one version (owner, 2026-09-28; pre-launch item
+    /// 181), on PostgreSQL itself: the sweep's new predicate and the "being prepared" query translate and
+    /// answer, and both count a RECEIPT's correction only — a statement's own correction never brings its
+    /// booking back.
+    /// </summary>
+    [PostgresFact]
+    public async Task A_receipts_correction_brings_the_statement_one_version_and_a_statements_own_does_not()
+    {
+        var harness = new IssuanceHarness((await FreshDatabaseAsync("corrected")).Options);
+        var (booking, payment) = await harness.PaidAsync(PaymentProviders.Sandbox);
+        await harness.PassAsync();
+        var receipt = (await harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+
+        harness.Now = harness.Now.AddHours(1);
+        var voided = await harness.VoidAsync(receipt.Id, "The office's name was wrong.");
+        Assert.True(voided.IsSuccess, voided.IsFailure ? voided.Error.Code : null);
+        await using (var reading = harness.NewContext())
+        {
+            var pending = Assert.Single(await new FinancialDocumentReader(reading).PendingForBookingAsync(booking.Id));
+            Assert.Equal(FinancialDocumentType.BookingStatement, pending.Type);
+            Assert.Equal(payment.AppliedAt, pending.OccurredAt);
+        }
+
+        // Past the late-commit margin, so the correction alone makes the statement a candidate.
+        harness.Now = harness.Now.AddMinutes(30);
+        Assert.Equal("TEST-STM-2026-000002", Assert.Single(await harness.PassAsync()).Number);
+        var restated = (await harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 2);
+        Assert.Equal(FinancialDocumentCause.ReceiptCorrected, restated.Cause);
+        Assert.Equal(payment.AppliedAt, restated.OccurredAt);
+        harness.Now = harness.Now.AddMinutes(30);
+        Assert.Empty(await harness.PassAsync());
+
+        // The statement voided in its turn: its correction is issued with the void, and nothing follows it.
+        harness.Now = harness.Now.AddHours(1);
+        Assert.True((await harness.VoidAsync(restated.Id, "Wrong total.")).IsSuccess);
+        harness.Now = harness.Now.AddMinutes(30);
+        Assert.Empty(await harness.PassAsync());
+        await using (var reading = harness.NewContext())
+            Assert.Empty(await new FinancialDocumentReader(reading).PendingForBookingAsync(booking.Id));
+        Assert.Equal(5, (await harness.DocumentsAsync()).Count);
     }
 
     [PostgresFact]

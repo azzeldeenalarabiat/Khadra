@@ -175,6 +175,14 @@ internal sealed class FinancialDocumentReader(KhadraDbContext context) : IFinanc
             .AsNoTracking()
             .Where(handover => handover.BookingId == bookingId && handover.CashCollected != null)
             .MaxAsync(handover => (DateTimeOffset?)handover.RecordedAt, cancellationToken);
+        // A RECEIPT's correction (owner, 2026-09-28) — never a statement's own, which follows what it covers.
+        var correction = FinancialDocumentCause.Correction;
+        var corrected = await context.FinancialDocuments
+            .AsNoTracking()
+            .Where(document => document.BookingId == bookingId
+                && (document.Type == paymentReceipt || document.Type == refundReceipt)
+                && document.Cause == correction)
+            .MaxAsync(document => (DateTimeOffset?)document.IssuedAt, cancellationToken);
 
         var pending = new List<PendingFinancialDocumentRecord>();
         pending.AddRange(captures
@@ -185,12 +193,14 @@ internal sealed class FinancialDocumentReader(KhadraDbContext context) : IFinanc
             .Select(refund => new PendingFinancialDocumentRecord(refundReceipt, refund.Id, refund.SettledAt!.Value)));
 
         // The statement is behind when no version exists yet, or when a checkpoint is newer than the latest
-        // version covers — on hold or not: the customer is told only that it is being prepared.
-        var latest = new[] { captures.Max(capture => capture.At), refunds.Max(refund => refund.SettledAt), decided, finished, cash }
+        // version covers — on hold or not: the customer is told only that it is being prepared. It is dated
+        // by the last money it will state; a receipt's correction makes it behind without moving any.
+        var moneyMoved = new[] { captures.Max(capture => capture.At), refunds.Max(refund => refund.SettledAt), decided, finished, cash }
             .Where(instant => instant is not null)
             .Max();
-        if (latest is { } newest && (covered is null || newest > covered))
-            pending.Add(new PendingFinancialDocumentRecord(statement, bookingId, newest));
+        var newest = corrected is { } correctedAt && (moneyMoved is null || correctedAt > moneyMoved) ? corrected : moneyMoved;
+        if (moneyMoved is { } dated && newest is { } behindFrom && (covered is null || behindFrom > covered))
+            pending.Add(new PendingFinancialDocumentRecord(statement, bookingId, dated));
 
         return [.. pending.OrderBy(entry => entry.OccurredAt).ThenBy(entry => entry.Type.Id)];
     }

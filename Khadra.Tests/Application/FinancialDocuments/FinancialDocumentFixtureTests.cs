@@ -112,7 +112,7 @@ public sealed partial class FinancialDocumentFixtureTests
         Assert.Contains(pages, page => page.GetProperty("voided").ValueKind == JsonValueKind.Object);
         Assert.Contains(pages, page => page.GetProperty("links").GetProperty("paymentReceipt").ValueKind == JsonValueKind.Object);
         Assert.Contains(pages, page => page.GetProperty("links").GetProperty("refundReceipts").GetArrayLength() > 0);
-        foreach (var cause in new[] { "PaymentCaptured", "RefundSettled", "DisputeResolved", "CashRecorded", "Correction" })
+        foreach (var cause in new[] { "PaymentCaptured", "RefundSettled", "DisputeResolved", "CashRecorded", "Correction", "ReceiptCorrected" })
             Assert.Contains(pages, page => page.GetProperty("cause").GetString() == cause);
     }
 
@@ -136,7 +136,7 @@ public sealed partial class FinancialDocumentFixtureTests
             new StatementFacts(
                 Issuer, depositParties, depositBooking,
                 BookingFinancialsCalculator.Calculate(depositBooking, [deposit], [], false, stamp.IssuedAt),
-                StatementCheckpoints.Of(depositBooking, [deposit], []), false,
+                StatementCheckpoints.Of(depositBooking, [deposit], [], [depositReceipt.Row]), false,
                 [Reference(depositReceipt)]),
             stamp, deposit.Provider));
 
@@ -157,7 +157,7 @@ public sealed partial class FinancialDocumentFixtureTests
                 new StatementFacts(
                     Issuer, depositParties, depositBooking,
                     BookingFinancialsCalculator.Calculate(depositBooking, [deposit], [], false, stamp.IssuedAt),
-                    StatementCheckpoints.Of(depositBooking, [deposit], []), false,
+                    StatementCheckpoints.Of(depositBooking, [deposit], [], [correction.Row]), false,
                     [Reference(correction)]),
                 stamp, deposit.Provider),
             previous: firstStatement);
@@ -209,13 +209,50 @@ public sealed partial class FinancialDocumentFixtureTests
             new StatementFacts(
                 Issuer, disputedParties, disputedBooking,
                 BookingFinancialsCalculator.Calculate(disputedBooking, [disputed], [ticket], false, stamp.IssuedAt),
-                StatementCheckpoints.Of(disputedBooking, [disputed], [ticket]), true,
+                StatementCheckpoints.Of(disputedBooking, [disputed], [ticket], [disputedReceipt.Row, aboveDepositReceipt.Row]), true,
                 [Reference(disputedReceipt), Reference(aboveDepositReceipt)]),
             stamp, disputed.Provider));
         var share = disputed.Refunds.Single(refund => refund.Reason == RefundReason.DisputeResolution);
         Settle(share, lateAt.AddHours(3));
         var shareReceipt = Issue(issued, "TEST-RFD-2026-000003", lateAt.AddHours(3).AddMinutes(1), stamp => Composer.RefundReceipt(
             new RefundReceiptFacts(Issuer, disputedParties, disputedBooking, disputed, share, new DocumentReference(disputedReceipt.Id, disputedReceipt.Number), ticket.ClosedAt), stamp));
+
+        // E — a deposit whose receipt is voided and corrected, after everything above: the booking's statement
+        // gains a version for the correction alone (owner, 2026-09-28), listing the correction in place of the
+        // voided receipt, dated by the money it states rather than by the void. A's history PRESUMES the sweep
+        // did not run between its correction (day 1) and its pickup (day 7) — the service down, say — so the
+        // pickup's version is the first to carry that correction; a running sweep would have issued E's shape
+        // within a minute of the void. The presumption keeps every page A already had exactly as it was.
+        var restatedAt = start.AddDays(8);
+        var (restatedBooking, restatedDeposit) = Build.PaidBooking(now: restatedAt, customerId: customer);
+        var restatedParties = PartiesOf(restatedBooking);
+        var mistakenReceipt = Issue(issued, "TEST-PAY-2026-000006", restatedAt.AddMinutes(1), stamp => Composer.PaymentReceipt(
+            new PaymentReceiptFacts(Issuer, restatedParties, restatedBooking, restatedDeposit, [restatedDeposit]), stamp));
+        var statedFirst = Issue(issued, "TEST-STM-2026-000004", restatedAt.AddMinutes(1), stamp => Composer.Statement(
+            new StatementFacts(
+                Issuer, restatedParties, restatedBooking,
+                BookingFinancialsCalculator.Calculate(restatedBooking, [restatedDeposit], [], false, stamp.IssuedAt),
+                StatementCheckpoints.Of(restatedBooking, [restatedDeposit], [], [mistakenReceipt.Row]), false,
+                [Reference(mistakenReceipt)]),
+            stamp, restatedDeposit.Provider));
+        var restatedVoidAt = restatedAt.AddHours(1);
+        voids[mistakenReceipt.Id] = new FinancialDocumentVoidRecord(
+            mistakenReceipt.Id, restatedVoidAt, Id.New(), "Fixture Administrator", "Issued before the payment was confirmed.");
+        var mendedReceipt = Issue(
+            issued, "TEST-PAY-2026-000007", restatedVoidAt,
+            stamp => Composer.PaymentReceipt(new PaymentReceiptFacts(Issuer, restatedParties, restatedBooking, restatedDeposit, [restatedDeposit]), stamp),
+            previous: mistakenReceipt,
+            isCorrection: true);
+        var restated = Issue(
+            issued, "TEST-STM-2026-000005", restatedVoidAt.AddMinutes(1),
+            stamp => Composer.Statement(
+                new StatementFacts(
+                    Issuer, restatedParties, restatedBooking,
+                    BookingFinancialsCalculator.Calculate(restatedBooking, [restatedDeposit], [], false, stamp.IssuedAt),
+                    StatementCheckpoints.Of(restatedBooking, [restatedDeposit], [], [mendedReceipt.Row]), false,
+                    [Reference(mendedReceipt)]),
+                stamp, restatedDeposit.Provider),
+            previous: statedFirst);
 
         // The records, with their standing worked out as the reader works it out.
         var records = issued.ToDictionary(document => document.Id, document => document.Record(
@@ -264,6 +301,7 @@ public sealed partial class FinancialDocumentFixtureTests
                 new { name = "payment-receipt-not-applied", page = Page(strayReceipt) },
                 new { name = "refund-receipt-dispute-decision", page = Page(shareReceipt) },
                 new { name = "booking-statement-dispute-decided", page = Page(decidedStatement) },
+                new { name = "booking-statement-receipt-corrected", page = Page(restated) },
             },
             myDocuments = new PagedResult<FinancialDocumentListItem>(rows, 1, 20, rows.Count),
             bookingDocuments = new BookingFinancialDocumentsDto(
@@ -286,7 +324,10 @@ public sealed partial class FinancialDocumentFixtureTests
         var stamp = previous is null
             ? DocumentStamp.First(number, issuedAt)
             : new DocumentStamp(number, issuedAt, previous.Version + 1, new DocumentReference(previous.Id, previous.Number), isCorrection);
-        var document = new Issued(Id.New(), number, issuedAt, stamp.Version, previous?.Id, previous?.Family ?? Id.New(), compose(stamp));
+        var draft = compose(stamp);
+        // Issued as the server issues it, so a later statement can read it back among the booking's receipts.
+        var row = FinancialDocument.Issue(draft, number, issuedAt);
+        var document = new Issued(row.Id, number, issuedAt, stamp.Version, previous?.Id, previous?.Family ?? Id.New(), draft, row);
         issued.Add(document);
         return document;
     }
@@ -359,7 +400,15 @@ public sealed partial class FinancialDocumentFixtureTests
     private static partial Regex BookingReferences();
 
     /// <summary>One document of the fixture, before its standing is known.</summary>
-    private sealed record Issued(Id Id, string Number, DateTimeOffset IssuedAt, int Version, Id? PreviousId, Id Family, FinancialDocumentDraft Draft)
+    private sealed record Issued(
+        Id Id,
+        string Number,
+        DateTimeOffset IssuedAt,
+        int Version,
+        Id? PreviousId,
+        Id Family,
+        FinancialDocumentDraft Draft,
+        FinancialDocument Row)
     {
         public FinancialDocumentRecord Record(bool voided, bool superseded) => new(
             Id,

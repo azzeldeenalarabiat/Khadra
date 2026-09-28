@@ -330,11 +330,32 @@ describe('the lists', () => {
 
 describe('voiding a document', () => {
   it('states the consequence first, in both languages', () => {
-    const words = voidDialogWords('TEST-PAY-2026-000005', en);
+    const words = voidDialogWords('TEST-PAY-2026-000005', true, en);
     expect(words.title).toBe('Void TEST-PAY-2026-000005 and issue its correction?');
     expect(words.body).toContain('permanent');
     expect(words.body).toContain('never your reason');
-    expect(voidDialogWords('TEST-PAY-2026-000005', ar).title).toBe('إلغاء TEST-PAY-2026-000005 وإصدار تصحيحه؟');
+    expect(voidDialogWords('TEST-PAY-2026-000005', true, ar).title).toBe('إلغاء TEST-PAY-2026-000005 وإصدار تصحيحه؟');
+  });
+
+  it("says a receipt's correction brings a new booking statement shortly after, and a statement's does not", () => {
+    expect(voidDialogWords('TEST-PAY-2026-000005', true, en).note).toBe(
+      'Your reason is kept with the void and in the audit log. A new booking statement will be issued shortly after the correction.',
+    );
+    expect(voidDialogWords('TEST-PAY-2026-000005', true, ar).note).toBe(
+      'يُحفظ سببك مع الإلغاء وفي سجل التدقيق. سيصدر كشف حساب جديد للحجز بعد التصحيح بقليل.',
+    );
+    expect(voidDialogWords('TEST-STM-2026-000003', false, en).note).toBe('Your reason is kept with the void and in the audit log.');
+  });
+
+  it('knows which documents the statement follows: receipts, and never a statement', () => {
+    expect(documentPage(adminPage('payment-receipt-deposit-correction'), english, format).statementFollows).toBe(true);
+    expect(documentPage(adminPage('refund-receipt-free-cancellation'), english, format).statementFollows).toBe(true);
+    expect(documentPage(adminPage('booking-statement-receipt-corrected'), english, format).statementFollows).toBe(false);
+  });
+
+  it("names a statement issued for a receipt's correction in both languages", () => {
+    expect(documentPage(adminPage('booking-statement-receipt-corrected'), english, format).cause).toBe('Receipt corrected');
+    expect(documentPage(adminPage('booking-statement-receipt-corrected'), arabic, format).cause).toBe('تصحيح إيصال');
   });
 
   it('reports what the void did as the server reported it', () => {

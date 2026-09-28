@@ -212,7 +212,7 @@ public sealed class FinancialDocumentComposerTests
 
         var receipt = Parse(PaymentReceipt(booking, payment).Snapshot);
         var statement = Parse(Composer.Statement(
-            new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [payment], []), false, []),
+            new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [payment], [], []), false, []),
             DocumentStamp.First("STM-2026-000001", Now.AddMinutes(1)),
             payment.Provider).Snapshot);
 
@@ -354,7 +354,7 @@ public sealed class FinancialDocumentComposerTests
     {
         var (booking, payment, ticket) = DisputedBooking();
         var financials = BookingFinancialsCalculator.Calculate(booking, [payment], [ticket], false, Now.AddHours(7));
-        var checkpoints = StatementCheckpoints.Of(booking, [payment], [ticket]);
+        var checkpoints = StatementCheckpoints.Of(booking, [payment], [ticket], []);
 
         var draft = Statement(booking, payment, ticket, financials);
 
@@ -362,6 +362,47 @@ public sealed class FinancialDocumentComposerTests
         Assert.Equal(checkpoints.Fingerprint, draft.CheckpointFingerprint);
         Assert.Equal(FinancialDocumentCause.DisputeResolved, draft.Cause);
         Assert.Equal(booking.Id, draft.SubjectId);
+    }
+
+    [Fact]
+    public void A_statement_for_a_receipts_correction_says_so_and_keeps_the_instant_its_money_moved()
+    {
+        // Owner, 2026-09-28 (pre-launch item 181): the version exists because a receipt was corrected, it
+        // states money that moved when it moved, and it covers facts up to the correction.
+        var (booking, payment) = Build.PaidBooking();
+        var receipt = FinancialDocument.Issue(PaymentReceipt(booking, payment), "PAY-2026-000001", Now.AddMinutes(1));
+        var correctedAt = Now.AddDays(1);
+        var correction = FinancialDocument.Issue(
+            Composer.PaymentReceipt(
+                new PaymentReceiptFacts(Issuer, PartiesOf(booking), booking, payment, [payment]),
+                new DocumentStamp("PAY-2026-000002", correctedAt, 2, new DocumentReference(receipt.Id, receipt.Number), true)),
+            "PAY-2026-000002",
+            correctedAt);
+        var checkpoints = StatementCheckpoints.Of(booking, [payment], [], [receipt, correction]);
+        var financials = BookingFinancialsCalculator.Calculate(booking, [payment], [], false, correctedAt.AddMinutes(1));
+        FinancialDocumentDraft Compose(DocumentStamp stamp) => Composer.Statement(
+            new StatementFacts(
+                Issuer, PartiesOf(booking), booking, financials, checkpoints, false,
+                [new ReceiptReference(correction.Type, correction.Id, correction.Number)]),
+            stamp,
+            payment.Provider);
+
+        var draft = Compose(new DocumentStamp("STM-2026-000002", correctedAt.AddMinutes(1), 2, new DocumentReference(Id.New(), "STM-2026-000001"), false));
+
+        Assert.Equal(FinancialDocumentCause.ReceiptCorrected, draft.Cause);
+        Assert.Equal(payment.AppliedAt, draft.OccurredAt);
+        Assert.Equal(correctedAt, draft.CoversThrough);
+        var snapshot = Parse(draft.Snapshot);
+        Assert.Equal("ReceiptCorrected", snapshot.GetProperty("document").GetProperty("cause").GetString());
+        var cause = Line(snapshot, "document", "cause").GetProperty("text");
+        Assert.Equal("Receipt corrected", cause.GetProperty("en").GetString());
+        Assert.Equal("تصحيح إيصال", cause.GetProperty("ar").GetString());
+
+        // Voided in its turn, its own correction is worded as one and dates the same money.
+        var corrected = Compose(new DocumentStamp("STM-2026-000003", correctedAt.AddHours(1), 3, new DocumentReference(Id.New(), "STM-2026-000002"), true));
+        Assert.Equal(FinancialDocumentCause.Correction, corrected.Cause);
+        Assert.Equal(draft.OccurredAt, corrected.OccurredAt);
+        Assert.Equal(draft.CoversThrough, corrected.CoversThrough);
     }
 
     [Fact]
@@ -377,7 +418,7 @@ public sealed class FinancialDocumentComposerTests
         Assert.False(financials.NeedsReview, string.Join(", ", financials.Issues));
 
         var snapshot = Parse(Composer.Statement(
-            new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [payment], []), false, []),
+            new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [payment], [], []), false, []),
             DocumentStamp.First("STM-2026-000001", Now.AddHours(1)),
             payment.Provider).Snapshot);
 
@@ -395,7 +436,7 @@ public sealed class FinancialDocumentComposerTests
         Assert.True(financials.NeedsReview);
 
         Assert.Throws<InvalidOperationException>(() => Composer.Statement(
-            new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [stray], []), false, []),
+            new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [stray], [], []), false, []),
             DocumentStamp.First("STM-2026-000001", Now),
             stray.Provider));
     }
@@ -442,7 +483,7 @@ public sealed class FinancialDocumentComposerTests
                 PartiesOf(booking),
                 booking,
                 financials,
-                StatementCheckpoints.Of(booking, [payment], [ticket]),
+                StatementCheckpoints.Of(booking, [payment], [ticket], []),
                 PenaltyResolvedByDispute: true,
                 [new ReceiptReference(FinancialDocumentType.PaymentReceipt, Id.New(), "PAY-2026-000001")]),
             DocumentStamp.First("STM-2026-000001", Now.AddHours(7)),

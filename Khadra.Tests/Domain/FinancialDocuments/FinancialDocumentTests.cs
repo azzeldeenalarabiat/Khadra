@@ -99,6 +99,18 @@ public sealed class FinancialDocumentTests
     }
 
     [Fact]
+    public void Only_a_statement_is_issued_because_a_receipt_was_corrected()
+    {
+        Assert.Throws<DomainException>(() => FinancialDocument.Issue(Receipt() with { Cause = FinancialDocumentCause.ReceiptCorrected }, "PAY-2026-000001", Now));
+
+        var restated = FinancialDocument.Issue(
+            Statement() with { Version = 2, PreviousVersionId = Id.New(), Cause = FinancialDocumentCause.ReceiptCorrected },
+            "STM-2026-000002",
+            Now);
+        Assert.Equal(FinancialDocumentCause.ReceiptCorrected, restated.Cause);
+    }
+
+    [Fact]
     public void A_correction_is_never_a_first_version() =>
         Assert.Throws<DomainException>(() =>
             FinancialDocument.Issue(Receipt() with { Cause = FinancialDocumentCause.Correction }, "PAY-2026-000001", Now));

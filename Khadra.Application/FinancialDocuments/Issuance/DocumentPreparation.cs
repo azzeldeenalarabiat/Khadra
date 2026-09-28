@@ -112,7 +112,10 @@ public sealed class DocumentPreparation(
         CancellationToken cancellationToken)
     {
         var booking = money.Booking;
-        var checkpoints = StatementCheckpoints.Of(booking, money.Payments, money.ResolvedTickets);
+        // Read once, because the receipts are both a checkpoint (a correction among them) and the Documents
+        // section: the two can never disagree about which receipts stand.
+        var receipts = await documents.ListLatestReceiptsForBookingAsync(booking.Id, cancellationToken);
+        var checkpoints = StatementCheckpoints.Of(booking, money.Payments, money.ResolvedTickets, receipts);
         if (checkpoints.IsEmpty)
             return new Preparation.NotOwed("no_money_moved");
 
@@ -144,13 +147,11 @@ public sealed class DocumentPreparation(
         if (hold is not null)
             return hold;
 
-        var receipts = (await documents.ListLatestReceiptsForBookingAsync(booking.Id, cancellationToken))
-            .Select(receipt => new ReceiptReference(receipt.Type, receipt.Id, receipt.Number))
-            .ToList();
+        var references = receipts.Select(receipt => new ReceiptReference(receipt.Type, receipt.Id, receipt.Number)).ToList();
         return new Preparation.Ready(
             provider,
             stamp => composer.Statement(
-                new StatementFacts(issuer!, parties!, booking, financials, checkpoints, money.ResolvedTickets.Count > 0, receipts),
+                new StatementFacts(issuer!, parties!, booking, financials, checkpoints, money.ResolvedTickets.Count > 0, references),
                 stamp,
                 provider));
     }

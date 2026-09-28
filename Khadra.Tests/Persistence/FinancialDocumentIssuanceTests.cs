@@ -320,6 +320,7 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
         await _harness.PaidAsync(PaymentProviders.Sandbox);
         await _harness.PassAsync();
         var receipt = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        _harness.Now = _harness.Now.AddHours(1);
 
         var voided = await _harness.VoidAsync(receipt.Id, "The office's name was wrong.");
 
@@ -349,10 +350,236 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
             Assert.Equal(FinancialDocumentStatus.Current, (await reader.GetAsync(correction.Id))!.Status);
         }
 
-        // The family has rows: the sweep never issues a voided receipt again.
+        // The family has rows: the sweep never issues a voided receipt again. What it does issue, once, is the
+        // booking's statement, to list the correction in the voided receipt's place (owner, 2026-09-28).
+        _harness.Now = _harness.Now.AddMinutes(1);
+        Assert.Equal(["TEST-STM-2026-000002"], (await _harness.PassAsync()).Where(outcome => outcome.Number is not null).Select(outcome => outcome.Number!).ToArray());
         _harness.Now = _harness.Now.AddMinutes(1);
         Assert.All(await _harness.PassAsync(), outcome => Assert.Null(outcome.Number));
+        Assert.Equal(4, (await _harness.DocumentsAsync()).Count);
+    }
+
+    // ── A receipt's correction brings the statement a version (owner, 2026-09-28; pre-launch item 181) ─────
+
+    [Fact]
+    public async Task A_receipts_correction_brings_the_statement_one_version_listing_the_correction_in_its_place()
+    {
+        var (booking, payment) = await _harness.PaidAsync(PaymentProviders.Sandbox);
+        await _harness.PassAsync();
+        var issued = await _harness.DocumentsAsync();
+        var receipt = issued.Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        var first = issued.Single(document => document.Type == FinancialDocumentType.BookingStatement);
+        _harness.Now = _harness.Now.AddHours(1);
+        var voided = await _harness.VoidAsync(receipt.Id, "The office's name was wrong.");
+        Assert.True(voided.IsSuccess, voided.IsFailure ? voided.Error.Code : null);
+
+        // Until the next pass the statement is being prepared, dated by its money — not by the void.
+        await using (var context = _harness.NewContext())
+        {
+            var pending = Assert.Single(await new FinancialDocumentReader(context).PendingForBookingAsync(booking.Id));
+            Assert.Equal(FinancialDocumentType.BookingStatement, pending.Type);
+            Assert.Equal(payment.AppliedAt, pending.OccurredAt);
+        }
+
+        // Past the late-commit margin, so the correction alone makes the statement a candidate.
+        _harness.Now = _harness.Now.AddMinutes(30);
+        Assert.Equal("TEST-STM-2026-000002", Assert.Single(await _harness.PassAsync()).Number);
+
+        var documents = await _harness.DocumentsAsync();
+        var correction = documents.Single(document => document.Id.Value == voided.Value.ReplacementDocumentId);
+        var restated = documents.Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 2);
+        Assert.Equal(first.Id, restated.PreviousVersionId);
+        Assert.Equal(FinancialDocumentCause.ReceiptCorrected, restated.Cause);
+        Assert.Equal(payment.AppliedAt, restated.OccurredAt);
+        Assert.Equal(correction.IssuedAt, restated.CoversThrough);
+        // It lists the correction, and names the voided receipt nowhere.
+        var snapshot = DocumentFixtures.Parse(restated.Snapshot);
+        Assert.Equal(
+            [correction.Number],
+            snapshot.GetProperty("facts").GetProperty("receipts").EnumerateArray().Select(listed => listed.GetProperty("number").GetString()!).ToArray());
+        Assert.DoesNotContain(receipt.Number, restated.Snapshot, StringComparison.Ordinal);
+
+        await using (var context = _harness.NewContext())
+        {
+            var reader = new FinancialDocumentReader(context);
+            Assert.Empty(await reader.PendingForBookingAsync(booking.Id));
+            Assert.Equal(FinancialDocumentStatus.Superseded, (await reader.GetAsync(first.Id))!.Status);
+        }
+
+        // Once: inside the margin the fingerprint says unchanged, and past it nothing is even looked at.
+        _harness.Now = _harness.Now.AddMinutes(1);
+        Assert.All(await _harness.PassAsync(), outcome => Assert.Null(outcome.Number));
+        _harness.Now = _harness.Now.AddMinutes(30);
+        Assert.Empty(await _harness.PassAsync());
+    }
+
+    [Fact]
+    public async Task A_statements_own_correction_brings_no_further_version_and_is_never_being_prepared()
+    {
+        var (booking, _) = await _harness.PaidAsync(PaymentProviders.Sandbox);
+        await _harness.PassAsync();
+        var statement = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.BookingStatement);
+        _harness.Now = _harness.Now.AddHours(1);
+        Assert.True((await _harness.VoidAsync(statement.Id, "Wrong total.")).IsSuccess);
+
+        await using (var context = _harness.NewContext())
+            Assert.Empty(await new FinancialDocumentReader(context).PendingForBookingAsync(booking.Id));
+        _harness.Now = _harness.Now.AddMinutes(1);
+        Assert.All(await _harness.PassAsync(), outcome => Assert.Null(outcome.Number));
+        // Past the margin the booking is not even a candidate: a statement's correction is not a receipt's.
+        _harness.Now = _harness.Now.AddMinutes(30);
+        Assert.Empty(await _harness.PassAsync());
         Assert.Equal(3, (await _harness.DocumentsAsync()).Count);
+    }
+
+    [Fact]
+    public async Task Each_correction_of_a_receipt_brings_one_version_listing_the_latest()
+    {
+        await _harness.PaidAsync(PaymentProviders.Sandbox);
+        await _harness.PassAsync();
+        var receipt = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        _harness.Now = _harness.Now.AddHours(1);
+        var first = await _harness.VoidAsync(receipt.Id, "The office's name was wrong.");
+        _harness.Now = _harness.Now.AddMinutes(30);
+        Assert.Equal("TEST-STM-2026-000002", Assert.Single(await _harness.PassAsync()).Number);
+
+        _harness.Now = _harness.Now.AddHours(1);
+        var second = await _harness.VoidAsync(Id.From(first.Value.ReplacementDocumentId), "Its address was wrong too.");
+        Assert.True(second.IsSuccess, second.IsFailure ? second.Error.Code : null);
+        _harness.Now = _harness.Now.AddMinutes(30);
+        Assert.Equal("TEST-STM-2026-000003", Assert.Single(await _harness.PassAsync()).Number);
+
+        var latest = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 3);
+        Assert.Equal(FinancialDocumentCause.ReceiptCorrected, latest.Cause);
+        Assert.Equal(
+            [second.Value.ReplacementNumber],
+            DocumentFixtures.Parse(latest.Snapshot).GetProperty("facts").GetProperty("receipts").EnumerateArray().Select(listed => listed.GetProperty("number").GetString()!).ToArray());
+    }
+
+    [Fact]
+    public async Task A_refund_receipts_correction_brings_the_statement_a_version_dated_by_the_last_money()
+    {
+        var (booking, payment) = await _harness.PaidAsync(PaymentProviders.Sandbox, inFull: true, fee: 4.5m);
+        await _harness.PassAsync();
+        await _harness.ChangeAsync(async context =>
+        {
+            var tracked = await context.Bookings.Include(candidate => candidate.Handovers).SingleAsync(candidate => candidate.Id == booking.Id);
+            var paid = await context.Payments.Include(candidate => candidate.Refunds).SingleAsync(candidate => candidate.Id == payment.Id);
+            Assert.True(tracked.Cancel(BookingParty.Customer, tracked.CustomerId, null, _harness.Now).IsSuccess);
+            var refund = BookingEndingRefunds.Record(tracked, paid, _harness.Now)!;
+            refund.MarkSent("rf_1", _harness.Now.AddMinutes(1));
+            refund.MarkSettled(_harness.Now.AddMinutes(2));
+        });
+        _harness.Now = _harness.Now.AddMinutes(3);
+        Assert.Equal(["TEST-RFD-2026-000001", "TEST-STM-2026-000002"], (await _harness.PassAsync()).Select(outcome => outcome.Number!).ToArray());
+        var documents = await _harness.DocumentsAsync();
+        var refundReceipt = documents.Single(document => document.Type == FinancialDocumentType.RefundReceipt);
+        var settledStatement = documents.Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 2);
+
+        _harness.Now = _harness.Now.AddHours(1);
+        var voided = await _harness.VoidAsync(refundReceipt.Id, "The refund's reason was wrong.");
+        Assert.True(voided.IsSuccess, voided.IsFailure ? voided.Error.Code : null);
+        _harness.Now = _harness.Now.AddMinutes(30);
+
+        Assert.Equal("TEST-STM-2026-000003", Assert.Single(await _harness.PassAsync()).Number);
+        var restated = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 3);
+        Assert.Equal(FinancialDocumentCause.ReceiptCorrected, restated.Cause);
+        Assert.Equal(settledStatement.OccurredAt, restated.OccurredAt);
+        var listed = DocumentFixtures.Parse(restated.Snapshot).GetProperty("facts").GetProperty("receipts").EnumerateArray()
+            .Select(receipt => receipt.GetProperty("number").GetString()!)
+            .ToArray();
+        Assert.Equal(["TEST-PAY-2026-000001", voided.Value.ReplacementNumber], listed);
+    }
+
+    [Fact]
+    public async Task A_receipt_voided_before_the_first_statement_gives_that_first_version_the_correction_and_its_cause()
+    {
+        // The statement is on hold (records that contradict one another) when the receipt is voided. Once the
+        // records are put right, the booking's FIRST statement lists the correction alone and — the correction
+        // being its newest fact — says it was issued because a receipt was corrected, dated by the money.
+        var (booking, payment) = await _harness.PaidAsync(PaymentProviders.Sandbox, inFull: true);
+        await CancelWithoutItsRefundAsync(booking);
+        Assert.Equal(["TEST-PAY-2026-000001"], (await _harness.PassAsync()).Where(outcome => outcome.Number is not null).Select(outcome => outcome.Number!).ToArray());
+        var receipt = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        _harness.Now = _harness.Now.AddHours(1);
+        var voided = await _harness.VoidAsync(receipt.Id, "The office's name was wrong.");
+        Assert.True(voided.IsSuccess, voided.IsFailure ? voided.Error.Code : null);
+        await RecordTheEndingsRefundAsync(booking, payment);
+        _harness.Now = _harness.Now.AddMinutes(1);
+
+        Assert.Equal("TEST-STM-2026-000001", Assert.Single(await _harness.PassAsync()).Number);
+        var documents = await _harness.DocumentsAsync();
+        var correction = documents.Single(document => document.Id.Value == voided.Value.ReplacementDocumentId);
+        var first = documents.Single(document => document.Type == FinancialDocumentType.BookingStatement);
+        Assert.Equal(1, first.Version);
+        Assert.Equal(FinancialDocumentCause.ReceiptCorrected, first.Cause);
+        Assert.True(first.OccurredAt < correction.IssuedAt);
+        Assert.Equal(correction.IssuedAt, first.CoversThrough);
+        Assert.Equal(
+            [correction.Number],
+            DocumentFixtures.Parse(first.Snapshot).GetProperty("facts").GetProperty("receipts").EnumerateArray().Select(listed => listed.GetProperty("number").GetString()!).ToArray());
+    }
+
+    [Fact]
+    public async Task A_correction_stamped_before_a_statement_that_missed_it_is_caught_inside_the_margin()
+    {
+        // A void that read its clock before the office recorded cash, and committed after the pass had stated
+        // that cash: the correction is older than the statement's coverage, so the margin alone finds it.
+        var (booking, _) = await _harness.PaidAsync(PaymentProviders.Sandbox);
+        await _harness.PassAsync();
+        var receipt = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        var cashAt = _harness.Now.AddHours(1);
+        await _harness.ChangeAsync(async context =>
+        {
+            var tracked = await context.Bookings.Include(candidate => candidate.Handovers).SingleAsync(candidate => candidate.Id == booking.Id);
+            var balance = Money.Create(tracked.Pricing.TotalPrice.Amount - tracked.Pricing.DepositAmount.Amount, tracked.Pricing.CurrencyCode);
+            Assert.True(tracked.RecordPickup(BookingParty.Dealer, Id.New(), cashAt, cashCollected: balance).IsSuccess);
+        });
+        _harness.Now = cashAt.AddMinutes(1);
+        Assert.Equal("TEST-STM-2026-000002", Assert.Single(await _harness.PassAsync()).Number);
+
+        _harness.Now = cashAt.AddMinutes(-3);
+        var voided = await _harness.VoidAsync(receipt.Id, "The office's name was wrong.");
+        Assert.True(voided.IsSuccess, voided.IsFailure ? voided.Error.Code : null);
+        _harness.Now = cashAt.AddMinutes(2);
+
+        Assert.Equal("TEST-STM-2026-000003", Assert.Single(await _harness.PassAsync()).Number);
+        var restated = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 3);
+        // The newest fact still names it — the cash — and what is new is the correction it lists.
+        Assert.Equal(FinancialDocumentCause.CashRecorded, restated.Cause);
+        Assert.Equal(cashAt, restated.CoversThrough);
+        Assert.Equal(
+            [voided.Value.ReplacementNumber],
+            DocumentFixtures.Parse(restated.Snapshot).GetProperty("facts").GetProperty("receipts").EnumerateArray().Select(listed => listed.GetProperty("number").GetString()!).ToArray());
+        _harness.Now = cashAt.AddMinutes(30);
+        Assert.Empty(await _harness.PassAsync());
+    }
+
+    [Fact]
+    public async Task A_receipts_correction_waits_on_hold_while_the_records_need_review_and_issues_once_they_are_put_right()
+    {
+        var (booking, payment) = await _harness.PaidAsync(PaymentProviders.Sandbox, inFull: true);
+        await _harness.PassAsync();
+        var receipt = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        _harness.Now = _harness.Now.AddHours(1);
+        var voided = await _harness.VoidAsync(receipt.Id, "The office's name was wrong.");
+        Assert.True(voided.IsSuccess, voided.IsFailure ? voided.Error.Code : null);
+        await CancelWithoutItsRefundAsync(booking);
+
+        Assert.Equal(IssuanceHoldReason.RecordsNeedReview, Assert.Single(await _harness.PassAsync()).Hold!.Reason);
+        await using (var context = _harness.NewContext())
+            Assert.Equal(FinancialDocumentType.BookingStatement, Assert.Single(await new FinancialDocumentReader(context).PendingForBookingAsync(booking.Id)).Type);
+        var hold = Assert.Single(await _harness.HoldsAsync());
+
+        await RecordTheEndingsRefundAsync(booking, payment);
+        _harness.Now = hold.NextAttemptAt.AddSeconds(1);
+
+        Assert.Equal("TEST-STM-2026-000002", Assert.Single(await _harness.PassAsync()).Number);
+        Assert.True(Assert.Single(await _harness.HoldsAsync()).IsResolved);
+        var restated = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.BookingStatement && document.Version == 2);
+        Assert.Equal(
+            [voided.Value.ReplacementNumber],
+            DocumentFixtures.Parse(restated.Snapshot).GetProperty("facts").GetProperty("receipts").EnumerateArray().Select(listed => listed.GetProperty("number").GetString()!).ToArray());
     }
 
     [Fact]

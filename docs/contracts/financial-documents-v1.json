@@ -5831,10 +5831,845 @@
         },
         "voided": null
       }
+    },
+    {
+      "name": "booking-statement-receipt-corrected",
+      "page": {
+        "documentId": "00000000-0000-4000-8000-000000000028",
+        "type": "BookingStatement",
+        "number": "TEST-STM-2026-000005",
+        "version": 2,
+        "status": "Current",
+        "bookingId": "00000000-0000-4000-8000-000000000029",
+        "bookingReference": "KH-FIXTURE5",
+        "title": {
+          "en": "Booking statement",
+          "ar": "كشف حساب الحجز"
+        },
+        "headline": {
+          "label": {
+            "en": "Net paid online",
+            "ar": "صافي المدفوع عبر الإنترنت"
+          },
+          "amount": {
+            "amount": 18,
+            "currency": "JOD"
+          }
+        },
+        "cause": "ReceiptCorrected",
+        "occurredAt": "2026-09-11T10:00:00+00:00",
+        "issuedAt": "2026-09-11T11:01:00+00:00",
+        "snapshotSchemaVersion": 1,
+        "snapshot": {
+          "schemaVersion": 1,
+          "document": {
+            "type": "BookingStatement",
+            "number": "TEST-STM-2026-000005",
+            "version": 2,
+            "cause": "ReceiptCorrected",
+            "occurredAt": {
+              "utc": "2026-09-11T10:00:00Z",
+              "local": "2026-09-11 13:00"
+            },
+            "issuedAt": {
+              "utc": "2026-09-11T11:01:00Z",
+              "local": "2026-09-11 14:01"
+            },
+            "timeZone": "Asia/Amman",
+            "calculatorVersion": 1,
+            "currency": {
+              "code": "JOD"
+            },
+            "amountScale": 3,
+            "previous": {
+              "documentId": "00000000-0000-4000-8000-000000000030",
+              "number": "TEST-STM-2026-000004"
+            },
+            "isCorrection": false
+          },
+          "issuer": {
+            "legalName": {
+              "en": "TEST ISSUER — not a real company",
+              "ar": "جهة إصدار تجريبية — ليست شركة حقيقية"
+            },
+            "commercialRegistration": "TEST-0000",
+            "address": {
+              "en": "Test address, Amman",
+              "ar": "عنوان تجريبي، عمّان"
+            },
+            "supportEmail": "documents@example.invalid",
+            "supportPhone": "+962 6 000 0000"
+          },
+          "customer": {
+            "customerId": "00000000-0000-4000-8000-000000000003",
+            "name": "Rana Sharif"
+          },
+          "office": {
+            "dealerId": "00000000-0000-4000-8000-000000000031",
+            "name": "Petra Rentals",
+            "commercialRegistration": "123456",
+            "city": {
+              "en": "Amman",
+              "ar": "عمّان"
+            },
+            "area": "Abdoun",
+            "street": "Street 12"
+          },
+          "booking": {
+            "bookingId": "00000000-0000-4000-8000-000000000029",
+            "reference": "KH-FIXTURE5",
+            "statusAtIssue": "Confirmed",
+            "rentalStart": {
+              "utc": "2026-09-18T10:00:00Z",
+              "local": "2026-09-18 13:00"
+            },
+            "rentalEnd": {
+              "utc": "2026-09-21T10:00:00Z",
+              "local": "2026-09-21 13:00"
+            },
+            "days": 3,
+            "pickupMethod": "SelfPickup",
+            "vehicle": {
+              "make": "Toyota",
+              "model": "Corolla",
+              "year": 2024,
+              "plate": "12-34567",
+              "carType": {
+                "en": "Sedan",
+                "ar": "سيدان"
+              }
+            }
+          },
+          "facts": {
+            "bookingStatus": "Confirmed",
+            "summary": {
+              "days": 3,
+              "dailyRate": {
+                "amount": "30.000",
+                "currency": "JOD"
+              },
+              "depositPercent": "20",
+              "rentalSubtotal": {
+                "amount": "90.000",
+                "currency": "JOD"
+              },
+              "deliveryFee": {
+                "amount": "0.000",
+                "currency": "JOD"
+              },
+              "bookingTotal": {
+                "amount": "90.000",
+                "currency": "JOD"
+              },
+              "requiredDeposit": {
+                "amount": "18.000",
+                "currency": "JOD"
+              },
+              "securityDeposit": {
+                "amount": "200.000",
+                "currency": "JOD"
+              },
+              "paidOnline": {
+                "amount": "18.000",
+                "currency": "JOD"
+              },
+              "processingFees": {
+                "amount": "0.000",
+                "currency": "JOD"
+              },
+              "chargedOnline": {
+                "amount": "18.000",
+                "currency": "JOD"
+              },
+              "refunded": {
+                "amount": "0.000",
+                "currency": "JOD"
+              },
+              "refundInProgress": {
+                "amount": "0.000",
+                "currency": "JOD"
+              },
+              "refundDelayed": {
+                "amount": "0.000",
+                "currency": "JOD"
+              },
+              "netPaidOnline": {
+                "amount": "18.000",
+                "currency": "JOD"
+              }
+            },
+            "balance": {
+              "state": "DueAtHandover",
+              "amount": {
+                "amount": "72.000",
+                "currency": "JOD"
+              },
+              "cashRecorded": []
+            },
+            "deposit": {
+              "state": "Held",
+              "amount": {
+                "amount": "18.000",
+                "currency": "JOD"
+              },
+              "windowEndsAt": null,
+              "refund": null,
+              "decision": null
+            },
+            "penalty": null,
+            "payments": [
+              {
+                "paymentId": "00000000-0000-4000-8000-000000000032",
+                "purpose": "Deposit",
+                "status": "Applied",
+                "occurredAt": {
+                  "utc": "2026-09-11T10:00:00Z",
+                  "local": "2026-09-11 13:00"
+                },
+                "amountCharged": {
+                  "amount": "18.000",
+                  "currency": "JOD"
+                },
+                "processingFee": {
+                  "amount": "0.000",
+                  "currency": "JOD"
+                },
+                "feeRefundable": true,
+                "appliedToBooking": {
+                  "amount": "18.000",
+                  "currency": "JOD"
+                },
+                "refunds": []
+              }
+            ],
+            "receipts": [
+              {
+                "type": "PaymentReceipt",
+                "documentId": "00000000-0000-4000-8000-000000000033",
+                "number": "TEST-PAY-2026-000007"
+              }
+            ]
+          },
+          "content": {
+            "title": {
+              "en": "Booking statement",
+              "ar": "كشف حساب الحجز"
+            },
+            "headline": {
+              "label": {
+                "en": "Net paid online",
+                "ar": "صافي المدفوع عبر الإنترنت"
+              },
+              "money": {
+                "amount": "18.000",
+                "currency": "JOD"
+              }
+            },
+            "sections": [
+              {
+                "key": "document",
+                "heading": {
+                  "en": "Document",
+                  "ar": "المستند"
+                },
+                "lines": [
+                  {
+                    "key": "number",
+                    "label": {
+                      "en": "Document number",
+                      "ar": "رقم المستند"
+                    },
+                    "plain": "TEST-STM-2026-000005"
+                  },
+                  {
+                    "key": "version",
+                    "label": {
+                      "en": "Version",
+                      "ar": "الإصدار"
+                    },
+                    "plain": "2"
+                  },
+                  {
+                    "key": "issuedAt",
+                    "label": {
+                      "en": "Issued",
+                      "ar": "تاريخ الإصدار"
+                    },
+                    "instant": {
+                      "utc": "2026-09-11T11:01:00Z",
+                      "local": "2026-09-11 14:01"
+                    }
+                  },
+                  {
+                    "key": "cause",
+                    "label": {
+                      "en": "Issued because of",
+                      "ar": "سبب الإصدار"
+                    },
+                    "text": {
+                      "en": "Receipt corrected",
+                      "ar": "تصحيح إيصال"
+                    }
+                  },
+                  {
+                    "key": "coversUntil",
+                    "label": {
+                      "en": "Covers money movements up to",
+                      "ar": "يشمل الحركات المالية حتى"
+                    },
+                    "instant": {
+                      "utc": "2026-09-11T11:00:00Z",
+                      "local": "2026-09-11 14:00"
+                    }
+                  },
+                  {
+                    "key": "previousVersion",
+                    "label": {
+                      "en": "Replaces version",
+                      "ar": "يحلّ محلّ الإصدار"
+                    },
+                    "plain": "TEST-STM-2026-000004"
+                  }
+                ]
+              },
+              {
+                "key": "parties",
+                "heading": {
+                  "en": "Issued by and to",
+                  "ar": "الجهة المُصدِرة والعميل"
+                },
+                "lines": [
+                  {
+                    "key": "issuedBy",
+                    "label": {
+                      "en": "Issued by",
+                      "ar": "صادر عن"
+                    },
+                    "text": {
+                      "en": "TEST ISSUER — not a real company",
+                      "ar": "جهة إصدار تجريبية — ليست شركة حقيقية"
+                    }
+                  },
+                  {
+                    "key": "issuerRegistration",
+                    "label": {
+                      "en": "Commercial registration",
+                      "ar": "السجل التجاري"
+                    },
+                    "plain": "TEST-0000"
+                  },
+                  {
+                    "key": "issuerAddress",
+                    "label": {
+                      "en": "Address",
+                      "ar": "العنوان"
+                    },
+                    "text": {
+                      "en": "Test address, Amman",
+                      "ar": "عنوان تجريبي، عمّان"
+                    }
+                  },
+                  {
+                    "key": "supportEmail",
+                    "label": {
+                      "en": "Support email",
+                      "ar": "بريد الدعم"
+                    },
+                    "plain": "documents@example.invalid"
+                  },
+                  {
+                    "key": "supportPhone",
+                    "label": {
+                      "en": "Support phone",
+                      "ar": "هاتف الدعم"
+                    },
+                    "plain": "+962 6 000 0000"
+                  },
+                  {
+                    "key": "customer",
+                    "label": {
+                      "en": "Customer",
+                      "ar": "العميل"
+                    },
+                    "plain": "Rana Sharif"
+                  },
+                  {
+                    "key": "office",
+                    "label": {
+                      "en": "Rental office",
+                      "ar": "مكتب التأجير"
+                    },
+                    "plain": "Petra Rentals"
+                  },
+                  {
+                    "key": "officeRegistration",
+                    "label": {
+                      "en": "Rental office's commercial registration",
+                      "ar": "السجل التجاري لمكتب التأجير"
+                    },
+                    "plain": "123456"
+                  },
+                  {
+                    "key": "officeLocation",
+                    "label": {
+                      "en": "Rental office's location",
+                      "ar": "موقع مكتب التأجير"
+                    },
+                    "text": {
+                      "en": "⁨Street 12⁩, ⁨Abdoun⁩, Amman",
+                      "ar": "⁨Street 12⁩، ⁨Abdoun⁩، عمّان"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "booking",
+                "heading": {
+                  "en": "Booking",
+                  "ar": "الحجز"
+                },
+                "lines": [
+                  {
+                    "key": "reference",
+                    "label": {
+                      "en": "Booking reference",
+                      "ar": "الرقم المرجعي"
+                    },
+                    "plain": "KH-FIXTURE5"
+                  },
+                  {
+                    "key": "status",
+                    "label": {
+                      "en": "Booking status",
+                      "ar": "حالة الحجز"
+                    },
+                    "text": {
+                      "en": "Confirmed",
+                      "ar": "مؤكد"
+                    }
+                  },
+                  {
+                    "key": "car",
+                    "label": {
+                      "en": "Car",
+                      "ar": "السيارة"
+                    },
+                    "plain": "Toyota Corolla 2024"
+                  },
+                  {
+                    "key": "carType",
+                    "label": {
+                      "en": "Car type",
+                      "ar": "فئة السيارة"
+                    },
+                    "text": {
+                      "en": "Sedan",
+                      "ar": "سيدان"
+                    }
+                  },
+                  {
+                    "key": "plate",
+                    "label": {
+                      "en": "Plate number",
+                      "ar": "رقم اللوحة"
+                    },
+                    "plain": "12-34567"
+                  },
+                  {
+                    "key": "rentalStart",
+                    "label": {
+                      "en": "Rental starts",
+                      "ar": "بداية الإيجار"
+                    },
+                    "instant": {
+                      "utc": "2026-09-18T10:00:00Z",
+                      "local": "2026-09-18 13:00"
+                    }
+                  },
+                  {
+                    "key": "rentalEnd",
+                    "label": {
+                      "en": "Rental ends",
+                      "ar": "نهاية الإيجار"
+                    },
+                    "instant": {
+                      "utc": "2026-09-21T10:00:00Z",
+                      "local": "2026-09-21 13:00"
+                    }
+                  },
+                  {
+                    "key": "days",
+                    "label": {
+                      "en": "Rental days",
+                      "ar": "أيام الإيجار"
+                    },
+                    "text": {
+                      "en": "3 days",
+                      "ar": "3 أيام"
+                    }
+                  },
+                  {
+                    "key": "pickupMethod",
+                    "label": {
+                      "en": "Pickup method",
+                      "ar": "طريقة الاستلام"
+                    },
+                    "text": {
+                      "en": "Collected from the rental office",
+                      "ar": "الاستلام من مكتب التأجير"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "charges",
+                "heading": {
+                  "en": "Booking charges",
+                  "ar": "رسوم الحجز"
+                },
+                "lines": [
+                  {
+                    "key": "rental",
+                    "label": {
+                      "en": "Rental: 3 days × 30.000 JOD",
+                      "ar": "الإيجار: 3 أيام × ⁨30.000 JOD⁩"
+                    },
+                    "money": {
+                      "amount": "90.000",
+                      "currency": "JOD"
+                    }
+                  },
+                  {
+                    "key": "bookingTotal",
+                    "label": {
+                      "en": "Booking total",
+                      "ar": "إجمالي الحجز"
+                    },
+                    "money": {
+                      "amount": "90.000",
+                      "currency": "JOD"
+                    }
+                  },
+                  {
+                    "key": "requiredDeposit",
+                    "label": {
+                      "en": "Required deposit (20%)",
+                      "ar": "العربون المطلوب (⁨20%⁩)"
+                    },
+                    "money": {
+                      "amount": "18.000",
+                      "currency": "JOD"
+                    }
+                  },
+                  {
+                    "key": "securityDeposit",
+                    "label": {
+                      "en": "Security deposit the rental office holds at pickup (not paid online)",
+                      "ar": "التأمين الذي يحتفظ به مكتب التأجير عند الاستلام (لا يُدفع عبر الإنترنت)"
+                    },
+                    "money": {
+                      "amount": "200.000",
+                      "currency": "JOD"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "payment1",
+                "heading": {
+                  "en": "Deposit",
+                  "ar": "العربون"
+                },
+                "lines": [
+                  {
+                    "key": "paidOn",
+                    "label": {
+                      "en": "Paid on",
+                      "ar": "تاريخ الدفع"
+                    },
+                    "instant": {
+                      "utc": "2026-09-11T10:00:00Z",
+                      "local": "2026-09-11 13:00"
+                    }
+                  },
+                  {
+                    "key": "amountPaid",
+                    "label": {
+                      "en": "Amount paid",
+                      "ar": "المبلغ المدفوع"
+                    },
+                    "money": {
+                      "amount": "18.000",
+                      "currency": "JOD"
+                    }
+                  },
+                  {
+                    "key": "appliedToBooking",
+                    "label": {
+                      "en": "Applied to the booking",
+                      "ar": "المحتسب على الحجز"
+                    },
+                    "money": {
+                      "amount": "18.000",
+                      "currency": "JOD"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "deposit",
+                "heading": {
+                  "en": "Deposit",
+                  "ar": "العربون"
+                },
+                "lines": [
+                  {
+                    "key": "state",
+                    "label": null,
+                    "text": {
+                      "en": "Your deposit of 18.000 JOD is held until you collect the car, when it counts towards the rental.",
+                      "ar": "عربونك البالغ ⁨18.000 JOD⁩ محتجز حتى تستلم السيارة، وعندها يُحتسب من قيمة الإيجار."
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "balance",
+                "heading": {
+                  "en": "Balance",
+                  "ar": "المتبقي"
+                },
+                "lines": [
+                  {
+                    "key": "dueAtPickup",
+                    "label": {
+                      "en": "Balance due to the rental office at pickup",
+                      "ar": "المتبقي المستحق لمكتب التأجير عند الاستلام"
+                    },
+                    "money": {
+                      "amount": "72.000",
+                      "currency": "JOD"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "totals",
+                "heading": {
+                  "en": "Totals",
+                  "ar": "الإجماليات"
+                },
+                "lines": [
+                  {
+                    "key": "chargedOnline",
+                    "label": {
+                      "en": "Charged online",
+                      "ar": "إجمالي ما خُصم عبر الإنترنت"
+                    },
+                    "money": {
+                      "amount": "18.000",
+                      "currency": "JOD"
+                    }
+                  },
+                  {
+                    "key": "refunded",
+                    "label": {
+                      "en": "Refunded to you",
+                      "ar": "تم استرداده لك"
+                    },
+                    "money": {
+                      "amount": "0.000",
+                      "currency": "JOD"
+                    }
+                  },
+                  {
+                    "key": "netPaidOnline",
+                    "label": {
+                      "en": "Net paid online",
+                      "ar": "صافي المدفوع عبر الإنترنت"
+                    },
+                    "money": {
+                      "amount": "18.000",
+                      "currency": "JOD"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "documents",
+                "heading": {
+                  "en": "Documents",
+                  "ar": "المستندات"
+                },
+                "lines": [
+                  {
+                    "key": "receipt1",
+                    "label": {
+                      "en": "Payment receipt",
+                      "ar": "إيصال دفع"
+                    },
+                    "plain": "TEST-PAY-2026-000007"
+                  },
+                  {
+                    "key": "previousStatement",
+                    "label": {
+                      "en": "Previous version of this statement",
+                      "ar": "الإصدار السابق من هذا الكشف"
+                    },
+                    "plain": "TEST-STM-2026-000004"
+                  }
+                ]
+              }
+            ],
+            "timeNote": {
+              "en": "All times are Amman time.",
+              "ar": "جميع الأوقات بتوقيت عمّان."
+            },
+            "notice": {
+              "en": "This document is not a tax invoice.",
+              "ar": "هذا المستند ليس فاتورة ضريبية."
+            }
+          }
+        },
+        "links": {
+          "versions": [
+            {
+              "documentId": "00000000-0000-4000-8000-000000000030",
+              "type": "BookingStatement",
+              "number": "TEST-STM-2026-000004",
+              "version": 1,
+              "status": "Superseded"
+            },
+            {
+              "documentId": "00000000-0000-4000-8000-000000000028",
+              "type": "BookingStatement",
+              "number": "TEST-STM-2026-000005",
+              "version": 2,
+              "status": "Current"
+            }
+          ],
+          "previousVersion": {
+            "documentId": "00000000-0000-4000-8000-000000000030",
+            "type": "BookingStatement",
+            "number": "TEST-STM-2026-000004",
+            "version": 1,
+            "status": "Superseded"
+          },
+          "nextVersion": null,
+          "replacedBy": null,
+          "paymentReceipt": null,
+          "refundReceipts": []
+        },
+        "voided": null
+      }
     }
   ],
   "myDocuments": {
     "items": [
+      {
+        "documentId": "00000000-0000-4000-8000-000000000028",
+        "type": "BookingStatement",
+        "number": "TEST-STM-2026-000005",
+        "version": 2,
+        "status": "Current",
+        "bookingId": "00000000-0000-4000-8000-000000000029",
+        "bookingReference": "KH-FIXTURE5",
+        "title": {
+          "en": "Booking statement",
+          "ar": "كشف حساب الحجز"
+        },
+        "headline": {
+          "label": {
+            "en": "Net paid online",
+            "ar": "صافي المدفوع عبر الإنترنت"
+          },
+          "amount": {
+            "amount": 18,
+            "currency": "JOD"
+          }
+        },
+        "cause": "ReceiptCorrected",
+        "occurredAt": "2026-09-11T10:00:00+00:00",
+        "issuedAt": "2026-09-11T11:01:00+00:00"
+      },
+      {
+        "documentId": "00000000-0000-4000-8000-000000000033",
+        "type": "PaymentReceipt",
+        "number": "TEST-PAY-2026-000007",
+        "version": 2,
+        "status": "Current",
+        "bookingId": "00000000-0000-4000-8000-000000000029",
+        "bookingReference": "KH-FIXTURE5",
+        "title": {
+          "en": "Payment receipt",
+          "ar": "إيصال دفع"
+        },
+        "headline": {
+          "label": {
+            "en": "Amount paid",
+            "ar": "المبلغ المدفوع"
+          },
+          "amount": {
+            "amount": 18,
+            "currency": "JOD"
+          }
+        },
+        "cause": "Correction",
+        "occurredAt": "2026-09-11T10:00:00+00:00",
+        "issuedAt": "2026-09-11T11:00:00+00:00"
+      },
+      {
+        "documentId": "00000000-0000-4000-8000-000000000030",
+        "type": "BookingStatement",
+        "number": "TEST-STM-2026-000004",
+        "version": 1,
+        "status": "Superseded",
+        "bookingId": "00000000-0000-4000-8000-000000000029",
+        "bookingReference": "KH-FIXTURE5",
+        "title": {
+          "en": "Booking statement",
+          "ar": "كشف حساب الحجز"
+        },
+        "headline": {
+          "label": {
+            "en": "Net paid online",
+            "ar": "صافي المدفوع عبر الإنترنت"
+          },
+          "amount": {
+            "amount": 18,
+            "currency": "JOD"
+          }
+        },
+        "cause": "PaymentCaptured",
+        "occurredAt": "2026-09-11T10:00:00+00:00",
+        "issuedAt": "2026-09-11T10:01:00+00:00"
+      },
+      {
+        "documentId": "00000000-0000-4000-8000-000000000034",
+        "type": "PaymentReceipt",
+        "number": "TEST-PAY-2026-000006",
+        "version": 1,
+        "status": "Voided",
+        "bookingId": "00000000-0000-4000-8000-000000000029",
+        "bookingReference": "KH-FIXTURE5",
+        "title": {
+          "en": "Payment receipt",
+          "ar": "إيصال دفع"
+        },
+        "headline": {
+          "label": {
+            "en": "Amount paid",
+            "ar": "المبلغ المدفوع"
+          },
+          "amount": {
+            "amount": 18,
+            "currency": "JOD"
+          }
+        },
+        "cause": "PaymentCaptured",
+        "occurredAt": "2026-09-11T10:00:00+00:00",
+        "issuedAt": "2026-09-11T10:01:00+00:00"
+      },
       {
         "documentId": "00000000-0000-4000-8000-000000000008",
         "type": "BookingStatement",
@@ -6124,7 +6959,7 @@
     ],
     "page": 1,
     "pageSize": 20,
-    "totalCount": 11,
+    "totalCount": 15,
     "totalPages": 1,
     "hasPrevious": false,
     "hasNext": false

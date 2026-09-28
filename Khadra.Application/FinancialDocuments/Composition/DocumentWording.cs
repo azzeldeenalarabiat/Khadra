@@ -55,6 +55,7 @@ internal static class DocumentWording
             ? BilingualText.Of("Cash recorded by the rental office", "تسجيل مبلغ نقدي من مكتب التأجير")
         : cause == FinancialDocumentCause.Correction
             ? BilingualText.Of("Correction of a voided document", "تصحيح لمستند أُبطل")
+        : cause == FinancialDocumentCause.ReceiptCorrected ? BilingualText.Of("Receipt corrected", "تصحيح إيصال")
         : throw new ArgumentOutOfRangeException(nameof(cause), cause.Name, "Not a document cause.");
 
     public static class Headings

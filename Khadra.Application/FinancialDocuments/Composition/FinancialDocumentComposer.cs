@@ -307,8 +307,10 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
         // The customer's projection and nothing wider (decision 3, plan §3.10).
         var view = BookingFinancialsDto.For(financials, BookingParty.Customer);
         var currency = view.Currency;
-        var latest = checkpoints.Latest;
-        var cause = stamp.IsCorrection ? FinancialDocumentCause.Correction : latest.Kind;
+        // Why this version exists; when the money it states last moved — which a receipt's correction never
+        // moves (owner, 2026-09-28); and, below, the instant its facts run to.
+        var cause = stamp.IsCorrection ? FinancialDocumentCause.Correction : checkpoints.Latest.Kind;
+        var moneyMovedAt = checkpoints.MoneyMovedAt;
         var net = Money.Create(view.Summary.ChargedOnline!.Amount - view.Summary.Refunded.Amount, currency);
         var penalty = booking.HasPenaltyAgainstCustomer ? booking.Penalty : null;
 
@@ -364,7 +366,7 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
         DocumentsSection(content, facts.Receipts, stamp);
 
         var snapshot = Root(
-            FinancialDocumentType.BookingStatement, stamp, cause, latest.At, currency,
+            FinancialDocumentType.BookingStatement, stamp, cause, moneyMovedAt, currency,
             facts.Issuer, facts.Parties, booking, factsNode,
             content.Build(DocumentWording.Title(FinancialDocumentType.BookingStatement), DocumentWording.Labels.NetPaidOnline, net));
 
@@ -381,7 +383,7 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
             PaymentId: null,
             RefundId: null,
             cause,
-            latest.At,
+            moneyMovedAt,
             checkpoints.CoversThrough,
             checkpoints.Fingerprint,
             net,

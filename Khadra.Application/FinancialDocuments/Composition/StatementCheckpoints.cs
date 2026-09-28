@@ -7,15 +7,19 @@ using Khadra.Domain.Payments;
 
 namespace Khadra.Application.FinancialDocuments.Composition;
 
-/// <summary>One fact that moves a booking's money, with the instant it is stored under.</summary>
-/// <param name="Key">The record the fact is about: the payment, refund, ticket, booking or handover.</param>
+/// <summary>
+/// One fact that moves a booking's money — or, for a receipt's correction, the paperwork about money already
+/// stated — with the instant it is stored under.
+/// </summary>
+/// <param name="Key">The record the fact is about: the payment, refund, ticket, booking, handover or correction.</param>
 /// <param name="Facts">What about it the fingerprint covers, beyond its identity and instant.</param>
 public sealed record Checkpoint(FinancialDocumentCause Kind, Guid Key, DateTimeOffset At, string Facts);
 
 /// <summary>
-/// The CLOSED list of facts that issue a new version of a booking statement (owner, 2026-09-27): a payment
-/// captured, a refund settled, a dispute resolved, the booking ended, cash recorded at a handover. Nothing
-/// else is one — not a refund being recorded, sent or refused, not a dispute opening, and never a state
+/// The CLOSED list of facts that issue a new version of a booking statement: a payment captured, a refund
+/// settled, a dispute resolved, the booking ended, cash recorded at a handover (owner, 2026-09-27), and a
+/// receipt corrected (owner, 2026-09-28; pre-launch item 181). Nothing else is one — not a refund being
+/// recorded, sent or refused, not a dispute opening, not a statement's own correction, and never a state
 /// that changes with the clock alone, such as a deposit's window closing.
 /// </summary>
 /// <remarks>
@@ -53,27 +57,37 @@ public sealed class StatementCheckpoints
         IsEmpty ? throw new InvalidOperationException("No checkpoint to cover.") : All.Max(checkpoint => checkpoint.At);
 
     /// <summary>
-    /// The newest fact: the statement's cause and money instant. Facts sharing an instant are ranked so the
-    /// one that explains the others wins — a dispute decision over the ending it brings about.
+    /// The newest fact: the statement's cause. Facts sharing an instant are ranked so the one that explains
+    /// the others wins — a dispute decision over the ending it brings about, any money over a correction.
     /// </summary>
-    public Checkpoint Latest =>
-        IsEmpty
-            ? throw new InvalidOperationException("No checkpoint to name.")
-            : All.OrderByDescending(checkpoint => checkpoint.At)
-                .ThenByDescending(checkpoint => Rank(checkpoint.Kind))
-                .ThenByDescending(checkpoint => checkpoint.Key)
-                .First();
+    public Checkpoint Latest => Newest(All) ?? throw new InvalidOperationException("No checkpoint to name.");
+
+    /// <summary>
+    /// The newest fact that MOVED money — every kind but <see cref="FinancialDocumentCause.ReceiptCorrected"/> —
+    /// which is the instant a statement records as when its money moved. A correction is paperwork about money
+    /// already stated: a version issued for one keeps the instant of the last money it states, and a booking
+    /// with no correction reads exactly as before (<c>MoneyMovedAt == Latest.At</c>).
+    /// </summary>
+    public DateTimeOffset MoneyMovedAt =>
+        Newest(All.Where(checkpoint => MovesMoney(checkpoint.Kind)))?.At
+            ?? throw new InvalidOperationException("A statement's facts hold no money: a receipt was corrected on a booking with no captured payment.");
 
     /// <param name="payments">The booking's payments, with their refunds. Others are ignored.</param>
     /// <param name="resolvedTickets">The booking's resolved tickets. Others are ignored.</param>
+    /// <param name="receipts">
+    /// The booking's receipts as issued. Only the latest version of each receipt family counts, and it counts
+    /// only when it is a correction; statements and other bookings' documents are ignored.
+    /// </param>
     public static StatementCheckpoints Of(
         Booking booking,
         IEnumerable<Payment> payments,
-        IEnumerable<DisputeTicket> resolvedTickets)
+        IEnumerable<DisputeTicket> resolvedTickets,
+        IEnumerable<FinancialDocument> receipts)
     {
         ArgumentNullException.ThrowIfNull(booking);
         ArgumentNullException.ThrowIfNull(payments);
         ArgumentNullException.ThrowIfNull(resolvedTickets);
+        ArgumentNullException.ThrowIfNull(receipts);
 
         var all = new List<Checkpoint>();
         foreach (var payment in payments.Where(payment => payment.BookingId == booking.Id && payment.Status.IsCaptured))
@@ -126,6 +140,18 @@ public sealed class StatementCheckpoints
                 $"{handover.Type.Name}|{SnapshotJson.Amount(cash.Amount)}|{cash.CurrencyCode}"));
         }
 
+        // A receipt's correction (owner, 2026-09-28): the family's latest version, when that is a correction,
+        // by identity and instant — an issued document never changes. A booking whose receipts were never
+        // corrected gets no line here, so its fingerprint is what it always was.
+        foreach (var correction in receipts
+                     .Where(receipt => receipt.BookingId == booking.Id && receipt.Type.IsReceipt)
+                     .GroupBy(receipt => (receipt.Type, receipt.SubjectId))
+                     .Select(family => family.MaxBy(receipt => receipt.Version)!)
+                     .Where(latest => latest.Cause == FinancialDocumentCause.Correction))
+        {
+            all.Add(new Checkpoint(FinancialDocumentCause.ReceiptCorrected, correction.Id.Value, correction.IssuedAt, string.Empty));
+        }
+
         return new StatementCheckpoints(
         [
             .. all.OrderBy(checkpoint => checkpoint.Kind.Id).ThenBy(checkpoint => checkpoint.Key),
@@ -150,10 +176,23 @@ public sealed class StatementCheckpoints
         return text.ToString();
     }
 
+    /// <summary>The newest of some facts, by one ordering shared by the cause and the money instant.</summary>
+    private static Checkpoint? Newest(IEnumerable<Checkpoint> checkpoints) =>
+        checkpoints
+            .OrderByDescending(checkpoint => checkpoint.At)
+            .ThenByDescending(checkpoint => Rank(checkpoint.Kind))
+            .ThenByDescending(checkpoint => checkpoint.Key)
+            .FirstOrDefault();
+
+    private static bool MovesMoney(FinancialDocumentCause kind) => kind != FinancialDocumentCause.ReceiptCorrected;
+
     private static int Rank(FinancialDocumentCause kind) =>
         kind == FinancialDocumentCause.DisputeResolved ? 5
         : kind == FinancialDocumentCause.BookingEnded ? 4
         : kind == FinancialDocumentCause.RefundSettled ? 3
         : kind == FinancialDocumentCause.CashRecorded ? 2
-        : 1;
+        : kind == FinancialDocumentCause.PaymentCaptured ? 1
+        // Paperwork about money already stated: any money fact at the same instant names the statement.
+        : kind == FinancialDocumentCause.ReceiptCorrected ? 0
+        : throw new ArgumentOutOfRangeException(nameof(kind), kind.Name, "Not a statement checkpoint.");
 }

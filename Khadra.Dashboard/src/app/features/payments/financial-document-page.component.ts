@@ -105,7 +105,7 @@ export class FinancialDocumentPageComponent {
   protected voidDocument(): void {
     const page = this.page();
     if (!page?.canVoid) return;
-    const words = voidDialogWords(page.number, this.t);
+    const words = voidDialogWords(page.number, page.statementFollows, this.t);
     this.ui.openAction(
       {
         icon: 'file-x',

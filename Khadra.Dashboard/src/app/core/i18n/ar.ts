@@ -3328,6 +3328,7 @@ export const AR = {
   'financialDocuments.voidBody':
     'هذا نهائي. يصدر فورًا مستند مصحّح برقم جديد، من سجلات الحجز كما هي الآن. يرى العميل هذا المستند ملغًى ومستبدلًا — ولا يرى سببك أبدًا.',
   'financialDocuments.voidNote': 'يُحفظ سببك مع الإلغاء وفي سجل التدقيق.',
+  'financialDocuments.voidStatementNote': 'سيصدر كشف حساب جديد للحجز بعد التصحيح بقليل.',
   'financialDocuments.voidReasonLabel': 'لماذا يُلغى؟',
   'financialDocuments.voidReasonPlaceholder': 'ما الخطأ في هذا المستند',
   // Opens with «تأكيد», not «إلغاء»: the dialog's shared Cancel button already reads «إلغاء», and the
@@ -3349,6 +3350,7 @@ export const AR = {
   'financialDocumentCause.bookingEnded': 'انتهاء الحجز',
   'financialDocumentCause.cashRecorded': 'تسجيل مبلغ نقدي من مكتب التأجير',
   'financialDocumentCause.correction': 'تصحيح لمستند أُبطل',
+  'financialDocumentCause.receiptCorrected': 'تصحيح إيصال',
   'financialDocumentHoldReason.recordsNeedReview': 'سجلات الحجز تحتاج إلى مراجعة',
   'financialDocumentHoldReason.issuerNotConfigured': 'الهوية القانونية لخضرا غير مهيّأة',
   'financialDocumentHoldReason.snapshotFailed': 'تعذّر إنشاء المستند',

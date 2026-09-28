@@ -21,7 +21,7 @@ public interface IFinancialDocumentRepository
 
     /// <summary>
     /// The latest version of every RECEIPT family on a booking, oldest money first: what a statement lists
-    /// as the receipts issued so far.
+    /// as the receipts issued so far, and where it finds a receipt's correction among its checkpoints.
     /// </summary>
     Task<IReadOnlyList<FinancialDocument>> ListLatestReceiptsForBookingAsync(
         Id bookingId,

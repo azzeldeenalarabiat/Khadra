@@ -3289,6 +3289,7 @@ export const EN = {
   'financialDocuments.voidBody':
     "This is permanent. A corrected document is issued at once under a new number, from the booking's records as they stand now. The customer sees this one voided and replaced — never your reason.",
   'financialDocuments.voidNote': 'Your reason is kept with the void and in the audit log.',
+  'financialDocuments.voidStatementNote': 'A new booking statement will be issued shortly after the correction.',
   'financialDocuments.voidReasonLabel': 'Why is it being voided?',
   'financialDocuments.voidReasonPlaceholder': 'What is wrong with this document',
   'financialDocuments.voidConfirm': 'Void and issue the correction',
@@ -3309,6 +3310,7 @@ export const EN = {
   'financialDocumentCause.bookingEnded': 'Booking ended',
   'financialDocumentCause.cashRecorded': 'Cash recorded by the rental office',
   'financialDocumentCause.correction': 'Correction of a voided document',
+  'financialDocumentCause.receiptCorrected': 'Receipt corrected',
   'financialDocumentHoldReason.recordsNeedReview': "The booking's records need review",
   'financialDocumentHoldReason.issuerNotConfigured': "Khadra's legal identity is not configured",
   'financialDocumentHoldReason.snapshotFailed': 'The document could not be composed',

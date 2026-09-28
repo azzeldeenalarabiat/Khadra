@@ -32,7 +32,8 @@ public sealed class FinancialDocumentType : Enumeration
 
 /// <summary>
 /// Why a document was issued: the money event it records (owner, 2026-09-27 — the closed list of
-/// checkpoints), or the correction of a voided document.
+/// checkpoints), the correction of a voided document, or — for a statement only — a receipt's correction
+/// (owner, 2026-09-28).
 /// </summary>
 public sealed class FinancialDocumentCause : Enumeration
 {
@@ -53,6 +54,12 @@ public sealed class FinancialDocumentCause : Enumeration
 
     /// <summary>An administrator voided the document this one replaces.</summary>
     public static readonly FinancialDocumentCause Correction = new(6, "Correction");
+
+    /// <summary>
+    /// A receipt on the booking was voided and corrected: the statement's new version lists the correction
+    /// in place of the voided receipt (owner, 2026-09-28; pre-launch item 181). A statement's cause only.
+    /// </summary>
+    public static readonly FinancialDocumentCause ReceiptCorrected = new(7, "ReceiptCorrected");
 
     private FinancialDocumentCause(int id, string name) : base(id, name)
     {

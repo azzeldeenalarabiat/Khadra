@@ -66,6 +66,20 @@ void main() {
       expect(content.title.ar, 'إيصال دفع');
     });
 
+    test("read a statement issued for a receipt's correction: its cause in both languages, the correction alone listed", () {
+      final content = DocumentContent.tryParse(1, snapshotOf('booking-statement-receipt-corrected'))!;
+      DocumentSection section(String key) => content.sections.firstWhere((candidate) => candidate.key == key);
+
+      final cause = section('document').lines.firstWhere((line) => line.key == 'cause').value as TextValue;
+      expect((cause.text.en, cause.text.ar), ('Receipt corrected', 'تصحيح إيصال'));
+      final listed = [
+        for (final line in section('documents').lines)
+          if (line.value case PlainValue(:final plain)) plain,
+      ];
+      expect(listed, contains('TEST-PAY-2026-000007'));
+      expect(listed, isNot(contains('TEST-PAY-2026-000006')));
+    });
+
     test('carry their standing, links and void as the endpoint sends them', () {
       final voided = FinancialDocumentPage.fromJson(pageJson('payment-receipt-deposit-voided'));
       expect(voided.row.status, 'Voided');

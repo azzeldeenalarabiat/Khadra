@@ -57,6 +57,18 @@ describe('the version 1 reader, over every document the server composes', () => 
     const content = read(page('payment-receipt-paid-in-full').snapshot)!;
     expect(content.headline).toEqual({ label: { en: 'Amount paid', ar: 'المبلغ المدفوع' }, amount: '94.500', currency: 'JOD' });
   });
+
+  it("reads a statement issued for a receipt's correction: its cause in both languages, the correction alone listed", () => {
+    const content = read(page('booking-statement-receipt-corrected').snapshot)!;
+    const section = (key: string) => content.sections.find((candidate) => candidate.key === key)!;
+    expect(section('document').lines.find((line) => line.key === 'cause')!.value).toEqual({
+      kind: 'text',
+      text: { en: 'Receipt corrected', ar: 'تصحيح إيصال' },
+    });
+    const listed = section('documents').lines.map((line) => line.value);
+    expect(listed).toContainEqual({ kind: 'plain', plain: 'TEST-PAY-2026-000007' });
+    expect(listed).not.toContainEqual({ kind: 'plain', plain: 'TEST-PAY-2026-000006' });
+  });
 });
 
 describe('what the reader tolerates (docs/contracts/README.md: what the server may do within version 1)', () => {

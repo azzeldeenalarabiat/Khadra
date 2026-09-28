@@ -15,12 +15,12 @@ namespace Khadra.Infrastructure.Reporting;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Statements</b> follow the closed list of checkpoints (owner, 2026-09-27) and never the clock: a
-/// booking is looked at when a checkpoint instant is later than its latest statement's
-/// <c>covers_through</c>, and — for the late-commit margin only — when that statement was issued moments
-/// ago, since a fact can commit just after a statement read the records while carrying an earlier instant.
-/// Either way the checkpoint fingerprint decides; a booking whose facts have not changed is never issued a
-/// version, however many passes run.
+/// <b>Statements</b> follow the closed list of checkpoints (owner, 2026-09-27; a receipt's correction joined
+/// it on 2026-09-28) and never the clock: a booking is looked at when a checkpoint instant is later than its
+/// latest statement's <c>covers_through</c>, and — for the late-commit margin only — when that statement was
+/// issued moments ago, since a fact can commit just after a statement read the records while carrying an
+/// earlier instant. Either way the checkpoint fingerprint decides; a booking whose facts have not changed is
+/// never issued a version, however many passes run.
 /// </para>
 /// <para>
 /// A family on hold waits for its next attempt. A hold for a missing issuer stops waiting the moment an
@@ -147,6 +147,8 @@ internal sealed class FinancialDocumentCandidateReader(KhadraDbContext context) 
         var (applied, orphaned) = (PaymentStatus.Applied, PaymentStatus.Orphaned);
         var settled = RefundStatus.Settled;
         var resolved = DisputeStatus.Resolved;
+        var (paymentReceipt, refundReceipt) = (FinancialDocumentType.PaymentReceipt, FinancialDocumentType.RefundReceipt);
+        var correction = FinancialDocumentCause.Correction;
         var recently = now - lateCommitMargin;
         var waiting = Waiting(type, now, issuerConfigured);
 
@@ -170,7 +172,14 @@ internal sealed class FinancialDocumentCandidateReader(KhadraDbContext context) 
                 || context.Bookings.Any(booking =>
                     booking.Id == statement.BookingId && booking.FinishedAt > statement.CoversThrough)
                 || context.Set<HandoverRecord>().Any(handover =>
-                    handover.BookingId == statement.BookingId && handover.CashCollected != null && handover.RecordedAt > statement.CoversThrough))
+                    handover.BookingId == statement.BookingId && handover.CashCollected != null && handover.RecordedAt > statement.CoversThrough)
+                // A RECEIPT's correction only: a statement's own correction is issued after the checkpoints
+                // it covers, and counting it would bring every voided statement back on every pass.
+                || context.FinancialDocuments.Any(receipt =>
+                    receipt.BookingId == statement.BookingId
+                    && (receipt.Type == paymentReceipt || receipt.Type == refundReceipt)
+                    && receipt.Cause == correction
+                    && receipt.IssuedAt > statement.CoversThrough))
             .OrderBy(statement => statement.CoversThrough)
             .ThenBy(statement => statement.Id)
             .Select(statement => statement.BookingId)

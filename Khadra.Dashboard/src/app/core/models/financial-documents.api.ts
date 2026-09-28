@@ -38,7 +38,7 @@ export interface AdminFinancialDocumentListItem {
   readonly dealerId: string;
   readonly title: Bilingual;
   readonly headline: FinancialDocumentHeadline;
-  /** What issued it: `PaymentCaptured`, `RefundSettled`, `DisputeResolved`, `BookingEnded`, `CashRecorded` or `Correction`. */
+  /** What issued it: `PaymentCaptured`, `RefundSettled`, `DisputeResolved`, `BookingEnded`, `CashRecorded`, `Correction` or, for a statement, `ReceiptCorrected`. */
   readonly cause: string;
   /** When the money event it records happened. */
   readonly occurredAt: string;

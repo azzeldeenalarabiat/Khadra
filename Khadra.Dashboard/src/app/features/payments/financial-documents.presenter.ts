@@ -306,6 +306,11 @@ export interface DocumentPageView {
   } | null;
   /** Only a CURRENT document can be voided; a superseded or voided one can never become current. */
   readonly canVoid: boolean;
+  /**
+   * A receipt: its correction brings the booking's statement a new version, issued by the next settlement
+   * pass rather than with the void (owner, 2026-09-28), so the void dialog says so.
+   */
+  readonly statementFollows: boolean;
 }
 
 /** What the console reports about a document its reader refused whole. */
@@ -401,6 +406,7 @@ export function documentPage(page: AdminFinancialDocument, words: DocumentWords,
         }
       : null,
     canVoid: document.status === 'Current',
+    statementFollows: document.type === 'PaymentReceipt' || document.type === 'RefundReceipt',
   };
 }
 
@@ -416,11 +422,13 @@ export interface VoidDialogWords {
   readonly confirm: string;
 }
 
-export function voidDialogWords(number: string, t: Translate): VoidDialogWords {
+/** @param statementFollows a receipt, whose correction the booking's statement follows shortly after. */
+export function voidDialogWords(number: string, statementFollows: boolean, t: Translate): VoidDialogWords {
+  const note = t('financialDocuments.voidNote');
   return {
     title: t('financialDocuments.voidTitle', { number }),
     body: t('financialDocuments.voidBody'),
-    note: t('financialDocuments.voidNote'),
+    note: statementFollows ? `${note} ${t('financialDocuments.voidStatementNote')}` : note,
     reasonLabel: t('financialDocuments.voidReasonLabel'),
     placeholder: t('financialDocuments.voidReasonPlaceholder'),
     confirm: t('financialDocuments.voidConfirm'),
