@@ -5,6 +5,9 @@ using System.Reflection;
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.FinancialDocuments.Queries;
+using Khadra.Application.FinancialDocuments.VoidFinancialDocument;
+using Khadra.Application.Payments.Financials;
+using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.FinancialDocuments;
 using Khadra.Tests.Support;
@@ -143,6 +146,65 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
         await controller.GetFinancialDocuments(SomeId, CancellationToken.None);
 
         Assert.Equal(NoStore, controller.Response.Headers.CacheControl.ToString());
+    }
+
+    // ── …nor of the administrator's documents, nor of a booking's financials (owner, 2026-09-28) ──────────
+
+    [Fact]
+    public async Task Every_answer_about_the_administrators_documents_is_kept_out_of_caches_refusals_included()
+    {
+        var mediator = Substitute.For<ISender>();
+        mediator.Send(Arg.Any<ListAdminFinancialDocumentsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success<PagedResult<AdminFinancialDocumentListItem>, Error>(PagedResult.Empty<AdminFinancialDocumentListItem>(1, 20)));
+        mediator.Send(Arg.Any<GetFinancialDocumentVocabularyQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<FinancialDocumentVocabularyDto, Error>(FinancialDocumentErrors.NotFound));
+        mediator.Send(Arg.Any<ListFinancialDocumentHoldsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success<PagedResult<FinancialDocumentHoldDto>, Error>(PagedResult.Empty<FinancialDocumentHoldDto>(1, 20)));
+        mediator.Send(Arg.Any<GetAdminFinancialDocumentQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<AdminFinancialDocumentDto, Error>(FinancialDocumentErrors.NotFound));
+        mediator.Send(Arg.Any<GetAdminBookingFinancialDocumentsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<AdminBookingFinancialDocumentsDto, Error>(FinancialDocumentErrors.NotFound));
+        mediator.Send(Arg.Any<VoidFinancialDocumentCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<VoidedFinancialDocumentDto, Error>(FinancialDocumentErrors.AlreadyVoided));
+
+        List<Func<AdminFinancialDocumentsController, Task<ActionResult>>> answers =
+        [
+            controller => controller.List(null, null, null, null, null, null, null, null, CancellationToken.None),
+            controller => controller.Vocabulary(CancellationToken.None),
+            controller => controller.Holds(null, null, CancellationToken.None),
+            controller => controller.Document(SomeId, CancellationToken.None),
+            controller => controller.ForBooking(SomeId, CancellationToken.None),
+            controller => controller.Void(SomeId, new AdminFinancialDocumentsController.VoidRequest("Wrong."), CancellationToken.None),
+        ];
+        // Every action is here: one added later without the header fails this count first.
+        Assert.Equal(
+            typeof(AdminFinancialDocumentsController).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly).Length,
+            answers.Count);
+
+        foreach (var answer in answers)
+        {
+            var controller = Over(new AdminFinancialDocumentsController(Customer()), mediator);
+            await answer(controller);
+            Assert.Equal(NoStore, controller.Response.Headers.CacheControl.ToString());
+        }
+    }
+
+    [Fact]
+    public async Task A_bookings_financials_are_kept_out_of_caches_for_its_parties_and_for_the_administrator()
+    {
+        var mediator = Substitute.For<ISender>();
+        mediator.Send(Arg.Any<GetBookingFinancialsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<BookingFinancialsDto, Error>(BookingErrors.NotFound));
+        mediator.Send(Arg.Any<GetAnyBookingFinancialsQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<BookingFinancialsDto, Error>(BookingErrors.NotFound));
+
+        var parties = Over(new BookingsController(Customer()), mediator);
+        await parties.GetFinancials(SomeId, CancellationToken.None);
+        Assert.Equal(NoStore, parties.Response.Headers.CacheControl.ToString());
+
+        var administrator = Over(new AdminBookingsController(), mediator);
+        await administrator.GetFinancials(SomeId, CancellationToken.None);
+        Assert.Equal(NoStore, administrator.Response.Headers.CacheControl.ToString());
     }
 
     private static ICurrentActor Customer()

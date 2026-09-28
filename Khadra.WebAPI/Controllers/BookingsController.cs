@@ -104,6 +104,8 @@ public sealed class BookingsController(ICurrentActor actor) : ApiControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetFinancials(Guid bookingId, CancellationToken cancellationToken)
     {
+        // A booking's money — paid, refunded, the balance, every payment — is somebody's private record.
+        KeepOutOfCaches();
         var result = await Mediator.Send(
             new GetBookingFinancialsQuery(actor.UserId!.Value, Id.From(bookingId)),
             cancellationToken);

@@ -13,6 +13,8 @@ namespace Khadra.WebAPI.Controllers;
 /// The administrator's issued financial documents (payments Phase 5): every document, one document's page
 /// with the provider, the proof of what was issued and any void, the holds on documents owed and not
 /// issued, a booking's documents — and the one action, voiding a wrong document and issuing its correction.
+/// Every answer is kept out of caches, refusals included (owner, 2026-09-28): a document names a customer and
+/// their money, a void carries the administrator's reason, and a hold its free-text error.
 /// </summary>
 [Authorize(Policy = SecurityPolicies.Admin)]
 [Route("api/v1/admin")]
@@ -31,29 +33,41 @@ public sealed class AdminFinancialDocumentsController(ICurrentActor actor) : Api
         [FromQuery] DateOnly? to,
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
-        CancellationToken cancellationToken) =>
-        FromResult(await Mediator.Send(
+        CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(
             new ListAdminFinancialDocumentsQuery(type, status, number, reference, from, to, page, pageSize),
             cancellationToken));
+    }
 
     /// <summary>The words the documents screens filter on, from the domain's own enumerations.</summary>
     [HttpGet("financial-documents/vocabulary")]
     [ProducesResponseType<FinancialDocumentVocabularyDto>(StatusCodes.Status200OK)]
-    public async Task<ActionResult> Vocabulary(CancellationToken cancellationToken) =>
-        FromResult(await Mediator.Send(new GetFinancialDocumentVocabularyQuery(), cancellationToken));
+    public async Task<ActionResult> Vocabulary(CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(new GetFinancialDocumentVocabularyQuery(), cancellationToken));
+    }
 
     /// <summary>Documents owed and not issued, with their reasons, oldest failure first.</summary>
     [HttpGet("financial-documents/holds")]
     [ProducesResponseType<PagedResult<FinancialDocumentHoldDto>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult> Holds([FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
-        FromResult(await Mediator.Send(new ListFinancialDocumentHoldsQuery(page, pageSize), cancellationToken));
+    public async Task<ActionResult> Holds([FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(new ListFinancialDocumentHoldsQuery(page, pageSize), cancellationToken));
+    }
 
     /// <summary>One document: the customer's page, plus its provider, its hash, what it covered and its void.</summary>
     [HttpGet("financial-documents/{documentId:guid}")]
     [ProducesResponseType<AdminFinancialDocumentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> Document(Guid documentId, CancellationToken cancellationToken) =>
-        FromResult(await Mediator.Send(new GetAdminFinancialDocumentQuery(Id.From(documentId)), cancellationToken));
+    public async Task<ActionResult> Document(Guid documentId, CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(new GetAdminFinancialDocumentQuery(Id.From(documentId)), cancellationToken));
+    }
 
     /// <summary>
     /// Voids a CURRENT document and issues its correction under a new number, in one audited transaction.
@@ -73,6 +87,7 @@ public sealed class AdminFinancialDocumentsController(ICurrentActor actor) : Api
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        KeepOutOfCaches();
         var result = await Mediator.Send(
             new VoidFinancialDocumentCommand(Id.From(documentId), actor.UserId!.Value, request.Reason),
             cancellationToken);
@@ -83,8 +98,11 @@ public sealed class AdminFinancialDocumentsController(ICurrentActor actor) : Api
     [HttpGet("bookings/{bookingId:guid}/financial-documents")]
     [ProducesResponseType<AdminBookingFinancialDocumentsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> ForBooking(Guid bookingId, CancellationToken cancellationToken) =>
-        FromResult(await Mediator.Send(new GetAdminBookingFinancialDocumentsQuery(Id.From(bookingId)), cancellationToken));
+    public async Task<ActionResult> ForBooking(Guid bookingId, CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(new GetAdminBookingFinancialDocumentsQuery(Id.From(bookingId)), cancellationToken));
+    }
 
     /// <summary>Why the document is being voided. The administrator's words; customers never see them.</summary>
     public sealed record VoidRequest([Required, MaxLength(FinancialDocumentVoid.MaxReasonLength)] string? Reason);

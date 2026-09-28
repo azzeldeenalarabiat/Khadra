@@ -84,6 +84,8 @@ public sealed class AdminBookingsController : ApiControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> GetFinancials(Guid bookingId, CancellationToken cancellationToken)
     {
+        // The customer's money and the office's and the platform's shares of it: kept out of caches.
+        KeepOutOfCaches();
         var result = await Mediator.Send(new GetAnyBookingFinancialsQuery(Id.From(bookingId)), cancellationToken);
         return FromResult(result);
     }

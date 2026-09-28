@@ -53,10 +53,10 @@ public abstract class ApiControllerBase : ControllerBase
 
     /// <summary>
     /// Keeps this answer out of every cache — a shared proxy's and the browser's own disk — for a body that
-    /// IS somebody's private record: an identity document's bytes, the list of a renter's documents, or a
+    /// IS somebody's private record: an identity document's bytes, the list of a renter's documents, a
     /// customer's financial documents, which carry their name and their money (payments Phase 5b; owner,
-    /// 2026-09-27). One place, so they can never drift apart. Called before the handler runs, so refusals
-    /// carry it too.
+    /// 2026-09-27), and the administrator's documents and a booking's financials (owner, 2026-09-28). One
+    /// place, so they can never drift apart. Called before the handler runs, so refusals carry it too.
     /// </summary>
     protected void KeepOutOfCaches() => Response.Headers.CacheControl = "no-store, private";
 
