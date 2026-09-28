@@ -103,7 +103,11 @@ Money moving is defined as exactly these **checkpoints**, each a fact stored wit
 2. a refund **settled** (`payment_refunds.settled_at`, its amount);
 3. a dispute **resolved** (`dispute_tickets.closed_at` on a resolved ticket, its shares);
 4. the booking **ended** — cancelled, no-show, completed or closed by a dispute (`bookings.finished_at`);
-5. cash **recorded at a handover** by the office (the handover's amount and time).
+5. cash **recorded at a handover** by the office (the handover's amount and time);
+6. a **receipt corrected** — the latest version of a payment or refund receipt, when that version is an
+   administrator's correction (its issue instant). *Added by the owner on 2026-09-28 (pre-launch item 181,
+   `07a7284`): the statement's new version lists the correction in place of the voided receipt and keeps
+   the instant of the last money it states. A statement's own correction is never one.*
 
 Nothing else is a checkpoint: not a refund being recorded, sent or refused; not a dispute opening; and
 never a state that changes with the clock alone (a deposit's window closing flips its state with no row
@@ -935,3 +939,64 @@ says so and links to the correction — the refund receipt's frozen text names t
 
 **Not yet done.** The clients (5b); the local issuance run with the test identity, after the advisor's
 review of 5a, then the browser scenarios of §16; the Staging migration, which waits for the owner.
+
+## 21. What 5b built (2026-09-27 to 29)
+
+The clients of this plan, planned in `docs/payments-phase5b-plan.md` and approved with its decisions D1–D6
+on 2026-09-27. That plan's §18 has the commits, the browser run and the review in full.
+
+**The customer's side.** The website (`b813b2c`, `3c2df2b`) and the app (`1337d54`, in the unreleased
+1.3.0) each gained Invoices & Receipts — every version of every document, each marked, filtered by kind and
+paged — a page per document that renders the stored snapshot, and the booking's documents inside Booking
+Details' "Payments & Invoices", with what is being prepared and "Check again". The website's document pages
+render in the browser only, with `noindex` and `no-store`. The app's change is additive: no field,
+endpoint, status or request changed, and the minimum supported version stays 1.1.0.
+
+**The administrator's side.** The console (`d26304f`, `b252c70`): a Financial documents tab on Payments
+(every version, filtered and paged), the documents on hold, a page per document with its recorded facts and
+its proof of issue, and Void and correct — the consequence stated first and a reason required; a refusal
+that can never succeed (`not_current`, `already_voided`) closes the dialog and reloads, and every other
+refusal keeps it open. A booking's Money section lists its documents, a payment's page its receipts; the
+work queue counts the documents on hold; the audit log and the activity strip word a void.
+
+**One reader, three implementations.** Each client implements the reader's contract in
+`docs/contracts/README.md` — website `document-content.ts`, app `document_content.dart`, console
+`financial-document-content.ts`: it gates on the DTO's `snapshotSchemaVersion`; ignores a key it does not
+know and keeps the stored order; fails closed on a structural break and shows the facts outside the
+snapshot instead; prints an amount or a time off its pattern as stored; formats money from the stored
+string and times from the frozen Amman `local`; and takes the newest version to be the highest member of
+`links.versions`. All three test suites read the shared fixture, `docs/contracts/financial-documents-v1.json`,
+which the server's own composer writes.
+
+**Privacy, D6 included.** Every customer read is scoped to the signed-in customer, and a document or a
+booking that is not the caller's answers exactly as a missing one does — byte for byte, verified live with
+a second customer. The void reason and the administrator reach no customer DTO, snapshot or page. The office
+reaches no document: no endpoint, no DTO, no console route. The three customer document endpoints answer
+`Cache-Control: no-store, private`, refusals included (`ApiControllerBase.KeepOutOfCaches`), and since
+`ec176c4` (pre-launch item 180) so does every administrator document endpoint and both financials
+endpoints, the parties' and the administrator's — verified live on 2026-09-29.
+
+**A business-rule change cannot re-judge an issued document**, by construction rather than by a test of its
+own: nothing under `FinancialDocuments` or `Payments/Financials` reads `IBusinessRulesProvider` — the
+calculator reads the booking's frozen pricing and terms — and the clock alone never issues a version
+(`The_clock_alone_never_issues_a_version`).
+
+**What voiding a receipt does** (owner, 2026-09-28; pre-launch item 181, `07a7284`). A receipt's correction
+is §3.3's sixth checkpoint, so the settlement pass issues the booking's statement one new version within a
+pass — never inside the void's transaction, which a statement's own hold must not block. Its cause is
+"Receipt corrected" / «تصحيح إيصال»; its Documents section lists the correction and never the voided
+receipt; its `occurredAt` stays the last money it states and only its `coversUntil` reaches the correction.
+A statement's own correction is not a checkpoint, and bookings never corrected keep a byte-identical
+fingerprint. The console's void dialog tells the administrator that a new booking statement follows
+shortly. Verified live on 2026-09-29: KH-P6UW4FB9's TEST-STM-2026-000020, version 4 and current, lists
+TEST-PAY-2026-000014 and not the voided TEST-PAY-2026-000013.
+
+**The concurrency proof** (pre-launch item 182). Two administrators voiding one document at once is forced
+by a test-only synchronization (`1e7f720`): both voids are held at the number series' row lock until both
+have passed their checks, so the loser can be refused only through the race branch. The owner ran the
+PostgreSQL suite against disposable scratch databases on 2026-09-29: 23 of 23, none skipped, and item 182
+is closed on it. The repository has no CI able to run that opt-in suite; automating it once CI exists is a
+separate infrastructure follow-up.
+
+**Not yet done.** Pre-launch items 183 and 194, both non-blocking; items 184–189, found during the run and
+older than 5b; the Staging migration, which waits for the owner; Phases 6–8.

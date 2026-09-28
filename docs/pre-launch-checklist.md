@@ -4658,3 +4658,139 @@ statement, and stamped earlier than it, go unnoticed until the booking's next ch
 single-instance assumption of the settlement pass. **To close:** decide how a statement names a booking paid
 under two providers before a real adapter lands; keep the instances' clocks synchronised (or run the pass on
 one instance) when the API scales out.
+
+## Issued financial documents — the clients (payments Phase 5b, 2026-09-28)
+
+What the review of the website, the app and the console (`docs/payments-phase5b-plan.md` §18) found
+beyond 5b's own follow-ups, R1–R7, which were fixed in 5b itself (`1315fd5`, 2026-09-28).
+
+### 180. The administrator's document reads, and a booking's financials, are sent without `no-store`
+
+**Status:** closed · **Raised:** 2026-09-28 (review of payments Phase 5b) · **Closed:** 2026-09-28 (`ec176c4`), verified live 2026-09-29 — every administrator document endpoint (the list, the vocabulary, the holds, a document, a booking's documents and the void) and both financials endpoints, the parties' and the administrator's, answer `Cache-Control: no-store, private`, refusals included.
+
+Decision D6 put `Cache-Control: no-store, private` on the three CUSTOMER document endpoints only. The
+administrator's reads (`AdminFinancialDocumentsController`: the list, a document with its void's reason, a
+booking's documents, and the holds, whose last error is free text) and `GET /bookings/{id}/financials`
+(Phase 4: paid, refunded, the payment history) answer with no cache header, so whether a body survives on a
+shared machine is left to the browser and to whatever sits in front of the BFF. Browsers do not
+heuristically cache such JSON and Cloudflare does not cache JSON by default, so the exposure is narrow, and
+the helper that closes it already exists. **To close:** the owner extends D6; `KeepOutOfCaches()` in those
+actions, with the same header assertions in `FinancialDocumentEndpointTests`.
+
+### 181. Voiding a receipt leaves the booking's current statement naming it
+
+**Status:** closed · **Raised:** 2026-09-28 (review of payments Phase 5b) · **Closed:** 2026-09-28 (`07a7284`), verified live 2026-09-29 — the owner decided that a receipt's correction is a sixth statement checkpoint, `ReceiptCorrected` ("Receipt corrected" / «تصحيح إيصال»): the settlement pass issues the booking's statement one new version within a pass, never inside the void's transaction, listing the correction and never the voided receipt, and the console's void dialog on a receipt says so. KH-P6UW4FB9's TEST-STM-2026-000020, version 4, lists TEST-PAY-2026-000014 and not TEST-PAY-2026-000013.
+
+A void is not one of the checkpoints that issue a statement (`StatementCheckpoints`, the closed list the
+owner approved on 2026-09-27), so after a receipt is voided and corrected the booking's current statement
+still lists the voided number in its Documents section — KH-P6UW4FB9's TEST-STM-2026-000014 names
+TEST-PAY-2026-000013. Neither page is wrong (the voided receipt says so and links its correction), but the
+statement a customer reads last is out of date. Today's remedy: void the statement too; its correction lists
+the receipts as they now stand. **To close:** the owner decides whether a receipt's correction also corrects
+the booking's current statement, in the same transaction; until then the console's void dialog could say so.
+
+### 182. The financial documents' concurrency proofs run only when PostgreSQL is opted in
+
+**Status:** closed · **Raised:** 2026-09-28 (review of payments Phase 5b) · **Closed:** 2026-09-29 — the void race is forced by a test-only synchronization (`1e7f720`), so the loser can be refused only through the race branch, and the owner's PostgreSQL proof against disposable scratch databases at `07a7284` passed 23 of 23, the forced void race among them, none skipped. This repository has no CI able to run the opt-in suite; automating it once CI exists is a separate infrastructure follow-up, not a Phase 5b blocker (owner, 2026-09-29).
+
+Two administrators voiding one document at once (one void, one correction), the number series' row lock,
+and a rolled-back number coming back are proven only by `[PostgresFact]` tests, which skip unless
+`KHADRA_TEST_POSTGRES` is set. On SQLite the unique-violation translation never happens, so the void
+handler's race branch is not reached by the default `dotnet test`; the browser run exercised the stale-tab
+pre-check, not a true race. **To close:** run the PostgreSQL suite once against a scratch database before
+`feature/payments-receipts` merges (the owner holds the connection string), and set the variable in CI.
+
+### 183. The shared document fixture does not carry every wording branch
+
+**Status:** open · **Raised:** 2026-09-28 (review of payments Phase 5b) · **Non-blocking** (owner, 2026-09-28)
+
+`docs/contracts/financial-documents-v1.json` holds every shape of the version-1 grammar, and all three
+clients' tests read it — since `07a7284` a `ReceiptCorrected` statement too — but not every WORDING branch
+the composer can write: a `BookingEnded` statement (a
+cancellation's version), a delivery fee, a refund that failed, a penalty stated as a range, a balance not
+yet due. The readers are covered in full; what is lost is that a change to those branches' words does not
+show as a fixture diff in review, as the contracts README promises. **To close:** add those cases to
+`FinancialDocumentFixtureTests.Generate()`, and `BookingEnded` to its assertion of causes.
+
+## Found during the payments Phase 5b browser run (2026-09-28)
+
+Behaviour met while verifying Phase 5b in the browser that predates it. None is a 5b regression; each is its
+own change.
+
+### 184. Typed text in the console inherits the page's direction
+
+**Status:** open · **Raised:** 2026-09-28
+
+`.user-text { unicode-bidi: isolate; }` (`Khadra.Dashboard/src/styles/_rtl.scss`) isolates text somebody
+typed but still inherits the page's direction, where its comment promises that the browser decides per
+value — that needs `plaintext` or `dir="auto"`. On an Arabic page a Latin reason beginning "§13 …" rendered
+as "… 13§"; `b252c70` fixed the void panel alone. **To close:** change the shared rule or add `dir="auto"`
+where it is used, and check every screen that uses it in both languages.
+
+### 185. Two sentences in the office console state rules that have changed
+
+**Status:** open · **Raised:** 2026-09-28 · **Before launch**
+
+The approval dialog tells an office that the customer's free-cancellation window "starts now"
+(`dealerDecide.approve.body`); it starts when the customer pays. The notification bell says a request expires
+when its rental date arrives unanswered (`notifications.oldestAndExpiry`); it expires when the answer window
+ends. **To close:** reword both from the current rules, in English and Arabic, with no business number
+written into them.
+
+### 186. The office's feed words a customer's cancellation as "updated"
+
+**Status:** open · **Raised:** 2026-09-28
+
+`notifications.service.ts` has no wording for `BookingCancelledByCustomer`, so an employee's Notifications
+screen shows "A customer updated KH-…" for a cancellation, and the employee screen's comment still says a
+customer's request and cancellation have no producer, which is no longer true. **To close:** word every
+notification kind the server raises for office staff, in both languages, and correct the comment.
+
+### 187. An email retry can deliver a second copy
+
+**Status:** open · **Raised:** 2026-09-28 · **Before real users**
+
+KH-6RLYEMBC's approval email arrived twice, four seconds apart. The API log says it was "accepted by Smtp …
+attempt 2": the first attempt counted as failed after the server had accepted the message, and the retry sent
+it again. The same retry policy covers every email and every transport. **To close:** a retry must not
+re-send a message that may already have been accepted — no retry once the SMTP data phase completed, and one
+message id or idempotency key across attempts for the HTTP providers — with the total wait still bounded by
+`Email:TimeoutSeconds`.
+
+### 188. The customer website never shows why the platform cancelled a booking
+
+**Status:** open · **Raised:** 2026-09-28 · **Owner decision**
+
+An administrator's cancellation requires a reason, and the server's own validation message says it "is
+shown to both parties". The API sends it to the customer (`cancellationReason`), but the website words only
+a coded reason, so the page says "Cancelled by Khadra" and nothing more. **To close:** decide whether the
+customer sees the administrator's reason; then show it (and check the app), or correct the server's message.
+
+### 189. The office is not told when the platform cancels one of its bookings
+
+**Status:** open · **Raised:** 2026-09-28 · **Owner decision**
+
+An administrator's cancellation notifies the customer only (`AdminBookingCommandHandlers`); on a confirmed
+booking the office can go on preparing a car for a rental that no longer exists. **To close:** decide, and if
+so notify the office's team as the customer's own actions already do.
+
+## Issued financial documents — after Phase 5b (2026-09-29)
+
+Items 190–193 are the iOS readiness work's, on its own branch (`ios/readiness`).
+
+### 194. A refund receipt issued after the booking's current statement does not bring that statement up to date
+
+**Status:** open · **Raised:** 2026-09-28 (the design of item 181) · **Non-blocking** (owner, 2026-09-29)
+
+A statement lists the receipts issued when it is composed, and within a settlement pass receipts are issued
+before statements. So a refund receipt normally arrives with, or before, the statement version its refund's
+settlement brings. It can arrive after: when the receipt is held (a composition defect), when its payment's
+own receipt has not been issued yet, or when the refund settles while a pass is already running, after the
+pass has listed its work. The booking's current statement then states the refund correctly — its figures
+come from the refund itself — but does not list the receipt in its Documents section, and nothing re-issues
+it when the receipt arrives: an original receipt's issuance is not a checkpoint
+(`docs/payments-phase5-plan.md` §3.3); only a receipt's correction is (item 181). It stays that way until
+the booking's next checkpoint. A payment receipt held past its booking's first statement is the same case.
+**To close:** let the later receipt bring the statement current — a new version that lists it, or another
+way the owner prefers — with tests for a held receipt and for a refund settled during a pass. Not to be
+implemented before the owner asks.

@@ -1,6 +1,8 @@
 # Payments Phase 5b — the clients: the plan
 
-**Status: PROPOSED on 2026-09-27, for the owner's review. Nothing in it is built.** It turns §6–§8 and §16
+**Status: done.** Approved on 2026-09-27 (D1–D6 as recommended), built on 2026-09-27/28, reviewed and its
+follow-ups closed on 2026-09-28, proven on PostgreSQL and verified live for the last time on 2026-09-29 —
+what was built, verified and reviewed, and what stays open, is in §18. As proposed, it turns §6–§8 and §16
 of the approved `docs/payments-phase5-plan.md` into work on the three clients, against the endpoints 5a
 built and verified locally (§20 there; 27 `TEST-` documents, 26 read-only checks passed). **It changes no
 API, no schema and no server behaviour** — the one optional server change (D6) is the owner's call. If
@@ -666,3 +668,128 @@ changed these before the owner saw it:
    All; the addresses are recorded as permanent; accessibility is stated.
 10. **Cache headers** on the customer document endpoints were raised as an optional server change for the
     owner (D6).
+
+---
+
+## 18. Completion notes (2026-09-28; final 2026-09-29)
+
+**Built.** Each its own local commit on `feature/payments-receipts`; nothing is pushed.
+
+| Commit | What |
+|---|---|
+| `b813b2c` | 5b-1, the website; the shared fixture and the server test that writes it; D6 |
+| `3c2df2b` | the website: document numbers kept whole in link sentences |
+| `1337d54` | 5b-2, the app, in the unreleased 1.3.0 — additive only, the minimum stays 1.1.0 |
+| `d26304f` | 5b-3, the console |
+| `b252c70` | the console's void panel: a space after "Reason:", and the typed reason in its own direction |
+| `1315fd5` | the review's follow-ups R1–R7, below |
+| `ec176c4` | `no-store` on every administrator document endpoint and both financials endpoints (item 180) |
+| `1e7f720` | the two-administrator void race forced in the PostgreSQL proof — test only (item 182) |
+| `07a7284` | a receipt's correction brings the booking's statement a new version (item 181) |
+
+`90865e6` (an Arabic administrator's booking cancellation sent an empty reason) and `19042bd` (the
+activity feed's audit subjects) are console work made in the same stretch, not 5b.
+
+**Decided by the owner while it was built.** D1–D6 as recommended (2026-09-27). The console's Arabic void
+confirmation reads «تأكيد الإلغاء وإصدار التصحيح», so it cannot be mistaken for the dialog's «إلغاء»;
+«ملغى», «أُلغي» and the stored «تصحيح لمستند أُبطل» are unchanged (2026-09-27). No office owner is created
+or transferred through SQL, so the edit half of scenario 6 is left to automated tests (2026-09-28). R1–R7
+fixed in 5b itself as one commit; `no-store` extended to the administrator (item 180); a receipt's
+correction brings the statement a new version, in five decisions (item 181, below); the void race forced
+test-only, and the PostgreSQL suite run once before the branch merges (item 182); item 183 left
+non-blocking (all 2026-09-28). No local document is created or corrupted to force a live refusal, so R2
+stays proven by its automated tests; item 182 is closed on its proof, CI being a separate follow-up; a
+first statement version may carry the cause "Receipt corrected"; and a receipt issued after the booking's
+current statement is tracked as item 194, non-blocking (all 2026-09-29). The decisions in full are in
+`docs/payments-programme.md`.
+
+**Verified in the browser (§13), 2026-09-27/28, local sandbox, English and Arabic.** Every account signed
+in by the owner; every booking, payment and document created through the screens.
+
+| # | Scenario | How | Bookings and documents |
+|---|---|---|---|
+| 1 | Every existing document, the filters, paging, print | live, in each slice's run | the 27 original `TEST-` documents |
+| 2 | The open hold | live | KH-95JGHJQZ's statement (a known relic) |
+| 3 | Full payment, then a free cancellation | live | KH-P6UW4FB9: TEST-PAY-2026-000013, TEST-RFD-2026-000005, TEST-STM-2026-000012/13/14 |
+| 4 | A deposit booking | live | KH-6RLYEMBC: TEST-PAY-2026-000015 ("balance due at pickup 48.000"), TEST-STM-2026-000015 |
+| 5 | Void and correct; a stale tab's second void | live | TEST-PAY-2026-000013 voided → TEST-PAY-2026-000014 (v2); the second void refused (409), nothing created, no gap |
+| 6 | Immutability: cash recorded at pickup | live | KH-6RLYEMBC: TEST-STM-2026-000016 (`CashRecorded`) |
+| 6 | Immutability: the office's location and a car edited | automated only — `Editing_the_office_or_the_car_changes_no_issued_document_and_the_next_checkpoint_carries_it` (R5) | — |
+| 7 | Another customer opens the links | live | 404s byte-identical to a made-up id; "isn't available" in both languages; an empty list |
+| 8 | The office shows and requests no document | live | the office console's network log |
+| 9 | A dispute's decision and its refund receipt | live | KH-NY8AHLNK: TEST-RFD-2026-000007, TEST-STM-2026-000019; its 84.750 JOD refund deliberately left Sent |
+| 10 | A capture never applied | live | KH-7K2CJUDM: TEST-PAY-2026-000016 ("refunded in full"), TEST-RFD-2026-000006 |
+
+Also live: an Arabic administrator cancelling a booking (`90865e6`, on KH-VEHNX7K5, which never took
+money), and the activity strip and audit log in Arabic. Automated only, as planned: a business-rule change
+(structural — `docs/payments-phase5-plan.md` §21), clearing a hold (R6: the records put right, and the
+`NotOwed` branch), the unsupported-snapshot state (all three clients, and the console's refusal report,
+R2), the 426 path (pre-existing tests).
+
+**The review (2026-09-28).** Three advisor reviews: privacy and authorization; the reader contract across
+the three clients; voids, versions, immutability and test coverage. **Nothing blocking**, and no 5b
+regression. Every customer read is scoped to the signed-in customer and a stranger's document answers
+exactly as a missing one; the void reason and the administrator never reach a customer; the office has no
+route to a document; the three readers agree line for line except where R1 said, since fixed; a void never stands
+without its correction and the number series stays gapless on every failure path.
+
+5b's own follow-ups, approved by the owner and fixed in one commit, `1315fd5` (2026-09-28):
+
+| | Finding | Where | Fixed |
+|---|---|---|---|
+| R1 | The app laid out a `plain` literal that contains Arabic letters by a word-count estimate; the website and the console by its first strong character, as the contract says. «أوتو رنت — Auto Rent Jordan LLC» would have shown its two halves in opposite order on the phone and on the website. The one difference a customer could see | `Khadra.Mobile/lib/features/invoices/invoice_content.dart` → `UserText` | `FirstStrongRun`; verified live in the app, English and Arabic, 2026-09-29 |
+| R2 | The console never reported a refused document (its id and schema version only), as the contract requires | `financial-document-page.component.ts` | `refusalReport`, logged once per document; proven by the automated unreadable and future-schema tests |
+| R3 | The website's and the app's Arabic-letter class was written in invisible literal characters, U+FEFF among them; a tool that strips a BOM would have changed it silently. The console's was escaped | `invoice-presentation.ts`, `invoice_presentation.dart` | written as `\u` escapes, the same ranges |
+| R4 | Booking Details' document card on the website could still break a number at a hyphen: `3c2df2b` reached the document page and the list, not this card | `Khadra.Web/src/styles/_invoices.scss` | kept whole; verified live on the website, 2026-09-29 |
+| R5 | No test proved the edit half of scenario 6: an office or car edit changes no issued document and issues nothing, and the next checkpoint's version carries it | `FinancialDocumentIssuanceTests` | the test named in scenario 6 above |
+| R6 | Clearing a `RecordsNeedReview` hold, and the `NotOwed` branch that resolves one, were untested (the missing-issuer hold was) | `FinancialDocumentIssuanceTests` | a test for each |
+| R7 | The publish-first rule was not written at the constant a developer would change | `SnapshotJson.SchemaVersion` | written there |
+
+Separate changes and owner decisions, `docs/pre-launch-checklist.md` items 180–183, settled on 2026-09-28
+and 29:
+
+- **S1, item 180 — closed** (`ec176c4`): `no-store, private` on every administrator document endpoint and
+  both financials endpoints, refusals included.
+- **S2, item 181 — closed** (`07a7284`): a receipt's correction is a sixth statement checkpoint,
+  `ReceiptCorrected`, worded "Receipt corrected" / «تصحيح إيصال». The settlement pass issues the booking's
+  statement one new version within a pass, never inside the void's transaction; the version lists the
+  correction and never the voided receipt; its `occurredAt` stays the last money it states and only its
+  `coversUntil` reaches the correction; a statement's own correction is never a checkpoint; and the console's
+  void dialog on a receipt says a new booking statement will be issued shortly after the correction. A
+  receipt voided while the booking's first statement is still on hold gives that first version the cause
+  "Receipt corrected" — truthful, approved by the owner on 2026-09-29, and pinned by a test. Additive for
+  every client: `snapshotSchemaVersion` stays 1 and no minimum is raised.
+- **S3, item 182 — closed** (`1e7f720`): the void race is forced by a test-only synchronization, and the
+  owner's PostgreSQL proof on 2026-09-29 passed 23 of 23, the forced void race among them, none skipped. The
+  repository has no CI able to run the opt-in suite; automating it once CI exists is a separate
+  infrastructure follow-up, not a 5b blocker (owner, 2026-09-29).
+- **S4, item 183 — open, non-blocking**: the fixture still lacks some wording branches.
+- **S5**, optional and not taken: the website and the app could show the standing of the payment receipt a
+  refund receipt links to, as the console does.
+
+**The final live verification (2026-09-29)**, after one restart of the local stack, by the owner:
+
+| Check | Result |
+|---|---|
+| R1 — the app, English and Arabic | passed |
+| R4 — Booking Details' document card on the website | passed: numbers intact, no wrong breaks |
+| Item 180 — `financial-documents` and `financials` | passed: `Cache-Control: no-store, private` on both |
+| Item 181 — KH-P6UW4FB9, on the website and in the console | passed: TEST-STM-2026-000020 is version 4 and current; its cause is "Receipt corrected" / «تصحيح إيصال»; it lists TEST-PAY-2026-000014 and not the voided TEST-PAY-2026-000013 |
+| Item 182 — the PostgreSQL suite on disposable scratch databases | passed: 23 of 23, the forced void race passed, none skipped |
+| R2 — the console's refusal report | not forced live: no local document is created or corrupted to reach it; proven by the automated unreadable and future-schema tests |
+
+**Found during the run, pre-existing, not 5b** — items 184–189: typed text in the console inherits the
+page's direction; two office-console sentences state rules that have changed; the office's feed words a
+customer's cancellation as "updated"; an email retry delivered a second copy; the website never shows why
+the platform cancelled a booking; the office is not told when the platform cancels its booking.
+
+**The local database after the run** (`khadra_web_it`): KH-VEHNX7K5 cancelled, unpaid; KH-P6UW4FB9
+cancelled and refunded; KH-6RLYEMBC **picked up and not returned** — its BMW stays out until a return is
+recorded; KH-7K2CJUDM cancelled, its orphaned capture refunded; KH-NY8AHLNK's 84.750 JOD refund still
+Sent; a second customer the owner signed up. After item 181's first pass, KH-P6UW4FB9's statement is at
+version 4. The highest numbers are TEST-PAY-2026-000016, TEST-RFD-2026-000007 and TEST-STM-2026-000020. The
+PostgreSQL proof left its scratch databases, `khadra_pgproof_<timestamp>` and one per scenario beside it:
+the tests never drop a database.
+
+**Not done.** Items 183 and 194, both non-blocking; items 184–189, older than 5b; the Staging migration,
+the owner's; Phase 6.

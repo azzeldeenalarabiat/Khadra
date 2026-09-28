@@ -16,7 +16,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Platform Settings | done | pending (configuration-backed) | pending |
 | Payments | done | done | **deposit checkout + provider webhook done**; NO PROVIDER CONFIGURED |
 | Shortlist | done | done | **save / forget / list / membership done** |
-| Financial Documents | done | done | **issued by the settlement pass, with holds; customer and administrator endpoints; void and correct** (payments Phase 5a). Clients are Phase 5b |
+| Financial Documents | done | done | **issued by the settlement pass, with holds; customer and administrator endpoints; void and correct** (payments Phase 5a); **read on the website, in the app and in the console** (payments Phase 5b) |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
