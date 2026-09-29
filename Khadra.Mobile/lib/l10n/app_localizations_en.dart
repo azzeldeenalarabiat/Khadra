@@ -757,7 +757,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String bookTermsCancellationPenalty(String percent) {
-    return 'Cancelling after that is assessed at $percent of the deposit. Nothing is taken without a dispute being opened and settled.';
+    return 'Cancelling after that is assessed at $percent of the deposit. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.';
   }
 
   @override
@@ -1186,6 +1186,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This penalty was resolved through a dispute. See Payments for the final amount.';
 
   @override
+  String get bookingPenaltyStateKeptFromDeposit =>
+      'The dispute window closed with no dispute, so this penalty was kept from your deposit. See Payments.';
+
+  @override
   String get bookingPartyCustomer => 'you';
 
   @override
@@ -1427,6 +1431,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String paymentsDepositKeptAsPenalty(String amount) {
+    return 'Your deposit of $amount was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.';
+  }
+
+  @override
   String paymentsDepositDecidedByDispute(String share, String amount) {
     return 'A dispute decided that $share of your $amount deposit is refunded to you.';
   }
@@ -1630,7 +1639,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String cancelPenaltyNotice(String amount) {
-    return 'Cancelling now assesses $amount against you. Nothing is charged unless a dispute is opened and settled.';
+    return 'Cancelling now assesses $amount against you. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.';
   }
 
   @override

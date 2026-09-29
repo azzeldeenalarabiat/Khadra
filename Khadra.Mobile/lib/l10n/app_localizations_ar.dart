@@ -792,7 +792,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String bookTermsCancellationPenalty(String percent) {
-    return 'الإلغاء بعد ذلك يُقدَّر بـ $percent من العربون. لا يُخصم شيء دون فتح نزاع وتسويته.';
+    return 'الإلغاء بعد ذلك يُقدَّر بـ $percent من العربون، ويُحتفظ به من عربونك عند انتهاء مهلة النزاع ما لم يقضِ نزاع بغير ذلك.';
   }
 
   @override
@@ -1223,6 +1223,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.';
 
   @override
+  String get bookingPenaltyStateKeptFromDeposit =>
+      'انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك. راجع قسم المدفوعات.';
+
+  @override
   String get bookingPartyCustomer => 'عليك';
 
   @override
@@ -1492,6 +1496,11 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String paymentsDepositKeptAsPenalty(String amount) {
+    return 'احتُفظ بعربونك البالغ $amount بوصفه الغرامة المقدَّرة على هذا الحجز، إذ انتهت مهلة النزاع دون فتح أيّ نزاع.';
+  }
+
+  @override
   String paymentsDepositDecidedByDispute(String share, String amount) {
     return 'قرّر نزاع أن يُسترد لك $share من عربونك البالغ $amount.';
   }
@@ -1691,7 +1700,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String cancelPenaltyNotice(String amount) {
-    return 'الإلغاء الآن يُقدِّر عليك مبلغ $amount. لا يُخصم شيء ما لم يُفتح نزاع ويُسوَّى.';
+    return 'الإلغاء الآن يُقدِّر عليك مبلغ $amount، ويُحتفظ به من عربونك عند انتهاء مهلة النزاع ما لم يقضِ نزاع بغير ذلك.';
   }
 
   @override

@@ -1294,9 +1294,10 @@ class PenaltyAssessment {
   final String reason;
 
   /// Where the penalty stands, as the server reads its own dispute records
-  /// (pre-launch item 173): "Assessed" (nothing charged yet) or
-  /// "ResolvedByDispute". Null on a cancellation preview, and from an API that
-  /// does not send it.
+  /// (pre-launch item 173): "Assessed" (nothing charged yet),
+  /// "ResolvedByDispute", or "KeptFromDeposit" — the window closed with no
+  /// dispute and the payables ledger kept it (payments Phase 8). Null on a
+  /// cancellation preview, and from an API that does not send it.
   final String? state;
 
   static PenaltyAssessment? maybe(dynamic json) => json is Map<String, dynamic>

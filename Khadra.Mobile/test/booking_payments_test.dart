@@ -200,6 +200,14 @@ void main() {
       );
     });
 
+    test('says a deposit the ledger kept as the penalty was kept, in both languages (payments Phase 8)', () {
+      expect(
+        plain(depositSentence(en, formatsFor('en'), deposit('KeptAsPenalty'))!),
+        'Your deposit of JOD 18.000 was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.',
+      );
+      expect(plain(depositSentence(ar, formatsFor('ar'), deposit('KeptAsPenalty'))!), contains('احتُفظ بعربونك البالغ'));
+    });
+
     test('names only the customer\'s own share of a dispute, in both languages', () {
       final decided = deposit('DecidedByDispute', decision: {'toCustomer': jod(9)});
       final nothing = deposit('DecidedByDispute', decision: {'toCustomer': jod(0)});
@@ -212,7 +220,7 @@ void main() {
     test('words every deposit state it may be sent, and nothing for a deposit never paid', () {
       for (final state in [
         'Held', 'AppliedToRental', 'InSettlementWindow', 'UnderDispute', 'SettledWithRental',
-        'ReturnedWithPayment', 'HeldUntilWindowCloses', 'HeldForAssessedPenalty', 'HeldUnresolved', 'Released',
+        'ReturnedWithPayment', 'HeldUntilWindowCloses', 'HeldForAssessedPenalty', 'HeldUnresolved', 'KeptAsPenalty', 'Released',
       ]) {
         expect(depositSentence(en, formatsFor('en'), deposit(state)), isNotEmpty, reason: state);
         expect(depositSentence(ar, formatsFor('ar'), deposit(state)), isNotEmpty, reason: state);

@@ -763,6 +763,14 @@ void main() {
         expect(find.text(l10n.bookingPenaltyNotCharged), findsNothing);
       });
 
+      screenTest('a penalty the ledger kept from the deposit says so ($tag)', (tester) async {
+        await pump(tester, cancelledWith('KeptFromDeposit'), locale: locale);
+
+        expect(find.text(l10n.bookingPenaltyStateKeptFromDeposit), findsOneWidget);
+        expect(find.text(l10n.bookingPenaltyStateAssessed), findsNothing);
+        expect(find.text(l10n.bookingPenaltyNotCharged), findsNothing);
+      });
+
       screenTest('a penalty a dispute resolved points to Payments ($tag)', (tester) async {
         await pump(tester, cancelledWith('ResolvedByDispute'), locale: locale);
 

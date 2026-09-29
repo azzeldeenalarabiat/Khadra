@@ -1970,6 +1970,7 @@ class _Penalty extends StatelessWidget {
       body: switch (penalty.state) {
         'Assessed' => l10n.bookingPenaltyStateAssessed,
         'ResolvedByDispute' => l10n.bookingPenaltyStateResolvedByDispute,
+        'KeptFromDeposit' => l10n.bookingPenaltyStateKeptFromDeposit,
         _ => null,
       },
       tone: NoticeTone.warn,

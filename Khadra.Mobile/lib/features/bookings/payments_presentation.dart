@@ -24,6 +24,8 @@ String? depositSentence(AppLocalizations l10n, Formats formats, FinancialDeposit
     'HeldForAssessedPenalty' => l10n.paymentsDepositHeldForAssessedPenalty(amount, date),
     // Pre-launch item 164, the owner's own sentence: promising nothing to either side.
     'HeldUnresolved' => l10n.paymentsDepositHeldUnresolved,
+    // Payments Phase 8 (owner, 2026-09-29): the office payables ledger kept it as the customer's penalty.
+    'KeptAsPenalty' => l10n.paymentsDepositKeptAsPenalty(amount),
     'Released' => l10n.paymentsDepositReleased(amount),
     'DecidedByDispute' => _decided(l10n, formats, deposit, amount),
     _ => null,

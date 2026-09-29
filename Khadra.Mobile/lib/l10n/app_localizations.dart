@@ -1277,7 +1277,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookTermsCancellationPenalty.
   ///
   /// In en, this message translates to:
-  /// **'Cancelling after that is assessed at {percent} of the deposit. Nothing is taken without a dispute being opened and settled.'**
+  /// **'Cancelling after that is assessed at {percent} of the deposit. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.'**
   String bookTermsCancellationPenalty(String percent);
 
   /// No description provided for @bookRequest.
@@ -2018,6 +2018,12 @@ abstract class AppLocalizations {
   /// **'This penalty was resolved through a dispute. See Payments for the final amount.'**
   String get bookingPenaltyStateResolvedByDispute;
 
+  /// Payments Phase 8 (owner, 2026-09-29; pre-launch item 164): the window closed with no dispute and the penalty was kept. A DRAFT awaiting the owner's sign-off.
+  ///
+  /// In en, this message translates to:
+  /// **'The dispute window closed with no dispute, so this penalty was kept from your deposit. See Payments.'**
+  String get bookingPenaltyStateKeptFromDeposit;
+
   /// No description provided for @bookingPartyCustomer.
   ///
   /// In en, this message translates to:
@@ -2390,6 +2396,12 @@ abstract class AppLocalizations {
   /// **'Your deposit of {amount} was returned to you when the dispute window closed.'**
   String paymentsDepositReleased(String amount);
 
+  /// Payments Phase 8 (owner, 2026-09-29). A DRAFT awaiting the owner's sign-off.
+  ///
+  /// In en, this message translates to:
+  /// **'Your deposit of {amount} was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.'**
+  String paymentsDepositKeptAsPenalty(String amount);
+
   /// No description provided for @paymentsDepositDecidedByDispute.
   ///
   /// In en, this message translates to:
@@ -2717,7 +2729,7 @@ abstract class AppLocalizations {
   /// No description provided for @cancelPenaltyNotice.
   ///
   /// In en, this message translates to:
-  /// **'Cancelling now assesses {amount} against you. Nothing is charged unless a dispute is opened and settled.'**
+  /// **'Cancelling now assesses {amount} against you. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.'**
   String cancelPenaltyNotice(String amount);
 
   /// No description provided for @cancelConfirm.
