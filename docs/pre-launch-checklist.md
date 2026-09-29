@@ -4541,6 +4541,13 @@ linked records that never overwrite the original payment receipt; and email deli
 history the administrator can see (queued, sent, failed). **To close:** all of it built and verified
 end to end on both customer clients, in both languages — not the backend alone.
 
+**Progress.** Phase 5 built the documents, the customer's area on the website and in the app, Booking
+Details' documents and the linked refunds (2026-09-27 to 29). Phase 6 (2026-09-29) built PDF viewing and
+download in English and Arabic on the website, in the app (1.3.0, unreleased) and in the console — with one
+default awaiting the owner: a VOIDED document's PDF is not handed to the customer, whose page stays marked
+void and links the correction, which has a PDF of its own (`docs/payments-programme.md`, Phase 6). Still to
+come: email delivery and its history (Phase 7).
+
 ### 173. The penalty notice still says "Nothing has been charged" after a dispute settled the penalty
 
 **Status:** closed · **Raised:** 2026-09-26 (found in the payments Phase 4a browser run) · **Closed:** 2026-09-26 — the notice words the server's `penalty.state` in the owner's two sentences.
@@ -4625,9 +4632,13 @@ database refuses to update, delete or truncate (the same `khadra_table_is_append
 audit trail). That is right for a financial record — a receipt must say whom it was issued to — and it
 is also personal data with no erasure path: `User.Delete` is a soft delete and never touches a document.
 The snapshot carries the minimum on purpose (the owner, 2026-09-27: the name only — no email, no phone;
-addresses and delivery attempts belong to the Phase 7 delivery history). **To close:** the owner
-states the legal basis for keeping issued documents and for how long (Jordan's record-keeping rules for
-the business), and the privacy notice says so, before the first real customer's document is issued.
+addresses and delivery attempts belong to the Phase 7 delivery history). **Widened by payments Phase 6
+(2026-09-29):** every document is now also stored as a PDF in each language, in private document storage
+(`financial-documents/{documentId}/…`), with the same name printed on it, and `financial_document_renditions`
+is append-only too; the retention decision and any erasure path cover those files as well. **To close:** the
+owner states the legal basis for keeping issued documents — and their PDFs — and for how long (Jordan's
+record-keeping rules for the business), and the privacy notice says so, before the first real customer's
+document is issued.
 
 ### 178. Khadra's legal identity must be configured before any real document is issued
 
@@ -4642,7 +4653,10 @@ missing. A clearly marked TEST identity (`TestIdentity` true) exists for local s
 `Program.cs` refuses it in any environment but Development and with any payment provider but
 `SANDBOX` — Staging included — and the issuer never lets it sign real money. **To close:** the owner
 gives the identity; it is set in Production's environment with `TestIdentity` false, and the boot log
-reads "Financial documents issued as …".
+reads "Financial documents issued as …". **Since payments Phase 6 (owner, 2026-09-29),** Khadra's commercial
+registration is captured in every snapshot but not printed in a PDF's body; the legal check before the first
+real document confirms that a receipt may leave it out — and if it may not, a compact legal line in the page
+footer is the recorded place for it, never the transaction details.
 
 ### 179. Two known bounds of statement issuing
 
@@ -4794,3 +4808,84 @@ the booking's next checkpoint. A payment receipt held past its booking's first s
 **To close:** let the later receipt bring the statement current — a new version that lists it, or another
 way the owner prefers — with tests for a held receipt and for a refund settled during a pass. Not to be
 implemented before the owner asks.
+
+## Issued financial documents — PDFs (payments Phase 6, 2026-09-29)
+
+Drawing each issued document as a PDF in English and Arabic, storing it privately and handing it out
+through short-lived links (`docs/payments-phase5-plan.md` §9 and §22), and what that knowingly leaves for
+later.
+
+### 195. QuestPDF's Community licence rests on an eligibility that must be re-checked as revenue grows
+
+**Status:** open, standing · **Raised:** 2026-09-29 (the owner confirmed eligibility) · **Every financial year**
+
+The PDFs are drawn with QuestPDF 2026.9.1 under its Community licence (v3.0, effective 6 July 2026), which
+the owner confirmed on 2026-09-29 that Khadra qualifies for: consolidated annual gross revenue under
+USD 1,000,000 across the entities under common control (a first fiscal year on a good-faith annualised
+estimate), not a public-sector body, not publicly traded. The code states it
+(`QuestPdfFinancialDocumentRenderer`, `Settings.License = Community`) and the boot log says it on every
+start ("Financial document PDFs are drawn with QuestPDF … under the QuestPDF Community licence"). The licence
+is only as true as the revenue figure: eligibility lapses the year revenue crosses the threshold, and the
+licence then allows a limited period to move to a commercial licence. **To close:** never, by design — at
+each financial year end the owner re-confirms eligibility against that year's revenue, and a commercial
+licence is bought, and the setting changed, before the grace period ends if it no longer holds.
+
+### 196. The fonts' licence text is not shipped beside the embedded fonts
+
+**Status:** open · **Raised:** 2026-09-29 · **Before real customers**
+
+The PDF renderer embeds Manrope and Noto Kufi Arabic in the API assembly
+(`Khadra.Infrastructure/FinancialDocuments/Fonts/`, copied from `Khadra.Mobile/assets/fonts`), and every
+PDF carries subsets of them. Both are under the SIL Open Font License 1.1, which lets them be bundled and
+embedded. The PDFs themselves need nothing: the licence lets subsets of a font be embedded in documents
+without its text. What wants `OFL.txt` is every place the font FILES are bundled — the TTFs in the repository
+and in the API assembly, and the app's assets — which carry their copyright notice and the licence's address in
+their own metadata, but not the licence text; no copy of `OFL.txt` is in the repository. Nothing was
+downloaded to fix it: that needs the owner's approval. **To close:** add each family's `OFL.txt` (from the
+fonts' own repositories) beside the TTFs in both places, and list the fonts in the app's licence page.
+
+### 197. A PDF that cannot be drawn is visible only in the log
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 6)
+
+A document whose snapshot no longer matches its hash, cannot be read for print, or makes the renderer throw
+is logged once at Error and left alone until the API restarts; drawing is not tried again every minute. The
+customer's page keeps saying the PDF is being prepared, and the administrator's page shows the rendition
+missing, with no reason on either. Issuing has holds with reasons on the work queue for exactly this; drawing
+does not yet. A full pass in which nothing could be drawn stops drawing until restart and says so at Error
+— that case is covered. **To close:** a durable record of an undrawable PDF with its reason — a hold row or
+an attention-queue kind — shown to the administrator, as issuing's holds are.
+
+### 198. Stored PDF files that no row points at are never removed
+
+**Status:** open · **Raised:** 2026-09-29 · **Housekeeping**
+
+The bytes are stored before the row that records them commits, under a fresh key per attempt, so a crash
+between the two, a write cancelled by a shutdown, or a failed record that may have committed without saying
+so (whose bytes are KEPT on purpose — removing them could leave a recorded PDF every download fails on)
+leaves a private file nothing points at. Only a lost race removes its own copy. Such files are unreachable —
+a download needs the row's key — and small, but nothing ever sweeps them. **To close:** a periodic sweep that
+lists `financial-documents/` keys older than a day with no rendition row, confirms again, and deletes them.
+
+### 199. On Supabase storage, the stored-size check proves nothing
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 6)
+
+Before it records a PDF, the renderer compares the size storage reports with the bytes it drew, and refuses
+to record a mismatch. `LocalDocumentStorage` reports the file it wrote; `SupabaseDocumentStorage` reports the
+length of the payload it sent, not anything the store confirmed, so the check is always satisfied there.
+The PDF's SHA-256 is still recorded from the drawn bytes, so a later download can be verified against it.
+**To close:** have the Supabase store report what it holds (a HEAD after the upload, or the size the store's
+answer carries), or record here that the check is local-only by design.
+
+### 200. The PDF work query walks every document on every pass
+
+**Status:** open · **Raised:** 2026-09-29 (final review of payments Phase 6) · **Scaling note**
+
+The facts are the queue, by design: each settlement pass asks which issued documents have no PDF in English
+or Arabic, oldest issue first. Once everything is drawn — the normal state — the answer is empty, but finding
+that out walks the documents in issue order with two correlated `EXISTS` per row, served by the renditions'
+unique index. Trivial at launch (tens of thousands of documents answer in well under a second); it grows
+with history, not with the backlog. **To close:** when the documents table is large enough for the pass to
+notice, bound the question — only documents issued since the oldest one still without a PDF, or a partial
+index of documents without both renditions.

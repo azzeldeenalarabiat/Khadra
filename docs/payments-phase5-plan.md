@@ -469,7 +469,7 @@ minimum supported version stays 1.1.0.
 
 ---
 
-## 9. Phase 6 — PDF (designed now, built then)
+## 9. Phase 6 — PDF (designed now, built then — built 2026-09-29, see §22)
 
 - `financial_document_renditions` (append-only): document, language, format, storage key, SHA-256 and
   size of the PDF, the snapshot hash it was rendered from, template and renderer versions, rendered at;
@@ -1000,3 +1000,83 @@ separate infrastructure follow-up.
 
 **Not yet done.** Pre-launch items 183 and 194, both non-blocking; items 184–189, found during the run and
 older than 5b; the Staging migration, which waits for the owner; Phases 6–8.
+
+## 22. What Phase 6 built (2026-09-29)
+
+§9's design, built as one local work package on the owner's instruction of 2026-09-29, after the owner
+confirmed that Khadra qualifies for QuestPDF's Community licence (`docs/payments-programme.md`, Phase 6).
+The implementation is four local commits: the backend `9bc92de`, the website `c2e9ff4`, the app `bd52ac4` (in the
+unreleased 1.3.0) and the console `487c4b4`.
+
+**Drawn once, from the record.** The settlement pass's last step draws every PDF owed: an issued document
+with no PDF in English or Arabic is the work, as a captured payment with no receipt is issuing's — nothing
+records that a PDF is due, so nothing can be lost. One scope per PDF. A PDF is drawn only from a snapshot that
+still hashes to the row's `content_sha256`, through `DocumentPrintLayout` — the snapshot contract's fourth
+reader (`docs/contracts/README.md`), which refuses a document whole rather than print it with a line
+missing — and QuestPDF draws the page: A4, mirrored for Arabic, Manrope then Noto Kufi Arabic glyph by glyph,
+Latin digits, direction carried by Unicode isolates as the website carries it, TEST documents watermarked
+"TEST" / «تجريبي», "Page n of m" / «صفحة n من m». The body leaves out every commercial registration — Khadra's,
+the rental office's and a (future) business customer's — which the snapshot keeps (owner, 2026-09-29;
+`DocumentPrintLayout.IsPrintedInBody`): a named presentation rule applied after each line is read whole, so a
+broken line that is left out still refuses the document. `DocumentPrintLayout.TemplateVersion` stayed at 1
+through that change because no rendition had been drawn anywhere but in throwaway test databases when it
+landed; from the first PDF drawn on a real database, any change to a rendition's appearance raises it. A document is drawn in both languages whatever its standing:
+a voided document's PDF is the record as issued, for the administrator. `FinancialDocuments:MaxRenditionsPerPass`
+(40) bounds a pass.
+
+**Stored before it is recorded.** The bytes go to private document storage under a fresh key per attempt
+(`financial-documents/{documentId}/v{template}-{language}-{guid}.pdf`), then one row records them in
+`financial_document_renditions`: language, format, template and renderer versions, the PDF's SHA-256 and
+size, the snapshot hash it was drawn from and when. The table is append-only like the documents (the same
+triggers refuse UPDATE, DELETE and TRUNCATE), unique per document, language, format and template, and its
+rollback refuses to run once a real document has a PDF. A second process drawing the same PDF loses on that
+key and removes only its own copy; any other failure to record keeps the bytes — the insert may have
+committed without saying so, and removing them could leave a recorded PDF that no download can open.
+Recording is not cancelled by a shutdown. A new template draws documents from then on beside the old PDFs,
+never over what a customer may already have.
+
+**Failures say so, once.** A host that cannot draw at all — a missing native library, a face that will not
+load — fails a probe page at boot, and the boot log says FINANCIAL DOCUMENT PDFs ARE NOT DRAWN with the
+reason; the pass then asks it for nothing. A document that cannot be drawn is logged once at Error and left
+until the next start (pre-launch item 197); a full pass that draws nothing stops drawing until restart; storage
+that refuses a PDF stops the step until the next tick.
+
+**Handed out through short-lived links.** `GET /financial-documents/{id}/pdf-link?language=` and its
+administrator twin mint a link to the existing `GET /documents/{token}`, which still needs a session.
+Whose document it is is decided first: a stranger is answered exactly as for a missing document, never with
+whether its PDF is ready. The customer's page carries `pdf { languages, preparing }`; the administrator's,
+every rendition with its proof. The website saves the file as `{number}-{language}.pdf` through the session;
+the app fetches the bytes over its own authenticated connection and opens them from its private cache, never
+in a browser; the console lists every PDF drawn with its hashes and downloads it. A voided document's PDF is
+not handed to the customer — a default awaiting the owner. The download endpoint moved from the `auth` rate
+limit to `private-documents`. The change is additive for installed apps: no minimum raised.
+
+**Verified.** Backend 2,324 tests; the PostgreSQL proofs on a scratch `postgres:18`, 46 of 46 with none
+skipped — among them the table's keys and triggers, a forced race between two processes, and both rollback
+branches; the 91 PDF tests on Ubuntu 24.04, the runtime image's base, with the network off (QuestPDF's native
+libraries need only libc, libm, libstdc++, libgcc_s, libpthread and zlib, all in `aspnet:10.0-noble`);
+website 231 (nine clean reruns after one failure under machine load that never reproduced), console 316
+(i18n clean), app 706 (`flutter analyze` clean); production builds of the website and the console.
+
+**Verified live** on 2026-09-29, on the local `khadra_web_it` through the owner's stack: the migration applied on
+boot and the boot log named QuestPDF under its Community licence; the first passes drew 86 PDFs — every one
+of the 43 documents, voided ones included, in English and Arabic — with no rendering error, and later passes
+drew none again; 86 files in storage, one per language per document, each a PDF. On the website, the current
+statement TEST-STM-2026-000020 offered Print and one button per language in both page languages, and each
+saved `{number}-{language}.pdf` byte-identical (SHA-256) to the stored file; the link lasted five minutes and
+every answer carried `no-store, private`, the file also `nosniff`. The voided TEST-PAY-2026-000013 offered no
+PDF and no "being prepared"; its link answered 409 `financial_documents.pdf_voided`. A missing document
+answered 404, a language other than `en`/`ar` 400, a tampered or expired link 404, a request with no session
+401, and each role's route refused the other role (403). In the console, the PDFs section listed each
+rendition with its proof in English and Arabic, the voided receipt carried the note that the customer is no
+longer offered its files, its "drawn from" hash equalled its proof of issue, and the administrator's
+download of it matched the file hash shown and the stored file. The stored PDFs, rendered with Windows's own
+PDF renderer, read correctly in both languages — mirrored in Arabic, amounts "200.000 JOD", Amman times, the
+phone number in order, the correction listed and the voided receipt not, and no commercial registration.
+
+**Not yet done.** Two live checks nothing on the stack could reach: another customer asking for this
+customer's PDF (it needs a second signed-in customer; the handler and endpoint tests prove the answer is the
+missing document's), and the app on a phone (the tests drive the open flow with the platform viewer faked).
+The owner's word on the voided-PDF default and on whether the on-screen pages should also leave the
+registrations out; pre-launch items 195–200; the fonts' licence text (item 196); the Staging migration, which
+waits for the owner; Phases 7 and 8.

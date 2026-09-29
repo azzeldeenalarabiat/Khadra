@@ -17,7 +17,7 @@ deliver is written down so it cannot be dropped. The rules already in force are 
 | 4a | One server calculator of a booking's financial state; `GET /bookings/{id}/financials` and its admin twin; the "Payments" section on the website and in app 1.3.0 | done (`c50ab9b`); item 173 (`673c586`) |
 | 4b | The consoles: the office's Financial section and the admin's Money section from the calculator; the admin Payments and Refunds screens; the dashboard's money panel | done (`8a0eed0`) |
 | 5 | Issued documents: payment receipts, refund receipts and booking statement versions, with numbering and immutable snapshots | plan approved 2026-09-27 (`docs/payments-phase5-plan.md`); SQL approved and applied locally only (scratch proof 35/35, then `khadra_web_it`); **5a, the backend, built** (`7a8d277`) — issued by the settlement pass with holds, customer and administrator endpoints, void and correct; **5b, the clients, done** — website (`b813b2c`, `3c2df2b`), app in the unreleased 1.3.0 (`1337d54`), console (`d26304f`, `b252c70`); the review's follow-ups R1–R7 (`1315fd5`); `no-store` on the administrator's documents and both financials endpoints (`ec176c4`, item 180); the forced void race (`1e7f720`, item 182); a receipt's correction brings the booking's statement a new version (`07a7284`, item 181); PostgreSQL proof 23/23 and final live verification 2026-09-29 (`docs/payments-phase5b-plan.md` §18); Staging not migrated |
-| 6 | PDF rendering and secure download | not started (QuestPDF only if its Community licence applies) |
+| 6 | PDF rendering and secure download | **built and verified locally** 2026-09-29 — backend `9bc92de`, website `c2e9ff4`, app in the unreleased 1.3.0 `bd52ac4`, console `487c4b4` — QuestPDF under its Community licence (eligibility confirmed by the owner 2026-09-29): each issued document drawn once from its stored snapshot as a PDF in English and Arabic, stored privately, recorded in the append-only `financial_document_renditions` (migration `20260928222747_FinancialDocumentRenditions`, applied locally only, to `khadra_web_it`), downloaded through short-lived links; scratch PostgreSQL proof 46/46, Linux rendering 91/91 offline; live run on `khadra_web_it`: 86 PDFs for 43 documents, downloads byte-identical to storage; the voided-PDF rule and the on-screen registrations wait for the owner; Staging not migrated (`docs/payments-phase5-plan.md` §22) |
 | 7 | Receipt and invoice email | not started |
 | 8 | The office payables ledger (manual settlement) | not started |
 
@@ -167,6 +167,35 @@ private` on the three customer document endpoints. Also decided:
    is, and pinned by its test (2026-09-29).
 10. **A receipt issued after the booking's current statement** does not yet bring that statement up to
     date; tracked as pre-launch item 194, non-blocking, not to be implemented now (2026-09-29).
+
+### 2026-09-29 — Phase 6, PDFs
+
+1. **The PDF library.** Khadra qualifies for QuestPDF's Community licence (v3.0): consolidated annual gross
+   revenue under USD 1,000,000 across the entities under common control, a first fiscal year on a
+   good-faith annualised estimate, not a public-sector body and not publicly traded. QuestPDF 2026.9.1 was
+   downloaded from nuget.org with the owner's approval and the licence is declared in code; the eligibility is
+   re-checked every financial year (pre-launch item 195).
+2. **No commercial registration in a PDF's body.** Khadra's registration and the rental office's are left out
+   of the customer-facing PDF's main body, and so is a customer's, which would be shown only for a business
+   account — a kind of account the platform does not have yet. Presentation only: the immutable snapshot and
+   the data model keep every one of them. Should the law come to require Khadra's registration on a document,
+   it goes in a compact legal line in the page footer, never among the transaction details.
+
+**Awaiting the owner** — shipped as the default, reversible without a contract break:
+
+- **A voided document's PDF is not handed to the customer.** Its page stays readable, marked void and
+  linking to its correction, which has a PDF of its own; the file itself was drawn before the void and
+  nothing on it says "void", so a fresh copy handed out after the platform declared the document wrong
+  would read as valid. The administrator can still download it: it is the record as issued. The
+  alternative is a PDF stamped VOID, drawn after the void — a second rendition of a different kind, because
+  the void is not in the snapshot and a rendition is drawn from the snapshot alone. Offering the unstamped
+  file instead would only fill `pdf.languages` for voided documents. Item 172's required scope lists "PDF
+  viewing and download" and "every earlier invoice and receipt available permanently", so this narrowing is
+  the owner's to confirm or change.
+- **Whether the on-screen document pages follow the PDF** in leaving the commercial registrations out. The rule
+  of 2026-09-29 named the PDFs; the website's, the app's and the console's document pages still render every
+  line of the snapshot, both registrations included. Leaving them out there too is the same presentation-only
+  change in each client's reader.
 
 ## Required scope for Phases 5–7: invoices and receipts reach the customer
 
