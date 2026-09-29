@@ -1431,8 +1431,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get paymentsDepositKeptAsPenalty =>
-      'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.';
+  String paymentsDepositKeptAsPenalty(String amount) {
+    return 'Your deposit of $amount was kept as the penalty assessed on this booking.';
+  }
 
   @override
   String paymentsDepositDecidedByDispute(String share, String amount) {

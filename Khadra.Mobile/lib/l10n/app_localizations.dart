@@ -2018,7 +2018,7 @@ abstract class AppLocalizations {
   /// **'This penalty was resolved through a dispute. See Payments for the final amount.'**
   String get bookingPenaltyStateResolvedByDispute;
 
-  /// Payments Phase 8 (pre-launch item 164): the window closed with no dispute and the penalty was kept. The owner's approved sentence (2026-09-30), here and on the deposit line.
+  /// Payments Phase 8 (pre-launch item 164): the window closed with no dispute and the penalty was kept. The owner's approved sentence (2026-09-30), said here ONCE; the deposit line states the amount instead.
   ///
   /// In en, this message translates to:
   /// **'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.'**
@@ -2396,11 +2396,11 @@ abstract class AppLocalizations {
   /// **'Your deposit of {amount} was returned to you when the dispute window closed.'**
   String paymentsDepositReleased(String amount);
 
-  /// Payments Phase 8: the owner's approved sentence (2026-09-30), like item 164's own.
+  /// Payments Phase 8: the amount and where it went; the explanation is the penalty notice's (owner, 2026-09-30).
   ///
   /// In en, this message translates to:
-  /// **'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.'**
-  String get paymentsDepositKeptAsPenalty;
+  /// **'Your deposit of {amount} was kept as the penalty assessed on this booking.'**
+  String paymentsDepositKeptAsPenalty(String amount);
 
   /// No description provided for @paymentsDepositDecidedByDispute.
   ///
