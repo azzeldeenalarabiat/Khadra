@@ -42,7 +42,7 @@ export interface FinancialBalance {
 
 /**
  * `NotPaid`, `Held`, `AppliedToRental`, `InSettlementWindow`, `UnderDispute`, `SettledWithRental`,
- * `ReturnedWithPayment`, `HeldUntilWindowCloses`, `HeldForAssessedPenalty`, `HeldUnresolved`,
+ * `ReturnedWithPayment`, `HeldUntilWindowCloses`, `HeldForAssessedPenalty`, `HeldUnresolved`, `KeptAsPenalty` (payments Phase 8),
  * `Released` or `DecidedByDispute`.
  */
 export interface FinancialDeposit {

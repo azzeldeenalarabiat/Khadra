@@ -338,7 +338,7 @@ export class BookingDetailComponent {
    * never one worked out here. A state this site does not know is left unsaid.
    */
   protected penaltyNote(penalty: PenaltyAssessment): string | null {
-    return penalty.state === 'Assessed' || penalty.state === 'ResolvedByDispute'
+    return penalty.state === 'Assessed' || penalty.state === 'ResolvedByDispute' || penalty.state === 'KeptFromDeposit'
       ? this.t(`booking.penaltyState.${penalty.state}` as TranslationKey)
       : null;
   }

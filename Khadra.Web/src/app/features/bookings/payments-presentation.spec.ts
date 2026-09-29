@@ -197,8 +197,17 @@ describe('the Payments section', () => {
     expect(ar('payments.reviewing')).toBe('تراجع خضرا المدفوعات على هذا الحجز.');
   });
 
+  it('says a deposit the ledger kept as the penalty was kept, in both languages (payments Phase 8)', () => {
+    const kept = state({ deposit: { state: 'KeptAsPenalty', amount: jod(18) } });
+
+    expect(paymentsView(kept, en, format).deposit).toBe(
+      'Your deposit of 18 JOD was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.',
+    );
+    expect(paymentsView(kept, ar, format).deposit).toContain('احتُفظ بعربونك البالغ');
+  });
+
   it('words every deposit state it may be sent, in both languages', () => {
-    for (const depositState of ['Held', 'AppliedToRental', 'InSettlementWindow', 'UnderDispute', 'SettledWithRental', 'ReturnedWithPayment', 'HeldUntilWindowCloses', 'HeldForAssessedPenalty', 'HeldUnresolved', 'Released']) {
+    for (const depositState of ['Held', 'AppliedToRental', 'InSettlementWindow', 'UnderDispute', 'SettledWithRental', 'ReturnedWithPayment', 'HeldUntilWindowCloses', 'HeldForAssessedPenalty', 'HeldUnresolved', 'KeptAsPenalty', 'Released']) {
       const input = state({ deposit: { state: depositState, windowEndsAt: '2026-09-28T05:14:00Z' } });
       expect(paymentsView(input, en, format).deposit, depositState).not.toContain('payments.');
       expect(paymentsView(input, ar, format).deposit, depositState).not.toContain('payments.');

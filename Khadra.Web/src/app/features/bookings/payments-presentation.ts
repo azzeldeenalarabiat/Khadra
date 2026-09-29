@@ -82,6 +82,7 @@ const DEPOSIT_STATES: ReadonlySet<string> = new Set([
   'HeldUntilWindowCloses',
   'HeldForAssessedPenalty',
   'HeldUnresolved',
+  'KeptAsPenalty',
   'Released',
 ]);
 

@@ -77,7 +77,8 @@ export interface PenaltyAssessment {
   readonly assessedAt: string;
   /**
    * Where the penalty stands, as the server reads its own dispute records (pre-launch item 173):
-   * "Assessed" (nothing charged yet) or "ResolvedByDispute". Absent on a cancellation preview.
+   * "Assessed" (nothing charged yet), "ResolvedByDispute", or "KeptFromDeposit" (the window closed with no dispute and
+   * the penalty was kept from the deposit, payments Phase 8). Absent on a cancellation preview.
    */
   readonly state?: string | null;
 }

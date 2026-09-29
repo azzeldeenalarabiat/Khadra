@@ -506,6 +506,8 @@ export const EN = {
   // Pre-launch item 173, the owner's words (2026-09-26): where an assessed penalty stands.
   'booking.penaltyState.Assessed': 'A penalty has been assessed, but no amount has been charged yet.',
   'booking.penaltyState.ResolvedByDispute': 'This penalty was resolved through a dispute. See Payments for the final amount.',
+  // Payments Phase 8 (owner, 2026-09-29; pre-launch item 164). A DRAFT awaiting the owner's sign-off.
+  'booking.penaltyState.KeptFromDeposit': 'The dispute window closed with no dispute, so this penalty was kept from your deposit. See Payments.',
   'booking.rentalCost': 'What the rental costs',
   'booking.howPaid': 'How it is paid',
   'booking.depositPaid': 'Paid',
@@ -586,6 +588,8 @@ export const EN = {
   // Pre-launch item 164, the owner's own sentence (2026-09-26): factual, promising nothing to either side.
   'payments.deposit.HeldUnresolved': 'Your deposit remains held because a customer penalty was assessed and no dispute was opened. Final settlement is still pending.',
   'payments.deposit.Released': 'Your deposit of {amount} was returned to you when the dispute window closed.',
+  // Payments Phase 8 (owner, 2026-09-29). A DRAFT awaiting the owner's sign-off.
+  'payments.deposit.KeptAsPenalty': 'Your deposit of {amount} was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.',
   'payments.deposit.DecidedByDispute': 'A dispute decided that {share} of your {amount} deposit is refunded to you.',
   'payments.deposit.DecidedByDisputeNothing': 'A dispute decided your {amount} deposit; none of it is refunded to you.',
   'payments.kind.Deposit': 'Deposit payment',
@@ -643,7 +647,9 @@ export const EN = {
   'notification.YourDepositRefunded': '{actor}: your payment has been refunded',
   'notification.YourPartialRefundSettled': '{actor}: part of your payment has been refunded',
   'cancel.free': 'Cancelling now costs you nothing.',
-  'cancel.penalty': 'Cancelling now assesses {amount} against you. Nothing is charged unless a dispute is opened and settled.',
+  // Payments Phase 8 (owner, 2026-09-29): a customer's penalty is kept when the window closes with no dispute. A DRAFT
+  // awaiting the owner's sign-off; the range below still needs a dispute, and keeps its sentence.
+  'cancel.penalty': 'Cancelling now assesses {amount} against you. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.',
   'cancel.penaltyRange': 'Cancelling now assesses between {min} and {max} against you. Nothing is charged unless a dispute is opened and settled.',
   'cancel.confirm': 'Cancel the booking',
   'cancel.keep': 'Keep it',
@@ -689,7 +695,8 @@ export const EN = {
     one: 'Cancelling is free within {count} hour after payment, as long as the rental has not started.',
     other: 'Cancelling is free within {count} hours after payment, as long as the rental has not started.',
   },
-  'book.termsPenalty': 'Cancelling after that assesses {percent} of the deposit. Nothing is charged unless a dispute is opened and settled.',
+  // Payments Phase 8 (owner, 2026-09-29). A DRAFT awaiting the owner's sign-off: the terms a customer books under.
+  'book.termsPenalty': 'Cancelling after that assesses {percent} of the deposit. It is kept from your deposit when the dispute window closes, unless a dispute decides otherwise.',
   'book.submit': 'Send the request',
   'book.sending': 'Sending your request…',
   'book.documentsTitle': 'Upload your documents first',

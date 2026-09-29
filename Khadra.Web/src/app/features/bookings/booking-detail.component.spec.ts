@@ -621,6 +621,16 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     expect(arabicResolved.text).not.toContain('لم يتم خصم أي مبلغ بعد');
   });
 
+  it('says a penalty the ledger kept from the deposit was kept, in both languages (payments Phase 8)', async () => {
+    const kept = await render(withPenaltyState('KeptFromDeposit'), 'en');
+    expect(kept.text).toContain('The dispute window closed with no dispute, so this penalty was kept from your deposit.');
+    expect(kept.text).not.toContain('no amount has been charged yet');
+    TestBed.resetTestingModule();
+
+    const arabicKept = await render(withPenaltyState('KeptFromDeposit'), 'ar');
+    expect(arabicKept.text).toContain('انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك.');
+  });
+
   it('never again says nothing has been charged, and says nothing under a penalty state it does not know', async () => {
     const unknown = await render(withPenaltyState('SomethingNewer'), 'en');
     const missing = { ...lateCancelled, penalty: PAST_WINDOW_PENALTY };
