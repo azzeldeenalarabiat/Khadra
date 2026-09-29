@@ -27,10 +27,17 @@ export const OPEN_WHILE_LOCKED: readonly string[] = [
  * A SUSPENDED dealer still has customers holding its cars. Returns must be recordable, so the
  * bookings screens stay open; approving and rejecting are hidden there by the booking screen
  * itself, and the API refuses them regardless.
+ *
+ * It is also still owed money, or owes it: what the ledger records for its bookings does not stop
+ * at a suspension, and neither do the settlements an administrator records. Its payouts are
+ * read-only and the API serves them to the owner and to staff granted the reports whatever the
+ * dealership's standing (payments Phase 8), so the page stays open — a default for the owner to
+ * confirm beside the other suspended-dealer defaults.
  */
 export const OPEN_WHILE_SUSPENDED: readonly string[] = [
   '/dealer/bookings',
   '/dealer/disputes',
+  '/dealer/payouts',
   '/employee/bookings',
   '/employee/disputes',
 ];

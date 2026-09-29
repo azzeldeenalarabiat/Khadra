@@ -64,23 +64,6 @@ const FALLBACK: Missing = {
  * is not built" tells the next person what to do, where "coming soon" tells them nothing.
  */
 const SCREENS: Readonly<Record<string, Missing>> = {
-  payouts: {
-    titleKey: 'nav.payouts',
-    icon: 'currency-circle-dollar',
-    purposeKey: 'notBuilt.payouts.purpose',
-    blockedKey: 'notBuilt.payouts.blocked',
-    instead: {
-      textKey: 'notBuilt.payouts.instead',
-      labelKey: 'nav.dealers',
-      route: '/dealers',
-    },
-  },
-  finance: {
-    titleKey: 'nav.finance',
-    icon: 'chart-line-up',
-    purposeKey: 'notBuilt.finance.purpose',
-    blockedKey: 'notBuilt.finance.blocked',
-  },
   reviews: {
     titleKey: 'nav.reviews',
     icon: 'star',

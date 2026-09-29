@@ -65,9 +65,41 @@ export function officeMoney(financials: BookingFinancials, t: Translate, format:
       v: commissionText(t, commission, format),
     });
   }
-  if (paysOut(commission)) {
-    lines.push({ k: t('dealerReports.netPayout'), v: t('dealerReports.notAvailableYet'), dim: true });
-  }
+  lines.push(...payoutLines(financials, t, format));
 
   return { lines, reviewing: financials.needsReview };
+}
+
+/**
+ * What the booking comes to for the office, from the payables ledger (payments Phase 8): who owes whom, and where it
+ * stands — being recorded, in the next payout, not due yet, or paid under a settlement. Before the outcome is final,
+ * one line says when it will be known. A booking that comes to nothing either way shows no payout line (item 158).
+ */
+function payoutLines(financials: BookingFinancials, t: Translate, format: MoneyFormat): MoneyLine[] {
+  const office = financials.office;
+  const net = office?.net;
+  if (!office || office.state === 'Open' || !net) {
+    return paysOut(financials.commission) && office?.state !== 'NotApplicable'
+      ? [{ k: t('dealerReports.netPayout'), v: t('dealerMoney.payoutOpen'), dim: true }]
+      : [];
+  }
+  if (net.amount === 0) return [];
+
+  const amount = format.money({ amount: Math.abs(net.amount), currency: net.currency });
+  const lines: MoneyLine[] = [
+    { k: t('dealerReports.netPayout'), v: t(net.amount > 0 ? 'payouts.net.toYou' : 'payouts.net.byYou', { amount }), hi: true },
+  ];
+  const settlement = office.settlement;
+  const where =
+    office.state === 'Settled' && settlement
+      ? t('dealerMoney.payoutSettled', { number: settlement.number, day: format.day ? format.day(settlement.paidOn) : settlement.paidOn })
+      : office.state === 'Due'
+        ? t('dealerMoney.payoutDue')
+        : office.state === 'Blocked' || office.state === 'OnHold'
+          ? t('dealerMoney.payoutNotYetDue')
+          : office.state === 'AwaitingRecord'
+            ? t('dealerMoney.payoutAwaiting')
+            : null;
+  if (where) lines.push({ k: t('dealerMoney.payoutWhere'), v: where, dim: true });
+  return lines;
 }

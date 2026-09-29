@@ -177,15 +177,16 @@ describe('toQueueItems, the money rows', () => {
     expect(row.queryParams).toEqual({ status: 'Orphaned' });
   });
 
-  it('opens the booking a held deposit belongs to', () => {
+  it('opens payouts for the offices\' money the ledger holds back, counted, and needing a look', () => {
     const [row] = toQueueItems(
-      queue(money({ id: 'deposit:b1', kind: 'DepositAwaitingDecision', severity: 'Info', count: 1, subjectIds: ['b1'], subtitle: 'Petra Wheels · KH-CCC33333' })),
+      queue(money({ id: 'payables-on-hold', kind: 'PayablesOnHold', severity: 'Warning', count: 2, subjectIds: ['b1', 'b2'], subtitle: 'KH-CCC33333 · KH-DDD44444' })),
       now,
       t,
     );
 
-    expect(row.title).toBe('Deposit held for a customer penalty — no dispute was opened');
-    expect(row.route).toBe('/bookings/b1');
+    expect(row.title).toBe('2 office payables held back — somebody needs to look');
+    expect(row.severity).toBe('Needs a look');
+    expect(row.route).toBe('/payouts');
     expect(row.queryParams).toBeUndefined();
   });
 
@@ -489,5 +490,27 @@ describe('toActivityRows', () => {
     expect(english(requested)).toBe('Azzeldeen Al-Arabiat queued an email of receipt TEST-PAY-2026-000013');
     expect(arabic(requested)).toBe('جُدولت رسالة بريد للإيصال TEST-PAY-2026-000013 من قِبل Azzeldeen Al-Arabiat');
     expect(toActivityRows([entry(requested)], now, t, 'en-GB')[0].icon).toBe('tray');
+  });
+
+  it('words the payables ledger by the settlement number and the booking reference', () => {
+    const recorded: Partial<ActivityEntry> = {
+      action: 'OfficeSettlementRecorded',
+      entityType: 'OfficeSettlement',
+      subjectLabel: 'TEST-SET-2026-000001',
+      bookingReference: null,
+    };
+    const held: Partial<ActivityEntry> = {
+      action: 'OfficePayableHeld',
+      entityType: 'OfficePayable',
+      subjectLabel: 'KH-ABCD1234',
+      bookingReference: null,
+    };
+
+    expect(english(recorded)).toBe('Azzeldeen Al-Arabiat recorded settlement TEST-SET-2026-000001');
+    expect(arabic(recorded)).toBe('سُجّلت التسوية TEST-SET-2026-000001 من قِبل Azzeldeen Al-Arabiat');
+    expect(english(held)).toBe("Azzeldeen Al-Arabiat held the office's payable for booking KH-ABCD1234");
+    expect(arabic(held)).toBe('عُلّق مستحق المكتب للحجز KH-ABCD1234 من قِبل Azzeldeen Al-Arabiat');
+    expect(toActivityRows([entry(recorded)], now, t, 'en-GB')[0].icon).toBe('receipt');
+    expect(toActivityRows([entry(held)], now, t, 'en-GB')[0].icon).toBe('pause-circle');
   });
 });

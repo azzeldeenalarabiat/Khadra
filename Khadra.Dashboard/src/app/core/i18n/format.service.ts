@@ -210,6 +210,36 @@ export class FormatService {
       : '—';
   }
 
+  /** 29 Sept 2026, for a calendar date — the day a settlement's money moved. The same zone rule as `calendarDayMonth`. */
+  calendarDay(isoDate: string | null | undefined): string {
+    const date = this.calendarDate(isoDate);
+    return date
+      ? this.isolate(
+          new Intl.DateTimeFormat(this.locale(), {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            calendar: 'gregory',
+            timeZone: 'UTC',
+          }).format(date),
+        )
+      : '—';
+  }
+
+  /**
+   * Today as a calendar date, `YYYY-MM-DD`, in the zone the console shows dates in: what a form offers for "the day
+   * it happened". A machine value for an input, never shown; the server judges the day against its own calendar.
+   */
+  todayIso(now: number = Date.now()): string {
+    // en-CA prints ISO order (2026-09-29).
+    return new Intl.DateTimeFormat('en-CA', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      timeZone: this.timeZone,
+    }).format(now);
+  }
+
   /** Tue 2 Sept, for a calendar date. The same zone rule as `calendarDayMonth`. */
   calendarWeekdayDayMonth(isoDate: string | null | undefined): string {
     const date = this.calendarDate(isoDate);

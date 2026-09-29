@@ -1,0 +1,143 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('nav.finance') }}</h1>
+      <div class="page-sub">{{ span() ?? t('finance.subtitle') }}</div>
+    </div>
+    <div class="dc-head-actions">
+      <a class="btn btn-secondary btn-sm" routerLink="/payouts">{{ t('nav.payouts') }}</a>
+    </div>
+  </div>
+
+  <section class="sect">
+    <div class="list-toolbar filters-row">
+      <label class="field-inline">
+        <span class="k">{{ t('payments.filterFrom') }}</span>
+        <input class="input input-sm" type="date" [value]="from()" (change)="setFrom($event)" />
+      </label>
+      <label class="field-inline">
+        <span class="k">{{ t('payments.filterTo') }}</span>
+        <input class="input input-sm" type="date" [value]="to()" (change)="setTo($event)" />
+      </label>
+      <button type="button" class="btn btn-primary btn-sm" (click)="apply()">{{ t('finance.apply') }}</button>
+      <button type="button" class="btn btn-secondary btn-sm" (click)="thisMonth()">{{ t('finance.thisMonth') }}</button>
+    </div>
+  </section>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('finance.loadFailed') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    </section>
+  } @else if (resource.isLoading() && groups().length === 0) {
+    <div class="sect-pad" aria-busy="true" aria-live="polite">
+      @for (row of [0, 1, 2]; track row) {
+        <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+      }
+    </div>
+  } @else {
+    @if (attention(); as message) {
+      <div class="banner s-warn">
+        <kh-icon name="warning-circle" />
+        <div>
+          {{ message }}
+          <a class="row-link" routerLink="/payouts">{{ t('finance.openPayouts') }}</a>
+        </div>
+      </div>
+    }
+
+    @for (group of groups(); track group.key) {
+      <section class="stack stack-8">
+        <div class="row row-gap-9 row-wrap">
+          <span class="sect-t">{{ group.title }}</span>
+          @if (group.isTest) {
+            <span class="pill s-warn">{{ t('payments.test') }}</span>
+          }
+        </div>
+        <div class="kpi-grid">
+          @for (card of group.cards; track card.label) {
+            <div class="sect kpi-card">
+              <div class="kpi-label">{{ card.label }}</div>
+              <div class="kpi-main num">{{ card.value }}</div>
+              @if (card.hint) {
+                <div class="kpi-sub-k">{{ card.hint }}</div>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    } @empty {
+      <section class="sect">
+        <div class="state-block is-empty">
+          <div class="state-icon is-outline"><kh-icon name="chart-line-up" /></div>
+          <div class="state-title">{{ t('finance.empty') }}</div>
+          <div class="state-text">{{ t('finance.emptyHint') }}</div>
+        </div>
+      </section>
+    }
+
+    <section class="sect sect-clip">
+      <div class="sect-h">
+        <kh-icon name="receipt" class="kpi-icon" />
+        <span class="sect-t">{{ t('finance.reportTitle') }}</span>
+      </div>
+      @if (rows().length === 0) {
+        <div class="state-block is-empty">
+          <div class="state-title">{{ t('finance.reportEmpty') }}</div>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table table-wide">
+            <thead>
+              <tr>
+                <th>{{ t('payments.colBooking') }}</th>
+                <th>{{ t('payouts.colOffice') }}</th>
+                <th>{{ t('payouts.colOutcome') }}</th>
+                <th class="td-num">{{ t('finance.colOfficeMoney') }}</th>
+                <th class="td-num">{{ t('finance.colCommission') }}</th>
+                <th>{{ t('finance.colPayout') }}</th>
+                <th>{{ t('payouts.colState') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows(); track row.id) {
+                <tr>
+                  <td class="td">
+                    <a class="row-link mono ltr" [routerLink]="['/bookings', row.bookingId]">{{ row.reference }}</a>
+                    <div class="td-sub">{{ row.final }}</div>
+                  </td>
+                  <td class="td">
+                    <a class="row-link user-text" [routerLink]="['/payouts', row.dealerId]">{{ row.office }}</a>
+                    @if (row.isTest) {
+                      <span class="pill s-warn">{{ t('payments.test') }}</span>
+                    }
+                  </td>
+                  <td class="td">{{ row.outcome }}</td>
+                  <td class="td td-num num">{{ row.officeMoney }}</td>
+                  <td class="td td-num num">{{ row.commission }}</td>
+                  <td class="td"><span class="num" [class]="'s-' + row.netTone">{{ row.net }}</span></td>
+                  <td class="td"><span class="pill" [class]="'s-' + row.stateTone">{{ row.state }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (pages() > 1) {
+          <div class="pager">
+            <div class="pager-nav">
+              <button type="button" class="btn btn-secondary btn-page" [disabled]="page() <= 1" (click)="goTo(page() - 1)">{{ t('common.previous') }}</button>
+              <span class="pager-count">{{ t('common.pageOf', { page: page(), total: pages() }) }}</span>
+              <button type="button" class="btn btn-secondary btn-page" [disabled]="page() >= pages()" (click)="goTo(page() + 1)">{{ t('common.next') }}</button>
+            </div>
+          </div>
+        }
+      }
+    </section>
+  }
+</div>

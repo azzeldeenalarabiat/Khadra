@@ -162,7 +162,12 @@ export const routes: Routes = [
               ),
           },
 
-          notBuilt('finance', 'nav.finance'),
+          // Finance (payments Phase 8): Khadra's own money over a span, and the commission report.
+          {
+            path: 'finance',
+            title: title('nav.finance'),
+            loadComponent: () => import('./features/finance/finance.component').then((m) => m.FinanceComponent),
+          },
           // Payments (payments Phase 4b): every checkout attempt, the refunds queue, and one payment's
           // page. `payments/refunds` comes before `payments/:paymentId`, which would otherwise take it.
           {
@@ -209,7 +214,25 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/payments/payment-detail.component').then((m) => m.PaymentDetailComponent),
           },
-          notBuilt('payouts', 'nav.payouts'),
+          // Payouts (payments Phase 8): every office's balance, one office's payables and settlements, one
+          // settlement. `payouts/settlements/:settlementId` comes before `payouts/:dealerId`, which would take it.
+          {
+            path: 'payouts',
+            title: title('nav.payouts'),
+            loadComponent: () => import('./features/payouts/payouts.component').then((m) => m.PayoutsComponent),
+          },
+          {
+            path: 'payouts/settlements/:settlementId',
+            title: title('screen.officeSettlement'),
+            loadComponent: () =>
+              import('./features/payouts/office-settlement.component').then((m) => m.OfficeSettlementComponent),
+          },
+          {
+            path: 'payouts/:dealerId',
+            title: title('screen.officePayouts'),
+            loadComponent: () =>
+              import('./features/payouts/office-payouts.component').then((m) => m.OfficePayoutsComponent),
+          },
 
           // Disputes are real: the queue, and the workspace where the platform's only decision
           // about money is made.
@@ -389,6 +412,13 @@ export const routes: Routes = [
               import('./features/dealer/dealer-reports.component').then(
                 (m) => m.DealerReportsComponent,
               ),
+          },
+          // The office's payouts (payments Phase 8): the same grant as the reports, decided on the screen.
+          {
+            path: 'payouts',
+            title: title('nav.payouts'),
+            loadComponent: () =>
+              import('./features/dealer/dealer-payouts.component').then((m) => m.DealerPayoutsComponent),
           },
           {
             path: 'activity',

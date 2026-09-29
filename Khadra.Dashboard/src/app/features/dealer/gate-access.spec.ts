@@ -59,6 +59,13 @@ describe('dealer gate', () => {
     expect(lockedOut('/dealer/reports', SUSPENDED)).toBe(true);
   });
 
+  it('lets a suspended dealership read what it is owed, or owes — and an applicant has nothing there yet', () => {
+    // The API serves the payouts whatever the standing (payments Phase 8): money recorded for its bookings is still
+    // owed after a suspension.
+    expect(lockedOut('/dealer/payouts', SUSPENDED)).toBe(false);
+    expect(lockedOut('/dealer/payouts', LOCKED)).toBe(true);
+  });
+
   it('opens exactly these paths', () => {
     expect([...OPEN_WHILE_LOCKED]).toEqual([
       '/dealer/profile',
@@ -69,6 +76,7 @@ describe('dealer gate', () => {
     expect([...OPEN_WHILE_SUSPENDED]).toEqual([
       '/dealer/bookings',
       '/dealer/disputes',
+      '/dealer/payouts',
       '/employee/bookings',
       '/employee/disputes',
     ]);

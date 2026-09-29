@@ -1,4 +1,5 @@
 import { Money } from './fleet.api';
+import { PayableBlock, PayableHold, PayableLine, SettlementRef } from './payables.api';
 
 /**
  * A booking's financial state (payments Phase 4), as the rental office reads it from
@@ -23,6 +24,33 @@ export interface BookingFinancials {
   readonly payments: readonly FinancialPayment[];
   /** What the records contradict, as stable codes. Administrator only. */
   readonly issues: readonly string[] | null;
+  /**
+   * What the booking comes to for the office, and where the payables ledger has it (payments Phase 8). Office and
+   * administrator; absent from an API older than the ledger.
+   */
+  readonly office?: FinancialOffice | null;
+}
+
+/**
+ * `NotApplicable`, `Open`, `AwaitingRecord`, `OnHold`, `Due`, `NothingDue`, `Blocked` or `Settled`. Recorded, the
+ * figures are the ledger's frozen ones; before that, the calculator's; while the outcome is open, none.
+ */
+export interface FinancialOffice {
+  readonly state: string;
+  readonly outcome: string | null;
+  readonly officeMoney: Money | null;
+  readonly commission: Money | null;
+  readonly charges: Money | null;
+  /** Signed: below zero, the office owes. */
+  readonly net: Money | null;
+  readonly lines: readonly PayableLine[];
+  readonly finalAt: string | null;
+  readonly recordedAt: string | null;
+  readonly settlement: SettlementRef | null;
+  /** Administrator only. */
+  readonly payableId: string | null;
+  readonly holds: readonly PayableHold[] | null;
+  readonly blocks: readonly PayableBlock[] | null;
 }
 
 export interface FinancialSummary {
@@ -57,7 +85,7 @@ export interface FinancialBalance {
 /**
  * `NotPaid`, `Held`, `AppliedToRental`, `InSettlementWindow`, `UnderDispute`, `SettledWithRental`,
  * `ReturnedWithPayment`, `HeldUntilWindowCloses`, `HeldForAssessedPenalty`, `HeldUnresolved`,
- * `Released` or `DecidedByDispute`.
+ * `KeptAsPenalty` (payments Phase 8), `Released` or `DecidedByDispute`.
  */
 export interface FinancialDeposit {
   readonly state: string;
@@ -88,6 +116,8 @@ export interface FinancialCommission {
   readonly percent: number;
   readonly basis: string;
   readonly state: string;
+  /** What Khadra earned, when `Earned` (payments Phase 8): the frozen figure, capped at the office's money. */
+  readonly earned?: Money | null;
 }
 
 export interface FinancialPayment {

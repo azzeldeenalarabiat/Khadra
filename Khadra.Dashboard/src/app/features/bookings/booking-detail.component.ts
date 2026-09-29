@@ -21,6 +21,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyFormat } from '../../core/i18n/money-words';
+import { officeCard } from '../payouts/payouts.presenter';
 import { adminMoney } from './admin-money.presenter';
 import {
   DocumentFormat,
@@ -140,6 +141,20 @@ export class AdminBookingDetailComponent {
     return financials && booking
       ? adminMoney(financials, booking.pickupMethod, this.t, this.enumLabel, this.moneyFormat)
       : null;
+  });
+
+  /**
+   * What the booking comes to for its office, and where the payables ledger has it (payments Phase 8): the ledger's
+   * frozen lines and net once recorded, the calculator's before that, with any hold and block and the settlement
+   * that closed it. Null when nothing was paid online.
+   */
+  protected readonly officeView = computed(() => {
+    this.i18n.lang();
+    return officeCard(this.financialsData()?.office, 'admin', { t: this.t, label: this.enumLabel }, {
+      money: (value) => this.money(value),
+      dateTime: (iso) => this.formats.dateTime(iso),
+      day: (isoDay) => this.formats.calendarDay(isoDay),
+    });
   });
 
   /** The rulebook this booking froze. Version included: it is what makes the rest reproducible. */

@@ -18,9 +18,9 @@ export interface NotificationRow {
 
 /**
  * Whether a row asks something of the reader. One with no clock and no warning is WATCHED money — a
- * capture being refunded, a deposit held for pre-launch item 164's decision — which the dashboard
- * lists and the bell does not: the badge counts the bell's rows, and a count that cannot clear until
- * payments Phase 8 would teach an administrator to ignore the bell, refused refunds included.
+ * capture being refunded — which the dashboard lists and the bell does not: the badge counts the bell's
+ * rows, and a count nobody can clear would teach an administrator to ignore the bell, refused refunds
+ * included. The offices' money the payables ledger holds back is a Warning: a person has to look.
  */
 const asksForAction = (item: AttentionItem): boolean =>
   item.slaDeadlineAt !== null || item.severity !== 'Info';

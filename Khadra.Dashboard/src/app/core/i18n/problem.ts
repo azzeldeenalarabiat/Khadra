@@ -100,6 +100,22 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'financial_documents.voided_not_emailed': 'problem.documentVoidedNotEmailed',
   'financial_documents.email_already_queued': 'problem.emailAlreadyQueued',
   'financial_documents.email_delivery_disabled': 'problem.emailDeliveryDisabled',
+  // The office payables ledger (payments Phase 8). Nothing was recorded in any of these; the screen reloads for the
+  // ones after which asking again cannot help as it stands.
+  'payables.nothing_due': 'problem.payablesNothingDue',
+  'payables.balance_changed': 'problem.payablesBalanceChanged',
+  'payables.records_changed': 'problem.payablesRecordsChanged',
+  'payables.changed_concurrently': 'problem.payablesChangedConcurrently',
+  'payables.paid_on_in_future': 'problem.payablesPaidOnInFuture',
+  'payables.settlement_already_voided': 'problem.settlementAlreadyVoided',
+  'payables.already_held': 'problem.payableAlreadyHeld',
+  'payables.not_held': 'problem.payableNotHeld',
+  'payables.already_settled': 'problem.payableAlreadySettled',
+  'payables.void_reason_required': 'problem.reasonRejected',
+  'payables.void_reason_too_long': 'problem.reasonRejected',
+  'payables.hold_reason_required': 'problem.reasonRejected',
+  'payables.hold_reason_too_long': 'problem.reasonRejected',
+  'payables.finance_span_invalid': 'problem.financeSpanInvalid',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */

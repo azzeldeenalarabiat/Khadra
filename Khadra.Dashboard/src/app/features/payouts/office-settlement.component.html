@@ -1,0 +1,119 @@
+@if (failure(); as message) {
+  <section class="sect">
+    <div class="state-block">
+      <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+      <div class="state-title">{{ t('payouts.settlementLoadFailed') }}</div>
+      <div class="state-text">{{ message }}</div>
+      <div class="state-actions">
+        <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        <a class="btn btn-secondary btn-sm" routerLink="/payouts">{{ t('nav.payouts') }}</a>
+      </div>
+    </div>
+  </section>
+} @else if (page(); as p) {
+  <div class="stack stack-14">
+    <div class="dc-head">
+      <div>
+        <div class="row row-gap-9 row-wrap">
+          <h1 class="page-title mono ltr">{{ p.settlement.number }}</h1>
+          @if (p.settlement.voided) {
+            <span class="pill s-bad">{{ t('payouts.voided') }}</span>
+          }
+          @if (p.settlement.isTest) {
+            <span class="pill s-warn">{{ t('payments.test') }}</span>
+          }
+        </div>
+        <div class="page-sub user-text">{{ p.settlement.office }}</div>
+      </div>
+      <div class="dc-head-actions">
+        <a class="btn btn-secondary btn-sm" [routerLink]="['/payouts', p.settlement.dealerId]">{{ t('payouts.backToOffice') }}</a>
+        @if (!p.settlement.voided) {
+          <button type="button" class="btn btn-danger btn-sm" (click)="voidSettlement()">{{ t('payouts.void.action') }}</button>
+        }
+      </div>
+    </div>
+
+    @if (p.settlement.voided; as voided) {
+      <div class="banner s-bad">
+        <kh-icon name="warning-circle" />
+        <div>
+          <div>{{ t('payouts.voidedOn', { when: voided.when }) }}@if (voided.by) { · <span class="user-text">{{ voided.by }}</span> }</div>
+          @if (voided.reason) {
+            <div class="user-text">{{ voided.reason }}</div>
+          }
+        </div>
+      </div>
+    }
+
+    <section class="sect">
+      <div class="sect-h">
+        <kh-icon name="arrow-line-up-right" class="kpi-icon" />
+        <span class="sect-t">{{ t('payouts.settlementTitle') }}</span>
+      </div>
+      <div class="kv-body">
+        <div class="kv-split">
+          <div class="kv-key">{{ p.settlement.direction }}</div>
+          <div class="kv-val"><span class="num" [class]="'s-' + p.movement.tone">{{ p.movement.text }}</span></div>
+        </div>
+        <div class="kv-split">
+          <div class="kv-key">{{ t('payouts.colPaidOn') }}</div>
+          <div class="kv-val">{{ p.settlement.day }}</div>
+        </div>
+        @if (p.settlement.reference) {
+          <div class="kv-split">
+            <div class="kv-key">{{ t('payouts.colReference') }}</div>
+            <div class="kv-val mono ltr user-text">{{ p.settlement.reference }}</div>
+          </div>
+        }
+        <div class="kv-split">
+          <div class="kv-key">{{ t('payouts.colRecorded') }}</div>
+          <div class="kv-val">
+            {{ p.settlement.recorded }}
+            @if (p.settlement.recordedBy) {
+              <div class="td-sub user-text">{{ p.settlement.recordedBy }}</div>
+            }
+          </div>
+        </div>
+        @if (p.settlement.note) {
+          <div class="kv-split">
+            <div class="kv-key">{{ t('payouts.record.noteLabel') }}</div>
+            <div class="kv-val user-text">{{ p.settlement.note }}</div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="sect sect-clip">
+      <div class="sect-h">
+        <kh-icon name="receipt" class="kpi-icon" />
+        <span class="sect-t">{{ t('payouts.closedTitle', { count: p.settlement.count }) }}</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table table-wide">
+          <thead>
+            <tr>
+              <th>{{ t('payments.colBooking') }}</th>
+              <th>{{ t('payouts.colOutcome') }}</th>
+              <th>{{ t('payouts.colNet') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of p.lines; track line.payableId) {
+              <tr>
+                <td class="td"><a class="row-link mono ltr" [routerLink]="['/bookings', line.bookingId]">{{ line.reference }}</a></td>
+                <td class="td">{{ line.outcome }}</td>
+                <td class="td"><span class="num" [class]="'s-' + line.netTone">{{ line.net }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+} @else {
+  <div class="sect-pad" aria-busy="true" aria-live="polite">
+    @for (row of [0, 1, 2]; track row) {
+      <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+    }
+  </div>
+}

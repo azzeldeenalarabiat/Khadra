@@ -193,7 +193,9 @@ export interface ModalField {
    * the textarea would put the password on screen in clear, next to whoever is standing behind the
    * person typing it.
    */
-  readonly type: 'select' | 'text' | 'line' | 'password';
+  readonly type: 'select' | 'text' | 'line' | 'password' | 'date';
+  /** For a `date` field: the latest day that may be chosen, `yyyy-MM-dd`. */
+  readonly max?: string;
   /** For a `line` field: the on-screen keyboard to ask for, and what the browser may autofill. */
   readonly inputMode?: 'text' | 'email' | 'tel';
   readonly autocomplete?: string;

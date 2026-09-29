@@ -87,23 +87,24 @@ describe('toAdminNotifications', () => {
   });
 
   /**
-   * Money with no clock (payments Phase 4b): a refused refund needs a look and rings the bell; a
-   * capture being refunded and a deposit held for item 164 are watched, and stay on the dashboard.
+   * Money with no clock (payments Phase 4b): a refused refund, and the offices' money the ledger holds back
+   * (payments Phase 8), need a look and ring the bell; a capture being refunded is watched, and stays on the
+   * dashboard.
    */
-  it('rings for a refused refund and leaves watched money to the dashboard', () => {
+  it('rings for money a person has to look at and leaves watched money to the dashboard', () => {
     const noClock = { slaDeadlineAt: null, isOverdue: false, description: null };
     const rows = toAdminNotifications(
       queue(
         item({ id: 'refunds-failed', kind: 'RefundFailed', severity: 'Warning', ...noClock }),
         item({ id: 'orphaned-captures', kind: 'OrphanedCaptureOwed', severity: 'Info', ...noClock }),
-        item({ id: 'deposit:b1', kind: 'DepositAwaitingDecision', severity: 'Info', ...noClock }),
+        item({ id: 'payables-on-hold', kind: 'PayablesOnHold', severity: 'Warning', ...noClock }),
         item({ id: 'dispute:t2', kind: 'DisputeOpen', severity: 'Info', isOverdue: false, slaDeadlineAt: '2026-09-06T12:00:00Z' }),
       ),
       NOW,
       t,
     );
 
-    expect(rows.map((row) => row.id)).toEqual(['refunds-failed', 'dispute:t2']);
+    expect(rows.map((row) => row.id)).toEqual(['refunds-failed', 'payables-on-hold', 'dispute:t2']);
   });
 });
 

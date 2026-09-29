@@ -17,6 +17,8 @@ export interface MoneyFormat {
   money(value: Money): string;
   percent(value: number): string;
   dateTime(iso: string): string;
+  /** A calendar day, `YYYY-MM-DD` — the day a settlement's money moved. */
+  day?(isoDay: string): string;
 }
 
 const DEPOSIT_STATES: ReadonlySet<string> = new Set([
@@ -30,6 +32,7 @@ const DEPOSIT_STATES: ReadonlySet<string> = new Set([
   'HeldUntilWindowCloses',
   'HeldForAssessedPenalty',
   'HeldUnresolved',
+  'KeptAsPenalty',
   'Released',
   'DecidedByDispute',
 ]);
@@ -95,7 +98,9 @@ export function commissionText(t: Translate, commission: FinancialCommission, fo
     case 'Expected':
       return t('money.commission.expected', { amount });
     case 'Earned':
-      return t('money.commission.earned', { amount });
+      // What was EARNED, when the ledger capped it at the office's money (payments Phase 8); the frozen figure
+      // otherwise, from an API that does not send it.
+      return t('money.commission.earned', { amount: commission.earned ? format.money(commission.earned) : amount });
     case 'Undecided':
       return t('money.commission.undecided', { amount });
     case 'NotEarned':

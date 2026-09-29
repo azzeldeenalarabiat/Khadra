@@ -1,0 +1,247 @@
+<div class="stack stack-14">
+  <div class="dc-head">
+    <div>
+      <h1 class="page-title">{{ t('nav.payouts') }}</h1>
+      <div class="page-sub">{{ t('dealerPayouts.subtitle') }}</div>
+    </div>
+  </div>
+
+  @if (granted() === false) {
+    <div class="banner s-warn">
+      <kh-icon name="lock-key" />
+      <div>{{ t('dealerPayouts.notGranted') }}</div>
+    </div>
+  } @else if (granted() === true) {
+    <div class="note-box">
+      <kh-icon name="info" />
+      {{ t('dealerPayouts.howItWorks') }}
+    </div>
+
+    @if (failed()) {
+      <section class="sect">
+        <div class="state-block">
+          <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+          <div class="state-title">{{ t('dealerPayouts.loadFailed') }}</div>
+          <div class="state-actions">
+            <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+          </div>
+        </div>
+      </section>
+    } @else {
+      @for (row of balanceRows(); track row.key) {
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="currency-circle-dollar" class="kpi-icon" />
+            <span class="sect-t">{{ t('payouts.balanceIn', { currency: row.currency }) }}</span>
+          </div>
+          <div class="kv-body">
+            <div class="kv-split">
+              <div class="kv-key">{{ t('dealerPayouts.dueNow') }}</div>
+              <div class="kv-val">
+                <span class="num" [class]="'s-' + row.dueTone">{{ row.due }}</span>
+                @if (row.dueCount > 0) {
+                  <div class="td-sub">{{ t('payouts.bookingsCount', { count: row.dueCount }) }}</div>
+                }
+              </div>
+            </div>
+            @if (row.notYetDue) {
+              <div class="kv-split">
+                <div class="kv-key">{{ t('payouts.colNotYetDue') }}</div>
+                <div class="kv-val td-sub">{{ row.notYetDue }}</div>
+              </div>
+            }
+            <div class="kv-split">
+              <div class="kv-key">{{ t('payouts.colLastSettlement') }}</div>
+              <div class="kv-val">
+                @if (row.lastSettlement) {
+                  <button type="button" class="row-link" (click)="open(row.lastSettlementId!)">{{ row.lastSettlement }}</button>
+                } @else {
+                  <span class="td-sub">{{ t('payouts.neverSettled') }}</span>
+                }
+              </div>
+            </div>
+          </div>
+        </section>
+      } @empty {
+        @if (!balancesResource.isLoading()) {
+          <section class="sect">
+            <div class="state-block is-empty">
+              <div class="state-icon is-outline"><kh-icon name="currency-circle-dollar" /></div>
+              <div class="state-title">{{ t('dealerPayouts.empty') }}</div>
+              <div class="state-text">{{ t('dealerPayouts.emptyHint') }}</div>
+            </div>
+          </section>
+        }
+      }
+
+      <section class="sect sect-clip">
+        <div class="sect-h">
+          <kh-icon name="receipt" class="kpi-icon" />
+          <span class="sect-t">{{ t('dealerPayouts.bookingsTitle') }}</span>
+        </div>
+        <div class="tabs" role="tablist">
+          @for (option of scopes; track option) {
+            <button type="button" class="tab" role="tab" [class.is-active]="scope() === option"
+                    [attr.aria-selected]="scope() === option" (click)="setScope(option)">
+              {{ t(option === 'open' ? 'payouts.scopeOpen' : option === 'settled' ? 'payouts.scopeSettled' : 'payouts.scopeAll') }}
+            </button>
+          }
+        </div>
+        @if (payableRows().length === 0) {
+          @if (!payablesResource.isLoading()) {
+            <div class="state-block is-empty">
+              <div class="state-title">{{ t('payouts.payablesEmpty') }}</div>
+            </div>
+          }
+        } @else {
+          <div class="table-wrap">
+            <table class="table table-wide">
+              <thead>
+                <tr>
+                  <th>{{ t('payments.colBooking') }}</th>
+                  <th>{{ t('payouts.colOutcome') }}</th>
+                  <th>{{ t('payouts.colLines') }}</th>
+                  <th>{{ t('payouts.colNet') }}</th>
+                  <th>{{ t('payouts.colState') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of payableRows(); track row.id) {
+                  <tr>
+                    <td class="td">
+                      <a class="row-link mono ltr" [routerLink]="['/dealer/bookings', row.bookingId]">{{ row.reference }}</a>
+                      <div class="td-sub">{{ t('payouts.finalOn', { when: row.final }) }}</div>
+                    </td>
+                    <td class="td">{{ row.outcome }}</td>
+                    <td class="td">
+                      @for (line of row.lines; track $index) {
+                        <div class="kv-split">
+                          <div class="kv-key td-sub">{{ line.label }}</div>
+                          <div class="kv-val num td-sub">{{ line.amount }}</div>
+                        </div>
+                      } @empty {
+                        <span class="td-sub">{{ t('payouts.noLines') }}</span>
+                      }
+                    </td>
+                    <td class="td"><span class="num" [class]="'s-' + row.netTone">{{ row.net }}</span></td>
+                    <td class="td">
+                      <span class="pill" [class]="'s-' + row.stateTone">{{ row.state }}</span>
+                      @if (row.settlement; as settlement) {
+                        <button type="button" class="td-sub row-link" (click)="open(settlement.id)">{{ t('payouts.settledUnder', { number: settlement.number, day: settlement.day }) }}</button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (payablePages() > 1) {
+            <div class="pager">
+              <div class="pager-nav">
+                <button type="button" class="btn btn-secondary btn-page" [disabled]="payablesPage() <= 1" (click)="goToPayables(payablesPage() - 1)">{{ t('common.previous') }}</button>
+                <span class="pager-count">{{ t('common.pageOf', { page: payablesPage(), total: payablePages() }) }}</span>
+                <button type="button" class="btn btn-secondary btn-page" [disabled]="payablesPage() >= payablePages()" (click)="goToPayables(payablesPage() + 1)">{{ t('common.next') }}</button>
+              </div>
+            </div>
+          }
+        }
+      </section>
+
+      <section class="sect sect-clip">
+        <div class="sect-h">
+          <kh-icon name="list" class="kpi-icon" />
+          <span class="sect-t">{{ t('payouts.settlementsTitle') }}</span>
+        </div>
+        @if (settlementRows().length === 0) {
+          <div class="state-block is-empty">
+            <div class="state-title">{{ t('payouts.settlementsEmpty') }}</div>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table table-wide">
+              <thead>
+                <tr>
+                  <th>{{ t('payouts.colNumber') }}</th>
+                  <th>{{ t('payouts.colDirection') }}</th>
+                  <th class="td-num">{{ t('payouts.colAmount') }}</th>
+                  <th>{{ t('payouts.colPaidOn') }}</th>
+                  <th>{{ t('payouts.colReference') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of settlementRows(); track row.id) {
+                  <tr class="rowlink" (click)="open(row.id)">
+                    <td class="td">
+                      <span class="row-link mono ltr">{{ row.number }}</span>
+                      @if (row.voided) {
+                        <span class="pill s-bad">{{ t('payouts.voided') }}</span>
+                      }
+                    </td>
+                    <td class="td">{{ row.direction }}</td>
+                    <td class="td td-num"><span class="num" [class]="'s-' + row.amountTone">{{ row.amount }}</span></td>
+                    <td class="td">{{ row.day }}</td>
+                    <td class="td">
+                      @if (row.reference) {
+                        <span class="mono ltr user-text">{{ row.reference }}</span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (settlementPages() > 1) {
+            <div class="pager">
+              <div class="pager-nav">
+                <button type="button" class="btn btn-secondary btn-page" [disabled]="settlementsPage() <= 1" (click)="goToSettlements(settlementsPage() - 1)">{{ t('common.previous') }}</button>
+                <span class="pager-count">{{ t('common.pageOf', { page: settlementsPage(), total: settlementPages() }) }}</span>
+                <button type="button" class="btn btn-secondary btn-page" [disabled]="settlementsPage() >= settlementPages()" (click)="goToSettlements(settlementsPage() + 1)">{{ t('common.next') }}</button>
+              </div>
+            </div>
+          }
+        }
+      </section>
+
+      @if (opened(); as o) {
+        <section class="sect sect-clip">
+          <div class="sect-h">
+            <kh-icon name="arrow-line-up-right" class="kpi-icon" />
+            <span class="sect-t mono ltr">{{ o.settlement.number }}</span>
+            @if (o.settlement.voided) {
+              <span class="pill s-bad">{{ t('payouts.voided') }}</span>
+            }
+          </div>
+          <div class="kv-body">
+            <div class="kv-split">
+              <div class="kv-key">{{ o.settlement.direction }}</div>
+              <div class="kv-val"><span class="num" [class]="'s-' + o.movement.tone">{{ o.movement.text }}</span></div>
+            </div>
+            <div class="kv-split">
+              <div class="kv-key">{{ t('payouts.colPaidOn') }}</div>
+              <div class="kv-val">{{ o.settlement.day }}</div>
+            </div>
+            @if (o.settlement.voided; as voided) {
+              <div class="kv-split">
+                <div class="kv-key">{{ t('payouts.voided') }}</div>
+                <div class="kv-val">{{ voided.when }}</div>
+              </div>
+            }
+          </div>
+          <div class="table-wrap">
+            <table class="table table-wide">
+              <tbody>
+                @for (line of o.lines; track line.payableId) {
+                  <tr>
+                    <td class="td"><a class="row-link mono ltr" [routerLink]="['/dealer/bookings', line.bookingId]">{{ line.reference }}</a></td>
+                    <td class="td">{{ line.outcome }}</td>
+                    <td class="td"><span class="num" [class]="'s-' + line.netTone">{{ line.net }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+    }
+  }
+</div>

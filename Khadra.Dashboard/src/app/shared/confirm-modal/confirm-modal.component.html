@@ -56,6 +56,16 @@
               [value]="field.value ?? ''"
               (input)="setField(field.name, $event)"
             />
+          } @else if (field.type === 'date') {
+            <!-- A calendar day, yyyy-MM-dd whatever the reader's language: the value the API reads as it is. -->
+            <input
+              class="input ltr"
+              type="date"
+              [id]="'modal-field-' + $index"
+              [attr.max]="field.max ?? null"
+              [value]="field.value ?? ''"
+              (input)="setField(field.name, $event)"
+            />
           } @else if (field.type === 'password') {
             <!-- Masked and single-line. A textarea here would show the password to the room. -->
             <input

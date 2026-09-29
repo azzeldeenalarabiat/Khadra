@@ -156,6 +156,56 @@
                 <div class="state-text">{{ t('adminMoney.noPayments') }}</div>
               }
             </div>
+            @if (officeView(); as office) {
+              <!-- What the booking comes to for the office (payments Phase 8). -->
+              <div class="sect-h">
+                <span class="sect-t">{{ t('payouts.officeCardTitle') }}</span>
+                <span class="pill sect-note" [class]="'s-' + office.stateTone">{{ office.state }}</span>
+              </div>
+              <div class="kv-body">
+                @if (office.outcome) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ t('payouts.colOutcome') }}</div>
+                    <div class="kv-val">{{ office.outcome }}</div>
+                  </div>
+                }
+                @for (line of office.lines; track $index) {
+                  <div class="kv-split">
+                    <div class="kv-key td-sub">{{ line.label }}</div>
+                    <div class="kv-val num">{{ line.amount }}</div>
+                  </div>
+                }
+                @if (office.net) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ t('payouts.colNet') }}</div>
+                    <div class="kv-val"><span class="num" [class]="'s-' + office.netTone">{{ office.net }}</span></div>
+                  </div>
+                }
+                @if (office.settlement; as settlement) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ t('payouts.colSettlement') }}</div>
+                    <div class="kv-val">
+                      <a class="row-link" [routerLink]="['/payouts/settlements', settlement.id]">{{ t('payouts.settledUnder', { number: settlement.number, day: settlement.day }) }}</a>
+                    </div>
+                  </div>
+                }
+                @for (hold of office.holds; track hold.id) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ hold.reason }}</div>
+                    <div class="kv-val td-sub user-text">{{ hold.detail }}</div>
+                  </div>
+                }
+                @for (block of office.blocks; track $index) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ block }}</div>
+                    <div class="kv-val"></div>
+                  </div>
+                }
+                @if (office.note) {
+                  <div class="state-text">{{ office.note }}</div>
+                }
+              </div>
+            }
           } @else {
             <div class="sect-pad">
               @for (row of [0, 1, 2, 3]; track row) {

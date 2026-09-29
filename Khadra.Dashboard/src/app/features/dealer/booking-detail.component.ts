@@ -489,6 +489,7 @@ export class DealerBookingDetailComponent {
     money: (value) => this.format.money(value.amount, value.currency),
     percent: (value) => this.format.percent(value),
     dateTime: (iso) => this.format.dateTime(iso),
+    day: (isoDay) => this.format.calendarDay(isoDay),
   };
 
   protected readonly financialsResource = this.service.financials;

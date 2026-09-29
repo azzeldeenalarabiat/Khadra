@@ -50,6 +50,10 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   HandoverCodeLocked: 'auditLog.actionHandoverCodeLocked',
   FinancialDocumentVoided: 'auditLog.actionFinancialDocumentVoided',
   FinancialDocumentEmailRequested: 'auditLog.actionFinancialDocumentEmailRequested',
+  OfficeSettlementRecorded: 'auditLog.actionOfficeSettlementRecorded',
+  OfficeSettlementVoided: 'auditLog.actionOfficeSettlementVoided',
+  OfficePayableHeld: 'auditLog.actionOfficePayableHeld',
+  OfficePayableReleased: 'auditLog.actionOfficePayableReleased',
 };
 
 /** The server's audit record types (`AuditEntityType`), worded the same way as the actions. */
@@ -64,6 +68,8 @@ const ENTITY_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
   City: 'auditLog.entityCity',
   CarType: 'auditLog.entityCarType',
   FinancialDocument: 'auditLog.entityFinancialDocument',
+  OfficeSettlement: 'auditLog.entityOfficeSettlement',
+  OfficePayable: 'auditLog.entityOfficePayable',
 };
 
 /**

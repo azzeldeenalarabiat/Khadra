@@ -170,13 +170,15 @@ const kindTarget = (
     case 'DealerApplicationsAtRisk':
       return { route: only ? `/dealers/${only}` : '/dealers', action: 'queue.actionReview' };
     // The money rows (payments Phase 4b): refused refunds open the refunds queue, where they lead; the
-    // captures being refunded open the payments that could not be applied; a held deposit its booking.
+    // captures being refunded open the payments that could not be applied.
     case 'RefundFailed':
       return { route: '/payments/refunds', action: 'queue.actionOpen' };
     case 'OrphanedCaptureOwed':
       return { route: '/payments', action: 'queue.actionOpen', filter: { key: 'status', value: 'Orphaned' } };
-    case 'DepositAwaitingDecision':
-      return { route: only ? `/bookings/${only}` : '/bookings', action: 'queue.actionOpen' };
+    // Offices' money the ledger holds back until somebody looks (payments Phase 8): the payouts screen lists the
+    // bookings that cannot be recorded, and each office page the payables no longer matching their records.
+    case 'PayablesOnHold':
+      return { route: '/payouts', action: 'queue.actionOpen' };
     // Documents owed and not issued (payments Phase 5b) open their holds — by PATH alone, because the
     // topbar bell reuses these rows and drops query parameters.
     case 'FinancialDocumentsOnHold':
@@ -242,7 +244,7 @@ const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
   // The money rows: the count in the reader's language; the subtitle carries the booking references.
   if (item.kind === 'RefundFailed') return t('queue.refundsRefused', { count: item.count });
   if (item.kind === 'OrphanedCaptureOwed') return t('queue.capturesBeingRefunded', { count: item.count });
-  if (item.kind === 'DepositAwaitingDecision') return t('queue.depositAwaitingDecision');
+  if (item.kind === 'PayablesOnHold') return t('queue.payablesOnHold', { count: item.count });
   if (item.kind === 'FinancialDocumentsOnHold') return t('queue.documentsOnHold', { count: item.count });
   if (item.kind === 'FinancialDocumentEmailsNotSent') return t('queue.documentEmailsNotSent', { count: item.count });
 
@@ -377,6 +379,10 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   LookupRestored: 'toggle-right',
   FinancialDocumentVoided: 'file-x',
   FinancialDocumentEmailRequested: 'tray',
+  OfficeSettlementRecorded: 'receipt',
+  OfficeSettlementVoided: 'file-x',
+  OfficePayableHeld: 'pause-circle',
+  OfficePayableReleased: 'check-circle',
 };
 
 /**
@@ -415,6 +421,11 @@ const ACTIVITY_SENTENCES: Readonly<Record<string, TranslationKey>> = {
   // Labelled by the document's NUMBER, never a customer: an audit entry can never be erased.
   FinancialDocumentVoided: 'activity.financialDocumentVoided',
   FinancialDocumentEmailRequested: 'activity.financialDocumentEmailRequested',
+  // Labelled by the settlement's NUMBER, and a payable by its booking's reference (payments Phase 8).
+  OfficeSettlementRecorded: 'activity.officeSettlementRecorded',
+  OfficeSettlementVoided: 'activity.officeSettlementVoided',
+  OfficePayableHeld: 'activity.officePayableHeld',
+  OfficePayableReleased: 'activity.officePayableReleased',
 };
 
 /** The lookup actions are shared by both lists; the entry's type says which one changed. */

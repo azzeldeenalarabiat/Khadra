@@ -68,7 +68,7 @@ describe("the office's Financial section", () => {
       ['Balance to collect in cash at handover', '84.75 JOD'],
       ['Deposit', 'Held until pickup, then counted towards the rental'],
       ['Platform commission · 20% of one daily rate (frozen on this booking)', '6 JOD · expected'],
-      ['Net payout', 'Not available yet'],
+      ['Net payout', "Worked out once this booking's outcome is final"],
     ]);
     expect(english.reviewing).toBe(false);
     expect(arabic.lines.map((line) => line.k)).toContain('المبلغ المتبقي نقدًا عند التسليم');
@@ -103,7 +103,7 @@ describe("the office's Financial section", () => {
       ['Deposit', 'Decided by a dispute'],
       ['Dispute decision — to you', '9 JOD'],
       ['Platform commission · 20% of one daily rate (frozen on this booking)', '6 JOD · not decided yet'],
-      ['Net payout', 'Not available yet'],
+      ['Net payout', "Worked out once this booking's outcome is final"],
     ]);
     const text = JSON.stringify(view.lines);
     expect(text).not.toMatch(/fee \d|processing/i);
@@ -183,6 +183,38 @@ describe("the office's Financial section", () => {
     expect(stuck.lines.find((line) => line.k === 'العربون')?.v).toBe(
       'محتجز بانتظار التسوية — قُدِّرت غرامة على العميل ولم يُفتح أي نزاع',
     );
+  });
+
+  it('says what the booking came to for the office once the ledger has it, and where it stands', () => {
+    const recorded = (state: string, net: number, settlement: { settlementId: string; number: string; paidOn: string } | null = null) =>
+      officeMoney(
+        financials({
+          bookingStatus: 'Completed',
+          commission: { amount: jod(6), percent: 20, basis: 'OneDay', state: 'Earned', earned: jod(6) },
+          office: {
+            state, outcome: 'Rental', officeMoney: jod(18), commission: jod(6), charges: jod(0), net: jod(net),
+            lines: [], finalAt: '2026-10-08T10:00:00Z', recordedAt: '2026-10-08T10:11:00Z', settlement,
+            payableId: null, holds: null, blocks: null,
+          },
+        }),
+        en,
+        format,
+      );
+
+    expect(lines(recorded('Due', 12)).slice(-2)).toEqual([
+      ['Net payout', 'Khadra owes you 12 JOD'],
+      ['Where it stands', 'In your next payout'],
+    ]);
+    expect(lines(recorded('Blocked', -5)).slice(-2)).toEqual([
+      ['Net payout', 'You owe Khadra 5 JOD'],
+      ['Where it stands', 'Not due yet: something on this booking is still open'],
+    ]);
+    expect(lines(recorded('Settled', 12, { settlementId: 's-1', number: 'SET-2026-000001', paidOn: '2026-10-12' })).at(-1)).toEqual([
+      'Where it stands',
+      'Paid under SET-2026-000001 on 2026-10-12',
+    ]);
+    // A booking that came to nothing either way shows no payout line (item 158).
+    expect(recorded('NothingDue', 0).lines.some((line) => line.k === 'Net payout')).toBe(false);
   });
 
   it('flags records under review without hiding the figures', () => {

@@ -54,8 +54,17 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
  * - Issued financial documents (payments Phase 5b): a document's type, what issued it, and why a
  *   document owed is on hold.
  * - Their emails (payments Phase 7): what a queued email is waiting for, and what an attempt came to.
+ * - The office payables ledger (payments Phase 8): how a paid booking ended for its office, where its payable
+ *   stands, the kinds of line it is made of, which way a settlement's money went, why a payable is held back, and
+ *   why an open one is not due.
  */
 export type EnumFamily =
+  | 'payableOutcome'
+  | 'payableState'
+  | 'payableLineKind'
+  | 'settlementDirection'
+  | 'payableHoldReason'
+  | 'payableBlock'
   | 'party'
   | 'handoverType'
   | 'penaltyReason'

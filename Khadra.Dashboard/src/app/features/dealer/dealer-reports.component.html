@@ -124,9 +124,9 @@
             <span class="k-label">{{ t('dealerReports.revenueAfterCommission') }}</span
             ><span class="num">{{ r.netAfterCommission | money }}</span>
           </div>
-          <div class="money-line is-dim">
+          <div class="money-line">
             <span class="k-label">{{ t('dealerReports.netPayout') }}</span
-            ><span>{{ t('dealerReports.notAvailableYet') }}</span>
+            ><a class="row-link" routerLink="/dealer/payouts">{{ t('dealerReports.seePayouts') }}</a>
           </div>
           <div class="note-box is-plain">
             <kh-icon name="info" />
