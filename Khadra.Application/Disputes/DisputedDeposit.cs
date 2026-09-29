@@ -41,9 +41,12 @@ public sealed record DisputeBasis(
 /// basis.
 /// </para>
 /// <para>
-/// "Earlier" means resolved tickets opened BEFORE the one asked about. For a live ticket that is every
-/// resolved one (a ticket can only open once the previous one closed); for a resolved ticket it keeps
-/// its basis what it was when it was decided, whatever later tickets do.
+/// "Earlier" is decided WITHOUT comparing timestamps (pre-launch item 171): a tie or a skew between two nodes'
+/// clocks inside an open-resolve-open sequence could otherwise make neither ticket earlier, and offer both the whole
+/// deposit. For a LIVE ticket every other resolved ticket is earlier — only one ticket per booking can be live, so
+/// one can open only after the previous one closed. A RESOLVED ticket keeps the basis stored on its own decision,
+/// and what earlier disputes decided is that basis subtracted from the deposit on the booking, whatever later
+/// tickets do.
 /// </para>
 /// </remarks>
 public static class DisputedDeposit
@@ -52,7 +55,7 @@ public static class DisputedDeposit
     /// Whether the booking's deposit already went back because its dispute window closed cleanly
     /// (a <c>DisputeWindowClosed</c> refund on its deposit payment).
     /// </param>
-    /// <param name="resolvedTickets">The booking's resolved tickets; only those opened before <paramref name="ticket"/> count.</param>
+    /// <param name="resolvedTickets">The booking's resolved tickets; which of them count is decided above.</param>
     public static Result<DisputeBasis, Error> For(
         DisputeTicket ticket,
         Booking booking,
@@ -64,28 +67,25 @@ public static class DisputedDeposit
         ArgumentNullException.ThrowIfNull(resolvedTickets);
 
         var deposit = BookingDisputeSettlement.DepositHeldFor(booking, depositReleased);
-        var currency = deposit.CurrencyCode;
+        var others = resolvedTickets
+            .Where(other => other.Id != ticket.Id && other.BookingId == ticket.BookingId && other.Resolution is not null)
+            .ToList();
 
+        return ticket.Resolution is { } own
+            ? Decided(ticket, own, booking, deposit, others)
+            : Live(booking, deposit, others);
+    }
+
+    /// <summary>A live ticket: every other resolved ticket of the booking decided before it.</summary>
+    private static Result<DisputeBasis, Error> Live(Booking booking, Money deposit, List<DisputeTicket> earlier)
+    {
+        var currency = deposit.CurrencyCode;
         var decided = 0m;
         var charged = 0m;
-        foreach (var earlier in resolvedTickets.Where(other =>
-                     other.Id != ticket.Id &&
-                     other.BookingId == ticket.BookingId &&
-                     other.OpenedAt < ticket.OpenedAt &&
-                     other.Resolution is not null))
+        foreach (var other in earlier)
         {
-            var split = earlier.Resolution!.Deposit;
-            if (!string.Equals(split.DepositHeld.CurrencyCode, currency, StringComparison.Ordinal))
-                throw new DomainException($"Dispute {earlier.Id} split a deposit in another currency than booking {booking.Id}.");
-
-            decided += split.RefundToCustomer.Amount + split.RetainedByPlatform.Amount + split.TransferredToDealer.Amount;
-
-            if (earlier.Resolution.DealerCharge is { } earlierCharge)
-            {
-                if (!string.Equals(earlierCharge.CurrencyCode, currency, StringComparison.Ordinal))
-                    throw new DomainException($"Dispute {earlier.Id} charged the office in another currency than booking {booking.Id}.");
-                charged += earlierCharge.Amount;
-            }
+            decided += SplitOf(other, booking, currency);
+            charged += ChargeOf(other, booking, currency);
         }
 
         // More decided than was ever held is a data-integrity failure, never a figure to show or to
@@ -98,5 +98,52 @@ public static class DisputedDeposit
             Money.Create(decided, currency),
             Money.Create(deposit.Amount - decided, currency),
             Money.Create(charged, currency));
+    }
+
+    /// <summary>
+    /// A resolved ticket: the basis its own decision stored, and what earlier disputes decided as that basis taken
+    /// from the deposit on the booking. What they charged the office is shown only, never validated against, so it is
+    /// read by resolution order.
+    /// </summary>
+    private static Result<DisputeBasis, Error> Decided(
+        DisputeTicket ticket,
+        DisputeResolution own,
+        Booking booking,
+        Money deposit,
+        List<DisputeTicket> others)
+    {
+        var currency = deposit.CurrencyCode;
+        var basis = own.Deposit.DepositHeld;
+        if (!string.Equals(basis.CurrencyCode, currency, StringComparison.Ordinal))
+            throw new DomainException($"Dispute {ticket.Id} split a deposit in another currency than booking {booking.Id}.");
+        if (basis.Amount > deposit.Amount)
+            return DisputeErrors.DepositOverAllocated;
+
+        var charged = others
+            .Where(other => other.Resolution!.ResolvedAt < own.ResolvedAt)
+            .Sum(other => ChargeOf(other, booking, currency));
+
+        return new DisputeBasis(
+            Money.Create(deposit.Amount, currency),
+            Money.Create(deposit.Amount - basis.Amount, currency),
+            Money.Create(basis.Amount, currency),
+            Money.Create(charged, currency));
+    }
+
+    private static decimal SplitOf(DisputeTicket ticket, Booking booking, string currency)
+    {
+        var split = ticket.Resolution!.Deposit;
+        if (!string.Equals(split.DepositHeld.CurrencyCode, currency, StringComparison.Ordinal))
+            throw new DomainException($"Dispute {ticket.Id} split a deposit in another currency than booking {booking.Id}.");
+        return split.RefundToCustomer.Amount + split.RetainedByPlatform.Amount + split.TransferredToDealer.Amount;
+    }
+
+    private static decimal ChargeOf(DisputeTicket ticket, Booking booking, string currency)
+    {
+        if (ticket.Resolution!.DealerCharge is not { } charge)
+            return 0m;
+        if (!string.Equals(charge.CurrencyCode, currency, StringComparison.Ordinal))
+            throw new DomainException($"Dispute {ticket.Id} charged the office in another currency than booking {booking.Id}.");
+        return charge.Amount;
     }
 }

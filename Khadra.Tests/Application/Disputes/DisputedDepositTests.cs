@@ -131,6 +131,40 @@ public sealed class DisputedDepositTests
         Assert.Equal(18m, basis.Basis.Amount);
     }
 
+    /// <summary>
+    /// Pre-launch item 171: a live ticket counts every resolved ticket of its booking, even one whose clock says it
+    /// opened later — two nodes' clocks can disagree, and only one ticket per booking can ever be live.
+    /// </summary>
+    [Fact]
+    public void A_live_ticket_counts_every_resolved_ticket_whatever_the_clocks_say()
+    {
+        var booking = CancelledBooking();
+        var skewed = Resolved(booking, 12, 18m, 9m, 0m, 9m);
+        var live = Ticket(booking, 8);
+        Assert.True(skewed.OpenedAt > live.OpenedAt);
+
+        var basis = DisputedDeposit.For(live, booking, depositReleased: false, [skewed]).Value;
+
+        Assert.Equal(18m, basis.DecidedByEarlierTickets.Amount);
+        Assert.Equal(0m, basis.Basis.Amount);
+    }
+
+    /// <summary>Pre-launch item 171: a resolved ticket reads its own stored basis, never the clocks.</summary>
+    [Fact]
+    public void A_resolved_ticket_keeps_the_basis_it_was_decided_against_whatever_the_clocks_say()
+    {
+        var booking = CancelledBooking();
+        var first = Resolved(booking, 8, 18m, 18m, 0m, 0m);
+        var second = Resolved(booking, 4, 0m, 0m, 0m, 0m);
+        Assert.True(second.OpenedAt < first.OpenedAt);
+
+        var ofFirst = DisputedDeposit.For(first, booking, depositReleased: false, [first, second]).Value;
+        var ofSecond = DisputedDeposit.For(second, booking, depositReleased: false, [first, second]).Value;
+
+        Assert.Equal((18m, 0m), (ofFirst.Basis.Amount, ofFirst.DecidedByEarlierTickets.Amount));
+        Assert.Equal((0m, 18m), (ofSecond.Basis.Amount, ofSecond.DecidedByEarlierTickets.Amount));
+    }
+
     [Fact]
     public void A_withdrawn_or_live_ticket_decided_nothing()
     {
