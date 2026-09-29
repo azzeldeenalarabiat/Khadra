@@ -451,18 +451,25 @@ public sealed class FinancialDocumentComposerTests
         var notYet = StatementWith(null);
 
         const string En = "The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.";
-        const string Ar = "انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.";
+        const string Ar = "انتهت مهلة النزاع دون فتح نزاع. تم تثبيت حسم العربون وتطبيقه وفق شروط إلغاء الحجز.";
         Assert.Equal("PenaltyKept", kept.GetProperty("document").GetProperty("cause").GetString());
         var cause = Line(kept, "document", "cause").GetProperty("text");
         Assert.Equal("Deposit penalty finalized", cause.GetProperty("en").GetString());
-        Assert.Equal("تثبيت حسم مبلغ التأمين", cause.GetProperty("ar").GetString());
+        Assert.Equal("تثبيت حسم العربون", cause.GetProperty("ar").GetString());
         Assert.Equal("KeptFromDeposit", kept.GetProperty("facts").GetProperty("penalty").GetProperty("standing").GetString());
-        foreach (var (section, line) in new[] { ("penalty", "standing"), ("deposit", "state") })
-        {
-            var text = Line(kept, section, line).GetProperty("text");
-            Assert.Equal(En, text.GetProperty("en").GetString());
-            Assert.Equal(Ar, text.GetProperty("ar").GetString());
-        }
+
+        // The owner's explanation once, where the penalty stands; the deposit says its amount and where it went.
+        var standing = Line(kept, "penalty", "standing").GetProperty("text");
+        Assert.Equal(En, standing.GetProperty("en").GetString());
+        Assert.Equal(Ar, standing.GetProperty("ar").GetString());
+        var deposit = Line(kept, "deposit", "state").GetProperty("text");
+        Assert.Equal("Your deposit of 18.000 JOD was kept as the penalty assessed on this booking.", deposit.GetProperty("en").GetString());
+        Assert.Equal("احتُفظ بعربونك البالغ ⁨18.000 JOD⁩ بوصفه الغرامة المقدَّرة على هذا الحجز.", deposit.GetProperty("ar").GetString());
+        var everything = kept.GetRawText();
+        Assert.Single(everything.Split(En)[1..]);
+        Assert.Single(everything.Split(Ar)[1..]);
+        // «التأمين» is the security deposit the office holds; the booking deposit is «العربون» (owner, 2026-09-30).
+        Assert.DoesNotContain("مبلغ التأمين", everything, StringComparison.Ordinal);
 
         // Before the ledger has recorded it, the deposit is still held, the penalty still only assessed, and the
         // statement is the ending's.
