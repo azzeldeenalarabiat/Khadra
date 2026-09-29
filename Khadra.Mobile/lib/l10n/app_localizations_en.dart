@@ -1187,7 +1187,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bookingPenaltyStateKeptFromDeposit =>
-      'The dispute window closed with no dispute, so this penalty was kept from your deposit. See Payments.';
+      'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.';
 
   @override
   String get bookingPartyCustomer => 'you';
@@ -1431,9 +1431,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String paymentsDepositKeptAsPenalty(String amount) {
-    return 'Your deposit of $amount was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.';
-  }
+  String get paymentsDepositKeptAsPenalty =>
+      'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.';
 
   @override
   String paymentsDepositDecidedByDispute(String share, String amount) {

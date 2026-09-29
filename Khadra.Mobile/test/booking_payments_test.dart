@@ -200,12 +200,12 @@ void main() {
       );
     });
 
-    test('says a deposit the ledger kept as the penalty was kept, in both languages (payments Phase 8)', () {
+    test("says a deposit the ledger kept as the penalty was kept, in the owner's approved words (payments Phase 8)", () {
       expect(
         plain(depositSentence(en, formatsFor('en'), deposit('KeptAsPenalty'))!),
-        'Your deposit of JOD 18.000 was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.',
+        'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.',
       );
-      expect(plain(depositSentence(ar, formatsFor('ar'), deposit('KeptAsPenalty'))!), contains('احتُفظ بعربونك البالغ'));
+      expect(plain(depositSentence(ar, formatsFor('ar'), deposit('KeptAsPenalty'))!), 'انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.');
     });
 
     test('names only the customer\'s own share of a dispute, in both languages', () {

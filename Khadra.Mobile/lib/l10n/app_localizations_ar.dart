@@ -1224,7 +1224,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookingPenaltyStateKeptFromDeposit =>
-      'انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك. راجع قسم المدفوعات.';
+      'انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.';
 
   @override
   String get bookingPartyCustomer => 'عليك';
@@ -1496,9 +1496,8 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String paymentsDepositKeptAsPenalty(String amount) {
-    return 'احتُفظ بعربونك البالغ $amount بوصفه الغرامة المقدَّرة على هذا الحجز، إذ انتهت مهلة النزاع دون فتح أيّ نزاع.';
-  }
+  String get paymentsDepositKeptAsPenalty =>
+      'انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.';
 
   @override
   String paymentsDepositDecidedByDispute(String share, String amount) {
