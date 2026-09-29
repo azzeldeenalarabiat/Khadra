@@ -628,6 +628,13 @@ export const EN = {
   'invoices.print': 'Print',
   'invoices.booking': 'Booking {reference}',
   'invoices.issued': 'Issued {date}',
+  // The PDFs of a document (payments Phase 6): one per language drawn, fetched on the click.
+  'invoices.pdf.en': 'PDF (English)',
+  'invoices.pdf.ar': 'PDF (Arabic)',
+  'invoices.pdf.downloadEn': 'Download the PDF in English',
+  'invoices.pdf.downloadAr': 'Download the PDF in Arabic',
+  'invoices.pdf.preparing': 'The PDF of this document is being prepared.',
+  'invoices.pdf.voided': 'This document was voided, so its PDF is no longer offered. Its replacement has one.',
   // One notification kind serves a deposit and a payment in full, and it does not say which.
   'notification.YourDepositRefunded': '{actor}: your payment has been refunded',
   'notification.YourPartialRefundSettled': '{actor}: part of your payment has been refunded',

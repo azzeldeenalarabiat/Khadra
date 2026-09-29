@@ -73,6 +73,23 @@ export interface FinancialDocumentVoidNotice {
   readonly replacedBy: FinancialDocumentLink | null;
 }
 
+/**
+ * The PDFs a document can be downloaded as (payments Phase 6). Each is fetched through a link minted on
+ * request — `GET /financial-documents/{id}/pdf-link?language=` — that lasts minutes, so none is listed here.
+ */
+export interface FinancialDocumentPdf {
+  /** `en`, `ar`: the languages whose PDF has been drawn, English first. Empty for a voided document. */
+  readonly languages: readonly string[];
+  /** A PDF the document will have is still being drawn. Never true for a voided document. */
+  readonly preparing: boolean;
+}
+
+/** A link to a private file, good for a few minutes: `GET /financial-documents/{id}/pdf-link`. */
+export interface SignedFileLink {
+  readonly url: string;
+  readonly expiresAt: string;
+}
+
 /** One document's page: its row, its stored snapshot exactly as issued, and its links. */
 export interface FinancialDocumentPage extends FinancialDocumentRow {
   readonly snapshotSchemaVersion: number;
@@ -80,6 +97,8 @@ export interface FinancialDocumentPage extends FinancialDocumentRow {
   readonly snapshot: unknown;
   readonly links: FinancialDocumentLinks;
   readonly voided: FinancialDocumentVoidNotice | null;
+  /** Absent from a server older than Phase 6: then no PDF is offered. */
+  readonly pdf?: FinancialDocumentPdf;
 }
 
 /** A document owed and not issued yet: "being prepared". */

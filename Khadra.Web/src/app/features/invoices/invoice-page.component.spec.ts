@@ -149,4 +149,114 @@ describe('InvoicePageComponent', () => {
     expect([...element.querySelectorAll('.invoice bdi')].map((node) => node.textContent)).toContain('أوتو رنت (Auto Rent)');
     expect([...element.querySelectorAll('.invoice .ltr')].map((node) => node.textContent)).toContain('TEST-PAY-2026-000002');
   });
+  // ── PDFs (payments Phase 6) ─────────────────────────────────────────────────────────────────────
+
+  /** A browser that saves files: the object URL it is handed, and the anchor clicked to save it. */
+  function saving() {
+    const saved: { href: string; download: string }[] = [];
+    const created = vi.fn(() => 'blob:khadra-pdf');
+    const revoked = vi.fn();
+    Object.assign(window.URL, { createObjectURL: created, revokeObjectURL: revoked });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      saved.push({ href: this.getAttribute('href')!, download: this.download });
+    });
+    return { saved, created, revoked };
+  }
+
+  const pdfButtons = (element: HTMLElement) =>
+    [...element.querySelectorAll<HTMLButtonElement>('.invoice-page__head button')].filter((button) => button.textContent!.includes('PDF'));
+
+  it('offers one PDF per language drawn and saves it under its number and language', async () => {
+    const browser = saving();
+    const document = page('payment-receipt-paid-in-full');
+    const { http, settle, element } = await show(document);
+
+    const buttons = pdfButtons(element);
+    expect(buttons.map((button) => button.textContent!.trim())).toEqual(['PDF (English)', 'PDF (Arabic)']);
+    // The visible words are the button's name (WCAG 2.5.3); the fuller sentence is its description.
+    expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([null, null]);
+    expect(buttons.map((button) => button.getAttribute('title'))).toEqual(['Download the PDF in English', 'Download the PDF in Arabic']);
+    expect(buttons[0]!.closest('.no-print')).not.toBeNull();
+
+    buttons[1]!.click();
+    await settle();
+    // Minted on the click — it lasts minutes — then fetched through the session, never handed to the address bar.
+    const minted = http.expectOne((request) => request.url === url(document.documentId) + '/pdf-link');
+    expect(minted.request.params.get('language')).toBe('ar');
+    minted.flush({ url: '/api/v1/documents/dG9rZW4?expires=1&signature=s', expiresAt: '2026-09-29T10:05:00Z' });
+    await settle();
+    const file = http.expectOne('/api/v1/documents/dG9rZW4?expires=1&signature=s');
+    expect(file.request.responseType).toBe('blob');
+    file.flush(new Blob(['%PDF-1.7'], { type: 'application/pdf' }));
+    await settle();
+
+    expect(browser.created).toHaveBeenCalledOnce();
+    expect(browser.saved).toEqual([{ href: 'blob:khadra-pdf', download: 'TEST-PAY-2026-000002-ar.pdf' }]);
+    expect(element.querySelector('.invoice-page__pdf')).toBeNull();
+  });
+
+  it('names the PDFs in Arabic on an Arabic page', async () => {
+    const { element } = await show(page('payment-receipt-paid-in-full'), 'ar');
+    expect(pdfButtons(element).map((button) => button.textContent!.trim())).toEqual(['PDF (بالإنجليزية)', 'PDF (بالعربية)']);
+  });
+
+  it('says a PDF is being prepared, beside the ones already drawn', async () => {
+    const none = await show(page('booking-statement-receipt-corrected'));
+    expect(pdfButtons(none.element)).toHaveLength(0);
+    expect(none.element.querySelector('.invoice-page__pdf')!.textContent).toContain('The PDF of this document is being prepared.');
+    TestBed.resetTestingModule();
+
+    const some = await show(page('refund-receipt-dispute-decision'), 'ar');
+    expect(pdfButtons(some.element).map((button) => button.textContent!.trim())).toEqual(['PDF (بالإنجليزية)']);
+    expect(some.element.querySelector('.invoice-page__pdf')!.textContent).toContain('يجري تجهيز ملف PDF لهذا المستند.');
+  });
+
+  it('offers no PDF of a voided document, and says nothing is being prepared', async () => {
+    const { element } = await show(page('payment-receipt-deposit-voided'));
+    expect(pdfButtons(element)).toHaveLength(0);
+    expect(element.querySelector('.invoice-page__pdf')).toBeNull();
+  });
+
+  it('offers no PDF when the server predates them', async () => {
+    const older = page('payment-receipt-paid-in-full') as { pdf?: unknown };
+    delete older.pdf;
+    const { element } = await show(older as FinancialDocumentPage);
+    expect(pdfButtons(element)).toHaveLength(0);
+    expect(element.querySelector('.invoice-page__pdf')).toBeNull();
+  });
+
+  it('words a refusal in the page language, and saves nothing', async () => {
+    const browser = saving();
+    const document = page('payment-receipt-paid-in-full');
+    const { http, settle, element } = await show(document, 'ar');
+
+    pdfButtons(element)[0]!.click();
+    await settle();
+    http
+      .expectOne((request) => request.url === url(document.documentId) + '/pdf-link')
+      .flush({ code: 'financial_documents.pdf_not_ready' }, { status: 409, statusText: 'Conflict' });
+    await settle();
+
+    expect(element.querySelector('.invoice-page__pdf .notice')!.textContent).toBe('يجري تجهيز ملف PDF لهذا المستند.');
+    expect(browser.saved).toHaveLength(0);
+    expect(pdfButtons(element).every((button) => !button.disabled)).toBe(true);
+  });
+
+  it('never follows a minted link that points anywhere but the private files', async () => {
+    const browser = saving();
+    const document = page('payment-receipt-paid-in-full');
+    const { http, settle, element } = await show(document);
+
+    pdfButtons(element)[0]!.click();
+    await settle();
+    http
+      .expectOne((request) => request.url === url(document.documentId) + '/pdf-link')
+      .flush({ url: 'https://elsewhere.example/receipt.pdf', expiresAt: '2026-09-29T10:05:00Z' });
+    await settle();
+
+    expect(http.match(() => true)).toHaveLength(0);
+    expect(browser.saved).toHaveLength(0);
+    expect(element.querySelector('.invoice-page__pdf .notice')).not.toBeNull();
+  });
+
 });

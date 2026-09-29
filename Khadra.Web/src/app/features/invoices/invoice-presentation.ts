@@ -270,6 +270,42 @@ export interface InvoicePageView {
   /** On a refund receipt: the payment receipt it was issued against, linked. */
   readonly paymentReceipt: NumberedLink | null;
   readonly refundReceipts: readonly LinkView[];
+  /** The PDFs to download (payments Phase 6), and whether one is still being drawn. */
+  readonly pdf: PdfView;
+}
+
+/** One PDF download: the language it is in, its button, and the name the saved file gets. */
+export interface PdfDownloadView {
+  readonly language: string;
+  readonly label: string;
+  readonly aria: string;
+  readonly fileName: string;
+}
+
+export interface PdfView {
+  readonly downloads: readonly PdfDownloadView[];
+  readonly preparing: boolean;
+}
+
+/** The two languages a PDF is drawn in; one this site has never heard of is not offered. */
+const PDF_LANGUAGES: Readonly<Record<string, { readonly label: TranslationKey; readonly aria: TranslationKey }>> = {
+  en: { label: 'invoices.pdf.en', aria: 'invoices.pdf.downloadEn' },
+  ar: { label: 'invoices.pdf.ar', aria: 'invoices.pdf.downloadAr' },
+};
+
+export function pdfView(page: FinancialDocumentPage, t: Translate): PdfView {
+  const pdf = page.pdf;
+  return {
+    downloads: (pdf?.languages ?? [])
+      .filter((language) => Object.hasOwn(PDF_LANGUAGES, language))
+      .map((language) => ({
+        language,
+        label: t(PDF_LANGUAGES[language].label),
+        aria: t(PDF_LANGUAGES[language].aria),
+        fileName: `${page.number}-${language}.pdf`,
+      })),
+    preparing: pdf?.preparing === true,
+  };
 }
 
 export function invoicePage(page: FinancialDocumentPage, arabic: boolean, t: Translate, format: InvoiceFormat): InvoicePageView {
@@ -312,6 +348,7 @@ export function invoicePage(page: FinancialDocumentPage, arabic: boolean, t: Tra
         )
       : null,
     refundReceipts: page.links.refundReceipts.map((link) => linkView(link, page.documentId, t, false)),
+    pdf: pdfView(page, t),
   };
 }
 

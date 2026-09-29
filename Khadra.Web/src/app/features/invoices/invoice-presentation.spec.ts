@@ -6,7 +6,7 @@ import { AR } from '../../core/i18n/ar';
 import { EN, TranslationKey } from '../../core/i18n/en';
 import { MessageParams } from '../../core/i18n/language';
 import { resolveMessage } from '../../core/i18n/resolve';
-import { DocumentBlock, InvoiceFormat, invoicePage, invoiceRow, preparingRow, standing } from './invoice-presentation';
+import { DocumentBlock, InvoiceFormat, invoicePage, invoiceRow, pdfView, preparingRow, standing } from './invoice-presentation';
 
 /**
  * Issued documents in words (payments Phase 5b), against the REAL dictionaries and the SHARED contract
@@ -195,5 +195,36 @@ describe('lists', () => {
     expect(preparingRow(pending('RefundReceipt'), ar, format).label).toBe('إيصال استرداد — قيد الإعداد');
     expect(preparingRow(pending('BookingStatement'), ar, format).label).toBe('كشف حساب الحجز — قيد الإعداد');
     expect(preparingRow(pending('PayablesStatement'), en, format).label).toBe('A document — being prepared');
+  });
+});
+
+describe('the PDFs of a document (payments Phase 6)', () => {
+  it('offers each language the server drew, English first, saved under the number and the language', () => {
+    expect(pdfView(page('payment-receipt-paid-in-full'), en)).toEqual({
+      downloads: [
+        { language: 'en', label: 'PDF (English)', aria: 'Download the PDF in English', fileName: 'TEST-PAY-2026-000002-en.pdf' },
+        { language: 'ar', label: 'PDF (Arabic)', aria: 'Download the PDF in Arabic', fileName: 'TEST-PAY-2026-000002-ar.pdf' },
+      ],
+      preparing: false,
+    });
+    expect(invoicePage(page('payment-receipt-paid-in-full'), true, ar, format).pdf.downloads.map((download) => download.label)).toEqual([
+      'PDF (بالإنجليزية)',
+      'PDF (بالعربية)',
+    ]);
+  });
+
+  it('says what the server says is still being drawn, and offers nothing of a voided document', () => {
+    expect(pdfView(page('booking-statement-receipt-corrected'), en)).toEqual({ downloads: [], preparing: true });
+    expect(pdfView(page('refund-receipt-dispute-decision'), en).downloads.map((download) => download.language)).toEqual(['en']);
+    expect(pdfView(page('refund-receipt-dispute-decision'), en).preparing).toBe(true);
+    expect(pdfView(page('payment-receipt-deposit-voided'), en)).toEqual({ downloads: [], preparing: false });
+  });
+
+  it('never offers a language this site does not know, nor anything from a server that predates PDFs', () => {
+    // `constructor` is a property of every object: only the table's own keys are languages.
+    const document = { ...page('payment-receipt-paid-in-full'), pdf: { languages: ['en', 'fr', 'constructor', 'toString'], preparing: false } };
+    expect(pdfView(document, en).downloads.map((download) => download.language)).toEqual(['en']);
+    const { pdf: _absent, ...older } = page('payment-receipt-paid-in-full');
+    expect(pdfView(older, en)).toEqual({ downloads: [], preparing: false });
   });
 });

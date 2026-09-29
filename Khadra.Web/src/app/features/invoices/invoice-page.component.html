@@ -27,8 +27,31 @@
         <button type="button" class="btn btn--secondary btn--sm" (click)="print()">
           <kh-icon name="printer" />{{ i18n.t('invoices.print') }}
         </button>
+        @for (download of v.pdf.downloads; track download.language) {
+          <button
+            type="button"
+            class="btn btn--secondary btn--sm"
+            [attr.title]="download.aria"
+            [attr.aria-busy]="downloading() === download.language"
+            [disabled]="downloading() !== null"
+            (click)="downloadPdf(download)"
+          >
+            <kh-icon name="download-simple" />{{ download.label }}
+          </button>
+        }
       </div>
     </div>
+
+    @if (v.pdf.preparing || pdfProblem()) {
+      <div class="invoice-page__pdf no-print" role="status">
+        @if (v.pdf.preparing) {
+          <p class="faint small">{{ i18n.t('invoices.pdf.preparing') }}</p>
+        }
+        @if (pdfProblem(); as text) {
+          <p class="notice notice--bad">{{ text }}</p>
+        }
+      </div>
+    }
 
     @if (v.voided; as voided) {
       <p class="notice notice--bad invoice-page__notice" role="status">

@@ -99,6 +99,13 @@ $sm: 767px;
 .invoice-page__notice {
   margin-block-end: var(--s-3);
 }
+// Whether a PDF is still being drawn, and why the last one could not be fetched (payments Phase 6).
+.invoice-page__pdf {
+  margin-block-end: var(--s-3);
+}
+.invoice-page__pdf p {
+  margin: 0 0 var(--s-1);
+}
 // A document number in one of the page's own sentences never breaks at one of its hyphens: the words
 // wrap, the number moves down whole. Only here — a Latin literal inside the document, an address, must
 // still wrap.
