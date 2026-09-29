@@ -628,7 +628,9 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     TestBed.resetTestingModule();
 
     const arabicKept = await render(withPenaltyState('KeptFromDeposit'), 'ar');
-    expect(arabicKept.text).toContain('انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.');
+    expect(arabicKept.text).toContain('انتهت مهلة النزاع دون فتح نزاع. تم تثبيت حسم العربون وتطبيقه وفق شروط إلغاء الحجز.');
+    // «التأمين» is the security deposit, which this page names in its own right; the booking deposit is «العربون».
+    expect(arabicKept.text).not.toContain('حسم مبلغ التأمين');
   });
 
   it('never again says nothing has been charged, and says nothing under a penalty state it does not know', async () => {

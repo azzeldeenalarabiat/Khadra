@@ -197,13 +197,16 @@ describe('the Payments section', () => {
     expect(ar('payments.reviewing')).toBe('تراجع خضرا المدفوعات على هذا الحجز.');
   });
 
-  it("says a deposit the ledger kept as the penalty was kept, in the owner's approved words (payments Phase 8)", () => {
+  it('says a deposit the ledger kept as the penalty was kept, with its amount and not the explanation (payments Phase 8)', () => {
     const kept = state({ deposit: { state: 'KeptAsPenalty', amount: jod(18) } });
 
     expect(paymentsView(kept, en, format).deposit).toBe(
-      'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.',
+      'Your deposit of 18 JOD was kept as the penalty assessed on this booking.',
     );
-    expect(paymentsView(kept, ar, format).deposit).toBe('انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.');
+    expect(paymentsView(kept, ar, format).deposit).toContain('احتُفظ بعربونك البالغ');
+    // The owner's explanation is the penalty notice's, said once (owner, 2026-09-30).
+    expect(paymentsView(kept, en, format).deposit).not.toContain('dispute window');
+    expect(paymentsView(kept, ar, format).deposit).not.toContain('التأمين');
   });
 
   it('words every deposit state it may be sent, in both languages', () => {
