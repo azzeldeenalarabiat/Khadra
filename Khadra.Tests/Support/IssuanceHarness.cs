@@ -4,6 +4,7 @@ using Khadra.Application.FinancialDocuments.Composition;
 using Khadra.Application.FinancialDocuments.Issuance;
 using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Application.FinancialDocuments.VoidFinancialDocument;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -13,6 +14,7 @@ using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Payments;
 using Khadra.Domain.PlatformSettings;
+using Khadra.Infrastructure.FinancialDocuments;
 using Khadra.Infrastructure.Persistence;
 using Khadra.Infrastructure.Persistence.Repositories;
 using Khadra.Infrastructure.Reporting;
@@ -39,7 +41,7 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
 
     public KhadraDbContext NewContext() => new(options);
 
-    public TestDocumentSettings Settings() => new(Issuer);
+    public TestDocumentSettings Settings() => new(Issuer, MaxRenditionsPerPass);
 
     public static UnitOfWork UnitOfWork(KhadraDbContext context) => new(context, Substitute.For<IDomainEventDispatcher>());
 
@@ -79,6 +81,75 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
         }
 
         return outcomes;
+    }
+
+    // ── PDFs (payments Phase 6) ─────────────────────────────────────────────────────────────────────
+
+    /// <summary>What draws the PDFs: the real renderer unless a test swaps it.</summary>
+    public IFinancialDocumentPdfRenderer Renderer { get; set; } = new QuestPdfFinancialDocumentRenderer();
+
+    /// <summary>Where the PDFs are stored, in memory.</summary>
+    public MemoryDocumentStorage Storage { get; } = new();
+
+    /// <summary>How many PDFs one pass draws at most.</summary>
+    public int MaxRenditionsPerPass { get; set; } = 40;
+
+    /// <summary>Whether "this process" stopped drawing after a full pass drew nothing — what <c>BookingSettlementService</c> keeps.</summary>
+    public bool DrawingStopped { get; private set; }
+
+    /// <summary>The pairs "this process" could not draw — what <c>BookingSettlementService</c> keeps; a restart is a new set.</summary>
+    public HashSet<RenditionCandidate> Undrawable { get; set; } = [];
+
+    /// <summary>What the rendering handlers logged, across passes.</summary>
+    public RecordingLogger<RenderFinancialDocumentHandler> RenderingLog { get; } = new();
+
+    /// <summary>One settlement pass's rendering, exactly as <c>BookingSettlementService</c> runs it.</summary>
+    public async Task<List<RenditionOutcome>> RenderPassAsync()
+    {
+        if (DrawingStopped)
+            return [];
+
+        IReadOnlyList<RenditionCandidate> work;
+        await using (var context = NewContext())
+        {
+            work = await new ListFinancialDocumentRenditionWorkHandler(new FinancialDocumentRenditionWorkReader(context), Renderer, Settings())
+                .Handle(new ListFinancialDocumentRenditionWorkQuery([.. Undrawable]), CancellationToken.None);
+        }
+
+        var outcomes = new List<RenditionOutcome>();
+        foreach (var candidate in work)
+        {
+            RenditionOutcome outcome;
+            await using (var context = NewContext())
+                outcome = await RenderHandler(context).Handle(new RenderFinancialDocumentCommand(candidate.DocumentId, candidate.Language), CancellationToken.None);
+
+            outcomes.Add(outcome);
+            if (outcome.StorageFailed)
+                break;
+            if (outcome.CannotBeDrawn)
+                Undrawable.Add(candidate);
+        }
+
+        if (outcomes.Count > 0 && outcomes.Count == work.Count && outcomes.All(outcome => outcome.CannotBeDrawn) && work.Count >= MaxRenditionsPerPass)
+            DrawingStopped = true;
+
+        return outcomes;
+    }
+
+    public RenderFinancialDocumentHandler RenderHandler(KhadraDbContext context) =>
+        new(
+            new FinancialDocumentRepository(context),
+            new FinancialDocumentRenditionRepository(context),
+            Renderer,
+            Storage,
+            UnitOfWork(context),
+            new TestClock(Now),
+            RenderingLog);
+
+    public async Task<List<FinancialDocumentRendition>> RenditionsAsync()
+    {
+        await using var context = NewContext();
+        return await context.FinancialDocumentRenditions.AsNoTracking().ToListAsync();
     }
 
     public async Task<CSharpFunctionalExtensions.Result<VoidedFinancialDocumentDto, Error>> VoidAsync(Id documentId, string reason)
@@ -204,10 +275,11 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
 }
 
 /// <summary>The issuing settings a test controls.</summary>
-internal sealed class TestDocumentSettings(DocumentIssuer? issuer) : IFinancialDocumentSettings
+internal sealed class TestDocumentSettings(DocumentIssuer? issuer, int maxRenditionsPerPass = 40) : IFinancialDocumentSettings
 {
     public DocumentIssuer? Issuer => issuer;
     public int MaxDocumentsPerPass => 200;
+    public int MaxRenditionsPerPass => maxRenditionsPerPass;
     public TimeSpan RetryInitialDelay => TimeSpan.FromMinutes(1);
     public TimeSpan RetryMaxDelay => TimeSpan.FromHours(1);
     public TimeSpan LateCommitMargin => TimeSpan.FromMinutes(10);

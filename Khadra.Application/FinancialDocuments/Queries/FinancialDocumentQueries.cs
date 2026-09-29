@@ -185,7 +185,7 @@ public sealed class AdminFinancialDocumentQueryHandlers(
         if (record is null)
             return FinancialDocumentErrors.NotFound;
 
-        var (page, voided) = await FinancialDocumentPageReader.ReadAsync(reader, record, cancellationToken);
+        var (page, voided, renditions) = await FinancialDocumentPageReader.ReadAsync(reader, record, cancellationToken);
         return new AdminFinancialDocumentDto(
             page,
             record.CustomerId.Value,
@@ -197,7 +197,8 @@ public sealed class AdminFinancialDocumentQueryHandlers(
             record.CheckpointFingerprint,
             voided is null
                 ? null
-                : new FinancialDocumentVoidDto(voided.VoidedAt, voided.VoidedByAdminId.Value, voided.VoidedByName, voided.Reason, page.Links.ReplacedBy));
+                : new FinancialDocumentVoidDto(voided.VoidedAt, voided.VoidedByAdminId.Value, voided.VoidedByName, voided.Reason, page.Links.ReplacedBy),
+            [.. renditions.Select(FinancialDocumentRenditionDto.From)]);
     }
 
     public async Task<Result<AdminBookingFinancialDocumentsDto, Error>> Handle(
@@ -245,7 +246,7 @@ public sealed class AdminFinancialDocumentQueryHandlers(
 /// <summary>Reads what a document's page needs besides the document: its family, its receipts, its void.</summary>
 internal static class FinancialDocumentPageReader
 {
-    public static async Task<(FinancialDocumentDto Page, FinancialDocumentVoidRecord? Void)> ReadAsync(
+    public static async Task<(FinancialDocumentDto Page, FinancialDocumentVoidRecord? Void, IReadOnlyList<FinancialDocumentRenditionRecord> Renditions)> ReadAsync(
         IFinancialDocumentReader reader,
         FinancialDocumentRecord record,
         CancellationToken cancellationToken)
@@ -271,6 +272,7 @@ internal static class FinancialDocumentPageReader
         }
 
         var voided = await reader.VoidOfAsync(record.Id, cancellationToken);
-        return (FinancialDocumentPages.Build(record, family, paymentReceipt, refundReceipts, voided), voided);
+        var renditions = await reader.RenditionsOfAsync(record.Id, cancellationToken);
+        return (FinancialDocumentPages.Build(record, family, paymentReceipt, refundReceipts, voided, renditions), voided, renditions);
     }
 }

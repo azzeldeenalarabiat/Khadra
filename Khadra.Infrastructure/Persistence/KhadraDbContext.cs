@@ -41,6 +41,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<ProviderEventReceipt> ProviderEventReceipts => Set<ProviderEventReceipt>();
     public DbSet<FinancialDocument> FinancialDocuments => Set<FinancialDocument>();
     public DbSet<FinancialDocumentVoid> FinancialDocumentVoids => Set<FinancialDocumentVoid>();
+    public DbSet<FinancialDocumentRendition> FinancialDocumentRenditions => Set<FinancialDocumentRendition>();
     public DbSet<FinancialDocumentIssuanceHold> FinancialDocumentIssuanceHolds => Set<FinancialDocumentIssuanceHold>();
     internal DbSet<FinancialDocumentSeries> FinancialDocumentSeries => Set<FinancialDocumentSeries>();
 

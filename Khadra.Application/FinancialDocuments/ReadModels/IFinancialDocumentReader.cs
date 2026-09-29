@@ -39,6 +39,17 @@ public sealed record FinancialDocumentVoidRecord(Id DocumentId, DateTimeOffset V
 /// <param name="OccurredAt">When the money event it will record happened.</param>
 public sealed record PendingFinancialDocumentRecord(FinancialDocumentType Type, Id SubjectId, DateTimeOffset OccurredAt);
 
+/// <summary>A stored rendering of a document (payments Phase 6): its language, what drew it, and the proof of its bytes.</summary>
+public sealed record FinancialDocumentRenditionRecord(
+    Language Language,
+    RenditionFormat Format,
+    int TemplateVersion,
+    string RendererVersion,
+    string ContentSha256,
+    long SizeBytes,
+    DateTimeOffset RenderedAt,
+    string SnapshotSha256);
+
 /// <summary>A family on hold, for the administrator.</summary>
 public sealed record FinancialDocumentHoldRecord(
     Id Id,
@@ -107,6 +118,9 @@ public interface IFinancialDocumentReader
         CancellationToken cancellationToken = default);
 
     Task<FinancialDocumentVoidRecord?> VoidOfAsync(Id documentId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every stored rendering of a document, oldest first (payments Phase 6).</summary>
+    Task<IReadOnlyList<FinancialDocumentRenditionRecord>> RenditionsOfAsync(Id documentId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// What a booking is owed and has not been issued yet: a captured payment with no receipt, a settled

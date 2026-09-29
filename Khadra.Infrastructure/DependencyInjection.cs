@@ -6,6 +6,7 @@ using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.Payments.ReadModels;
@@ -26,6 +27,7 @@ using Khadra.Domain.Reviews.Repositories;
 using Khadra.Domain.Shortlist.Repositories;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
+using Khadra.Infrastructure.FinancialDocuments;
 using Khadra.Infrastructure.Geocoding;
 using Khadra.Application.Bookings.Handover;
 using Khadra.Application.Bookings.Reminders;
@@ -350,6 +352,10 @@ public static class DependencyInjection
         services.AddScoped<IFinancialDocumentRepository, FinancialDocumentRepository>();
         services.AddScoped<IFinancialDocumentIssuanceHoldRepository, FinancialDocumentIssuanceHoldRepository>();
         services.AddScoped<IFinancialDocumentSeries, FinancialDocumentSeriesCounter>();
+        // Their PDF renditions (payments Phase 6): the append-only rows, and the one renderer, which holds the
+        // fonts and the library's once-per-process setup.
+        services.AddScoped<IFinancialDocumentRenditionRepository, FinancialDocumentRenditionRepository>();
+        services.AddSingleton<IFinancialDocumentPdfRenderer, QuestPdfFinancialDocumentRenderer>();
         services.AddScoped<INotifier, Notifier>();
         services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
 
@@ -393,6 +399,7 @@ public static class DependencyInjection
         // the customer's and the administrator's readings of them.
         services.AddScoped<IFinancialDocumentFactsReader, FinancialDocumentFactsReader>();
         services.AddScoped<IFinancialDocumentCandidateReader, FinancialDocumentCandidateReader>();
+        services.AddScoped<IFinancialDocumentRenditionWorkReader, FinancialDocumentRenditionWorkReader>();
         services.AddScoped<IFinancialDocumentReader, FinancialDocumentReader>();
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();

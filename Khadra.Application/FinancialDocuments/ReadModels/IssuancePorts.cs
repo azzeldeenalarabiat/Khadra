@@ -23,6 +23,12 @@ public interface IFinancialDocumentSettings
     /// <summary>The most documents one settlement pass issues or holds; the rest wait for the next pass.</summary>
     int MaxDocumentsPerPass { get; }
 
+    /// <summary>
+    /// The most PDF renditions one settlement pass draws (payments Phase 6); the rest wait for the next pass.
+    /// Drawing is the heaviest thing a pass does, so it is bounded on its own.
+    /// </summary>
+    int MaxRenditionsPerPass { get; }
+
     /// <summary>The first wait after a family is put on hold; each further failure doubles it.</summary>
     TimeSpan RetryInitialDelay { get; }
 

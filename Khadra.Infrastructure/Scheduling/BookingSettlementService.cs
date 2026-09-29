@@ -1,6 +1,8 @@
 using Khadra.Application.Bookings.Reminders;
 using Khadra.Application.Bookings.SettleBookings;
 using Khadra.Application.FinancialDocuments.Issuance;
+using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Application.Payments.SettlePayments;
 using Khadra.Infrastructure.Configuration;
 using MediatR;
@@ -36,9 +38,15 @@ namespace Khadra.Infrastructure.Scheduling;
 internal sealed partial class BookingSettlementService(
     IServiceScopeFactory scopes,
     IOptions<SchedulingOptions> options,
+    IOptions<FinancialDocumentOptions> documentOptions,
     ILogger<BookingSettlementService> logger)
     : BackgroundService
 {
+    // The PDFs this process could not draw (payments Phase 6), and whether it has stopped drawing altogether.
+    // Only the pass touches them, and passes never overlap.
+    private readonly HashSet<RenditionCandidate> _undrawable = [];
+    private bool _drawingStopped;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -84,10 +92,59 @@ internal sealed partial class BookingSettlementService(
         // paperwork: issuing runs after the money is recorded, never inside the transaction that records it.
         await IssueFinancialDocumentsAsync(cancellationToken);
 
-        // Reminders LAST, after both sweeps: a booking whose payment window has just closed is expired
-        // above, so it is never reminded to pay for something that is already gone. The reminders only
-        // stage notifications; the outbox dispatcher sends them within seconds.
+        // Reminders after both sweeps: a booking whose payment window has just closed is expired above, so
+        // it is never reminded to pay for something that is already gone. The reminders only stage
+        // notifications; the outbox dispatcher sends them within seconds.
         await RunAsync(new SendDueRemindersCommand(), cancellationToken);
+
+        // PDFs last (payments Phase 6): the heaviest step and the least urgent, so nothing a customer is
+        // waiting on waits behind it — and still in the pass that issued the document, so its PDF follows it
+        // within the minute.
+        await RenderFinancialDocumentsAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Draws the PDFs owed (payments Phase 6): one query for the work, then one scope PER PDF, as issuing does.
+    /// A PDF that cannot be drawn is a defect — logged once at Error by the step that found it, and left alone
+    /// until the process restarts, because drawing it again every minute would only log it again. Storage that
+    /// refuses a PDF stops the step: it would refuse the next one too, and the next tick tries again.
+    /// </summary>
+    /// <remarks>
+    /// A FULL pass in which not one PDF could be drawn is a defect in the layout or the renderer, not in forty
+    /// documents that happen to be next in line. Drawing then stops until the process restarts, said once at
+    /// Error, rather than failing — and logging — every document on the platform a pass at a time, with a
+    /// work query that grows by every failure. A pass of fewer PDFs, or one that draws anything, never stops it.
+    /// </remarks>
+    private async Task RenderFinancialDocumentsAsync(CancellationToken cancellationToken)
+    {
+        if (_drawingStopped)
+            return;
+
+        var work = await RunAsync(new ListFinancialDocumentRenditionWorkQuery([.. _undrawable]), cancellationToken);
+        if (work is null)
+            return;
+
+        var undrawable = 0;
+        foreach (var candidate in work)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+
+            var outcome = await RunAsync(new RenderFinancialDocumentCommand(candidate.DocumentId, candidate.Language), cancellationToken);
+            if (outcome is null || outcome.StorageFailed)
+                return;
+            if (outcome.CannotBeDrawn)
+            {
+                _undrawable.Add(candidate);
+                undrawable++;
+            }
+        }
+
+        if (undrawable > 0 && undrawable == work.Count && work.Count >= documentOptions.Value.MaxRenditionsPerPass)
+        {
+            _drawingStopped = true;
+            LogDrawingStopped(logger, undrawable);
+        }
     }
 
     /// <summary>
@@ -152,6 +209,13 @@ internal sealed partial class BookingSettlementService(
 
     [LoggerMessage(2202, LogLevel.Error, "The {Pass} settlement pass failed. The other passes still ran; the next tick will retry.")]
     private static partial void LogPassFailed(ILogger logger, string pass, Exception exception);
+
+    [LoggerMessage(
+        2203,
+        LogLevel.Error,
+        "Not one of {Count} PDFs could be drawn in a full pass: a defect in the layout or the renderer, not in the documents. "
+        + "Drawing PDFs is STOPPED until the API restarts; documents are still issued and readable on screen.")]
+    private static partial void LogDrawingStopped(ILogger logger, int count);
 
     private static async Task<bool> SafeWaitAsync(PeriodicTimer timer, CancellationToken cancellationToken)
     {

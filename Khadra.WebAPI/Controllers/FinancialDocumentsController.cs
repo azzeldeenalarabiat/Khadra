@@ -1,4 +1,5 @@
 using Khadra.Application.Common;
+using Khadra.Application.Common.Ports;
 using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
@@ -47,6 +48,26 @@ public sealed class FinancialDocumentsController(ICurrentActor actor) : ApiContr
         KeepOutOfCaches();
         return FromResult(await Mediator.Send(
             new GetMyFinancialDocumentQuery(actor.UserId!.Value, Id.From(documentId)),
+            cancellationToken));
+    }
+
+    /// <summary>
+    /// A link, good for a few minutes, to the document's PDF in <c>en</c> or <c>ar</c> (payments Phase 6). The
+    /// bytes come from <c>GET /api/v1/documents/{token}</c>, like every private file; ask again when it lapses.
+    /// 404 for a document that is not the caller's, exactly as for one that does not exist; 409
+    /// <c>financial_documents.pdf_not_ready</c> while it is being drawn, and <c>financial_documents.pdf_voided</c>
+    /// for a voided document, whose correction has a PDF of its own.
+    /// </summary>
+    [HttpGet("financial-documents/{documentId:guid}/pdf-link")]
+    [ProducesResponseType<SignedDocumentLink>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> PdfLink(Guid documentId, [FromQuery] string? language, CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        return FromResult(await Mediator.Send(
+            new GetMyFinancialDocumentPdfLinkQuery(actor.UserId!.Value, Id.From(documentId), language),
             cancellationToken));
     }
 }

@@ -1,3 +1,4 @@
+using Khadra.Domain.Common;
 using Khadra.Domain.FinancialDocuments;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -121,6 +122,52 @@ internal sealed class FinancialDocumentVoidConfiguration : IEntityTypeConfigurat
             .WithOne()
             .HasForeignKey<FinancialDocumentVoid>(voided => voided.Id)
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+// A stored rendering of a document in one language (payments Phase 6). Append-only, like the document: one
+// per document, language, format and template version, never replaced; its bytes live in private document
+// storage and the row is the only pointer to them. Every index is created with the table, as for the
+// documents: it only ever grows.
+internal sealed class FinancialDocumentRenditionConfiguration : IEntityTypeConfiguration<FinancialDocumentRendition>
+{
+    public void Configure(EntityTypeBuilder<FinancialDocumentRendition> entity)
+    {
+        ConfigureAggregate(entity, "financial_document_renditions");
+
+        ConfigureId(entity.Property(rendition => rendition.DocumentId)).IsRequired();
+        entity.Property(rendition => rendition.Language)
+            .HasConversion(language => language.Name, name => Enumeration.FromName<Language>(name))
+            .HasMaxLength(2)
+            .IsRequired();
+        ConfigureEnumeration(entity.Property(rendition => rendition.Format), 10);
+        entity.Property(rendition => rendition.TemplateVersion).IsRequired();
+        entity.Property(rendition => rendition.RendererVersion)
+            .HasMaxLength(FinancialDocumentRendition.MaxRendererVersionLength)
+            .IsRequired();
+        entity.Property(rendition => rendition.StorageKey)
+            .HasMaxLength(FinancialDocumentRendition.MaxStorageKeyLength)
+            .IsRequired();
+        entity.Property(rendition => rendition.ContentSha256).HasMaxLength(64).IsFixedLength().IsRequired();
+        entity.Property(rendition => rendition.SizeBytes).IsRequired();
+        entity.Property(rendition => rendition.SnapshotSha256).HasMaxLength(64).IsFixedLength().IsRequired();
+        entity.Property(rendition => rendition.RenderedAt).IsRequired();
+
+        // One context, so a real reference; restricting, as every constraint here is.
+        entity.HasOne<FinancialDocument>()
+            .WithMany()
+            .HasForeignKey(rendition => rendition.DocumentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasIndex(rendition => new { rendition.DocumentId, rendition.Language, rendition.Format, rendition.TemplateVersion })
+            .IsUnique();
+        entity.HasIndex(rendition => rendition.StorageKey).IsUnique();
+
+        entity.ToTable(table =>
+        {
+            table.HasCheckConstraint("ck_financial_document_renditions_template_version", "template_version >= 1");
+            table.HasCheckConstraint("ck_financial_document_renditions_size_bytes", "size_bytes > 0");
+        });
     }
 }
 

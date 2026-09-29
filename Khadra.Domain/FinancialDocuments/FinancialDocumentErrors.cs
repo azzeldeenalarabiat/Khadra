@@ -41,4 +41,16 @@ public static class FinancialDocumentErrors
 
     public static readonly Error UnknownStatus =
         Error.Validation("financial_documents.unknown_status", "Unknown document status.");
+
+    /// <summary>The document exists and is the caller's, but its PDF in that language is not drawn yet (payments Phase 6).</summary>
+    public static readonly Error PdfNotReady =
+        Error.Conflict("financial_documents.pdf_not_ready", "The PDF of this document is being prepared.");
+
+    /// <summary>
+    /// A voided document keeps its page, marked void and linking to its correction, but no new copy of its PDF is
+    /// handed to the customer: the file shows the document as issued, with nothing on it to say it was voided.
+    /// </summary>
+    public static readonly Error PdfOfVoidedDocument = Error.Conflict(
+        "financial_documents.pdf_voided",
+        "This document was voided. Its correction has a PDF of its own.");
 }

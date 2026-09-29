@@ -18,6 +18,9 @@
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.1" />
     <PackageVersion Include="MailKit" Version="4.17.0" />
+    <!-- PDF renditions of issued financial documents (payments Phase 6). Community licence: the owner
+         confirmed on 2026-09-29 that Khadra qualifies (docs/pre-launch-checklist.md). -->
+    <PackageVersion Include="QuestPDF" Version="2026.9.1" />
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.22.0" />
     <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />

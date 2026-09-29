@@ -20,6 +20,10 @@ public sealed class FinancialDocumentOptions
     [Range(1, 1000)]
     public int MaxDocumentsPerPass { get; init; } = 200;
 
+    /// <summary>The most PDF renditions one settlement pass draws (payments Phase 6); the rest wait for the next pass.</summary>
+    [Range(1, 1000)]
+    public int MaxRenditionsPerPass { get; init; } = 40;
+
     /// <summary>The first wait after a document family is put on hold; each further failure doubles it.</summary>
     [Range(1, 86_400)]
     public int RetryInitialSeconds { get; init; } = 60;
@@ -144,6 +148,8 @@ internal sealed class FinancialDocumentSettings(IOptions<FinancialDocumentOption
     }
 
     public int MaxDocumentsPerPass => options.Value.MaxDocumentsPerPass;
+
+    public int MaxRenditionsPerPass => options.Value.MaxRenditionsPerPass;
 
     public TimeSpan RetryInitialDelay => TimeSpan.FromSeconds(options.Value.RetryInitialSeconds);
 

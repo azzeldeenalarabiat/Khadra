@@ -122,6 +122,28 @@ internal sealed class FinancialDocumentReader(KhadraDbContext context) : IFinanc
         return new FinancialDocumentVoidRecord(documentId, voided.VoidedAt, voided.VoidedByAdminId, name, voided.Reason);
     }
 
+    public async Task<IReadOnlyList<FinancialDocumentRenditionRecord>> RenditionsOfAsync(Id documentId, CancellationToken cancellationToken = default)
+    {
+        var renditions = await context.FinancialDocumentRenditions
+            .AsNoTracking()
+            .Where(rendition => rendition.DocumentId == documentId)
+            .OrderBy(rendition => rendition.RenderedAt)
+            .ThenBy(rendition => rendition.Id)
+            .ToListAsync(cancellationToken);
+        return
+        [
+            .. renditions.Select(rendition => new FinancialDocumentRenditionRecord(
+                rendition.Language,
+                rendition.Format,
+                rendition.TemplateVersion,
+                rendition.RendererVersion,
+                rendition.ContentSha256,
+                rendition.SizeBytes,
+                rendition.RenderedAt,
+                rendition.SnapshotSha256)),
+        ];
+    }
+
     public async Task<IReadOnlyList<PendingFinancialDocumentRecord>> PendingForBookingAsync(
         Id bookingId,
         CancellationToken cancellationToken = default)

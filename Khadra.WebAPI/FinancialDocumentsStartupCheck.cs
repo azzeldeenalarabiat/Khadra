@@ -1,5 +1,6 @@
 using System.Data.Common;
 using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,14 @@ internal static partial class FinancialDocumentsStartupCheck
             LogTestIdentity(logger, issuer.LegalName.En);
         else
             LogReady(logger, issuer.LegalName.En);
+
+        // PDFs (payments Phase 6): proved on this host by drawing one throwaway page, so a missing native library
+        // or face is said here, once, instead of once per document owed.
+        var pdf = services.GetRequiredService<IFinancialDocumentPdfRenderer>().Probe();
+        if (pdf.IsReady)
+            LogPdfsReady(logger, pdf.Description);
+        else
+            LogPdfsNotDrawn(logger, pdf.Description);
 
         try
         {
@@ -55,6 +64,14 @@ internal static partial class FinancialDocumentsStartupCheck
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Financial documents issued as {LegalName}.")]
     private static partial void LogReady(ILogger logger, string legalName);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Financial document PDFs are {Detail}.")]
+    private static partial void LogPdfsReady(ILogger logger, string detail);
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "FINANCIAL DOCUMENT PDFs ARE NOT DRAWN. {Reason} Documents are still issued and readable on screen; "
+                  + "their PDFs are drawn once this host can draw them and the API restarts.")]
+    private static partial void LogPdfsNotDrawn(ILogger logger, string reason);
 
     [LoggerMessage(Level = LogLevel.Warning,
         Message = "{Count} financial document(s) are on hold. The administrator's work queue lists them with their reasons.")]

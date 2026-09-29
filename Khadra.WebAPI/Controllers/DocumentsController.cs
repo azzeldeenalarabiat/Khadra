@@ -18,8 +18,10 @@ public sealed class DocumentsController(
     IDocumentLinkSigner signer,
     Application.Common.IClock clock) : ApiControllerBase
 {
+    // PrivateDocuments, not Auth (payments Phase 6): on a GET, Auth is ten a minute per ADDRESS, and a carrier's
+    // NAT is one address for thousands of customers downloading their receipts.
     [HttpGet("{token}")]
-    [EnableRateLimiting(RateLimitPolicies.Auth)]
+    [EnableRateLimiting(RateLimitPolicies.PrivateDocuments)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult> Download(

@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Reflection;
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Ports;
 using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.FinancialDocuments.VoidFinancialDocument;
 using Khadra.Application.Payments.Financials;
@@ -50,9 +51,11 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
     [Theory]
     [InlineData("GET", "/api/v1/customers/me/financial-documents")]
     [InlineData("GET", "/api/v1/financial-documents/{0}")]
+    [InlineData("GET", "/api/v1/financial-documents/{0}/pdf-link?language=en")]
     [InlineData("GET", "/api/v1/bookings/{0}/financial-documents")]
     [InlineData("GET", "/api/v1/admin/financial-documents")]
     [InlineData("GET", "/api/v1/admin/financial-documents/{0}")]
+    [InlineData("GET", "/api/v1/admin/financial-documents/{0}/pdf-link?language=ar")]
     [InlineData("GET", "/api/v1/admin/financial-documents/holds")]
     [InlineData("GET", "/api/v1/admin/financial-documents/vocabulary")]
     [InlineData("GET", "/api/v1/admin/bookings/{0}/financial-documents")]
@@ -136,6 +139,35 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task A_link_to_a_documents_pdf_is_kept_out_of_caches_and_so_is_the_answer_that_it_is_not_ready()
+    {
+        var mediator = Substitute.For<ISender>();
+        mediator.Send(Arg.Any<GetMyFinancialDocumentPdfLinkQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<SignedDocumentLink, Error>(FinancialDocumentErrors.PdfNotReady));
+        var controller = Over(new FinancialDocumentsController(Customer()), mediator);
+
+        var answer = await controller.PdfLink(SomeId, "ar", CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status409Conflict, Assert.IsType<ObjectResult>(answer).StatusCode);
+        Assert.Equal(NoStore, controller.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public void A_pdf_is_downloaded_where_every_private_file_is_and_under_the_private_documents_limit()
+    {
+        // No dedicated route for PDFs (payments Phase 6): the signed link points at the one download endpoint,
+        // which still needs a session and now shares the private-documents bucket, not the ten-a-minute auth one.
+        var download = typeof(DocumentsController).GetMethod(nameof(DocumentsController.Download))!;
+
+        Assert.Equal(RateLimitPolicies.PrivateDocuments, download.GetCustomAttribute<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()?.PolicyName);
+        Assert.Null(download.GetCustomAttribute<AllowAnonymousAttribute>());
+        Assert.Null(typeof(DocumentsController).GetCustomAttribute<AllowAnonymousAttribute>());
+        Assert.Equal(
+            "financial-documents/{documentId:guid}/pdf-link",
+            typeof(FinancialDocumentsController).GetMethod(nameof(FinancialDocumentsController.PdfLink))!.GetCustomAttribute<HttpGetAttribute>()!.Template);
+    }
+
+    [Fact]
     public async Task A_bookings_documents_are_kept_out_of_caches()
     {
         var mediator = Substitute.For<ISender>();
@@ -166,6 +198,8 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
             .Returns(Result.Failure<AdminBookingFinancialDocumentsDto, Error>(FinancialDocumentErrors.NotFound));
         mediator.Send(Arg.Any<VoidFinancialDocumentCommand>(), Arg.Any<CancellationToken>())
             .Returns(Result.Failure<VoidedFinancialDocumentDto, Error>(FinancialDocumentErrors.AlreadyVoided));
+        mediator.Send(Arg.Any<GetAdminFinancialDocumentPdfLinkQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<SignedDocumentLink, Error>(FinancialDocumentErrors.PdfNotReady));
 
         List<Func<AdminFinancialDocumentsController, Task<ActionResult>>> answers =
         [
@@ -175,6 +209,7 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
             controller => controller.Document(SomeId, CancellationToken.None),
             controller => controller.ForBooking(SomeId, CancellationToken.None),
             controller => controller.Void(SomeId, new AdminFinancialDocumentsController.VoidRequest("Wrong."), CancellationToken.None),
+            controller => controller.PdfLink(SomeId, "en", CancellationToken.None),
         ];
         // Every action is here: one added later without the header fails this count first.
         Assert.Equal(

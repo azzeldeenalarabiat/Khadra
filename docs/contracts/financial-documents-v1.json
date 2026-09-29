@@ -584,6 +584,10 @@
             "version": 2,
             "status": "Current"
           }
+        },
+        "pdf": {
+          "languages": [],
+          "preparing": false
         }
       }
     },
@@ -1165,7 +1169,14 @@
           "paymentReceipt": null,
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en",
+            "ar"
+          ],
+          "preparing": false
+        }
       }
     },
     {
@@ -1899,7 +1910,14 @@
           "paymentReceipt": null,
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en",
+            "ar"
+          ],
+          "preparing": false
+        }
       }
     },
     {
@@ -2675,7 +2693,14 @@
           "paymentReceipt": null,
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en",
+            "ar"
+          ],
+          "preparing": false
+        }
       }
     },
     {
@@ -3248,7 +3273,14 @@
             }
           ]
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en",
+            "ar"
+          ],
+          "preparing": false
+        }
       }
     },
     {
@@ -3831,7 +3863,14 @@
           },
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en",
+            "ar"
+          ],
+          "preparing": false
+        }
       }
     },
     {
@@ -4306,7 +4345,14 @@
           "paymentReceipt": null,
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en",
+            "ar"
+          ],
+          "preparing": false
+        }
       }
     },
     {
@@ -4881,7 +4927,13 @@
           },
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en"
+          ],
+          "preparing": true
+        }
       }
     },
     {
@@ -5829,7 +5881,14 @@
           "paymentReceipt": null,
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [
+            "en",
+            "ar"
+          ],
+          "preparing": false
+        }
       }
     },
     {
@@ -6560,7 +6619,11 @@
           "paymentReceipt": null,
           "refundReceipts": []
         },
-        "voided": null
+        "voided": null,
+        "pdf": {
+          "languages": [],
+          "preparing": true
+        }
       }
     }
   ],

@@ -275,8 +275,16 @@ public sealed partial class FinancialDocumentFixtureTests
                         .ThenBy(candidate => candidate.Number, StringComparer.Ordinal),
                 ]
                 : [];
-            return FinancialDocumentPages.Build(records[document.Id], family, paymentReceipt, refundReceipts, voids.GetValueOrDefault(document.Id));
+            return FinancialDocumentPages.Build(records[document.Id], family, paymentReceipt, refundReceipts, voids.GetValueOrDefault(document.Id), Drawn(document));
         }
+
+        // The PDFs drawn so far (payments Phase 6): both languages for most pages; none yet for the newest
+        // statement and English only for the dispute's refund receipt, both still being prepared; and the voided
+        // receipt's, drawn before its void and offered to nobody.
+        IReadOnlyList<FinancialDocumentRenditionRecord> Drawn(Issued document) =>
+            document == restated ? []
+            : document == shareReceipt ? [Pdf(Language.English, document)]
+            : [Pdf(Language.English, document), Pdf(Language.Arabic, document)];
 
         var rows = issued
             .Select(document => records[document.Id])
@@ -333,6 +341,9 @@ public sealed partial class FinancialDocumentFixtureTests
     }
 
     private static ReceiptReference Reference(Issued receipt) => new(receipt.Draft.Type, receipt.Id, receipt.Number);
+
+    private static FinancialDocumentRenditionRecord Pdf(Language language, Issued document) =>
+        new(language, RenditionFormat.Pdf, 1, "QuestPDF 2026.9.1", FinancialDocument.Sha256(document.Number + language.Name), 1, document.IssuedAt, document.Row.ContentSha256);
 
     private static DateTimeOffset Earliest(DateTimeOffset first, DateTimeOffset second) => first <= second ? first : second;
 

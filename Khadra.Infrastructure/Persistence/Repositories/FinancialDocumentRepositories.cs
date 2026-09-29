@@ -48,6 +48,33 @@ internal sealed class FinancialDocumentRepository(KhadraDbContext context) : IFi
     public void AddVoid(FinancialDocumentVoid voided) => context.FinancialDocumentVoids.Add(voided);
 }
 
+/// <summary>The stored renderings of issued documents (payments Phase 6). Append-only: nothing here updates or removes.</summary>
+internal sealed class FinancialDocumentRenditionRepository(KhadraDbContext context) : IFinancialDocumentRenditionRepository
+{
+    public Task<FinancialDocumentRendition?> CurrentAsync(
+        Id documentId,
+        Language language,
+        RenditionFormat format,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        ArgumentNullException.ThrowIfNull(format);
+        return context.FinancialDocumentRenditions
+            .Where(rendition => rendition.DocumentId == documentId && rendition.Language == language && rendition.Format == format)
+            .OrderByDescending(rendition => rendition.TemplateVersion)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<FinancialDocumentRendition>> ListForDocumentAsync(Id documentId, CancellationToken cancellationToken = default) =>
+        await context.FinancialDocumentRenditions
+            .Where(rendition => rendition.DocumentId == documentId)
+            .OrderBy(rendition => rendition.RenderedAt)
+            .ThenBy(rendition => rendition.Id)
+            .ToListAsync(cancellationToken);
+
+    public void Add(FinancialDocumentRendition rendition) => context.FinancialDocumentRenditions.Add(rendition);
+}
+
 /// <summary>The holds on document families that are owed a document (payments Phase 5).</summary>
 internal sealed class FinancialDocumentIssuanceHoldRepository(KhadraDbContext context) : IFinancialDocumentIssuanceHoldRepository
 {

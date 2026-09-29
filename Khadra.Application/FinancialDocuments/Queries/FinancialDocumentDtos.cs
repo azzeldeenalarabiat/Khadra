@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Khadra.Application.Common.Dtos;
 using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.FinancialDocuments.Rendering;
+using Khadra.Domain.Common;
 using Khadra.Domain.FinancialDocuments;
 using Khadra.Domain.Payments;
 
@@ -100,7 +102,63 @@ public sealed record FinancialDocumentDto(
     int SnapshotSchemaVersion,
     JsonElement Snapshot,
     FinancialDocumentLinksDto Links,
-    FinancialDocumentVoidNoticeDto? Voided);
+    FinancialDocumentVoidNoticeDto? Voided,
+    FinancialDocumentPdfDto Pdf);
+
+/// <summary>
+/// The PDFs the customer can download a document as (payments Phase 6).
+/// </summary>
+/// <param name="Languages">
+/// The languages whose PDF has been drawn, <c>en</c> before <c>ar</c> — one download each. Empty for a voided
+/// document: its page stays, marked void, but no new copy of a file that does not say so is handed out.
+/// </param>
+/// <param name="Preparing">
+/// True while a PDF the document will have is not drawn yet — the settlement pass draws them within minutes of
+/// issue. Never true for a voided document.
+/// </param>
+public sealed record FinancialDocumentPdfDto(IReadOnlyList<string> Languages, bool Preparing)
+{
+    internal static FinancialDocumentPdfDto For(bool voided, IEnumerable<FinancialDocumentRenditionRecord> renditions)
+    {
+        if (voided)
+            return new FinancialDocumentPdfDto([], false);
+
+        // The languages a PDF is drawn in, in their own order — never the platform's whole list of languages, which
+        // another feature may grow: a third one there must not leave every document "being prepared" for good.
+        var printed = DocumentPrintLayout.Languages;
+        var stored = renditions
+            .Where(rendition => rendition.Format == RenditionFormat.Pdf)
+            .Select(rendition => rendition.Language)
+            .ToHashSet();
+        var drawn = printed.Where(stored.Contains).ToList();
+        return new FinancialDocumentPdfDto([.. drawn.Select(language => language.Name)], drawn.Count < printed.Count);
+    }
+}
+
+/// <summary>A stored rendering as the administrator sees it: what drew it and the proof of its bytes.</summary>
+/// <param name="ContentSha256">SHA-256 of the stored PDF: the proof of which bytes were handed out.</param>
+/// <param name="SnapshotSha256">The document's own hash when it was drawn: the proof it pictures the record as issued.</param>
+public sealed record FinancialDocumentRenditionDto(
+    string Language,
+    string Format,
+    int TemplateVersion,
+    string RendererVersion,
+    string ContentSha256,
+    long SizeBytes,
+    DateTimeOffset RenderedAt,
+    string SnapshotSha256)
+{
+    internal static FinancialDocumentRenditionDto From(FinancialDocumentRenditionRecord record) =>
+        new(
+            record.Language.Name,
+            record.Format.Name,
+            record.TemplateVersion,
+            record.RendererVersion,
+            record.ContentSha256,
+            record.SizeBytes,
+            record.RenderedAt,
+            record.SnapshotSha256);
+}
 
 /// <summary>A document owed and not issued yet: "your receipt is being prepared".</summary>
 /// <param name="SubjectId">The payment, refund or booking it will be about.</param>
@@ -171,9 +229,14 @@ public sealed record FinancialDocumentVoidDto(
 
 /// <summary>
 /// One document as the administrator reads it: the customer's page, plus the provider it froze and the test
-/// marker read from it, the proof of what was issued (<c>contentSha256</c>), what a statement covered, and
-/// the void with its reason.
+/// marker read from it, the proof of what was issued (<c>contentSha256</c>), what a statement covered, the
+/// void with its reason, and every PDF drawn of it (payments Phase 6).
 /// </summary>
+/// <remarks>
+/// For a VOIDED document <c>Document.Pdf.Languages</c> is empty — the customer is no longer handed its PDF —
+/// while <see cref="Renditions"/> is not: the administrator can still download the record as issued. A console
+/// keys its downloads off <see cref="Renditions"/>.
+/// </remarks>
 public sealed record AdminFinancialDocumentDto(
     FinancialDocumentDto Document,
     Guid CustomerId,
@@ -183,7 +246,8 @@ public sealed record AdminFinancialDocumentDto(
     string ContentSha256,
     DateTimeOffset? CoversThrough,
     string? CheckpointFingerprint,
-    FinancialDocumentVoidDto? Void);
+    FinancialDocumentVoidDto? Void,
+    IReadOnlyList<FinancialDocumentRenditionDto> Renditions);
 
 /// <summary>A document family on hold: owed, not issued, and why.</summary>
 /// <param name="Reason"><c>RecordsNeedReview</c>, <c>IssuerNotConfigured</c> or <c>SnapshotFailed</c>.</param>
@@ -267,7 +331,8 @@ internal static class FinancialDocumentPages
         IReadOnlyList<FinancialDocumentRecord> family,
         FinancialDocumentRecord? paymentReceipt,
         IReadOnlyList<FinancialDocumentRecord> refundReceipts,
-        FinancialDocumentVoidRecord? voided)
+        FinancialDocumentVoidRecord? voided,
+        IReadOnlyList<FinancialDocumentRenditionRecord> renditions)
     {
         var row = FinancialDocumentListItem.From(record);
         var versions = family.OrderBy(member => member.Version).ToList();
@@ -300,7 +365,7 @@ internal static class FinancialDocumentPages
                 [.. refundReceipts.Select(FinancialDocumentLinkDto.From)]),
             voided is null
                 ? null
-                : new FinancialDocumentVoidNoticeDto(voided.VoidedAt, replacedBy is null ? null : FinancialDocumentLinkDto.From(replacedBy)));
+                : new FinancialDocumentVoidNoticeDto(voided.VoidedAt, replacedBy is null ? null : FinancialDocumentLinkDto.From(replacedBy)),
+            FinancialDocumentPdfDto.For(voided is not null, renditions));
     }
-
 }
