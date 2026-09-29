@@ -8,9 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:khadra_mobile/api/dtos.dart';
+import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/providers.dart';
 import 'package:khadra_mobile/core/theme/khadra_theme.dart';
 import 'package:khadra_mobile/features/invoices/invoice_content.dart';
+import 'package:khadra_mobile/features/invoices/invoice_providers.dart';
 import 'package:khadra_mobile/features/invoices/invoice_screen.dart';
 import 'package:khadra_mobile/features/invoices/invoices_screen.dart';
 import 'package:khadra_mobile/l10n/app_localizations.dart';
@@ -47,6 +49,7 @@ void main() {
     double height = 915,
     List<FinancialDocumentRow>? documents,
     Map<String, FinancialDocumentPage>? byId,
+    FileOpener? opener,
   }) async {
     tester.view.physicalSize = Size(width, height);
     tester.view.devicePixelRatio = 1;
@@ -60,6 +63,8 @@ void main() {
       sessionStoreProvider.overrideWithValue(FakeSessionStore()),
       sharedPreferencesProvider.overrideWithValue(null),
       isArabicProvider.overrideWithValue(locale.languageCode == 'ar'),
+      // Never the platform viewer: a test sees what the screen asked to open.
+      fileOpenerProvider.overrideWithValue(opener ?? ({required bytes, required contentType, required documentId}) async => true),
     ]);
     addTearDown(container.dispose);
     // The app's own language, not only the framework's: `formatsProvider` follows it,
@@ -177,6 +182,90 @@ void main() {
         expect(tester.getSize(text).height, lessThan(line * 1.5));
       });
     }
+
+    // ── PDFs (payments Phase 6) ─────────────────────────────────────────────────
+
+    screenTest('opens a PDF drawn, fetched over this session and named by its number and language, in $tag', (tester) async {
+      final opened = <(String, String?, int)>[];
+      final page = pages['payment-receipt-paid-in-full']!;
+      final api = await pump(
+        tester,
+        InvoiceScreen(documentId: page.row.documentId),
+        locale: locale,
+        opener: ({required bytes, required contentType, required documentId}) async {
+          opened.add((documentId, contentType, bytes.length));
+          return true;
+        },
+      );
+
+      expect(find.text(l10n.invoicesPdfEnglish), findsOneWidget);
+      expect(find.text(l10n.invoicesPdfArabic), findsOneWidget);
+      expect(find.text(l10n.invoicesPdfPreparing), findsNothing);
+      expect(find.byTooltip(l10n.invoicesPdfOpenArabic), findsOneWidget);
+
+      await tester.tap(find.text(l10n.invoicesPdfArabic));
+      await tester.pumpAndSettle();
+
+      // Minted on the tap, fetched by THIS app — never handed to a browser, which has no session.
+      expect(api.pdfLinks, [(page.row.documentId, 'ar')]);
+      expect(api.fetchedFiles, ['https://api.test/api/v1/documents/signed-ar?expires=1&signature=s']);
+      expect(opened, [('TEST-PAY-2026-000002-ar', 'application/pdf', 8)]);
+    });
+
+    screenTest('says a PDF is still being prepared beside the one drawn, in $tag', (tester) async {
+      await pump(tester, InvoiceScreen(documentId: pages['refund-receipt-dispute-decision']!.row.documentId), locale: locale);
+
+      expect(find.text(l10n.invoicesPdfEnglish), findsOneWidget);
+      expect(find.text(l10n.invoicesPdfArabic), findsNothing);
+      expect(find.text(l10n.invoicesPdfPreparing), findsOneWidget);
+    });
+
+    screenTest('offers no PDF of a voided document and says none is coming, in $tag', (tester) async {
+      await pump(tester, InvoiceScreen(documentId: pages['payment-receipt-deposit-voided']!.row.documentId), locale: locale);
+
+      expect(find.text(l10n.invoicesPdfEnglish), findsNothing);
+      expect(find.text(l10n.invoicesPdfArabic), findsNothing);
+      expect(find.text(l10n.invoicesPdfPreparing), findsNothing);
+    });
+
+    screenTest('words a PDF that is not drawn yet, and opens nothing, in $tag', (tester) async {
+      final opened = <String>[];
+      final page = pages['payment-receipt-paid-in-full']!;
+      final api = await pump(
+        tester,
+        InvoiceScreen(documentId: page.row.documentId),
+        locale: locale,
+        opener: ({required bytes, required contentType, required documentId}) async {
+          opened.add(documentId);
+          return true;
+        },
+      );
+      api.pdfLinkFailure = const ApiFailure(kind: ApiFailureKind.conflict, code: 'financial_documents.pdf_not_ready', statusCode: 409);
+
+      await tester.tap(find.text(l10n.invoicesPdfEnglish));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l10n.invoicesPdfPreparing), findsOneWidget);
+      expect(api.fetchedFiles, isEmpty);
+      expect(opened, isEmpty);
+      // The buttons work again: the refusal did not leave the screen waiting.
+      expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, l10n.invoicesPdfEnglish)).onPressed, isNotNull);
+    });
+
+    screenTest('says so when the phone has nothing that opens a PDF, in $tag', (tester) async {
+      final page = pages['payment-receipt-paid-in-full']!;
+      await pump(
+        tester,
+        InvoiceScreen(documentId: page.row.documentId),
+        locale: locale,
+        opener: ({required bytes, required contentType, required documentId}) async => false,
+      );
+
+      await tester.tap(find.text(l10n.invoicesPdfEnglish));
+      await tester.pumpAndSettle();
+
+      expect(find.text(l10n.documentsOpenFailed), findsOneWidget);
+    });
 
     screenTest('a document that is not there reads as not available, in $tag', (tester) async {
       await pump(tester, const InvoiceScreen(documentId: '00000000-0000-4000-8000-000000000999'), locale: locale);

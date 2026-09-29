@@ -5,6 +5,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:khadra_mobile/api/dtos.dart';
+import 'package:khadra_mobile/api/khadra_api.dart';
+import 'package:khadra_mobile/core/config/app_environment.dart';
 import 'package:khadra_mobile/core/api/api_failure.dart';
 import 'package:khadra_mobile/core/api/api_failure_messages.dart';
 import 'package:khadra_mobile/core/uploads/document_viewer.dart';
@@ -113,6 +115,18 @@ void main() {
 
       expect(Uri.parse(link.url).isAbsolute, isTrue);
       expect(link.url, contains('/api/v1/documents/abc'));
+    });
+  });
+
+  group("where a signed link may send this app's credentials (payments Phase 6)", () {
+    // The bytes are fetched with the bearer token, so a link is followed only to
+    // this API's own private-file endpoint, as the website and the console refuse
+    // any other.
+    test("the API's own private-file endpoint, and nothing else", () {
+      expect(KhadraApi.isPrivateFileAddress(AppEnvironment.resolve('/api/v1/documents/dG9rZW4?expires=1&signature=s')), isTrue);
+      expect(KhadraApi.isPrivateFileAddress('https://elsewhere.example/api/v1/documents/dG9rZW4'), isFalse);
+      expect(KhadraApi.isPrivateFileAddress(AppEnvironment.resolve('/api/v1/customers/me')), isFalse);
+      expect(KhadraApi.isPrivateFileAddress('/api/v1/documents/unresolved'), isFalse);
     });
   });
 }

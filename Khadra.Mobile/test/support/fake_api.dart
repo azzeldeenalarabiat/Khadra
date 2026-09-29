@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:khadra_mobile/api/dtos.dart';
@@ -319,6 +321,32 @@ class FakeApi extends KhadraApi {
 
   @override
   Future<FinancialDocumentPage?> financialDocument(String documentId) async => documentsById[documentId];
+
+  /// Every PDF link this phone asked for: (document, language).
+  final List<(String, String)> pdfLinks = [];
+
+  /// When set, the next PDF link is refused with it, once.
+  ApiFailure? pdfLinkFailure;
+
+  @override
+  Future<SignedDocumentLink> financialDocumentPdfLink(String documentId, String language) async {
+    pdfLinks.add((documentId, language));
+    final failure = pdfLinkFailure;
+    if (failure != null) {
+      pdfLinkFailure = null;
+      throw failure;
+    }
+    return SignedDocumentLink('https://api.test/api/v1/documents/signed-$language?expires=1&signature=s', null);
+  }
+
+  /// Every private file this phone fetched, by its signed address.
+  final List<String> fetchedFiles = [];
+
+  @override
+  Future<DocumentBytes> documentBytes(String url) async {
+    fetchedFiles.add(url);
+    return DocumentBytes(Uint8List.fromList(utf8.encode('%PDF-1.7')), 'application/pdf');
+  }
 
   /// Every cancellation this phone sent: (reason code, details, expected refund).
   final List<(String, String?, num?)> cancellations = [];

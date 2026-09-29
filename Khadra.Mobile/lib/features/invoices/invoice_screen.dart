@@ -20,7 +20,8 @@ import 'invoice_providers.dart';
 /// One issued financial document (payments Phase 5b), at
 /// `/profile/invoices/:documentId` — an address Phase 7 will email, so it never
 /// moves. The stored document in the app's language; around it, its standing, a
-/// void or a newer version, its other versions and the receipts it belongs with.
+/// void or a newer version, its other versions and the receipts it belongs with;
+/// and its PDFs (Phase 6), one per language drawn.
 ///
 /// A document that is not the reader's, and one that does not exist, read exactly
 /// alike: nothing here says whether it exists.
@@ -75,7 +76,7 @@ class InvoiceScreen extends ConsumerWidget {
               ref.invalidate(financialDocumentProvider(documentId));
               await ref.read(financialDocumentProvider(documentId).future);
             },
-            child: _Document(view: invoicePage(value!, l10n, formats), formats: formats),
+            child: _Document(documentId: documentId, view: invoicePage(value!, l10n, formats), formats: formats),
           ),
         _ => const KhadraLoading(),
       },
@@ -84,8 +85,9 @@ class InvoiceScreen extends ConsumerWidget {
 }
 
 class _Document extends ConsumerWidget {
-  const _Document({required this.view, required this.formats});
+  const _Document({required this.documentId, required this.view, required this.formats});
 
+  final String documentId;
   final InvoicePageView view;
   final Formats formats;
 
@@ -125,6 +127,7 @@ class _Document extends ConsumerWidget {
             child: Text(view.booking),
           ),
         ),
+        if (view.pdf.opens.isNotEmpty || view.pdf.preparing) _PdfActions(documentId: documentId, pdf: view.pdf),
         if (view.voided case final voided?) ...[
           const SizedBox(height: Space.sm),
           KhadraNotice(
@@ -181,6 +184,89 @@ class _Document extends ConsumerWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// The document's PDFs (payments Phase 6): a button per language drawn, and a line
+/// while one is still being drawn. A tap mints a link — it lasts minutes — fetches
+/// the bytes over this app's authenticated connection, as the identity documents
+/// are fetched, and hands them to the platform's viewer from the app's private
+/// cache: never a browser, which has no session and would be refused.
+class _PdfActions extends ConsumerStatefulWidget {
+  const _PdfActions({required this.documentId, required this.pdf});
+
+  final String documentId;
+  final PdfView pdf;
+
+  @override
+  ConsumerState<_PdfActions> createState() => _PdfActionsState();
+}
+
+class _PdfActionsState extends ConsumerState<_PdfActions> {
+  /// The language being fetched, while one is.
+  String? _opening;
+
+  Future<void> _open(PdfOpenView pdf) async {
+    final l10n = AppLocalizations.of(context);
+    setState(() => _opening = pdf.language);
+    try {
+      final api = ref.read(apiProvider);
+      final link = await api.financialDocumentPdfLink(widget.documentId, pdf.language);
+      final fetched = await api.documentBytes(link.url);
+      final opened = await ref.read(fileOpenerProvider)(
+        bytes: fetched.bytes,
+        contentType: fetched.contentType,
+        documentId: pdf.fileStem,
+      );
+      if (!mounted) return;
+      if (!opened) showKhadraMessage(context, l10n.documentsOpenFailed, isError: true);
+    } on ApiFailure catch (failure) {
+      if (!mounted) return;
+      showKhadraMessage(context, failure.messageFor(l10n), isError: true);
+    } on Exception {
+      // Writing the cache file, or the platform refusing to open it: words, not a crash.
+      if (!mounted) return;
+      showKhadraMessage(context, l10n.documentsOpenFailed, isError: true);
+    } finally {
+      if (mounted) setState(() => _opening = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Space.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.pdf.opens.isNotEmpty)
+            Wrap(
+              spacing: Space.sm,
+              runSpacing: Space.xs,
+              children: [
+                for (final pdf in widget.pdf.opens)
+                  // The visible label stays the button's name; the fuller sentence is its tooltip.
+                  Tooltip(
+                    message: pdf.semantics,
+                    child: OutlinedButton.icon(
+                      onPressed: _opening == null ? () => _open(pdf) : null,
+                      icon: _opening == pdf.language
+                          ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      label: Text(pdf.label),
+                    ),
+                  ),
+              ],
+            ),
+          if (widget.pdf.preparing)
+            Padding(
+              padding: const EdgeInsets.only(top: Space.xs),
+              child: Text(l10n.invoicesPdfPreparing, style: const TextStyle(color: KhadraColors.neutral600, fontSize: 12)),
+            ),
+        ],
+      ),
     );
   }
 }

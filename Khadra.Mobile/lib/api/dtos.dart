@@ -2919,6 +2919,34 @@ class FinancialDocumentVoidNotice {
       : null;
 }
 
+/// The PDFs a document can be opened as (payments Phase 6). Each is fetched
+/// through a link minted on the tap, which lasts minutes, so none is listed here.
+class FinancialDocumentPdf {
+  const FinancialDocumentPdf({required this.languages, required this.preparing});
+
+  /// `en`, `ar`: the languages whose PDF has been drawn, English first. Empty
+  /// for a voided document, which the customer is no longer handed.
+  final List<String> languages;
+
+  /// A PDF the document will have is still being drawn. Never true for a voided
+  /// document.
+  final bool preparing;
+
+  /// What an API older than Phase 6 means: nothing offered, nothing coming.
+  static const none = FinancialDocumentPdf(languages: [], preparing: false);
+
+  static FinancialDocumentPdf fromJson(dynamic json) => json is Map<String, dynamic>
+      ? FinancialDocumentPdf(
+          languages: [
+            if (json['languages'] case final List<dynamic> languages)
+              for (final language in languages)
+                if (language is String) language,
+          ],
+          preparing: json['preparing'] == true,
+        )
+      : none;
+}
+
 /// One document's page: its row, the stored snapshot exactly as issued, and its
 /// links.
 class FinancialDocumentPage {
@@ -2928,6 +2956,7 @@ class FinancialDocumentPage {
     required this.snapshot,
     required this.links,
     required this.voided,
+    this.pdf = FinancialDocumentPdf.none,
   });
 
   final FinancialDocumentRow row;
@@ -2941,6 +2970,9 @@ class FinancialDocumentPage {
   final FinancialDocumentLinks links;
   final FinancialDocumentVoidNotice? voided;
 
+  /// Its PDFs (payments Phase 6); [FinancialDocumentPdf.none] from an older API.
+  final FinancialDocumentPdf pdf;
+
   static FinancialDocumentPage fromJson(Map<String, dynamic> json) => FinancialDocumentPage(
         row: FinancialDocumentRow.fromJson(json),
         snapshotSchemaVersion: _int(json['snapshotSchemaVersion']),
@@ -2949,6 +2981,7 @@ class FinancialDocumentPage {
             ? FinancialDocumentLinks.fromJson(json['links'] as Map<String, dynamic>)
             : FinancialDocumentLinks.none,
         voided: FinancialDocumentVoidNotice.maybe(json['voided']),
+        pdf: FinancialDocumentPdf.fromJson(json['pdf']),
       );
 }
 

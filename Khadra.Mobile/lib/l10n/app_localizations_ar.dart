@@ -1636,6 +1636,25 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get invoicesPdfEnglish => 'PDF (بالإنجليزية)';
+
+  @override
+  String get invoicesPdfArabic => 'PDF (بالعربية)';
+
+  @override
+  String get invoicesPdfOpenEnglish => 'فتح ملف PDF بالإنجليزية';
+
+  @override
+  String get invoicesPdfOpenArabic => 'فتح ملف PDF بالعربية';
+
+  @override
+  String get invoicesPdfPreparing => 'يجري تجهيز ملف PDF لهذا المستند.';
+
+  @override
+  String get invoicesPdfVoided =>
+      'أُلغي هذا المستند، لذا لم يعد ملف PDF الخاص به متاحًا. للمستند البديل ملفه الخاص.';
+
+  @override
   String cancelRefundAboveDeposit(String amount) {
     return 'سيُعاد إليك $amount إلى وسيلة الدفع الأصلية: كل ما دفعته فوق العربون. سنبدأ عملية الاسترداد فورًا، وقد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك.';
   }

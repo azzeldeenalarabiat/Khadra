@@ -1574,6 +1574,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get invoicesPdfEnglish => 'PDF (English)';
+
+  @override
+  String get invoicesPdfArabic => 'PDF (Arabic)';
+
+  @override
+  String get invoicesPdfOpenEnglish => 'Open the PDF in English';
+
+  @override
+  String get invoicesPdfOpenArabic => 'Open the PDF in Arabic';
+
+  @override
+  String get invoicesPdfPreparing =>
+      'The PDF of this document is being prepared.';
+
+  @override
+  String get invoicesPdfVoided =>
+      'This document was voided, so its PDF is no longer offered. Its replacement has one.';
+
+  @override
   String cancelRefundAboveDeposit(String amount) {
     return 'You will get $amount back to your original payment method: everything you paid above the deposit. We will initiate the refund immediately, but your bank may take additional time to show it.';
   }

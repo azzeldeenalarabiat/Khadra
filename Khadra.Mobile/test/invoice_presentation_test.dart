@@ -268,4 +268,38 @@ void main() {
       expect(preparingRow(pending('PaymentReceipt'), en, formatsFor('en')).date, contains('2026'));
     });
   });
+
+  group('its PDFs (payments Phase 6)', () {
+    test('one per language drawn, English first, named by the number and the language', () {
+      final view = pdfView(page('payment-receipt-paid-in-full'), en);
+      expect([for (final open in view.opens) (open.language, open.label, open.semantics, open.fileStem)], [
+        ('en', 'PDF (English)', 'Open the PDF in English', 'TEST-PAY-2026-000002-en'),
+        ('ar', 'PDF (Arabic)', 'Open the PDF in Arabic', 'TEST-PAY-2026-000002-ar'),
+      ]);
+      expect(view.preparing, isFalse);
+      expect([for (final open in pdfView(page('payment-receipt-paid-in-full'), ar).opens) open.label], ['PDF (بالإنجليزية)', 'PDF (بالعربية)']);
+    });
+
+    test('says what the server says is still being drawn, and offers nothing of a voided document', () {
+      expect(pdfView(page('booking-statement-receipt-corrected'), en).opens, isEmpty);
+      expect(pdfView(page('booking-statement-receipt-corrected'), en).preparing, isTrue);
+      expect([for (final open in pdfView(page('refund-receipt-dispute-decision'), en).opens) open.language], ['en']);
+      expect(pdfView(page('refund-receipt-dispute-decision'), en).preparing, isTrue);
+      expect(pdfView(page('payment-receipt-deposit-voided'), en).opens, isEmpty);
+      expect(pdfView(page('payment-receipt-deposit-voided'), en).preparing, isFalse);
+    });
+
+    test('never offers a language this build does not know', () {
+      final known = page('payment-receipt-paid-in-full');
+      final strange = FinancialDocumentPage(
+        row: known.row,
+        snapshotSchemaVersion: known.snapshotSchemaVersion,
+        snapshot: known.snapshot,
+        links: known.links,
+        voided: known.voided,
+        pdf: const FinancialDocumentPdf(languages: ['fr', 'en'], preparing: false),
+      );
+      expect([for (final open in pdfView(strange, en).opens) open.language], ['en']);
+    });
+  });
 }

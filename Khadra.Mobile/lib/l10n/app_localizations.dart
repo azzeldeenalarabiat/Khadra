@@ -2624,6 +2624,42 @@ abstract class AppLocalizations {
   /// **'Issued {date}'**
   String invoicesIssued(String date);
 
+  /// Payments Phase 6: opens the document's PDF drawn in English.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF (English)'**
+  String get invoicesPdfEnglish;
+
+  /// No description provided for @invoicesPdfArabic.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF (Arabic)'**
+  String get invoicesPdfArabic;
+
+  /// No description provided for @invoicesPdfOpenEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the PDF in English'**
+  String get invoicesPdfOpenEnglish;
+
+  /// No description provided for @invoicesPdfOpenArabic.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the PDF in Arabic'**
+  String get invoicesPdfOpenArabic;
+
+  /// No description provided for @invoicesPdfPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'The PDF of this document is being prepared.'**
+  String get invoicesPdfPreparing;
+
+  /// No description provided for @invoicesPdfVoided.
+  ///
+  /// In en, this message translates to:
+  /// **'This document was voided, so its PDF is no longer offered. Its replacement has one.'**
+  String get invoicesPdfVoided;
+
   /// No description provided for @cancelRefundAboveDeposit.
   ///
   /// In en, this message translates to:

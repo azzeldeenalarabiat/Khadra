@@ -304,6 +304,7 @@ class InvoicePageView {
     required this.versions,
     required this.paymentReceipt,
     required this.refundReceipts,
+    this.pdf = const PdfView(opens: [], preparing: false),
   });
 
   final String title;
@@ -331,7 +332,50 @@ class InvoicePageView {
   /// On a refund receipt: the payment receipt it was issued against.
   final LinkText? paymentReceipt;
   final List<LinkView> refundReceipts;
+
+  /// Its PDFs (payments Phase 6), and whether one is still being drawn.
+  final PdfView pdf;
 }
+
+/// One PDF to open: the language it is in, its button, and the name of the file
+/// the platform viewer is handed — the document's number and the language, so a
+/// file shared onwards says what it is.
+class PdfOpenView {
+  const PdfOpenView({required this.language, required this.label, required this.semantics, required this.fileStem});
+
+  final String language;
+  final String label;
+  final String semantics;
+  final String fileStem;
+}
+
+class PdfView {
+  const PdfView({required this.opens, required this.preparing});
+
+  final List<PdfOpenView> opens;
+  final bool preparing;
+}
+
+/// The PDFs the server says were drawn, in the order it sent them (English
+/// first). A language this build has never heard of is not offered.
+PdfView pdfView(FinancialDocumentPage page, AppLocalizations l10n) => PdfView(
+      opens: [
+        for (final language in page.pdf.languages)
+          if (switch (language) {
+            'en' => (l10n.invoicesPdfEnglish, l10n.invoicesPdfOpenEnglish),
+            'ar' => (l10n.invoicesPdfArabic, l10n.invoicesPdfOpenArabic),
+            _ => null,
+          }
+              case (final label, final semantics))
+            PdfOpenView(
+              language: language,
+              label: label,
+              semantics: semantics,
+              fileStem: '${page.row.number}-$language',
+            ),
+      ],
+      preparing: page.pdf.preparing,
+    );
 
 InvoicePageView invoicePage(FinancialDocumentPage page, AppLocalizations l10n, Formats formats) {
   final row = page.row;
@@ -383,6 +427,7 @@ InvoicePageView invoicePage(FinancialDocumentPage page, AppLocalizations l10n, F
       final receipt => LinkText(receipt.documentId, l10n.invoicesIssuedAgainst(_run(receipt.number)), receipt.number),
     },
     refundReceipts: [for (final link in page.links.refundReceipts) _linkView(link, row.documentId, l10n, asVersion: false)],
+    pdf: pdfView(page, l10n),
   );
 }
 

@@ -112,6 +112,10 @@ extension ApiFailureMessages on ApiFailure {
         // server's English sentence in front of an Arabic reader.
         'financial_documents.not_found' => l10n.invoicesNotAvailable,
         'financial_documents.unknown_type' => l10n.errorGeneric,
+        // Its PDF (payments Phase 6): not drawn yet, or a voided document's, which
+        // is no longer handed out.
+        'financial_documents.pdf_not_ready' => l10n.invoicesPdfPreparing,
+        'financial_documents.pdf_voided' => l10n.invoicesPdfVoided,
         'booking.cannot_cancel' => l10n.errorBookingCannotCancel,
         'booking.non_delivery_too_early' => l10n.nonDeliveryTooEarly,
         'booking.account_cannot_book' => l10n.errorBookingAccountCannotBook,

@@ -236,4 +236,29 @@ void main() {
       expect(DocumentContent.tryParse(1, <String, dynamic>{}), isNull);
     });
   });
+
+  group('its PDFs (payments Phase 6), an ADDITIVE field', () {
+    test('reads the languages drawn and whether one is still being drawn', () {
+      final drawn = FinancialDocumentPage.fromJson(pageJson('payment-receipt-paid-in-full')).pdf;
+      expect(drawn.languages, ['en', 'ar']);
+      expect(drawn.preparing, isFalse);
+      final voided = FinancialDocumentPage.fromJson(pageJson('payment-receipt-deposit-voided')).pdf;
+      expect(voided.languages, isEmpty);
+      expect(voided.preparing, isFalse);
+      final none = FinancialDocumentPage.fromJson(pageJson('booking-statement-receipt-corrected')).pdf;
+      expect(none.languages, isEmpty);
+      expect(none.preparing, isTrue);
+    });
+
+    test('an API older than Phase 6 — no field at all, or a malformed one — offers nothing and promises nothing', () {
+      final older = pageJson('payment-receipt-paid-in-full')..remove('pdf');
+      final page = FinancialDocumentPage.fromJson(older);
+      expect(page.pdf.languages, isEmpty);
+      expect(page.pdf.preparing, isFalse);
+
+      final odd = pageJson('payment-receipt-paid-in-full')..['pdf'] = {'languages': ['en', 7, null], 'preparing': 'yes'};
+      expect(FinancialDocumentPage.fromJson(odd).pdf.languages, ['en']);
+      expect(FinancialDocumentPage.fromJson(odd).pdf.preparing, isFalse);
+    });
+  });
 }

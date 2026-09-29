@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_failure.dart';
 import '../core/api/auth_interceptor.dart';
+import '../core/config/app_environment.dart';
 import 'dtos.dart';
 
 /// Every endpoint this app calls, in one place.
@@ -385,6 +386,15 @@ class KhadraApi {
     }
   }
 
+  /// A link, good for minutes, to one of the caller's documents as a PDF in
+  /// `en` or `ar` (payments Phase 6). Minted on the tap; the bytes come
+  /// through [documentBytes], over this authenticated connection.
+  Future<SignedDocumentLink> financialDocumentPdfLink(String documentId, String language) async =>
+      SignedDocumentLink.fromJson(_object(await _client.get<dynamic>(
+        '/api/v1/financial-documents/$documentId/pdf-link',
+        query: {'language': language},
+      )));
+
   /// A booking's documents and what is still being prepared, or null from an
   /// API without them.
   Future<BookingFinancialDocuments?> bookingFinancialDocuments(String bookingId) async {
@@ -551,6 +561,11 @@ class KhadraApi {
   /// authenticated client every other request uses, so both checks are satisfied
   /// without loosening either.
   Future<DocumentBytes> documentBytes(String url) async {
+    // The bearer token rides on this request, so it goes to the platform's own
+    // private-file endpoint or nowhere: a link pointing anywhere else is refused
+    // before a byte is asked for, as the website and the console refuse it.
+    if (!isPrivateFileAddress(url)) throw const ApiFailure(kind: ApiFailureKind.server);
+
     // `raw` rather than the wrapper, because this one response is bytes and not
     // JSON -- so the DioException has to be turned into an ApiFailure here, the
     // way the wrapper does for everything else. Without it a refused download
@@ -578,6 +593,10 @@ class KhadraApi {
       throw ApiFailure.from(error);
     }
   }
+
+  /// Whether [url] is this API's own private-file endpoint — the only place a
+  /// signed link may send this app's credentials.
+  static bool isPrivateFileAddress(String url) => url.startsWith(AppEnvironment.resolve('/api/v1/documents/'));
 
   // ── Disputes ────────────────────────────────────────────────────────────────
 

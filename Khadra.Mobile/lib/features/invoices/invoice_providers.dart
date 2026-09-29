@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../api/dtos.dart';
 import '../../core/paging.dart';
 import '../../core/providers.dart';
+import '../../core/uploads/document_viewer.dart';
 
 /// The Invoices & Receipts filters: every document, or one kind of it. The kinds
 /// are the server's own names; a kind this build does not know still appears
@@ -69,3 +71,14 @@ final financialDocumentProvider =
     FutureProvider.autoDispose.family<FinancialDocumentPage?, String>((ref, documentId) async {
   return ref.watch(apiProvider).financialDocument(documentId);
 });
+
+/// Opens a fetched file in the platform's viewer (payments Phase 6): the
+/// document's PDF, written to this app's private cache first. A seam, so a
+/// widget test sees what the screen asked to open without a platform channel.
+typedef FileOpener = Future<bool> Function({
+  required Uint8List bytes,
+  required String? contentType,
+  required String documentId,
+});
+
+final fileOpenerProvider = Provider<FileOpener>((ref) => DocumentViewer.open);
