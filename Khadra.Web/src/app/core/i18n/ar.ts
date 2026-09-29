@@ -609,7 +609,7 @@ export const AR: Record<TranslationKey, Message> = {
   // Pre-launch item 173, the owner's words (2026-09-26): where an assessed penalty stands.
   'booking.penaltyState.Assessed': 'تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.',
   'booking.penaltyState.ResolvedByDispute': 'تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.',
-  'booking.penaltyState.KeptFromDeposit': 'انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك. راجع قسم المدفوعات.',
+  'booking.penaltyState.KeptFromDeposit': 'انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.',
   'booking.rentalCost': 'تكلفة الإيجار',
   'booking.howPaid': 'طريقة الدفع',
   'booking.depositPaid': 'مدفوع',
@@ -704,7 +704,7 @@ export const AR: Record<TranslationKey, Message> = {
   'payments.deposit.HeldForAssessedPenalty': 'عربونك البالغ {amount} محتجز لأنّ غرامةً قُدِّرت على العميل. يمكن فتح نزاع حتى {date}.',
   'payments.deposit.HeldUnresolved': 'لا يزال عربونك محتجزًا لأنّ غرامةً قُدِّرت على العميل ولم يُفتح أيّ نزاع. التسوية النهائية لا تزال معلّقة.',
   'payments.deposit.Released': 'أُعيد إليك عربونك البالغ {amount} عند انتهاء مهلة النزاع.',
-  'payments.deposit.KeptAsPenalty': 'احتُفظ بعربونك البالغ {amount} بوصفه الغرامة المقدَّرة على هذا الحجز، إذ انتهت مهلة النزاع دون فتح أيّ نزاع.',
+  'payments.deposit.KeptAsPenalty': 'انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.',
   'payments.deposit.DecidedByDispute': 'قرّر نزاع أن يُسترد لك {share} من عربونك البالغ {amount}.',
   'payments.deposit.DecidedByDisputeNothing': 'قرّر نزاع مصير عربونك البالغ {amount}، ولا يُسترد لك منه شيء.',
   'payments.kind.Deposit': 'دفعة العربون',

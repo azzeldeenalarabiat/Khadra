@@ -621,14 +621,14 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     expect(arabicResolved.text).not.toContain('لم يتم خصم أي مبلغ بعد');
   });
 
-  it('says a penalty the ledger kept from the deposit was kept, in both languages (payments Phase 8)', async () => {
+  it("says a penalty the ledger kept from the deposit was kept, in the owner's approved words (payments Phase 8)", async () => {
     const kept = await render(withPenaltyState('KeptFromDeposit'), 'en');
-    expect(kept.text).toContain('The dispute window closed with no dispute, so this penalty was kept from your deposit.');
+    expect(kept.text).toContain('The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.');
     expect(kept.text).not.toContain('no amount has been charged yet');
     TestBed.resetTestingModule();
 
     const arabicKept = await render(withPenaltyState('KeptFromDeposit'), 'ar');
-    expect(arabicKept.text).toContain('انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك.');
+    expect(arabicKept.text).toContain('انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.');
   });
 
   it('never again says nothing has been charged, and says nothing under a penalty state it does not know', async () => {

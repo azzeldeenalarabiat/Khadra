@@ -506,8 +506,8 @@ export const EN = {
   // Pre-launch item 173, the owner's words (2026-09-26): where an assessed penalty stands.
   'booking.penaltyState.Assessed': 'A penalty has been assessed, but no amount has been charged yet.',
   'booking.penaltyState.ResolvedByDispute': 'This penalty was resolved through a dispute. See Payments for the final amount.',
-  // Payments Phase 8 (owner, 2026-09-29; pre-launch item 164). A DRAFT awaiting the owner's sign-off.
-  'booking.penaltyState.KeptFromDeposit': 'The dispute window closed with no dispute, so this penalty was kept from your deposit. See Payments.',
+  // Payments Phase 8 (pre-launch item 164): the owner's approved sentence (2026-09-30), here and on the deposit line.
+  'booking.penaltyState.KeptFromDeposit': 'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.',
   'booking.rentalCost': 'What the rental costs',
   'booking.howPaid': 'How it is paid',
   'booking.depositPaid': 'Paid',
@@ -588,8 +588,8 @@ export const EN = {
   // Pre-launch item 164, the owner's own sentence (2026-09-26): factual, promising nothing to either side.
   'payments.deposit.HeldUnresolved': 'Your deposit remains held because a customer penalty was assessed and no dispute was opened. Final settlement is still pending.',
   'payments.deposit.Released': 'Your deposit of {amount} was returned to you when the dispute window closed.',
-  // Payments Phase 8 (owner, 2026-09-29). A DRAFT awaiting the owner's sign-off.
-  'payments.deposit.KeptAsPenalty': 'Your deposit of {amount} was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.',
+  // Payments Phase 8: the owner's approved sentence (2026-09-30), like item 164's own above it.
+  'payments.deposit.KeptAsPenalty': 'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.',
   'payments.deposit.DecidedByDispute': 'A dispute decided that {share} of your {amount} deposit is refunded to you.',
   'payments.deposit.DecidedByDisputeNothing': 'A dispute decided your {amount} deposit; none of it is refunded to you.',
   'payments.kind.Deposit': 'Deposit payment',
