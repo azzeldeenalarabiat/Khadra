@@ -1,4 +1,5 @@
 using Khadra.Application.Bookings;
+using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
@@ -29,10 +30,15 @@ public sealed class BookingFinancialsQueryTests
     private readonly IPaymentRepository _payments = Substitute.For<IPaymentRepository>();
     private readonly IDisputeTicketRepository _tickets = Substitute.For<IDisputeTicketRepository>();
     private readonly IDealerRepository _dealers = Substitute.For<IDealerRepository>();
+    private readonly IOfficeLedgerReader _ledger = Substitute.For<IOfficeLedgerReader>();
     private readonly RecordingLogger<BookingFinancialsHandlers> _logger = new();
 
+    public BookingFinancialsQueryTests() =>
+        // Nothing recorded in the office payables ledger: the booking has not reached it.
+        _ledger.ForBookingAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(new BookingLedger(null, [], []));
+
     private BookingFinancialsHandlers Handlers() =>
-        new(_bookings, _payments, _tickets, new BookingPartyResolver(_dealers), new TestClock(Build.Now), _logger);
+        new(_bookings, _payments, _tickets, _ledger, new BookingPartyResolver(_dealers), new TestClock(Build.Now), _logger);
 
     private (Booking Booking, Payment Payment) Given(Id dealerId)
     {

@@ -5,6 +5,7 @@ using Khadra.Application.Fleet.Dtos;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 using Khadra.Domain.Reviews;
 using Khadra.Infrastructure.Persistence;
@@ -323,6 +324,7 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         var underReview = DisputeStatus.UnderReview;
         var resolved = DisputeStatus.Resolved;
         var customerRatesDealer = ReviewDirection.CustomerRatesDealer;
+        var penaltyKept = PayableOutcome.PenaltyKept;
 
         // Each party's name is read once, as null when it no longer resolves, and the flag and the
         // stand-in are both taken from that read -- the same shape the list row uses.
@@ -364,6 +366,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
                     .FirstOrDefault(),
                 // A withdrawn ticket decided nothing, and an open one has not decided yet.
                 context.DisputeTickets.Any(ticket => ticket.BookingId == booking.Id && ticket.Status == resolved),
+                // The ledger's decision, never a reading of the clock (payments Phase 8).
+                context.OfficePayables.Any(payable => payable.BookingId == booking.Id && payable.Outcome == penaltyKept),
                 context.Reviews
                     .Where(review =>
                         review.BookingId == booking.Id &&
@@ -391,7 +395,8 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             DepositRefund: DepositRefundOf(refunds),
             ConfirmingPayment: await ConfirmingPaymentAsync(bookingId, cancellationToken),
             Refunds: refunds,
-            HasResolvedDispute: found.HasResolvedDispute);
+            HasResolvedDispute: found.HasResolvedDispute,
+            PenaltyKept: found.PenaltyKept);
     }
 
     /// <summary>
@@ -508,5 +513,6 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
         string? CustomerName,
         Guid? LiveDisputeId,
         bool HasResolvedDispute,
+        bool PenaltyKept,
         Guid? MyReviewId);
 }

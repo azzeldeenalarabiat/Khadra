@@ -60,6 +60,16 @@ public sealed class AuditAction : Enumeration
     // and no address.
     public static readonly AuditAction FinancialDocumentEmailRequested = new(29, "FinancialDocumentEmailRequested");
 
+    // An administrator recorded money moved to or from a rental office by hand, or voided that record (payments
+    // Phase 8). Labelled by the settlement's number; the values are the signed amount and its currency.
+    public static readonly AuditAction OfficeSettlementRecorded = new(30, "OfficeSettlementRecorded");
+    public static readonly AuditAction OfficeSettlementVoided = new(31, "OfficeSettlementVoided");
+
+    // An administrator left a booking's payable out of settlements, or let it back in (payments Phase 8). Labelled
+    // by the booking's reference, never by a name.
+    public static readonly AuditAction OfficePayableHeld = new(32, "OfficePayableHeld");
+    public static readonly AuditAction OfficePayableReleased = new(33, "OfficePayableReleased");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }
@@ -83,6 +93,10 @@ public sealed class AuditEntityType : Enumeration
 
     // A receipt or a booking statement (payments Phase 5), recorded by its id and labelled by its number.
     public static readonly AuditEntityType FinancialDocument = new(10, "FinancialDocument");
+
+    // A settlement with a rental office, and one booking's payable (payments Phase 8).
+    public static readonly AuditEntityType OfficeSettlement = new(11, "OfficeSettlement");
+    public static readonly AuditEntityType OfficePayable = new(12, "OfficePayable");
 
     private AuditEntityType(int id, string name) : base(id, name)
     {

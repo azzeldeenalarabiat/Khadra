@@ -18,6 +18,11 @@ public sealed record HeldDeposit(Id BookingId, DateTimeOffset HeldSince);
 /// </summary>
 /// <remarks>
 /// <para>
+/// UNUSED since payments Phase 8: the office payables ledger records these deposits as kept, and the work queue
+/// shows the ledger's own holds instead. Left in place, with its repository query and tests, until the owner
+/// approves deleting them.
+/// </para>
+/// <para>
 /// The calculator is the one definition. The repository finds CANDIDATES cheaply in SQL — the deposit
 /// release query with its penalty condition inverted — and <see cref="BookingFinancialsCalculator"/>
 /// keeps only the ones whose deposit it reads as <see cref="DepositStates.HeldUnresolved"/>. The

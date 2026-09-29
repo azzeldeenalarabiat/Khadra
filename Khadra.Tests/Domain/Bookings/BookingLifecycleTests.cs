@@ -508,8 +508,9 @@ public sealed class BookingCancellationTests
         // 3 days at 30 JOD is 90; the 20% deposit is 18, and the whole deposit is at stake.
         Assert.Equal(Money.Jod(18m), penalty.MaxAmount);
         Assert.False(penalty.IsRange);
-        // Spec 3.3: assessed only. Nothing is charged unless someone opens a ticket.
-        Assert.True(penalty.RequiresTicketToEnforce);
+        // Assessed only — nothing is charged now — but no longer only through a ticket: since payments Phase 8
+        // (owner, 2026-09-29) a customer's fixed penalty is kept from the deposit when the window closes with none.
+        Assert.False(penalty.RequiresTicketToEnforce);
     }
 
     [Fact]
@@ -677,7 +678,8 @@ public sealed class BookingNoShowTests
         var penalty = booking.Penalty!;
         Assert.Same(BookingParty.Customer, penalty.AttributedTo);
         Assert.Equal(Money.Jod(18m), penalty.MaxAmount);
-        Assert.True(penalty.RequiresTicketToEnforce);
+        // The customer's whole deposit, kept when the window closes with no dispute (payments Phase 8).
+        Assert.False(penalty.RequiresTicketToEnforce);
     }
 
     [Fact]

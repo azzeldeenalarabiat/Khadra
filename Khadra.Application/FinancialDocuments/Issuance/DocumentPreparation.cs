@@ -1,6 +1,7 @@
 using Khadra.Application.Common.Ports;
 using Khadra.Application.FinancialDocuments.Composition;
 using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Common;
 using Khadra.Domain.FinancialDocuments;
@@ -31,7 +32,8 @@ public sealed class DocumentPreparation(
     IFinancialDocumentFactsReader facts,
     IFinancialDocumentRepository documents,
     IFinancialDocumentSettings settings,
-    FinancialDocumentComposer composer)
+    FinancialDocumentComposer composer,
+    IOfficeLedgerReader ledger)
 {
     /// <param name="correcting">
     /// True when composing the correction of a voided document: the family already has a row (the voided
@@ -127,8 +129,10 @@ public sealed class DocumentPreparation(
         }
 
         // An official record never freezes records that contradict one another; a live screen still shows
-        // them, but a statement waits on hold until somebody has put them right.
-        var financials = BookingFinancialsCalculator.Calculate(booking, money.Payments, money.ResolvedTickets, money.HasLiveDispute, now);
+        // them, but a statement waits on hold until somebody has put them right. A deposit the office payables
+        // ledger kept as a penalty (payments Phase 8) is stated as kept, exactly as the live page states it.
+        var recorded = await ledger.RecordedAsync(booking.Id, cancellationToken);
+        var financials = BookingFinancialsCalculator.Calculate(booking, money.Payments, money.ResolvedTickets, money.HasLiveDispute, now, recorded);
         if (financials.NeedsReview)
             return new Preparation.OnHold(IssuanceHoldReason.RecordsNeedReview, string.Join(", ", financials.Issues));
 

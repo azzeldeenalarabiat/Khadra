@@ -313,6 +313,10 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
         var moneyMovedAt = checkpoints.MoneyMovedAt;
         var net = Money.Create(view.Summary.ChargedOnline!.Amount - view.Summary.Refunded.Amount, currency);
         var penalty = booking.HasPenaltyAgainstCustomer ? booking.Penalty : null;
+        // The deposit section and the penalty's standing read ONE fact — the deposit kept as the penalty, which the
+        // calculator states only once the ledger has recorded it (payments Phase 8) — so no statement can say the
+        // deposit was kept while its penalty reads "nothing charged yet".
+        var penaltyKept = view.Deposit.State == DepositStates.KeptAsPenalty;
 
         var factsNode = new JsonObject
         {
@@ -327,7 +331,9 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
                     ["minAmount"] = SnapshotJson.Money(penalty.MinAmount),
                     ["maxAmount"] = SnapshotJson.Money(penalty.MaxAmount),
                     ["reasonCode"] = penalty.ReasonCode?.Name,
-                    ["standing"] = facts.PenaltyResolvedByDispute ? PenaltyStates.ResolvedByDispute : PenaltyStates.Assessed,
+                    ["standing"] = facts.PenaltyResolvedByDispute ? PenaltyStates.ResolvedByDispute
+                        : penaltyKept ? PenaltyStates.KeptFromDeposit
+                        : PenaltyStates.Assessed,
                 },
             ["payments"] = new JsonArray([.. view.Payments.Select(PaymentFacts)]),
             ["receipts"] = new JsonArray(
@@ -358,7 +364,7 @@ public sealed class FinancialDocumentComposer(IReportingCalendar calendar)
                     ? section.Text("amountAssessed", DocumentWording.Labels.AmountAssessed, DocumentWording.Range(penalty.MinAmount, penalty.MaxAmount))
                     : section.Money("amountAssessed", DocumentWording.Labels.AmountAssessed, penalty.MaxAmount))
                 .Text("reason", DocumentWording.Labels.Reason, DocumentWording.PenaltyReason(penalty.ReasonCode, penalty.Reason))
-                .Text("standing", null, DocumentWording.PenaltyStanding(facts.PenaltyResolvedByDispute));
+                .Text("standing", null, DocumentWording.PenaltyStanding(facts.PenaltyResolvedByDispute, penaltyKept));
         }
 
         BalanceSection(content, view.Balance);

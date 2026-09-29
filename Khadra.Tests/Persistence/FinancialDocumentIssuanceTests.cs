@@ -871,7 +871,8 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
         {
             Assert.Equal(document.ContentSha256, FinancialDocument.Sha256(document.Snapshot));
             Assert.Equal(1, document.SnapshotSchemaVersion);
-            Assert.Equal(1, document.CalculatorVersion);
+            // Version 2 since payments Phase 8: a document states which rules computed it.
+            Assert.Equal(2, document.CalculatorVersion);
             Assert.Equal(PaymentProviders.Sandbox, document.Provider);
             Assert.NotNull(document.HeadlineAmount);
             Assert.Equal("JOD", document.HeadlineAmount.CurrencyCode);

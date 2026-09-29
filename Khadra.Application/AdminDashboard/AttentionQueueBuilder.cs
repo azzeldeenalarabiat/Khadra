@@ -3,6 +3,7 @@ using Khadra.Application.AdminDashboard.Dtos;
 using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
 
@@ -34,8 +35,13 @@ public static class AttentionQueueBuilder
         /// <summary>Captures that could not be applied, whose refund is on its way and not back.</summary>
         public const string OrphanedCaptureOwed = "OrphanedCaptureOwed";
 
-        /// <summary>A deposit held for a penalty against the customer with no dispute (pre-launch item 164).</summary>
-        public const string DepositAwaitingDecision = "DepositAwaitingDecision";
+        /// <summary>
+        /// Offices' money the ledger holds back until somebody looks (payments Phase 8): a booking whose records
+        /// contradict one another or whose penalty cannot be kept, or a payable that no longer matches its records.
+        /// It replaced the row that watched a deposit held for a customer penalty (pre-launch item 164), which the
+        /// ledger now records.
+        /// </summary>
+        public const string PayablesOnHold = "PayablesOnHold";
 
         /// <summary>Financial documents owed and not issued, and why: never silence (payments Phase 5).</summary>
         public const string FinancialDocumentsOnHold = "FinancialDocumentsOnHold";
@@ -65,7 +71,8 @@ public static class AttentionQueueBuilder
         DateTimeOffset now,
         MoneyAttention? money = null,
         FinancialDocumentHoldsSummary? documentsOnHold = null,
-        FinancialDocumentEmailsSummary? emailsNotSent = null)
+        FinancialDocumentEmailsSummary? emailsNotSent = null,
+        PayableHoldsSummary? payablesOnHold = null)
     {
         ArgumentNullException.ThrowIfNull(liveDisputes);
         ArgumentNullException.ThrowIfNull(disputeSubtitles);
@@ -119,13 +126,14 @@ public static class AttentionQueueBuilder
         }
 
         AddMoney(items, money ?? MoneyAttention.None);
+        AddPayablesOnHold(items, payablesOnHold ?? PayableHoldsSummary.None);
         AddDocumentsOnHold(items, documentsOnHold ?? FinancialDocumentHoldsSummary.None);
         AddEmailsNotSent(items, emailsNotSent ?? FinancialDocumentEmailsSummary.None);
 
         // Overdue work first; then whatever runs out of time soonest, because each of those is a promise
         // the platform made and can still keep; then money a human has to look at, which has no clock —
         // a refused refund is sent again by the payment sweep on its own, so it loses nothing by waiting
-        // behind a live deadline; then money that is only being watched until the rules give it an exit.
+        // behind a live deadline; then money that is only being watched while it makes its own way back.
         // Inside a band with no clock, whatever has waited longest. An admin reads top-down.
         var ordered = items
             .OrderBy(Band)
@@ -181,22 +189,28 @@ public static class AttentionQueueBuilder
                 SlaDeadlineAt: null,
                 IsOverdue: false));
         }
+    }
 
-        foreach (var held in money.HeldDeposits)
-        {
-            items.Add(new AttentionItemDto(
-                Id: $"deposit:{held.BookingId}",
-                Kind: Kinds.DepositAwaitingDecision,
-                // Nothing an administrator can do until payments Phase 8: the row makes the money visible.
-                Severity: Severities.Info,
-                Count: 1,
-                SubjectIds: [held.BookingId],
-                Subtitle: held.Subtitle,
-                Description: null,
-                SlaStartedAt: held.HeldSince,
-                SlaDeadlineAt: null,
-                IsOverdue: false));
-        }
+    /// <summary>
+    /// ONE row for every office payable the system holds back (payments Phase 8), opening the payouts screen's holds.
+    /// No deadline — nobody has frozen one — but a Warning: an office's money is waiting on a person.
+    /// </summary>
+    private static void AddPayablesOnHold(List<AttentionItemDto> items, PayableHoldsSummary holds)
+    {
+        if (holds.Count == 0 || holds.OldestOpenedAt is not { } oldest)
+            return;
+
+        items.Add(new AttentionItemDto(
+            Id: "payables-on-hold",
+            Kind: Kinds.PayablesOnHold,
+            Severity: Severities.Warning,
+            Count: holds.Count,
+            SubjectIds: [.. holds.BookingIds.Select(id => id.Value)],
+            Subtitle: References(holds.BookingReferences),
+            Description: null,
+            SlaStartedAt: oldest,
+            SlaDeadlineAt: null,
+            IsOverdue: false));
     }
 
     /// <summary>
@@ -295,15 +309,11 @@ public static class AttentionQueueBuilder
     }
 }
 
-/// <summary>A deposit awaiting a decision, with its booking's label.</summary>
-public sealed record HeldDepositRow(Guid BookingId, string? Subtitle, DateTimeOffset HeldSince);
-
 /// <summary>What the Payments context owes a human, for the work queue (payments Phase 4b).</summary>
 public sealed record MoneyAttention(
     IReadOnlyCollection<FailedRefundItem> FailedRefunds,
-    IReadOnlyCollection<OwedOrphanItem> OwedOrphans,
-    IReadOnlyCollection<HeldDepositRow> HeldDeposits)
+    IReadOnlyCollection<OwedOrphanItem> OwedOrphans)
 {
     /// <summary>Nothing owed to anybody's attention.</summary>
-    public static readonly MoneyAttention None = new([], [], []);
+    public static readonly MoneyAttention None = new([], []);
 }

@@ -946,6 +946,9 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_dispute_tickets_status");
 
+                    b.HasIndex(new[] { "BookingId" }, "ix_dispute_tickets_booking")
+                        .HasDatabaseName("ix_dispute_tickets_booking");
+
                     b.ToTable("dispute_tickets", (string)null);
                 });
 
@@ -2073,6 +2076,412 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_notification_deliveries_notification_id_channel");
 
                     b.ToTable("notification_deliveries", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficePayable", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<string>("BookingReference")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("booking_reference");
+
+                    b.Property<int>("CalculatorVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("calculator_version");
+
+                    b.Property<decimal>("Commission")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("commission");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<DateTimeOffset>("FinalAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("final_at");
+
+                    b.Property<decimal>("Net")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("net");
+
+                    b.Property<decimal>("OfficeCharges")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("office_charges");
+
+                    b.Property<decimal>("OfficeMoney")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("office_money");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<DateTimeOffset?>("SettledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("settled_at");
+
+                    b.Property<Guid?>("SettlementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("settlement_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_office_payables");
+
+                    b.HasIndex("BookingId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_office_payables_booking");
+
+                    b.HasIndex("SettlementId")
+                        .HasDatabaseName("ix_office_payables_settlement")
+                        .HasFilter("settlement_id IS NOT NULL");
+
+                    b.HasIndex("FinalAt", "Id")
+                        .IsDescending()
+                        .HasDatabaseName("ix_office_payables_final");
+
+                    b.HasIndex("DealerId", "Currency", "Provider")
+                        .HasDatabaseName("ix_office_payables_open")
+                        .HasFilter("settlement_id IS NULL");
+
+                    b.HasIndex("DealerId", "FinalAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_office_payables_dealer_final");
+
+                    b.ToTable("office_payables", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_office_payables_calculator_version", "calculator_version >= 1");
+
+                            t.HasCheckConstraint("ck_office_payables_settled", "(settlement_id IS NULL) = (settled_at IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficePayableHold", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BookingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("booking_id");
+
+                    b.Property<int>("Checks")
+                        .HasColumnType("integer")
+                        .HasColumnName("checks");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("detail");
+
+                    b.Property<DateTimeOffset>("LastCheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_checked_at");
+
+                    b.Property<DateTimeOffset?>("NextCheckAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_check_at");
+
+                    b.Property<DateTimeOffset>("OpenedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("opened_at");
+
+                    b.Property<Guid?>("OpenedByAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("opened_by_admin_id");
+
+                    b.Property<Guid?>("PayableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payable_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ReleaseNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("release_note");
+
+                    b.Property<DateTimeOffset?>("ReleasedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("released_at");
+
+                    b.Property<Guid?>("ReleasedByAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("released_by_admin_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_office_payable_holds");
+
+                    b.HasIndex("DealerId")
+                        .HasDatabaseName("ix_office_payable_holds_open_dealer")
+                        .HasFilter("released_at IS NULL");
+
+                    b.HasIndex("NextCheckAt")
+                        .HasDatabaseName("ix_office_payable_holds_open_next_check")
+                        .HasFilter("released_at IS NULL");
+
+                    b.HasIndex("PayableId")
+                        .HasDatabaseName("ix_office_payable_holds_payable_id");
+
+                    b.HasIndex("BookingId", "Reason")
+                        .IsUnique()
+                        .HasDatabaseName("ix_office_payable_holds_one_open")
+                        .HasFilter("released_at IS NULL");
+
+                    b.ToTable("office_payable_holds", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_office_payable_holds_checks", "checks >= 0");
+
+                            t.HasCheckConstraint("ck_office_payable_holds_manual", "(reason = 'Manual') = (opened_by_admin_id IS NOT NULL) AND (released_by_admin_id IS NULL OR reason = 'Manual')");
+
+                            t.HasCheckConstraint("ck_office_payable_holds_payable", "(payable_id IS NULL) = (reason IN ('NeedsReview', 'PenaltyNotWholeDeposit'))");
+                        });
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficePayableLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("PayableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payable_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_office_payable_lines");
+
+                    b.HasIndex("PayableId", "Position")
+                        .IsUnique()
+                        .HasDatabaseName("ix_office_payable_lines_payable_id_position");
+
+                    b.ToTable("office_payable_lines", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_office_payable_lines_position", "position >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficeSettlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<Guid>("DealerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dealer_id");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("settlement_number");
+
+                    b.Property<DateOnly>("PaidOn")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_on");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at");
+
+                    b.Property<Guid>("RecordedByAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by_admin_id");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_office_settlements");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_office_settlements_settlement_number");
+
+                    b.HasIndex("PaidOn")
+                        .HasDatabaseName("ix_office_settlements_paid_on");
+
+                    b.HasIndex("DealerId", "RecordedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_office_settlements_dealer_recorded");
+
+                    b.ToTable("office_settlements", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficeSettlementLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Net")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("net");
+
+                    b.Property<Guid>("PayableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payable_id");
+
+                    b.Property<Guid>("SettlementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("settlement_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_office_settlement_lines");
+
+                    b.HasIndex("PayableId")
+                        .HasDatabaseName("ix_office_settlement_lines_payable_id");
+
+                    b.HasIndex("SettlementId", "PayableId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_office_settlement_lines_settlement_id_payable_id");
+
+                    b.ToTable("office_settlement_lines", (string)null);
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficeSettlementVoid", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("settlement_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateTimeOffset>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
+                    b.Property<Guid>("VoidedByAdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("voided_by_admin_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_office_settlement_voids");
+
+                    b.ToTable("office_settlement_voids", (string)null);
                 });
 
             modelBuilder.Entity("Khadra.Domain.Payments.Payment", b =>
@@ -3960,6 +4369,61 @@ namespace Khadra.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_notification_deliveries_notifications_notification_id");
                 });
 
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficePayable", b =>
+                {
+                    b.HasOne("Khadra.Domain.Payables.OfficeSettlement", null)
+                        .WithMany()
+                        .HasForeignKey("SettlementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_office_payables_settlement");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficePayableHold", b =>
+                {
+                    b.HasOne("Khadra.Domain.Payables.OfficePayable", null)
+                        .WithMany()
+                        .HasForeignKey("PayableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_office_payable_holds_payable");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficePayableLine", b =>
+                {
+                    b.HasOne("Khadra.Domain.Payables.OfficePayable", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("PayableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_office_payable_lines_payable");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficeSettlementLine", b =>
+                {
+                    b.HasOne("Khadra.Domain.Payables.OfficePayable", null)
+                        .WithMany()
+                        .HasForeignKey("PayableId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_office_settlement_lines_payable");
+
+                    b.HasOne("Khadra.Domain.Payables.OfficeSettlement", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("SettlementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_office_settlement_lines_settlement");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficeSettlementVoid", b =>
+                {
+                    b.HasOne("Khadra.Domain.Payables.OfficeSettlement", null)
+                        .WithOne()
+                        .HasForeignKey("Khadra.Domain.Payables.OfficeSettlementVoid", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_office_settlement_voids_settlement");
+                });
+
             modelBuilder.Entity("Khadra.Domain.Payments.Payment", b =>
                 {
                     b.OwnsOne("Khadra.Domain.Common.Money", "Amount", b1 =>
@@ -4156,6 +4620,16 @@ namespace Khadra.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Khadra.Domain.IdentityAccess.User", b =>
                 {
                     b.Navigation("Documents");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficePayable", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Khadra.Domain.Payables.OfficeSettlement", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Khadra.Domain.Payments.Payment", b =>

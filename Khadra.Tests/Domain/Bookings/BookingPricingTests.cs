@@ -343,11 +343,27 @@ public sealed class PenaltyAssessmentTests
     }
 
     [Fact]
-    public void Every_assessment_says_out_loud_that_it_needs_a_ticket()
+    public void Every_assessment_but_a_customers_penalty_of_the_whole_deposit_says_out_loud_that_it_needs_a_ticket()
     {
         Assert.True(PenaltyAssessment.None(PenaltyReason.CancelledByPlatform, "JOD", Now).RequiresTicketToEnforce);
         Assert.True(PenaltyAssessment
-            .Fixed(BookingParty.Customer, Build.Percent(10m), Money.Jod(90m), PenaltyReason.CustomerNoShow, Now)
+            .Range(BookingParty.Dealer, Build.Percent(25m), Build.Percent(50m), Money.Jod(90m), PenaltyReason.DealerDidNotHandOver, Now)
+            .RequiresTicketToEnforce);
+        Assert.True(PenaltyAssessment
+            .Fixed(BookingParty.Dealer, Build.Percent(100m), Money.Jod(90m), PenaltyReason.DealerDidNotHandOver, Now)
+            .RequiresTicketToEnforce);
+        Assert.True(PenaltyAssessment
+            .Range(BookingParty.Customer, Build.Percent(10m), Build.Percent(20m), Money.Jod(90m), PenaltyReason.CustomerNoShow, Now)
+            .RequiresTicketToEnforce);
+        // Less than the whole deposit: nothing can keep part of one yet (pre-launch item 205), so the server may not
+        // tell the customer it will be kept.
+        Assert.True(PenaltyAssessment
+            .Fixed(BookingParty.Customer, Build.Percent(50m), Money.Jod(90m), PenaltyReason.CustomerCancelledAfterFreeWindow, Now)
+            .RequiresTicketToEnforce);
+        // The one case the owner decided on 2026-09-29 (pre-launch item 164): kept from the deposit when the window
+        // closes with no dispute.
+        Assert.False(PenaltyAssessment
+            .Fixed(BookingParty.Customer, Build.Percent(100m), Money.Jod(90m), PenaltyReason.CustomerNoShow, Now)
             .RequiresTicketToEnforce);
     }
 }

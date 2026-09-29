@@ -263,12 +263,18 @@ public sealed record BookingDto(
     /// here, so no client works it out for itself.
     /// </summary>
     /// <remarks>
-    /// <c>RequiresTicketToEnforce</c> is always true today, which is what makes "no resolved dispute"
-    /// mean "nothing charged". A penalty that could be enforced without one would need a state of its own.
+    /// A customer's fixed penalty can now be enforced without a dispute (payments Phase 8): the ledger keeps it
+    /// from the deposit when the window closes with none, and that has the state of its own this remark once
+    /// said it would need — read from the ledger's record, never worked out from the clock.
     /// </remarks>
     private static PenaltyAssessmentDto? PenaltyOf(PenaltyAssessment? penalty, BookingContext context) =>
         PenaltyAssessmentDto.From(penalty) is { } assessed
-            ? assessed with { State = context.HasResolvedDispute ? PenaltyStates.ResolvedByDispute : PenaltyStates.Assessed }
+            ? assessed with
+            {
+                State = context.HasResolvedDispute ? PenaltyStates.ResolvedByDispute
+                    : context.PenaltyKept ? PenaltyStates.KeptFromDeposit
+                    : PenaltyStates.Assessed,
+            }
             : null;
 
     /// <summary>
@@ -399,8 +405,12 @@ public sealed record PenaltyAssessmentDto(
     bool IsRange,
     bool IsNothingOwed,
     /// <summary>
-    /// Always true today, and sent anyway so a screen states the rule from the server's answer rather
-    /// than from a sentence typed into it. Spec 3.3: with no ticket, nothing is charged at all.
+    /// Whether nothing can come of this assessment without a dispute, sent so a screen states the rule from
+    /// the server's answer rather than from a sentence typed into it. False for a customer's fixed penalty
+    /// of the whole deposit since payments Phase 8 (owner, 2026-09-29): on a paid booking it is kept from
+    /// the deposit when the dispute window closes with no dispute. True for every other one (spec 3.3),
+    /// a customer's penalty of less than the deposit included, which nothing can keep yet (pre-launch
+    /// item 205).
     /// </summary>
     bool RequiresTicketToEnforce,
     /// <summary>The sentence the platform wrote when it assessed this, frozen on the booking.</summary>
@@ -443,11 +453,18 @@ public sealed record PenaltyAssessmentDto(
 /// </summary>
 public static class PenaltyStates
 {
-    /// <summary>Assessed, and nothing charged: no dispute has resolved it, and without one none can (spec 3.3).</summary>
+    /// <summary>Assessed, and nothing charged yet: no dispute has resolved it, and the ledger has not kept it.</summary>
     public const string Assessed = "Assessed";
 
     /// <summary>A dispute on the booking was resolved: its decision is what the assessment became.</summary>
     public const string ResolvedByDispute = "ResolvedByDispute";
+
+    /// <summary>
+    /// The dispute window closed with no dispute, and the office payables ledger kept the penalty from the
+    /// deposit (payments Phase 8; owner, 2026-09-29; pre-launch item 164). A code installed apps do not know,
+    /// and so leave unsaid.
+    /// </summary>
+    public const string KeptFromDeposit = "KeptFromDeposit";
 }
 
 public sealed record HandoverDto(

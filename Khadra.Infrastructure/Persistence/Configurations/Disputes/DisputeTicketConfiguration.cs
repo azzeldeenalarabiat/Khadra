@@ -58,6 +58,10 @@ internal sealed class DisputeTicketConfiguration : IEntityTypeConfiguration<Disp
         entity.HasIndex(ticket => ticket.BookingId)
             .IsUnique()
             .HasFilter("status IN ('Open', 'UnderReview')");
+        // Every ticket of a booking, live or not (pre-launch item 171): the resolved ones a dispute's basis and a
+        // booking's office money are read from, and whether anything still claims a deposit. The partial index
+        // above holds live rows only.
+        entity.HasIndex(ticket => ticket.BookingId, "ix_dispute_tickets_booking").HasDatabaseName("ix_dispute_tickets_booking");
         entity.HasIndex(ticket => ticket.Status);
         // The overdue count and the attention queue both ask for live tickets past their deadline.
         entity.HasIndex(ticket => ticket.SlaDeadline);

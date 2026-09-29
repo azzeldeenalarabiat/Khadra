@@ -7,7 +7,7 @@ using Khadra.Application.Dealers.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.FinancialDocuments.Email;
 using Khadra.Application.FinancialDocuments.ReadModels;
-using Khadra.Application.Payments.Financials;
+using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Common;
 using MediatR;
@@ -33,7 +33,7 @@ public sealed class GetAttentionQueueHandler(
     IBookingDashboardReader bookings,
     IPaymentDashboardReader payments,
     IFinancialDocumentReader financialDocuments,
-    HeldDepositFinder heldDeposits,
+    IOfficeLedgerReader ledger,
     IBusinessRulesProvider businessRules,
     IAdminDashboardSettings settings,
     IFinancialDocumentEmailSettings documentEmails,
@@ -54,12 +54,10 @@ public sealed class GetAttentionQueueHandler(
         var pending = await dealers.PendingApplicationsAsync(cancellationToken);
         var failedRefunds = await payments.FailedRefundsAsync(cancellationToken);
         var owedOrphans = await payments.OwedOrphansAsync(cancellationToken);
-        var held = await heldDeposits.FindAsync(now, cancellationToken);
+        var payablesOnHold = await ledger.SystemHoldsSummaryAsync(cancellationToken);
         var documentsOnHold = await financialDocuments.OpenHoldsSummaryAsync(cancellationToken);
         var emailsNotSent = await financialDocuments.EmailsNotSentSummaryAsync(now.Subtract(documentEmails.StaleAfter), cancellationToken);
-        var labels = await ResolveBookingLabelsAsync(
-            [.. live.Select(dispute => dispute.BookingId), .. held.Select(deposit => deposit.BookingId)],
-            cancellationToken);
+        var labels = await ResolveBookingLabelsAsync([.. live.Select(dispute => dispute.BookingId)], cancellationToken);
 
         // A ticket whose booking has gone gets no subtitle rather than a fabricated one. The row still
         // renders: the deadline is the fact that matters, and inventing a label would be the one thing
@@ -75,20 +73,14 @@ public sealed class GetAttentionQueueHandler(
             settings.SlaWarningThreshold,
             rules.AdminSlaHours,
             now,
-            new MoneyAttention(
-                failedRefunds,
-                owedOrphans,
-                [.. held.Select(deposit => new HeldDepositRow(
-                    deposit.BookingId.Value,
-                    labels.GetValueOrDefault(deposit.BookingId),
-                    deposit.HeldSince))]),
+            new MoneyAttention(failedRefunds, owedOrphans),
             documentsOnHold,
-            emailsNotSent);
+            emailsNotSent,
+            payablesOnHold);
     }
 
     /// <summary>
-    /// Builds "Aqaba Coast Cars · KH-20411" for each booking a row names: a live ticket's, or a held
-    /// deposit's.
+    /// Builds "Aqaba Coast Cars · KH-20411" for each booking a row names: a live ticket's.
     ///
     /// A ticket knows only its BookingId, and a booking knows only its DealerId: cross-context
     /// references are by id, with no navigation properties. So the labels are resolved by asking each

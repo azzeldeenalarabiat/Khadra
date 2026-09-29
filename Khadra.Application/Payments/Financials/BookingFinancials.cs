@@ -1,5 +1,6 @@
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
+using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 
 namespace Khadra.Application.Payments.Financials;
@@ -35,13 +36,20 @@ public sealed record BookingFinancials(
     DepositPosition Deposit,
     CommissionPosition Commission,
     IReadOnlyList<PaymentRecord> Payments,
-    IReadOnlyList<string> Issues)
+    IReadOnlyList<string> Issues,
+    OfficePosition Office)
 {
     /// <summary>
     /// The version of the rules this answer was computed by. Raised whenever a figure's definition
     /// changes, so a statement frozen from an earlier answer says which rules produced it.
     /// </summary>
-    public const int CalculatorVersion = 1;
+    /// <remarks>
+    /// 2 (payments Phase 8, owner 2026-09-29): what a final booking comes to for the office; a customer's penalty
+    /// kept from the deposit when the window closes with no dispute; commission earned, capped at the office's
+    /// money, whenever the ledger records a payable; and a refund on a completed booking that no dispute explains
+    /// is a contradiction.
+    /// </remarks>
+    public const int CalculatorVersion = 2;
 
     /// <summary>
     /// Whether the records contradict one another (<see cref="FinancialIssues"/>): the answer is still
@@ -132,7 +140,42 @@ public sealed record DisputeDecision(
 /// Khadra's commission: the figures FROZEN on the booking (terms, never claims about money) and a state
 /// (<see cref="CommissionStates"/>). Never shown to a customer.
 /// </summary>
-public sealed record CommissionPosition(Money Amount, decimal Percent, string Basis, string State);
+/// <param name="Earned">
+/// What Khadra earned, when the state is <see cref="CommissionStates.Earned"/> (payments Phase 8): the frozen
+/// figure, capped at the office's money on the booking (owner, 2026-09-29). Null in every other state.
+/// </param>
+public sealed record CommissionPosition(Money Amount, decimal Percent, string Basis, string State, Money? Earned);
+
+/// <summary>
+/// What a final booking comes to for the rental office (payments Phase 8): the outcome, the lines that make it, and
+/// the office's money, Khadra's commission, any dispute charge and the signed net. The ledger records exactly this
+/// (<c>OfficePayable</c>), and checks what it recorded against it again until it is settled. Administrator and
+/// office only; never the customer.
+/// </summary>
+/// <param name="State">One of <see cref="OfficeStates"/>.</param>
+/// <param name="FinalAt">When the outcome became final: the booking's completion, or its dispute window's close.</param>
+/// <param name="Net">What the office is owed, signed: below zero, the office owes Khadra.</param>
+/// <param name="UndeterminedBecause">A <c>PayableHoldReason</c> name, when a final outcome cannot be recorded.</param>
+public sealed record OfficePosition(
+    string State,
+    PayableOutcome? Outcome,
+    DateTimeOffset? FinalAt,
+    IReadOnlyList<PayableLineDraft> Lines,
+    Money OfficeMoney,
+    Money Commission,
+    Money Charges,
+    decimal Net,
+    string? UndeterminedBecause)
+{
+    public bool IsFinal => State == OfficeStates.Final;
+}
+
+/// <summary>
+/// The facts the calculator reads from the office payables ledger once it recorded the booking (payments Phase 8):
+/// the recorded decision is the truth about where a kept penalty went and what commission was earned, never a
+/// figure worked out again from today's records.
+/// </summary>
+public sealed record RecordedPayable(PayableOutcome Outcome, Money Commission);
 
 /// <summary>One checkout attempt, as the financial history shows it.</summary>
 /// <param name="AmountCharged">What the card was charged: the capture, or what was asked while nothing was.</param>
@@ -231,10 +274,16 @@ public static class DepositStates
     public const string HeldForAssessedPenalty = "HeldForAssessedPenalty";
 
     /// <summary>
-    /// A penalty on the customer, the window closed, and no dispute was opened (pre-launch item 164):
-    /// held, with final settlement pending. Nothing is promised to either side.
+    /// A penalty on the customer, the window closed, and no dispute was opened (pre-launch item 164), and the
+    /// office payables ledger has not recorded the booking yet — or cannot (payments Phase 8): held.
     /// </summary>
     public const string HeldUnresolved = "HeldUnresolved";
+
+    /// <summary>
+    /// A penalty on the customer, the window closed with no dispute, and the ledger recorded it: the deposit was
+    /// kept as the penalty, for the office less Khadra's commission (owner, 2026-09-29; pre-launch item 164).
+    /// </summary>
+    public const string KeptAsPenalty = "KeptAsPenalty";
 
     /// <summary>Returned to the customer when the window closed cleanly.</summary>
     public const string Released = "Released";
@@ -262,10 +311,26 @@ public static class CommissionStates
     public const string NotApplicable = "NotApplicable";
 
     /// <summary>
-    /// Completed through a dispute, or ended before pickup with money still held: the office payables
-    /// ledger (payments Phase 8) decides. Phase 4 takes no commission from a held deposit.
+    /// Completed through a dispute, or ended before pickup with money still held, and not yet recorded by the
+    /// office payables ledger (payments Phase 8), which decides once the outcome is final.
     /// </summary>
     public const string Undecided = "Undecided";
+}
+
+/// <summary>What a booking comes to for the rental office, as a state (payments Phase 8).</summary>
+public static class OfficeStates
+{
+    /// <summary>Nothing was paid online: the booking never reaches the office payables ledger.</summary>
+    public const string NotApplicable = "NotApplicable";
+
+    /// <summary>The outcome is not final yet: the booking is running, its dispute window is open, or a dispute is live.</summary>
+    public const string Open = "Open";
+
+    /// <summary>The outcome is final, and these figures are what the ledger records.</summary>
+    public const string Final = "Final";
+
+    /// <summary>The outcome is final but cannot be recorded (<see cref="OfficePosition.UndeterminedBecause"/>).</summary>
+    public const string Undetermined = "Undetermined";
 }
 
 /// <summary>Where a payment's refunds stand, as one reading of their statuses.</summary>
@@ -286,4 +351,16 @@ public static class FinancialIssues
 
     /// <summary>The resolved disputes' shares do not add up to the deposit they decided.</summary>
     public const string DisputeSharesUnbalanced = "DisputeSharesUnbalanced";
+
+    /// <summary>
+    /// A completed booking's payment carries a refund no resolved dispute of the booking explains (payments Phase 8):
+    /// a rental that happened owes nothing back except what a dispute decided.
+    /// </summary>
+    public const string RefundWithoutCause = "RefundWithoutCause";
+
+    /// <summary>
+    /// What the booking records as paid online is not what its confirming payment applied (payments Phase 8): the
+    /// office's money is priced from one of them, and they must be the same fact.
+    /// </summary>
+    public const string PaidOnlineDisagrees = "PaidOnlineDisagrees";
 }

@@ -68,6 +68,7 @@ public sealed class BookingFinancialsPersistenceTests : IDisposable
             new BookingRepository(context),
             new PaymentRepository(context),
             new DisputeTicketRepository(context),
+            new Khadra.Infrastructure.Reporting.OfficeLedgerReader(context),
             new BookingPartyResolver(Substitute.For<IDealerRepository>()),
             new TestClock(now),
             new RecordingLogger<BookingFinancialsHandlers>());

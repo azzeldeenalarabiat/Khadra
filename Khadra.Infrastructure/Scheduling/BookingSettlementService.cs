@@ -3,6 +3,7 @@ using Khadra.Application.Bookings.SettleBookings;
 using Khadra.Application.FinancialDocuments.Issuance;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.FinancialDocuments.Rendering;
+using Khadra.Application.Payables.Pass;
 using Khadra.Application.Payments.SettlePayments;
 using Khadra.Infrastructure.Configuration;
 using MediatR;
@@ -47,6 +48,9 @@ internal sealed partial class BookingSettlementService(
     private readonly HashSet<RenditionCandidate> _undrawable = [];
     private bool _drawingStopped;
 
+    // Where the next page of open payables to check again starts (payments Phase 8). Only the pass touches it.
+    private int _verifyOffset;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
@@ -86,6 +90,11 @@ internal sealed partial class BookingSettlementService(
         // sweeping in that order closes the attempt on the same tick rather than the next. A second
         // timer would buy nothing and give two schedules to reason about.
         await RunAsync(new SettlePaymentsCommand(), cancellationToken);
+
+        // The office payables ledger after the money and before the documents (payments Phase 8): a booking the
+        // sweep above closed, and whose refunds it recorded, is judged on everything this tick knows, and a
+        // statement issued below reads a penalty the ledger kept here as kept.
+        await RecordPayablesAsync(cancellationToken);
 
         // Financial documents right after the money (payments Phase 5), so a refund settled in this pass
         // gets its receipt in this pass (when its payment already has one). The money never waits for its
@@ -175,6 +184,35 @@ internal sealed partial class BookingSettlementService(
                     cancellationToken);
             }
         }
+    }
+
+    /// <summary>
+    /// Records what final bookings come to for their offices (payments Phase 8): one query for the work, then one
+    /// scope — one context, one transaction — PER BOOKING, as issuing does, so a booking that cannot be recorded never
+    /// holds up another. Then a page of the open payables is checked against their records again, the next page on the
+    /// next tick, so every payable is looked at in turn however many there are.
+    /// </summary>
+    private async Task RecordPayablesAsync(CancellationToken cancellationToken)
+    {
+        var work = await RunAsync(new ListPayableWorkQuery(_verifyOffset), cancellationToken);
+        if (work is null)
+            return;
+
+        foreach (var bookingId in work.BookingsToRecord)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+            await RunAsync(new RecordOfficePayableCommand(bookingId), cancellationToken);
+        }
+
+        foreach (var payableId in work.PayablesToVerify)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return;
+            await RunAsync(new VerifyOfficePayableCommand(payableId), cancellationToken);
+        }
+
+        _verifyOffset = work.NextVerifyOffset;
     }
 
     private async Task<TResponse?> RunAsync<TResponse>(IRequest<TResponse> command, CancellationToken cancellationToken)

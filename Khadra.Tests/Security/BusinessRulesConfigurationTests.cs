@@ -74,6 +74,19 @@ public sealed class BusinessRulesConfigurationTests
         Assert.Contains("ProcessingFee", failure.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("50")]
+    [InlineData("0")]
+    public void A_customer_penalty_below_the_whole_deposit_is_refused_at_startup(string percent)
+    {
+        // Payments Phase 8 (pre-launch item 205): the ledger keeps a customer's penalty from the deposit when the window
+        // closes with no dispute, and nothing can return the rest of a partial one yet.
+        var failure = Assert.Throws<OptionsValidationException>(() => Rules(("BusinessRules:CustomerCancellationPenaltyPercent", percent)));
+
+        Assert.Contains("CustomerCancellationPenaltyPercent", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(100m, Rules().CustomerCancellationPenaltyPercent);
+    }
+
     [Fact]
     public void An_enabled_processing_fee_with_a_figure_is_accepted()
     {

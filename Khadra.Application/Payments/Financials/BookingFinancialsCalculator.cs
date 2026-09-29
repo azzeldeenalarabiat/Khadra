@@ -2,6 +2,7 @@ using Khadra.Application.Bookings;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
+using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 
 namespace Khadra.Application.Payments.Financials;
@@ -13,12 +14,18 @@ namespace Khadra.Application.Payments.Financials;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A pure function of the booking, its payments (with their refunds) and its resolved disputes, and it
+/// A pure function of the booking, its payments (with their refunds), its resolved disputes and — once the
+/// office payables ledger recorded it — the booking's payable (payments Phase 8), and it
 /// adds NO rule of its own: every state is a reading of a verdict the aggregates already give —
 /// <c>Booking.ReturnsWholePayment</c>, <c>RefundableAboveDeposit</c>, <c>HasPenaltyAgainstCustomer</c>,
 /// <c>DisputeWindowEndsAt</c>, <c>EndedBeforePickup</c>, <c>IsPaidInFull</c>; <c>Payment.FeeInside</c>,
 /// <c>WholePaymentRefundAmount</c>, <c>IsRefundedInFull</c>; the dispute resolutions' own shares. A rule
 /// that is missing belongs on the aggregate, not here.
+/// </para>
+/// <para>
+/// The office's position (payments Phase 8) is the one composition no aggregate can make: what a final booking
+/// comes to for its office needs the booking, its disputes and the frozen commission together, and the owner's
+/// rules for it (2026-09-24 and 2026-09-29) live in <c>Office</c> below, the only place that states them.
 /// </para>
 /// <para>
 /// It never throws on data that contradicts itself — an ending whose refund was never recorded (the
@@ -33,12 +40,17 @@ public static class BookingFinancialsCalculator
     /// <param name="resolvedTickets">The booking's RESOLVED dispute tickets. Others are ignored.</param>
     /// <param name="hasLiveDispute">Whether a dispute on the booking is open right now.</param>
     /// <param name="now">The instant the answer is for: the dispute window is judged against it.</param>
+    /// <param name="recorded">
+    /// The booking's payable, once the office payables ledger recorded it (payments Phase 8): what it decided about
+    /// a kept penalty and the commission earned. Null before that, and for every booking that never gets one.
+    /// </param>
     public static BookingFinancials Calculate(
         Booking booking,
         IEnumerable<Payment> payments,
         IEnumerable<DisputeTicket> resolvedTickets,
         bool hasLiveDispute,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        RecordedPayable? recorded = null)
     {
         ArgumentNullException.ThrowIfNull(booking);
         ArgumentNullException.ThrowIfNull(payments);
@@ -76,10 +88,11 @@ public static class BookingFinancialsCalculator
             now,
             Summary(booking, records, currency),
             Balance(booking, currency),
-            Deposit(booking, confirming, records, decided, hasLiveDispute, now, currency),
-            Commission(booking, confirming, decided),
+            Deposit(booking, confirming, records, decided, hasLiveDispute, now, currency, recorded),
+            Commission(booking, confirming, decided, recorded),
             records,
-            issues.Distinct(StringComparer.Ordinal).ToList());
+            issues.Distinct(StringComparer.Ordinal).ToList(),
+            Office(booking, decided, hasLiveDispute, now, currency));
     }
 
     // ── One payment ────────────────────────────────────────────────────────────────────────────────
@@ -262,7 +275,8 @@ public static class BookingFinancialsCalculator
         List<DisputeTicket> decided,
         bool hasLiveDispute,
         DateTimeOffset now,
-        string currency)
+        string currency,
+        RecordedPayable? recorded)
     {
         if (booking.DepositPaymentId is null)
             return new DepositPosition(DepositStates.NotPaid, Money.ZeroIn(currency), null, null, null);
@@ -294,7 +308,11 @@ public static class BookingFinancialsCalculator
                     ? DepositStates.HeldUntilWindowCloses
                     : windowEndsAt is { } end && now < end
                         ? DepositStates.HeldForAssessedPenalty
-                        : DepositStates.HeldUnresolved
+                        // Kept only once the ledger RECORDED it (payments Phase 8): the stored decision is what
+                        // moved the deposit, never this reading of the clock.
+                        : recorded?.Outcome == PayableOutcome.PenaltyKept
+                            ? DepositStates.KeptAsPenalty
+                            : DepositStates.HeldUnresolved
             // Confirmed: every exit is still open.
             : DepositStates.Held;
 
@@ -343,28 +361,170 @@ public static class BookingFinancialsCalculator
             customerRefunds);
     }
 
-    /// <summary>The commission's state, by the owner's rules of 2026-09-26 (docs/payments-programme.md).</summary>
-    private static CommissionPosition Commission(Booking booking, Payment? confirming, List<DisputeTicket> decided)
+    /// <summary>
+    /// The commission's state, by the owner's rules of 2026-09-26 and 2026-09-29 (docs/payments-programme.md).
+    /// </summary>
+    /// <remarks>
+    /// Once the ledger recorded the booking, its payable decides (payments Phase 8): earned as recorded — the frozen
+    /// figure, never more than the office's money on the booking — or not earned when that was nothing. Before
+    /// that, completed with nothing affecting settlement is earned in full, as it always was.
+    /// </remarks>
+    private static CommissionPosition Commission(
+        Booking booking,
+        Payment? confirming,
+        List<DisputeTicket> decided,
+        RecordedPayable? recorded)
     {
         string state;
-        if (booking.DepositPaymentId is null)
+        Money? earned = null;
+        if (booking.DepositPaymentId is not null && recorded is not null)
+        {
+            state = recorded.Commission.IsZero ? CommissionStates.NotEarned : CommissionStates.Earned;
+            earned = recorded.Commission.IsZero ? null : Fresh(recorded.Commission);
+        }
+        else if (booking.DepositPaymentId is null)
             state = booking.Status.IsTerminal ? CommissionStates.NotApplicable : CommissionStates.Projected;
         else if (booking.Status == BookingStatus.Completed)
-            // Earned only when nothing affects settlement: completed through a dispute, or with money
-            // sent back from the payment, is the ledger's (Phase 8) to decide.
+        {
+            // Earned only when nothing affects settlement: completed through a dispute, or with money sent back
+            // from the payment, waits for the ledger.
             state = decided.Count > 0 || confirming?.Refunds.Count > 0 ? CommissionStates.Undecided : CommissionStates.Earned;
+            if (state == CommissionStates.Earned)
+                earned = Fresh(booking.Pricing.CommissionAmount);
+        }
         else if (booking.Status == BookingStatus.Confirmed || booking.Status == BookingStatus.PickedUp || booking.Status == BookingStatus.Returned)
             state = CommissionStates.Expected;
         else
-            // Ended before pickup, paid: nothing is earned once the whole payment is going back; a
-            // deposit still held (a customer penalty, a window not yet closed) is Phase 8's.
+            // Ended before pickup, paid: nothing is earned once the whole payment is going back; a deposit still
+            // held (a customer penalty, a window not yet closed) waits for the ledger.
             state = WholePaymentReturned(confirming) ? CommissionStates.NotEarned : CommissionStates.Undecided;
 
         return new CommissionPosition(
             Fresh(booking.Pricing.CommissionAmount),
             booking.Terms.CommissionPercent.Value,
             booking.Terms.CommissionBasis.Name,
-            state);
+            state,
+            earned);
+    }
+
+    // ── The office ─────────────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// What a final booking comes to for its rental office (payments Phase 8; owner, 2026-09-24 and 2026-09-29): the
+    /// ledger records exactly this, and nothing else computes it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Final means nothing can change the booking's money any more: completed (a completed booking cannot be
+    /// disputed), or cancelled or a no-show with its own frozen dispute window closed — and in either case no
+    /// dispute live. Whether a refund is still on its way does not change what the office is owed, only when it
+    /// may be paid, so it is the ledger's to judge, not this.
+    /// </para>
+    /// <para>
+    /// The office's money, by outcome: a rental, everything paid online; a rental a dispute decided, what was paid
+    /// above the deposit and its share of the deposit; an ending a dispute decided, its share; a customer's penalty
+    /// kept when the window closed with no dispute, the penalty (owner, 2026-09-29: pre-launch item 164, amending
+    /// spec 3.3 for this one case); the deposit released or the whole payment returned, nothing. Khadra's commission
+    /// is the frozen figure, never more than that money (owner, 2026-09-29). Every charge a resolved dispute
+    /// assessed on the office is taken from it, whatever the outcome, which can leave the office owing.
+    /// </para>
+    /// <para>
+    /// A customer's penalty is kept only when it is the whole deposit held: anything less would leave the rest owed
+    /// back to the customer, and nothing can return it yet. Such an outcome is final and undetermined, and the
+    /// ledger holds it (pre-launch item 205).
+    /// </para>
+    /// </remarks>
+    private static OfficePosition Office(Booking booking, List<DisputeTicket> decided, bool hasLiveDispute, DateTimeOffset now, string currency)
+    {
+        var zero = Money.ZeroIn(currency);
+        if (booking.DepositPaymentId is null)
+            return new OfficePosition(OfficeStates.NotApplicable, null, null, [], zero, Money.ZeroIn(currency), Money.ZeroIn(currency), 0m, null);
+
+        var finalAt =
+            booking.Status == BookingStatus.Completed ? booking.FinishedAt
+            : booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.NoShow ? booking.DisputeWindowEndsAt
+            : null;
+        if (finalAt is not { } final || now < final || hasLiveDispute)
+            return new OfficePosition(OfficeStates.Open, null, null, [], zero, Money.ZeroIn(currency), Money.ZeroIn(currency), 0m, null);
+
+        var lines = new List<PayableLineDraft>();
+        PayableOutcome outcome;
+        if (booking.Status == BookingStatus.Completed)
+        {
+            if (decided.Count == 0)
+            {
+                outcome = PayableOutcome.Rental;
+                AddLine(lines, PayableLineKind.RentalRevenue, booking.OnlinePaid.Amount, null);
+            }
+            else
+            {
+                outcome = PayableOutcome.RentalAfterDispute;
+                AddLine(lines, PayableLineKind.RentalRevenue, booking.PaidAboveDeposit.Amount, null);
+                AddShares(lines, decided);
+            }
+        }
+        else if (booking.ReturnsWholePayment)
+            outcome = PayableOutcome.PaymentReturned;
+        else if (decided.Count > 0)
+        {
+            outcome = PayableOutcome.DisputeDecided;
+            AddShares(lines, decided);
+        }
+        else if (booking.HasPenaltyAgainstCustomer)
+        {
+            var penalty = booking.Penalty!;
+            var held = BookingDisputeSettlement.DepositHeldFor(booking);
+            // The booking's own assessment says whether it needs a ticket, so what a customer is told and
+            // what the ledger keeps cannot part: nothing is kept that the server says a dispute must decide.
+            if (penalty.RequiresTicketToEnforce ||
+                !string.Equals(penalty.MaxAmount.CurrencyCode, currency, StringComparison.Ordinal) ||
+                penalty.MaxAmount.Amount != held.Amount)
+            {
+                return new OfficePosition(
+                    OfficeStates.Undetermined, PayableOutcome.PenaltyKept, final, [], zero, Money.ZeroIn(currency), Money.ZeroIn(currency), 0m,
+                    PayableHoldReason.PenaltyNotWholeDeposit.Name);
+            }
+
+            outcome = PayableOutcome.PenaltyKept;
+            AddLine(lines, PayableLineKind.PenaltyKept, penalty.MaxAmount.Amount, null);
+        }
+        else
+            outcome = PayableOutcome.DepositReleased;
+
+        var money = lines.Sum(line => line.Amount);
+        var commission = Math.Min(booking.Pricing.CommissionAmount.Amount, money);
+        AddLine(lines, PayableLineKind.Commission, commission, null);
+        foreach (var ticket in decided)
+        {
+            if (ticket.Resolution!.DealerCharge is { } charge)
+                AddLine(lines, PayableLineKind.DisputeCharge, charge.Amount, ticket.Id);
+        }
+
+        var charges = lines.Where(line => line.Kind == PayableLineKind.DisputeCharge).Sum(line => line.Amount);
+        return new OfficePosition(
+            OfficeStates.Final,
+            outcome,
+            final,
+            lines,
+            Money.Create(money, currency),
+            Money.Create(commission, currency),
+            Money.Create(charges, currency),
+            money - commission - charges,
+            null);
+    }
+
+    /// <summary>The office's share of the deposit, one line per dispute that transferred any.</summary>
+    private static void AddShares(List<PayableLineDraft> lines, List<DisputeTicket> decided)
+    {
+        foreach (var ticket in decided)
+            AddLine(lines, PayableLineKind.DisputeShare, ticket.Resolution!.Deposit.TransferredToDealer.Amount, ticket.Id);
+    }
+
+    /// <summary>A line only for money that exists: a payable carries no zero lines.</summary>
+    private static void AddLine(List<PayableLineDraft> lines, PayableLineKind kind, decimal amount, Id? source)
+    {
+        if (amount > 0m)
+            lines.Add(new PayableLineDraft(kind, amount, source));
     }
 
     /// <summary>Whether everything the payment will ever return is refunded or owed back.</summary>
@@ -410,6 +570,32 @@ public static class BookingFinancialsCalculator
                 issues.Add(FinancialIssues.EndingRefundMissing);
             if (!booking.RefundableAboveDeposit.IsZero && confirming.RefundFor(RefundReason.EndedBeforePickup) is null)
                 issues.Add(FinancialIssues.EndingRefundMissing);
+
+            // A rental that happened owes nothing back but what one of its own resolved disputes decided (payments
+            // Phase 8): anything else would be paid to the office AND returned to the customer.
+            if (booking.Status == BookingStatus.Completed &&
+                confirming.Refunds.Any(refund =>
+                    refund.Reason != RefundReason.DisputeResolution ||
+                    !decided.Exists(ticket => ticket.Id == refund.DisputeTicketId)))
+            {
+                issues.Add(FinancialIssues.RefundWithoutCause);
+            }
+
+            // The deposit is the customer's OR the office's, never both (payments Phase 8): a release beside a penalty
+            // the ledger would keep, or a whole-payment refund on an ending that does not return the whole payment,
+            // is a contradiction — the deposit state reads the refund, the office's position reads the booking.
+            if (booking.HasPenaltyAgainstCustomer && confirming.RefundFor(RefundReason.DisputeWindowClosed) is not null)
+                issues.Add(FinancialIssues.RefundsConflict);
+            if (!booking.ReturnsWholePayment && confirming.WholePaymentRefund is not null)
+                issues.Add(FinancialIssues.RefundsConflict);
+
+            // What the booking says was paid online is what the office's money is priced from; the payment that
+            // confirmed it says what it applied. They are one fact written twice, and must agree.
+            if (!string.Equals(confirming.AppliedToBooking.CurrencyCode, booking.OnlinePaid.CurrencyCode, StringComparison.Ordinal) ||
+                confirming.AppliedToBooking.Amount != booking.OnlinePaid.Amount)
+            {
+                issues.Add(FinancialIssues.PaidOnlineDisagrees);
+            }
         }
 
         if (decided.Count > 0)

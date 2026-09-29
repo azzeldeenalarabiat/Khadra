@@ -10,6 +10,7 @@ using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Application.Fleet.ReadModels;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Application.Reviews.ReadModels;
 using Khadra.Application.Shortlist.ReadModels;
@@ -23,6 +24,7 @@ using Khadra.Domain.FinancialDocuments.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.Payables.Repositories;
 using Khadra.Domain.Payments.Repositories;
 using Khadra.Domain.Reviews.Repositories;
 using Khadra.Domain.Shortlist.Repositories;
@@ -247,6 +249,13 @@ public static class DependencyInjection
             // that refuses every save while naming its own limit as nought.
             .Validate(options => options.MaxShortlistEntries is > 0,
                 "BusinessRules: MaxShortlistEntries must be set to a positive number of cars.")
+            // Locked at the whole deposit (payments Phase 8, pre-launch item 205). A customer's penalty is kept from
+            // the deposit when the window closes with no dispute (owner, 2026-09-29), and a penalty below 100% would
+            // leave the rest owed back to the customer with no refund to send it: the office payables ledger would
+            // hold every such booking. Frozen on each booking, so an older one keeps what it was made under.
+            .Validate(options => options.CustomerCancellationPenaltyPercent == 100m,
+                "BusinessRules: CustomerCancellationPenaltyPercent must be 100 until a partial penalty can return the rest "
+                + "of the deposit (pre-launch item 205).")
             .ValidateOnStart();
         services.AddOptions<FinancialDocumentOptions>()
             .Bind(configuration.GetSection(FinancialDocumentOptions.SectionName))
@@ -254,6 +263,13 @@ public static class DependencyInjection
             .Validate(options => options.RetryMaxSeconds >= options.RetryInitialSeconds,
                 "FinancialDocuments: RetryMaxSeconds must be at least RetryInitialSeconds.")
             .ValidateOnStart();
+        services.AddOptions<PayablesOptions>()
+            .Bind(configuration.GetSection(PayablesOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(options => options.RetryMaxSeconds >= options.RetryInitialSeconds,
+                "Payables: RetryMaxSeconds must be at least RetryInitialSeconds.")
+            .ValidateOnStart();
+        services.AddSingleton<IPayablesSettings, PayablesSettings>();
         // Khadra's identity is all or nothing (owner, 2026-09-27): a half-filled one is refused at boot,
         // naming the settings that are missing, rather than holding every document for a reason nobody reads.
         services.AddSingleton<IValidateOptions<FinancialDocumentOptions>, FinancialDocumentIssuerValidator>();
@@ -376,6 +392,11 @@ public static class DependencyInjection
         // Their emails (payments Phase 7): the outbox row and its append-only attempts.
         services.AddScoped<IFinancialDocumentDeliveryRepository, FinancialDocumentDeliveryRepository>();
         services.AddSingleton<IFinancialDocumentPdfRenderer, QuestPdfFinancialDocumentRenderer>();
+        // The office payables ledger (payments Phase 8): payables with their frozen lines, settlements and their
+        // voids, and the holds. Settlement numbers come from the documents' gapless counters.
+        services.AddScoped<IOfficePayableRepository, OfficePayableRepository>();
+        services.AddScoped<IOfficeSettlementRepository, OfficeSettlementRepository>();
+        services.AddScoped<IOfficePayableHoldRepository, OfficePayableHoldRepository>();
         services.AddScoped<INotifier, Notifier>();
         services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
 
@@ -421,6 +442,9 @@ public static class DependencyInjection
         services.AddScoped<IFinancialDocumentCandidateReader, FinancialDocumentCandidateReader>();
         services.AddScoped<IFinancialDocumentRenditionWorkReader, FinancialDocumentRenditionWorkReader>();
         services.AddScoped<IFinancialDocumentReader, FinancialDocumentReader>();
+        // The office payables ledger (payments Phase 8): every screen's reading of it, and the pass's work.
+        services.AddScoped<IOfficeLedgerReader, OfficeLedgerReader>();
+        services.AddScoped<IPayableWorkReader, PayableWorkReader>();
         services.AddSingleton<IReportingCalendar, ReportingCalendar>();
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();

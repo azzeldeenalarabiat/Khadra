@@ -7,6 +7,7 @@ using Khadra.Domain.FinancialDocuments;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Notifications;
+using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 using Khadra.Domain.PlatformSettings;
 using Khadra.Domain.Reviews;
@@ -46,6 +47,10 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<FinancialDocumentDeliveryAttempt> FinancialDocumentDeliveryAttempts => Set<FinancialDocumentDeliveryAttempt>();
     public DbSet<FinancialDocumentIssuanceHold> FinancialDocumentIssuanceHolds => Set<FinancialDocumentIssuanceHold>();
     internal DbSet<FinancialDocumentSeries> FinancialDocumentSeries => Set<FinancialDocumentSeries>();
+    public DbSet<OfficePayable> OfficePayables => Set<OfficePayable>();
+    public DbSet<OfficeSettlement> OfficeSettlements => Set<OfficeSettlement>();
+    public DbSet<OfficeSettlementVoid> OfficeSettlementVoids => Set<OfficeSettlementVoid>();
+    public DbSet<OfficePayableHold> OfficePayableHolds => Set<OfficePayableHold>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -69,9 +74,17 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
         //   overwriting the other's view of whether money moved -- a booking Confirmed with a payment
         //   that says Orphaned, or the reverse. The webhook handler catches the conflict, re-reads,
         //   and decides again against what it finds.
+        // - OfficePayable (payments Phase 8): two administrators settling the same office at once both
+        //   find the same payables due; the second's save is refused whole, so no payable is closed by
+        //   two settlements and no money is recorded as moving twice.
+        // - OfficePayableHold: an administrator releasing a hold while the payables pass checks it.
         if (Database.IsNpgsql())
         {
-            foreach (var type in new[] { typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer), typeof(Payment) })
+            foreach (var type in new[]
+                     {
+                         typeof(RefreshToken), typeof(DisputeTicket), typeof(Booking), typeof(Dealer), typeof(Payment),
+                         typeof(OfficePayable), typeof(OfficePayableHold),
+                     })
             {
                 modelBuilder.Entity(type)
                     .Property<uint>("xmin")

@@ -246,7 +246,8 @@ public sealed class CancelBookingTests
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Same(BookingParty.Customer, booking.Penalty!.AttributedTo);
         Assert.Equal(booking.Pricing.DepositAmount.Amount, booking.Penalty.MaxAmount.Amount);
-        Assert.True(booking.Penalty.RequiresTicketToEnforce);
+        // Kept from the deposit when the window closes with no dispute (payments Phase 8), so no ticket is needed.
+        Assert.False(booking.Penalty.RequiresTicketToEnforce);
     }
 
     /// <summary>

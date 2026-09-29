@@ -241,14 +241,23 @@ internal static class DocumentWording
     /// Where the penalty stands — pre-launch item 173's sentences (owner, 2026-09-26). "See Payments", the
     /// booking page's pointer, becomes the section of this document that shows the decision.
     /// </summary>
-    public static BilingualText PenaltyStanding(bool resolvedByDispute) =>
+    /// <param name="keptFromDeposit">
+    /// The ledger kept the penalty from the deposit when the window closed with no dispute (payments Phase 8;
+    /// owner, 2026-09-29; pre-launch item 164). The booking page's sentence, and a DRAFT awaiting the owner's
+    /// sign-off with it.
+    /// </param>
+    public static BilingualText PenaltyStanding(bool resolvedByDispute, bool keptFromDeposit) =>
         resolvedByDispute
             ? BilingualText.Of(
                 "This penalty was resolved through a dispute. The final amount is shown under Deposit.",
                 "تم حسم هذا الجزاء من خلال نزاع. يظهر المبلغ النهائي في قسم العربون.")
-            : BilingualText.Of(
-                "A penalty has been assessed, but no amount has been charged yet.",
-                "تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.");
+            : keptFromDeposit
+                ? BilingualText.Of(
+                    "The dispute window closed with no dispute, so this penalty was kept from your deposit. The amount is shown under Deposit.",
+                    "انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك. يظهر المبلغ في قسم العربون.")
+                : BilingualText.Of(
+                    "A penalty has been assessed, but no amount has been charged yet.",
+                    "تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.");
 
     public static BilingualText Range(Money min, Money max) =>
         BilingualText.Of(
@@ -296,6 +305,10 @@ internal static class DocumentWording
             DepositStates.HeldUnresolved => BilingualText.Of(
                 "Your deposit remains held because a customer penalty was assessed and no dispute was opened. Final settlement is still pending.",
                 "لا يزال عربونك محتجزًا لأنّ غرامةً قُدِّرت على العميل ولم يُفتح أيّ نزاع. التسوية النهائية لا تزال معلّقة."),
+            // Payments Phase 8 (owner, 2026-09-29; pre-launch item 164). A DRAFT awaiting the owner's sign-off.
+            DepositStates.KeptAsPenalty => BilingualText.Of(
+                $"Your deposit of {en} was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.",
+                $"احتُفظ بعربونك البالغ {ar} بوصفه الغرامة المقدَّرة على هذا الحجز، إذ انتهت مهلة النزاع دون فتح أيّ نزاع."),
             DepositStates.Released => BilingualText.Of(
                 $"Your deposit of {en} was returned to you when the dispute window closed.",
                 $"أُعيد إليك عربونك البالغ {ar} عند انتهاء مهلة النزاع."),

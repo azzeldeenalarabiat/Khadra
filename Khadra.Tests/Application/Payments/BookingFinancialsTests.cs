@@ -727,7 +727,9 @@ public sealed class BookingFinancialsTests
         Assert.Equal(JsonValueKind.Null, paymentJson.GetProperty("providerReference").ValueKind);
         Assert.Equal(JsonValueKind.Null, paymentJson.GetProperty("isSandbox").ValueKind);
         Assert.Equal(JsonValueKind.Null, paymentJson.GetProperty("refunds")[0].GetProperty("providerReference").ValueKind);
-        Assert.Equal(1, root.GetProperty("calculatorVersion").GetInt32());
+        // What the booking comes to for the office is never the customer's to read (payments Phase 8).
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("office").ValueKind);
+        Assert.Equal(2, root.GetProperty("calculatorVersion").GetInt32());
         Assert.Equal("Cancelled", root.GetProperty("bookingStatus").GetString());
         Assert.Equal("JOD", root.GetProperty("currency").GetString());
     }

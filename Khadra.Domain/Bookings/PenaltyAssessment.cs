@@ -7,8 +7,12 @@ namespace Khadra.Domain.Bookings;
 //
 // Spec 3.3 and 5.5 are explicit: when no dispute ticket is opened after a cancellation, a no-show or
 // a late delivery, no penalty is applied at all. So the booking records the assessment and stops.
-// Money only ever moves when an Admin resolves a ticket. Treating this record as a charge would
-// silently break the platform's "amicable resolution by default" promise.
+// Money moves when an Admin resolves a ticket — and, since payments Phase 8, in ONE other case the
+// owner decided on 2026-09-29 (pre-launch item 164, amending spec 3.3 for it): a CUSTOMER's fixed
+// penalty on a paid booking that never ran is kept from the held deposit when the booking's own
+// dispute window closes with no dispute, for the office, less Khadra's commission. The office
+// payables ledger records that, and only that; every other assessment is still no charge at all, and
+// treating one as a charge would silently break the "amicable resolution by default" promise.
 public sealed class PenaltyAssessment : ValueObject
 {
     public BookingParty AttributedTo { get; }
@@ -131,12 +135,16 @@ public sealed class PenaltyAssessment : ValueObject
 
     public bool IsRange => MinPercent != MaxPercent;
 
-    // Always true, and deliberately an instance member: reading `assessment.RequiresTicketToEnforce`
-    // at a call site is what stops someone treating an assessment as a charge. A static member would
-    // not appear where the decision is actually made.
-#pragma warning disable CA1822
-    public bool RequiresTicketToEnforce => true;
-#pragma warning restore CA1822
+    // Whether nothing can come of this assessment without a dispute, and deliberately an instance
+    // member: reading `assessment.RequiresTicketToEnforce` at a call site is what stops someone treating
+    // an assessment as a charge. False for exactly the case the owner decided on 2026-09-29 (pre-launch
+    // item 164): a fixed penalty on the CUSTOMER of the whole of its basis — every customer penalty is
+    // assessed on the deposit — which a paid booking keeps from its deposit when the dispute window
+    // closes with no dispute. A range, a penalty on the office, nothing owed, and a customer's penalty of
+    // less than the whole deposit, which nothing can keep yet (pre-launch item 205), all still need a
+    // ticket (spec 3.3).
+    public bool RequiresTicketToEnforce =>
+        AttributedTo != BookingParty.Customer || IsNothingOwed || IsRange || MaxPercent.Value != 100m;
 
     protected override IEnumerable<object?> GetEqualityComponents()
     {

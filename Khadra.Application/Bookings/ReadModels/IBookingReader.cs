@@ -108,7 +108,13 @@ public sealed record BookingContext(
     /// server's own answer to "has a dispute settled what was assessed here", which the penalty's
     /// state is read from (pre-launch item 173, owner 2026-09-26).
     /// </summary>
-    bool HasResolvedDispute = false);
+    bool HasResolvedDispute = false,
+    /// <summary>
+    /// Whether the office payables ledger recorded this booking's penalty as KEPT from its deposit — the dispute
+    /// window closed with no dispute (payments Phase 8; owner, 2026-09-29): the other thing an assessment can
+    /// become.
+    /// </summary>
+    bool PenaltyKept = false);
 
 /// <summary>
 /// One refund, as every screen shows it (Phase 3, 2026-09-26): WHY it is owed, HOW MUCH, and WHERE it

@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using Khadra.Application.Bookings;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Payables.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
@@ -26,6 +27,7 @@ public sealed partial class BookingFinancialsHandlers(
     IBookingRepository bookings,
     IPaymentRepository payments,
     IDisputeTicketRepository tickets,
+    IOfficeLedgerReader ledger,
     BookingPartyResolver parties,
     IClock clock,
     ILogger<BookingFinancialsHandlers> logger)
@@ -47,7 +49,7 @@ public sealed partial class BookingFinancialsHandlers(
         if (party.IsFailure)
             return party.Error;
 
-        return BookingFinancialsDto.For(await CalculateAsync(booking, cancellationToken), party.Value);
+        return await AnswerAsync(booking, party.Value, cancellationToken);
     }
 
     public async Task<Result<BookingFinancialsDto, Error>> Handle(
@@ -60,24 +62,31 @@ public sealed partial class BookingFinancialsHandlers(
         if (booking is null)
             return BookingErrors.NotFound;
 
-        return BookingFinancialsDto.For(await CalculateAsync(booking, cancellationToken), BookingParty.Admin);
+        return await AnswerAsync(booking, BookingParty.Admin, cancellationToken);
     }
 
     /// <summary>
-    /// Reads the booking's payments and disputes one after another — the repositories share the
-    /// request's DbContext — and runs the calculator. Contradictions are logged for a human, never
-    /// thrown: the answer is still served.
+    /// Reads the booking's payments, disputes and — for the office and the administrator — what the payables ledger
+    /// holds about it, one after another (they share the request's DbContext), and runs the calculator.
+    /// Contradictions are logged for a human, never thrown: the answer is still served.
     /// </summary>
-    private async Task<BookingFinancials> CalculateAsync(Booking booking, CancellationToken cancellationToken)
+    private async Task<BookingFinancialsDto> AnswerAsync(Booking booking, BookingParty reader, CancellationToken cancellationToken)
     {
         var bookingPayments = await payments.ListForBookingAsync(booking.Id, cancellationToken);
         var resolved = await tickets.ListResolvedForBookingAsync(booking.Id, cancellationToken);
         var hasLiveDispute = await tickets.HasLiveTicketAsync(booking.Id, cancellationToken);
+        // The customer is never shown the ledger, but the deposit it kept as a penalty is theirs to read.
+        var entry = reader == BookingParty.Customer ? null : await ledger.ForBookingAsync(booking.Id, cancellationToken);
+        var recorded = entry is null
+            ? await ledger.RecordedAsync(booking.Id, cancellationToken)
+            : entry.Payable is { } payable
+                ? new RecordedPayable(payable.Outcome, Money.Create(payable.Commission, payable.Currency))
+                : null;
 
-        var financials = BookingFinancialsCalculator.Calculate(booking, bookingPayments, resolved, hasLiveDispute, clock.UtcNow);
+        var financials = BookingFinancialsCalculator.Calculate(booking, bookingPayments, resolved, hasLiveDispute, clock.UtcNow, recorded);
         if (financials.NeedsReview)
             LogNeedsReview(logger, booking.Id.Value, string.Join(", ", financials.Issues));
-        return financials;
+        return BookingFinancialsDto.For(financials, reader, entry);
     }
 
     [LoggerMessage(

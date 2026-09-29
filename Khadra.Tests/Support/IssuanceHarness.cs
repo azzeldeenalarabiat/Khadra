@@ -364,7 +364,8 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
             new FinancialDocumentFactsReader(new BookingRepository(context), new PaymentRepository(context), new DisputeTicketRepository(context), context),
             documents,
             Settings(),
-            DocumentFixtures.Composer());
+            DocumentFixtures.Composer(),
+            new OfficeLedgerReader(context));
 }
 
 /// <summary>The issuing settings a test controls.</summary>

@@ -1,4 +1,6 @@
 using Khadra.Application.Common.Dtos;
+using Khadra.Application.Payables.Dtos;
+using Khadra.Application.Payables.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Payments;
@@ -40,9 +42,18 @@ public sealed record BookingFinancialsDto(
     FinancialCommissionDto? Commission,
     IReadOnlyList<FinancialPaymentDto> Payments,
     /// <summary>What the records contradict (<see cref="FinancialIssues"/>). Administrator only.</summary>
-    IReadOnlyList<string>? Issues)
+    IReadOnlyList<string>? Issues,
+    /// <summary>
+    /// What the booking comes to for the rental office, and where the payables ledger has it (payments Phase 8).
+    /// Null for the customer. ADDITIVE: a client that does not read it loses nothing it had.
+    /// </summary>
+    FinancialOfficeDto? Office = null)
 {
-    public static BookingFinancialsDto For(BookingFinancials financials, BookingParty reader)
+    /// <param name="ledger">
+    /// What the office payables ledger holds about the booking (payments Phase 8); null when the reader is the
+    /// customer, who is never shown it.
+    /// </param>
+    public static BookingFinancialsDto For(BookingFinancials financials, BookingParty reader, BookingLedger? ledger = null)
     {
         ArgumentNullException.ThrowIfNull(financials);
         ArgumentNullException.ThrowIfNull(reader);
@@ -63,7 +74,104 @@ public sealed record BookingFinancialsDto(
                 .Where(payment => view.Admin || (view.Office ? payment.Status == PaymentStatus.Applied : payment.Status.IsCaptured))
                 .Select(payment => FinancialPaymentDto.For(payment, view))
                 .ToList(),
-            view.Admin ? financials.Issues : null);
+            view.Admin ? financials.Issues : null,
+            view.Customer ? null : FinancialOfficeDto.For(financials.Office, ledger, view));
+    }
+}
+
+/// <summary>What a booking comes to for the office, as a state the console words (payments Phase 8).</summary>
+public static class FinancialOfficeStates
+{
+    /// <summary>Nothing was paid online.</summary>
+    public const string NotApplicable = OfficeStates.NotApplicable;
+
+    /// <summary>The outcome is not final yet.</summary>
+    public const string Open = OfficeStates.Open;
+
+    /// <summary>Final, and the ledger records it within minutes: the figures are the calculator's.</summary>
+    public const string AwaitingRecord = "AwaitingRecord";
+
+    /// <summary>Held back: not recorded, or recorded and left out of settlements.</summary>
+    public const string OnHold = PayableStates.OnHold;
+
+    // Recorded and open: Due, NothingDue or Blocked; or Settled (PayableStates).
+}
+
+/// <summary>
+/// What the booking comes to for the rental office, and where the payables ledger has it (payments Phase 8). The
+/// office and the administrator read it; the customer never does. Once recorded, the figures are the ledger's —
+/// frozen — and before that the calculator's, never a sum a screen makes.
+/// </summary>
+/// <param name="State">
+/// <c>NotApplicable</c>, <c>Open</c>, <c>AwaitingRecord</c>, <c>OnHold</c>, <c>Due</c>, <c>NothingDue</c>, <c>Blocked</c>
+/// or <c>Settled</c>.
+/// </param>
+/// <param name="Net">What the office is owed on the booking: below zero, it owes.</param>
+/// <param name="PayableId">The recorded payable. Administrator only.</param>
+/// <param name="Holds">Every open hold on the booking or its payable. Administrator only.</param>
+/// <param name="Blocks">Why the payable is not due, live. Administrator only.</param>
+public sealed record FinancialOfficeDto(
+    string State,
+    string? Outcome,
+    MoneyDto? OfficeMoney,
+    MoneyDto? Commission,
+    MoneyDto? Charges,
+    MoneyDto? Net,
+    IReadOnlyList<PayableLineDto> Lines,
+    DateTimeOffset? FinalAt,
+    DateTimeOffset? RecordedAt,
+    SettlementRefDto? Settlement,
+    Guid? PayableId,
+    IReadOnlyList<PayableHoldDto>? Holds,
+    IReadOnlyList<PayableBlockDto>? Blocks)
+{
+    internal static FinancialOfficeDto For(OfficePosition office, BookingLedger? ledger, Reader view)
+    {
+        var holds = view.Admin ? (ledger?.Holds ?? []).Select(PayableHoldDto.From).ToList() : null;
+        var blocks = view.Admin ? (ledger?.Blocks ?? []).Select(PayableBlockDto.From).ToList() : null;
+
+        if (ledger?.Payable is { } payable)
+        {
+            var currency = payable.Currency;
+            return new FinancialOfficeDto(
+                payable.State,
+                payable.Outcome.Name,
+                new MoneyDto(payable.OfficeMoney, currency),
+                new MoneyDto(payable.Commission, currency),
+                new MoneyDto(payable.OfficeCharges, currency),
+                new MoneyDto(payable.Net, currency),
+                payable.Lines.Select(line => PayableLineDto.From(line, currency)).ToList(),
+                payable.FinalAt,
+                payable.RecordedAt,
+                SettlementRefDto.From(payable.Settlement),
+                view.Admin ? payable.PayableId.Value : null,
+                holds,
+                blocks);
+        }
+
+        var state =
+            office.State == OfficeStates.NotApplicable ? FinancialOfficeStates.NotApplicable
+            : ledger?.Holds.Count > 0 || office.State == OfficeStates.Undetermined ? FinancialOfficeStates.OnHold
+            : office.IsFinal ? FinancialOfficeStates.AwaitingRecord
+            : FinancialOfficeStates.Open;
+        if (!office.IsFinal)
+            return new FinancialOfficeDto(state, null, null, null, null, null, [], office.FinalAt, null, null, null, holds, blocks);
+
+        var code = office.OfficeMoney.CurrencyCode;
+        return new FinancialOfficeDto(
+            state,
+            office.Outcome!.Name,
+            MoneyDto.From(office.OfficeMoney),
+            MoneyDto.From(office.Commission),
+            MoneyDto.From(office.Charges),
+            new MoneyDto(office.Net, code),
+            office.Lines.Select(line => new PayableLineDto(line.Kind.Name, new MoneyDto(line.Amount, code), line.SourceId?.Value)).ToList(),
+            office.FinalAt,
+            null,
+            null,
+            null,
+            holds,
+            blocks);
     }
 }
 
@@ -196,10 +304,14 @@ public sealed record FinancialDisputeDecisionDto(
 
 /// <param name="State">One of <see cref="CommissionStates"/>.</param>
 /// <param name="Basis">What <paramref name="Percent"/> is a percent of: "OneDay" or "RentalTotal".</param>
-public sealed record FinancialCommissionDto(MoneyDto Amount, decimal Percent, string Basis, string State)
+/// <param name="Earned">
+/// What Khadra earned, when <paramref name="State"/> is <c>Earned</c> (payments Phase 8): the frozen figure, capped
+/// at the office's money on the booking. ADDITIVE.
+/// </param>
+public sealed record FinancialCommissionDto(MoneyDto Amount, decimal Percent, string Basis, string State, MoneyDto? Earned = null)
 {
     internal static FinancialCommissionDto From(CommissionPosition commission) =>
-        new(MoneyDto.From(commission.Amount), commission.Percent, commission.Basis, commission.State);
+        new(MoneyDto.From(commission.Amount), commission.Percent, commission.Basis, commission.State, MoneyDto.FromOptional(commission.Earned));
 }
 
 /// <summary>One checkout attempt in the booking's history.</summary>

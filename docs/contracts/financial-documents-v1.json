@@ -46,7 +46,7 @@
               "local": "2026-09-03 13:01"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -638,7 +638,7 @@
               "local": "2026-09-04 13:00"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -1226,7 +1226,7 @@
               "local": "2026-09-03 13:01"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -1967,7 +1967,7 @@
               "local": "2026-09-10 13:01"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -2750,7 +2750,7 @@
               "local": "2026-09-03 15:01"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -3330,7 +3330,7 @@
               "local": "2026-09-03 15:33"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -3920,7 +3920,7 @@
               "local": "2026-09-03 17:06"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -4402,7 +4402,7 @@
               "local": "2026-09-03 23:02"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -4983,7 +4983,7 @@
               "local": "2026-09-03 22:02"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
@@ -5938,7 +5938,7 @@
               "local": "2026-09-11 14:01"
             },
             "timeZone": "Asia/Amman",
-            "calculatorVersion": 1,
+            "calculatorVersion": 2,
             "currency": {
               "code": "JOD"
             },
