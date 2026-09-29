@@ -1078,5 +1078,61 @@ phone number in order, the correction listed and the voided receipt not, and no 
 customer's PDF (it needs a second signed-in customer; the handler and endpoint tests prove the answer is the
 missing document's), and the app on a phone (the tests drive the open flow with the platform viewer faked).
 The owner's word on the voided-PDF default and on whether the on-screen pages should also leave the
-registrations out; pre-launch items 195–200; the fonts' licence text (item 196); the Staging migration, which
-waits for the owner; Phases 7 and 8.
+registrations out, and the fonts' licence text (item 196) — all three settled the same day, below; pre-launch
+items 195 and 197–200; the Staging migration, which waits for the owner; Phases 7 and 8.
+
+### The follow-up (2026-09-29, `506fef7`)
+
+The owner's three decisions of the same day (`docs/payments-programme.md`, Phase 6, 3–5), built as one local
+commit and reviewed by the architecture advisor, who found no defect.
+
+**A voided document's customer gets a voided copy.** A rendition now has a kind — `RenditionKind`
+`AsIssued` or `Voided` — in a column of its own (migration `20260929020747_FinancialDocumentRenditionKind`:
+every existing row arrives `AsIssued` and the default that put it there is dropped at once, so every later row
+says which it is; the unique index is widened by the kind; the rollback refuses once any voided copy exists,
+because the rows cannot be deleted and the narrower index would then merge the two kinds). The settlement pass
+owes a voided document its copy in each language, after its PDFs as issued: drawn once, from the snapshot and
+the void's facts alone — the void's instant as the frozen Amman wall time (`SnapshotJson.Local`), and the
+number of the correction, the family's member one version on with the cause `Correction` — and never the
+void's reason. The copy carries "VOID" / «ملغى» in the header and diagonally across every page (a test
+document's TEST beneath it), and on its first page a banner saying when the document was voided and that it is
+no longer valid, then, on a line of its own so a number never breaks across two, what replaced it; the file's
+title names the stamp, and its modified date is the void. The original is never re-drawn, never overwritten
+and stays the administrator's: the customer's link serves the voided copy whatever the request says ("being
+prepared" until drawn), and the administrator's takes `kind` and serves both. `TemplateVersion` stays 1: the
+document as issued draws exactly as before, and the copy is a new kind rather than a new appearance.
+
+**The pages follow the PDF.** The website's and the app's document pages leave out Khadra's, the rental
+office's and a customer's commercial registration, by the same predicate the PDF uses; the console moves them
+from the body into its proof of issue. The snapshot keeps all three.
+
+**The fonts' licences.** Each family's `OFL.txt` beside the fonts in the API and the app, a `FONTS.md` per
+folder, and a test that reads every font's own `name` table back against its notice (item 196, closed; the
+app's missing licences screen is item 201).
+
+**Verified.** Backend 2,353, none failed; the PostgreSQL proofs on a scratch `postgres:18`, 49 of 49 — among
+them the kind arriving on an old row with no default left and both triggers intact, the rollback refusing over
+a voided copy and running while every rendition is as issued, and a full pass over a voided receipt; the 113
+PDF tests on Ubuntu 24.04 with the network off; website 235, app 711 (`flutter analyze` clean), console 320
+(i18n clean); both production builds.
+
+**Verified live** on `khadra_web_it` after the owner's restart: the migration applied on boot, the first pass
+drew the English (31,233 bytes) and Arabic (52,011 bytes) voided copies of TEST-PAY-2026-000013, and no later
+pass drew anything; its originals kept their hashes (`55a66f96…`, `417cd617…`), and storage held 88 PDFs for
+43 documents. On the website, in both page languages, the voided receipt offered "Voided copy (English)" /
+«نسخة ملغاة (بالإنجليزية)» and its Arabic twin beside its notice and the link to TEST-PAY-2026-000014, and saved
+`TEST-PAY-2026-000013-en-void.pdf` and `-ar-void.pdf` byte-identical to the stored copies; a request adding
+`kind=AsIssued` still got the copy, and the administrator's route answered the customer 403. Rendered with
+Windows's own PDF renderer, both copies carry the stamp on both pages, the notice "voided on 27 Sept 2026, 21:16
+and is no longer valid" with "It was replaced by TEST-PAY-2026-000014" and their Arabic, and neither the reason
+nor a registration. The current correction downloaded exactly as before. In the console, in English and Arabic,
+the voided receipt listed four PDFs — "original as issued, unstamped" and "voided copy, the customer's" in each
+language — each downloading byte-identical to the hash beside it, all four drawn from the proof of issue's
+content hash, under the note that the customer is given the voided copies; `kind` absent served the original,
+`kind=Voided` on the current correction answered 409 `financial_documents.not_voided`, an unknown kind 400
+and a missing document 404, every answer `no-store, private`. The registrations stood in the console's proof of
+issue and in no document body — the website's, the console's or a PDF's.
+
+**Not yet done.** The same two live checks no stack here can reach (a second customer; the app on a phone —
+its voided-copy buttons and open flow are proven by the widget tests); pre-launch items 195, 197–201; the
+Staging migrations, which wait for the owner; Phases 7 and 8.

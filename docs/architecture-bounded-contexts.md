@@ -326,9 +326,13 @@ issued document as a PDF in English and Arabic from its stored snapshot alone �
 still hashes to what was issued — stores it privately, and records it in the append-only
 `financial_document_renditions` with the PDF's hash and the snapshot hash it was drawn from. It is handed out
 through links minted on request (`…/pdf-link?language=`) to the one private-file endpoint, ownership decided
-first. A voided document's PDF is kept, and offered to the administrator only (a default awaiting the owner).
-The commercial registrations — Khadra's, the rental office's, a future business customer's — are frozen in the
-snapshot and left out of the PDF's body (owner, 2026-09-29). QuestPDF under its Community licence draws the
+first. A rendition has a KIND (owner, 2026-09-29): the document as issued, or — for a voided document — its
+voided copy, a second rendition drawn once after the void from the snapshot and the void's facts, stamped VOID
+on every page and naming the correction. The original is never re-drawn or touched and stays the
+administrator's; the customer of a voided document is only ever handed the copy. The commercial registrations —
+Khadra's, the rental office's, a future business customer's — are frozen in the snapshot and left out of the
+PDF's body and of the customer's document pages; the console shows them in its proof of issue (owner,
+2026-09-29). QuestPDF under its Community licence draws the
 page; the fonts are embedded, never the host's.
 
 ## Owner decisions required

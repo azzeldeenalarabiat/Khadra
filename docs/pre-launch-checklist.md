@@ -4543,10 +4543,11 @@ end to end on both customer clients, in both languages — not the backend alone
 
 **Progress.** Phase 5 built the documents, the customer's area on the website and in the app, Booking
 Details' documents and the linked refunds (2026-09-27 to 29). Phase 6 (2026-09-29) built PDF viewing and
-download in English and Arabic on the website, in the app (1.3.0, unreleased) and in the console — with one
-default awaiting the owner: a VOIDED document's PDF is not handed to the customer, whose page stays marked
-void and links the correction, which has a PDF of its own (`docs/payments-programme.md`, Phase 6). Still to
-come: email delivery and its history (Phase 7).
+download in English and Arabic on the website, in the app (1.3.0, unreleased) and in the console. Its
+follow-up the same day (`506fef7`) settled the one default left: a VOIDED document stays in the customer's
+history and its PDF is a voided copy — stamped VOID / «ملغى» on every page, saying it is no longer valid and
+naming its correction — while the original stays the administrator's (`docs/payments-programme.md`, Phase 6,
+3). Still to come: email delivery and its history (Phase 7).
 
 ### 173. The penalty notice still says "Nothing has been charged" after a dispute settled the penalty
 
@@ -4654,7 +4655,8 @@ missing. A clearly marked TEST identity (`TestIdentity` true) exists for local s
 `SANDBOX` — Staging included — and the issuer never lets it sign real money. **To close:** the owner
 gives the identity; it is set in Production's environment with `TestIdentity` false, and the boot log
 reads "Financial documents issued as …". **Since payments Phase 6 (owner, 2026-09-29),** Khadra's commercial
-registration is captured in every snapshot but not printed in a PDF's body; the legal check before the first
+registration is captured in every snapshot but not printed in a PDF's body, nor — since the Phase 6 follow-up —
+shown on the website's or the app's document pages (the console keeps it in its proof of issue); the legal check before the first
 real document confirms that a receipt may leave it out — and if it may not, a compact legal line in the page
 footer is the recorded place for it, never the transaction details.
 
@@ -4832,7 +4834,7 @@ licence is bought, and the setting changed, before the grace period ends if it n
 
 ### 196. The fonts' licence text is not shipped beside the embedded fonts
 
-**Status:** open · **Raised:** 2026-09-29 · **Before real customers**
+**Status:** closed · **Raised:** 2026-09-29 · **Closed:** 2026-09-29 (`506fef7`) — each family's `OFL.txt`, downloaded with the owner's approval from its official repository and unchanged, sits beside the font files in the API and in the app, and the font files and the texts are proven to correspond.
 
 The PDF renderer embeds Manrope and Noto Kufi Arabic in the API assembly
 (`Khadra.Infrastructure/FinancialDocuments/Fonts/`, copied from `Khadra.Mobile/assets/fonts`), and every
@@ -4843,6 +4845,19 @@ and in the API assembly, and the app's assets — which carry their copyright no
 their own metadata, but not the licence text; no copy of `OFL.txt` is in the repository. Nothing was
 downloaded to fix it: that needs the owner's approval. **To close:** add each family's `OFL.txt` (from the
 fonts' own repositories) beside the TTFs in both places, and list the fonts in the app's licence page.
+
+**How it closed.** `OFL-Manrope.txt` (from googlefonts/manrope) and `OFL-NotoKufiArabic.txt` (from
+notofonts/arabic, the same text Google Fonts ships) sit beside the TTFs in
+`Khadra.Infrastructure/FinancialDocuments/Fonts` and `Khadra.Mobile/assets/fonts`, each folder with a
+`FONTS.md` naming every font file with its family and style, version, the copyright notice the file itself
+carries (it differs from the one heading the licence text: the year, and the repository or holder named), the
+licence it names and its SHA-256. `FontLicenceTests` holds them together: every TTF is in its notice with its
+hash; the notice's name, version, copyright and licence read back from the font's own `name` table; every
+font names the SIL Open Font License 1.1, whose text is beside it for its family; both places carry the same
+bytes; and the API's build copies the texts and the notice beside the assembly that embeds the fonts. The app
+bundles both texts as assets and adds them to Flutter's licence registry (`registerFontLicences`). The second
+half of the old "to close" — a licence page in the app — is not built: the app has no screen that opens
+Flutter's licence page at all, for the fonts or for its packages. That is recorded as item 201, not dropped.
 
 ### 197. A PDF that cannot be drawn is visible only in the log
 
@@ -4883,9 +4898,23 @@ answer carries), or record here that the check is local-only by design.
 **Status:** open · **Raised:** 2026-09-29 (final review of payments Phase 6) · **Scaling note**
 
 The facts are the queue, by design: each settlement pass asks which issued documents have no PDF in English
-or Arabic, oldest issue first. Once everything is drawn — the normal state — the answer is empty, but finding
-that out walks the documents in issue order with two correlated `EXISTS` per row, served by the renditions'
-unique index. Trivial at launch (tens of thousands of documents answer in well under a second); it grows
+or Arabic, oldest issue first — and, since the Phase 6 follow-up, which voided documents have no voided copy.
+Once everything is drawn — the normal state — the answer is empty, but finding that out walks the documents in
+issue order with five correlated `EXISTS` per row (a PDF as issued in each language, whether it is voided, and
+its voided copy in each language), served by the renditions' unique index and the voids' key. Trivial at launch (tens of thousands of documents answer in well under a second); it grows
 with history, not with the backlog. **To close:** when the documents table is large enough for the pass to
 notice, bound the question — only documents issued since the oldest one still without a PDF, or a partial
 index of documents without both renditions.
+
+### 201. The customer app has no screen that shows its open-source licences
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of the payments Phase 6 follow-up) · **Before release**
+
+The app bundles the fonts' licence texts and registers them with Flutter's licence registry beside every
+package's own (item 196), but nothing in the app opens `showLicensePage` or an About dialog, so no customer can
+read any of them. The fonts' texts travelling inside the app as files satisfies the font licence; many package
+licences (MIT, BSD, Apache) also ask that their notices be available to the people the app is distributed to,
+and the standard way to do that in Flutter is its licence page. This is new UI, so it was left for the owner
+rather than built inside the follow-up. **To close:** a row in the app — Profile, beside the language — reading
+"Licences" / «التراخيص» that opens Flutter's licence page, with its two strings and a widget test, or the owner's
+word that it is not needed.
