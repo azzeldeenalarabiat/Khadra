@@ -102,48 +102,6 @@ public sealed class PostgresEndingRefundQueryTests : IAsyncLifetime
         Assert.True(await new DisputeTicketRepository(read).HasClaimOnDepositAsync(disputed.Id));
     }
 
-    /// <summary>
-    /// Its twin (payments Phase 4b, pre-launch item 164): the same JSON filter with the penalty condition
-    /// inverted, read by the work queue every time an administrator's bell polls it. SQLite proves the
-    /// meaning in <see cref="PaymentAdminReaderTests"/>; this proves Npgsql translates it, order included.
-    /// </summary>
-    [PostgresFact]
-    public async Task The_deposits_held_for_a_customer_penalty_translate_on_postgres()
-    {
-        var (first, firstPayment) = CancelledBy(BookingParty.Customer);
-        var (withdrawn, withdrawnPayment) = CancelledBy(BookingParty.Customer);
-        var withdrawnTicket = DisputeTicket.Open(withdrawn.Id, withdrawn.CustomerId, BookingParty.Customer, "Changed my mind.", TimeSpan.FromHours(48), AfterFreeWindow(withdrawn)).Value;
-        Assert.True(withdrawnTicket.Withdraw(withdrawn.CustomerId, AfterFreeWindow(withdrawn).AddMinutes(5)).IsSuccess);
-        var (lenient, lenientPayment) = CancelledBy(BookingParty.Customer, terms: Build.Terms(customerPenaltyPercent: 0m));
-        var (gallery, galleryPayment) = CancelledBy(BookingParty.Dealer);
-        var (disputed, disputedPayment) = CancelledBy(BookingParty.Customer);
-        var openTicket = DisputeTicket.Open(disputed.Id, disputed.CustomerId, BookingParty.Customer, "The penalty is wrong.", TimeSpan.FromHours(48), AfterFreeWindow(disputed)).Value;
-
-        await using (var write = NewContext())
-        {
-            write.Bookings.AddRange(first, withdrawn, lenient, gallery, disputed);
-            write.Payments.AddRange(firstPayment, withdrawnPayment, lenientPayment, galleryPayment, disputedPayment);
-            write.DisputeTickets.AddRange(withdrawnTicket, openTicket);
-            await write.SaveChangesAsync();
-        }
-
-        await using var read = NewContext();
-        var found = (await new BookingRepository(read).ListHeldForCustomerPenaltyAsync(Now.AddDays(30)))
-            .Select(booking => booking.Id)
-            .ToList();
-
-        Assert.Contains(first.Id, found);
-        Assert.Contains(withdrawn.Id, found);
-        Assert.DoesNotContain(lenient.Id, found);
-        Assert.DoesNotContain(gallery.Id, found);
-        Assert.DoesNotContain(disputed.Id, found);
-        // Oldest ending first, as the queue lists them; the database is reused, so only this test's rows.
-        var ours = found.Where(id => id == first.Id || id == withdrawn.Id).ToList();
-        Assert.Equal(
-            new[] { first, withdrawn }.OrderBy(booking => booking.FinishedAt).ThenBy(booking => booking.Id.Value).Select(booking => booking.Id),
-            ours);
-    }
-
     [PostgresFact]
     public async Task The_safety_net_and_the_refund_list_translate_on_postgres()
     {

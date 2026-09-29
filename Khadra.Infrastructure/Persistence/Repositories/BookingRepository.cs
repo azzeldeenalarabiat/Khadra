@@ -167,41 +167,6 @@ internal sealed class BookingRepository(KhadraDbContext context) : IBookingRepos
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<Booking>> ListHeldForCustomerPenaltyAsync(
-        DateTimeOffset now,
-        CancellationToken cancellationToken = default)
-    {
-        // The release query's exclusions, word for word — a refund that returned or released the
-        // deposit, a claim on it (any dispute not withdrawn) — and its penalty condition INVERTED:
-        // HasPenaltyAgainstCustomer, which is a penalty on the customer that is not "nothing owed".
-        // Amounts are never negative, so "not zero" is "above zero" without comparing decimals in SQL.
-        var cancelled = BookingStatus.Cancelled;
-        var noShow = BookingStatus.NoShow;
-        var customer = BookingParty.Customer;
-        var freeCancellation = RefundReason.FreeCancellation;
-        var platformCancellation = RefundReason.PlatformCancellation;
-        var released = RefundReason.DisputeWindowClosed;
-        var withdrawn = DisputeStatus.Withdrawn;
-
-        return await WithChildren()
-            .Where(booking =>
-                (booking.Status == cancelled || booking.Status == noShow) &&
-                booking.PickedUpAt == null &&
-                booking.DepositPaymentId != null &&
-                booking.FinishedAt != null &&
-                booking.FinishedAt <= now &&
-                booking.Penalty != null &&
-                booking.Penalty.AttributedTo == customer &&
-                booking.Penalty.MaxAmount.Amount != 0m &&
-                !context.Set<Refund>().Any(refund =>
-                    refund.PaymentId == booking.DepositPaymentId &&
-                    (refund.Reason == freeCancellation || refund.Reason == platformCancellation || refund.Reason == released)) &&
-                !context.DisputeTickets.Any(ticket => ticket.BookingId == booking.Id && ticket.Status != withdrawn))
-            .OrderBy(booking => booking.FinishedAt)
-            .ThenBy(booking => booking.Id)
-            .ToListAsync(cancellationToken);
-    }
-
     public async Task AddAsync(Booking booking, CancellationToken cancellationToken = default) =>
         await context.Bookings.AddAsync(booking, cancellationToken);
 

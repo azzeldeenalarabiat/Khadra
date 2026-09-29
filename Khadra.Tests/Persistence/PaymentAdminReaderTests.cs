@@ -1,6 +1,5 @@
 using Khadra.Application.AdminDashboard;
 using Khadra.Application.Common;
-using Khadra.Application.Payments.Financials;
 using Khadra.Application.Payments.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -14,7 +13,6 @@ using Khadra.Infrastructure.Reporting;
 using Khadra.Tests.Support;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Khadra.Tests.Persistence;
 
@@ -268,51 +266,5 @@ public sealed class PaymentAdminReaderTests : IDisposable
         Assert.Contains(failed, item => item.RefundId == refused.Id.Value && item.BookingReference == booking.Reference.Value);
         // The refused orphan is a failed refund, and only that.
         Assert.Equal([owed.Id.Value], orphans.Select(item => item.PaymentId));
-    }
-
-    [Fact]
-    public async Task Only_deposits_the_calculator_reads_as_held_unresolved_await_a_decision()
-    {
-        (Booking Booking, Payment Payment) CancelledByCustomer()
-        {
-            var pair = Build.PaidBooking();
-            Assert.True(pair.Booking.Cancel(BookingParty.Customer, pair.Booking.CustomerId, "Plans changed.", pair.Booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
-            return pair;
-        }
-
-        // Found: a customer penalty, no dispute, the window closed.
-        var (stuck, stuckPayment) = CancelledByCustomer();
-        // Found too: a dispute opened and WITHDRAWN decided nothing.
-        var (withdrawn, withdrawnPayment) = CancelledByCustomer();
-        var withdrawnTicket = DisputeTicket.Open(withdrawn.Id, withdrawn.CustomerId, BookingParty.Customer, "Changed my mind.", TimeSpan.FromHours(48), withdrawn.FinishedAt!.Value.AddHours(1)).Value;
-        Assert.True(withdrawnTicket.Withdraw(withdrawn.CustomerId, withdrawn.FinishedAt!.Value.AddHours(2)).IsSuccess);
-        // Left out: the office carries the penalty (the release rules decide that deposit).
-        var (office, officePayment) = Build.PaidBooking();
-        Assert.True(office.Cancel(BookingParty.Dealer, Id.New(), "No car.", Now.AddHours(3)).IsSuccess);
-        // Left out: an open dispute is deciding it.
-        var (disputed, disputedPayment) = CancelledByCustomer();
-        var openTicket = DisputeTicket.Open(disputed.Id, disputed.CustomerId, BookingParty.Customer, "The penalty is wrong.", TimeSpan.FromHours(48), disputed.FinishedAt!.Value.AddHours(1)).Value;
-        await SaveAsync(
-            [stuck, withdrawn, office, disputed],
-            [stuckPayment, withdrawnPayment, officePayment, disputedPayment],
-            [withdrawnTicket, openTicket]);
-
-        var windowClosed = new[] { stuck, withdrawn }.Max(booking => booking.DisputeWindowEndsAt!.Value).AddMinutes(1);
-        await using var read = NewContext();
-        HeldDepositFinder Finder() => new(
-            new BookingRepository(read),
-            new PaymentRepository(read),
-            new DisputeTicketRepository(read),
-            NullLogger<HeldDepositFinder>.Instance);
-
-        var whileOpen = await Finder().FindAsync(stuck.FinishedAt!.Value.AddMinutes(1), CancellationToken.None);
-        var afterwards = await Finder().FindAsync(windowClosed, CancellationToken.None);
-
-        // Inside the window the deposit is held for its penalty, not stuck: nothing to show yet.
-        Assert.Empty(whileOpen);
-        Assert.Equal(
-            new[] { stuck.Id, withdrawn.Id }.OrderBy(id => id.Value),
-            afterwards.Select(held => held.BookingId).OrderBy(id => id.Value));
-        Assert.Equal(stuck.DisputeWindowEndsAt, afterwards.Single(held => held.BookingId == stuck.Id).HeldSince);
     }
 }
