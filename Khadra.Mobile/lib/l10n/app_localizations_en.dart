@@ -2016,6 +2016,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Khadra connects renters with licensed rental offices in Jordan. Every office on the platform holds a green plate licence and is checked before it can list a car.';
 
   @override
+  String get profileLicences => 'Licences';
+
+  @override
   String profileVersion(String version) {
     return 'Version $version';
   }

@@ -751,6 +751,8 @@
   "profileLanguageArabic": "العربية",
   "profileAbout": "About Khadra",
   "profileAboutBody": "Khadra connects renters with licensed rental offices in Jordan. Every office on the platform holds a green plate licence and is checked before it can list a car.",
+  "profileLicences": "Licences",
+  "@profileLicences": { "description": "Pre-launch item 201: the row under About that opens the app's open-source licences, the fonts' among them." },
   "profileVersion": "Version {version}",
   "@profileVersion": { "placeholders": { "version": { "type": "String" } } },
   "profileSignOutConfirm": "Sign out of Khadra?",

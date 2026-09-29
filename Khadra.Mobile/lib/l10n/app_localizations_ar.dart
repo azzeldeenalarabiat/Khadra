@@ -2074,6 +2074,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'تربط خضرا المستأجرين بمكاتب تأجير مرخّصة في الأردن. كل مكتب على المنصة يحمل رخصة اللوحة الخضراء ويُدقَّق قبل أن يتمكن من عرض سيارة.';
 
   @override
+  String get profileLicences => 'التراخيص';
+
+  @override
   String profileVersion(String version) {
     return 'الإصدار $version';
   }

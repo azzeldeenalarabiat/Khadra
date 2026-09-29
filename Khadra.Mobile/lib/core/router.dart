@@ -21,6 +21,7 @@ import '../features/invoices/invoices_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/profile/edit_profile_screen.dart';
 import '../features/profile/change_password_screen.dart';
+import '../features/profile/licences_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile/reputation_screen.dart';
 import '../features/profile/sessions_screen.dart';
@@ -76,6 +77,11 @@ abstract final class Routes {
   /// Both addresses are permanent: Phase 7 will email them.
   static const invoices = '/profile/invoices';
   static String invoice(String documentId) => '/profile/invoices/$documentId';
+
+  /// The app's open-source licences, the fonts' among them (pre-launch item 201),
+  /// opened from About on the Profile tab. Not guarded: reading them needs no
+  /// account, and About is shown to a guest too.
+  static const licences = '/profile/licences';
 
   static String vehicle(String id) => '/vehicle/$id';
   static String gallery(String id) => '/gallery/$id';
@@ -344,6 +350,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, __) => const ShortlistScreen(),
       ),
       GoRoute(path: Routes.invoices, builder: (_, __) => const InvoicesScreen()),
+      GoRoute(path: Routes.licences, builder: (_, __) => const LicencesScreen()),
       GoRoute(
         path: '${Routes.invoices}/:documentId',
         builder: (_, state) => InvoiceScreen(documentId: state.pathParameters['documentId']!),

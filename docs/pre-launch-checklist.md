@@ -4908,7 +4908,7 @@ index of documents without both renditions.
 
 ### 201. The customer app has no screen that shows its open-source licences
 
-**Status:** open · **Raised:** 2026-09-29 (architecture review of the payments Phase 6 follow-up) · **Before release**
+**Status:** closed · **Raised:** 2026-09-29 (architecture review of the payments Phase 6 follow-up) · **Closed:** 2026-09-29 (owner's cleanup before Phase 7) — a "Licences" / «التراخيص» row under About on the Profile tab opens Flutter's licence page.
 
 The app bundles the fonts' licence texts and registers them with Flutter's licence registry beside every
 package's own (item 196), but nothing in the app opens `showLicensePage` or an About dialog, so no customer can
@@ -4918,3 +4918,11 @@ and the standard way to do that in Flutter is its licence page. This is new UI, 
 rather than built inside the follow-up. **To close:** a row in the app — Profile, beside the language — reading
 "Licences" / «التراخيص» that opens Flutter's licence page, with its two strings and a widget test, or the owner's
 word that it is not needed.
+
+**How it closed.** The owner asked for it (2026-09-29): a row under About on the Profile tab — shown to a guest
+as well, since About is not an account's — opens `/profile/licences`, Flutter's own licence page
+(`LicencesScreen`), which lists every open-source package the build bundles, collected by the build itself,
+beside the fonts' licences registered at start, and opens each one's full text. It carries the app's name and
+the installed version, and on an English page reads Material's British strings ("Licences", matching the row);
+Arabic is «التراخيص». `licences_test.dart` opens it as a guest in both languages and reads Manrope's licence
+text from it.

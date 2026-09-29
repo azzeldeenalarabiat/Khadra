@@ -102,7 +102,8 @@ internal static partial class PaymentsStartupCheck
         try
         {
             // Whichever kind this process is NOT. Five names is enough to diagnose it; the count is
-            // not the point, the existence is.
+            // not the point, the existence is. The first five in order, so a refusal names the same
+            // five on every boot — a limit with no order is whichever five the database meets first.
             offending = await context.Payments
                 .AsNoTracking()
                 .Where(payment => sandbox
@@ -110,6 +111,7 @@ internal static partial class PaymentsStartupCheck
                     : payment.Provider == PaymentProviders.Sandbox)
                 .Select(payment => payment.Provider)
                 .Distinct()
+                .OrderBy(name => name)
                 .Take(5)
                 .ToListAsync(cancellationToken);
         }

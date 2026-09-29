@@ -3372,6 +3372,12 @@ abstract class AppLocalizations {
   /// **'Khadra connects renters with licensed rental offices in Jordan. Every office on the platform holds a green plate licence and is checked before it can list a car.'**
   String get profileAboutBody;
 
+  /// Pre-launch item 201: the row under About that opens the app's open-source licences, the fonts' among them.
+  ///
+  /// In en, this message translates to:
+  /// **'Licences'**
+  String get profileLicences;
+
   /// No description provided for @profileVersion.
   ///
   /// In en, this message translates to:

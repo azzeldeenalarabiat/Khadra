@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -362,7 +363,8 @@ public sealed class SandboxPaymentGuardTests
     /// <remarks>
     /// SQLite rather than a substitute, because the guard is a QUERY and a fake repository would
     /// prove only that the fake was asked. What is under test is that the question reaches a database
-    /// and that its answer is acted on.
+    /// and that its answer is acted on. EF's warning about a limit with no order is an ERROR here: the
+    /// question limits its answer, and every boot once logged that it could not say which five it meant.
     /// </remarks>
     private static async Task<IServiceProvider> DatabaseHolding(
         IPaymentProvider provider,
@@ -374,6 +376,7 @@ public sealed class SandboxPaymentGuardTests
         var options = new DbContextOptionsBuilder<KhadraDbContext>()
             .UseSqlite(connection)
             .UseSnakeCaseNamingConvention()
+            .ConfigureWarnings(warnings => warnings.Throw(CoreEventId.RowLimitingOperationWithoutOrderByWarning))
             .Options;
 
         await using (var seed = new KhadraDbContext(options))
@@ -473,6 +476,27 @@ public sealed class SandboxPaymentGuardTests
             () => Khadra.WebAPI.PaymentsStartupCheck.ReportAsync(services));
 
         Assert.Contains("HyperPay", failure.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The names a refusal quotes are the first five in order, the same five on every boot, however
+    /// many there are and whatever order they were taken in.
+    /// </summary>
+    /// <remarks>
+    /// Only the order is new (2026-09-29): a limit with no order was whichever five the database met
+    /// first, and EF said so at every start. Whether the guard refuses is decided exactly as before — by
+    /// whether any such row exists at all.
+    /// </remarks>
+    [Fact]
+    public async Task A_refusal_names_the_first_five_providers_in_order_whatever_order_they_were_taken_in()
+    {
+        var services = await DatabaseHolding(
+            Sandbox(), "Tap", "Stripe", "MEPS", "PayTabs", "HyperPay", "Checkout", "Adyen", "MEPS");
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Khadra.WebAPI.PaymentsStartupCheck.ReportAsync(services));
+
+        Assert.Contains("payments from: Adyen, Checkout, HyperPay, MEPS, PayTabs. ", failure.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

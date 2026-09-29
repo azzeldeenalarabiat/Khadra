@@ -146,6 +146,12 @@ class ProfileScreen extends ConsumerWidget {
                         fontSize: 14, height: 1.55, color: KhadraColors.neutral700),
                   ),
                 ),
+                // Open to a guest as well: About sits outside the account's groups.
+                _Row(
+                  icon: Icons.article_outlined,
+                  label: l10n.profileLicences,
+                  onTap: () => context.push(Routes.licences),
+                ),
               ],
             ),
 

@@ -656,6 +656,7 @@
   "profileLanguageArabic": "العربية",
   "profileAbout": "عن خضرا",
   "profileAboutBody": "تربط خضرا المستأجرين بمكاتب تأجير مرخّصة في الأردن. كل مكتب على المنصة يحمل رخصة اللوحة الخضراء ويُدقَّق قبل أن يتمكن من عرض سيارة.",
+  "profileLicences": "التراخيص",
   "profileVersion": "الإصدار {version}",
   "@profileVersion": { "placeholders": { "version": { "type": "String" } } },
   "profileSignOutConfirm": "تسجيل الخروج من خضرا؟",
