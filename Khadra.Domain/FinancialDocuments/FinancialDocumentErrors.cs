@@ -50,4 +50,27 @@ public static class FinancialDocumentErrors
     public static readonly Error NotVoided = Error.Conflict(
         "financial_documents.not_voided",
         "This document is not voided, so it has no voided copy.");
+
+    /// <summary>Only receipts are emailed to the customer (payments Phase 7; owner, 2026-09-29): a statement is not.</summary>
+    public static readonly Error NotEmailed = Error.Conflict(
+        "financial_documents.not_emailed",
+        "Only receipts are emailed to the customer.");
+
+    /// <summary>A voided receipt is not emailed again: its correction is the receipt that stands.</summary>
+    public static readonly Error VoidedNotEmailed = Error.Conflict(
+        "financial_documents.voided_not_emailed",
+        "This receipt was voided. Its correction is the one to email.");
+
+    /// <summary>An email of this document is already on its way: one at a time.</summary>
+    public static readonly Error EmailAlreadyQueued = Error.Conflict(
+        "financial_documents.email_already_queued",
+        "An email of this document is already queued.");
+
+    /// <summary>
+    /// This host sends no financial-document email at all (owner, 2026-09-29): Production on Brevo, whose single-send
+    /// idempotency has not been verified (pre-launch item 202).
+    /// </summary>
+    public static readonly Error EmailDeliveryDisabled = Error.Conflict(
+        "financial_documents.email_delivery_disabled",
+        "Financial-document emails are switched off on this server: its mail provider, Brevo, has not had its single-send idempotency verified.");
 }

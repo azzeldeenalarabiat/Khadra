@@ -1,6 +1,7 @@
 using Khadra.Application.Auditing;
 using Khadra.Application.Common;
 using Khadra.Application.FinancialDocuments.Composition;
+using Khadra.Application.FinancialDocuments.Email;
 using Khadra.Application.FinancialDocuments.Issuance;
 using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.FinancialDocuments.ReadModels;
@@ -10,6 +11,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Dealers;
 using Khadra.Domain.FinancialDocuments;
+using Khadra.Domain.FinancialDocuments.Repositories;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.Payments;
@@ -147,6 +149,93 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
             new TestClock(Now),
             RenderingLog);
 
+    // ── Emails (payments Phase 7) ───────────────────────────────────────────────────────────────────
+
+    /// <summary>The mail transport, which keeps what it is handed.</summary>
+    public RecordingEmailSender Mail { get; } = new();
+
+    /// <summary>The emails' mechanics.</summary>
+    public TestDocumentEmailSettings EmailSettings { get; } = new();
+
+    /// <summary>What the email handlers logged, across passes.</summary>
+    public RecordingLogger<EmailFinancialDocumentHandler> EmailLog { get; } = new();
+
+    /// <summary>What administrators' requests to email a receipt again logged.</summary>
+    public RecordingLogger<RequestFinancialDocumentEmailHandler> RequestLog { get; } = new();
+
+    /// <summary>Whether the customers PartiesAsync creates from now on have verified their address.</summary>
+    public bool CustomerEmailVerified { get; set; } = true;
+
+    /// <summary>The language the customers PartiesAsync creates from now on chose; null for none.</summary>
+    public Language? CustomerLanguage { get; set; }
+
+    /// <summary>
+    /// One pass of the email service, exactly as <c>FinancialDocumentEmailService</c> runs it: one claim, then a context
+    /// per email. <paramref name="stopping"/> is the service's own token, for a process that stops mid-pass.
+    /// </summary>
+    public async Task<List<FinancialDocumentEmailOutcome>> EmailPassAsync(CancellationToken stopping = default)
+    {
+        var outcomes = new List<FinancialDocumentEmailOutcome>();
+        foreach (var claimed in await ClaimEmailsAsync())
+            outcomes.Add(await EmailAsync(claimed, stopping));
+        return outcomes;
+    }
+
+    /// <summary>The claim that starts a pass, on its own: what it took, and the count each claim left.</summary>
+    public async Task<IReadOnlyList<ClaimedFinancialDocumentDelivery>> ClaimEmailsAsync()
+    {
+        await using var context = NewContext();
+        return await new ClaimFinancialDocumentEmailsHandler(new FinancialDocumentDeliveryRepository(context), EmailSettings, new TestClock(Now))
+            .Handle(new ClaimFinancialDocumentEmailsQuery(), CancellationToken.None);
+    }
+
+    /// <summary>One claimed email, worked in a context of its own as the service works it.</summary>
+    public async Task<FinancialDocumentEmailOutcome> EmailAsync(ClaimedFinancialDocumentDelivery claimed, CancellationToken stopping = default)
+    {
+        await using var context = NewContext();
+        return await EmailHandler(context).Handle(new EmailFinancialDocumentCommand(claimed.DeliveryId, claimed.Claims), stopping);
+    }
+
+    public EmailFinancialDocumentHandler EmailHandler(KhadraDbContext context) =>
+        new(
+            new FinancialDocumentDeliveryRepository(context),
+            new FinancialDocumentRepository(context),
+            new FinancialDocumentRenditionRepository(context),
+            new UserRepository(context),
+            Storage,
+            Mail,
+            EmailSettings,
+            UnitOfWork(context),
+            new TestClock(Now),
+            EmailLog);
+
+    public async Task<List<FinancialDocumentDelivery>> DeliveriesAsync()
+    {
+        await using var context = NewContext();
+        return await context.FinancialDocumentDeliveries.AsNoTracking().Include(delivery => delivery.Attempts).ToListAsync();
+    }
+
+    /// <summary>An administrator's "email it again", through the real audit trail.</summary>
+    public async Task<CSharpFunctionalExtensions.Result<RequestedFinancialDocumentEmailDto, Error>> RequestEmailAsync(Id documentId, Id? adminId = null)
+    {
+        await using var context = NewContext();
+        var admin = adminId ?? Id.New();
+        var actor = Substitute.For<ICurrentActor>();
+        actor.UserId.Returns(admin);
+        actor.Role.Returns(UserRole.Admin);
+        actor.Name.Returns("Test Admin");
+        actor.CorrelationId.Returns("test");
+        var handler = new RequestFinancialDocumentEmailHandler(
+            new FinancialDocumentRepository(context),
+            new FinancialDocumentDeliveryRepository(context),
+            new AdminActionRecorder(new AuditTrail(context), actor, new TestClock(Now)),
+            EmailSettings,
+            UnitOfWork(context),
+            new TestClock(Now),
+            RequestLog);
+        return await handler.Handle(new RequestFinancialDocumentEmailCommand(documentId, admin), CancellationToken.None);
+    }
+
     public async Task<List<FinancialDocumentRendition>> RenditionsAsync()
     {
         await using var context = NewContext();
@@ -166,7 +255,7 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
         var handler = new VoidFinancialDocumentHandler(
             documents,
             Preparation(context, documents),
-            new FinancialDocumentIssuing(new FinancialDocumentSeriesCounter(context), documents, DocumentFixtures.Amman),
+            new FinancialDocumentIssuing(new FinancialDocumentSeriesCounter(context), documents, new FinancialDocumentDeliveryRepository(context), DocumentFixtures.Amman),
             new AdminActionRecorder(new AuditTrail(context), actor, new TestClock(Now)),
             UnitOfWork(context),
             new TestClock(Now),
@@ -183,8 +272,11 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
     {
         var digits = new string([.. unique.Where(char.IsAsciiDigit)]);
         var customer = Build.Customer(
+            emailVerified: CustomerEmailVerified,
             email: $"rana{unique}@example.jo",
             phone: digits.Length == 0 ? "0791234567" : "079" + digits.PadRight(7, '0')[..7]);
+        if (CustomerLanguage is { } language)
+            customer.ChoosePreferredLanguage(language);
         var dealer = Build.ApprovedDealer(commercialRegistration: digits.Length == 0 ? "123456" : digits[..Math.Min(10, digits.Length)]);
         var city = City.Create("Amman" + unique, "عمّان" + unique, 1, Start).Value;
         var carType = CarType.Create("Sedan" + unique, "سيدان" + unique, 1, Start).Value;
@@ -259,7 +351,7 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
         var documents = new FinancialDocumentRepository(context);
         return new IssueFinancialDocumentHandler(
             Preparation(context, documents),
-            new FinancialDocumentIssuing(new FinancialDocumentSeriesCounter(context), documents, DocumentFixtures.Amman),
+            new FinancialDocumentIssuing(new FinancialDocumentSeriesCounter(context), documents, new FinancialDocumentDeliveryRepository(context), DocumentFixtures.Amman),
             documents,
             new FinancialDocumentIssuanceHoldRepository(context),
             UnitOfWork(context),

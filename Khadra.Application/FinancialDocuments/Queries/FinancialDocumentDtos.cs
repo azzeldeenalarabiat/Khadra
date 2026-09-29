@@ -240,6 +240,8 @@ public sealed record FinancialDocumentVoidDto(
 /// For a VOIDED document <c>Document.Pdf</c> describes the customer's voided copies, while <see cref="Renditions"/>
 /// lists every rendition of both kinds: the administrator can download the record as issued, unstamped, and the
 /// voided copy the customer is given. A console keys its downloads off <see cref="Renditions"/>.
+/// <see cref="EmailDeliveryDisabled"/> says this server sends no financial-document email at all (Production on
+/// Brevo, pre-launch item 202): its emails wait in the queue, and <see cref="CanEmailAgain"/> is false.
 /// </remarks>
 public sealed record AdminFinancialDocumentDto(
     FinancialDocumentDto Document,
@@ -251,7 +253,75 @@ public sealed record AdminFinancialDocumentDto(
     DateTimeOffset? CoversThrough,
     string? CheckpointFingerprint,
     FinancialDocumentVoidDto? Void,
-    IReadOnlyList<FinancialDocumentRenditionDto> Renditions);
+    IReadOnlyList<FinancialDocumentRenditionDto> Renditions,
+    IReadOnlyList<FinancialDocumentEmailDto> Emails,
+    bool CanEmailAgain,
+    bool EmailDeliveryDisabled);
+
+/// <summary>
+/// One email of a document as the administrator reads it (payments Phase 7): where it stands, who asked, where and in
+/// which languages it went, and every attempt. <c>Sent</c> means ACCEPTED by the mail provider — not delivered, and not
+/// read: bounces are not reported back yet (pre-launch item 38).
+/// </summary>
+/// <param name="State"><c>Queued</c>, <c>Sent</c>, <c>Skipped</c> or <c>Failed</c>.</param>
+/// <param name="WaitingFor"><c>PdfNotReady</c> while a queued email waits for its PDF; null otherwise.</param>
+/// <param name="RequestedByAdminId">Null for the email owed when the receipt was issued.</param>
+/// <param name="Languages">The languages the last send was written in, <c>en</c> and/or <c>ar</c>.</param>
+public sealed record FinancialDocumentEmailDto(
+    Guid DeliveryId,
+    string State,
+    string? WaitingFor,
+    DateTimeOffset? WaitingSince,
+    Guid? RequestedByAdminId,
+    string? RequestedByName,
+    DateTimeOffset QueuedAt,
+    DateTimeOffset? CompletedAt,
+    string? Recipient,
+    IReadOnlyList<string> Languages,
+    int SendAttempts,
+    string? LastError,
+    IReadOnlyList<FinancialDocumentEmailAttemptDto> Attempts)
+{
+    internal static FinancialDocumentEmailDto From(FinancialDocumentDeliveryRecord record) =>
+        new(
+            record.Id.Value,
+            record.State.Name,
+            record.WaitingReason?.Name,
+            record.WaitingSince,
+            record.RequestedByAdminId?.Value,
+            record.RequestedByName,
+            record.QueuedAt,
+            record.CompletedAt,
+            record.RecipientAddress,
+            string.IsNullOrWhiteSpace(record.Languages) ? [] : record.Languages.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+            record.SendAttempts,
+            record.LastError,
+            [.. record.Attempts.OrderBy(attempt => attempt.Number).Select(FinancialDocumentEmailAttemptDto.From)]);
+}
+
+/// <summary>One attempt at an email: what it came to, which provider said so, and the hashes of the PDFs it carried.</summary>
+/// <param name="Outcome"><c>Accepted</c>, <c>Failed</c> or <c>Skipped</c>.</param>
+public sealed record FinancialDocumentEmailAttemptDto(
+    int Number,
+    string Outcome,
+    DateTimeOffset AttemptedAt,
+    string? Error,
+    string? Provider,
+    string? ProviderMessageId,
+    string? EnglishPdfSha256,
+    string? ArabicPdfSha256)
+{
+    internal static FinancialDocumentEmailAttemptDto From(FinancialDocumentDeliveryAttemptRecord record) =>
+        new(
+            record.Number,
+            record.Outcome.Name,
+            record.AttemptedAt,
+            record.Error,
+            record.Provider,
+            record.ProviderMessageId,
+            record.EnglishPdfSha256,
+            record.ArabicPdfSha256);
+}
 
 /// <summary>A document family on hold: owed, not issued, and why.</summary>
 /// <param name="Reason"><c>RecordsNeedReview</c>, <c>IssuerNotConfigured</c> or <c>SnapshotFailed</c>.</param>

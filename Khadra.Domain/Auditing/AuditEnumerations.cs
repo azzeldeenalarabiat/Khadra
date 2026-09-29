@@ -55,6 +55,11 @@ public sealed class AuditAction : Enumeration
     // correction are one transaction with this entry; the previous and new values are the two numbers.
     public static readonly AuditAction FinancialDocumentVoided = new(28, "FinancialDocumentVoided");
 
+    // An administrator asked for an issued receipt to be emailed to its customer again (payments Phase 7).
+    // Labelled by the document's number, like the void: an entry that can never be erased names no customer
+    // and no address.
+    public static readonly AuditAction FinancialDocumentEmailRequested = new(29, "FinancialDocumentEmailRequested");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }

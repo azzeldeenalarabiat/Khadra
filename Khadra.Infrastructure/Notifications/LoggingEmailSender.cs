@@ -18,6 +18,9 @@ internal sealed partial class LoggingEmailSender(IClock clock, ILogger<LoggingEm
     {
         ArgumentNullException.ThrowIfNull(message);
         LogNotDelivered(logger, message.Subject, message.RecipientDomain);
+        // Names and sizes, never contents: a receipt's PDF is a customer's money on paper.
+        foreach (var attachment in message.Attachments)
+            LogAttachmentNotDelivered(logger, attachment.FileName, attachment.Content.LongLength);
         return Task.FromResult(new EmailSendReceipt(
             EmailOptions.LoggingProvider,
             ProviderMessageId: null,
@@ -31,4 +34,7 @@ internal sealed partial class LoggingEmailSender(IClock clock, ILogger<LoggingEm
     [LoggerMessage(1400, LogLevel.Information,
         "Email NOT delivered, because Email:Provider is Logging: \"{Subject}\" for an address at {RecipientDomain}")]
     private static partial void LogNotDelivered(ILogger logger, string subject, string recipientDomain);
+
+    [LoggerMessage(1401, LogLevel.Information, "With it, NOT delivered: the attachment {FileName} ({Bytes} bytes).")]
+    private static partial void LogAttachmentNotDelivered(ILogger logger, string fileName, long bytes);
 }

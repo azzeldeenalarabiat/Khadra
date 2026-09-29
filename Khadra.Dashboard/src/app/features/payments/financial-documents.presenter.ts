@@ -7,6 +7,8 @@ import {
   AdminFinancialDocumentListItem,
   Bilingual,
   FinancialDocument,
+  FinancialDocumentEmail,
+  FinancialDocumentEmailAttempt,
   FinancialDocumentHold,
   FinancialDocumentLink,
   FinancialDocumentRendition,
@@ -351,6 +353,8 @@ export interface DocumentPageView {
   readonly statementFollows: boolean;
   /** Its PDFs (payments Phase 6): each one drawn, with its proof, and a download per kind and language. */
   readonly pdf: PdfSectionView;
+  /** Its emails to the customer (payments Phase 7); null from a server that does not report them. */
+  readonly emails: EmailSectionView | null;
 }
 
 /** One PDF download: which PDF it is, its button, and the name the saved file gets. */
@@ -473,6 +477,174 @@ export function pdfSection(page: AdminFinancialDocument, words: DocumentWords, f
   };
 }
 
+// ── Its emails (payments Phase 7) ─────────────────────────────────────────────────────────────────────
+
+/** One attempt at an email: what it came to, and the proof of it. */
+export interface EmailAttemptView {
+  readonly key: string;
+  /** "Attempt 2 · Accepted by the mail provider". */
+  readonly title: string;
+  readonly tone: Tone;
+  readonly rows: readonly ProofRow[];
+}
+
+/** One email of the document: where it stands, who asked for it, and every attempt. */
+export interface EmailView {
+  readonly key: string;
+  readonly standing: StandingView;
+  /** "Queued when the receipt was issued", or the administrator who asked. */
+  readonly requested: string;
+  readonly rows: readonly ProofRow[];
+  readonly attempts: readonly EmailAttemptView[];
+}
+
+export interface EmailSectionView {
+  /** Newest first, as the server sends them. */
+  readonly emails: readonly EmailView[];
+  /**
+   * Emailing it (again): absent for what is never emailed again — a statement, a voided receipt — and otherwise its
+   * label, with `waiting` saying why it cannot be taken yet while an email is already on its way.
+   */
+  readonly action: { readonly label: string; readonly waiting: string | null } | null;
+  /** Why it is not emailed at all, when that is the case: a statement, or a voided receipt. */
+  readonly note: string | null;
+}
+
+/**
+ * What each state reads as. `Sent` is ACCEPTED by the mail provider — not delivered, not read — and the section says
+ * so rather than the pill; a queued email is work in progress, not yet a problem.
+ */
+const EMAIL_TONES: Readonly<Record<string, Tone>> = { Queued: 'accent', Sent: 'ok', Skipped: 'dim', Failed: 'bad' };
+const ATTEMPT_TONES: Readonly<Record<string, Tone>> = { Accepted: 'ok', Failed: 'bad', Skipped: 'dim' };
+
+/**
+ * The emails of a document to its customer, as the administrator reads them: the history the server keeps, worded;
+ * and whether it can be emailed again, which is the SERVER's word (`canEmailAgain`) — the console only says why not.
+ */
+export function emailSection(page: AdminFinancialDocument, words: DocumentWords, format: DocumentFormat): EmailSectionView | null {
+  if (page.emails === undefined) return null;
+  const { t } = words;
+  const document = page.document;
+  const onItsWay = page.emails.some((email) => email.state === 'Queued');
+  // Only a receipt is emailed, and never once it is voided (owner, 2026-09-29); the server refuses both as well. A
+  // server whose delivery is switched off sends none at all: its queued emails wait, and none is on its way.
+  const note =
+    document.type === 'BookingStatement'
+      ? t('financialDocuments.emailsNotForStatements')
+      : document.status === 'Voided'
+        ? t('financialDocuments.emailsVoided')
+        : page.emailDeliveryDisabled === true
+          ? t('financialDocuments.emailsSwitchedOff')
+          : null;
+
+  return {
+    emails: page.emails.map((email) => emailView(email, words, format)),
+    action:
+      page.canEmailAgain === true || (note === null && onItsWay)
+        ? {
+            label: t(page.emails.length ? 'financialDocuments.emailAgain' : 'financialDocuments.emailSend'),
+            waiting: page.canEmailAgain === true ? null : t('financialDocuments.emailOnItsWay'),
+          }
+        : null,
+    note,
+  };
+}
+
+function emailView(email: FinancialDocumentEmail, words: DocumentWords, format: DocumentFormat): EmailView {
+  const { t } = words;
+  const rows: ProofRow[] = [{ k: t('financialDocuments.emailQueuedAt'), v: format.when(email.queuedAt), code: false }];
+  if (email.waitingFor) {
+    const reason = words.enumLabel('financialDocumentEmailWait', email.waitingFor);
+    rows.push({
+      k: t('financialDocuments.emailWaiting'),
+      v: email.waitingSince ? t('financialDocuments.emailWaitingSince', { reason, since: format.when(email.waitingSince) }) : reason,
+      code: false,
+    });
+  }
+  if (email.completedAt) rows.push({ k: t('financialDocuments.emailFinished'), v: format.when(email.completedAt), code: false });
+  if (email.recipient) rows.push({ k: t('financialDocuments.emailTo'), v: email.recipient, code: true });
+  if (email.languages.length) {
+    rows.push({
+      k: t('financialDocuments.emailLanguages'),
+      v: email.languages.map((language) => (Object.hasOwn(PDF_LANGUAGES, language) ? t(PDF_LANGUAGES[language].name) : language)).join(' · '),
+      code: false,
+    });
+  }
+  if (email.sendAttempts > 0) rows.push({ k: t('financialDocuments.emailSendAttempts'), v: format.count(email.sendAttempts), code: false });
+  if (email.lastError) {
+    rows.push({
+      k: t(email.state === 'Skipped' ? 'financialDocuments.emailWhyNotSent' : 'financialDocuments.emailLastError'),
+      v: email.lastError,
+      code: true,
+    });
+  }
+
+  return {
+    key: email.deliveryId,
+    standing: { label: words.statusLabel(email.state, 'financialDocumentEmail'), tone: EMAIL_TONES[email.state] ?? 'dim' },
+    requested:
+      email.requestedByAdminId === null
+        ? t('financialDocuments.emailAskedAtIssue')
+        : t('financialDocuments.emailAskedBy', { name: email.requestedByName ?? t('financialDocuments.emailByUnknown') }),
+    rows,
+    attempts: email.attempts.map((attempt) => attemptView(email.deliveryId, attempt, words, format)),
+  };
+}
+
+function attemptView(deliveryId: string, attempt: FinancialDocumentEmailAttempt, words: DocumentWords, format: DocumentFormat): EmailAttemptView {
+  const { t } = words;
+  const rows: ProofRow[] = [{ k: t('financialDocuments.emailAttemptAt'), v: format.when(attempt.attemptedAt), code: false }];
+  if (attempt.provider) rows.push({ k: t('financialDocuments.emailProvider'), v: attempt.provider, code: true });
+  if (attempt.providerMessageId) rows.push({ k: t('financialDocuments.emailMessageId'), v: attempt.providerMessageId, code: true });
+  if (attempt.error) {
+    rows.push({
+      k: t(attempt.outcome === 'Skipped' ? 'financialDocuments.emailWhy' : 'financialDocuments.emailError'),
+      v: attempt.error,
+      code: true,
+    });
+  }
+  if (attempt.englishPdfSha256) rows.push({ k: t('financialDocuments.emailPdfEn'), v: attempt.englishPdfSha256, code: true });
+  if (attempt.arabicPdfSha256) rows.push({ k: t('financialDocuments.emailPdfAr'), v: attempt.arabicPdfSha256, code: true });
+  return {
+    key: `${deliveryId}:${attempt.number}`,
+    title: t('financialDocuments.emailAttempt', {
+      n: attempt.number,
+      outcome: words.enumLabel('financialDocumentEmailOutcome', attempt.outcome),
+    }),
+    tone: ATTEMPT_TONES[attempt.outcome] ?? 'dim',
+    rows,
+  };
+}
+
+/** The dialog's words: what is sent, to whom, and that it is recorded. */
+export function emailDialogWords(number: string, t: Translate): { title: string; body: string; note: string; confirm: string } {
+  return {
+    title: t('financialDocuments.emailTitle', { number }),
+    body: t('financialDocuments.emailBody'),
+    note: t('financialDocuments.emailNote'),
+    confirm: t('financialDocuments.emailConfirm'),
+  };
+}
+
+/** "Email queued": what asking did — never "delivered", and no promise of when. */
+export function emailQueuedToast(number: string, t: Translate): { title: string; body: string } {
+  return { title: t('financialDocuments.emailQueuedTitle'), body: t('financialDocuments.emailQueuedBody', { number }) };
+}
+
+/**
+ * The refusals after which asking again cannot help — the document is a statement, it was voided, an email is
+ * already on its way, or this server sends none at all: the dialog closes, the refusal is a toast, and the page
+ * reloads to show why. Anything else leaves the dialog open with the words, and nothing was queued.
+ */
+export function emailRefusalIsFinal(code: string | null): boolean {
+  return (
+    code === 'financial_documents.not_emailed' ||
+    code === 'financial_documents.voided_not_emailed' ||
+    code === 'financial_documents.email_already_queued' ||
+    code === 'financial_documents.email_delivery_disabled'
+  );
+}
+
 /** What the console reports about a document its reader refused whole. */
 export interface RefusalReport {
   readonly documentId: string;
@@ -569,6 +741,7 @@ export function documentPage(page: AdminFinancialDocument, words: DocumentWords,
     canVoid: document.status === 'Current',
     statementFollows: document.type === 'PaymentReceipt' || document.type === 'RefundReceipt',
     pdf: pdfSection(page, words, format),
+    emails: emailSection(page, words, format),
   };
 }
 

@@ -39,6 +39,9 @@ public static class AttentionQueueBuilder
 
         /// <summary>Financial documents owed and not issued, and why: never silence (payments Phase 5).</summary>
         public const string FinancialDocumentsOnHold = "FinancialDocumentsOnHold";
+
+        /// <summary>Receipts whose email has not gone — failed, or queued too long (payments Phase 7).</summary>
+        public const string FinancialDocumentEmailsNotSent = "FinancialDocumentEmailsNotSent";
     }
 
     public static class Severities
@@ -61,7 +64,8 @@ public static class AttentionQueueBuilder
         int slaHours,
         DateTimeOffset now,
         MoneyAttention? money = null,
-        FinancialDocumentHoldsSummary? documentsOnHold = null)
+        FinancialDocumentHoldsSummary? documentsOnHold = null,
+        FinancialDocumentEmailsSummary? emailsNotSent = null)
     {
         ArgumentNullException.ThrowIfNull(liveDisputes);
         ArgumentNullException.ThrowIfNull(disputeSubtitles);
@@ -116,6 +120,7 @@ public static class AttentionQueueBuilder
 
         AddMoney(items, money ?? MoneyAttention.None);
         AddDocumentsOnHold(items, documentsOnHold ?? FinancialDocumentHoldsSummary.None);
+        AddEmailsNotSent(items, emailsNotSent ?? FinancialDocumentEmailsSummary.None);
 
         // Overdue work first; then whatever runs out of time soonest, because each of those is a promise
         // the platform made and can still keep; then money a human has to look at, which has no clock —
@@ -212,6 +217,29 @@ public static class AttentionQueueBuilder
             Count: holds.Count,
             SubjectIds: [.. holds.HoldIds.Select(id => id.Value)],
             Subtitle: References(holds.BookingReferences),
+            Description: null,
+            SlaStartedAt: oldest,
+            SlaDeadlineAt: null,
+            IsOverdue: false));
+    }
+
+    /// <summary>
+    /// ONE row for every receipt whose email has not gone (payments Phase 7): its latest email failed, or it has been
+    /// queued longer than it should — usually waiting for a PDF that is late. No deadline, but never merely watched: a
+    /// customer is owed their receipt, and a Failed email is only sent again when somebody asks.
+    /// </summary>
+    private static void AddEmailsNotSent(List<AttentionItemDto> items, FinancialDocumentEmailsSummary emails)
+    {
+        if (emails.Count == 0 || emails.OldestQueuedAt is not { } oldest)
+            return;
+
+        items.Add(new AttentionItemDto(
+            Id: "financial-document-emails-not-sent",
+            Kind: Kinds.FinancialDocumentEmailsNotSent,
+            Severity: Severities.Warning,
+            Count: emails.Count,
+            SubjectIds: [.. emails.DocumentIds.Select(id => id.Value)],
+            Subtitle: emails.Numbers.Count == 0 ? null : string.Join(" · ", emails.Numbers),
             Description: null,
             SlaStartedAt: oldest,
             SlaDeadlineAt: null,

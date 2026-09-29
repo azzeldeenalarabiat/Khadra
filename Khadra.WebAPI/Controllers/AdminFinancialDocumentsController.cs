@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.FinancialDocuments.Email;
 using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.FinancialDocuments.VoidFinancialDocument;
 using Khadra.Domain.Common;
@@ -114,6 +115,26 @@ public sealed class AdminFinancialDocumentsController(ICurrentActor actor) : Api
             new VoidFinancialDocumentCommand(Id.From(documentId), actor.UserId!.Value, request.Reason),
             cancellationToken);
         return FromResult(result, voided => Created($"/api/v1/admin/financial-documents/{voided.ReplacementDocumentId}", voided));
+    }
+
+    /// <summary>
+    /// Queues a receipt's email to its customer again, with its PDF (payments Phase 7), audited: 202 with the email
+    /// queued, which the email service sends within a minute or two. 404 for a missing document; 409
+    /// <c>financial_documents.not_emailed</c> for a statement (only receipts are emailed),
+    /// <c>financial_documents.voided_not_emailed</c> for a voided receipt (its correction is the one to send), and
+    /// <c>financial_documents.email_already_queued</c> while one is still on its way.
+    /// </summary>
+    [HttpPost("financial-documents/{documentId:guid}/emails")]
+    [ProducesResponseType<RequestedFinancialDocumentEmailDto>(StatusCodes.Status202Accepted)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> EmailAgain(Guid documentId, CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        var result = await Mediator.Send(
+            new RequestFinancialDocumentEmailCommand(Id.From(documentId), actor.UserId!.Value),
+            cancellationToken);
+        return FromResult(result, queued => Accepted($"/api/v1/admin/financial-documents/{queued.DocumentId}", queued));
     }
 
     /// <summary>A booking's documents, what is being prepared, and what is on hold — for its Money section.</summary>

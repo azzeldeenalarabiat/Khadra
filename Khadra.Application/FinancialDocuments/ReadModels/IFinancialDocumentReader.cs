@@ -51,6 +51,49 @@ public sealed record FinancialDocumentRenditionRecord(
     DateTimeOffset RenderedAt,
     string SnapshotSha256);
 
+/// <summary>One email of a document (payments Phase 7), as the administrator reads it: where it stands, and every attempt.</summary>
+/// <param name="RequestedByName">The administrator who asked for it again, when their account still resolves; null for the email owed at issue.</param>
+/// <param name="RecipientAddress">The verified address the last send used, or null before any.</param>
+public sealed record FinancialDocumentDeliveryRecord(
+    Id Id,
+    FinancialDocumentDeliveryState State,
+    FinancialDocumentDeliveryWait? WaitingReason,
+    DateTimeOffset? WaitingSince,
+    Id? RequestedByAdminId,
+    string? RequestedByName,
+    DateTimeOffset QueuedAt,
+    DateTimeOffset? CompletedAt,
+    string? RecipientAddress,
+    string? Languages,
+    int SendAttempts,
+    string? LastError,
+    IReadOnlyList<FinancialDocumentDeliveryAttemptRecord> Attempts);
+
+/// <summary>One attempt at an email, with the hashes of the PDFs it carried: the proof of which bytes went.</summary>
+public sealed record FinancialDocumentDeliveryAttemptRecord(
+    int Number,
+    FinancialDocumentDeliveryOutcome Outcome,
+    DateTimeOffset AttemptedAt,
+    string? Error,
+    string? Provider,
+    string? ProviderMessageId,
+    string? EnglishPdfSha256,
+    string? ArabicPdfSha256);
+
+/// <summary>
+/// What the work queue says about receipts whose email has not gone (payments Phase 7): those whose latest email
+/// FAILED, and those queued longer than they should be — usually waiting for a PDF.
+/// </summary>
+/// <param name="Numbers">Up to three document numbers, the ones a human reads first.</param>
+public sealed record FinancialDocumentEmailsSummary(
+    int Count,
+    IReadOnlyList<Id> DocumentIds,
+    IReadOnlyList<string> Numbers,
+    DateTimeOffset? OldestQueuedAt)
+{
+    public static readonly FinancialDocumentEmailsSummary None = new(0, [], [], null);
+}
+
 /// <summary>A family on hold, for the administrator.</summary>
 public sealed record FinancialDocumentHoldRecord(
     Id Id,
@@ -136,4 +179,14 @@ public interface IFinancialDocumentReader
     Task<IReadOnlyList<FinancialDocumentHoldRecord>> OpenHoldsForBookingAsync(Id bookingId, CancellationToken cancellationToken = default);
 
     Task<FinancialDocumentHoldsSummary> OpenHoldsSummaryAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Every email of a document, newest first, each with its attempts (payments Phase 7).</summary>
+    Task<IReadOnlyList<FinancialDocumentDeliveryRecord>> DeliveriesOfAsync(Id documentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Documents whose LATEST email failed, or is still queued from before <paramref name="staleBefore"/> — a later
+    /// email that went clears the one that failed, and a voided receipt is never listed: it is not emailed again, its
+    /// correction is. Oldest first.
+    /// </summary>
+    Task<FinancialDocumentEmailsSummary> EmailsNotSentSummaryAsync(DateTimeOffset staleBefore, CancellationToken cancellationToken = default);
 }

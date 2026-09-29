@@ -88,6 +88,51 @@ public sealed class BrevoEmailSenderTests
         Assert.Null(receipt.ProviderResponse);
     }
 
+    [Fact]
+    public async Task Attached_pdfs_travel_in_base64_with_their_names_and_none_travel_when_there_are_none()
+    {
+        // Payments Phase 7: a receipt's PDFs go with its email.
+        var (sender, handler) = Build(HttpStatusCode.Created, """{"messageId":"<a@smtp-relay.mailin.fr>"}""");
+        byte[] english = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31];
+
+        await sender.SendAsync(Message() with
+        {
+            Attachments = [new EmailAttachment("RFD-2026-000003-en.pdf", "application/pdf", english)],
+        });
+
+        using (var body = JsonDocument.Parse(handler.RequestBody!))
+        {
+            var file = Assert.Single(body.RootElement.GetProperty("attachment").EnumerateArray());
+            Assert.Equal("RFD-2026-000003-en.pdf", file.GetProperty("name").GetString());
+            Assert.Equal(Convert.ToBase64String(english), file.GetProperty("content").GetString());
+        }
+
+        var (plain, plainHandler) = Build(HttpStatusCode.Created, """{"messageId":"<b@smtp-relay.mailin.fr>"}""");
+        await plain.SendAsync(Message());
+        using var plainBody = JsonDocument.Parse(plainHandler.RequestBody!);
+        Assert.False(plainBody.RootElement.TryGetProperty("attachment", out _));
+    }
+
+    [Fact]
+    public async Task A_reply_to_travels_as_brevos_own_object_with_an_address_alone_and_none_travels_without_one()
+    {
+        // Payments Phase 7 (owner, 2026-09-29): a receipt's replies go to Khadra's support address.
+        var (sender, handler) = Build(HttpStatusCode.Created, """{"messageId":"<c@smtp-relay.mailin.fr>"}""");
+        await sender.SendAsync(Message() with { ReplyTo = "support@khadra.jo" });
+        using (var body = JsonDocument.Parse(handler.RequestBody!))
+        {
+            var replyTo = body.RootElement.GetProperty("replyTo");
+            Assert.Equal("support@khadra.jo", replyTo.GetProperty("email").GetString());
+            // No "name": null for Brevo to read as a name.
+            Assert.False(replyTo.TryGetProperty("name", out _));
+        }
+
+        var (plain, plainHandler) = Build(HttpStatusCode.Created, """{"messageId":"<d@smtp-relay.mailin.fr>"}""");
+        await plain.SendAsync(Message());
+        using var plainBody = JsonDocument.Parse(plainHandler.RequestBody!);
+        Assert.False(plainBody.RootElement.TryGetProperty("replyTo", out _));
+    }
+
     /// <summary>
     /// Brevo said yes, then said something nobody can read. The message still went, so the send still
     /// succeeds: the log loses an id, and a registration screen does not tell somebody that an email

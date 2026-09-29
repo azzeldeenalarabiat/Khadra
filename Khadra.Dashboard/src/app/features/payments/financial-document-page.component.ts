@@ -16,6 +16,9 @@ import {
   DocumentWords,
   PdfDownloadView,
   documentPage,
+  emailDialogWords,
+  emailQueuedToast,
+  emailRefusalIsFinal,
   refusalReport,
   voidDialogWords,
   voidRefusalIsFinal,
@@ -31,8 +34,9 @@ const OBJECT_URL_GRACE_MS = 30_000;
 /**
  * One issued financial document, as the administrator reads it (payments Phase 5b): the document exactly
  * as issued, the facts it recorded, the proof of what was issued, its family and links, and its void when
- * there is one — with the one action this console takes on a document, voiding a wrong one, which issues
- * its correction in the same transaction — and its PDFs (Phase 6), each with the proof of its bytes.
+ * there is one — with voiding a wrong one, which issues its correction in the same transaction — its PDFs
+ * (Phase 6), each with the proof of its bytes, and its emails to the customer (Phase 7), with emailing a
+ * receipt again.
  */
 @Component({
   selector: 'kh-financial-document-page',
@@ -184,6 +188,47 @@ export class FinancialDocumentPageComponent {
         }
       },
       { title: this.t('financialDocuments.voidedTitle'), body: '' },
+    );
+  }
+
+  /**
+   * Queues this receipt's email to its customer again, with its PDF. The page reloads either way, so the history
+   * shows the email queued — or, after a refusal that asking again cannot mend, why it was refused. Any other
+   * refusal leaves the dialog open with the words, and nothing was queued.
+   */
+  protected emailAgain(): void {
+    const page = this.page();
+    const action = page?.emails?.action;
+    if (!page || !action || action.waiting) return;
+    const words = emailDialogWords(page.number, this.t);
+    const queued = emailQueuedToast(page.number, this.t);
+    this.ui.openAction(
+      {
+        icon: 'tray',
+        tone: 'accent',
+        title: words.title,
+        body: words.body,
+        note: words.note,
+        confirm: words.confirm,
+        result: { ...queued, tone: 'ok' },
+      },
+      async () => {
+        try {
+          await this.service.emailAgain(page.id);
+          this.resource.reload();
+          return { ...queued, tone: 'ok' };
+        } catch (error) {
+          const problem = snapshotProblem(error);
+          if (!emailRefusalIsFinal(problem.code)) throw error;
+          this.resource.reload();
+          return {
+            title: this.t('common.thatDidNotGoThrough'),
+            body: problemMessage(problem, this.i18n.lang(), this.t) ?? this.t('common.serviceDidNotRespond'),
+            tone: 'bad',
+          };
+        }
+      },
+      queued,
     );
   }
 }

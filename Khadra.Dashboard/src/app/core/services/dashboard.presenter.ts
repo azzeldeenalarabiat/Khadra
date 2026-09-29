@@ -181,6 +181,10 @@ const kindTarget = (
     // topbar bell reuses these rows and drops query parameters.
     case 'FinancialDocumentsOnHold':
       return { route: '/payments/financial-documents/holds', action: 'queue.actionOpen' };
+    // Receipts whose email has not gone (payments Phase 7): one opens its page, where it can be emailed again;
+    // several open the documents list.
+    case 'FinancialDocumentEmailsNotSent':
+      return { route: only ? `/payments/financial-documents/${only}` : '/payments/financial-documents', action: 'queue.actionOpen' };
     default:
       return { route: '/dashboard', action: 'queue.actionOpen' };
   }
@@ -240,6 +244,7 @@ const queueTitle = (item: AttentionItem, now: number, t: Translate): string => {
   if (item.kind === 'OrphanedCaptureOwed') return t('queue.capturesBeingRefunded', { count: item.count });
   if (item.kind === 'DepositAwaitingDecision') return t('queue.depositAwaitingDecision');
   if (item.kind === 'FinancialDocumentsOnHold') return t('queue.documentsOnHold', { count: item.count });
+  if (item.kind === 'FinancialDocumentEmailsNotSent') return t('queue.documentEmailsNotSent', { count: item.count });
 
   const ageHours = Math.max(0, Math.round((now - Date.parse(item.slaStartedAt)) / 3_600_000));
   if (item.kind === 'DisputeOverdue' || item.kind === 'DisputeOpen') {
@@ -371,6 +376,7 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   LookupRetired: 'toggle-left',
   LookupRestored: 'toggle-right',
   FinancialDocumentVoided: 'file-x',
+  FinancialDocumentEmailRequested: 'tray',
 };
 
 /**
@@ -408,6 +414,7 @@ const ACTIVITY_SENTENCES: Readonly<Record<string, TranslationKey>> = {
   HandoverCodeLocked: 'activity.handoverCodeLocked',
   // Labelled by the document's NUMBER, never a customer: an audit entry can never be erased.
   FinancialDocumentVoided: 'activity.financialDocumentVoided',
+  FinancialDocumentEmailRequested: 'activity.financialDocumentEmailRequested',
 };
 
 /** The lookup actions are shared by both lists; the entry's type says which one changed. */

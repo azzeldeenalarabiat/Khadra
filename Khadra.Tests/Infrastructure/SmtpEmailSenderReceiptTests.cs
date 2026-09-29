@@ -191,6 +191,74 @@ public sealed class SmtpEmailSenderReceiptTests
         new("ali@example.com", "Ali Haddad", "Verify your Khadra email address", "<p>link</p>", "link");
 
     [Fact]
+    public async Task A_message_sent_with_an_idempotency_key_carries_it_as_its_message_id_so_a_repeat_is_the_same_message()
+    {
+        // Payments Phase 7: the big mailboxes collapse two messages with one Message-ID into one.
+        using var relay = new FakeRelay();
+        const string Key = "fd-0123456789abcdef0123456789abcdef-0123456789abcdef";
+
+        var first = await Sender(relay.Port).SendAsync(Message() with { IdempotencyKey = Key });
+        var again = await Sender(relay.Port).SendAsync(Message() with { IdempotencyKey = Key });
+
+        Assert.Equal($"<{Key}@khadra.test>", first.ProviderMessageId);
+        Assert.Equal(first.ProviderMessageId, again.ProviderMessageId);
+        Assert.All(relay.Messages, message => Assert.Contains($"Message-Id: <{Key}@khadra.test>", message, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task A_reply_to_arrives_as_the_messages_reply_to_header_and_none_arrives_without_one()
+    {
+        // Payments Phase 7 (owner, 2026-09-29): a receipt's replies go to Khadra's support address.
+        using var relay = new FakeRelay();
+
+        await Sender(relay.Port).SendAsync(Message() with { ReplyTo = "support@khadra.jo" });
+        await Sender(relay.Port).SendAsync(Message());
+
+        Assert.Equal(2, relay.Messages.Count);
+        using var first = new MemoryStream(Encoding.UTF8.GetBytes(relay.Messages[0]));
+        var replying = await MimeKit.MimeMessage.LoadAsync(first);
+        Assert.Equal("support@khadra.jo", Assert.Single(replying.ReplyTo.Mailboxes).Address);
+        using var second = new MemoryStream(Encoding.UTF8.GetBytes(relay.Messages[1]));
+        var plain = await MimeKit.MimeMessage.LoadAsync(second);
+        Assert.Empty(plain.ReplyTo);
+    }
+
+    [Fact]
+    public async Task Attached_pdfs_arrive_as_attachments_under_their_own_names_byte_for_byte()
+    {
+        // Payments Phase 7: a receipt's PDFs go with its email.
+        using var relay = new FakeRelay();
+        byte[] english = [.. Enumerable.Range(0, 3000).Select(index => (byte)(index % 251))];
+        byte[] arabic = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37];
+
+        await Sender(relay.Port).SendAsync(Message() with
+        {
+            Attachments =
+            [
+                new EmailAttachment("PAY-2026-000001-en.pdf", "application/pdf", english),
+                new EmailAttachment("PAY-2026-000001-ar.pdf", "application/pdf", arabic),
+            ],
+        });
+
+        using var raw = new MemoryStream(Encoding.UTF8.GetBytes(Assert.Single(relay.Messages)));
+        var received = await MimeKit.MimeMessage.LoadAsync(raw);
+        var files = received.Attachments.OfType<MimeKit.MimePart>().ToList();
+        Assert.Equal(["PAY-2026-000001-en.pdf", "PAY-2026-000001-ar.pdf"], files.Select(file => file.FileName));
+        Assert.All(files, file => Assert.Equal("application/pdf", file.ContentType.MimeType));
+        Assert.Equal(english, Decoded(files[0]));
+        Assert.Equal(arabic, Decoded(files[1]));
+        // And the message itself still reads as it did.
+        Assert.Equal("link", received.TextBody?.Trim());
+
+        static byte[] Decoded(MimeKit.MimePart part)
+        {
+            using var content = new MemoryStream();
+            part.Content!.DecodeTo(content);
+            return content.ToArray();
+        }
+    }
+
+    [Fact]
     public async Task The_receipt_names_the_message_id_the_relay_received_and_carries_the_relays_reply()
     {
         using var relay = new FakeRelay("250 2.0.0 Ok: queued as FAKE42");

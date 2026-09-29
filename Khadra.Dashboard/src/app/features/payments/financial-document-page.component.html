@@ -289,6 +289,67 @@
             </div>
           }
         </section>
+
+        <!-- Its emails to the customer (payments Phase 7): receipts only, with their PDFs. Sent is accepted, not delivered. -->
+        @if (p.emails; as mail) {
+          <section class="sect">
+            <div class="sect-h">
+              <kh-icon name="tray" class="kpi-icon" />
+              <span class="sect-t">{{ t('financialDocuments.emails') }}</span>
+              <span class="sect-hint">{{ t('financialDocuments.emailsHint') }}</span>
+            </div>
+            @if (mail.note; as note) {
+              <div class="sect-pad"><div class="state-text">{{ note }}</div></div>
+            }
+            @for (email of mail.emails; track email.key) {
+              <div class="kv-body">
+                <div class="row row-gap-9 row-wrap">
+                  <span class="pill" [class]="'s-' + email.standing.tone">{{ email.standing.label }}</span>
+                  <span class="td-sub">{{ email.requested }}</span>
+                </div>
+                @for (row of email.rows; track row.k) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ row.k }}</div>
+                    <div class="kv-val" [class.mono]="row.code" [class.ltr]="row.code" [class.fdoc-proof]="row.code">{{ row.v }}</div>
+                  </div>
+                }
+                @for (attempt of email.attempts; track attempt.key) {
+                  <div class="td-sub">
+                    <span class="status-text" [class]="'s-' + attempt.tone">{{ attempt.title }}</span>
+                  </div>
+                  @for (row of attempt.rows; track row.k) {
+                    <div class="kv-split">
+                      <div class="kv-key">{{ row.k }}</div>
+                      <div class="kv-val" [class.mono]="row.code" [class.ltr]="row.code" [class.fdoc-proof]="row.code">{{ row.v }}</div>
+                    </div>
+                  }
+                }
+              </div>
+            } @empty {
+              @if (!mail.note) {
+                <div class="sect-pad"><div class="state-text">{{ t('financialDocuments.emailsNone') }}</div></div>
+              }
+            }
+            @if (mail.action; as action) {
+              <div class="sect-pad fdoc-links">
+                <!-- Waiting out an email already on its way: the control stays, disabled, saying why. -->
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  [disabled]="action.waiting !== null"
+                  [attr.title]="action.waiting"
+                  (click)="emailAgain()"
+                >
+                  <kh-icon name="tray" />
+                  {{ action.label }}
+                </button>
+              </div>
+              @if (action.waiting; as waiting) {
+                <div class="sect-pad"><div class="state-text">{{ waiting }}</div></div>
+              }
+            }
+          </section>
+        }
       </div>
     </div>
   </div>

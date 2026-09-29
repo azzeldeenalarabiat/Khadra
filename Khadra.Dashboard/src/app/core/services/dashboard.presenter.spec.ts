@@ -217,6 +217,38 @@ describe('toQueueItems, the money rows', () => {
     expect(arabic(100)).toBe('100 مستند مالي معلّق — مستحق ولم يصدر');
   });
 
+  it('opens the one receipt whose email has not gone, and the documents list for several — counted in every Arabic form', () => {
+    const notSent = (count: number, subjectIds: string[]) =>
+      money({
+        id: 'financial-document-emails-not-sent',
+        kind: 'FinancialDocumentEmailsNotSent',
+        count,
+        subjectIds,
+        subtitle: 'TEST-PAY-2026-000014 · TEST-RFD-2026-000003',
+      });
+    const [one] = toQueueItems(queue(notSent(1, ['doc1'])), now, t);
+    const [two] = toQueueItems(queue(notSent(2, ['doc1', 'doc2'])), now, t);
+
+    expect(one.title).toBe('1 receipt not emailed — its email failed or has waited too long');
+    expect(one.route).toBe('/payments/financial-documents/doc1');
+    expect(two.title).toBe('2 receipts not emailed — their emails failed or have waited too long');
+    expect(two.route).toBe('/payments/financial-documents');
+    // By path alone: the bell drops query parameters. No deadline, so no clock, but it needs a look.
+    expect(two.queryParams).toBeUndefined();
+    expect(two.hasClock).toBe(false);
+    expect(two.severity).toBe('Needs a look');
+    expect(two.entity).toBe('TEST-PAY-2026-000014 · TEST-RFD-2026-000003');
+
+    const tAr: Translate = (key, params) =>
+      (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[⁨⁩]/g, '');
+    const arabic = (count: number) => toQueueItems(queue(notSent(count, ['doc1', 'doc2'])), now, tAr)[0].title;
+    expect(arabic(1)).toBe('إيصال واحد لم يُرسَل بالبريد — تعذّر إرساله أو طال انتظاره');
+    expect(arabic(2)).toBe('إيصالان لم يُرسَلا بالبريد — تعذّر إرسالهما أو طال انتظارهما');
+    expect(arabic(3)).toBe('3 إيصالات لم تُرسَل بالبريد — تعذّر إرسالها أو طال انتظارها');
+    expect(arabic(11)).toBe('11 إيصالًا لم يُرسَل بالبريد — تعذّر إرسالها أو طال انتظارها');
+    expect(arabic(100)).toBe('100 إيصال لم يُرسَل بالبريد — تعذّر إرسالها أو طال انتظارها');
+  });
+
   it('keeps a clock and a meter on the rows that have a deadline', () => {
     const [row] = toQueueItems(
       queue(money({ id: 'dispute:t1', kind: 'DisputeOpen', severity: 'Info', count: 1, subjectIds: ['t1'], slaDeadlineAt: '2026-09-27T12:00:00Z' })),
@@ -444,5 +476,18 @@ describe('toActivityRows', () => {
     expect(english(voided)).toBe('Azzeldeen Al-Arabiat voided document TEST-PAY-2026-000001');
     expect(arabic(voided)).toBe('أُلغي المستند TEST-PAY-2026-000001 من قِبل Azzeldeen Al-Arabiat');
     expect(toActivityRows([entry(voided)], now, t, 'en-GB')[0].icon).toBe('file-x');
+  });
+
+  it('words a receipt emailed again by its number too — never a customer, never an address', () => {
+    const requested: Partial<ActivityEntry> = {
+      action: 'FinancialDocumentEmailRequested',
+      entityType: 'FinancialDocument',
+      subjectLabel: 'TEST-PAY-2026-000013',
+      bookingReference: null,
+    };
+
+    expect(english(requested)).toBe('Azzeldeen Al-Arabiat queued an email of receipt TEST-PAY-2026-000013');
+    expect(arabic(requested)).toBe('جُدولت رسالة بريد للإيصال TEST-PAY-2026-000013 من قِبل Azzeldeen Al-Arabiat');
+    expect(toActivityRows([entry(requested)], now, t, 'en-GB')[0].icon).toBe('tray');
   });
 });

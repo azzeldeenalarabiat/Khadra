@@ -46,7 +46,19 @@ internal sealed class BrevoEmailSender(
         [property: JsonPropertyName("to")] Party[] To,
         [property: JsonPropertyName("subject")] string Subject,
         [property: JsonPropertyName("htmlContent")] string HtmlContent,
-        [property: JsonPropertyName("textContent")] string TextContent);
+        [property: JsonPropertyName("textContent")] string TextContent,
+        [property: JsonPropertyName("attachment"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        BrevoAttachment[]? Attachment,
+        [property: JsonPropertyName("replyTo"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        ReplyAddress? ReplyTo);
+
+    /// <summary>Where replies go: an address alone, since Brevo's name there is optional and a null one is not a name.</summary>
+    private sealed record ReplyAddress([property: JsonPropertyName("email")] string Email);
+
+    /// <summary>One attached file, its bytes in base64 as Brevo takes them.</summary>
+    private sealed record BrevoAttachment(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("content")] string Content);
 
     public async Task<EmailSendReceipt> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
@@ -73,7 +85,11 @@ internal sealed class BrevoEmailSender(
             [new Party(message.ToAddress, message.ToName)],
             message.Subject,
             message.HtmlBody,
-            message.TextBody);
+            message.TextBody,
+            message.Attachments.Count == 0
+                ? null
+                : [.. message.Attachments.Select(file => new BrevoAttachment(file.FileName, Convert.ToBase64String(file.Content)))],
+            string.IsNullOrWhiteSpace(message.ReplyTo) ? null : new ReplyAddress(message.ReplyTo.Trim()));
 
         using var response = await client.PostAsJsonAsync("v3/smtp/email", request, cancellationToken);
         if (response.IsSuccessStatusCode)

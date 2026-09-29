@@ -11,8 +11,10 @@ import { EN, TranslationKey } from './en';
  *   "Off the road"; an `Active` dealership or account is a different word.
  * - `financialDocument`: an issued document's standing (payments Phase 5b) — `Current`, `Superseded`
  *   ("Earlier version") and `Voided`, words no other record uses.
+ * - `financialDocumentEmail`: a receipt's email to its customer (payments Phase 7) — `Queued`, `Sent`,
+ *   `Skipped` and `Failed`, where `Sent` means accepted by the mail provider.
  */
-export type StatusScope = 'booking' | 'dealerBooking' | 'vehicle' | 'financialDocument';
+export type StatusScope = 'booking' | 'dealerBooking' | 'vehicle' | 'financialDocument' | 'financialDocumentEmail';
 
 /**
  * The dictionary key for a server status name, most specific scope first.
@@ -32,7 +34,9 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
           ? [`status.${camel}Vehicle`, `status.${camel}`]
           : scope === 'financialDocument'
             ? [`status.${camel}FinancialDocument`, `status.${camel}`]
-            : [`status.${camel}`];
+            : scope === 'financialDocumentEmail'
+              ? [`status.${camel}FinancialDocumentEmail`, `status.${camel}`]
+              : [`status.${camel}`];
   const key = chain.find((candidate) => candidate in EN);
   return key === undefined ? null : (key as TranslationKey);
 }
@@ -49,6 +53,7 @@ export function statusKey(name: string, scope?: StatusScope): TranslationKey | n
  *   contradictions a booking's records can show, and the platform's payment mode.
  * - Issued financial documents (payments Phase 5b): a document's type, what issued it, and why a
  *   document owed is on hold.
+ * - Their emails (payments Phase 7): what a queued email is waiting for, and what an attempt came to.
  */
 export type EnumFamily =
   | 'party'
@@ -64,7 +69,9 @@ export type EnumFamily =
   | 'paymentMode'
   | 'financialDocumentType'
   | 'financialDocumentCause'
-  | 'financialDocumentHoldReason';
+  | 'financialDocumentHoldReason'
+  | 'financialDocumentEmailWait'
+  | 'financialDocumentEmailOutcome';
 
 /** The dictionary key for a server enum name within its family, or null when this build has none. */
 export function enumKey(family: EnumFamily, name: string): TranslationKey | null {

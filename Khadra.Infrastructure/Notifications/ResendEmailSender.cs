@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
@@ -34,7 +36,17 @@ internal sealed class ResendEmailSender(
         [property: JsonPropertyName("to")] string[] To,
         [property: JsonPropertyName("subject")] string Subject,
         [property: JsonPropertyName("html")] string Html,
-        [property: JsonPropertyName("text")] string Text);
+        [property: JsonPropertyName("text")] string Text,
+        [property: JsonPropertyName("attachments"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        ResendAttachment[]? Attachments,
+        [property: JsonPropertyName("reply_to"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? ReplyTo);
+
+    /// <summary>One attached file, its bytes in base64 as Resend takes them.</summary>
+    private sealed record ResendAttachment(
+        [property: JsonPropertyName("filename")] string FileName,
+        [property: JsonPropertyName("content")] string Content,
+        [property: JsonPropertyName("content_type")] string ContentType);
 
     public async Task<EmailSendReceipt> SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
     {
@@ -62,10 +74,27 @@ internal sealed class ResendEmailSender(
         var client = httpClientFactory.CreateClient(HttpClientName);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _options.ApiKey);
 
-        using var response = await client.PostAsJsonAsync(
-            "emails",
-            new ResendRequest(from, [message.ToAddress], message.Subject, message.HtmlBody, message.TextBody),
-            cancellationToken);
+        // Resend keeps a key for a day: the same key and payload answer as the first time and send nothing new.
+        using var request = new HttpRequestMessage(HttpMethod.Post, "emails")
+        {
+            Content = JsonContent.Create(new ResendRequest(
+                from,
+                [message.ToAddress],
+                message.Subject,
+                message.HtmlBody,
+                message.TextBody,
+                message.Attachments.Count == 0
+                    ? null
+                    : [.. message.Attachments.Select(file => new ResendAttachment(file.FileName, Convert.ToBase64String(file.Content), file.ContentType))],
+                string.IsNullOrWhiteSpace(message.ReplyTo) ? null : message.ReplyTo.Trim())),
+        };
+        // …and the same key with any OTHER payload is refused (409). The message's key covers what it says and to whom;
+        // the sender is this transport's, so its tag is added here — or a sender changed between a crashed send and its
+        // retry would turn every retry into that refusal.
+        if (!string.IsNullOrWhiteSpace(message.IdempotencyKey))
+            request.Headers.Add("Idempotency-Key", $"{message.IdempotencyKey}-{SenderTag(from)}");
+
+        using var response = await client.SendAsync(request, cancellationToken);
 
         if (response.IsSuccessStatusCode)
         {
@@ -91,4 +120,8 @@ internal sealed class ResendEmailSender(
             $"Resend refused the message ({(int)response.StatusCode} {response.ReasonPhrase}): " +
             ProviderReply.Refusal(detail));
     }
+
+    /// <summary>Eight hex characters of the sender's hash: the same sender, the same tag.</summary>
+    internal static string SenderTag(string from) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(from)))[..8];
 }

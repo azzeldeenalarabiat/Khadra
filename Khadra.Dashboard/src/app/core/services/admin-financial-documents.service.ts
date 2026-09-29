@@ -7,6 +7,7 @@ import {
   AdminFinancialDocumentListItem,
   FinancialDocumentHold,
   FinancialDocumentVocabulary,
+  RequestedFinancialDocumentEmail,
   SignedFileLink,
   VoidedFinancialDocument,
 } from '../models/financial-documents.api';
@@ -117,6 +118,19 @@ export class AdminFinancialDocumentsService {
     const token = await firstValueFrom(this.http.get<{ requestToken: string }>('/bff/antiforgery'));
     return firstValueFrom(
       this.http.post<VoidedFinancialDocument>(`${this.base}/${documentId}/void`, { reason }, {
+        headers: { 'X-XSRF-TOKEN': token.requestToken },
+      }),
+    );
+  }
+
+  /**
+   * Queues a receipt's email to its customer again, with its PDF (payments Phase 7), audited. The email service sends
+   * it; the page's history shows when the mail provider accepts it. Rejects with the server's refusal.
+   */
+  async emailAgain(documentId: string): Promise<RequestedFinancialDocumentEmail> {
+    const token = await firstValueFrom(this.http.get<{ requestToken: string }>('/bff/antiforgery'));
+    return firstValueFrom(
+      this.http.post<RequestedFinancialDocumentEmail>(`${this.base}/${documentId}/emails`, null, {
         headers: { 'X-XSRF-TOKEN': token.requestToken },
       }),
     );

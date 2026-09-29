@@ -640,7 +640,7 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
         await using (var context = _harness.NewContext())
         {
             var unitOfWork = IssuanceHarness.UnitOfWork(context);
-            var issuing = new FinancialDocumentIssuing(new FinancialDocumentSeriesCounter(context), new FinancialDocumentRepository(context), DocumentFixtures.Amman);
+            var issuing = new FinancialDocumentIssuing(new FinancialDocumentSeriesCounter(context), new FinancialDocumentRepository(context), new FinancialDocumentDeliveryRepository(context), DocumentFixtures.Amman);
 
             await Assert.ThrowsAsync<DocumentCompositionException>(() => unitOfWork.ExecuteInTransactionAsync(async token =>
             {
@@ -841,7 +841,7 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
         Assert.True((await _harness.VoidAsync(receipt.Id, "Wrong.")).IsSuccess);
 
         await using var context = _harness.NewContext();
-        var handlers = new AdminFinancialDocumentQueryHandlers(new FinancialDocumentReader(context), new BookingRepository(context), DocumentFixtures.Amman);
+        var handlers = new AdminFinancialDocumentQueryHandlers(new FinancialDocumentReader(context), new BookingRepository(context), DocumentFixtures.Amman, new TestDocumentEmailSettings());
 
         var voided = await handlers.Handle(new ListAdminFinancialDocumentsQuery(null, "Voided", null, null, null, null, 1, 20), CancellationToken.None);
         var current = await handlers.Handle(new ListAdminFinancialDocumentsQuery(null, "Current", null, null, null, null, 1, 20), CancellationToken.None);

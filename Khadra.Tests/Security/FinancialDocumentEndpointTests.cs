@@ -5,6 +5,7 @@ using System.Reflection;
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.FinancialDocuments.Email;
 using Khadra.Application.FinancialDocuments.Queries;
 using Khadra.Application.FinancialDocuments.VoidFinancialDocument;
 using Khadra.Application.Payments.Financials;
@@ -200,6 +201,8 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
             .Returns(Result.Failure<VoidedFinancialDocumentDto, Error>(FinancialDocumentErrors.AlreadyVoided));
         mediator.Send(Arg.Any<GetAdminFinancialDocumentPdfLinkQuery>(), Arg.Any<CancellationToken>())
             .Returns(Result.Failure<SignedDocumentLink, Error>(FinancialDocumentErrors.PdfNotReady));
+        mediator.Send(Arg.Any<RequestFinancialDocumentEmailCommand>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<RequestedFinancialDocumentEmailDto, Error>(FinancialDocumentErrors.EmailAlreadyQueued));
 
         List<Func<AdminFinancialDocumentsController, Task<ActionResult>>> answers =
         [
@@ -210,6 +213,7 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
             controller => controller.ForBooking(SomeId, CancellationToken.None),
             controller => controller.Void(SomeId, new AdminFinancialDocumentsController.VoidRequest("Wrong."), CancellationToken.None),
             controller => controller.PdfLink(SomeId, "en", null, CancellationToken.None),
+            controller => controller.EmailAgain(SomeId, CancellationToken.None),
         ];
         // Every action is here: one added later without the header fails this count first.
         Assert.Equal(

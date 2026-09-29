@@ -42,4 +42,14 @@ public sealed class SchedulingOptions
     /// <summary>How often the outbox is worked. Seconds, because a customer is waiting on the push.</summary>
     [Range(1, 600)]
     public int NotificationDispatchIntervalSeconds { get; init; } = 5;
+
+    /// <summary>
+    /// Whether issued receipts are emailed at all (payments Phase 7). Defaults ON, as the other clocks do; off is for
+    /// tests and one-off tools that must not have a timer sending mail underneath them.
+    /// </summary>
+    public bool EmailFinancialDocuments { get; init; } = true;
+
+    /// <summary>How often the document emails are worked. A minute: a receipt follows its PDF, which follows its issue.</summary>
+    [Range(5, 3600)]
+    public int FinancialDocumentEmailIntervalSeconds { get; init; } = 60;
 }

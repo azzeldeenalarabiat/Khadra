@@ -213,3 +213,117 @@ internal sealed class FinancialDocumentSeriesConfiguration : IEntityTypeConfigur
         entity.Property(series => series.UpdatedAt).IsRequired();
     }
 }
+
+// The emails owed for issued receipts (payments Phase 7). The header is mutable — it is the outbox row, and it moves
+// from Queued to where it ended — while its attempts are append-only children: the history the administrator reads.
+// The recipient's address lives on the header only, which a future erasure can blank; the attempts carry none.
+internal sealed class FinancialDocumentDeliveryConfiguration : IEntityTypeConfiguration<FinancialDocumentDelivery>
+{
+    public void Configure(EntityTypeBuilder<FinancialDocumentDelivery> entity)
+    {
+        ConfigureAggregate(entity, "financial_document_deliveries");
+
+        ConfigureId(entity.Property(delivery => delivery.DocumentId)).IsRequired();
+        ConfigureEnumeration(entity.Property(delivery => delivery.Channel), 10);
+        ConfigureEnumeration(entity.Property(delivery => delivery.State), 10);
+        // By id only: the administrator is another context's.
+        ConfigureId(entity.Property(delivery => delivery.RequestedByAdminId));
+        entity.Property(delivery => delivery.QueuedAt).IsRequired();
+        entity.Property(delivery => delivery.NextAttemptAt).IsRequired();
+        // The proof of a claim: every claim moves it, so a process whose claim was taken over cannot write the row.
+        entity.Property(delivery => delivery.Claims).IsRequired().IsConcurrencyToken();
+        entity.Property(delivery => delivery.SendAttempts).IsRequired();
+        entity.Property(delivery => delivery.CompletedAt);
+        entity.Property(delivery => delivery.RecipientAddress).HasMaxLength(FinancialDocumentDelivery.MaxAddressLength);
+        entity.Property(delivery => delivery.Languages).HasMaxLength(FinancialDocumentDelivery.MaxLanguagesLength);
+        entity.Property(delivery => delivery.WaitingReason)
+            .HasConversion(reason => reason!.Name, name => Enumeration.FromName<FinancialDocumentDeliveryWait>(name))
+            .HasMaxLength(20);
+        entity.Property(delivery => delivery.WaitingSince);
+        entity.Property(delivery => delivery.LastError).HasMaxLength(FinancialDocumentDelivery.MaxErrorLength);
+
+        // One context, so a real reference; restricting, as every constraint here is.
+        entity.HasOne<FinancialDocument>()
+            .WithMany()
+            .HasForeignKey(delivery => delivery.DocumentId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_financial_document_deliveries_document");
+
+        // The aggregate never removes an attempt, so Restrict rather than ClientCascade: there is nothing to sever.
+        entity.HasMany(delivery => delivery.Attempts)
+            .WithOne()
+            .HasForeignKey(attempt => attempt.DeliveryId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_financial_document_delivery_attempts_delivery");
+        entity.Metadata.FindNavigation(nameof(FinancialDocumentDelivery.Attempts))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+
+        // One email of a document on its way at a time: queueing at issue is idempotent, and a second "email it again"
+        // while one is queued is refused by the database as well as by the handler.
+        entity.HasIndex(delivery => delivery.DocumentId)
+            .IsUnique()
+            .HasFilter("state = 'Queued'")
+            .HasDatabaseName("ix_financial_document_deliveries_one_queued");
+        // The dispatcher's question, which only queued rows answer: the size of the backlog, not of history.
+        entity.HasIndex(delivery => delivery.NextAttemptAt)
+            .HasFilter("state = 'Queued'")
+            .HasDatabaseName("ix_financial_document_deliveries_queued_due");
+        // A document's page lists its emails newest first.
+        entity.HasIndex(delivery => new { delivery.DocumentId, delivery.QueuedAt });
+        // The work queue's other question, "which emails failed": failures only, so it stays the size of the failures
+        // however long history grows.
+        entity.HasIndex(delivery => delivery.QueuedAt)
+            .HasFilter("state = 'Failed'")
+            .HasDatabaseName("ix_financial_document_deliveries_failed");
+
+        entity.ToTable(table =>
+        {
+            table.HasCheckConstraint("ck_financial_document_deliveries_counts", "claims >= 0 AND send_attempts >= 0");
+            table.HasCheckConstraint("ck_financial_document_deliveries_completed", "(state = 'Queued') = (completed_at IS NULL)");
+            // A wait has a reason and a start, both or neither — and only a queued email waits: one that was sent or ended
+            // never says "waiting for its PDF" above its end.
+            table.HasCheckConstraint(
+                "ck_financial_document_deliveries_waiting",
+                "(waiting_reason IS NULL) = (waiting_since IS NULL) AND (state = 'Queued' OR waiting_reason IS NULL)");
+        });
+    }
+}
+
+// One attempt at a document email (payments Phase 7). Append-only: the application refuses to modify or delete a row
+// (IAppendOnly), and the migration adds the database triggers that refuse it too, TRUNCATE included.
+internal sealed class FinancialDocumentDeliveryAttemptConfiguration : IEntityTypeConfiguration<FinancialDocumentDeliveryAttempt>
+{
+    public void Configure(EntityTypeBuilder<FinancialDocumentDeliveryAttempt> entity)
+    {
+        entity.ToTable("financial_document_delivery_attempts");
+        entity.HasKey(attempt => attempt.Id);
+        entity.Property(attempt => attempt.Id).HasConversion(IdConverter).ValueGeneratedNever();
+
+        ConfigureId(entity.Property(attempt => attempt.DeliveryId)).IsRequired();
+        entity.Property(attempt => attempt.Number).IsRequired();
+        ConfigureEnumeration(entity.Property(attempt => attempt.Outcome), 10);
+        entity.Property(attempt => attempt.AttemptedAt).IsRequired();
+        entity.Property(attempt => attempt.Error).HasMaxLength(FinancialDocumentDelivery.MaxErrorLength);
+        entity.Property(attempt => attempt.Provider).HasMaxLength(FinancialDocumentDeliveryAttempt.MaxProviderLength);
+        entity.Property(attempt => attempt.ProviderMessageId).HasMaxLength(FinancialDocumentDeliveryAttempt.MaxProviderMessageIdLength);
+        ConfigureId(entity.Property(attempt => attempt.EnglishRenditionId));
+        ConfigureId(entity.Property(attempt => attempt.ArabicRenditionId));
+
+        // The PDFs it carried: real references in one context, restricting — each named for its language, since the
+        // generated names differ only by a trailing digit.
+        entity.HasOne<FinancialDocumentRendition>()
+            .WithMany()
+            .HasForeignKey(attempt => attempt.EnglishRenditionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_financial_document_delivery_attempts_english_rendition");
+        entity.HasOne<FinancialDocumentRendition>()
+            .WithMany()
+            .HasForeignKey(attempt => attempt.ArabicRenditionId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_financial_document_delivery_attempts_arabic_rendition");
+
+        entity.HasIndex(attempt => new { attempt.DeliveryId, attempt.Number }).IsUnique();
+
+        entity.ToTable(table => table.HasCheckConstraint("ck_financial_document_delivery_attempts_number", "number >= 1"));
+    }
+}

@@ -158,6 +158,62 @@ export interface AdminFinancialDocument {
   readonly void: FinancialDocumentVoid | null;
   /** Every PDF drawn of it, a voided document's included. Absent from a server older than Phase 6. */
   readonly renditions?: readonly FinancialDocumentRendition[];
+  /** Every email of it to its customer, newest first (payments Phase 7). Absent from a server older than Phase 7. */
+  readonly emails?: readonly FinancialDocumentEmail[];
+  /** Whether it may be emailed again now: a receipt, not voided, with no email already on its way. */
+  readonly canEmailAgain?: boolean;
+  /**
+   * This server sends no financial-document email at all (owner, 2026-09-29): Production on Brevo, until its single-send
+   * idempotency is verified. Its emails wait in the queue and nothing is sent.
+   */
+  readonly emailDeliveryDisabled?: boolean;
+}
+
+/**
+ * One email of a receipt to its customer (payments Phase 7): where it stands, who asked for it, where and in which
+ * languages it went, and every attempt. `Sent` means ACCEPTED by the mail provider — not delivered, and not read.
+ */
+export interface FinancialDocumentEmail {
+  readonly deliveryId: string;
+  /** `Queued`, `Sent`, `Skipped` or `Failed`. */
+  readonly state: string;
+  /** `PdfNotReady` while a queued email waits for its PDF; null otherwise. */
+  readonly waitingFor: string | null;
+  readonly waitingSince: string | null;
+  /** Null for the email owed when the receipt was issued. */
+  readonly requestedByAdminId: string | null;
+  /** Null when no administrator asked, or when their account no longer resolves. */
+  readonly requestedByName: string | null;
+  readonly queuedAt: string;
+  readonly completedAt: string | null;
+  /** The address the last send went to; null before anything was sent. */
+  readonly recipient: string | null;
+  /** `en` and/or `ar`: what the last send was written in. */
+  readonly languages: readonly string[];
+  readonly sendAttempts: number;
+  /** Why it failed or was skipped, as the server recorded it: machine English, shown as it is. */
+  readonly lastError: string | null;
+  /** Oldest first. */
+  readonly attempts: readonly FinancialDocumentEmailAttempt[];
+}
+
+/** One attempt at an email: what it came to, which provider said so, and the hashes of the PDFs it carried. */
+export interface FinancialDocumentEmailAttempt {
+  readonly number: number;
+  /** `Accepted`, `Failed` or `Skipped`. */
+  readonly outcome: string;
+  readonly attemptedAt: string;
+  readonly error: string | null;
+  readonly provider: string | null;
+  readonly providerMessageId: string | null;
+  readonly englishPdfSha256: string | null;
+  readonly arabicPdfSha256: string | null;
+}
+
+/** What asking for an email did: the email it queued. */
+export interface RequestedFinancialDocumentEmail {
+  readonly deliveryId: string;
+  readonly documentId: string;
 }
 
 /** A document family owed and not issued, and why. */

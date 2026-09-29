@@ -274,6 +274,105 @@ internal sealed class FinancialDocumentReader(KhadraDbContext context) : IFinanc
             holds[0].FirstFailedAt);
     }
 
+    public async Task<IReadOnlyList<FinancialDocumentDeliveryRecord>> DeliveriesOfAsync(Id documentId, CancellationToken cancellationToken = default)
+    {
+        var deliveries = await context.FinancialDocumentDeliveries
+            .AsNoTracking()
+            .Include(delivery => delivery.Attempts)
+            .Where(delivery => delivery.DocumentId == documentId)
+            .OrderByDescending(delivery => delivery.QueuedAt)
+            .ToListAsync(cancellationToken);
+        if (deliveries.Count == 0)
+            return [];
+
+        // Past the soft-delete filter, as the void's is: an email an administrator asked for names them for good.
+        var adminIds = deliveries.Select(delivery => delivery.RequestedByAdminId).OfType<Id>().Distinct().ToList();
+        var names = adminIds.Count == 0
+            ? []
+            : await context.Users
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(user => adminIds.Contains(user.Id))
+                .Select(user => new { user.Id, Name = user.Name.Value })
+                .ToDictionaryAsync(user => user.Id, user => user.Name, cancellationToken);
+
+        // The PDFs each attempt carried, by their hashes: the proof of which bytes went.
+        var renditionIds = deliveries
+            .SelectMany(delivery => delivery.Attempts)
+            .SelectMany(attempt => new[] { attempt.EnglishRenditionId, attempt.ArabicRenditionId })
+            .OfType<Id>()
+            .Distinct()
+            .ToList();
+        var hashes = renditionIds.Count == 0
+            ? []
+            : await context.FinancialDocumentRenditions
+                .AsNoTracking()
+                .Where(rendition => renditionIds.Contains(rendition.Id))
+                .ToDictionaryAsync(rendition => rendition.Id, rendition => rendition.ContentSha256, cancellationToken);
+
+        string? Hash(Id? id) => id is { } key && hashes.TryGetValue(key, out var hash) ? hash : null;
+
+        return
+        [
+            .. deliveries.Select(delivery => new FinancialDocumentDeliveryRecord(
+                delivery.Id,
+                delivery.State,
+                delivery.WaitingReason,
+                delivery.WaitingSince,
+                delivery.RequestedByAdminId,
+                delivery.RequestedByAdminId is { } admin && names.TryGetValue(admin, out var name) ? name : null,
+                delivery.QueuedAt,
+                delivery.CompletedAt,
+                delivery.RecipientAddress,
+                delivery.Languages,
+                delivery.SendAttempts,
+                delivery.LastError,
+                [
+                    .. delivery.Attempts.Select(attempt => new FinancialDocumentDeliveryAttemptRecord(
+                        attempt.Number,
+                        attempt.Outcome,
+                        attempt.AttemptedAt,
+                        attempt.Error,
+                        attempt.Provider,
+                        attempt.ProviderMessageId,
+                        Hash(attempt.EnglishRenditionId),
+                        Hash(attempt.ArabicRenditionId))),
+                ])),
+        ];
+    }
+
+    public async Task<FinancialDocumentEmailsSummary> EmailsNotSentSummaryAsync(DateTimeOffset staleBefore, CancellationToken cancellationToken = default)
+    {
+        var (failed, queued) = (FinancialDocumentDeliveryState.Failed, FinancialDocumentDeliveryState.Queued);
+
+        // The LATEST email of each document only: one that went after an earlier one failed clears it. And never a
+        // voided receipt's: it is not emailed again — its correction is, with an email of its own — so nobody could
+        // ever clear the row it would hold.
+        var rows = await context.FinancialDocumentDeliveries
+            .AsNoTracking()
+            .Where(delivery => delivery.State == failed || (delivery.State == queued && delivery.QueuedAt < staleBefore))
+            .Where(delivery => !context.FinancialDocumentDeliveries.Any(later =>
+                later.DocumentId == delivery.DocumentId && later.QueuedAt > delivery.QueuedAt))
+            .Where(delivery => !context.FinancialDocumentVoids.Any(voided => voided.Id == delivery.DocumentId))
+            .OrderBy(delivery => delivery.QueuedAt)
+            .Select(delivery => new { delivery.DocumentId, delivery.QueuedAt })
+            .ToListAsync(cancellationToken);
+        if (rows.Count == 0)
+            return FinancialDocumentEmailsSummary.None;
+
+        var first = rows.Select(row => row.DocumentId).Distinct().Take(3).ToList();
+        var numbers = await context.FinancialDocuments
+            .AsNoTracking()
+            .Where(document => first.Contains(document.Id))
+            .Select(document => new { document.Id, document.Number })
+            .ToDictionaryAsync(document => document.Id, document => document.Number, cancellationToken);
+        return new FinancialDocumentEmailsSummary(
+            rows.Count,
+            [.. rows.Select(row => row.DocumentId)],
+            [.. first.Where(numbers.ContainsKey).Select(id => numbers[id])],
+            rows[0].QueuedAt);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────────────────────────
 
     private IQueryable<FinancialDocumentIssuanceHold> OpenHolds() =>

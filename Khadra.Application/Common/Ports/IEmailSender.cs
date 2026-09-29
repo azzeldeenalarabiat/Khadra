@@ -5,6 +5,25 @@ namespace Khadra.Application.Common.Ports;
 public sealed record EmailMessage(string ToAddress, string ToName, string Subject, string HtmlBody, string TextBody)
 {
     /// <summary>
+    /// Files sent with the message (payments Phase 7): an issued receipt's PDFs. Empty for every other email, and
+    /// every transport sends none then.
+    /// </summary>
+    public IReadOnlyList<EmailAttachment> Attachments { get; init; } = [];
+
+    /// <summary>
+    /// The same key for the same message sent again after a crash (payments Phase 7), or null. A provider that honours
+    /// one drops the repeat — Resend's <c>Idempotency-Key</c>, for a day — and the SMTP transport makes it the
+    /// message's Message-ID, which the big mailboxes collapse. Up to 200 letters, digits and hyphens.
+    /// </summary>
+    public string? IdempotencyKey { get; init; }
+
+    /// <summary>
+    /// Where a reply goes, when not to the sender (payments Phase 7): an issued receipt's replies go to Khadra's support
+    /// address (owner, 2026-09-29), never to the no-reply sender. Null for every other email, which sets none.
+    /// </summary>
+    public string? ReplyTo { get; init; }
+
+    /// <summary>
     /// The part of <see cref="ToAddress"/> after its <c>@</c>: all a log line may say about who a
     /// message was for.
     /// </summary>
@@ -21,6 +40,37 @@ public sealed record EmailMessage(string ToAddress, string ToName, string Subjec
             return at >= 0 && at < ToAddress.Length - 1 ? ToAddress[(at + 1)..].Trim() : "(unknown)";
         }
     }
+}
+
+/// <summary>
+/// A file sent with an email (payments Phase 7). Its name is what the recipient's mail client shows and saves it
+/// as, and it travels in a header, so it is letters, digits, dots, hyphens and underscores only — nothing a header
+/// could be broken with.
+/// </summary>
+public sealed partial record EmailAttachment
+{
+    public EmailAttachment(string fileName, string contentType, byte[] content)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
+        ArgumentNullException.ThrowIfNull(content);
+        if (fileName is null || !SafeName().IsMatch(fileName))
+            throw new ArgumentException("An attachment's name is 1 to 100 letters, digits, dots, hyphens and underscores.", nameof(fileName));
+        if (content.Length == 0)
+            throw new ArgumentException("An attachment has content.", nameof(content));
+
+        FileName = fileName;
+        ContentType = contentType;
+        Content = content;
+    }
+
+    public string FileName { get; }
+
+    public string ContentType { get; }
+
+    public byte[] Content { get; }
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")]
+    private static partial System.Text.RegularExpressions.Regex SafeName();
 }
 
 public interface IEmailSender

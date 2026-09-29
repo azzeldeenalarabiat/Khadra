@@ -94,6 +94,76 @@ public sealed class ResendEmailSenderTests
         Assert.Equal("link", body.RootElement.GetProperty("text").GetString());
     }
 
+    [Fact]
+    public async Task An_idempotency_key_travels_as_resends_own_header_and_none_travels_without_one()
+    {
+        // Payments Phase 7: Resend answers a repeat of the same key and payload as it did the first time, sending
+        // nothing new — which is what makes a retry after a crash safe.
+        const string key = "fd-0123456789abcdef0123456789abcdef-0123456789abcdef";
+        var (sender, handler) = Build(HttpStatusCode.OK, """{"id":"abc-123"}""");
+        await sender.SendAsync(Message() with { IdempotencyKey = key });
+        var sent = Assert.Single(handler.Request!.Headers.GetValues("Idempotency-Key"));
+        // The message's own key, tagged with this transport's sender: stable for the same sender…
+        Assert.Matches("^fd-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{8}$", sent);
+        Assert.Equal($"{key}-{ResendEmailSender.SenderTag("Khadra <onboarding@resend.dev>")}", sent);
+
+        // …and new for another, which Resend would otherwise refuse (409) as the same key with a different payload.
+        var (moved, movedHandler) = Build(HttpStatusCode.OK, """{"id":"abc-125"}""", fromAddress: "receipts@khadra.jo");
+        await moved.SendAsync(Message() with { IdempotencyKey = key });
+        Assert.NotEqual(sent, Assert.Single(movedHandler.Request!.Headers.GetValues("Idempotency-Key")));
+
+        var (plain, plainHandler) = Build(HttpStatusCode.OK, """{"id":"abc-124"}""");
+        await plain.SendAsync(Message());
+        Assert.False(plainHandler.Request!.Headers.Contains("Idempotency-Key"));
+    }
+
+    [Fact]
+    public async Task Attached_pdfs_travel_in_base64_with_their_names_and_types_and_none_travel_when_there_are_none()
+    {
+        // Payments Phase 7: a receipt's PDFs go with its email.
+        var (sender, handler) = Build(HttpStatusCode.OK, """{"id":"abc-123"}""");
+        byte[] english = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31], arabic = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x32];
+
+        await sender.SendAsync(Message() with
+        {
+            Attachments =
+            [
+                new EmailAttachment("PAY-2026-000001-en.pdf", "application/pdf", english),
+                new EmailAttachment("PAY-2026-000001-ar.pdf", "application/pdf", arabic),
+            ],
+        });
+
+        using (var body = JsonDocument.Parse(handler.RequestBody!))
+        {
+            var files = body.RootElement.GetProperty("attachments");
+            Assert.Equal(2, files.GetArrayLength());
+            Assert.Equal("PAY-2026-000001-en.pdf", files[0].GetProperty("filename").GetString());
+            Assert.Equal(Convert.ToBase64String(english), files[0].GetProperty("content").GetString());
+            Assert.Equal("application/pdf", files[0].GetProperty("content_type").GetString());
+            Assert.Equal(Convert.ToBase64String(arabic), files[1].GetProperty("content").GetString());
+        }
+
+        var (plain, plainHandler) = Build(HttpStatusCode.OK, """{"id":"abc-124"}""");
+        await plain.SendAsync(Message());
+        using var plainBody = JsonDocument.Parse(plainHandler.RequestBody!);
+        Assert.False(plainBody.RootElement.TryGetProperty("attachments", out _));
+    }
+
+    [Fact]
+    public async Task A_reply_to_travels_as_resends_own_field_and_none_travels_without_one()
+    {
+        // Payments Phase 7 (owner, 2026-09-29): a receipt's replies go to Khadra's support address.
+        var (sender, handler) = Build(HttpStatusCode.OK, """{"id":"abc-126"}""");
+        await sender.SendAsync(Message() with { ReplyTo = "support@khadra.jo" });
+        using (var body = JsonDocument.Parse(handler.RequestBody!))
+            Assert.Equal("support@khadra.jo", body.RootElement.GetProperty("reply_to").GetString());
+
+        var (plain, plainHandler) = Build(HttpStatusCode.OK, """{"id":"abc-127"}""");
+        await plain.SendAsync(Message());
+        using var plainBody = JsonDocument.Parse(plainHandler.RequestBody!);
+        Assert.False(plainBody.RootElement.TryGetProperty("reply_to", out _));
+    }
+
     /// <summary>
     /// A refusal must throw. `AuthEmailDispatcher` catches it and reports the send as failed, which
     /// is what stops the registration screen promising an email nobody sent.

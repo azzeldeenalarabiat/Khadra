@@ -95,6 +95,11 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   // A document's PDF not drawn yet (payments Phase 6), and a voided copy of a document that is not voided.
   'financial_documents.pdf_not_ready': 'problem.pdfNotReady',
   'financial_documents.not_voided': 'problem.pdfNotVoided',
+  // Emailing a receipt again (payments Phase 7): each means asking again cannot help, so the page reloads.
+  'financial_documents.not_emailed': 'problem.documentNotEmailed',
+  'financial_documents.voided_not_emailed': 'problem.documentVoidedNotEmailed',
+  'financial_documents.email_already_queued': 'problem.emailAlreadyQueued',
+  'financial_documents.email_delivery_disabled': 'problem.emailDeliveryDisabled',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */

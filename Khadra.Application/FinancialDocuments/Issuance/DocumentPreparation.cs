@@ -211,9 +211,15 @@ public sealed class DocumentCompositionException : Exception
 /// transaction, so if anything after the number fails the number goes back with the rollback and the series
 /// stays gapless.
 /// </summary>
+/// <remarks>
+/// A receipt is owed to its customer by email in that same transaction (payments Phase 7; owner, 2026-09-29):
+/// both the settlement pass and a void's correction issue here, so no receipt exists without its promise to be
+/// emailed, and no email is owed for a receipt that was rolled back.
+/// </remarks>
 public sealed class FinancialDocumentIssuing(
     IFinancialDocumentSeries series,
     IFinancialDocumentRepository documents,
+    IFinancialDocumentDeliveryRepository deliveries,
     IReportingCalendar calendar)
 {
     public async Task<FinancialDocument> IssueAsync(
@@ -249,6 +255,8 @@ public sealed class FinancialDocumentIssuing(
         }
 
         documents.Add(document);
+        if (type.IsEmailedToCustomer)
+            deliveries.Add(FinancialDocumentDelivery.Queue(document, requestedByAdminId: null, issuedAt));
         return document;
     }
 }

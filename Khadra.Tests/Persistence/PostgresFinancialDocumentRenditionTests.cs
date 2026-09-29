@@ -75,7 +75,9 @@ SELECT confdeltype FROM pg_constraint WHERE conname = 'fk_financial_document_ren
 SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_document_renditions'::regclass")).Order(StringComparer.Ordinal));
         await RefusedAsync(connection, "UPDATE financial_document_renditions SET size_bytes = size_bytes", "UPDATE");
         await RefusedAsync(connection, "DELETE FROM financial_document_renditions", "DELETE");
-        await RefusedAsync(connection, "TRUNCATE financial_document_renditions", "TRUNCATE");
+        // Truncated with the one table that references it (payments Phase 7's email attempts), so the foreign key lets it
+        // reach its own trigger — alone, PostgreSQL refuses it for the reference before any trigger runs.
+        await RefusedAsync(connection, "TRUNCATE financial_document_renditions, financial_document_delivery_attempts", "TRUNCATE");
         await using var count = new NpgsqlCommand("SELECT count(*) FROM financial_document_renditions", connection);
         Assert.Equal(8L, (long)(await count.ExecuteScalarAsync())!);
     }

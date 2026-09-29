@@ -3,6 +3,7 @@ using FluentValidation;
 using Khadra.Application.Bookings;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.FinancialDocuments.Email;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
@@ -151,7 +152,8 @@ public sealed class CustomerFinancialDocumentQueryHandlers(
 public sealed class AdminFinancialDocumentQueryHandlers(
     IFinancialDocumentReader reader,
     IBookingRepository bookings,
-    IReportingCalendar calendar)
+    IReportingCalendar calendar,
+    IFinancialDocumentEmailSettings emailSettings)
     : IRequestHandler<ListAdminFinancialDocumentsQuery, Result<PagedResult<AdminFinancialDocumentListItem>, Error>>,
       IRequestHandler<GetAdminFinancialDocumentQuery, Result<AdminFinancialDocumentDto, Error>>,
       IRequestHandler<GetAdminBookingFinancialDocumentsQuery, Result<AdminBookingFinancialDocumentsDto, Error>>,
@@ -186,6 +188,7 @@ public sealed class AdminFinancialDocumentQueryHandlers(
             return FinancialDocumentErrors.NotFound;
 
         var (page, voided, renditions) = await FinancialDocumentPageReader.ReadAsync(reader, record, cancellationToken);
+        var emails = await reader.DeliveriesOfAsync(record.Id, cancellationToken);
         return new AdminFinancialDocumentDto(
             page,
             record.CustomerId.Value,
@@ -198,7 +201,15 @@ public sealed class AdminFinancialDocumentQueryHandlers(
             voided is null
                 ? null
                 : new FinancialDocumentVoidDto(voided.VoidedAt, voided.VoidedByAdminId.Value, voided.VoidedByName, voided.Reason, page.Links.ReplacedBy),
-            [.. renditions.Select(FinancialDocumentRenditionDto.From)]);
+            [.. renditions.Select(FinancialDocumentRenditionDto.From)],
+            [.. emails.Select(FinancialDocumentEmailDto.From)],
+            // Only a receipt is emailed, never a voided one, one email at a time, and none from a server whose
+            // delivery is switched off (owner, 2026-09-29).
+            CanEmailAgain: record.Type.IsEmailedToCustomer
+                && voided is null
+                && emails.All(email => email.State != FinancialDocumentDeliveryState.Queued)
+                && emailSettings.DeliveryDisabledReason is null,
+            EmailDeliveryDisabled: emailSettings.DeliveryDisabledReason is not null);
     }
 
     public async Task<Result<AdminBookingFinancialDocumentsDto, Error>> Handle(

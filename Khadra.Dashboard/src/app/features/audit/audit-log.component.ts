@@ -49,6 +49,7 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   HandoverUnverified: 'auditLog.actionHandoverUnverified',
   HandoverCodeLocked: 'auditLog.actionHandoverCodeLocked',
   FinancialDocumentVoided: 'auditLog.actionFinancialDocumentVoided',
+  FinancialDocumentEmailRequested: 'auditLog.actionFinancialDocumentEmailRequested',
 };
 
 /** The server's audit record types (`AuditEntityType`), worded the same way as the actions. */

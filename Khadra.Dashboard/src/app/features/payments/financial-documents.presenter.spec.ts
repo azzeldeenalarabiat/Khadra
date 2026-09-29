@@ -10,6 +10,8 @@ import {
   AdminFinancialDocument,
   AdminFinancialDocumentListItem,
   FinancialDocument,
+  FinancialDocumentEmail,
+  FinancialDocumentEmailAttempt,
   FinancialDocumentHold,
   FinancialDocumentRendition,
 } from '../../core/models/financial-documents.api';
@@ -22,6 +24,9 @@ import {
   directionOf,
   documentPage,
   documentRow,
+  emailDialogWords,
+  emailQueuedToast,
+  emailRefusalIsFinal,
   holdRow,
   preparingRow,
   refusalReport,
@@ -541,6 +546,252 @@ describe('the PDFs of a document, as the administrator reads them (payments Phas
     const notVoided = snapshotProblem({ status: 409, error: { code: 'financial_documents.not_voided', title: 'This document is not voided, so it has no voided copy.' } });
     expect(problemMessage(notVoided, 'en', en)).toBe('This document is not voided, so it has no voided copy.');
     expect(problemMessage(notVoided, 'ar', ar)).toBe('هذا المستند غير ملغى، لذا لا نسخة ملغاة له.');
+  });
+});
+
+describe('the emails of a document, as the administrator reads them (payments Phase 7)', () => {
+  const attempt = (number: number, over: Partial<FinancialDocumentEmailAttempt> = {}): FinancialDocumentEmailAttempt => ({
+    number,
+    outcome: 'Failed',
+    attemptedAt: `2026-09-29T09:0${number}:00+00:00`,
+    error: 'Brevo refused the message (401): key not found',
+    provider: 'Brevo',
+    providerMessageId: null,
+    englishPdfSha256: 'e'.repeat(64),
+    arabicPdfSha256: null,
+    ...over,
+  });
+
+  const email = (over: Partial<FinancialDocumentEmail> = {}): FinancialDocumentEmail => ({
+    deliveryId: 'mail-1',
+    state: 'Sent',
+    waitingFor: null,
+    waitingSince: null,
+    requestedByAdminId: null,
+    requestedByName: null,
+    queuedAt: '2026-09-29T09:00:00+00:00',
+    completedAt: '2026-09-29T09:02:00+00:00',
+    recipient: 'rana@example.jo',
+    languages: ['en'],
+    sendAttempts: 2,
+    lastError: null,
+    attempts: [attempt(1), attempt(2, { outcome: 'Accepted', error: null, providerMessageId: '<abc@smtp-relay.brevo.com>' })],
+    ...over,
+  });
+
+  const emailsOf = (name: string, over: Partial<AdminFinancialDocument>, words = english) =>
+    documentPage(adminPage(name, over), words, format).emails;
+
+  it('lists each email with its state, who asked, where it went and every attempt, the machine values as code', () => {
+    const view = emailsOf('payment-receipt-paid-in-full', { emails: [email()], canEmailAgain: true })!;
+
+    const [sent] = view.emails;
+    expect(sent!.standing).toEqual({ label: 'Sent', tone: 'ok' });
+    expect(sent!.requested).toBe('Queued when the receipt was issued');
+    expect(sent!.rows).toEqual([
+      { k: 'Queued', v: '2026-09-29T09:00', code: false },
+      { k: 'Finished', v: '2026-09-29T09:02', code: false },
+      { k: 'To', v: 'rana@example.jo', code: true },
+      { k: 'Written in', v: 'English', code: false },
+      { k: 'Send attempts', v: '#2', code: false },
+    ]);
+    expect(sent!.attempts.map((item) => [item.title, item.tone])).toEqual([
+      ['Attempt 1 · Failed', 'bad'],
+      ['Attempt 2 · Accepted by the mail provider', 'ok'],
+    ]);
+    expect(sent!.attempts[0]!.rows).toEqual([
+      { k: 'When', v: '2026-09-29T09:01', code: false },
+      { k: 'Mail provider', v: 'Brevo', code: true },
+      { k: 'Error', v: 'Brevo refused the message (401): key not found', code: true },
+      { k: 'English PDF attached (SHA-256)', v: 'e'.repeat(64), code: true },
+    ]);
+    expect(sent!.attempts[1]!.rows.map((row) => row.k)).toEqual(['When', 'Mail provider', "Provider's message id", 'English PDF attached (SHA-256)']);
+  });
+
+  it('says who asked for an email again, and what a queued one is waiting for', () => {
+    const waiting = email({
+      deliveryId: 'mail-2',
+      state: 'Queued',
+      waitingFor: 'PdfNotReady',
+      waitingSince: '2026-09-29T10:00:00+00:00',
+      requestedByAdminId: 'admin-1',
+      requestedByName: 'Azzeldeen Al-Arabiat',
+      completedAt: null,
+      recipient: null,
+      languages: [],
+      sendAttempts: 0,
+      attempts: [],
+    });
+    const [view] = emailsOf('payment-receipt-paid-in-full', { emails: [waiting], canEmailAgain: false })!.emails;
+
+    expect(view!.standing).toEqual({ label: 'Queued', tone: 'accent' });
+    expect(view!.requested).toBe('Asked for by Azzeldeen Al-Arabiat');
+    expect(view!.rows).toEqual([
+      { k: 'Queued', v: '2026-09-29T09:00', code: false },
+      { k: 'Waiting for', v: 'Its PDF to be drawn, since 2026-09-29T10:00', code: false },
+    ]);
+    // An administrator whose account no longer resolves is still named as one.
+    const [gone] = emailsOf('payment-receipt-paid-in-full', { emails: [{ ...waiting, requestedByName: null }] })!.emails;
+    expect(gone!.requested).toBe('Asked for by an administrator no longer on the platform');
+  });
+
+  it('names why an email was skipped as a reason, and a failure as an error', () => {
+    const skipped = email({
+      state: 'Skipped',
+      recipient: null,
+      languages: [],
+      sendAttempts: 0,
+      lastError: 'The customer has no verified email address.',
+      attempts: [attempt(1, { outcome: 'Skipped', provider: null, englishPdfSha256: null, error: 'The customer has no verified email address.' })],
+    });
+    const [view] = emailsOf('payment-receipt-paid-in-full', { emails: [skipped], canEmailAgain: true })!.emails;
+    expect(view!.standing).toEqual({ label: 'Skipped', tone: 'dim' });
+    expect(view!.rows.at(-1)).toEqual({ k: 'Why it was not sent', v: 'The customer has no verified email address.', code: true });
+    expect(view!.attempts[0]!.rows.at(-1)).toEqual({ k: 'Why', v: 'The customer has no verified email address.', code: true });
+
+    const [failed] = emailsOf('payment-receipt-paid-in-full', { emails: [email({ state: 'Failed', lastError: 'TimeoutException' })], canEmailAgain: true })!.emails;
+    expect(failed!.standing).toEqual({ label: 'Failed', tone: 'bad' });
+    expect(failed!.rows.at(-1)).toEqual({ k: 'Last error', v: 'TimeoutException', code: true });
+  });
+
+  it('words it all in Arabic, the languages in the reader’s own words', () => {
+    const view = emailsOf('payment-receipt-paid-in-full', { emails: [email({ languages: ['ar', 'en'] })], canEmailAgain: true }, arabic)!;
+    const [sent] = view.emails;
+    expect(sent!.standing.label).toBe('أُرسلت');
+    expect(sent!.requested).toBe('جُدولت عند إصدار الإيصال');
+    expect(sent!.rows.map((row) => row.k)).toEqual(['وقت الجدولة', 'وقت الانتهاء', 'إلى', 'اللغة', 'محاولات الإرسال']);
+    expect(sent!.rows[3]!.v).toBe('العربية · الإنجليزية');
+    expect(sent!.attempts[1]!.title).toBe('المحاولة 2 · قبِلها مزوّد البريد');
+    expect(view.action!.label).toBe('إرساله بالبريد مجددًا');
+  });
+
+  it('offers emailing on the server’s word, labelled by whether it was ever emailed', () => {
+    expect(emailsOf('payment-receipt-paid-in-full', { emails: [], canEmailAgain: true })).toEqual({
+      emails: [],
+      action: { label: 'Email it to the customer', waiting: null },
+      note: null,
+    });
+    expect(emailsOf('refund-receipt-free-cancellation', { emails: [email()], canEmailAgain: true })!.action).toEqual({
+      label: 'Email it again',
+      waiting: null,
+    });
+  });
+
+  it('waits out an email already on its way — the control stays, disabled, saying why', () => {
+    const view = emailsOf('payment-receipt-paid-in-full', {
+      emails: [email({ deliveryId: 'mail-2', state: 'Queued', completedAt: null }), email()],
+      canEmailAgain: false,
+    })!;
+    expect(view.action).toEqual({ label: 'Email it again', waiting: 'An email of this receipt is already on its way.' });
+    expect(view.note).toBeNull();
+  });
+
+  it('never offers it for a statement or a voided receipt, and says why each is not emailed', () => {
+    const statement = emailsOf('booking-statement-cash-at-handover', { emails: [], canEmailAgain: false })!;
+    expect(statement.action).toBeNull();
+    expect(statement.note).toBe('Booking statements are not emailed to the customer. Only receipts are.');
+
+    const voided = emailsOf('payment-receipt-deposit-voided', { emails: [email()], canEmailAgain: false })!;
+    expect(voided.action).toBeNull();
+    expect(voided.note).toBe('Voided, so it is not emailed again. Its correction is the receipt the customer is sent.');
+    // Its history stays: what was sent before the void was sent.
+    expect(voided.emails).toHaveLength(1);
+  });
+
+  it('shows nothing about emails for a server that does not report them', () => {
+    expect(emailsOf('payment-receipt-paid-in-full', {})).toBeNull();
+  });
+
+  it('says a server whose delivery is switched off sends nothing, offers no way to send, and still lists what waits', () => {
+    // Production on Brevo (owner, 2026-09-29): the email owed at issue waits in the queue; it is not "on its way".
+    const held = email({ state: 'Queued', completedAt: null, recipient: null, languages: [], sendAttempts: 0, attempts: [] });
+    const switchedOff = { emails: [held], canEmailAgain: false, emailDeliveryDisabled: true };
+
+    const view = emailsOf('payment-receipt-paid-in-full', switchedOff)!;
+    expect(view.action).toBeNull();
+    expect(view.note).toBe(
+      'Receipt emails are switched off on this server: its mail provider, Brevo, has not had its protection against duplicate sends verified. Queued emails wait here, and nothing is sent.',
+    );
+    expect(view.emails.map((row) => row.standing.label)).toEqual(['Queued']);
+    expect(emailsOf('payment-receipt-paid-in-full', switchedOff, arabic)!.note).toBe(
+      'إرسال الإيصالات بالبريد متوقف على هذا الخادم: لم يُتحقَّق بعد من حماية مزوّد البريد Brevo من الإرسال المكرر. تنتظر الرسائل المجدولة هنا، ولا يُرسَل شيء.',
+    );
+
+    // A statement and a voided receipt keep their own, more particular, reason.
+    expect(emailsOf('booking-statement-cash-at-handover', { ...switchedOff, emails: [] })!.note).toBe(
+      'Booking statements are not emailed to the customer. Only receipts are.',
+    );
+    expect(emailsOf('payment-receipt-deposit-voided', switchedOff)!.note).toBe(
+      'Voided, so it is not emailed again. Its correction is the receipt the customer is sent.',
+    );
+  });
+
+  it('says Sent means accepted by the mail provider, in both languages, and never claims it was delivered', () => {
+    expect(en('financialDocuments.emailsHint')).toBe('Sent means the mail provider accepted it, not that it reached the inbox');
+    expect(ar('financialDocuments.emailsHint')).toBe('«أُرسلت» تعني أن مزوّد البريد قبِلها، لا أنها وصلت إلى صندوق الوارد');
+    // Every word this phase added about a document's emails.
+    const emailWords = (Object.keys(EN) as TranslationKey[]).filter(
+      (key) =>
+        /^(financialDocuments\.email|financialDocumentEmail)/.test(key) ||
+        /FinancialDocumentEmail/.test(key) ||
+        [
+          'queue.documentEmailsNotSent',
+          'problem.documentNotEmailed',
+          'problem.documentVoidedNotEmailed',
+          'problem.emailAlreadyQueued',
+          'problem.emailDeliveryDisabled',
+        ].includes(key),
+    );
+    expect(emailWords.length).toBeGreaterThan(40);
+    for (const key of emailWords) {
+      const message = EN[key];
+      const forms = typeof message === 'string' ? [message] : Object.values(message);
+      expect(forms.join(' '), key).not.toMatch(/deliver/i);
+    }
+  });
+
+  it('asks before queuing, states what is sent and to whom, and promises no time in the toast', () => {
+    expect(emailDialogWords('TEST-PAY-2026-000013', en)).toEqual({
+      title: 'Email TEST-PAY-2026-000013 to its customer?',
+      body: "It goes to the customer's verified email address with its PDF attached: in the language they chose, or in Arabic and English if they never chose one.",
+      note: "The request is recorded in the audit log under this receipt's number.",
+      confirm: 'Queue the email',
+    });
+    expect(emailDialogWords('TEST-PAY-2026-000013', ar).title).toBe('إرسال TEST-PAY-2026-000013 إلى عميله بالبريد؟');
+    const toast = emailQueuedToast('TEST-PAY-2026-000013', en);
+    expect(toast).toEqual({
+      title: 'Email queued',
+      body: 'TEST-PAY-2026-000013 is queued for its customer. This page shows when the mail provider accepts it.',
+    });
+    expect(toast.body).not.toMatch(/\d+ (second|minute|hour)/);
+  });
+
+  it('closes the dialog only on a refusal that asking again cannot mend, and words each in both languages', () => {
+    for (const code of [
+      'financial_documents.not_emailed',
+      'financial_documents.voided_not_emailed',
+      'financial_documents.email_already_queued',
+      'financial_documents.email_delivery_disabled',
+    ]) {
+      expect(emailRefusalIsFinal(code), code).toBe(true);
+    }
+    expect(emailRefusalIsFinal('financial_documents.not_found')).toBe(false);
+    expect(emailRefusalIsFinal(null)).toBe(false);
+
+    const refused = (code: string) => snapshotProblem({ status: 409, error: { code, title: 'server words' } });
+    expect(problemMessage(refused('financial_documents.email_already_queued'), 'en', en)).toBe(
+      'An email of this receipt is already queued. The page now shows it.',
+    );
+    expect(problemMessage(refused('financial_documents.voided_not_emailed'), 'ar', ar)).toBe(
+      'أُلغي هذا الإيصال، فلا يُرسَل بالبريد مجددًا. تصحيحه هو الذي يُرسَل.',
+    );
+    expect(problemMessage(refused('financial_documents.not_emailed'), 'en', en)).toBe('Only receipts are emailed to the customer.');
+    expect(problemMessage(refused('financial_documents.email_delivery_disabled'), 'en', en)).toBe(
+      "Receipt emails are switched off on this server until Brevo's protection against duplicate sends is verified. Nothing was queued.",
+    );
+    expect(problemMessage(refused('financial_documents.email_delivery_disabled'), 'ar', ar)).toBe(
+      'إرسال الإيصالات بالبريد متوقف على هذا الخادم إلى أن يُتحقَّق من حماية Brevo من الإرسال المكرر. لم يُجدوَل شيء.',
+    );
   });
 });
 

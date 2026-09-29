@@ -5,7 +5,7 @@ namespace Khadra.Tests.Support;
 /// <summary>
 /// Document storage that keeps the bytes in memory (payments Phase 6), so a test can open what a handler
 /// stored and hash it — and can make the store refuse, keep something other than it was given, or run a
-/// step of the test at the moment a write arrives.
+/// step of the test at the moment a write or a read arrives.
 /// </summary>
 internal sealed class MemoryDocumentStorage : IDocumentStorage
 {
@@ -53,8 +53,23 @@ internal sealed class MemoryDocumentStorage : IDocumentStorage
         return new StoredDocument(storageKey, contentType, bytes.LongLength);
     }
 
-    public Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default) =>
-        Task.FromResult<Stream?>(_files.TryGetValue(storageKey, out var bytes) ? new MemoryStream(bytes, writable: false) : null);
+    /// <summary>Puts other bytes under a key already written, as a store that altered or lost a file would.</summary>
+    public void Replace(string storageKey, byte[] bytes)
+    {
+        if (!_files.ContainsKey(storageKey))
+            throw new InvalidOperationException($"Nothing is stored at {storageKey}.");
+        _files[storageKey] = bytes;
+    }
+
+    /// <summary>Runs as a read arrives, before it is answered: where a test stages another process mid-step (payments Phase 7).</summary>
+    public Func<string, Task>? BeforeOpen { get; set; }
+
+    public async Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        if (BeforeOpen is { } before)
+            await before(storageKey);
+        return _files.TryGetValue(storageKey, out var bytes) ? new MemoryStream(bytes, writable: false) : null;
+    }
 
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken = default)
     {

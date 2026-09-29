@@ -42,6 +42,39 @@ public sealed class LoggingEmailSenderTests
     }
 
     [Fact]
+    public async Task An_attachment_is_logged_by_its_name_and_size_never_its_contents()
+    {
+        var log = new RecordingLogger<LoggingEmailSender>();
+        byte[] pdf = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37, 0x0A];
+
+        await new LoggingEmailSender(new TestClock(Now), log).SendAsync(
+            new EmailMessage("rana@example.com", "Rana", "Payment receipt PAY-2026-000001", "<p>Hi</p>", "Hi")
+            {
+                Attachments = [new EmailAttachment("PAY-2026-000001-en.pdf", "application/pdf", pdf)],
+            });
+
+        Assert.Equal(2, log.Entries.Count);
+        var line = log.Entries[1].Message;
+        Assert.Contains("PAY-2026-000001-en.pdf", line, StringComparison.Ordinal);
+        Assert.Contains("9 bytes", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("%PDF", log.AllText, StringComparison.Ordinal);
+        Assert.DoesNotContain(Convert.ToBase64String(pdf), log.AllText, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("receipt.pdf\r\nBcc: someone@example.com")]
+    [InlineData("../receipt.pdf")]
+    [InlineData("receipt one.pdf")]
+    [InlineData(".hidden.pdf")]
+    public void An_attachment_name_that_could_break_a_header_or_a_path_is_refused(string name) =>
+        Assert.Throws<ArgumentException>(() => new EmailAttachment(name, "application/pdf", [1]));
+
+    [Fact]
+    public void An_attachment_has_bytes() =>
+        Assert.Throws<ArgumentException>(() => new EmailAttachment("PAY-2026-000001-en.pdf", "application/pdf", []));
+
+    [Fact]
     public async Task Its_receipt_says_the_message_was_not_delivered()
     {
         var receipt = await new LoggingEmailSender(new TestClock(Now), new RecordingLogger<LoggingEmailSender>())

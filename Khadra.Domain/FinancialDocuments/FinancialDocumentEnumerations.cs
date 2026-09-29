@@ -28,6 +28,13 @@ public sealed class FinancialDocumentType : Enumeration
 
     /// <summary>A receipt: one per payment or refund, gaining a version only through a correction.</summary>
     public bool IsReceipt => this == PaymentReceipt || this == RefundReceipt;
+
+    /// <summary>
+    /// Whether the customer is emailed this document, with its PDF (payments Phase 7; owner, 2026-09-29): every
+    /// receipt, its corrections included, and no booking statement — a rental draws several statement versions,
+    /// and they stay in the customer's Invoices &amp; Receipts. The one place that rule lives.
+    /// </summary>
+    public bool IsEmailedToCustomer => IsReceipt;
 }
 
 /// <summary>

@@ -95,6 +95,95 @@ internal sealed class FinancialDocumentRenditionRepository(KhadraDbContext conte
     public void Add(FinancialDocumentRendition rendition) => context.FinancialDocumentRenditions.Add(rendition);
 }
 
+/// <summary>The emails owed for issued receipts (payments Phase 7): the outbox the email service works.</summary>
+internal sealed class FinancialDocumentDeliveryRepository(KhadraDbContext context) : IFinancialDocumentDeliveryRepository
+{
+    public void Add(FinancialDocumentDelivery delivery) => context.FinancialDocumentDeliveries.Add(delivery);
+
+    public async Task<IReadOnlyList<ClaimedFinancialDocumentDelivery>> ClaimDueAsync(
+        DateTimeOffset now,
+        TimeSpan lease,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        var leaseUntil = now.Add(lease);
+        var queued = FinancialDocumentDeliveryState.Queued;
+        List<Id> claimed;
+
+        if (context.Database.IsNpgsql())
+        {
+            // One statement: choose, lock, lease and count, as the notification outbox claims. SKIP LOCKED is what
+            // makes two processes safe — a row another is claiming is passed over, never waited on and never taken
+            // twice. Oldest due first, so a backlog drains in the order it built up.
+            var ids = await context.Database
+                .SqlQuery<Guid>($"""
+                    UPDATE financial_document_deliveries AS d
+                       SET claims = d.claims + 1,
+                           next_attempt_at = {leaseUntil},
+                           updated_at = {now}
+                     WHERE d.id IN (
+                           SELECT id FROM financial_document_deliveries
+                            WHERE state = 'Queued' AND next_attempt_at <= {now}
+                            ORDER BY next_attempt_at, id
+                            LIMIT {batchSize}
+                            FOR UPDATE SKIP LOCKED)
+                    RETURNING d.id AS "Value"
+                    """)
+                .ToListAsync(cancellationToken);
+            claimed = [.. ids.Select(Id.From)];
+        }
+        else
+        {
+            // SQLite (the persistence tests) has one writer at a time and no row locks, so the plain select-then-update
+            // is already exclusive there. Same effect, same columns.
+            claimed = await context.FinancialDocumentDeliveries
+                .Where(delivery => delivery.State == queued && delivery.NextAttemptAt <= now)
+                .OrderBy(delivery => delivery.NextAttemptAt)
+                .Take(batchSize)
+                .Select(delivery => delivery.Id)
+                .ToListAsync(cancellationToken);
+            await context.FinancialDocumentDeliveries
+                .Where(delivery => claimed.Contains(delivery.Id))
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(delivery => delivery.Claims, delivery => delivery.Claims + 1)
+                        .SetProperty(delivery => delivery.NextAttemptAt, leaseUntil),
+                    cancellationToken);
+        }
+
+        if (claimed.Count == 0)
+            return [];
+
+        // The count each claim left, read back while the lease still holds the rows — nobody else can claim them before
+        // it runs out. It is what the sender checks before working a row, so a row whose lease ran out and was claimed
+        // again by another process is left to that process. Worked oldest first.
+        var counts = await context.FinancialDocumentDeliveries
+            .AsNoTracking()
+            .Where(delivery => claimed.Contains(delivery.Id))
+            .Select(delivery => new { delivery.Id, delivery.Claims, delivery.QueuedAt })
+            .ToListAsync(cancellationToken);
+        return
+        [
+            .. counts
+                .OrderBy(row => row.QueuedAt)
+                .ThenBy(row => row.Id.Value)
+                .Select(row => new ClaimedFinancialDocumentDelivery(row.Id, row.Claims)),
+        ];
+    }
+
+    public Task<FinancialDocumentDelivery?> GetAsync(Id deliveryId, CancellationToken cancellationToken = default) =>
+        context.FinancialDocumentDeliveries
+            .Include(delivery => delivery.Attempts)
+            .FirstOrDefaultAsync(delivery => delivery.Id == deliveryId, cancellationToken);
+
+    public Task<bool> HasQueuedAsync(Id documentId, CancellationToken cancellationToken = default)
+    {
+        var queued = FinancialDocumentDeliveryState.Queued;
+        return context.FinancialDocumentDeliveries
+            .AnyAsync(delivery => delivery.DocumentId == documentId && delivery.State == queued, cancellationToken);
+    }
+}
+
 /// <summary>The holds on document families that are owed a document (payments Phase 5).</summary>
 internal sealed class FinancialDocumentIssuanceHoldRepository(KhadraDbContext context) : IFinancialDocumentIssuanceHoldRepository
 {

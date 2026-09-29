@@ -5,6 +5,7 @@ using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Dealers.ReadModels;
+using Khadra.Application.FinancialDocuments.Email;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Application.Fleet.ReadModels;
@@ -71,6 +72,10 @@ public static class DependencyInjection
 
         AddPush(services, configuration);
         services.AddHostedService<NotificationDispatchService>();
+
+        // Issued receipts, emailed with their PDFs (payments Phase 7) — on a clock of their own, never the
+        // settlement pass's: a stalled mail server must not delay a single booking deadline.
+        services.AddHostedService<FinancialDocumentEmailService>();
 
         return services;
     }
@@ -253,6 +258,19 @@ public static class DependencyInjection
         // naming the settings that are missing, rather than holding every document for a reason nobody reads.
         services.AddSingleton<IValidateOptions<FinancialDocumentOptions>, FinancialDocumentIssuerValidator>();
         services.AddSingleton<IFinancialDocumentSettings, FinancialDocumentSettings>();
+        services.AddOptions<FinancialDocumentEmailOptions>()
+            .Bind(configuration.GetSection(FinancialDocumentEmailOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate<IOptions<EmailOptions>>(
+                (options, email) => options.LeaseOutlastsSend(email.Value.TimeoutSeconds),
+                "FinancialDocuments:Email: LeaseSeconds must be at least twice Email:TimeoutSeconds, "
+                + "or a send still in flight can outlive the lease renewed for it and be sent again by another process.")
+            .Validate(options => options.RetryCapSeconds >= options.RetryBaseSeconds,
+                "FinancialDocuments:Email: RetryCapSeconds must be at least RetryBaseSeconds.")
+            .Validate(options => options.TestRecipientsAreAddresses,
+                "FinancialDocuments:Email:TestRecipients: every entry must be an email address — the allowlist names people, never a pattern.")
+            .ValidateOnStart();
+        services.AddSingleton<IFinancialDocumentEmailSettings, FinancialDocumentEmailSettings>();
         services.AddOptions<MobileAppOptions>()
             .Bind(configuration.GetSection(MobileAppOptions.SectionName))
             // Refused at startup rather than read as "no minimum": a typo in the one setting that
@@ -355,6 +373,8 @@ public static class DependencyInjection
         // Their PDF renditions (payments Phase 6): the append-only rows, and the one renderer, which holds the
         // fonts and the library's once-per-process setup.
         services.AddScoped<IFinancialDocumentRenditionRepository, FinancialDocumentRenditionRepository>();
+        // Their emails (payments Phase 7): the outbox row and its append-only attempts.
+        services.AddScoped<IFinancialDocumentDeliveryRepository, FinancialDocumentDeliveryRepository>();
         services.AddSingleton<IFinancialDocumentPdfRenderer, QuestPdfFinancialDocumentRenderer>();
         services.AddScoped<INotifier, Notifier>();
         services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();

@@ -31,14 +31,24 @@ internal sealed class SmtpEmailSender(IOptions<EmailOptions> options, IClock clo
         var mime = new MimeMessage();
         mime.From.Add(new MailboxAddress(_options.FromName, from));
         mime.To.Add(new MailboxAddress(message.ToName, message.ToAddress));
+        if (!string.IsNullOrWhiteSpace(message.ReplyTo))
+            mime.ReplyTo.Add(MailboxAddress.Parse(message.ReplyTo.Trim()));
         mime.Subject = message.Subject;
         // Set here rather than left to MimeKit, whose default is built from the name of the machine it
         // runs on and then travels in a header every relay and inbox can read. It is also the only id
         // this transport can log — a relay names its queue entry only in free text — so the receipt
         // reports the id the relay was HANDED; a relay may stamp its own on the way out. Set once,
         // outside the retries, so a copy that a retry sends is recognisably the same message.
-        mime.MessageId = MimeUtils.GenerateMessageId(from[(from.LastIndexOf('@') + 1)..]);
-        mime.Body = new BodyBuilder { HtmlBody = message.HtmlBody, TextBody = message.TextBody }.ToMessageBody();
+        // A message sent again with the same idempotency key (payments Phase 7) is the same message: same id, which
+        // the big mailboxes collapse into one.
+        var domain = from[(from.LastIndexOf('@') + 1)..];
+        mime.MessageId = string.IsNullOrWhiteSpace(message.IdempotencyKey)
+            ? MimeUtils.GenerateMessageId(domain)
+            : $"{message.IdempotencyKey}@{domain}";
+        var body = new BodyBuilder { HtmlBody = message.HtmlBody, TextBody = message.TextBody };
+        foreach (var attachment in message.Attachments)
+            body.Attachments.Add(attachment.FileName, attachment.Content, ContentType.Parse(attachment.ContentType));
+        mime.Body = body.ToMessageBody();
 
         // The attempts SHARE the timeout budget, so more attempts never mean a longer wait for the
         // person watching the form. See EmailOptions.MaxAttempts for why one attempt is not enough.
