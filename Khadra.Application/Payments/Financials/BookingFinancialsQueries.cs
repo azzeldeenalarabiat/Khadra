@@ -80,7 +80,7 @@ public sealed partial class BookingFinancialsHandlers(
         var recorded = entry is null
             ? await ledger.RecordedAsync(booking.Id, cancellationToken)
             : entry.Payable is { } payable
-                ? new RecordedPayable(payable.Outcome, Money.Create(payable.Commission, payable.Currency))
+                ? new RecordedPayable(payable.PayableId, payable.Outcome, Money.Create(payable.Commission, payable.Currency), payable.RecordedAt)
                 : null;
 
         var financials = BookingFinancialsCalculator.Calculate(booking, bookingPayments, resolved, hasLiveDispute, clock.UtcNow, recorded);

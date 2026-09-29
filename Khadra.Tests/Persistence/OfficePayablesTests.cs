@@ -137,6 +137,42 @@ public sealed class OfficePayablesTests : IDisposable
     }
 
     [Fact]
+    public async Task A_kept_penalty_brings_the_booking_one_new_statement_that_states_it()
+    {
+        // Owner, 2026-09-30 (pre-launch item 212): when the ledger keeps a penalty, the booking's statement gets a new
+        // version so the current statement states the outcome — issued by the documents step the same pass runs next.
+        var (booking, _) = await CancelledLateAsync();
+        _harness.Bookings.Now = booking.FinishedAt!.Value.AddMinutes(1);
+        await _harness.Bookings.PassAsync();
+        var ended = Assert.Single(await _harness.Bookings.DocumentsAsync(), document => document.Type == FinancialDocumentType.BookingStatement);
+        Assert.Same(FinancialDocumentCause.BookingEnded, ended.Cause);
+
+        await _harness.PassAsync();
+        var payable = Assert.Single(await _harness.PayablesAsync());
+        Assert.Same(PayableOutcome.PenaltyKept, payable.Outcome);
+        _harness.Bookings.Now = _harness.Now;
+        await _harness.Bookings.PassAsync();
+
+        var statements = (await _harness.Bookings.DocumentsAsync())
+            .Where(document => document.Type == FinancialDocumentType.BookingStatement)
+            .OrderBy(document => document.Version)
+            .ToList();
+        Assert.Equal(2, statements.Count);
+        var kept = statements[1];
+        Assert.Same(FinancialDocumentCause.PenaltyKept, kept.Cause);
+        Assert.Equal(ended.Id, kept.PreviousVersionId);
+        Assert.Equal(payable.RecordedAt, kept.CoversThrough);
+        Assert.Contains(
+            "The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.",
+            kept.Snapshot,
+            StringComparison.Ordinal);
+
+        // Once: the next pass finds nothing new about the booking.
+        Assert.DoesNotContain(await _harness.Bookings.PassAsync(), outcome => outcome.DocumentId is not null);
+        Assert.Equal(2, (await _harness.Bookings.DocumentsAsync()).Count(document => document.Type == FinancialDocumentType.BookingStatement));
+    }
+
+    [Fact]
     public async Task A_booking_whose_records_contradict_one_another_is_held_and_looked_at_again_later()
     {
         var (booking, payment) = await CompletedAsync();

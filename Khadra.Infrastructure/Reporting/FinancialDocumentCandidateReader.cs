@@ -2,6 +2,7 @@ using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.FinancialDocuments;
+using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 using Khadra.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ namespace Khadra.Infrastructure.Reporting;
 /// <remarks>
 /// <para>
 /// <b>Statements</b> follow the closed list of checkpoints (owner, 2026-09-27; a receipt's correction joined
-/// it on 2026-09-28) and never the clock: a booking is looked at when a checkpoint instant is later than its
+/// it on 2026-09-28, a kept penalty on 2026-09-30) and never the clock: a booking is looked at when a checkpoint instant is later than its
 /// latest statement's <c>covers_through</c>, and — for the late-commit margin only — when that statement was
 /// issued moments ago, since a fact can commit just after a statement read the records while carrying an
 /// earlier instant. Either way the checkpoint fingerprint decides; a booking whose facts have not changed is
@@ -149,6 +150,7 @@ internal sealed class FinancialDocumentCandidateReader(KhadraDbContext context) 
         var resolved = DisputeStatus.Resolved;
         var (paymentReceipt, refundReceipt) = (FinancialDocumentType.PaymentReceipt, FinancialDocumentType.RefundReceipt);
         var correction = FinancialDocumentCause.Correction;
+        var penaltyKept = PayableOutcome.PenaltyKept;
         var recently = now - lateCommitMargin;
         var waiting = Waiting(type, now, issuerConfigured);
 
@@ -179,7 +181,12 @@ internal sealed class FinancialDocumentCandidateReader(KhadraDbContext context) 
                     receipt.BookingId == statement.BookingId
                     && (receipt.Type == paymentReceipt || receipt.Type == refundReceipt)
                     && receipt.Cause == correction
-                    && receipt.IssuedAt > statement.CoversThrough))
+                    && receipt.IssuedAt > statement.CoversThrough)
+                // A penalty the office payables ledger kept (owner, 2026-09-30; pre-launch item 212).
+                || context.OfficePayables.Any(payable =>
+                    payable.BookingId == statement.BookingId
+                    && payable.Outcome == penaltyKept
+                    && payable.RecordedAt > statement.CoversThrough))
             .OrderBy(statement => statement.CoversThrough)
             .ThenBy(statement => statement.Id)
             .Select(statement => statement.BookingId)

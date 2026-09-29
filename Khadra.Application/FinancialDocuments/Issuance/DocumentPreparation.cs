@@ -117,7 +117,10 @@ public sealed class DocumentPreparation(
         // Read once, because the receipts are both a checkpoint (a correction among them) and the Documents
         // section: the two can never disagree about which receipts stand.
         var receipts = await documents.ListLatestReceiptsForBookingAsync(booking.Id, cancellationToken);
-        var checkpoints = StatementCheckpoints.Of(booking, money.Payments, money.ResolvedTickets, receipts);
+        // Read once, because the ledger's record is both a checkpoint (a kept penalty, item 212) and what the deposit
+        // is stated from: the statement's cause and its Deposit section read the same row.
+        var recorded = await ledger.RecordedAsync(booking.Id, cancellationToken);
+        var checkpoints = StatementCheckpoints.Of(booking, money.Payments, money.ResolvedTickets, receipts, recorded);
         if (checkpoints.IsEmpty)
             return new Preparation.NotOwed("no_money_moved");
 
@@ -131,7 +134,6 @@ public sealed class DocumentPreparation(
         // An official record never freezes records that contradict one another; a live screen still shows
         // them, but a statement waits on hold until somebody has put them right. A deposit the office payables
         // ledger kept as a penalty (payments Phase 8) is stated as kept, exactly as the live page states it.
-        var recorded = await ledger.RecordedAsync(booking.Id, cancellationToken);
         var financials = BookingFinancialsCalculator.Calculate(booking, money.Payments, money.ResolvedTickets, money.HasLiveDispute, now, recorded);
         if (financials.NeedsReview)
             return new Preparation.OnHold(IssuanceHoldReason.RecordsNeedReview, string.Join(", ", financials.Issues));

@@ -56,7 +56,17 @@ internal static class DocumentWording
         : cause == FinancialDocumentCause.Correction
             ? BilingualText.Of("Correction of a voided document", "تصحيح لمستند أُبطل")
         : cause == FinancialDocumentCause.ReceiptCorrected ? BilingualText.Of("Receipt corrected", "تصحيح إيصال")
+        // Pre-launch item 212 (owner, 2026-09-30), in the words of the owner's approved sentence below.
+        : cause == FinancialDocumentCause.PenaltyKept ? BilingualText.Of("Deposit penalty finalized", "تثبيت حسم مبلغ التأمين")
         : throw new ArgumentOutOfRangeException(nameof(cause), cause.Name, "Not a document cause.");
+
+    /// <summary>
+    /// What a customer is told once the ledger has kept their penalty from the deposit — in the Deposit and Penalty
+    /// sections alike, as on the booking page. The owner's own words, approved on 2026-09-30.
+    /// </summary>
+    public static readonly BilingualText PenaltyKeptFromDeposit = BilingualText.Of(
+        "The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.",
+        "انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.");
 
     public static class Headings
     {
@@ -243,8 +253,7 @@ internal static class DocumentWording
     /// </summary>
     /// <param name="keptFromDeposit">
     /// The ledger kept the penalty from the deposit when the window closed with no dispute (payments Phase 8;
-    /// owner, 2026-09-29; pre-launch item 164). The booking page's sentence, and a DRAFT awaiting the owner's
-    /// sign-off with it.
+    /// owner, 2026-09-29; pre-launch item 164): the owner's approved sentence (2026-09-30).
     /// </param>
     public static BilingualText PenaltyStanding(bool resolvedByDispute, bool keptFromDeposit) =>
         resolvedByDispute
@@ -252,9 +261,7 @@ internal static class DocumentWording
                 "This penalty was resolved through a dispute. The final amount is shown under Deposit.",
                 "تم حسم هذا الجزاء من خلال نزاع. يظهر المبلغ النهائي في قسم العربون.")
             : keptFromDeposit
-                ? BilingualText.Of(
-                    "The dispute window closed with no dispute, so this penalty was kept from your deposit. The amount is shown under Deposit.",
-                    "انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك. يظهر المبلغ في قسم العربون.")
+                ? PenaltyKeptFromDeposit
                 : BilingualText.Of(
                     "A penalty has been assessed, but no amount has been charged yet.",
                     "تم تقدير جزاء، ولكن لم يتم خصم أي مبلغ بعد.");
@@ -305,10 +312,9 @@ internal static class DocumentWording
             DepositStates.HeldUnresolved => BilingualText.Of(
                 "Your deposit remains held because a customer penalty was assessed and no dispute was opened. Final settlement is still pending.",
                 "لا يزال عربونك محتجزًا لأنّ غرامةً قُدِّرت على العميل ولم يُفتح أيّ نزاع. التسوية النهائية لا تزال معلّقة."),
-            // Payments Phase 8 (owner, 2026-09-29; pre-launch item 164). A DRAFT awaiting the owner's sign-off.
-            DepositStates.KeptAsPenalty => BilingualText.Of(
-                $"Your deposit of {en} was kept as the penalty assessed on this booking: the dispute window closed with no dispute opened.",
-                $"احتُفظ بعربونك البالغ {ar} بوصفه الغرامة المقدَّرة على هذا الحجز، إذ انتهت مهلة النزاع دون فتح أيّ نزاع."),
+            // Payments Phase 8 (owner, 2026-09-29; pre-launch item 164): the owner's approved sentence (2026-09-30),
+            // like item 164's own above it.
+            DepositStates.KeptAsPenalty => PenaltyKeptFromDeposit,
             DepositStates.Released => BilingualText.Of(
                 $"Your deposit of {en} was returned to you when the dispute window closed.",
                 $"أُعيد إليك عربونك البالغ {ar} عند انتهاء مهلة النزاع."),

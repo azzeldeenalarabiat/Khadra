@@ -56,9 +56,11 @@ internal sealed class OfficeLedgerReader(KhadraDbContext context) : IOfficeLedge
         var found = await context.OfficePayables
             .AsNoTracking()
             .Where(payable => payable.BookingId == bookingId)
-            .Select(payable => new { payable.Outcome, payable.Commission, payable.Currency })
+            .Select(payable => new { payable.Id, payable.Outcome, payable.Commission, payable.Currency, payable.RecordedAt })
             .FirstOrDefaultAsync(cancellationToken);
-        return found is null ? null : new RecordedPayable(found.Outcome, Money.Create(found.Commission, found.Currency));
+        return found is null
+            ? null
+            : new RecordedPayable(found.Id, found.Outcome, Money.Create(found.Commission, found.Currency), found.RecordedAt);
     }
 
     public async Task<IReadOnlyList<OfficeBalance>> BalancesAsync(Id? dealerId, CancellationToken cancellationToken = default)

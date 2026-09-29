@@ -5,6 +5,7 @@ using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.FinancialDocuments;
+using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 using Khadra.Tests.Support;
 
@@ -261,6 +262,46 @@ public sealed class StatementCheckpointsTests
 
         Assert.Equal(FinancialDocumentCause.ReceiptCorrected, Assert.Single(checkpoints.All).Kind);
         Assert.Throws<InvalidOperationException>(() => checkpoints.MoneyMovedAt);
+    }
+
+    [Fact]
+    public void A_penalty_the_ledger_kept_is_a_checkpoint_named_by_its_payable_and_the_instant_it_was_recorded()
+    {
+        // Owner, 2026-09-30 (pre-launch item 212): the seventh checkpoint. The ledger's RECORD, never the window's
+        // closing: until the pass records the payable, nothing about the booking is new.
+        var (booking, payment) = Build.PaidBooking();
+        Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, null, booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        var recordedAt = booking.DisputeWindowEndsAt!.Value.AddMinutes(11);
+        var payableId = Id.New();
+
+        var ended = StatementCheckpoints.Of(booking, [payment], [], []);
+        var kept = StatementCheckpoints.Of(booking, [payment], [], [], new RecordedPayable(payableId, PayableOutcome.PenaltyKept, Money.Jod(6m), recordedAt));
+
+        Assert.NotEqual(ended.Fingerprint, kept.Fingerprint);
+        Assert.Equal(FinancialDocumentCause.PenaltyKept, kept.Latest.Kind);
+        Assert.Equal(payableId.Value, kept.Latest.Key);
+        Assert.Equal(recordedAt, kept.CoversThrough);
+        // The deposit kept IS money moving: the statement dates its money by it.
+        Assert.Equal(recordedAt, kept.MoneyMovedAt);
+        // Read again, the same record is the same fact.
+        Assert.Equal(
+            kept.Fingerprint,
+            StatementCheckpoints.Of(booking, [payment], [], [], new RecordedPayable(payableId, PayableOutcome.PenaltyKept, Money.Jod(6m), recordedAt)).Fingerprint);
+    }
+
+    [Fact]
+    public void A_payable_that_kept_no_penalty_adds_nothing()
+    {
+        // Every other outcome is already stated by the facts that made it: the ending, the release, the dispute.
+        var (booking, payment) = Build.PaidBooking();
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", Now.AddHours(3)).IsSuccess);
+        var ended = StatementCheckpoints.Of(booking, [payment], [], []).Fingerprint;
+
+        var released = StatementCheckpoints.Of(
+            booking, [payment], [], [], new RecordedPayable(Id.New(), PayableOutcome.DepositReleased, Money.ZeroIn("JOD"), Now.AddDays(3)));
+
+        Assert.Equal(ended, released.Fingerprint);
+        Assert.DoesNotContain(released.All, checkpoint => checkpoint.Kind == FinancialDocumentCause.PenaltyKept);
     }
 
     private static readonly FinancialDocumentComposer Composer = DocumentFixtures.Composer();

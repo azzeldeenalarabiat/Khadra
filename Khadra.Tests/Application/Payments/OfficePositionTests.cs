@@ -274,7 +274,7 @@ public sealed class OfficePositionTests
         var after = booking.DisputeWindowEndsAt!.Value.AddHours(1);
 
         var unrecorded = Calculate(booking, [payment], after);
-        var recorded = Calculate(booking, [payment], after, recorded: new RecordedPayable(PayableOutcome.PenaltyKept, Money.Jod(6m)));
+        var recorded = Calculate(booking, [payment], after, recorded: new RecordedPayable(Id.New(), PayableOutcome.PenaltyKept, Money.Jod(6m), after));
 
         Assert.Equal(DepositStates.HeldUnresolved, unrecorded.Deposit.State);
         Assert.Equal(CommissionStates.Undecided, unrecorded.Commission.State);
@@ -292,7 +292,7 @@ public sealed class OfficePositionTests
         Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", Now.AddHours(3)).IsSuccess);
 
         var financials = Calculate(
-            booking, [payment], booking.DisputeWindowEndsAt!.Value, recorded: new RecordedPayable(PayableOutcome.DepositReleased, Money.ZeroIn("JOD")));
+            booking, [payment], booking.DisputeWindowEndsAt!.Value, recorded: new RecordedPayable(Id.New(), PayableOutcome.DepositReleased, Money.ZeroIn("JOD"), booking.DisputeWindowEndsAt!.Value));
 
         Assert.Equal(CommissionStates.NotEarned, financials.Commission.State);
         Assert.Null(financials.Commission.Earned);
@@ -304,7 +304,7 @@ public sealed class OfficePositionTests
         var (booking, payment) = Completed();
 
         var before = Calculate(booking, [payment], booking.FinishedAt!.Value);
-        var after = Calculate(booking, [payment], booking.FinishedAt!.Value, recorded: new RecordedPayable(PayableOutcome.Rental, Money.Jod(6m)));
+        var after = Calculate(booking, [payment], booking.FinishedAt!.Value, recorded: new RecordedPayable(Id.New(), PayableOutcome.Rental, Money.Jod(6m), booking.FinishedAt!.Value));
 
         Assert.Equal(CommissionStates.Earned, before.Commission.State);
         Assert.Equal(Money.Jod(6m), before.Commission.Earned);

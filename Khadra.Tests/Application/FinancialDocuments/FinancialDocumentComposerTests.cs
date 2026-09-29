@@ -428,11 +428,11 @@ public sealed class FinancialDocumentComposerTests
     }
 
     [Fact]
-    public void A_penalty_the_ledger_kept_is_stated_as_kept_where_the_deposit_is()
+    public void A_penalty_the_ledger_kept_issues_a_statement_that_says_so_where_the_deposit_and_the_penalty_are()
     {
-        // Payments Phase 8 (owner, 2026-09-29; pre-launch item 164): the window closed with no dispute and the ledger
-        // kept the deposit. The penalty's standing reads the same fact the deposit's line does, so no statement says
-        // the deposit was kept while its penalty reads "nothing charged yet".
+        // Payments Phase 8: the window closed with no dispute and the ledger kept the deposit (owner, 2026-09-29; item
+        // 164). The statement it brings (owner, 2026-09-30; item 212) is caused by the kept penalty, and its Deposit and
+        // Penalty sections read the same record, in the owner's approved words — never "nothing charged yet" beside it.
         var (booking, payment) = Build.PaidBooking();
         Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, null, booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
         var after = booking.DisputeWindowEndsAt!.Value.AddHours(1);
@@ -442,23 +442,31 @@ public sealed class FinancialDocumentComposerTests
             var financials = BookingFinancialsCalculator.Calculate(booking, [payment], [], false, after, recorded);
             Assert.False(financials.NeedsReview, string.Join(", ", financials.Issues));
             return Parse(Composer.Statement(
-                new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [payment], [], []), false, []),
+                new StatementFacts(Issuer, PartiesOf(booking), booking, financials, StatementCheckpoints.Of(booking, [payment], [], [], recorded), false, []),
                 DocumentStamp.First("STM-2026-000001", after),
                 payment.Provider).Snapshot);
         }
 
-        var kept = StatementWith(new RecordedPayable(PayableOutcome.PenaltyKept, Money.Jod(6m)));
+        var kept = StatementWith(new RecordedPayable(Id.New(), PayableOutcome.PenaltyKept, Money.Jod(6m), after));
         var notYet = StatementWith(null);
 
+        const string En = "The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.";
+        const string Ar = "انتهت مهلة الاعتراض دون فتح نزاع. تم تثبيت حسم مبلغ التأمين وتطبيقه وفق شروط إلغاء الحجز.";
+        Assert.Equal("PenaltyKept", kept.GetProperty("document").GetProperty("cause").GetString());
+        var cause = Line(kept, "document", "cause").GetProperty("text");
+        Assert.Equal("Deposit penalty finalized", cause.GetProperty("en").GetString());
+        Assert.Equal("تثبيت حسم مبلغ التأمين", cause.GetProperty("ar").GetString());
         Assert.Equal("KeptFromDeposit", kept.GetProperty("facts").GetProperty("penalty").GetProperty("standing").GetString());
-        var standing = Line(kept, "penalty", "standing").GetProperty("text");
-        Assert.Equal(
-            "The dispute window closed with no dispute, so this penalty was kept from your deposit. The amount is shown under Deposit.",
-            standing.GetProperty("en").GetString());
-        Assert.Equal("انتهت مهلة النزاع دون فتح نزاع، فاحتُفظ بهذا الجزاء من عربونك. يظهر المبلغ في قسم العربون.", standing.GetProperty("ar").GetString());
-        Assert.Contains("was kept as the penalty", Line(kept, "deposit", "state").GetProperty("text").GetProperty("en").GetString(), StringComparison.Ordinal);
+        foreach (var (section, line) in new[] { ("penalty", "standing"), ("deposit", "state") })
+        {
+            var text = Line(kept, section, line).GetProperty("text");
+            Assert.Equal(En, text.GetProperty("en").GetString());
+            Assert.Equal(Ar, text.GetProperty("ar").GetString());
+        }
 
-        // Before the ledger has recorded it, the deposit is still held and the penalty still only assessed.
+        // Before the ledger has recorded it, the deposit is still held, the penalty still only assessed, and the
+        // statement is the ending's.
+        Assert.Equal("BookingEnded", notYet.GetProperty("document").GetProperty("cause").GetString());
         Assert.Equal("Assessed", notYet.GetProperty("facts").GetProperty("penalty").GetProperty("standing").GetString());
         Assert.Equal(
             "A penalty has been assessed, but no amount has been charged yet.",

@@ -68,6 +68,13 @@ public sealed class FinancialDocumentCause : Enumeration
     /// </summary>
     public static readonly FinancialDocumentCause ReceiptCorrected = new(7, "ReceiptCorrected");
 
+    /// <summary>
+    /// The office payables ledger recorded a customer's penalty as kept from the deposit: the dispute window closed
+    /// with no dispute (owner, 2026-09-29, pre-launch item 164), and the statement's new version states the
+    /// outcome (owner, 2026-09-30; pre-launch item 212). A statement's cause only.
+    /// </summary>
+    public static readonly FinancialDocumentCause PenaltyKept = new(8, "PenaltyKept");
+
     private FinancialDocumentCause(int id, string name) : base(id, name)
     {
     }

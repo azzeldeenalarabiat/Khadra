@@ -175,7 +175,9 @@ public sealed record OfficePosition(
 /// the recorded decision is the truth about where a kept penalty went and what commission was earned, never a
 /// figure worked out again from today's records.
 /// </summary>
-public sealed record RecordedPayable(PayableOutcome Outcome, Money Commission);
+/// <param name="PayableId">The payable, which a booking statement names when it states a kept penalty (item 212).</param>
+/// <param name="RecordedAt">When the ledger recorded it: the instant a kept penalty became final.</param>
+public sealed record RecordedPayable(Id PayableId, PayableOutcome Outcome, Money Commission, DateTimeOffset RecordedAt);
 
 /// <summary>One checkout attempt, as the financial history shows it.</summary>
 /// <param name="AmountCharged">What the card was charged: the capture, or what was asked while nothing was.</param>

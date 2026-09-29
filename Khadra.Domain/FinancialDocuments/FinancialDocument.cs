@@ -183,6 +183,8 @@ public sealed class FinancialDocument : AggregateRoot, IAppendOnly
             throw new DomainException("A receipt gains a version only through a correction.");
         if (draft.Cause == FinancialDocumentCause.ReceiptCorrected && draft.Type != FinancialDocumentType.BookingStatement)
             throw new DomainException("Only a statement is issued because a receipt was corrected.");
+        if (draft.Cause == FinancialDocumentCause.PenaltyKept && draft.Type != FinancialDocumentType.BookingStatement)
+            throw new DomainException("Only a statement is issued because a penalty was kept.");
     }
 
     private static void RequireSubject(FinancialDocumentDraft draft)

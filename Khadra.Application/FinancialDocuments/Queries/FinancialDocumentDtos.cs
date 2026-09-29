@@ -20,7 +20,7 @@ public sealed record FinancialDocumentHeadlineDto(BilingualDto Label, MoneyDto A
 /// </summary>
 /// <param name="Type"><c>PaymentReceipt</c>, <c>RefundReceipt</c> or <c>BookingStatement</c>.</param>
 /// <param name="Status"><c>Current</c>, <c>Superseded</c> or <c>Voided</c>, worked out when read.</param>
-/// <param name="Cause">What issued it: <c>PaymentCaptured</c>, <c>RefundSettled</c>, <c>DisputeResolved</c>, <c>BookingEnded</c>, <c>CashRecorded</c>, <c>Correction</c> or, for a statement, <c>ReceiptCorrected</c>.</param>
+/// <param name="Cause">What issued it: <c>PaymentCaptured</c>, <c>RefundSettled</c>, <c>DisputeResolved</c>, <c>BookingEnded</c>, <c>CashRecorded</c>, <c>Correction</c> or, for a statement, <c>ReceiptCorrected</c> or <c>PenaltyKept</c>.</param>
 /// <param name="OccurredAt">When the money event it records happened.</param>
 /// <param name="IssuedAt">When it was issued. A document issued late for older money shows both.</param>
 public sealed record FinancialDocumentListItem(

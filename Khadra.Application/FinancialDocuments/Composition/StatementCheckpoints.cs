@@ -1,8 +1,10 @@
 using System.Globalization;
 using System.Text;
+using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.FinancialDocuments;
+using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 
 namespace Khadra.Application.FinancialDocuments.Composition;
@@ -17,10 +19,12 @@ public sealed record Checkpoint(FinancialDocumentCause Kind, Guid Key, DateTimeO
 
 /// <summary>
 /// The CLOSED list of facts that issue a new version of a booking statement: a payment captured, a refund
-/// settled, a dispute resolved, the booking ended, cash recorded at a handover (owner, 2026-09-27), and a
-/// receipt corrected (owner, 2026-09-28; pre-launch item 181). Nothing else is one — not a refund being
-/// recorded, sent or refused, not a dispute opening, not a statement's own correction, and never a state
-/// that changes with the clock alone, such as a deposit's window closing.
+/// settled, a dispute resolved, the booking ended, cash recorded at a handover (owner, 2026-09-27), a
+/// receipt corrected (owner, 2026-09-28; pre-launch item 181), and a customer's penalty kept from the deposit
+/// (owner, 2026-09-30; pre-launch item 212). Nothing else is one — not a refund being recorded, sent or
+/// refused, not a dispute opening, not a statement's own correction, and never a state that changes with the
+/// clock alone, such as a deposit's window closing. A kept penalty is not the clock either: it is the office
+/// payables ledger's RECORD of it, a row with its own instant, which the deposit's state is read from too.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -78,11 +82,17 @@ public sealed class StatementCheckpoints
     /// The booking's receipts as issued. Only the latest version of each receipt family counts, and it counts
     /// only when it is a correction; statements and other bookings' documents are ignored.
     /// </param>
+    /// <param name="recorded">
+    /// The booking's payable as the office payables ledger recorded it, if it has. It counts only when it kept a
+    /// customer's penalty: the same record the deposit's <c>KeptAsPenalty</c> is read from, so a statement cannot
+    /// state the deposit kept without this fact, nor this fact without it.
+    /// </param>
     public static StatementCheckpoints Of(
         Booking booking,
         IEnumerable<Payment> payments,
         IEnumerable<DisputeTicket> resolvedTickets,
-        IEnumerable<FinancialDocument> receipts)
+        IEnumerable<FinancialDocument> receipts,
+        RecordedPayable? recorded = null)
     {
         ArgumentNullException.ThrowIfNull(booking);
         ArgumentNullException.ThrowIfNull(payments);
@@ -152,6 +162,14 @@ public sealed class StatementCheckpoints
             all.Add(new Checkpoint(FinancialDocumentCause.ReceiptCorrected, correction.Id.Value, correction.IssuedAt, string.Empty));
         }
 
+        // A kept penalty (owner, 2026-09-30; pre-launch item 212): the payable by identity and the instant the ledger
+        // recorded it. A payable's figures are frozen by the database, so nothing more needs fingerprinting; a
+        // booking with no kept penalty gets no line here, so its fingerprint is what it always was.
+        if (recorded is { } payable && payable.Outcome == PayableOutcome.PenaltyKept)
+        {
+            all.Add(new Checkpoint(FinancialDocumentCause.PenaltyKept, payable.PayableId.Value, payable.RecordedAt, string.Empty));
+        }
+
         return new StatementCheckpoints(
         [
             .. all.OrderBy(checkpoint => checkpoint.Kind.Id).ThenBy(checkpoint => checkpoint.Key),
@@ -187,7 +205,9 @@ public sealed class StatementCheckpoints
     private static bool MovesMoney(FinancialDocumentCause kind) => kind != FinancialDocumentCause.ReceiptCorrected;
 
     private static int Rank(FinancialDocumentCause kind) =>
-        kind == FinancialDocumentCause.DisputeResolved ? 5
+        // The last word on a deposit nobody disputed: it explains every other fact at its instant.
+        kind == FinancialDocumentCause.PenaltyKept ? 6
+        : kind == FinancialDocumentCause.DisputeResolved ? 5
         : kind == FinancialDocumentCause.BookingEnded ? 4
         : kind == FinancialDocumentCause.RefundSettled ? 3
         : kind == FinancialDocumentCause.CashRecorded ? 2
