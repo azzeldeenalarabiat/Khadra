@@ -6,7 +6,7 @@ import { AR } from '../../core/i18n/ar';
 import { EN, TranslationKey } from '../../core/i18n/en';
 import { MessageParams } from '../../core/i18n/language';
 import { resolveMessage } from '../../core/i18n/resolve';
-import { DocumentBlock, InvoiceFormat, invoicePage, invoiceRow, pdfView, preparingRow, standing } from './invoice-presentation';
+import { DocumentBlock, InvoiceFormat, invoicePage, invoiceRow, pdfView, preparingRow, shownToCustomer, standing } from './invoice-presentation';
 
 /**
  * Issued documents in words (payments Phase 5b), against the REAL dictionaries and the SHARED contract
@@ -213,11 +213,32 @@ describe('the PDFs of a document (payments Phase 6)', () => {
     ]);
   });
 
-  it('says what the server says is still being drawn, and offers nothing of a voided document', () => {
+  it('says what the server says is still being drawn', () => {
     expect(pdfView(page('booking-statement-receipt-corrected'), en)).toEqual({ downloads: [], preparing: true });
     expect(pdfView(page('refund-receipt-dispute-decision'), en).downloads.map((download) => download.language)).toEqual(['en']);
     expect(pdfView(page('refund-receipt-dispute-decision'), en).preparing).toBe(true);
-    expect(pdfView(page('payment-receipt-deposit-voided'), en)).toEqual({ downloads: [], preparing: false });
+  });
+
+  it('offers a voided document as its voided copies, named and saved as such in both languages (owner, 2026-09-29)', () => {
+    expect(pdfView(page('payment-receipt-deposit-voided'), en)).toEqual({
+      downloads: [
+        { language: 'en', label: 'Voided copy (English)', aria: 'Download the voided copy in English', fileName: 'TEST-PAY-2026-000001-en-void.pdf' },
+        { language: 'ar', label: 'Voided copy (Arabic)', aria: 'Download the voided copy in Arabic', fileName: 'TEST-PAY-2026-000001-ar-void.pdf' },
+      ],
+      preparing: false,
+    });
+    expect(pdfView(page('payment-receipt-deposit-voided'), ar).downloads.map((download) => [download.label, download.aria])).toEqual([
+      ['نسخة ملغاة (بالإنجليزية)', 'تنزيل النسخة الملغاة بالإنجليزية'],
+      ['نسخة ملغاة (بالعربية)', 'تنزيل النسخة الملغاة بالعربية'],
+    ]);
+    // Until the server has drawn them, a voided document offers nothing and says they are being prepared.
+    const undrawn = { ...page('payment-receipt-deposit-voided'), pdf: { languages: [], preparing: true } };
+    expect(pdfView(undrawn, en)).toEqual({ downloads: [], preparing: true });
+    // Its correction, current, is offered as issued.
+    expect(pdfView(page('payment-receipt-deposit-correction'), en).downloads.map((download) => download.fileName)).toEqual([
+      'TEST-PAY-2026-000005-en.pdf',
+      'TEST-PAY-2026-000005-ar.pdf',
+    ]);
   });
 
   it('never offers a language this site does not know, nor anything from a server that predates PDFs', () => {
@@ -226,5 +247,36 @@ describe('the PDFs of a document (payments Phase 6)', () => {
     expect(pdfView(document, en).downloads.map((download) => download.language)).toEqual(['en']);
     const { pdf: _absent, ...older } = page('payment-receipt-paid-in-full');
     expect(pdfView(older, en)).toEqual({ downloads: [], preparing: false });
+  });
+});
+
+describe('what a customer page leaves out of the stored document (owner, 2026-09-29)', () => {
+  const registrations = ['Commercial registration', "Rental office's commercial registration", 'السجل التجاري', 'السجل التجاري لمكتب التأجير'];
+
+  it('never shows a commercial registration, in either language, though the stored document keeps both', () => {
+    for (const entry of fixture.documents) {
+      const snapshot = entry.page.snapshot as { issuer: { commercialRegistration: string }; office: { commercialRegistration: string } };
+      expect(snapshot.issuer.commercialRegistration, entry.name).toBeTruthy();
+      expect(snapshot.office.commercialRegistration, entry.name).toBeTruthy();
+      for (const [arabic, t] of [[false, en], [true, ar]] as const) {
+        const body = invoicePage(page(entry.name), arabic, t, format).body!;
+        const lines = body.sections.flatMap((section) => linesOf(section.blocks));
+        expect(lines.map((line) => line.label).filter((label) => registrations.includes(label)), entry.name).toEqual([]);
+        expect(
+          lines.filter((line) => [snapshot.issuer.commercialRegistration, snapshot.office.commercialRegistration].includes(line.value)),
+          entry.name,
+        ).toEqual([]);
+        // The parties are still all there: who issued it, how to reach them, the customer and the office.
+        expect(body.sections.find((section) => section.key.endsWith(':parties'))!.blocks.length, entry.name).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('keeps every other line, and a registration by any other key or in any other section', () => {
+    expect(shownToCustomer('parties', 'issuerRegistration')).toBe(false);
+    expect(shownToCustomer('parties', 'officeRegistration')).toBe(false);
+    expect(shownToCustomer('parties', 'customerRegistration')).toBe(false);
+    expect(shownToCustomer('parties', 'customer')).toBe(true);
+    expect(shownToCustomer('booking', 'officeRegistration')).toBe(true);
   });
 });

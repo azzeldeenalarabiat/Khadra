@@ -634,7 +634,11 @@ export const EN = {
   'invoices.pdf.downloadEn': 'Download the PDF in English',
   'invoices.pdf.downloadAr': 'Download the PDF in Arabic',
   'invoices.pdf.preparing': 'The PDF of this document is being prepared.',
-  'invoices.pdf.voided': 'This document was voided, so its PDF is no longer offered. Its replacement has one.',
+  // A voided document's PDFs are its voided copies, stamped VOID and naming the replacement (owner, 2026-09-29).
+  'invoices.pdf.voidEn': 'Voided copy (English)',
+  'invoices.pdf.voidAr': 'Voided copy (Arabic)',
+  'invoices.pdf.downloadVoidEn': 'Download the voided copy in English',
+  'invoices.pdf.downloadVoidAr': 'Download the voided copy in Arabic',
   // One notification kind serves a deposit and a payment in full, and it does not say which.
   'notification.YourDepositRefunded': '{actor}: your payment has been refunded',
   'notification.YourPartialRefundSettled': '{actor}: part of your payment has been refunded',

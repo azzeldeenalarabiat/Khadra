@@ -586,7 +586,10 @@
           }
         },
         "pdf": {
-          "languages": [],
+          "languages": [
+            "en",
+            "ar"
+          ],
           "preparing": false
         }
       }

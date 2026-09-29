@@ -220,12 +220,33 @@ void main() {
       expect(find.text(l10n.invoicesPdfPreparing), findsOneWidget);
     });
 
-    screenTest('offers no PDF of a voided document and says none is coming, in $tag', (tester) async {
-      await pump(tester, InvoiceScreen(documentId: pages['payment-receipt-deposit-voided']!.row.documentId), locale: locale);
+    screenTest('offers a voided document as its voided copies and opens one named so, in $tag', (tester) async {
+      final opened = <(String, String?, int)>[];
+      final page = pages['payment-receipt-deposit-voided']!;
+      final api = await pump(
+        tester,
+        InvoiceScreen(documentId: page.row.documentId),
+        locale: locale,
+        opener: ({required bytes, required contentType, required documentId}) async {
+          opened.add((documentId, contentType, bytes.length));
+          return true;
+        },
+      );
 
+      // Owner, 2026-09-29: the document as issued, stamped VOID — never offered as if it were current.
       expect(find.text(l10n.invoicesPdfEnglish), findsNothing);
       expect(find.text(l10n.invoicesPdfArabic), findsNothing);
+      expect(find.text(l10n.invoicesPdfVoidedEnglish), findsOneWidget);
+      expect(find.text(l10n.invoicesPdfVoidedArabic), findsOneWidget);
+      expect(find.byTooltip(l10n.invoicesPdfOpenVoidedEnglish), findsOneWidget);
       expect(find.text(l10n.invoicesPdfPreparing), findsNothing);
+
+      await tester.tap(find.text(l10n.invoicesPdfVoidedEnglish));
+      await tester.pumpAndSettle();
+
+      // The same link as any PDF: the server alone decides that it is the voided copy.
+      expect(api.pdfLinks, [(page.row.documentId, 'en')]);
+      expect(opened, [('TEST-PAY-2026-000001-en-void', 'application/pdf', 8)]);
     });
 
     screenTest('words a PDF that is not drawn yet, and opens nothing, in $tag', (tester) async {

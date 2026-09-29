@@ -98,11 +98,12 @@ export class AdminFinancialDocumentsService {
 
   /**
    * One PDF of a document (payments Phase 6), fetched through a link minted now — it lasts minutes — with the
-   * bytes coming through the session like every private file. Rejects with the server's refusal.
+   * bytes coming through the session like every private file: the document as issued (`AsIssued`), or a voided
+   * document's voided copy (`Voided`). Rejects with the server's refusal.
    */
-  async pdf(documentId: string, language: string): Promise<Blob> {
+  async pdf(documentId: string, language: string, kind: string): Promise<Blob> {
     const link = await firstValueFrom(
-      this.http.get<SignedFileLink>(`${this.base}/${documentId}/pdf-link`, { params: { language } }),
+      this.http.get<SignedFileLink>(`${this.base}/${documentId}/pdf-link`, { params: { language, kind } }),
     );
     if (!link.url.startsWith(PRIVATE_FILES)) throw { status: 0 };
     return firstValueFrom(this.http.get(link.url, { responseType: 'blob' }));

@@ -39,7 +39,7 @@ public sealed class RenderFinancialDocumentHandlerTests
     {
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new UniqueConstraintConflictException("taken"));
 
-        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.English), CancellationToken.None);
+        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.English, RenditionKind.AsIssued), CancellationToken.None);
 
         Assert.Equal("lost_race", outcome.Skipped);
         Assert.False(outcome.CannotBeDrawn);
@@ -54,7 +54,7 @@ public sealed class RenderFinancialDocumentHandlerTests
         _unitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).ThrowsAsync(new InvalidOperationException("The connection dropped."));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.Arabic), CancellationToken.None));
+            Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.Arabic, RenditionKind.AsIssued), CancellationToken.None));
 
         Assert.Single(_storage.Files);
         Assert.Empty(_storage.Deleted);
@@ -71,7 +71,7 @@ public sealed class RenderFinancialDocumentHandlerTests
             .ThrowsAsync(new OperationCanceledException(shutdown.Token));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.English), shutdown.Token));
+            Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.English, RenditionKind.AsIssued), shutdown.Token));
 
         // The record is written under no token of the pass's: a few milliseconds past the point of no return.
         Assert.Equal(CancellationToken.None, saveToken);
@@ -85,7 +85,7 @@ public sealed class RenderFinancialDocumentHandlerTests
         var broken = Composed("{\"schemaVersion\":1,\"content\":{\"headline\":{\"money\":{\"amount\":\"12.500\",\"currency\":\"JOD\"}}}}");
         _documents.GetByIdAsync(broken.Id, Arg.Any<CancellationToken>()).Returns(broken);
 
-        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(broken.Id, Language.English), CancellationToken.None);
+        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(broken.Id, Language.English, RenditionKind.AsIssued), CancellationToken.None);
 
         Assert.True(outcome.CannotBeDrawn);
         Assert.Equal("snapshot_unreadable", outcome.Skipped);
@@ -98,7 +98,7 @@ public sealed class RenderFinancialDocumentHandlerTests
         FinancialDocumentRendition? recorded = null;
         _renditions.When(repository => repository.Add(Arg.Any<FinancialDocumentRendition>())).Do(call => recorded = call.Arg<FinancialDocumentRendition>());
 
-        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.Arabic), CancellationToken.None);
+        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.Arabic, RenditionKind.AsIssued), CancellationToken.None);
 
         Assert.Equal(recorded!.Id, outcome.RenditionId);
         Assert.Equal(6, recorded.SizeBytes);
@@ -112,14 +112,83 @@ public sealed class RenderFinancialDocumentHandlerTests
     [Fact]
     public async Task A_document_that_is_not_there_is_not_owed_a_pdf()
     {
-        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(Id.New(), Language.English), CancellationToken.None);
+        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(Id.New(), Language.English, RenditionKind.AsIssued), CancellationToken.None);
 
         Assert.Equal("not_found", outcome.Skipped);
         _renderer.DidNotReceive().Render(Arg.Any<PrintedDocument>());
     }
 
+    [Fact]
+    public async Task A_voided_copy_of_a_document_that_is_not_voided_is_not_owed_and_nothing_is_drawn()
+    {
+        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.English, RenditionKind.Voided), CancellationToken.None);
+
+        Assert.Equal("not_voided", outcome.Skipped);
+        Assert.False(outcome.CannotBeDrawn);
+        _renderer.DidNotReceive().Render(Arg.Any<PrintedDocument>());
+        Assert.Empty(_storage.Files);
+    }
+
+    [Fact]
+    public async Task A_voided_copy_is_stamped_names_its_correction_and_never_the_reason_and_is_recorded_as_its_own_kind()
+    {
+        // Owner, 2026-09-29: the customer's copy of a voided document is drawn beside the original, never over it.
+        const string reason = "Wrong amount keyed by the administrator";
+        var voidedAt = Now.AddHours(3);
+        var correction = CorrectionOf(_document, "PAY-2026-000002");
+        _documents.VoidOfAsync(_document.Id, Arg.Any<CancellationToken>())
+            .Returns(FinancialDocumentVoid.Record(_document.Id, Id.New(), reason, voidedAt).Value);
+        _documents.FamilyMemberAsync(_document.Type, _document.SubjectId, 2, Arg.Any<CancellationToken>()).Returns(correction);
+        FinancialDocumentRendition? recorded = null;
+        _renditions.When(repository => repository.Add(Arg.Any<FinancialDocumentRendition>())).Do(call => recorded = call.Arg<FinancialDocumentRendition>());
+
+        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.English, RenditionKind.Voided), CancellationToken.None);
+
+        Assert.Equal(recorded!.Id, outcome.RenditionId);
+        Assert.Equal(RenditionKind.Voided, recorded.Kind);
+        Assert.Contains("/v1-en-void-", recorded.StorageKey, StringComparison.Ordinal);
+        // Drawn from the document's own snapshot: the copy represents the record as issued, marked void.
+        Assert.Equal(_document.ContentSha256, recorded.SnapshotSha256);
+        _renderer.Received(1).Render(Arg.Is<PrintedDocument>(printed =>
+            printed.Void != null
+            && printed.Void.Stamp == "VOID"
+            && printed.Void.Replacement!.Contains("PAY-2026-000002", StringComparison.Ordinal)
+            && !(printed.Void.Notice + printed.Void.Replacement).Contains(reason, StringComparison.Ordinal)
+            && printed.Metadata.ModifiedAt == voidedAt
+            && printed.Metadata.Title.Contains("VOID", StringComparison.Ordinal)));
+        Assert.Contains(_log.Entries, entry => entry.Id.Id == 2620 && entry.Message.Contains("Voided", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_voided_copy_names_no_replacement_when_the_next_version_is_not_a_correction()
+    {
+        _documents.VoidOfAsync(_document.Id, Arg.Any<CancellationToken>())
+            .Returns(FinancialDocumentVoid.Record(_document.Id, Id.New(), "Duplicate", Now).Value);
+
+        var outcome = await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.Arabic, RenditionKind.Voided), CancellationToken.None);
+
+        Assert.NotNull(outcome.RenditionId);
+        _renderer.Received(1).Render(Arg.Is<PrintedDocument>(printed =>
+            printed.Void != null
+            && printed.Void.Stamp == "ملغى"
+            && printed.Void.Replacement == null));
+    }
+
+    [Fact]
+    public async Task The_document_as_issued_carries_no_void_marks_even_once_it_is_voided()
+    {
+        _documents.VoidOfAsync(_document.Id, Arg.Any<CancellationToken>())
+            .Returns(FinancialDocumentVoid.Record(_document.Id, Id.New(), "Duplicate", Now).Value);
+
+        await Handler().Handle(new RenderFinancialDocumentCommand(_document.Id, Language.English, RenditionKind.AsIssued), CancellationToken.None);
+
+        // The original stays exactly the record as issued; it never learns about its void.
+        _renderer.Received(1).Render(Arg.Is<PrintedDocument>(printed => printed.Void == null && printed.Metadata.ModifiedAt == null));
+        await _documents.DidNotReceive().VoidOfAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>());
+    }
+
     private RenderFinancialDocumentHandler Handler() =>
-        new(_documents, _renditions, _renderer, _storage, _unitOfWork, new TestClock(Now), _log);
+        new(_documents, _renditions, _renderer, _storage, _unitOfWork, DocumentFixtures.Amman, new TestClock(Now), _log);
 
     /// <summary>A receipt for real money (no watermark), composed by the real composer as issuing stores it.</summary>
     private static FinancialDocument Composed()
@@ -131,6 +200,18 @@ public sealed class RenderFinancialDocumentHandlerTests
                 DocumentFixtures.Issuer, DocumentFixtures.PartiesOf(booking), booking, payment, [payment]),
             stamp);
         return FinancialDocument.Issue(draft, stamp.Number, Now);
+    }
+
+    /// <summary>The correction issued with a void: the voided receipt's next version, under its own number.</summary>
+    private static FinancialDocument CorrectionOf(FinancialDocument voided, string number)
+    {
+        var draft = new FinancialDocumentDraft(
+            voided.Type, voided.SubjectId, Version: voided.Version + 1, PreviousVersionId: voided.Id, RelatedDocumentId: null,
+            BookingId: voided.BookingId, BookingReference: voided.BookingReference, CustomerId: voided.CustomerId, DealerId: voided.DealerId,
+            PaymentId: voided.PaymentId, RefundId: null, FinancialDocumentCause.Correction, OccurredAt: Now, CoversThrough: null,
+            CheckpointFingerprint: null, HeadlineAmount: voided.HeadlineAmount, Provider: voided.Provider, CalculatorVersion: 1,
+            SnapshotSchemaVersion: voided.SnapshotSchemaVersion, Snapshot: voided.Snapshot);
+        return FinancialDocument.Issue(draft, number, Now);
     }
 
     /// <summary>A receipt whose stored snapshot is exactly <paramref name="snapshot"/>, hashed as issuing hashes it.</summary>

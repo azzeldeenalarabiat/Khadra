@@ -164,16 +164,32 @@ export function documentBody(content: DocumentContent, arabic: boolean, format: 
     sections: content.sections.map((section, index) => ({
       key: `${index}:${section.key}`,
       heading: pick(section.heading, arabic),
-      blocks: blocksOf(section.lines, arabic, format),
+      blocks: blocksOf(section.key, section.lines, arabic, format),
     })),
     timeNote: content.timeNote ? pick(content.timeNote, arabic) : null,
     notice: content.notice ? pick(content.notice, arabic) : null,
   };
 }
 
-function blocksOf(lines: DocumentContent['sections'][number]['lines'], arabic: boolean, format: InvoiceFormat): DocumentBlock[] {
+/**
+ * Whether a customer's page shows a line of the stored document (owner, 2026-09-29). The commercial registrations
+ * stay off it, as they stay off the PDF's body: Khadra's, the rental office's and — while there are no business
+ * accounts — a customer's. Presentation only: the reader has read every line (a broken one refuses the document
+ * whole), and the stored document keeps them all.
+ */
+export function shownToCustomer(sectionKey: string, lineKey: string): boolean {
+  return !(sectionKey === 'parties' && ['issuerRegistration', 'officeRegistration', 'customerRegistration'].includes(lineKey));
+}
+
+function blocksOf(
+  sectionKey: string,
+  lines: DocumentContent['sections'][number]['lines'],
+  arabic: boolean,
+  format: InvoiceFormat,
+): DocumentBlock[] {
   const blocks: DocumentBlock[] = [];
   lines.forEach((line, position) => {
+    if (!shownToCustomer(sectionKey, line.key)) return;
     const key = `${position}:${line.key}`;
     const value = valueText(line.value, arabic, format);
     const direction = directionOf(line.value);
@@ -287,23 +303,43 @@ export interface PdfView {
   readonly preparing: boolean;
 }
 
-/** The two languages a PDF is drawn in; one this site has never heard of is not offered. */
-const PDF_LANGUAGES: Readonly<Record<string, { readonly label: TranslationKey; readonly aria: TranslationKey }>> = {
-  en: { label: 'invoices.pdf.en', aria: 'invoices.pdf.downloadEn' },
-  ar: { label: 'invoices.pdf.ar', aria: 'invoices.pdf.downloadAr' },
+interface PdfWords {
+  readonly label: TranslationKey;
+  readonly aria: TranslationKey;
+}
+
+/**
+ * The two languages a PDF is drawn in; one this site has never heard of is not offered. A voided document's PDFs are
+ * its voided copies — stamped VOID and naming its replacement (owner, 2026-09-29) — and are named as such, so a saved
+ * file says what it is before it is opened.
+ */
+const PDF_LANGUAGES: Readonly<Record<string, { readonly current: PdfWords; readonly voided: PdfWords }>> = {
+  en: {
+    current: { label: 'invoices.pdf.en', aria: 'invoices.pdf.downloadEn' },
+    voided: { label: 'invoices.pdf.voidEn', aria: 'invoices.pdf.downloadVoidEn' },
+  },
+  ar: {
+    current: { label: 'invoices.pdf.ar', aria: 'invoices.pdf.downloadAr' },
+    voided: { label: 'invoices.pdf.voidAr', aria: 'invoices.pdf.downloadVoidAr' },
+  },
 };
 
 export function pdfView(page: FinancialDocumentPage, t: Translate): PdfView {
   const pdf = page.pdf;
+  // The server offers a voided document's voided copies and nothing else; the page only names them so.
+  const voided = page.voided != null;
   return {
     downloads: (pdf?.languages ?? [])
       .filter((language) => Object.hasOwn(PDF_LANGUAGES, language))
-      .map((language) => ({
-        language,
-        label: t(PDF_LANGUAGES[language].label),
-        aria: t(PDF_LANGUAGES[language].aria),
-        fileName: `${page.number}-${language}.pdf`,
-      })),
+      .map((language) => {
+        const words = voided ? PDF_LANGUAGES[language].voided : PDF_LANGUAGES[language].current;
+        return {
+          language,
+          label: t(words.label),
+          aria: t(words.aria),
+          fileName: voided ? `${page.number}-${language}-void.pdf` : `${page.number}-${language}.pdf`,
+        };
+      }),
     preparing: pdf?.preparing === true,
   };
 }

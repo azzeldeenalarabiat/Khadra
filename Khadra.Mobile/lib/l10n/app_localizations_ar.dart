@@ -1651,8 +1651,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get invoicesPdfPreparing => 'يجري تجهيز ملف PDF لهذا المستند.';
 
   @override
-  String get invoicesPdfVoided =>
-      'أُلغي هذا المستند، لذا لم يعد ملف PDF الخاص به متاحًا. للمستند البديل ملفه الخاص.';
+  String get invoicesPdfVoidedEnglish => 'نسخة ملغاة (بالإنجليزية)';
+
+  @override
+  String get invoicesPdfVoidedArabic => 'نسخة ملغاة (بالعربية)';
+
+  @override
+  String get invoicesPdfOpenVoidedEnglish => 'فتح النسخة الملغاة بالإنجليزية';
+
+  @override
+  String get invoicesPdfOpenVoidedArabic => 'فتح النسخة الملغاة بالعربية';
 
   @override
   String cancelRefundAboveDeposit(String amount) {

@@ -2924,12 +2924,13 @@ class FinancialDocumentVoidNotice {
 class FinancialDocumentPdf {
   const FinancialDocumentPdf({required this.languages, required this.preparing});
 
-  /// `en`, `ar`: the languages whose PDF has been drawn, English first. Empty
-  /// for a voided document, which the customer is no longer handed.
+  /// `en`, `ar`: the languages whose PDF has been drawn, English first. For a
+  /// voided document, its voided copies — stamped VOID and naming the
+  /// correction — never the original (owner, 2026-09-29).
   final List<String> languages;
 
-  /// A PDF the document will have is still being drawn. Never true for a voided
-  /// document.
+  /// A PDF the document will have is still being drawn: for a voided document,
+  /// its voided copy.
   final bool preparing;
 
   /// What an API older than Phase 6 means: nothing offered, nothing coming.

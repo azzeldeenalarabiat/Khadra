@@ -129,6 +129,47 @@ void main() {
     });
   });
 
+  group('what a customer page leaves out of the stored document (owner, 2026-09-29)', () {
+    const registrations = ['Commercial registration', "Rental office's commercial registration", 'السجل التجاري', 'السجل التجاري لمكتب التأجير'];
+
+    test('never shows a commercial registration, in either language, though the stored document keeps both', () {
+      for (final entry in (fixture['documents'] as List<dynamic>).cast<Map<String, dynamic>>()) {
+        final name = entry['name'] as String;
+        final snapshot = (entry['page'] as Map<String, dynamic>)['snapshot'] as Map<String, dynamic>;
+        final issuer = (snapshot['issuer'] as Map<String, dynamic>)['commercialRegistration'] as String;
+        final office = (snapshot['office'] as Map<String, dynamic>)['commercialRegistration'] as String;
+        expect(issuer, isNotEmpty, reason: name);
+        expect(office, isNotEmpty, reason: name);
+        for (final (l10n, locale) in [(en, 'en'), (ar, 'ar')]) {
+          final body = invoicePage(page(name), l10n, formatsFor(locale)).body!;
+          final lines = linesOf(body);
+          expect([for (final line in lines) if (registrations.contains(line.label)) line.label], isEmpty, reason: '$name ($locale)');
+          expect([for (final line in lines) if (line.value == issuer || line.value == office) line.value], isEmpty, reason: '$name ($locale)');
+          expect([for (final line in lines) if (line.key.endsWith('Registration')) line.key], isEmpty, reason: '$name ($locale)');
+          // The parties are all still there: who issued it, how to reach them, the customer and the office.
+          expect(body.sections.firstWhere((section) => section.key.endsWith(':parties')).blocks, isNotEmpty, reason: name);
+        }
+      }
+    });
+
+    test('keeps every other line, and a registration by any other key or in any other section', () {
+      expect(shownToCustomer('parties', 'issuerRegistration'), isFalse);
+      expect(shownToCustomer('parties', 'officeRegistration'), isFalse);
+      expect(shownToCustomer('parties', 'customerRegistration'), isFalse);
+      expect(shownToCustomer('parties', 'customer'), isTrue);
+      expect(shownToCustomer('booking', 'officeRegistration'), isTrue);
+    });
+
+    test('keeps each shown line in its stored place, so nothing else moves', () {
+      final parties = invoicePage(page('payment-receipt-paid-in-full'), en, formatsFor('en'))
+          .body!
+          .sections
+          .firstWhere((section) => section.key.endsWith(':parties'));
+      final keys = [for (final block in parties.blocks) if (block is LinesBlock) for (final line in block.lines) line.key.split(':').last];
+      expect(keys, ['issuedBy', 'issuerAddress', 'supportEmail', 'supportPhone', 'customer', 'office', 'officeLocation']);
+    });
+  });
+
   group('what surrounds a document', () {
     test('links an earlier version to the NEWEST — the highest of the versions, never merely the next', () {
       final superseded = invoicePage(page('booking-statement-superseded'), en, formatsFor('en'));
@@ -280,13 +321,43 @@ void main() {
       expect([for (final open in pdfView(page('payment-receipt-paid-in-full'), ar).opens) open.label], ['PDF (بالإنجليزية)', 'PDF (بالعربية)']);
     });
 
-    test('says what the server says is still being drawn, and offers nothing of a voided document', () {
+    test('says what the server says is still being drawn', () {
       expect(pdfView(page('booking-statement-receipt-corrected'), en).opens, isEmpty);
       expect(pdfView(page('booking-statement-receipt-corrected'), en).preparing, isTrue);
       expect([for (final open in pdfView(page('refund-receipt-dispute-decision'), en).opens) open.language], ['en']);
       expect(pdfView(page('refund-receipt-dispute-decision'), en).preparing, isTrue);
-      expect(pdfView(page('payment-receipt-deposit-voided'), en).opens, isEmpty);
-      expect(pdfView(page('payment-receipt-deposit-voided'), en).preparing, isFalse);
+    });
+
+    test('offers a voided document as its voided copies, named so in both languages (owner, 2026-09-29)', () {
+      final view = pdfView(page('payment-receipt-deposit-voided'), en);
+      expect([for (final open in view.opens) (open.language, open.label, open.semantics, open.fileStem)], [
+        ('en', 'Voided copy (English)', 'Open the voided copy in English', 'TEST-PAY-2026-000001-en-void'),
+        ('ar', 'Voided copy (Arabic)', 'Open the voided copy in Arabic', 'TEST-PAY-2026-000001-ar-void'),
+      ]);
+      expect(view.preparing, isFalse);
+      expect([for (final open in pdfView(page('payment-receipt-deposit-voided'), ar).opens) (open.label, open.semantics)], [
+        ('نسخة ملغاة (بالإنجليزية)', 'فتح النسخة الملغاة بالإنجليزية'),
+        ('نسخة ملغاة (بالعربية)', 'فتح النسخة الملغاة بالعربية'),
+      ]);
+
+      // Until the server has drawn them, nothing is offered and the page says they are being prepared.
+      final voided = page('payment-receipt-deposit-voided');
+      final undrawn = FinancialDocumentPage(
+        row: voided.row,
+        snapshotSchemaVersion: voided.snapshotSchemaVersion,
+        snapshot: voided.snapshot,
+        links: voided.links,
+        voided: voided.voided,
+        pdf: const FinancialDocumentPdf(languages: [], preparing: true),
+      );
+      expect(pdfView(undrawn, en).opens, isEmpty);
+      expect(pdfView(undrawn, en).preparing, isTrue);
+
+      // Its correction, current, is offered as issued.
+      expect([for (final open in pdfView(page('payment-receipt-deposit-correction'), en).opens) open.fileStem], [
+        'TEST-PAY-2026-000005-en',
+        'TEST-PAY-2026-000005-ar',
+      ]);
     });
 
     test('never offers a language this build does not know', () {

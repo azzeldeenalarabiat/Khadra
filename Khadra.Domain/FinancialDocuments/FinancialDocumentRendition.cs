@@ -21,6 +21,29 @@ public sealed class RenditionFormat : Enumeration
 }
 
 /// <summary>
+/// What a rendition pictures (payments Phase 6 follow-up; owner, 2026-09-29): the document exactly as it was
+/// issued, or — for a voided document — the same document drawn after its void, marked void on every page and
+/// naming its correction. A separate axis from the file format: both kinds are PDFs.
+/// </summary>
+public sealed class RenditionKind : Enumeration
+{
+    /// <summary>The document exactly as issued. For a voided document, the administrator's alone.</summary>
+    public static readonly RenditionKind AsIssued = new(1, "AsIssued", string.Empty);
+
+    /// <summary>
+    /// A voided document as its customer is given it: the record as issued, stamped VOID on every page, saying it
+    /// is no longer valid and naming the correction that replaced it. Drawn once, after the void, from facts that
+    /// never change again — the snapshot, the void and the correction.
+    /// </summary>
+    public static readonly RenditionKind Voided = new(2, "Voided", "void-");
+
+    private RenditionKind(int id, string name, string keyMarker) : base(id, name) => KeyMarker = keyMarker;
+
+    /// <summary>What a storage key carries after the language, so a stored file says which kind it is.</summary>
+    public string KeyMarker { get; }
+}
+
+/// <summary>
 /// One stored rendering of an issued document in one language (payments Phase 6): a PDF drawn from the
 /// document's stored snapshot, once, and kept privately in document storage.
 /// </summary>
@@ -32,10 +55,12 @@ public sealed class RenditionFormat : Enumeration
 /// document's own hash when it was drawn).
 /// </para>
 /// <para>
-/// Append-only, like the document: one per document, language, format and template version, never
-/// replaced. A new template renders documents from then on beside the old renditions rather than over
-/// them, so what a customer downloaded stays what the platform holds. A void touches no rendition: the
-/// voided document keeps its PDF, and its correction gets its own.
+/// Append-only, like the document: one per document, language, format, kind and template version, never
+/// replaced. A new template renders documents from then on beside the old renditions rather than over them, so
+/// what a customer downloaded stays what the platform holds. A void never changes a rendition either (owner,
+/// 2026-09-29): the as-issued PDF stays exactly as it was, for the administrator alone, and a second rendition —
+/// the <see cref="RenditionKind.Voided"/> copy — is drawn after the void for the customer. The void is unique per
+/// document and final, and the correction is the family's next version, so what that copy pictures never changes.
 /// </para>
 /// </remarks>
 public sealed partial class FinancialDocumentRendition : AggregateRoot, IAppendOnly
@@ -48,6 +73,9 @@ public sealed partial class FinancialDocumentRendition : AggregateRoot, IAppendO
     public Language Language { get; private set; } = null!;
 
     public RenditionFormat Format { get; private set; } = null!;
+
+    /// <summary>Whether it pictures the document as issued, or as voided.</summary>
+    public RenditionKind Kind { get; private set; } = null!;
 
     /// <summary>The layout's version (<c>DocumentPrintLayout.TemplateVersion</c>) the bytes were drawn with.</summary>
     public int TemplateVersion { get; private set; }
@@ -84,6 +112,7 @@ public sealed partial class FinancialDocumentRendition : AggregateRoot, IAppendO
         FinancialDocument document,
         Language language,
         RenditionFormat format,
+        RenditionKind kind,
         int templateVersion,
         string rendererVersion,
         string storageKey,
@@ -94,6 +123,7 @@ public sealed partial class FinancialDocumentRendition : AggregateRoot, IAppendO
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(language);
         ArgumentNullException.ThrowIfNull(format);
+        ArgumentNullException.ThrowIfNull(kind);
         if (templateVersion < 1)
             throw new DomainException("A rendition's template version starts at 1.");
         if (string.IsNullOrWhiteSpace(rendererVersion) || rendererVersion.Length > MaxRendererVersionLength)
@@ -110,6 +140,7 @@ public sealed partial class FinancialDocumentRendition : AggregateRoot, IAppendO
             DocumentId = document.Id,
             Language = language,
             Format = format,
+            Kind = kind,
             TemplateVersion = templateVersion,
             RendererVersion = rendererVersion,
             StorageKey = storageKey,
@@ -123,13 +154,14 @@ public sealed partial class FinancialDocumentRendition : AggregateRoot, IAppendO
     /// <summary>
     /// The private storage key for one attempt at rendering: a fresh name each time, so an attempt that stored
     /// bytes and never recorded them (a crash between the two) leaves an orphan the next attempt steps
-    /// around, rather than a key it can never write again.
+    /// around, rather than a key it can never write again. A voided copy's key says so (<c>…-en-void-….pdf</c>).
     /// </summary>
-    public static string NewStorageKey(Id documentId, Language language, RenditionFormat format, int templateVersion)
+    public static string NewStorageKey(Id documentId, Language language, RenditionFormat format, RenditionKind kind, int templateVersion)
     {
         ArgumentNullException.ThrowIfNull(language);
         ArgumentNullException.ThrowIfNull(format);
-        return $"financial-documents/{documentId.Value:D}/v{templateVersion}-{language.Name}-{Guid.CreateVersion7():N}.{format.Extension}";
+        ArgumentNullException.ThrowIfNull(kind);
+        return $"financial-documents/{documentId.Value:D}/v{templateVersion}-{language.Name}-{kind.KeyMarker}{Guid.CreateVersion7():N}.{format.Extension}";
     }
 
     [GeneratedRegex("^[0-9a-f]{64}$")]

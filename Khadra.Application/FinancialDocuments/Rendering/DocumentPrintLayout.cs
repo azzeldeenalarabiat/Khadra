@@ -83,7 +83,11 @@ public static partial class DocumentPrintLayout
     /// </summary>
     /// <param name="schemaVersion">The row's <c>snapshot_schema_version</c>, never the snapshot's own.</param>
     /// <param name="isTest">The row's own marker (<c>FinancialDocument.IsTest</c>), never the snapshot's.</param>
-    public static PrintedDocument? TryLayOut(int schemaVersion, string snapshot, string number, bool isTest, Language language)
+    /// <param name="voided">
+    /// For a voided copy (<c>RenditionKind.Voided</c>): when the document was voided and what replaced it. Null for
+    /// the document as issued. Never the void's reason, which is the administrators' alone.
+    /// </param>
+    public static PrintedDocument? TryLayOut(int schemaVersion, string snapshot, string number, bool isTest, Language language, VoidFacts? voided = null)
     {
         ArgumentNullException.ThrowIfNull(language);
         ArgumentException.ThrowIfNullOrWhiteSpace(number);
@@ -102,6 +106,12 @@ public static partial class DocumentPrintLayout
                 .Select(section => Section(section, language))
                 .ToList();
             var arabic = language == Language.Arabic;
+            var stamp = voided is null
+                ? null
+                : new PrintedVoid(VoidStamp(language), VoidNotice(language, voided.VoidedAtLocal), VoidReplacement(language, voided.ReplacedBy));
+            var fileTitle = stamp is null
+                ? $"{number} — {WithoutIsolates(title)}"
+                : $"{number} — {stamp.Stamp} — {WithoutIsolates(title)}";
 
             return new PrintedDocument(
                 language,
@@ -115,7 +125,8 @@ public static partial class DocumentPrintLayout
                 isTest ? Watermark(language) : null,
                 arabic ? "صفحة" : "Page",
                 arabic ? "من" : "of",
-                new PrintedMetadata($"{number} — {WithoutIsolates(title)}", IssuerName(root, language), language.Name, IssuedAt(root)));
+                new PrintedMetadata(fileTitle, IssuerName(root, language), language.Name, IssuedAt(root), voided?.VoidedAt),
+                stamp);
         }
         catch (JsonException)
         {
@@ -129,6 +140,44 @@ public static partial class DocumentPrintLayout
     {
         ArgumentNullException.ThrowIfNull(language);
         return language == Language.Arabic ? "تجريبي" : "TEST";
+    }
+
+    /// <summary>
+    /// The stamp a voided copy carries on every page, in the page's language (owner, 2026-09-29): a fixed template
+    /// word, as "TEST" is — «ملغى» is the word every client already uses for a voided document.
+    /// </summary>
+    public static string VoidStamp(Language language)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        return language == Language.Arabic ? "ملغى" : "VOID";
+    }
+
+    /// <summary>
+    /// What a voided copy says above the document (owner, 2026-09-29): that it was voided and when, in Amman time, and
+    /// that it is no longer valid. The time is the frozen shape every document time has (<c>SnapshotJson.Local</c>),
+    /// isolated by its first strong character as a literal is.
+    /// </summary>
+    public static string VoidNotice(Language language, string voidedAtLocal)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        ArgumentException.ThrowIfNullOrWhiteSpace(voidedAtLocal);
+        var when = Literal(FormatFrozenTime(voidedAtLocal, language));
+        return language == Language.Arabic
+            ? $"أُلغي هذا المستند في {when} ولم يعد ساريًا."
+            : $"This document was voided on {when} and is no longer valid.";
+    }
+
+    /// <summary>
+    /// The line under that notice naming the correction that replaced the document, its number isolated left to
+    /// right (owner, 2026-09-29) — or null when nothing replaced it.
+    /// </summary>
+    public static string? VoidReplacement(Language language, string? replacedBy)
+    {
+        ArgumentNullException.ThrowIfNull(language);
+        if (string.IsNullOrWhiteSpace(replacedBy))
+            return null;
+        var number = LeftToRight(replacedBy.Trim());
+        return language == Language.Arabic ? $"وحلّ محلّه {number}." : $"It was replaced by {number}.";
     }
 
     /// <summary>

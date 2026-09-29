@@ -130,7 +130,7 @@ internal sealed partial class BookingSettlementService(
             if (cancellationToken.IsCancellationRequested)
                 return;
 
-            var outcome = await RunAsync(new RenderFinancialDocumentCommand(candidate.DocumentId, candidate.Language), cancellationToken);
+            var outcome = await RunAsync(new RenderFinancialDocumentCommand(candidate.DocumentId, candidate.Language, candidate.Kind), cancellationToken);
             if (outcome is null || outcome.StorageFailed)
                 return;
             if (outcome.CannotBeDrawn)

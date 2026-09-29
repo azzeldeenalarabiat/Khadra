@@ -55,8 +55,8 @@ public sealed class FinancialDocumentsController(ICurrentActor actor) : ApiContr
     /// A link, good for a few minutes, to the document's PDF in <c>en</c> or <c>ar</c> (payments Phase 6). The
     /// bytes come from <c>GET /api/v1/documents/{token}</c>, like every private file; ask again when it lapses.
     /// 404 for a document that is not the caller's, exactly as for one that does not exist; 409
-    /// <c>financial_documents.pdf_not_ready</c> while it is being drawn, and <c>financial_documents.pdf_voided</c>
-    /// for a voided document, whose correction has a PDF of its own.
+    /// <c>financial_documents.pdf_not_ready</c> while it is being drawn. For a voided document it is the voided copy —
+    /// stamped VOID on every page and naming the correction — never the unstamped original (owner, 2026-09-29).
     /// </summary>
     [HttpGet("financial-documents/{documentId:guid}/pdf-link")]
     [ProducesResponseType<SignedDocumentLink>(StatusCodes.Status200OK)]

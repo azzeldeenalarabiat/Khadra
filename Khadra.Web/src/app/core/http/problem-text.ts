@@ -26,9 +26,8 @@ const WORDED: Readonly<Record<string, TranslationKey>> = {
   'auth.account_suspended': 'signIn.suspended',
   'auth.email_not_verified': 'signIn.unverified',
   rate_limited: 'problem.rateLimited',
-  // Payments Phase 6: a PDF not drawn yet, and a voided document's, which is no longer handed out.
+  // Payments Phase 6: a PDF not drawn yet. A voided document's is its voided copy, which is handed out like any other.
   'financial_documents.pdf_not_ready': 'invoices.pdf.preparing',
-  'financial_documents.pdf_voided': 'invoices.pdf.voided',
 };
 
 export function problemText(

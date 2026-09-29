@@ -71,19 +71,24 @@ public sealed class AdminFinancialDocumentsController(ICurrentActor actor) : Api
     }
 
     /// <summary>
-    /// A link, good for a few minutes, to the document's PDF in <c>en</c> or <c>ar</c> (payments Phase 6) — the
-    /// one drawn with the newest template, a voided document's included: it is the record as issued. 409
-    /// <c>financial_documents.pdf_not_ready</c> while it is being drawn.
+    /// A link, good for a few minutes, to the document's PDF in <c>en</c> or <c>ar</c> (payments Phase 6), drawn with
+    /// the newest template: the document as issued — a voided one's included, unstamped — or, with
+    /// <c>kind=Voided</c>, the voided copy its customer is given. 409 <c>financial_documents.pdf_not_ready</c> while it
+    /// is being drawn, and <c>financial_documents.not_voided</c> for the voided copy of a document that is not voided.
     /// </summary>
     [HttpGet("financial-documents/{documentId:guid}/pdf-link")]
     [ProducesResponseType<SignedDocumentLink>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult> PdfLink(Guid documentId, [FromQuery] string? language, CancellationToken cancellationToken)
+    public async Task<ActionResult> PdfLink(
+        Guid documentId,
+        [FromQuery] string? language,
+        [FromQuery] string? kind,
+        CancellationToken cancellationToken)
     {
         KeepOutOfCaches();
-        return FromResult(await Mediator.Send(new GetAdminFinancialDocumentPdfLinkQuery(Id.From(documentId), language), cancellationToken));
+        return FromResult(await Mediator.Send(new GetAdminFinancialDocumentPdfLinkQuery(Id.From(documentId), language, kind), cancellationToken));
     }
 
     /// <summary>

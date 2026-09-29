@@ -242,8 +242,9 @@ void main() {
       final drawn = FinancialDocumentPage.fromJson(pageJson('payment-receipt-paid-in-full')).pdf;
       expect(drawn.languages, ['en', 'ar']);
       expect(drawn.preparing, isFalse);
+      // A voided document's are its voided copies (owner, 2026-09-29): offered in the same field.
       final voided = FinancialDocumentPage.fromJson(pageJson('payment-receipt-deposit-voided')).pdf;
-      expect(voided.languages, isEmpty);
+      expect(voided.languages, ['en', 'ar']);
       expect(voided.preparing, isFalse);
       final none = FinancialDocumentPage.fromJson(pageJson('booking-statement-receipt-corrected')).pdf;
       expect(none.languages, isEmpty);

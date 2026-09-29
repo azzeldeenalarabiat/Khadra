@@ -8,6 +8,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 
 import 'core/config/app_environment.dart';
 import 'core/config/update_requirement.dart';
+import 'core/fonts/font_licences.dart';
 import 'core/live/live_refresh.dart';
 import 'core/live/live_surfaces.dart';
 import 'core/providers.dart';
@@ -19,6 +20,9 @@ import 'l10n/app_localizations.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // The fonts' licence texts join the packages' in Flutter's licence registry.
+  registerFontLicences();
 
   // Loaded before the first frame because every calendar answer on this platform
   // is in Amman and a date picker that opened before the zone database was ready

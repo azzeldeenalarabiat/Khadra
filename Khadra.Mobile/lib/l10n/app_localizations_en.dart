@@ -1590,8 +1590,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'The PDF of this document is being prepared.';
 
   @override
-  String get invoicesPdfVoided =>
-      'This document was voided, so its PDF is no longer offered. Its replacement has one.';
+  String get invoicesPdfVoidedEnglish => 'Voided copy (English)';
+
+  @override
+  String get invoicesPdfVoidedArabic => 'Voided copy (Arabic)';
+
+  @override
+  String get invoicesPdfOpenVoidedEnglish => 'Open the voided copy in English';
+
+  @override
+  String get invoicesPdfOpenVoidedArabic => 'Open the voided copy in Arabic';
 
   @override
   String cancelRefundAboveDeposit(String amount) {

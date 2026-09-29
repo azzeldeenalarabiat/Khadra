@@ -122,6 +122,10 @@ flutter:
 
   assets:
     - assets/brand/
+    # The fonts' licence texts (SIL Open Font License 1.1), registered with Flutter's licence registry at start
+    # (lib/core/fonts/font_licences.dart) so they travel inside every build. See assets/fonts/FONTS.md.
+    - assets/fonts/OFL-Manrope.txt
+    - assets/fonts/OFL-NotoKufiArabic.txt
 
   # The approved design is SET in these. A system UI face is a different typeface
   # on every phone the app runs on, so the design would be approximate everywhere

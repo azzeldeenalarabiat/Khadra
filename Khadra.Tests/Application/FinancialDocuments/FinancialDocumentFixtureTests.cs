@@ -279,11 +279,17 @@ public sealed partial class FinancialDocumentFixtureTests
         }
 
         // The PDFs drawn so far (payments Phase 6): both languages for most pages; none yet for the newest
-        // statement and English only for the dispute's refund receipt, both still being prepared; and the voided
-        // receipt's, drawn before its void and offered to nobody.
+        // statement and English only for the dispute's refund receipt, both still being prepared; and for a voided
+        // receipt both kinds — its PDFs as issued, drawn before the void and the administrator's alone, and the voided
+        // copies drawn after it, which are what its page offers (owner, 2026-09-29).
         IReadOnlyList<FinancialDocumentRenditionRecord> Drawn(Issued document) =>
             document == restated ? []
             : document == shareReceipt ? [Pdf(Language.English, document)]
+            : voids.ContainsKey(document.Id)
+                ? [
+                    Pdf(Language.English, document), Pdf(Language.Arabic, document),
+                    Pdf(Language.English, document, RenditionKind.Voided), Pdf(Language.Arabic, document, RenditionKind.Voided),
+                ]
             : [Pdf(Language.English, document), Pdf(Language.Arabic, document)];
 
         var rows = issued
@@ -342,8 +348,17 @@ public sealed partial class FinancialDocumentFixtureTests
 
     private static ReceiptReference Reference(Issued receipt) => new(receipt.Draft.Type, receipt.Id, receipt.Number);
 
-    private static FinancialDocumentRenditionRecord Pdf(Language language, Issued document) =>
-        new(language, RenditionFormat.Pdf, 1, "QuestPDF 2026.9.1", FinancialDocument.Sha256(document.Number + language.Name), 1, document.IssuedAt, document.Row.ContentSha256);
+    private static FinancialDocumentRenditionRecord Pdf(Language language, Issued document, RenditionKind? kind = null) =>
+        new(
+            language,
+            RenditionFormat.Pdf,
+            kind ?? RenditionKind.AsIssued,
+            1,
+            "QuestPDF 2026.9.1",
+            FinancialDocument.Sha256(document.Number + language.Name + (kind ?? RenditionKind.AsIssued).KeyMarker),
+            1,
+            document.IssuedAt,
+            document.Row.ContentSha256);
 
     private static DateTimeOffset Earliest(DateTimeOffset first, DateTimeOffset second) => first <= second ? first : second;
 

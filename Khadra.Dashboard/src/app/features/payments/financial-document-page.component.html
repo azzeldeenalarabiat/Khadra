@@ -212,6 +212,22 @@
                 <div class="kv-val" [class.mono]="row.code" [class.ltr]="row.code" [class.fdoc-proof]="row.code">{{ row.v }}</div>
               </div>
             }
+            <!-- The commercial registrations, as stored: in the record, off the customer's page and the PDF (owner, 2026-09-29). -->
+            @if (p.registrations.length) {
+              <div class="td-sub">{{ t('financialDocuments.registrations') }}</div>
+              @for (line of p.registrations; track line.key) {
+                <div class="kv-split">
+                  <div class="kv-key">{{ line.label }}</div>
+                  <div class="kv-val">
+                    @switch (line.direction) {
+                      @case ('ltr') { <span class="ltr">{{ line.value }}</span> }
+                      @case ('auto') { <bdi>{{ line.value }}</bdi> }
+                      @default { {{ line.value }} }
+                    }
+                  </div>
+                </div>
+              }
+            }
           </div>
         </section>
 
@@ -222,11 +238,11 @@
             <span class="sect-t">{{ t('financialDocuments.pdfs') }}</span>
             <span class="sect-hint">{{ t('financialDocuments.pdfsHint') }}</span>
           </div>
-          @if (p.pdf.withheld) {
+          @if (p.pdf.voided) {
             <div class="sect-pad">
               <div class="banner s-warn">
                 <kh-icon name="warning" />
-                <div>{{ t('financialDocuments.pdfWithheld') }}</div>
+                <div>{{ t('financialDocuments.pdfVoidedNote') }}</div>
               </div>
             </div>
           }
@@ -250,12 +266,12 @@
           }
           @if (p.pdf.downloads.length) {
             <div class="sect-pad fdoc-links">
-              @for (download of p.pdf.downloads; track download.language) {
+              @for (download of p.pdf.downloads; track download.key) {
                 <button
                   type="button"
                   class="btn btn-secondary btn-sm"
                   [disabled]="downloading() !== null"
-                  [attr.aria-busy]="downloading() === download.language"
+                  [attr.aria-busy]="downloading() === download.key"
                   (click)="downloadPdf(download)"
                 >
                   <kh-icon name="download-simple" />

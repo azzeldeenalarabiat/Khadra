@@ -91,9 +91,9 @@ export interface FinancialDocument {
   readonly links: FinancialDocumentLinks;
   readonly voided: { readonly voidedAt: string; readonly replacedBy: FinancialDocumentLink | null } | null;
   /**
-   * The PDFs the CUSTOMER is offered (payments Phase 6): empty for a voided document, which the customer is
-   * no longer handed. Absent from a server older than Phase 6. The administrator's downloads come from
-   * `AdminFinancialDocument.renditions` instead.
+   * The PDFs the CUSTOMER is offered (payments Phase 6): for a voided document, its voided copies — stamped VOID
+   * and naming the correction (owner, 2026-09-29) — never the original. Absent from a server older than Phase 6.
+   * The administrator's downloads come from `AdminFinancialDocument.renditions` instead.
    */
   readonly pdf?: FinancialDocumentPdf;
 }
@@ -110,6 +110,11 @@ export interface FinancialDocumentRendition {
   readonly language: string;
   /** `Pdf`. */
   readonly format: string;
+  /**
+   * `AsIssued`, or `Voided` for the copy a voided document's customer is given (payments Phase 6 follow-up).
+   * Absent from a server that predates it, whose PDFs were all as issued.
+   */
+  readonly kind?: string;
   readonly templateVersion: number;
   readonly rendererVersion: string;
   /** SHA-256 of the stored file: which bytes were handed out. */

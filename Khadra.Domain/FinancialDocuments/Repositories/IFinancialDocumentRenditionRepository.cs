@@ -16,6 +16,7 @@ public interface IFinancialDocumentRenditionRepository
         Id documentId,
         Language language,
         RenditionFormat format,
+        RenditionKind kind,
         CancellationToken cancellationToken = default);
 
     /// <summary>Every rendition of a document, oldest first: what the administrator's page lists.</summary>

@@ -78,9 +78,12 @@ export interface FinancialDocumentVoidNotice {
  * request — `GET /financial-documents/{id}/pdf-link?language=` — that lasts minutes, so none is listed here.
  */
 export interface FinancialDocumentPdf {
-  /** `en`, `ar`: the languages whose PDF has been drawn, English first. Empty for a voided document. */
+  /**
+   * `en`, `ar`: the languages whose PDF has been drawn, English first. For a voided document, its voided copies —
+   * stamped VOID and naming the correction — never the original (owner, 2026-09-29).
+   */
   readonly languages: readonly string[];
-  /** A PDF the document will have is still being drawn. Never true for a voided document. */
+  /** A PDF the document will have is still being drawn: for a voided document, its voided copy. */
   readonly preparing: boolean;
 }
 

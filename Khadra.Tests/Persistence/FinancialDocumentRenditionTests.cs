@@ -72,6 +72,7 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
                 Assert.Equal(bytes.LongLength, rendition.SizeBytes);
                 Assert.Equal(document.ContentSha256, rendition.SnapshotSha256);
                 Assert.Equal(RenditionFormat.Pdf, rendition.Format);
+                Assert.Equal(RenditionKind.AsIssued, rendition.Kind);
                 Assert.Equal(DocumentPrintLayout.TemplateVersion, rendition.TemplateVersion);
                 Assert.StartsWith("QuestPDF 2026.", rendition.RendererVersion, StringComparison.Ordinal);
                 Assert.Equal(_harness.Now, rendition.RenderedAt);
@@ -107,7 +108,7 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
         await _harness.RenderPassAsync();
 
         await using var context = _harness.NewContext();
-        var outcome = await _harness.RenderHandler(context).Handle(new RenderFinancialDocumentCommand(receipt.Id, Language.Arabic), CancellationToken.None);
+        var outcome = await _harness.RenderHandler(context).Handle(new RenderFinancialDocumentCommand(receipt.Id, Language.Arabic, RenditionKind.AsIssued), CancellationToken.None);
 
         Assert.Equal("already_rendered", outcome.Skipped);
         Assert.Equal(4, _harness.Storage.Files.Count);
@@ -129,6 +130,7 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
         // counts and offers them — the reader's pair and DocumentPrintLayout.Languages never part.
         Assert.Equal(DocumentPrintLayout.Languages, new[] { all[0].Language, all[1].Language });
         Assert.Equal(first.BookingId, (await DocumentAsync(all[0].DocumentId)).BookingId);
+        Assert.All(all, candidate => Assert.Equal(RenditionKind.AsIssued, candidate.Kind));
         for (var index = 0; index < all.Count; index += 2)
         {
             Assert.Equal(all[index].DocumentId, all[index + 1].DocumentId);
@@ -218,7 +220,7 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
 
         Assert.Equal(3, outcomes.Count(outcome => outcome.RenditionId is not null));
         Assert.Equal("drawing_failed", Assert.Single(outcomes, outcome => outcome.CannotBeDrawn).Skipped);
-        Assert.Equal(new RenditionCandidate(receipt.Id, Language.Arabic), Assert.Single(_harness.Undrawable));
+        Assert.Equal(new RenditionCandidate(receipt.Id, Language.Arabic, RenditionKind.AsIssued), Assert.Single(_harness.Undrawable));
         Assert.Single(_harness.RenderingLog.Entries, entry => entry.Id.Id == 2623);
         Assert.Empty(await _harness.RenderPassAsync());
         Assert.Single(_harness.RenderingLog.Entries, entry => entry.Id.Id == 2623);
@@ -314,18 +316,18 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
 
         await using (var duplicate = _harness.NewContext())
         {
-            duplicate.FinancialDocumentRenditions.Add(Rendition(document, Language.English, templateVersion: 1));
+            duplicate.FinancialDocumentRenditions.Add(Rendition(document, Language.English, RenditionKind.AsIssued, templateVersion: 1));
             await Assert.ThrowsAsync<DbUpdateException>(() => duplicate.SaveChangesAsync());
         }
 
         await using (var newer = _harness.NewContext())
         {
-            newer.FinancialDocumentRenditions.Add(Rendition(document, Language.English, templateVersion: 2));
+            newer.FinancialDocumentRenditions.Add(Rendition(document, Language.English, RenditionKind.AsIssued, templateVersion: 2));
             await newer.SaveChangesAsync();
         }
 
         await using var reading = _harness.NewContext();
-        var current = await new FinancialDocumentRenditionRepository(reading).CurrentAsync(receipt.Id, Language.English, RenditionFormat.Pdf);
+        var current = await new FinancialDocumentRenditionRepository(reading).CurrentAsync(receipt.Id, Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued);
         Assert.Equal(2, current!.TemplateVersion);
         Assert.Equal(3, (await new FinancialDocumentRenditionRepository(reading).ListForDocumentAsync(receipt.Id)).Count);
     }
@@ -384,27 +386,145 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
     }
 
     [Fact]
-    public async Task A_voided_documents_pdf_is_offered_to_nobody_but_the_administrator()
+    public async Task A_voided_documents_customer_is_given_its_voided_copy_and_the_original_stays_the_administrators()
     {
+        // Owner, 2026-09-29: the document stays in the customer's history, and its PDF becomes a copy stamped VOID that
+        // names its correction — drawn beside the original, which is never touched and never handed to them again.
         var (receipt, _) = await IssuedAsync();
         await _harness.RenderPassAsync();
+        var originals = (await _harness.RenditionsAsync())
+            .Where(rendition => rendition.DocumentId == receipt.Id)
+            .ToDictionary(rendition => rendition.Language.Name, rendition => (rendition.StorageKey, rendition.ContentSha256));
         _harness.Now = _harness.Now.AddMinutes(5);
         var voided = await _harness.VoidAsync(receipt.Id, "Issued from the wrong capture.");
         Assert.True(voided.IsSuccess);
 
+        // Until the copy is drawn the page says it is being prepared — and the original is not handed out meanwhile.
+        var waiting = await PageAsync(receipt.Id);
+        Assert.Empty(waiting.Pdf.Languages);
+        Assert.True(waiting.Pdf.Preparing);
+        Assert.Equal(FinancialDocumentErrors.PdfNotReady, (await MineAsync(receipt.CustomerId, receipt.Id, "en", Signer())).Error);
+
+        // The next pass draws the two voided copies and the correction's two PDFs, and nothing else.
+        var outcomes = await _harness.RenderPassAsync();
+        Assert.Equal(4, outcomes.Count(outcome => outcome.RenditionId is not null));
+        var renditions = await _harness.RenditionsAsync();
+        var copies = renditions.Where(rendition => rendition.DocumentId == receipt.Id && rendition.Kind == RenditionKind.Voided).ToList();
+        Assert.Equal(["ar", "en"], copies.Select(copy => copy.Language.Name).Order(StringComparer.Ordinal));
+        foreach (var copy in copies)
+        {
+            Assert.Contains($"/v1-{copy.Language.Name}-void-", copy.StorageKey, StringComparison.Ordinal);
+            Assert.Equal(receipt.ContentSha256, copy.SnapshotSha256);
+            Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(_harness.Storage.Files[copy.StorageKey])), copy.ContentSha256);
+        }
+
+        // The original bytes are exactly what they were: same rows, same keys, same hashes, still stored.
+        var asIssued = renditions.Where(rendition => rendition.DocumentId == receipt.Id && rendition.Kind == RenditionKind.AsIssued).ToList();
+        Assert.Equal(2, asIssued.Count);
+        foreach (var original in asIssued)
+        {
+            Assert.Equal(originals[original.Language.Name], (original.StorageKey, original.ContentSha256));
+            Assert.Equal(original.ContentSha256, Convert.ToHexStringLower(SHA256.HashData(_harness.Storage.Files[original.StorageKey])));
+        }
+
+        // The customer's page offers the voided copies; their link opens the copy, never the original.
         var page = await PageAsync(receipt.Id);
-        Assert.Empty(page.Pdf.Languages);
+        Assert.Equal(["en", "ar"], page.Pdf.Languages);
         Assert.False(page.Pdf.Preparing);
-        Assert.Equal(FinancialDocumentErrors.PdfOfVoidedDocument, (await MineAsync(receipt.CustomerId, receipt.Id, "en", Signer())).Error);
+        foreach (var language in new[] { "en", "ar" })
+        {
+            var key = KeyOf((await MineAsync(receipt.CustomerId, receipt.Id, language, Signer())).Value);
+            Assert.Equal(copies.Single(copy => copy.Language.Name == language).StorageKey, key);
+        }
 
-        // The administrator can still read what was issued; the void touched no rendition.
-        Assert.True((await AdminAsync(receipt.Id, "en")).IsSuccess);
-        Assert.Equal(2, (await _harness.RenditionsAsync()).Count(rendition => rendition.DocumentId == receipt.Id));
+        // The administrator reads the original by default and the customer's copy on asking for it.
+        Assert.Equal(originals["en"].StorageKey, KeyOf((await AdminAsync(receipt.Id, "en")).Value));
+        Assert.Equal(copies.Single(copy => copy.Language == Language.Arabic).StorageKey, KeyOf((await AdminAsync(receipt.Id, "ar", "Voided")).Value));
 
-        // Its correction is drawn on the next pass, and offered.
-        await _harness.RenderPassAsync();
+        // A stranger learns nothing of the void or the copy.
+        Assert.Equal(FinancialDocumentErrors.NotFound, (await MineAsync(Id.New(), receipt.Id, "en", Signer())).Error);
+
+        // Its correction is offered as issued.
         var correction = (await PageAsync(voided.Value.ReplacementDocumentId)).Pdf;
         Assert.Equal(["en", "ar"], correction.Languages);
+        Assert.Empty(await _harness.RenderPassAsync());
+    }
+
+    [Fact]
+    public async Task A_document_voided_before_it_was_drawn_gets_both_kinds_in_one_pass_as_issued_first()
+    {
+        var (receipt, statement) = await IssuedAsync();
+        _harness.Now = _harness.Now.AddMinutes(1);
+        var voided = await _harness.VoidAsync(receipt.Id, "Voided before any PDF was drawn.");
+        Assert.True(voided.IsSuccess);
+
+        await using (var context = _harness.NewContext())
+        {
+            var work = await new FinancialDocumentRenditionWorkReader(context).ListAsync([1], [], 100);
+            // Oldest issue first; within a document, the record as issued before its voided copy, English before Arabic.
+            Assert.Equal(
+                [
+                    new RenditionCandidate(receipt.Id, Language.English, RenditionKind.AsIssued),
+                    new RenditionCandidate(receipt.Id, Language.Arabic, RenditionKind.AsIssued),
+                    new RenditionCandidate(receipt.Id, Language.English, RenditionKind.Voided),
+                    new RenditionCandidate(receipt.Id, Language.Arabic, RenditionKind.Voided),
+                ],
+                work.Where(candidate => candidate.DocumentId == receipt.Id));
+            Assert.Equal(8, work.Count);
+            Assert.Equal(2, work.Count(candidate => candidate.DocumentId == statement.Id));
+            Assert.Equal(2, work.Count(candidate => candidate.DocumentId.Value == voided.Value.ReplacementDocumentId));
+
+            // A kind this process could not draw is stepped around on its own: the other kind is still owed.
+            var skipped = await new FinancialDocumentRenditionWorkReader(context)
+                .ListAsync([1], [new RenditionCandidate(receipt.Id, Language.English, RenditionKind.AsIssued)], 100);
+            Assert.Contains(new RenditionCandidate(receipt.Id, Language.English, RenditionKind.Voided), skipped);
+            Assert.DoesNotContain(new RenditionCandidate(receipt.Id, Language.English, RenditionKind.AsIssued), skipped);
+        }
+
+        var outcomes = await _harness.RenderPassAsync();
+
+        Assert.Equal(8, outcomes.Count(outcome => outcome.RenditionId is not null));
+        Assert.Equal(4, (await _harness.RenditionsAsync()).Count(rendition => rendition.DocumentId == receipt.Id));
+        Assert.Empty(await _harness.RenderPassAsync());
+    }
+
+    [Fact]
+    public async Task One_voided_copy_per_document_language_and_template_beside_the_original()
+    {
+        var (receipt, _) = await IssuedAsync();
+        await _harness.VoidAsync(receipt.Id, "Duplicate capture.");
+        await _harness.RenderPassAsync();
+        var document = (await _harness.DocumentsAsync()).Single(candidate => candidate.Id == receipt.Id);
+
+        await using (var duplicate = _harness.NewContext())
+        {
+            duplicate.FinancialDocumentRenditions.Add(Rendition(document, Language.Arabic, RenditionKind.Voided, templateVersion: 1));
+            await Assert.ThrowsAsync<DbUpdateException>(() => duplicate.SaveChangesAsync());
+        }
+
+        // And asked for directly, it is already drawn.
+        await using var context = _harness.NewContext();
+        var outcome = await _harness.RenderHandler(context).Handle(
+            new RenderFinancialDocumentCommand(receipt.Id, Language.Arabic, RenditionKind.Voided), CancellationToken.None);
+        Assert.Equal("already_rendered", outcome.Skipped);
+    }
+
+    [Fact]
+    public async Task A_document_that_is_not_voided_has_no_voided_copy_for_anyone()
+    {
+        var (receipt, _) = await IssuedAsync();
+        await _harness.RenderPassAsync();
+
+        Assert.Equal(FinancialDocumentErrors.NotVoided, (await AdminAsync(receipt.Id, "en", "Voided")).Error);
+        Assert.Equal(FinancialDocumentErrors.NotFound, (await AdminAsync(Id.New(), "en", "Voided")).Error);
+        Assert.Equal(KeyOf((await AdminAsync(receipt.Id, "en")).Value), KeyOf((await AdminAsync(receipt.Id, "en", "AsIssued")).Value));
+
+        // Nor is one drawn when asked for directly.
+        await using var context = _harness.NewContext();
+        var outcome = await _harness.RenderHandler(context).Handle(
+            new RenderFinancialDocumentCommand(receipt.Id, Language.English, RenditionKind.Voided), CancellationToken.None);
+        Assert.Equal("not_voided", outcome.Skipped);
+        Assert.DoesNotContain(await _harness.RenditionsAsync(), rendition => rendition.Kind == RenditionKind.Voided);
     }
 
     [Fact]
@@ -430,6 +550,17 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
         Assert.Equal(accepted, new GetMyFinancialDocumentPdfLinkQueryValidator().Validate(new GetMyFinancialDocumentPdfLinkQuery(Id.New(), Id.New(), language)).IsValid);
         Assert.Equal(accepted, new GetAdminFinancialDocumentPdfLinkQueryValidator().Validate(new GetAdminFinancialDocumentPdfLinkQuery(Id.New(), language)).IsValid);
     }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("AsIssued", true)]
+    [InlineData("Voided", true)]
+    [InlineData(" voided ", true)]
+    [InlineData("Original", false)]
+    [InlineData("void", false)]
+    public void The_administrator_asks_for_the_document_as_issued_or_its_voided_copy(string? kind, bool accepted) =>
+        Assert.Equal(accepted, new GetAdminFinancialDocumentPdfLinkQueryValidator().Validate(new GetAdminFinancialDocumentPdfLinkQuery(Id.New(), "en", kind)).IsValid);
 
     // ── Helpers ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -460,10 +591,18 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
         return await Links(context, signer).Handle(new GetMyFinancialDocumentPdfLinkQuery(customerId, documentId, language), CancellationToken.None);
     }
 
-    private async Task<CSharpFunctionalExtensions.Result<SignedDocumentLink, Error>> AdminAsync(Id documentId, string language)
+    private async Task<CSharpFunctionalExtensions.Result<SignedDocumentLink, Error>> AdminAsync(Id documentId, string language, string? kind = null)
     {
         await using var context = _harness.NewContext();
-        return await Links(context, Signer()).Handle(new GetAdminFinancialDocumentPdfLinkQuery(documentId, language), CancellationToken.None);
+        return await Links(context, Signer()).Handle(new GetAdminFinancialDocumentPdfLinkQuery(documentId, language, kind), CancellationToken.None);
+    }
+
+    /// <summary>The storage key a minted link opens.</summary>
+    private static string KeyOf(SignedDocumentLink link)
+    {
+        var token = link.Url.Split('/')[^1].Split('?')[0];
+        Assert.True(Signer().TryDecodeToken(token, out var key));
+        return key;
     }
 
     private FinancialDocumentPdfLinkHandlers Links(KhadraDbContext context, IDocumentLinkSigner signer) =>
@@ -472,14 +611,15 @@ public sealed class FinancialDocumentRenditionTests : IDisposable
     private static HmacDocumentLinkSigner Signer() =>
         new(Options.Create(new JwtOptions { SigningKey = new string('k', 48) }), FakeDocumentPolicy.Default);
 
-    private FinancialDocumentRendition Rendition(FinancialDocument document, Language language, int templateVersion) =>
+    private FinancialDocumentRendition Rendition(FinancialDocument document, Language language, RenditionKind kind, int templateVersion) =>
         FinancialDocumentRendition.Record(
             document,
             language,
             RenditionFormat.Pdf,
+            kind,
             templateVersion,
             "QuestPDF 2026.9.1",
-            FinancialDocumentRendition.NewStorageKey(document.Id, language, RenditionFormat.Pdf, templateVersion),
+            FinancialDocumentRendition.NewStorageKey(document.Id, language, RenditionFormat.Pdf, kind, templateVersion),
             new string('a', 64),
             1234,
             _harness.Now);

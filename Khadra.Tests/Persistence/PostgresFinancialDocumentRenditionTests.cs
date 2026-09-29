@@ -12,17 +12,20 @@ using Npgsql;
 namespace Khadra.Tests.Persistence;
 
 /// <summary>
-/// The PDF renditions of issued documents on PostgreSQL itself (payments Phase 6, migration
-/// <c>20260928222747_FinancialDocumentRenditions</c>): the table, its keys and its append-only triggers; the
-/// rendering pass's queries; a second process losing the race to record the same PDF — forced, not hoped
-/// for — and removing its own copy; and the rollback, which refuses to run over a real document's PDFs. Opt-in:
-/// set <c>KHADRA_TEST_POSTGRES</c> to a scratch database. Each scenario gets a fresh database of its own.
+/// The PDF renditions of issued documents on PostgreSQL itself (payments Phase 6, migrations
+/// <c>20260928222747_FinancialDocumentRenditions</c> and <c>20260929020747_FinancialDocumentRenditionKind</c>): the
+/// table, its keys and its append-only triggers; the rendering pass's queries, voided copies included; a second
+/// process losing the race to record the same PDF — forced, not hoped for — and removing its own copy; the kind
+/// arriving on rows already there; and the rollbacks, which refuse to run over a real document's PDFs or over a
+/// voided copy. Opt-in: set <c>KHADRA_TEST_POSTGRES</c> to a scratch database. Each scenario gets a fresh database
+/// of its own.
 /// </summary>
 [Collection(PostgresTestDatabase.Collection)]
 public sealed class PostgresFinancialDocumentRenditionTests
 {
     private const string Previous = "20260926230609_FinancialDocuments";
     private const string ThisMigration = "20260928222747_FinancialDocumentRenditions";
+    private const string KindMigration = "20260929020747_FinancialDocumentRenditionKind";
 
     private static readonly DateTimeOffset Now = Build.Now;
 
@@ -34,6 +37,15 @@ public sealed class PostgresFinancialDocumentRenditionTests
         await harness.PaidAsync(PaymentProviders.Sandbox, unique: "31313");
         await harness.PassAsync();
         Assert.Equal(4, (await harness.RenderPassAsync()).Count(outcome => outcome.RenditionId is not null));
+
+        // A void: the pass's queries find the two voided copies and the correction's two PDFs, and nothing more.
+        var receipt = (await harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
+        Assert.True((await harness.VoidAsync(receipt.Id, "Proving the voided copy on PostgreSQL.")).IsSuccess);
+        Assert.Equal(4, (await harness.RenderPassAsync()).Count(outcome => outcome.RenditionId is not null));
+        Assert.Empty(await harness.RenderPassAsync());
+        Assert.Equal(
+            ["AsIssued", "AsIssued", "Voided", "Voided"],
+            (await harness.RenditionsAsync()).Where(rendition => rendition.DocumentId == receipt.Id).Select(rendition => rendition.Kind.Name).Order(StringComparer.Ordinal));
 
         await using var connection = await OpenAsync(database);
         var constraints = await NamesAsync(connection, @"
@@ -47,7 +59,8 @@ SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid WHER
             ],
             name => Assert.Contains(name, constraints));
         var indexes = await NamesAsync(connection, "SELECT indexname FROM pg_indexes WHERE tablename = 'financial_document_renditions'");
-        Assert.Contains("ix_financial_document_renditions_document_id_language_format_t", indexes);
+        Assert.Contains("ix_financial_document_renditions_document_id_language_format_k", indexes);
+        Assert.DoesNotContain("ix_financial_document_renditions_document_id_language_format_t", indexes);
         Assert.Contains("ix_financial_document_renditions_storage_key", indexes);
         // The key restricts: a document cannot be removed from under its PDF (it cannot be removed at all).
         await using (var rule = new NpgsqlCommand(@"
@@ -64,7 +77,7 @@ SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_do
         await RefusedAsync(connection, "DELETE FROM financial_document_renditions", "DELETE");
         await RefusedAsync(connection, "TRUNCATE financial_document_renditions", "TRUNCATE");
         await using var count = new NpgsqlCommand("SELECT count(*) FROM financial_document_renditions", connection);
-        Assert.Equal(4L, (long)(await count.ExecuteScalarAsync())!);
+        Assert.Equal(8L, (long)(await count.ExecuteScalarAsync())!);
     }
 
     [PostgresFact]
@@ -74,7 +87,7 @@ SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_do
         await harness.PaidAsync(PaymentProviders.Sandbox, unique: "41414");
         await harness.PassAsync();
         var receipt = (await harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
-        var command = new RenderFinancialDocumentCommand(receipt.Id, Language.English);
+        var command = new RenderFinancialDocumentCommand(receipt.Id, Language.English, RenditionKind.AsIssued);
 
         // The loser has looked (no PDF yet) and drawn; as its bytes reach storage, the winner draws, stores and
         // RECORDS the same PDF. The loser's own record then meets the unique index.
@@ -104,7 +117,6 @@ SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_do
         var database = await FreshDatabaseAsync("realpdf");
         await using (var context = new KhadraDbContext(database.Options))
         {
-            await MigrateToAsync(context, ThisMigration);
             var document = Receipt("PAY-2026-000001", "Stripe");
             context.FinancialDocuments.Add(document);
             context.FinancialDocumentRenditions.Add(Rendition(document));
@@ -128,7 +140,6 @@ SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_do
         var database = await FreshDatabaseAsync("testpdf");
         await using (var context = new KhadraDbContext(database.Options))
         {
-            await MigrateToAsync(context, ThisMigration);
             var document = Receipt("TEST-PAY-2026-000001", PaymentProviders.Sandbox);
             context.FinancialDocuments.Add(document);
             context.FinancialDocumentRenditions.Add(Rendition(document));
@@ -144,6 +155,107 @@ SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_do
         // The documents themselves are untouched by this rollback.
         await using var documents = new NpgsqlCommand("SELECT count(*) FROM financial_documents", connection);
         Assert.Equal(1L, (long)(await documents.ExecuteScalarAsync())!);
+    }
+
+    [PostgresFact]
+    public async Task The_kind_arrives_on_every_existing_row_as_issued_and_every_later_row_must_say_which_it_is()
+    {
+        var database = await FreshDatabaseAsync("kindup");
+        await using (var context = new KhadraDbContext(database.Options))
+        {
+            await MigrateToAsync(context, ThisMigration);
+            var document = Receipt("TEST-PAY-2026-000002", PaymentProviders.Sandbox);
+            context.FinancialDocuments.Add(document);
+            await context.SaveChangesAsync();
+
+            // A PDF drawn before the kind existed: written as the table then stood.
+            await context.Database.ExecuteSqlAsync($@"
+INSERT INTO financial_document_renditions
+    (id, document_id, language, format, template_version, renderer_version, storage_key, content_sha256, size_bytes, snapshot_sha256, rendered_at)
+VALUES ({Guid.CreateVersion7()}, {document.Id.Value}, 'en', 'Pdf', 1, 'QuestPDF 2026.9.1',
+        {FinancialDocumentRendition.NewStorageKey(document.Id, Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued, 1)},
+        {new string('c', 64)}, 2048, {document.ContentSha256}, {Now})");
+
+            await MigrateToAsync(context, KindMigration);
+        }
+
+        await using var connection = await OpenAsync(database);
+        Assert.Equal(["AsIssued"], await NamesAsync(connection, "SELECT kind FROM financial_document_renditions"));
+        await using (var column = new NpgsqlCommand(@"
+SELECT is_nullable, column_default IS NULL, character_maximum_length FROM information_schema.columns
+WHERE table_name = 'financial_document_renditions' AND column_name = 'kind'", connection))
+        {
+            await using var reader = await column.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("NO", reader.GetString(0));
+            // The default filled the rows already there, and went: from then on every row names its kind.
+            Assert.True(reader.GetBoolean(1));
+            Assert.Equal(10, reader.GetInt32(2));
+        }
+
+        // The migration rewrote nothing the triggers guard, and they still stand.
+        Assert.Equal(2, (await NamesAsync(connection, @"
+SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_document_renditions'::regclass")).Count);
+        var indexes = await NamesAsync(connection, "SELECT indexname FROM pg_indexes WHERE tablename = 'financial_document_renditions'");
+        Assert.Contains("ix_financial_document_renditions_document_id_language_format_k", indexes);
+        Assert.DoesNotContain("ix_financial_document_renditions_document_id_language_format_t", indexes);
+
+        await using var unnamed = new NpgsqlCommand(@"
+INSERT INTO financial_document_renditions
+    (id, document_id, language, format, template_version, renderer_version, storage_key, content_sha256, size_bytes, snapshot_sha256, rendered_at)
+SELECT gen_random_uuid(), document_id, 'ar', 'Pdf', 1, renderer_version, storage_key || '-ar', content_sha256, size_bytes, snapshot_sha256, rendered_at
+FROM financial_document_renditions", connection);
+        var refusal = await Assert.ThrowsAsync<PostgresException>(() => unnamed.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.NotNullViolation, refusal.SqlState);
+    }
+
+    [PostgresFact]
+    public async Task The_kind_rollback_refuses_once_a_voided_copy_exists()
+    {
+        var database = await FreshDatabaseAsync("kindvoid");
+        await using (var context = new KhadraDbContext(database.Options))
+        {
+            // A test document, so that the only thing standing in the way is the voided copy itself.
+            var document = Receipt("TEST-PAY-2026-000003", PaymentProviders.Sandbox);
+            context.FinancialDocuments.Add(document);
+            context.FinancialDocumentRenditions.Add(Rendition(document));
+            context.FinancialDocumentRenditions.Add(Rendition(document, RenditionKind.Voided));
+            await context.SaveChangesAsync();
+        }
+
+        await using (var context = new KhadraDbContext(database.Options))
+        {
+            var refusal = await Assert.ThrowsAsync<PostgresException>(() => MigrateToAsync(context, ThisMigration));
+            Assert.Contains("voided copies", refusal.MessageText, StringComparison.Ordinal);
+            Assert.Contains("fixed forward", refusal.MessageText, StringComparison.Ordinal);
+        }
+
+        await using var connection = await OpenAsync(database);
+        Assert.Equal(["AsIssued", "Voided"], (await NamesAsync(connection, "SELECT kind FROM financial_document_renditions")).Order(StringComparer.Ordinal));
+    }
+
+    [PostgresFact]
+    public async Task The_kind_rollback_runs_while_every_rendition_is_as_issued()
+    {
+        var database = await FreshDatabaseAsync("kinddown");
+        await using (var context = new KhadraDbContext(database.Options))
+        {
+            var document = Receipt("PAY-2026-000004", "Stripe");
+            context.FinancialDocuments.Add(document);
+            context.FinancialDocumentRenditions.Add(Rendition(document));
+            await context.SaveChangesAsync();
+
+            await MigrateToAsync(context, ThisMigration);
+        }
+
+        await using var connection = await OpenAsync(database);
+        Assert.Empty(await NamesAsync(connection, @"
+SELECT column_name::text FROM information_schema.columns WHERE table_name = 'financial_document_renditions' AND column_name = 'kind'"));
+        var indexes = await NamesAsync(connection, "SELECT indexname FROM pg_indexes WHERE tablename = 'financial_document_renditions'");
+        Assert.Contains("ix_financial_document_renditions_document_id_language_format_t", indexes);
+        Assert.DoesNotContain("ix_financial_document_renditions_document_id_language_format_k", indexes);
+        await using var count = new NpgsqlCommand("SELECT count(*) FROM financial_document_renditions", connection);
+        Assert.Equal(1L, (long)(await count.ExecuteScalarAsync())!);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────────────────────
@@ -175,14 +287,15 @@ SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'financial_do
         return FinancialDocument.Issue(draft, number, Now);
     }
 
-    private static FinancialDocumentRendition Rendition(FinancialDocument document) =>
+    private static FinancialDocumentRendition Rendition(FinancialDocument document, RenditionKind? kind = null) =>
         FinancialDocumentRendition.Record(
             document,
             Language.English,
             RenditionFormat.Pdf,
+            kind ?? RenditionKind.AsIssued,
             1,
             "QuestPDF 2026.9.1",
-            FinancialDocumentRendition.NewStorageKey(document.Id, Language.English, RenditionFormat.Pdf, 1),
+            FinancialDocumentRendition.NewStorageKey(document.Id, Language.English, RenditionFormat.Pdf, kind ?? RenditionKind.AsIssued, 1),
             new string('b', 64),
             2048,
             Now);

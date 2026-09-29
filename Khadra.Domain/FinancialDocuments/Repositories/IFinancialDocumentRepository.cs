@@ -19,6 +19,19 @@ public interface IFinancialDocumentRepository
     /// <summary>Whether a void was recorded against the document.</summary>
     Task<bool> IsVoidedAsync(Id documentId, CancellationToken cancellationToken = default);
 
+    /// <summary>The void recorded against the document, or null. At most one: the void's key is the document's.</summary>
+    Task<FinancialDocumentVoid?> VoidOfAsync(Id documentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// One version of a family, or null. A void's correction is exactly the voided version plus one — never simply
+    /// the family's latest, which a later checkpoint may already have moved on from.
+    /// </summary>
+    Task<FinancialDocument?> FamilyMemberAsync(
+        FinancialDocumentType type,
+        Id subjectId,
+        int version,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// The latest version of every RECEIPT family on a booking, oldest money first: what a statement lists
     /// as the receipts issued so far, and where it finds a receipt's correction among its checkpoints.

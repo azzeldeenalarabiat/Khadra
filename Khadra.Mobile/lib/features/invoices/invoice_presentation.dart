@@ -208,7 +208,7 @@ DocumentBodyView documentBody(DocumentContent content, Formats formats) {
         DocumentSectionView(
           key: '$index:${section.key}',
           heading: section.heading.of(arabic: arabic),
-          blocks: _blocksOf(section.lines, formats),
+          blocks: _blocksOf(section.key, section.lines, formats),
         ),
     ],
     timeNote: content.timeNote?.of(arabic: arabic),
@@ -216,9 +216,18 @@ DocumentBodyView documentBody(DocumentContent content, Formats formats) {
   );
 }
 
-List<DocumentBlock> _blocksOf(List<DocumentLine> lines, Formats formats) {
+/// Whether a customer's page shows a line of the stored document (owner,
+/// 2026-09-29). The commercial registrations stay off it, as they stay off the
+/// PDF's body: Khadra's, the rental office's and — while there are no business
+/// accounts — a customer's. Presentation only: the reader has read every line (a
+/// broken one refuses the document whole), and the stored document keeps them all.
+bool shownToCustomer(String sectionKey, String lineKey) =>
+    !(sectionKey == 'parties' && const {'issuerRegistration', 'officeRegistration', 'customerRegistration'}.contains(lineKey));
+
+List<DocumentBlock> _blocksOf(String sectionKey, List<DocumentLine> lines, Formats formats) {
   final blocks = <DocumentBlock>[];
   for (final (position, line) in lines.indexed) {
+    if (!shownToCustomer(sectionKey, line.key)) continue;
     final key = '$position:${line.key}';
     final value = _valueText(line.value, formats);
     final direction = directionOf(line.value);
@@ -338,8 +347,8 @@ class InvoicePageView {
 }
 
 /// One PDF to open: the language it is in, its button, and the name of the file
-/// the platform viewer is handed — the document's number and the language, so a
-/// file shared onwards says what it is.
+/// the platform viewer is handed — the document's number and the language, and
+/// `-void` for a voided copy, so a file shared onwards says what it is.
 class PdfOpenView {
   const PdfOpenView({required this.language, required this.label, required this.semantics, required this.fileStem});
 
@@ -358,24 +367,33 @@ class PdfView {
 
 /// The PDFs the server says were drawn, in the order it sent them (English
 /// first). A language this build has never heard of is not offered.
-PdfView pdfView(FinancialDocumentPage page, AppLocalizations l10n) => PdfView(
-      opens: [
-        for (final language in page.pdf.languages)
-          if (switch (language) {
-            'en' => (l10n.invoicesPdfEnglish, l10n.invoicesPdfOpenEnglish),
-            'ar' => (l10n.invoicesPdfArabic, l10n.invoicesPdfOpenArabic),
-            _ => null,
-          }
-              case (final label, final semantics))
-            PdfOpenView(
-              language: language,
-              label: label,
-              semantics: semantics,
-              fileStem: '${page.row.number}-$language',
-            ),
-      ],
-      preparing: page.pdf.preparing,
-    );
+///
+/// A voided document's PDFs are its voided copies — the document as issued,
+/// stamped VOID and naming its replacement (owner, 2026-09-29). The server alone
+/// decides that; this only names them so.
+PdfView pdfView(FinancialDocumentPage page, AppLocalizations l10n) {
+  final voided = page.voided != null;
+  return PdfView(
+    opens: [
+      for (final language in page.pdf.languages)
+        if (switch ((language, voided)) {
+          ('en', false) => (l10n.invoicesPdfEnglish, l10n.invoicesPdfOpenEnglish),
+          ('ar', false) => (l10n.invoicesPdfArabic, l10n.invoicesPdfOpenArabic),
+          ('en', true) => (l10n.invoicesPdfVoidedEnglish, l10n.invoicesPdfOpenVoidedEnglish),
+          ('ar', true) => (l10n.invoicesPdfVoidedArabic, l10n.invoicesPdfOpenVoidedArabic),
+          _ => null,
+        }
+            case (final label, final semantics))
+          PdfOpenView(
+            language: language,
+            label: label,
+            semantics: semantics,
+            fileStem: voided ? '${page.row.number}-$language-void' : '${page.row.number}-$language',
+          ),
+    ],
+    preparing: page.pdf.preparing,
+  );
+}
 
 InvoicePageView invoicePage(FinancialDocumentPage page, AppLocalizations l10n, Formats formats) {
   final row = page.row;

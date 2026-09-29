@@ -2654,11 +2654,29 @@ abstract class AppLocalizations {
   /// **'The PDF of this document is being prepared.'**
   String get invoicesPdfPreparing;
 
-  /// No description provided for @invoicesPdfVoided.
+  /// Payments Phase 6 follow-up (owner, 2026-09-29): opens a VOIDED document's copy drawn in English — the document as issued, stamped VOID, naming its replacement.
   ///
   /// In en, this message translates to:
-  /// **'This document was voided, so its PDF is no longer offered. Its replacement has one.'**
-  String get invoicesPdfVoided;
+  /// **'Voided copy (English)'**
+  String get invoicesPdfVoidedEnglish;
+
+  /// No description provided for @invoicesPdfVoidedArabic.
+  ///
+  /// In en, this message translates to:
+  /// **'Voided copy (Arabic)'**
+  String get invoicesPdfVoidedArabic;
+
+  /// No description provided for @invoicesPdfOpenVoidedEnglish.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the voided copy in English'**
+  String get invoicesPdfOpenVoidedEnglish;
+
+  /// No description provided for @invoicesPdfOpenVoidedArabic.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the voided copy in Arabic'**
+  String get invoicesPdfOpenVoidedArabic;
 
   /// No description provided for @cancelRefundAboveDeposit.
   ///

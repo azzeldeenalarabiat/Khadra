@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.FinancialDocuments.Composition;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.FinancialDocuments;
@@ -16,10 +17,10 @@ public sealed record ListFinancialDocumentRenditionWorkQuery(IReadOnlyCollection
     : IQuery<IReadOnlyList<RenditionCandidate>>;
 
 /// <summary>
-/// Draws ONE document's PDF in one language, stores it privately and records it, in its own scope (payments
-/// Phase 6). The settlement pass sends one of these per candidate.
+/// Draws ONE document's PDF in one language — as issued, or as its voided copy — stores it privately and records
+/// it, in its own scope (payments Phase 6). The settlement pass sends one of these per candidate.
 /// </summary>
-public sealed record RenderFinancialDocumentCommand(Id DocumentId, Language Language) : ICommand<RenditionOutcome>;
+public sealed record RenderFinancialDocumentCommand(Id DocumentId, Language Language, RenditionKind Kind) : ICommand<RenditionOutcome>;
 
 /// <summary>What one rendering step did.</summary>
 /// <param name="Skipped">Why nothing was drawn, when nothing was.</param>
@@ -79,6 +80,12 @@ public sealed class ListFinancialDocumentRenditionWorkHandler(
 /// recording them commits. A crash between the two leaves bytes nothing points at, never a row pointing at
 /// nothing; a second process drawing the same PDF loses on the unique index and removes its own copy.
 /// </para>
+/// <para>
+/// <b>A voided copy</b> (owner, 2026-09-29) is the same document drawn after its void, stamped VOID and saying
+/// when it was voided and what replaced it. Every fact on it is final: the void is unique and append-only, and the
+/// correction is the voided version plus one, issued with the void — never the family's latest, which a later
+/// checkpoint may have moved on from. The void's reason never reaches it: it is the administrators' alone.
+/// </para>
 /// </remarks>
 public sealed partial class RenderFinancialDocumentHandler(
     IFinancialDocumentRepository documents,
@@ -86,6 +93,7 @@ public sealed partial class RenderFinancialDocumentHandler(
     IFinancialDocumentPdfRenderer renderer,
     IDocumentStorage storage,
     IUnitOfWork unitOfWork,
+    IReportingCalendar calendar,
     IClock clock,
     ILogger<RenderFinancialDocumentHandler> logger)
     : IRequestHandler<RenderFinancialDocumentCommand, RenditionOutcome>
@@ -93,13 +101,24 @@ public sealed partial class RenderFinancialDocumentHandler(
     public async Task<RenditionOutcome> Handle(RenderFinancialDocumentCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (language, format) = (request.Language, RenditionFormat.Pdf);
+        var (language, format, kind) = (request.Language, RenditionFormat.Pdf, request.Kind);
 
         var document = await documents.GetByIdAsync(request.DocumentId, cancellationToken);
         if (document is null)
             return RenditionOutcome.NotOwed("not_found");
-        if (await renditions.CurrentAsync(document.Id, language, format, cancellationToken) is not null)
+        if (await renditions.CurrentAsync(document.Id, language, format, kind, cancellationToken) is not null)
             return RenditionOutcome.NotOwed("already_rendered");
+
+        VoidFacts? voided = null;
+        if (kind == RenditionKind.Voided)
+        {
+            var recorded = await documents.VoidOfAsync(document.Id, cancellationToken);
+            if (recorded is null)
+                return RenditionOutcome.NotOwed("not_voided");
+            var next = await documents.FamilyMemberAsync(document.Type, document.SubjectId, document.Version + 1, cancellationToken);
+            var replacedBy = next is not null && next.Cause == FinancialDocumentCause.Correction ? next.Number : null;
+            voided = new VoidFacts(recorded.VoidedAt, SnapshotJson.Local(recorded.VoidedAt, calendar), replacedBy);
+        }
 
         if (!string.Equals(FinancialDocument.Sha256(document.Snapshot), document.ContentSha256, StringComparison.Ordinal))
         {
@@ -115,7 +134,8 @@ public sealed partial class RenderFinancialDocumentHandler(
                 document.Snapshot,
                 document.Number,
                 document.IsTest,
-                language);
+                language,
+                voided);
         }
 #pragma warning disable CA1031 // Whatever the layout throws, it is this snapshot it could not read: the class of failure, not one instance.
         catch (Exception failure) when (failure is not OperationCanceledException)
@@ -144,7 +164,7 @@ public sealed partial class RenderFinancialDocumentHandler(
             return RenditionOutcome.Undrawable("drawing_failed");
         }
 
-        var key = FinancialDocumentRendition.NewStorageKey(document.Id, language, format, DocumentPrintLayout.TemplateVersion);
+        var key = FinancialDocumentRendition.NewStorageKey(document.Id, language, format, kind, DocumentPrintLayout.TemplateVersion);
         try
         {
             await using var content = new MemoryStream(bytes, writable: false);
@@ -169,6 +189,7 @@ public sealed partial class RenderFinancialDocumentHandler(
             document,
             language,
             format,
+            kind,
             DocumentPrintLayout.TemplateVersion,
             renderer.RendererVersion,
             key,
@@ -199,7 +220,7 @@ public sealed partial class RenderFinancialDocumentHandler(
             throw;
         }
 
-        LogRendered(logger, document.Number, language.Name, bytes.LongLength);
+        LogRendered(logger, document.Number, language.Name, kind.Name, bytes.LongLength);
         return RenditionOutcome.Rendered(rendition);
     }
 
@@ -221,8 +242,8 @@ public sealed partial class RenderFinancialDocumentHandler(
         }
     }
 
-    [LoggerMessage(2620, LogLevel.Information, "Drew the {Language} PDF of {Number} ({Bytes} bytes).")]
-    private static partial void LogRendered(ILogger logger, string number, string language, long bytes);
+    [LoggerMessage(2620, LogLevel.Information, "Drew the {Language} {Kind} PDF of {Number} ({Bytes} bytes).")]
+    private static partial void LogRendered(ILogger logger, string number, string language, string kind, long bytes);
 
     [LoggerMessage(2621, LogLevel.Error, "The stored snapshot of {Number} no longer matches its hash. It is not drawn: a PDF shows the record as issued or nothing.")]
     private static partial void LogSnapshotAltered(ILogger logger, string number);

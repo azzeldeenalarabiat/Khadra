@@ -106,28 +106,29 @@ public sealed record FinancialDocumentDto(
     FinancialDocumentPdfDto Pdf);
 
 /// <summary>
-/// The PDFs the customer can download a document as (payments Phase 6).
+/// The PDFs the customer can download a document as (payments Phase 6). For a VOIDED document these are its voided
+/// copies — the document as issued, stamped VOID on every page and naming its correction (owner, 2026-09-29) — and
+/// never the unstamped original, which stays the administrator's.
 /// </summary>
 /// <param name="Languages">
-/// The languages whose PDF has been drawn, <c>en</c> before <c>ar</c> — one download each. Empty for a voided
-/// document: its page stays, marked void, but no new copy of a file that does not say so is handed out.
+/// The languages whose PDF has been drawn, <c>en</c> before <c>ar</c> — one download each: the as-issued PDF, or
+/// for a voided document the voided copy.
 /// </param>
 /// <param name="Preparing">
 /// True while a PDF the document will have is not drawn yet — the settlement pass draws them within minutes of
-/// issue. Never true for a voided document.
+/// issue, and a voided copy within minutes of the void.
 /// </param>
 public sealed record FinancialDocumentPdfDto(IReadOnlyList<string> Languages, bool Preparing)
 {
     internal static FinancialDocumentPdfDto For(bool voided, IEnumerable<FinancialDocumentRenditionRecord> renditions)
     {
-        if (voided)
-            return new FinancialDocumentPdfDto([], false);
+        var kind = voided ? RenditionKind.Voided : RenditionKind.AsIssued;
 
         // The languages a PDF is drawn in, in their own order — never the platform's whole list of languages, which
         // another feature may grow: a third one there must not leave every document "being prepared" for good.
         var printed = DocumentPrintLayout.Languages;
         var stored = renditions
-            .Where(rendition => rendition.Format == RenditionFormat.Pdf)
+            .Where(rendition => rendition.Format == RenditionFormat.Pdf && rendition.Kind == kind)
             .Select(rendition => rendition.Language)
             .ToHashSet();
         var drawn = printed.Where(stored.Contains).ToList();
@@ -136,11 +137,13 @@ public sealed record FinancialDocumentPdfDto(IReadOnlyList<string> Languages, bo
 }
 
 /// <summary>A stored rendering as the administrator sees it: what drew it and the proof of its bytes.</summary>
+/// <param name="Kind"><c>AsIssued</c>, or <c>Voided</c> for the copy a voided document's customer is given.</param>
 /// <param name="ContentSha256">SHA-256 of the stored PDF: the proof of which bytes were handed out.</param>
 /// <param name="SnapshotSha256">The document's own hash when it was drawn: the proof it pictures the record as issued.</param>
 public sealed record FinancialDocumentRenditionDto(
     string Language,
     string Format,
+    string Kind,
     int TemplateVersion,
     string RendererVersion,
     string ContentSha256,
@@ -152,6 +155,7 @@ public sealed record FinancialDocumentRenditionDto(
         new(
             record.Language.Name,
             record.Format.Name,
+            record.Kind.Name,
             record.TemplateVersion,
             record.RendererVersion,
             record.ContentSha256,
@@ -233,9 +237,9 @@ public sealed record FinancialDocumentVoidDto(
 /// void with its reason, and every PDF drawn of it (payments Phase 6).
 /// </summary>
 /// <remarks>
-/// For a VOIDED document <c>Document.Pdf.Languages</c> is empty — the customer is no longer handed its PDF —
-/// while <see cref="Renditions"/> is not: the administrator can still download the record as issued. A console
-/// keys its downloads off <see cref="Renditions"/>.
+/// For a VOIDED document <c>Document.Pdf</c> describes the customer's voided copies, while <see cref="Renditions"/>
+/// lists every rendition of both kinds: the administrator can download the record as issued, unstamped, and the
+/// voided copy the customer is given. A console keys its downloads off <see cref="Renditions"/>.
 /// </remarks>
 public sealed record AdminFinancialDocumentDto(
     FinancialDocumentDto Document,

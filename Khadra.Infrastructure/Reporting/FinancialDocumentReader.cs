@@ -135,6 +135,7 @@ internal sealed class FinancialDocumentReader(KhadraDbContext context) : IFinanc
             .. renditions.Select(rendition => new FinancialDocumentRenditionRecord(
                 rendition.Language,
                 rendition.Format,
+                rendition.Kind,
                 rendition.TemplateVersion,
                 rendition.RendererVersion,
                 rendition.ContentSha256,

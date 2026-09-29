@@ -20,8 +20,8 @@ public sealed class FinancialDocumentContractTests
     [Fact]
     public void A_page_offers_the_pdfs_drawn_in_the_languages_a_pdf_is_drawn_in_and_counts_only_those()
     {
-        static FinancialDocumentRenditionRecord Pdf(Language language, int template = 1) =>
-            new(language, RenditionFormat.Pdf, template, "QuestPDF 2026.9.1", new string('a', 64), 1, DateTimeOffset.UnixEpoch, new string('b', 64));
+        static FinancialDocumentRenditionRecord Pdf(Language language, int template = 1, RenditionKind? kind = null) =>
+            new(language, RenditionFormat.Pdf, kind ?? RenditionKind.AsIssued, template, "QuestPDF 2026.9.1", new string('a', 64), 1, DateTimeOffset.UnixEpoch, new string('b', 64));
 
         // In the order a page offers them, whatever order they were drawn in, and one entry per language.
         var both = FinancialDocumentPdfDto.For(false, [Pdf(Language.Arabic), Pdf(Language.English), Pdf(Language.English, template: 2)]);
@@ -34,13 +34,43 @@ public sealed class FinancialDocumentContractTests
 
         Assert.True(FinancialDocumentPdfDto.For(false, []).Preparing);
 
-        // A voided document's PDFs exist, and are offered to nobody through this page.
-        var voided = FinancialDocumentPdfDto.For(true, [Pdf(Language.English), Pdf(Language.Arabic)]);
-        Assert.Empty(voided.Languages);
+        // A voided document offers its VOIDED copies and nothing else (owner, 2026-09-29): its PDFs as issued stay the
+        // administrator's, and until the copies are drawn the page says they are being prepared.
+        var voidedUndrawn = FinancialDocumentPdfDto.For(true, [Pdf(Language.English), Pdf(Language.Arabic)]);
+        Assert.Empty(voidedUndrawn.Languages);
+        Assert.True(voidedUndrawn.Preparing);
+        var voidedHalf = FinancialDocumentPdfDto.For(true, [Pdf(Language.English), Pdf(Language.Arabic), Pdf(Language.Arabic, kind: RenditionKind.Voided)]);
+        Assert.Equal(["ar"], voidedHalf.Languages);
+        Assert.True(voidedHalf.Preparing);
+        var voided = FinancialDocumentPdfDto.For(
+            true,
+            [Pdf(Language.English), Pdf(Language.Arabic), Pdf(Language.Arabic, kind: RenditionKind.Voided), Pdf(Language.English, kind: RenditionKind.Voided)]);
+        Assert.Equal(["en", "ar"], voided.Languages);
         Assert.False(voided.Preparing);
+
+        // And a current document never offers a voided copy, whatever is stored.
+        var current = FinancialDocumentPdfDto.For(false, [Pdf(Language.English, kind: RenditionKind.Voided), Pdf(Language.Arabic, kind: RenditionKind.Voided)]);
+        Assert.Empty(current.Languages);
+        Assert.True(current.Preparing);
 
         // The list a page counts is the renderer's own, never the platform's whole list of languages.
         Assert.Equal(new[] { Language.English, Language.Arabic }, DocumentPrintLayout.Languages);
+    }
+
+    [Fact]
+    public void A_rendition_names_its_kind_for_the_administrator()
+    {
+        var rendition = new FinancialDocumentRenditionDto(
+            "ar", "Pdf", "Voided", 1, "QuestPDF 2026.9.1", new string('a', 64), 2048, DateTimeOffset.UnixEpoch, new string('b', 64));
+
+        using var json = JsonDocument.Parse(JsonSerializer.Serialize(rendition, Wire));
+
+        // Payments Phase 6 follow-up, additive: which PDF it is — the document as issued, or its voided copy.
+        Assert.Equal(
+            ["language", "format", "kind", "templateVersion", "rendererVersion", "contentSha256", "sizeBytes", "renderedAt", "snapshotSha256"],
+            json.RootElement.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal("Voided", json.RootElement.GetProperty("kind").GetString());
+        Assert.Equal(["AsIssued", "Voided"], Enumeration.GetAll<RenditionKind>().OrderBy(kind => kind.Id).Select(kind => kind.Name));
     }
 
     [Fact]

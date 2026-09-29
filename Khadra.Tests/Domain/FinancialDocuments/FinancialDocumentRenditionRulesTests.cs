@@ -18,13 +18,14 @@ public sealed class FinancialDocumentRenditionRulesTests
     public void A_rendition_names_its_document_the_snapshot_it_was_drawn_from_and_its_bytes()
     {
         var document = Receipt();
-        var key = FinancialDocumentRendition.NewStorageKey(document.Id, Language.Arabic, RenditionFormat.Pdf, 1);
+        var key = FinancialDocumentRendition.NewStorageKey(document.Id, Language.Arabic, RenditionFormat.Pdf, RenditionKind.AsIssued, 1);
 
-        var rendition = FinancialDocumentRendition.Record(document, Language.Arabic, RenditionFormat.Pdf, 1, "QuestPDF 2026.9.1", key, Hash, 4096, Now);
+        var rendition = FinancialDocumentRendition.Record(document, Language.Arabic, RenditionFormat.Pdf, RenditionKind.AsIssued, 1, "QuestPDF 2026.9.1", key, Hash, 4096, Now);
 
         Assert.Equal(document.Id, rendition.DocumentId);
         Assert.Equal(Language.Arabic, rendition.Language);
         Assert.Equal(RenditionFormat.Pdf, rendition.Format);
+        Assert.Equal(RenditionKind.AsIssued, rendition.Kind);
         Assert.Equal(1, rendition.TemplateVersion);
         Assert.Equal(key, rendition.StorageKey);
         Assert.Equal(Hash, rendition.ContentSha256);
@@ -49,7 +50,7 @@ public sealed class FinancialDocumentRenditionRulesTests
         var document = Receipt();
         var storageKey = key switch
         {
-            "ok" => FinancialDocumentRendition.NewStorageKey(document.Id, Language.English, RenditionFormat.Pdf, 1),
+            "ok" => FinancialDocumentRendition.NewStorageKey(document.Id, Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued, 1),
             "long" => new string('k', FinancialDocumentRendition.MaxStorageKeyLength + 1),
             _ => key,
         };
@@ -62,7 +63,7 @@ public sealed class FinancialDocumentRenditionRulesTests
         };
 
         Assert.Throws<DomainException>(() =>
-            FinancialDocumentRendition.Record(document, Language.English, RenditionFormat.Pdf, templateVersion, rendererVersion, storageKey, contentHash, size, Now));
+            FinancialDocumentRendition.Record(document, Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued, templateVersion, rendererVersion, storageKey, contentHash, size, Now));
     }
 
     [Fact]
@@ -70,8 +71,8 @@ public sealed class FinancialDocumentRenditionRulesTests
     {
         var documentId = Id.New();
 
-        var first = FinancialDocumentRendition.NewStorageKey(documentId, Language.English, RenditionFormat.Pdf, 1);
-        var second = FinancialDocumentRendition.NewStorageKey(documentId, Language.English, RenditionFormat.Pdf, 1);
+        var first = FinancialDocumentRendition.NewStorageKey(documentId, Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued, 1);
+        var second = FinancialDocumentRendition.NewStorageKey(documentId, Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued, 1);
 
         // A crash between storing and recording leaves an orphan the next attempt steps around, never a key it
         // can no longer write.
@@ -81,8 +82,28 @@ public sealed class FinancialDocumentRenditionRulesTests
         Assert.Equal(first, DocumentKeys.Validate(first));
         Assert.Equal(
             "financial-documents",
-            FinancialDocumentRendition.NewStorageKey(documentId, Language.Arabic, RenditionFormat.Pdf, 12).Split('/')[0]);
-        Assert.Contains("/v12-ar-", FinancialDocumentRendition.NewStorageKey(documentId, Language.Arabic, RenditionFormat.Pdf, 12), StringComparison.Ordinal);
+            FinancialDocumentRendition.NewStorageKey(documentId, Language.Arabic, RenditionFormat.Pdf, RenditionKind.AsIssued, 12).Split('/')[0]);
+        Assert.Contains("/v12-ar-", FinancialDocumentRendition.NewStorageKey(documentId, Language.Arabic, RenditionFormat.Pdf, RenditionKind.AsIssued, 12), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_voided_copy_is_a_rendition_of_its_own_kind_and_its_key_says_so()
+    {
+        // Owner, 2026-09-29: a voided document's customer is given a copy stamped VOID, drawn beside the document as
+        // issued and never over it — so the copy is its own row, and its stored file names itself.
+        var document = Receipt();
+        var key = FinancialDocumentRendition.NewStorageKey(document.Id, Language.English, RenditionFormat.Pdf, RenditionKind.Voided, 1);
+
+        var copy = FinancialDocumentRendition.Record(document, Language.English, RenditionFormat.Pdf, RenditionKind.Voided, 1, "QuestPDF 2026.9.1", key, Hash, 4096, Now);
+
+        Assert.Equal(RenditionKind.Voided, copy.Kind);
+        Assert.StartsWith($"financial-documents/{document.Id.Value:D}/v1-en-void-", key, StringComparison.Ordinal);
+        Assert.Equal(key, DocumentKeys.Validate(key));
+        Assert.DoesNotContain(
+            "void",
+            FinancialDocumentRendition.NewStorageKey(document.Id, Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued, 1),
+            StringComparison.Ordinal);
+        Assert.Equal(["AsIssued", "Voided"], Enumeration.GetAll<RenditionKind>().OrderBy(kind => kind.Id).Select(kind => kind.Name));
     }
 
     [Fact]
@@ -92,7 +113,10 @@ public sealed class FinancialDocumentRenditionRulesTests
         Assert.Equal("pdf", RenditionFormat.Pdf.Extension);
         Assert.Equal(
             "application/pdf",
-            Khadra.Application.Common.Ports.DocumentContentTypes.ForStorageKey(FinancialDocumentRendition.NewStorageKey(Id.New(), Language.English, RenditionFormat.Pdf, 1)));
+            Khadra.Application.Common.Ports.DocumentContentTypes.ForStorageKey(FinancialDocumentRendition.NewStorageKey(Id.New(), Language.English, RenditionFormat.Pdf, RenditionKind.AsIssued, 1)));
+        Assert.Equal(
+            "application/pdf",
+            Khadra.Application.Common.Ports.DocumentContentTypes.ForStorageKey(FinancialDocumentRendition.NewStorageKey(Id.New(), Language.Arabic, RenditionFormat.Pdf, RenditionKind.Voided, 1)));
     }
 
     private static FinancialDocument Receipt()

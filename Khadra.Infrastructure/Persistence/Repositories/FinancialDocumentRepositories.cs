@@ -28,6 +28,21 @@ internal sealed class FinancialDocumentRepository(KhadraDbContext context) : IFi
     public Task<bool> IsVoidedAsync(Id documentId, CancellationToken cancellationToken = default) =>
         context.FinancialDocumentVoids.AnyAsync(voided => voided.Id == documentId, cancellationToken);
 
+    public Task<FinancialDocumentVoid?> VoidOfAsync(Id documentId, CancellationToken cancellationToken = default) =>
+        context.FinancialDocumentVoids.FirstOrDefaultAsync(voided => voided.Id == documentId, cancellationToken);
+
+    public Task<FinancialDocument?> FamilyMemberAsync(
+        FinancialDocumentType type,
+        Id subjectId,
+        int version,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        return context.FinancialDocuments.FirstOrDefaultAsync(
+            document => document.Type == type && document.SubjectId == subjectId && document.Version == version,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<FinancialDocument>> ListLatestReceiptsForBookingAsync(
         Id bookingId,
         CancellationToken cancellationToken = default)
@@ -55,12 +70,17 @@ internal sealed class FinancialDocumentRenditionRepository(KhadraDbContext conte
         Id documentId,
         Language language,
         RenditionFormat format,
+        RenditionKind kind,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(language);
         ArgumentNullException.ThrowIfNull(format);
+        ArgumentNullException.ThrowIfNull(kind);
         return context.FinancialDocumentRenditions
-            .Where(rendition => rendition.DocumentId == documentId && rendition.Language == language && rendition.Format == format)
+            .Where(rendition => rendition.DocumentId == documentId
+                && rendition.Language == language
+                && rendition.Format == format
+                && rendition.Kind == kind)
             .OrderByDescending(rendition => rendition.TemplateVersion)
             .FirstOrDefaultAsync(cancellationToken);
     }

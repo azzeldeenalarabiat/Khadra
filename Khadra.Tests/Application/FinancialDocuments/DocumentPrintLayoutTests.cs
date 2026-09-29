@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Khadra.Application.FinancialDocuments.Composition;
 using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Domain.Common;
 using Khadra.Tests.Support;
@@ -113,6 +114,77 @@ public sealed class DocumentPrintLayoutTests
         Assert.Equal(
             DateTimeOffset.Parse(page["snapshot"]!["document"]!["issuedAt"]!["utc"]!.GetValue<string>(), CultureInfo.InvariantCulture),
             printed.Metadata.IssuedAt);
+    }
+
+    // ── A voided copy (owner, 2026-09-29) ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void A_voided_copy_says_in_english_when_it_was_voided_that_it_is_no_longer_valid_and_what_replaced_it()
+    {
+        var (_, page) = FixturePages().First(entry => entry.Name == "payment-receipt-deposit-voided");
+
+        var printed = LayOut(page, English, VoidedAt(new DateTimeOffset(2026, 9, 27, 9, 30, 0, TimeSpan.Zero), "TEST-PAY-2026-000002"))!;
+
+        // 09:30 UTC is 12:30 in Amman: the notice prints the frozen wall time every document prints.
+        Assert.Equal("VOID", printed.Void!.Stamp);
+        Assert.Equal("This document was voided on " + Lri + "27 Sept 2026, 12:30" + Pdi + " and is no longer valid.", printed.Void.Notice);
+        Assert.Equal("It was replaced by " + Lri + "TEST-PAY-2026-000002" + Pdi + ".", printed.Void.Replacement);
+    }
+
+    [Fact]
+    public void A_voided_copy_says_the_same_in_arabic_with_the_time_and_the_number_isolated()
+    {
+        var (_, page) = FixturePages().First(entry => entry.Name == "payment-receipt-deposit-voided");
+
+        var printed = LayOut(page, Arabic, VoidedAt(new DateTimeOffset(2026, 9, 27, 9, 30, 0, TimeSpan.Zero), "TEST-PAY-2026-000002"))!;
+
+        Assert.Equal("ملغى", printed.Void!.Stamp);
+        Assert.Equal("أُلغي هذا المستند في " + Fsi + "27 أيلول 2026، 12:30" + Pdi + " ولم يعد ساريًا.", printed.Void.Notice);
+        Assert.Equal("وحلّ محلّه " + Lri + "TEST-PAY-2026-000002" + Pdi + ".", printed.Void.Replacement);
+    }
+
+    [Fact]
+    public void A_voided_copy_with_no_correction_names_none()
+    {
+        var (_, page) = FixturePages().First(entry => entry.Name == "payment-receipt-deposit-voided");
+        var voided = VoidedAt(new DateTimeOffset(2026, 9, 27, 21, 5, 0, TimeSpan.Zero), replacedBy: null);
+
+        var english = LayOut(page, English, voided)!.Void!;
+        var arabic = LayOut(page, Arabic, voided)!.Void!;
+        Assert.Equal("This document was voided on " + Lri + "28 Sept 2026, 00:05" + Pdi + " and is no longer valid.", english.Notice);
+        Assert.Equal("أُلغي هذا المستند في " + Fsi + "28 أيلول 2026، 00:05" + Pdi + " ولم يعد ساريًا.", arabic.Notice);
+        Assert.Null(english.Replacement);
+        Assert.Null(arabic.Replacement);
+    }
+
+    [Fact]
+    public void A_voided_copy_pictures_the_record_as_issued_and_marks_it_rather_than_changing_it()
+    {
+        foreach (var (name, page) in FixturePages())
+        {
+            foreach (var language in BothLanguages)
+            {
+                var original = LayOut(page, language)!;
+                var voidedAt = new DateTimeOffset(2026, 9, 28, 8, 0, 0, TimeSpan.Zero);
+                var copy = LayOut(page, language, VoidedAt(voidedAt, "TEST-PAY-2026-000099"))!;
+
+                // Every word and figure of the record is exactly as issued; only the marks are added.
+                Assert.Null(original.Void);
+                Assert.Equal(Lines(original), Lines(copy));
+                Assert.Equal(
+                    (original.Title, original.HeadlineLabel, original.HeadlineAmount, original.Notice, original.TimeNote, original.Watermark),
+                    (copy.Title, copy.HeadlineLabel, copy.HeadlineAmount, copy.Notice, copy.TimeNote, copy.Watermark));
+                Assert.NotNull(copy.Watermark); // every fixture page is a TEST document, and stays marked TEST under the void
+
+                // The file says so too: titled with the stamp, created at issue and modified at the void.
+                Assert.StartsWith($"{page["number"]!.GetValue<string>()} — {copy.Void!.Stamp} — ", copy.Metadata.Title, StringComparison.Ordinal);
+                Assert.Equal(original.Metadata.IssuedAt, copy.Metadata.IssuedAt);
+                Assert.Equal(voidedAt, copy.Metadata.ModifiedAt);
+                Assert.Null(original.Metadata.ModifiedAt);
+                Assert.DoesNotContain(copy.Metadata.Title, character => character is >= '\u2066' and <= '\u2069');
+                Assert.True(copy.Void.Notice.Length > 0, name);
+            }
+        }
     }
 
     // ── What the record keeps and the page leaves out (owner, 2026-09-29) ───────────────────────────
@@ -297,7 +369,7 @@ public sealed class DocumentPrintLayoutTests
             yield return (entry!["name"]!.GetValue<string>(), entry["page"]!);
     }
 
-    internal static PrintedDocument? LayOut(JsonNode page, Language language)
+    internal static PrintedDocument? LayOut(JsonNode page, Language language, VoidFacts? voided = null)
     {
         var number = page["number"]!.GetValue<string>();
         return DocumentPrintLayout.TryLayOut(
@@ -305,8 +377,16 @@ public sealed class DocumentPrintLayoutTests
             page["snapshot"]!.ToJsonString(),
             number,
             number.StartsWith("TEST-", StringComparison.Ordinal),
-            language);
+            language,
+            voided);
     }
+
+    /// <summary>The facts of a void at <paramref name="at"/>, its time frozen as the render handler freezes it.</summary>
+    private static VoidFacts VoidedAt(DateTimeOffset at, string? replacedBy) =>
+        new(at, SnapshotJson.Local(at, DocumentFixtures.Amman), replacedBy);
+
+    private static List<(string Heading, string? Label, string Value)> Lines(PrintedDocument printed) =>
+        [.. printed.Sections.SelectMany(section => section.Lines.Select(line => (section.Heading, line.Label, line.Value)))];
 
     private static PrintedDocument? Lay(string snapshot) =>
         DocumentPrintLayout.TryLayOut(1, snapshot, "TEST-PAY-2026-000001", true, English);

@@ -141,6 +141,7 @@ internal sealed class FinancialDocumentRenditionConfiguration : IEntityTypeConfi
             .HasMaxLength(2)
             .IsRequired();
         ConfigureEnumeration(entity.Property(rendition => rendition.Format), 10);
+        ConfigureEnumeration(entity.Property(rendition => rendition.Kind), 10);
         entity.Property(rendition => rendition.TemplateVersion).IsRequired();
         entity.Property(rendition => rendition.RendererVersion)
             .HasMaxLength(FinancialDocumentRendition.MaxRendererVersionLength)
@@ -159,7 +160,8 @@ internal sealed class FinancialDocumentRenditionConfiguration : IEntityTypeConfi
             .HasForeignKey(rendition => rendition.DocumentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        entity.HasIndex(rendition => new { rendition.DocumentId, rendition.Language, rendition.Format, rendition.TemplateVersion })
+        // One of each kind — as issued, and for a voided document its voided copy — per language, format and template.
+        entity.HasIndex(rendition => new { rendition.DocumentId, rendition.Language, rendition.Format, rendition.Kind, rendition.TemplateVersion })
             .IsUnique();
         entity.HasIndex(rendition => rendition.StorageKey).IsUnique();
 

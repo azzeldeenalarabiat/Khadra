@@ -115,18 +115,19 @@ export class FinancialDocumentPageComponent {
 
   /**
    * Fetches one PDF — through a link minted on the click, with the bytes coming through the session — and
-   * saves it under the document's number and its language. A voided document's too: it is the record as
-   * issued, which the administrator may still need.
+   * saves it under the document's number, its language and, for a voided copy, `-void`. A voided document offers
+   * both: the original as issued, unstamped, which the administrator may still need, and the copy its customer is
+   * given.
    */
   protected async downloadPdf(download: PdfDownloadView): Promise<void> {
     const page = this.page();
     const browser = this.browserPage.defaultView;
     if (!page || !browser || this.downloading()) return;
 
-    this.downloading.set(download.language);
+    this.downloading.set(download.key);
     this.pdfProblem.set(null);
     try {
-      const file = await this.service.pdf(page.id, download.language);
+      const file = await this.service.pdf(page.id, download.language, download.kind);
       const address = browser.URL.createObjectURL(file);
       const anchor = this.browserPage.createElement('a');
       anchor.href = address;

@@ -9,7 +9,8 @@ namespace Khadra.Infrastructure.FinancialDocuments;
 
 /// <summary>
 /// Draws an issued document's printed layout as a PDF with QuestPDF (payments Phase 6): one A4 page flow per
-/// language, mirrored for Arabic, set in the platform's own faces, with a TEST document watermarked.
+/// language, mirrored for Arabic, set in the platform's own faces, with a TEST document watermarked and a voided
+/// copy stamped VOID on every page.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -39,7 +40,9 @@ internal sealed class QuestPdfFinancialDocumentRenderer : IFinancialDocumentPdfR
     private static readonly string[] Faces = ["Manrope", "Noto Kufi Arabic"];
 
     // The customer design's colours (khadra_theme.dart): text, the accent green, the price green, muted text,
-    // rules, the accent's lightest tint, and a translucent red for the TEST watermark.
+    // rules, the accent's lightest tint, and a translucent red for the TEST watermark. A voided copy is marked in
+    // the design's reds for a document that is not valid — bad, badStrong and badTint — and its diagonal stamp is
+    // the same red, translucent, so the record under it stays readable.
     private const string Ink = "#111827";
     private const string Accent = "#15803D";
     private const string Price = "#14532D";
@@ -47,6 +50,10 @@ internal sealed class QuestPdfFinancialDocumentRenderer : IFinancialDocumentPdfR
     private const string Rule = "#E2E5E3";
     private const string Band = "#F0FDF4";
     private const string WatermarkInk = "#40DC2626";
+    private const string VoidRed = "#DC2626";
+    private const string VoidInk = "#991B1B";
+    private const string VoidTint = "#FEE2E2";
+    private const string VoidStampInk = "#4DDC2626";
 
     private static readonly string Version =
         "QuestPDF " + (typeof(Document).Assembly.GetName().Version?.ToString(3) ?? "unknown");
@@ -76,9 +83,10 @@ internal sealed class QuestPdfFinancialDocumentRenderer : IFinancialDocumentPdfR
             Language = document.Metadata.Language,
             Creator = "Khadra",
         };
-        // The file is dated by the document it renders, not by the moment it was drawn.
+        // The file is dated by the document it renders, not by the moment it was drawn — and a voided copy, which
+        // pictures the document as of its void, is modified then.
         if (document.Metadata.IssuedAt is { } issuedAt)
-            (metadata.CreationDate, metadata.ModifiedDate) = (issuedAt, issuedAt);
+            (metadata.CreationDate, metadata.ModifiedDate) = (issuedAt, document.Metadata.ModifiedAt ?? issuedAt);
 
         return Document
             .Create(container => container.Page(page => Page(page, document)))
@@ -161,7 +169,21 @@ internal sealed class QuestPdfFinancialDocumentRenderer : IFinancialDocumentPdfR
         page.Header().Element(header => Header(header, document));
         page.Content().PaddingTop(18).Element(content => Body(content, document));
         page.Footer().Element(footer => Footer(footer, document));
-        if (document.Watermark is { } watermark)
+        if (document.Void is { } voided)
+        {
+            // Across every page, and above TEST when the document is a test one: both words stay on the page.
+            page.Foreground()
+                .AlignCenter()
+                .AlignMiddle()
+                .Rotate(-32)
+                .Column(stamp =>
+                {
+                    stamp.Item().AlignCenter().Text(voided.Stamp).FontSize(120).Bold().FontColor(VoidStampInk);
+                    if (document.Watermark is { } test)
+                        stamp.Item().AlignCenter().Text(test).FontSize(56).Bold().FontColor(WatermarkInk);
+                });
+        }
+        else if (document.Watermark is { } watermark)
         {
             page.Foreground()
                 .AlignCenter()
@@ -185,6 +207,16 @@ internal sealed class QuestPdfFinancialDocumentRenderer : IFinancialDocumentPdfR
                     title.Item().Element(item => Write(item, document.Title, style => style.FontSize(20).Bold()));
                     title.Item().PaddingTop(2).Element(item => Write(
                         item, DocumentPrintLayout.LeftToRight(document.Number), style => style.FontSize(10.5f).SemiBold().FontColor(Accent)));
+                    // A voided copy says so at the top of every page, at the start edge in either direction.
+                    if (document.Void is { } voided)
+                    {
+                        title.Item().PaddingTop(6).Row(stamp =>
+                        {
+                            stamp.AutoItem().Border(1.2f).BorderColor(VoidRed).Background(VoidTint).PaddingHorizontal(10).PaddingVertical(2)
+                                .Element(pill => Write(pill, voided.Stamp, style => style.FontSize(11).Bold().FontColor(VoidInk)));
+                            stamp.RelativeItem();
+                        });
+                    }
                 });
                 row.ConstantItem(14);
                 row.RelativeItem(2).Background(Band).Padding(10).Column(headline =>
@@ -203,6 +235,19 @@ internal sealed class QuestPdfFinancialDocumentRenderer : IFinancialDocumentPdfR
         container.Column(column =>
         {
             column.Spacing(16);
+
+            // Before anything else the document says: it is void, since when, and what replaced it.
+            if (document.Void is { } voided)
+            {
+                column.Item().Background(VoidTint).Border(1.2f).BorderColor(VoidRed).PaddingVertical(8).PaddingHorizontal(10).Column(banner =>
+                {
+                    banner.Item().Element(item => Write(item, voided.Stamp, style => style.FontSize(12).Bold().FontColor(VoidInk)));
+                    banner.Item().PaddingTop(2).Element(item => Write(item, voided.Notice, style => style.SemiBold().FontColor(VoidInk)));
+                    if (voided.Replacement is { } replacement)
+                        banner.Item().Element(item => Write(item, replacement, style => style.SemiBold().FontColor(VoidInk)));
+                });
+            }
+
             foreach (var section in document.Sections)
             {
                 // A heading never ends a page alone: with too little room left, the section starts the next one.

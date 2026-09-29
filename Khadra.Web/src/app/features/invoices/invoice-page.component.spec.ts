@@ -163,8 +163,9 @@ describe('InvoicePageComponent', () => {
     return { saved, created, revoked };
   }
 
+  // Every download button in the head: all of them but Print.
   const pdfButtons = (element: HTMLElement) =>
-    [...element.querySelectorAll<HTMLButtonElement>('.invoice-page__head button')].filter((button) => button.textContent!.includes('PDF'));
+    [...element.querySelectorAll<HTMLButtonElement>('.invoice-page__head button')].filter((button) => button.hasAttribute('aria-busy'));
 
   it('offers one PDF per language drawn and saves it under its number and language', async () => {
     const browser = saving();
@@ -211,10 +212,35 @@ describe('InvoicePageComponent', () => {
     expect(some.element.querySelector('.invoice-page__pdf')!.textContent).toContain('يجري تجهيز ملف PDF لهذا المستند.');
   });
 
-  it('offers no PDF of a voided document, and says nothing is being prepared', async () => {
-    const { element } = await show(page('payment-receipt-deposit-voided'));
-    expect(pdfButtons(element)).toHaveLength(0);
+  it('offers a voided document as its voided copies, and saves one under a name that says so (owner, 2026-09-29)', async () => {
+    const browser = saving();
+    const document = page('payment-receipt-deposit-voided');
+    const { http, settle, element } = await show(document);
+
+    const buttons = pdfButtons(element);
+    expect(buttons.map((button) => button.textContent!.trim())).toEqual(['Voided copy (English)', 'Voided copy (Arabic)']);
+    expect(buttons.map((button) => button.getAttribute('title'))).toEqual(['Download the voided copy in English', 'Download the voided copy in Arabic']);
     expect(element.querySelector('.invoice-page__pdf')).toBeNull();
+    // The page still says it is void and what replaced it, beside the copies.
+    expect(element.querySelector('.invoice-page__notice')!.textContent).toContain('TEST-PAY-2026-000005');
+
+    buttons[0]!.click();
+    await settle();
+    // The same link as any PDF: the server alone decides that a voided document's is its voided copy.
+    const minted = http.expectOne((request) => request.url === url(document.documentId) + '/pdf-link');
+    expect(minted.request.params.get('language')).toBe('en');
+    expect(minted.request.params.keys()).toEqual(['language']);
+    minted.flush({ url: '/api/v1/documents/dm9pZA?expires=1&signature=s', expiresAt: '2026-09-29T10:05:00Z' });
+    await settle();
+    http.expectOne('/api/v1/documents/dm9pZA?expires=1&signature=s').flush(new Blob(['%PDF-1.7'], { type: 'application/pdf' }));
+    await settle();
+
+    expect(browser.saved).toEqual([{ href: 'blob:khadra-pdf', download: 'TEST-PAY-2026-000001-en-void.pdf' }]);
+  });
+
+  it('names the voided copies in Arabic on an Arabic page', async () => {
+    const { element } = await show(page('payment-receipt-deposit-voided'), 'ar');
+    expect(pdfButtons(element).map((button) => button.textContent!.trim())).toEqual(['نسخة ملغاة (بالإنجليزية)', 'نسخة ملغاة (بالعربية)']);
   });
 
   it('offers no PDF when the server predates them', async () => {

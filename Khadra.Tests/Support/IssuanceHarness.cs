@@ -121,7 +121,7 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
         {
             RenditionOutcome outcome;
             await using (var context = NewContext())
-                outcome = await RenderHandler(context).Handle(new RenderFinancialDocumentCommand(candidate.DocumentId, candidate.Language), CancellationToken.None);
+                outcome = await RenderHandler(context).Handle(new RenderFinancialDocumentCommand(candidate.DocumentId, candidate.Language, candidate.Kind), CancellationToken.None);
 
             outcomes.Add(outcome);
             if (outcome.StorageFailed)
@@ -143,6 +143,7 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
             Renderer,
             Storage,
             UnitOfWork(context),
+            DocumentFixtures.Amman,
             new TestClock(Now),
             RenderingLog);
 

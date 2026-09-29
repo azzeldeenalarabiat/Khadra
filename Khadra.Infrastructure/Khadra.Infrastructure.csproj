@@ -31,6 +31,8 @@
   <ItemGroup>
     <!-- The PDF renderer's only faces (payments Phase 6): copied from the app's assets, SIL Open Font Licence. -->
     <EmbeddedResource Include="FinancialDocuments\Fonts\*.ttf" LogicalName="Khadra.FinancialDocuments.Fonts.%(Filename)%(Extension)" />
+    <!-- Their licence texts and notices ship beside the assembly in every build and publish: the licence travels with the fonts. -->
+    <None Include="FinancialDocuments\Fonts\OFL-*.txt;FinancialDocuments\Fonts\FONTS.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

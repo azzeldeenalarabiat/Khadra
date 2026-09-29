@@ -209,7 +209,7 @@ public sealed class FinancialDocumentEndpointTests : IDisposable
             controller => controller.Document(SomeId, CancellationToken.None),
             controller => controller.ForBooking(SomeId, CancellationToken.None),
             controller => controller.Void(SomeId, new AdminFinancialDocumentsController.VoidRequest("Wrong."), CancellationToken.None),
-            controller => controller.PdfLink(SomeId, "en", CancellationToken.None),
+            controller => controller.PdfLink(SomeId, "en", null, CancellationToken.None),
         ];
         // Every action is here: one added later without the header fails this count first.
         Assert.Equal(

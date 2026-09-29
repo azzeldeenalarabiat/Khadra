@@ -43,6 +43,7 @@ public sealed record PendingFinancialDocumentRecord(FinancialDocumentType Type, 
 public sealed record FinancialDocumentRenditionRecord(
     Language Language,
     RenditionFormat Format,
+    RenditionKind Kind,
     int TemplateVersion,
     string RendererVersion,
     string ContentSha256,

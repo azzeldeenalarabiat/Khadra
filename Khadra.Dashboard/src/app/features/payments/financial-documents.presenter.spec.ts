@@ -25,6 +25,7 @@ import {
   holdRow,
   preparingRow,
   refusalReport,
+  shownInBody,
   voidDialogWords,
   voidRefusalIsFinal,
   voidedToast,
@@ -424,10 +425,10 @@ describe('the PDFs of a document, as the administrator reads them (payments Phas
     ]);
     // One download per language — the server serves its newest template — saved under the number and the language.
     expect(view.downloads).toEqual([
-      { language: 'en', label: 'Download PDF (English)', fileName: 'TEST-PAY-2026-000002-en.pdf' },
-      { language: 'ar', label: 'Download PDF (Arabic)', fileName: 'TEST-PAY-2026-000002-ar.pdf' },
+      { key: 'AsIssued:en', language: 'en', kind: 'AsIssued', label: 'Download PDF (English)', fileName: 'TEST-PAY-2026-000002-en.pdf' },
+      { key: 'AsIssued:ar', language: 'ar', kind: 'AsIssued', label: 'Download PDF (Arabic)', fileName: 'TEST-PAY-2026-000002-ar.pdf' },
     ]);
-    expect(view.withheld).toBe(false);
+    expect(view.voided).toBe(false);
     expect(view.preparing).toBe(false);
   });
 
@@ -438,25 +439,88 @@ describe('the PDFs of a document, as the administrator reads them (payments Phas
     expect(view.renditions[0]!.rows.map((row) => row.k)).toEqual(['تاريخ الإنشاء', 'أداة الإنشاء', 'الحجم', 'بصمة الملف (SHA-256)', 'أُنشئ من بصمة المحتوى']);
   });
 
-  it('still offers a voided document as issued, and says the customer is no longer handed it', () => {
+  it('offers a voided document both ways: the original as issued, unstamped, and the voided copy its customer is given', () => {
     const view = documentPage(
-      adminPage('payment-receipt-deposit-voided', { renditions: [rendition('en', 1), rendition('ar', 1)] }),
+      adminPage('payment-receipt-deposit-voided', {
+        renditions: [
+          rendition('ar', 1, { kind: 'Voided' }),
+          rendition('en', 1, { kind: 'AsIssued' }),
+          rendition('en', 1, { kind: 'Voided' }),
+          rendition('ar', 1, { kind: 'AsIssued' }),
+        ],
+      }),
       english,
       format,
     ).pdf;
-    expect(view.downloads.map((download) => download.language)).toEqual(['en', 'ar']);
-    expect(view.withheld).toBe(true);
+
+    expect(view.downloads).toEqual([
+      {
+        key: 'AsIssued:en',
+        language: 'en',
+        kind: 'AsIssued',
+        label: 'Download the original as issued, unstamped (English)',
+        fileName: 'TEST-PAY-2026-000001-en.pdf',
+      },
+      {
+        key: 'AsIssued:ar',
+        language: 'ar',
+        kind: 'AsIssued',
+        label: 'Download the original as issued, unstamped (Arabic)',
+        fileName: 'TEST-PAY-2026-000001-ar.pdf',
+      },
+      { key: 'Voided:en', language: 'en', kind: 'Voided', label: 'Download the voided copy (English)', fileName: 'TEST-PAY-2026-000001-en-void.pdf' },
+      { key: 'Voided:ar', language: 'ar', kind: 'Voided', label: 'Download the voided copy (Arabic)', fileName: 'TEST-PAY-2026-000001-ar-void.pdf' },
+    ]);
+    expect(view.renditions.map((item) => item.title)).toEqual([
+      'English · original as issued, unstamped · template 1',
+      'Arabic · original as issued, unstamped · template 1',
+      "English · voided copy, the customer's · template 1",
+      "Arabic · voided copy, the customer's · template 1",
+    ]);
+    expect(new Set(view.renditions.map((item) => item.key)).size).toBe(4);
+    expect(view.voided).toBe(true);
     expect(view.preparing).toBe(false);
+
+    const arabicView = documentPage(
+      adminPage('payment-receipt-deposit-voided', { renditions: [rendition('en', 1, { kind: 'AsIssued' }), rendition('en', 1, { kind: 'Voided' })] }),
+      arabic,
+      format,
+    ).pdf;
+    expect(arabicView.downloads.map((download) => download.label)).toEqual([
+      'تنزيل الأصل كما صدر، بلا ختم (بالإنجليزية)',
+      'تنزيل النسخة الملغاة (بالإنجليزية)',
+    ]);
+    expect(arabicView.renditions.map((item) => item.title)).toEqual([
+      'الإنجليزية · الأصل كما صدر، بلا ختم · القالب 1',
+      'الإنجليزية · النسخة الملغاة، نسخة العميل · القالب 1',
+    ]);
+  });
+
+  it('says a voided copy is being drawn, and names the original before it is', () => {
+    const page = adminPage('payment-receipt-deposit-voided', { renditions: [rendition('en', 1), rendition('ar', 1)] });
+    const view = documentPage({ ...page, document: { ...page.document, pdf: { languages: [], preparing: true } } }, english, format).pdf;
+    // A server that predates the kind drew only the document as issued.
+    expect(view.downloads.map((download) => [download.kind, download.label])).toEqual([
+      ['AsIssued', 'Download the original as issued, unstamped (English)'],
+      ['AsIssued', 'Download the original as issued, unstamped (Arabic)'],
+    ]);
+    expect(view.voided).toBe(true);
+    expect(view.preparing).toBe(true);
   });
 
   it('takes "being drawn" from the server, and shows nothing it does not know', () => {
     const none = documentPage(adminPage('booking-statement-receipt-corrected', { renditions: [] }), english, format).pdf;
-    expect(none).toEqual({ downloads: [], renditions: [], preparing: true, withheld: false });
+    expect(none).toEqual({ downloads: [], renditions: [], preparing: true, voided: false });
 
     const strange = documentPage(
       adminPage('payment-receipt-paid-in-full', {
         // `constructor` is a property of every object: only the table's own keys are languages.
-        renditions: [rendition('fr', 1), rendition('constructor', 1), rendition('en', 1, { format: 'Html' })],
+        renditions: [
+          rendition('fr', 1),
+          rendition('constructor', 1),
+          rendition('en', 1, { format: 'Html' }),
+          rendition('en', 1, { kind: 'Stamped' }),
+        ],
       }),
       english,
       format,
@@ -467,12 +531,53 @@ describe('the PDFs of a document, as the administrator reads them (payments Phas
     // A server older than Phase 6 sends neither field: nothing is offered and nothing is being drawn.
     const older = adminPage('payment-receipt-paid-in-full');
     const { pdf: _absent, ...page } = older.document;
-    expect(documentPage({ ...older, document: page }, english, format).pdf).toEqual({ downloads: [], renditions: [], preparing: false, withheld: false });
+    expect(documentPage({ ...older, document: page }, english, format).pdf).toEqual({ downloads: [], renditions: [], preparing: false, voided: false });
   });
 
-  it('words a PDF that is not drawn yet', () => {
+  it('words a PDF that is not drawn yet, and a voided copy of a document that is not voided', () => {
     const problem = snapshotProblem({ status: 409, error: { code: 'financial_documents.pdf_not_ready', title: 'The PDF of this document is being prepared.' } });
     expect(problemMessage(problem, 'en', en)).toBe('This PDF is still being drawn. Try again shortly.');
     expect(problemMessage(problem, 'ar', ar)).toBe('ما زال ملف PDF هذا قيد الإنشاء. حاول مجددًا بعد قليل.');
+    const notVoided = snapshotProblem({ status: 409, error: { code: 'financial_documents.not_voided', title: 'This document is not voided, so it has no voided copy.' } });
+    expect(problemMessage(notVoided, 'en', en)).toBe('This document is not voided, so it has no voided copy.');
+    expect(problemMessage(notVoided, 'ar', ar)).toBe('هذا المستند غير ملغى، لذا لا نسخة ملغاة له.');
+  });
+});
+
+describe('the commercial registrations (owner, 2026-09-29)', () => {
+  const registrations = ['Commercial registration', "Rental office's commercial registration", 'السجل التجاري', 'السجل التجاري لمكتب التأجير'];
+
+  it('leave the document body, in both languages, as they leave the customer page and the PDF', () => {
+    for (const entry of fixture.documents) {
+      for (const words of [english, arabic]) {
+        const view = documentPage(adminPage(entry.name), words, format);
+        const lines = view.body!.sections.flatMap((section) => linesOf(section.blocks));
+        expect(lines.map((line) => line.label).filter((label) => registrations.includes(label)), entry.name).toEqual([]);
+        expect(lines.filter((line) => line.key.endsWith('Registration')), entry.name).toEqual([]);
+      }
+    }
+  });
+
+  it('stay in the proof of issue, exactly as the document stores them', () => {
+    const view = documentPage(adminPage('payment-receipt-paid-in-full'), english, format);
+    expect(view.registrations.map((line) => [line.label, line.value, line.direction])).toEqual([
+      ['Commercial registration', 'TEST-0000', 'ltr'],
+      ["Rental office's commercial registration", '123456', 'ltr'],
+    ]);
+    expect(documentPage(adminPage('payment-receipt-paid-in-full'), arabic, format).registrations.map((line) => line.label)).toEqual([
+      'السجل التجاري',
+      'السجل التجاري لمكتب التأجير',
+    ]);
+    // A document this console cannot read whole has no lines to move.
+    const unknown = adminPage('payment-receipt-paid-in-full');
+    expect(documentPage({ ...unknown, document: { ...unknown.document, snapshotSchemaVersion: 2 } }, english, format).registrations).toEqual([]);
+  });
+
+  it('is one rule, the same the website, the app and the PDF apply', () => {
+    expect(shownInBody('parties', 'issuerRegistration')).toBe(false);
+    expect(shownInBody('parties', 'officeRegistration')).toBe(false);
+    expect(shownInBody('parties', 'customerRegistration')).toBe(false);
+    expect(shownInBody('parties', 'customer')).toBe(true);
+    expect(shownInBody('booking', 'officeRegistration')).toBe(true);
   });
 });

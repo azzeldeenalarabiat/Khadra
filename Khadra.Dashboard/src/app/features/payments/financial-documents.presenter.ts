@@ -9,6 +9,7 @@ import {
   FinancialDocument,
   FinancialDocumentHold,
   FinancialDocumentLink,
+  FinancialDocumentRendition,
   PendingFinancialDocument,
 } from '../../core/models/financial-documents.api';
 import { Money } from '../../core/models/fleet.api';
@@ -201,7 +202,16 @@ export interface DocumentBodyView {
   readonly notice: string | null;
 }
 
-/** The stored document, in the console's language, exactly as it was issued. */
+/**
+ * Whether the document's body shows a line (owner, 2026-09-29): every line but the commercial registrations —
+ * Khadra's, the rental office's and a customer's — which the customer's page and the PDF leave out too. The console
+ * keeps them, in its proof of issue ({@link registrationsOf}); the stored document keeps them all.
+ */
+export function shownInBody(sectionKey: string, lineKey: string): boolean {
+  return !(sectionKey === 'parties' && ['issuerRegistration', 'officeRegistration', 'customerRegistration'].includes(lineKey));
+}
+
+/** The stored document, in the console's language, exactly as its customer reads it. */
 export function documentBody(content: DocumentContent, arabic: boolean, format: DocumentFormat): DocumentBodyView {
   return {
     title: pick(content.title, arabic),
@@ -210,16 +220,40 @@ export function documentBody(content: DocumentContent, arabic: boolean, format: 
     sections: content.sections.map((section, index) => ({
       key: `${index}:${section.key}`,
       heading: pick(section.heading, arabic),
-      blocks: blocksOf(section.lines, arabic, format),
+      blocks: blocksOf(section.key, section.lines, arabic, format),
     })),
     timeNote: content.timeNote ? pick(content.timeNote, arabic) : null,
     notice: content.notice ? pick(content.notice, arabic) : null,
   };
 }
 
-function blocksOf(lines: DocumentContent['sections'][number]['lines'], arabic: boolean, format: DocumentFormat): DocumentBlock[] {
+/**
+ * The lines the body leaves out — the commercial registrations — exactly as the document stores them, label and
+ * all, for the administrator's proof of issue. Not a customer's reading: internal, like the rest of that section.
+ */
+export function registrationsOf(content: DocumentContent, arabic: boolean, format: DocumentFormat): DocumentLineView[] {
+  return content.sections.flatMap((section, index) =>
+    section.lines
+      .map((line, position) => ({ line, position }))
+      .filter(({ line }) => line.label !== null && !shownInBody(section.key, line.key))
+      .map(({ line, position }) => ({
+        key: `${index}:${position}:${line.key}`,
+        label: pick(line.label!, arabic),
+        value: valueText(line.value, arabic, format),
+        direction: directionOf(line.value),
+      })),
+  );
+}
+
+function blocksOf(
+  sectionKey: string,
+  lines: DocumentContent['sections'][number]['lines'],
+  arabic: boolean,
+  format: DocumentFormat,
+): DocumentBlock[] {
   const blocks: DocumentBlock[] = [];
   lines.forEach((line, position) => {
+    if (!shownInBody(sectionKey, line.key)) return;
     const key = `${position}:${line.key}`;
     const value = valueText(line.value, arabic, format);
     const direction = directionOf(line.value);
@@ -295,6 +329,8 @@ export interface DocumentPageView {
   /** The snapshot's recorded facts, pretty-printed: evidence, not a customer's reading. */
   readonly facts: string | null;
   readonly proof: readonly ProofRow[];
+  /** The commercial registrations the body leaves out, as stored: shown in the proof of issue, never to a customer. */
+  readonly registrations: readonly DocumentLineView[];
   /** On an earlier version: the NEWEST version, never merely the next one. */
   readonly newer: LinkView | null;
   readonly versions: readonly LinkView[];
@@ -313,18 +349,22 @@ export interface DocumentPageView {
    * pass rather than with the void (owner, 2026-09-28), so the void dialog says so.
    */
   readonly statementFollows: boolean;
-  /** Its PDFs (payments Phase 6): each one drawn, with its proof, and a download per language. */
+  /** Its PDFs (payments Phase 6): each one drawn, with its proof, and a download per kind and language. */
   readonly pdf: PdfSectionView;
 }
 
-/** One PDF download: the language, its button, and the name the saved file gets. */
+/** One PDF download: which PDF it is, its button, and the name the saved file gets. */
 export interface PdfDownloadView {
+  /** `kind:language`, unique on the page. */
+  readonly key: string;
   readonly language: string;
+  /** `AsIssued`, or `Voided` for the copy a voided document's customer is given. */
+  readonly kind: string;
   readonly label: string;
   readonly fileName: string;
 }
 
-/** One PDF drawn of the document: which language and template, and the proof of what was stored. */
+/** One PDF drawn of the document: which kind, language and template, and the proof of what was stored. */
 export interface PdfRenditionView {
   readonly key: string;
   readonly title: string;
@@ -332,39 +372,91 @@ export interface PdfRenditionView {
 }
 
 export interface PdfSectionView {
-  /** One per language drawn, English first: what a download serves is that language's newest template. */
+  /**
+   * One per kind and language drawn — the document as issued first, English first: what a download serves is that
+   * PDF's newest template.
+   */
   readonly downloads: readonly PdfDownloadView[];
-  /** Every PDF drawn, English first, newest template first. */
+  /** Every PDF drawn, as issued first, English first, newest template first. */
   readonly renditions: readonly PdfRenditionView[];
   /** The server's word that a PDF the customer will be offered is still being drawn. */
   readonly preparing: boolean;
-  /** Voided: the customer is no longer handed these files, which say nothing of the void. */
-  readonly withheld: boolean;
+  /**
+   * Voided (owner, 2026-09-29): its customer is given the voided copies, stamped VOID and naming the correction;
+   * the original as issued, unstamped, stays the administrators'.
+   */
+  readonly voided: boolean;
+}
+
+interface PdfLanguageWords {
+  readonly name: TranslationKey;
+  /** A current document's PDF. */
+  readonly download: TranslationKey;
+  /** A voided document's original, as issued and unstamped. */
+  readonly original: TranslationKey;
+  /** A voided document's voided copy. */
+  readonly voidedCopy: TranslationKey;
 }
 
 /** The two languages a PDF is drawn in; one this console has never heard of is not shown. */
-const PDF_LANGUAGES: Readonly<Record<string, { readonly name: TranslationKey; readonly download: TranslationKey }>> = {
-  en: { name: 'financialDocuments.pdfEnglish', download: 'financialDocuments.pdfDownloadEn' },
-  ar: { name: 'financialDocuments.pdfArabic', download: 'financialDocuments.pdfDownloadAr' },
+const PDF_LANGUAGES: Readonly<Record<string, PdfLanguageWords>> = {
+  en: {
+    name: 'financialDocuments.pdfEnglish',
+    download: 'financialDocuments.pdfDownloadEn',
+    original: 'financialDocuments.pdfDownloadOriginalEn',
+    voidedCopy: 'financialDocuments.pdfDownloadVoidedEn',
+  },
+  ar: {
+    name: 'financialDocuments.pdfArabic',
+    download: 'financialDocuments.pdfDownloadAr',
+    original: 'financialDocuments.pdfDownloadOriginalAr',
+    voidedCopy: 'financialDocuments.pdfDownloadVoidedAr',
+  },
 };
+
+/** The two kinds of PDF, in the order they are listed; a kind this console has never heard of is not shown. */
+const PDF_KINDS: readonly string[] = ['AsIssued', 'Voided'];
 
 export function pdfSection(page: AdminFinancialDocument, words: DocumentWords, format: DocumentFormat): PdfSectionView {
   const { t } = words;
+  const voided = page.document.status === 'Voided';
   const order = (language: string) => (language === 'en' ? 0 : 1);
+  // A server that predates the kind drew nothing but the document as issued.
+  const kindOf = (rendition: FinancialDocumentRendition) => rendition.kind ?? 'AsIssued';
   const drawn = (page.renditions ?? [])
-    .filter((rendition) => rendition.format === 'Pdf' && Object.hasOwn(PDF_LANGUAGES, rendition.language))
-    .sort((a, b) => order(a.language) - order(b.language) || b.templateVersion - a.templateVersion);
-  const languages = [...new Set(drawn.map((rendition) => rendition.language))];
+    .filter(
+      (rendition) =>
+        rendition.format === 'Pdf' && Object.hasOwn(PDF_LANGUAGES, rendition.language) && PDF_KINDS.includes(kindOf(rendition)),
+    )
+    .sort(
+      (a, b) =>
+        PDF_KINDS.indexOf(kindOf(a)) - PDF_KINDS.indexOf(kindOf(b)) ||
+        order(a.language) - order(b.language) ||
+        b.templateVersion - a.templateVersion,
+    );
+  const pairs = [...new Map(drawn.map((rendition) => [`${kindOf(rendition)}:${rendition.language}`, rendition])).values()];
+  const label = (kind: string, language: string): TranslationKey =>
+    kind === 'Voided' ? PDF_LANGUAGES[language].voidedCopy : voided ? PDF_LANGUAGES[language].original : PDF_LANGUAGES[language].download;
+  const title = (kind: string): TranslationKey =>
+    kind === 'Voided' ? 'financialDocuments.pdfTitleVoided' : voided ? 'financialDocuments.pdfTitleOriginal' : 'financialDocuments.pdfTitle';
 
   return {
-    downloads: languages.map((language) => ({
-      language,
-      label: t(PDF_LANGUAGES[language].download),
-      fileName: `${page.document.number}-${language}.pdf`,
-    })),
+    downloads: pairs.map((rendition) => {
+      const kind = kindOf(rendition);
+      return {
+        key: `${kind}:${rendition.language}`,
+        language: rendition.language,
+        kind,
+        label: t(label(kind, rendition.language)),
+        fileName:
+          kind === 'Voided'
+            ? `${page.document.number}-${rendition.language}-void.pdf`
+            : `${page.document.number}-${rendition.language}.pdf`,
+      };
+    }),
     renditions: drawn.map((rendition) => ({
-      key: `${rendition.language}:${rendition.templateVersion}`,
-      title: t('financialDocuments.pdfTitle', {
+      key: `${kindOf(rendition)}:${rendition.language}:${rendition.templateVersion}`,
+      title: t(title(kindOf(rendition)), {
         language: t(PDF_LANGUAGES[rendition.language].name),
         n: rendition.templateVersion,
       }),
@@ -377,7 +469,7 @@ export function pdfSection(page: AdminFinancialDocument, words: DocumentWords, f
       ],
     })),
     preparing: page.document.pdf?.preparing === true,
-    withheld: page.document.status === 'Voided' && drawn.length > 0,
+    voided,
   };
 }
 
@@ -449,6 +541,7 @@ export function documentPage(page: AdminFinancialDocument, words: DocumentWords,
     headline: format.money(document.headline.amount),
     facts: facts ? JSON.stringify(facts, null, 2) : null,
     proof,
+    registrations: content ? registrationsOf(content, words.arabic, format) : [],
     newer:
       document.status === 'Superseded' && newest && newest.documentId !== document.documentId
         ? link(newest, t('financialDocuments.version', { n: newest.version }))
