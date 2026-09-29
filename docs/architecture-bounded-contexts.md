@@ -335,6 +335,19 @@ PDF's body and of the customer's document pages; the console shows them in its p
 2026-09-29). QuestPDF under its Community licence draws the
 page; the fonts are embedded, never the host's.
 
+**Emails are deliveries, never records** (payments Phase 7, 2026-09-29). Every payment and refund receipt — never a
+statement — is owed an email in the transaction that issues it: a row in `financial_document_deliveries`, the outbox
+a background service of its own works every minute, never the settlement pass, so a mail server that stalls cannot
+delay a booking deadline. An email is decided as it is sent: the customer's verified address and language (both,
+Arabic first, for one who never chose), the PDFs as issued attached, and never without them — it waits, however
+long, for a PDF not drawn yet. A send attempt is spent before the transport is called and its outcome recorded
+after; a row is worked only by the process whose claim count it still carries, and a retry is the same message under
+the same idempotency key. Every attempt is kept in the append-only `financial_document_delivery_attempts`, which
+holds no address, name or body; the address is on the mutable delivery row. The administrator reads each email's
+history and can email a receipt again, audited by its number, and a Failed email or one queued too long is a row on
+the work queue. TEST receipts reach only the local Mailpit or, through a real provider, an allowlist; replies go to
+Khadra's support address.
+
 ## Owner decisions required
 
 These change field shapes, so they are worth settling before the affected context is built.

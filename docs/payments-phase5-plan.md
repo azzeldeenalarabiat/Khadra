@@ -481,7 +481,7 @@ minimum supported version stays 1.1.0.
 - **Licence first:** QuestPDF only if Khadra qualifies for its Community licence (owner, 2026-09-24);
   otherwise stop and propose another library.
 
-## 10. Phase 7 — email (designed now, built then)
+## 10. Phase 7 — email (designed now, built then — built 2026-09-29, see §23)
 
 - `financial_document_deliveries`: document, channel (email), the recipient address at the time, state —
   **Queued → Sent**, or **Failed** after the last attempt, or **Skipped** (no verified address) —
@@ -1136,3 +1136,101 @@ issue and in no document body — the website's, the console's or a PDF's.
 **Not yet done.** The same two live checks no stack here can reach (a second customer; the app on a phone —
 its voided-copy buttons and open flow are proven by the widget tests); pre-launch items 195, 197–201; the
 Staging migrations, which wait for the owner; Phases 7 and 8.
+
+## 23. What Phase 7 built (2026-09-29)
+
+§10's design, built as one local work package after the owner's two decisions of 2026-09-29 — every payment and
+refund receipt and correction is emailed, never a statement, and the email carries the PDF itself
+(`docs/payments-programme.md`, Phase 7, 1–2) — and changed where the architecture review and the owner's decisions
+at the SQL review said so (3–13 there). One local commit, `730a9c5`, reviewed twice by the architecture advisor.
+
+**Owed where it is issued.** `FinancialDocumentIssuing.IssueAsync` — the one seam both the settlement pass and a
+void's correction issue through — adds a `FinancialDocumentDelivery` for every receipt in the same transaction as
+the receipt, so a receipt can never exist without its promise to be emailed; `FinancialDocumentType.IsEmailedToCustomer`
+is the owner's rule in one place. Receipts issued before the migration are owed nothing (no backfill); an
+administrator's "Email it to the customer" is a new delivery, audited (`FinancialDocumentEmailRequested`, labelled by
+the number), never a second life for one that ended, and at most one is queued per document — the handler refuses a
+second, and a partial unique index refuses it too.
+
+**Worked by a service of its own.** `FinancialDocumentEmailService` claims a batch every minute (`UPDATE … FOR
+UPDATE SKIP LOCKED … RETURNING`, leased) and works each email in its own scope — never inside the settlement pass,
+whose deadlines a stalled mail server must not delay. Each email is decided as it is sent: the document still
+exists and is not voided (a voided receipt is Skipped; its correction goes with the correction's PDFs alone); the
+transport delivers (Logging makes it Skipped, so "Sent" means the same on every host); the customer's CURRENT
+address is verified, whoever asked; a TEST receipt through a real provider goes only to
+`FinancialDocuments:Email:TestRecipients`, while only SMTP to the local Mailpit (port 1025 on this machine or on the
+compose network's `mailpit`) counts as delivering nowhere. It is written in the customer's language when first handed
+to the transport — both, Arabic first, for one who never chose — and a retry keeps those languages.
+
+**Never without its PDF.** It attaches the PDFs as issued, in the email's own language order, read from storage and
+checked against their recorded hashes: a PDF not drawn yet makes it WAIT (`PdfNotReady`, no attempt spent, looked at
+again each minute, never failed for waiting), and a stored PDF that no longer matches its record gives the email up.
+The body states the document's own title, number, amount, booking reference and frozen Amman issue time as the PDF
+prints them (`DocumentPrintLayout`), a correction names what it corrects, the closing says where every receipt stays
+("in your Khadra account" / «في حسابك على خضرا», singular for one PDF and plural for two), and each language links
+the website's page for the document once `App:CustomerAppBaseUrl` is set. Replies go to
+`FinancialDocuments:Issuer:SupportEmail`.
+
+**At least once, recorded as it happened.** A send attempt is spent and saved before the transport is called, and
+the outcome saved after under no token of the pass's. A row is worked only while its claim count is the one this
+process's claim left — the count is a concurrency token, so a claim taken over during the PDFs' reading or the send
+is refused by the database and the row is left to the process that took it. A retry after a crash is the same
+message under the same idempotency key (the recipient, Reply-To, words and PDF hashes; Resend's header adds the
+sender): Resend drops the repeat, SMTP carries it as the Message-ID, and Brevo is sent none (pre-launch item 202). A
+refusal is retried with a growing delay up to `MaxSendAttempts`, then Failed. Every attempt is a row of the
+append-only `financial_document_delivery_attempts` — outcome, time, provider, provider message id, and the renditions
+it carried — and no address, name or body reaches it, the audit entry or a log line: the address the email went to
+is on the mutable delivery row (pre-launch item 203).
+
+**What the administrator sees.** The document's page lists every email newest first — its state, who asked, when it
+was queued, what it waits for, where and in which languages it went, how many sends, the last error — with every
+attempt and the hashes of the PDFs it carried, and offers "Email it to the customer" / "Email it again" when the
+server says it may (`canEmailAgain`), disabled with the reason while one is on its way, absent for a statement and a
+voided receipt. A receipt whose latest email Failed, or has been queued longer than `StaleAfterMinutes`, is one row on
+the work queue (`FinancialDocumentEmailsNotSent`), never a voided one's, which nobody could clear.
+
+**Switched off in Production on Brevo** (owner, 2026-09-29; pre-launch item 202). A Production host whose mail
+provider is Brevo, by its API or its SMTP relay, sends no financial-document email: the service does not start and
+says why at boot, the last step of a send refuses too, and an administrator's request answers 409
+`financial_documents.email_delivery_disabled` — while the API and every other path carry on. Receipts are still
+issued and their emails wait in the queue until the server may send; the console's page says emails are switched off
+there. Local and Staging may use Brevo under the TEST allowlist; Resend and every other transport are unaffected.
+
+**The schema** is migration `20260929164711_FinancialDocumentDeliveries`: two additive tables; checks that a finished
+email has a finish time and that only a queued one waits; every constraint named; the attempts guarded by the same
+append-only triggers as the documents; a rollback that refuses once a real (non-TEST) document has an email. Its
+first draft was removed and generated again with the review's constraints before it was applied anywhere but
+throwaway test databases (owner, 2026-09-29).
+
+**Verified.** Backend 2,444, none failed; the PostgreSQL proofs on a scratch `postgres:18`, 55 of 55 — among them the
+tables, their named constraints and triggers, the waiting check refusing a sent row, a claim passing over rows
+another process holds, a claim taken over mid-step and sent once, one queued email per document, the
+administrator's readings and both rollback branches; console 334 (i18n clean) and its production build. The review's
+cases each have a test: a process stopped mid-send spends its attempt and retries the same message under the same
+key; a claim taken over, mid-send or while the PDFs are read, sends and writes nothing; one of two PDFs drawn makes
+the email wait; a retry keeps its languages; a TEST receipt reaches a real provider only through the allowlist; an
+administrator's resend to an unverified address is Skipped; a correction carries its own PDFs alone; and Production
+on Brevo sends nothing, refuses a request and keeps every email owed until it may send.
+
+**Verified live** on 2026-09-29, on the local `khadra_web_it` through the owner's stack, every email to Mailpit. The
+migration applied on boot, the email service started, the host said Development, and none of the hard stop (event
+2715), the allowlist line or the Brevo warning appeared — Mailpit counts as delivering nowhere. The administrator's page
+of TEST-PAY-2026-000014, a receipt issued before the migration, showed no email and offered "Email it to the customer"
+(`canEmailAgain` true, `emailDeliveryDisabled` false). The request answered 202, the toast said "Email queued", and
+within the minute Mailpit held one message: English, as the customer had chosen; from `Khadra <no-reply@khadra.jo>`
+with Reply-To the configured support address; the subject "Payment receipt TEST-PAY-2026-000014"; the facts, the
+correction line, the singular "attached as a PDF … in your Khadra account" and the link to `/en/invoices/{id}`, which
+opened the website's page for the receipt; and one attachment, `TEST-PAY-2026-000014-en.pdf`, byte-identical (SHA-256
+`f058db56…`) to the stored English PDF and to the hash on the page. The history then read Sent, asked for by the
+administrator, with one attempt "Accepted by the mail provider", `Smtp`, the Message-ID Mailpit received
+(`fd-{delivery}-{content hash}@khadra.jo`) and the PDF's hash. "Email it again" queued a second email; the button stayed
+disabled with "An email of this receipt is already on its way." until it went; and Mailpit then held exactly two
+messages — one per request, the second under a new key over the same content — and still two after another pass. The
+work queue showed no email row, the activity strip "… queued an email of receipt TEST-PAY-2026-000014" twice with the
+tray icon, and the audit log two "Receipt email requested" entries labelled by the number. In Arabic the section read
+right to left («أُرسلت», «قبِلها مزوّد البريد»). The Arabic email itself could not be reached live: a customer's
+language is set only by the app's push registration, and this customer's is English; its words are pinned by the
+tests.
+
+**Not yet done.** An email in Arabic, and one queued at issue rather than asked for, seen live (both proven by the
+tests); pre-launch items 202–204; the Staging migration, which waits for the owner; Phase 8.

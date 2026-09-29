@@ -775,6 +775,13 @@ claiming a send that did not happen. That is the honesty fix, not a delivery gua
 and record the terminal state. Bounce handling needs a provider with a webhook, which is also the
 point at which `Email:Provider` should stop being raw SMTP.
 
+**Progress (payments Phase 7, 2026-09-29).** Issued receipts now go through exactly that outbox:
+`financial_document_deliveries`, queued in the transaction that issues the receipt, worked by its own
+background service, retried with backoff, and ended Sent, Skipped or Failed, with every attempt kept in the
+append-only `financial_document_delivery_attempts` that the administrator reads. The account emails —
+verification, invitations, password resets, booking notices — still send inside the request, and bounces
+are reported back for none of them: "Sent" still means only that the provider ACCEPTED a message.
+
 ### 39. The delivery fee has no history
 
 **Status:** open · **Raised:** 2026-09-06
@@ -4547,7 +4554,14 @@ download in English and Arabic on the website, in the app (1.3.0, unreleased) an
 follow-up the same day (`506fef7`) settled the one default left: a VOIDED document stays in the customer's
 history and its PDF is a voided copy — stamped VOID / «ملغى» on every page, saying it is no longer valid and
 naming its correction — while the original stays the administrator's (`docs/payments-programme.md`, Phase 6,
-3). Still to come: email delivery and its history (Phase 7).
+3). Phase 7 (2026-09-29) built the last of it: every payment and refund receipt, and every correction, is emailed
+to its customer with its PDF — in the language they chose, or Arabic and English for a customer who never chose,
+never to an address they have not verified — and the administrator sees each email's state (queued, sent,
+skipped, failed), who asked for it, where and in which languages it went, and every attempt, and can email a
+receipt again; English and Arabic throughout (`docs/payments-programme.md`, Phase 7; `730a9c5`, verified live through
+Mailpit on 2026-09-29). What stands between this item
+and closing is its own test: the whole of it verified end to end on both customer clients — the app's open flow on
+a phone is the one part no stack here has reached (Phase 6).
 
 ### 173. The penalty notice still says "Nothing has been charged" after a dispute settled the penalty
 
@@ -4926,3 +4940,76 @@ beside the fonts' licences registered at start, and opens each one's full text. 
 the installed version, and on an English page reads Material's British strings ("Licences", matching the row);
 Arabic is «التراخيص». `licences_test.dart` opens it as a guest in both languages and reads Manrope's licence
 text from it.
+
+## Issued financial documents — emails (payments Phase 7, 2026-09-29)
+
+Emailing every payment and refund receipt, and their corrections, to its customer with its PDF, and the delivery
+history the administrator reads (`docs/payments-programme.md`, Phase 7; `docs/payments-phase5-plan.md` §10 and
+§23), and what that knowingly leaves for later. Booking statements are not emailed (owner, 2026-09-29), and no
+receipt issued before the Phase 7 migration is emailed on its own: an administrator sends one with "Email it to
+the customer" when it is needed.
+
+### 202. Receipts emailed through Brevo carry no idempotency key: a process stopped mid-send can email one twice
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 7) · **Owner decision (2026-09-29): accepted for local and Staging only · Before Production on Brevo**
+
+A receipt's email spends its send attempt before the transport is called and records the outcome after, so a
+process that stops in between — a deploy or a crash in the few seconds a send is in flight — leaves the email to
+be sent again once its lease runs out. The retry is the same message under the same key, and what that key buys
+depends on the transport: Resend drops the repeat (its `Idempotency-Key`, kept for a day), and SMTP carries the key
+as the Message-ID, which the big mailboxes collapse. Brevo's HTTPS API is sent no key, so on Brevo the customer
+receives the receipt twice. Brevo does document an `idempotencyKey` inside a request's `headers` object — a UUID,
+kept 30 minutes, a repeat refused with `duplicate_parameter` and not processed — but only in its batch-sending
+examples. Its documentation does not say whether a single send honours it, what status the refusal carries, or
+whether a key used by a request Brevo REJECTED is remembered: if it is, a retry after a genuine rejection would be
+refused as a duplicate and could be recorded as sent, which is worse than a second email. The boot log warns on
+every start with Brevo (event 2714). **Owner, 2026-09-29:** acceptable for local and Staging only, and not approved
+as a Production risk.
+
+**The hard stop (owner, 2026-09-29).** A Production host whose mail provider is Brevo — by its API
+(`Email:Provider` `Brevo`) or by its SMTP relay (`Smtp` to a `brevo.com` or `sendinblue.com` host), which is the same
+provider — sends no financial-document email until this item is closed, and nothing else about the API stops:
+`FinancialDocumentEmailSettings.DeliveryDisabledReason`. The receipt email service does not start there, and says why
+at boot (event 2715, "FINANCIAL-DOCUMENT EMAILS ARE NOT SENT", with the reason); the last step of a send refuses
+too, should anything reach it; an administrator's "Email it again" is refused with **409
+`financial_documents.email_delivery_disabled`**, nothing queued and nothing audited, and the refusal is logged (event
+2705). Receipts are still issued and still owed their emails, which wait in the queue — the work queue lists them
+once they have waited longer than `StaleAfterMinutes` — and the console's document page says emails are switched off
+on this server rather than that one is on its way. Local and Staging may use Brevo under the TEST allowlist; Resend
+and every other transport are unaffected. Pinned by `FinancialDocumentEmailConfigurationTests` (which environments
+and hosts), `FinancialDocumentEmailServiceTests` (the service never starts a pass) and `FinancialDocumentEmailTests`
+(nothing sent, the request refused, the email still owed and sent once the server may send again).
+
+**To close, before Production on Brevo:** either verify Brevo's single-send idempotency against a real Brevo test
+account — a repeated send, and a repeat of a rejected send — and implement it safely (a UUID derived from the email's
+own key; `duplicate_parameter` read as "already accepted" only once that is proven), then lift the hard stop; or send
+receipts through a provider whose idempotency is proven, such as Resend, which the hard stop already lets through.
+Either way, the emails that waited in the queue go out when the server may send again.
+
+### 203. The address each receipt email went to is kept with no retention rule and no erasure path
+
+**Status:** open · **Raised:** 2026-09-29 (payments Phase 7) · **Owner decision (2026-09-29): keep it for now as delivery evidence** · **Before real customers**
+
+`financial_document_deliveries.recipient_address` holds the verified address each receipt email was sent to — the
+evidence of delivery the administrator reads, and the answer to "where did it go?" should the customer's address
+ever change. It is personal data with no retention rule: `User.Delete` is a soft delete and touches no delivery. The
+address is on the MUTABLE delivery row on purpose — the append-only attempts and the audit entries carry no address,
+name or message body — so an erasure can blank it without touching any record that must never change. No automatic
+deletion is added (owner, 2026-09-29). **To close:** the owner decides how long a delivery keeps its address and
+what an erasure request does to it, the privacy notice says so, and that behaviour is built with its tests —
+beside items 18 and 177, which cover the documents themselves.
+
+### 204. The notification outbox never checks at send time that its claim is still its own
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 7) · **Owner decision (2026-09-29): fix before Production**
+
+`DeliverNotificationsHandler` claims push and reminder rows with `NotificationDeliveryRepository.ClaimDueAsync`
+under a lease, but nothing at send time checks that the claim is still its own. A process whose batch outlives its
+lease — a push provider that stalls, a slow database — can reach a row another process has claimed since, and both
+send the same push or reminder. `NotificationDeliveryOptions.LeaseOutlastsBatch` keeps the arithmetic honest for
+the worst case it assumes, not for every case. Payments Phase 7 closed exactly this gap for receipt emails, and the
+owner decided the outbox gets the same treatment before Production. **To close:** the claim returns each row with
+the claim count it left; the sender works a row only while the count is still that one; the count is a concurrency
+token on the outbox row, so a claim taken over between the read and the send is refused by the database; tests force
+the takeover on SQLite and on PostgreSQL — `FinancialDocumentEmailTests` and `PostgresFinancialDocumentEmailTests`
+show the pattern.

@@ -18,7 +18,7 @@ deliver is written down so it cannot be dropped. The rules already in force are 
 | 4b | The consoles: the office's Financial section and the admin's Money section from the calculator; the admin Payments and Refunds screens; the dashboard's money panel | done (`8a0eed0`) |
 | 5 | Issued documents: payment receipts, refund receipts and booking statement versions, with numbering and immutable snapshots | plan approved 2026-09-27 (`docs/payments-phase5-plan.md`); SQL approved and applied locally only (scratch proof 35/35, then `khadra_web_it`); **5a, the backend, built** (`7a8d277`) — issued by the settlement pass with holds, customer and administrator endpoints, void and correct; **5b, the clients, done** — website (`b813b2c`, `3c2df2b`), app in the unreleased 1.3.0 (`1337d54`), console (`d26304f`, `b252c70`); the review's follow-ups R1–R7 (`1315fd5`); `no-store` on the administrator's documents and both financials endpoints (`ec176c4`, item 180); the forced void race (`1e7f720`, item 182); a receipt's correction brings the booking's statement a new version (`07a7284`, item 181); PostgreSQL proof 23/23 and final live verification 2026-09-29 (`docs/payments-phase5b-plan.md` §18); Staging not migrated |
 | 6 | PDF rendering and secure download | **built and verified locally** 2026-09-29 — backend `9bc92de`, website `c2e9ff4`, app in the unreleased 1.3.0 `bd52ac4`, console `487c4b4` — QuestPDF under its Community licence (eligibility confirmed by the owner 2026-09-29): each issued document drawn once from its stored snapshot as a PDF in English and Arabic, stored privately, recorded in the append-only `financial_document_renditions` (migration `20260928222747_FinancialDocumentRenditions`, applied locally only, to `khadra_web_it`), downloaded through short-lived links; scratch PostgreSQL proof 46/46, Linux rendering 91/91 offline; live run on `khadra_web_it`: 86 PDFs for 43 documents, downloads byte-identical to storage; **the follow-up** (`506fef7`, owner's three decisions of 2026-09-29): a voided document's customer is given a copy stamped VOID / «ملغى» naming its correction, drawn beside the untouched original (migration `20260929020747_FinancialDocumentRenditionKind`, applied locally only), the on-screen pages leave the commercial registrations out as the PDF does, and the fonts' OFL texts ship beside the fonts; Staging not migrated (`docs/payments-phase5-plan.md` §22) |
-| 7 | Receipt and invoice email | not started |
+| 7 | Receipt and invoice email | **done locally** 2026-09-29 (`730a9c5`) — every payment and refund receipt, and every correction, emailed to its customer with its PDF (never a booking statement) by a background service of its own: queued in the transaction that issues the receipt, retried, and ended Sent, Skipped or Failed with every attempt kept in an append-only history the administrator reads, where a receipt can also be emailed again; English and Arabic; the owner's thirteen decisions below, the Production hard stop on Brevo among them; migration `20260929164711_FinancialDocumentDeliveries` (SQL approved by the owner 2026-09-29, applied locally only, to `khadra_web_it`); scratch PostgreSQL proof 55/55; verified live through Mailpit (`docs/payments-phase5-plan.md` §23); Staging not migrated |
 | 8 | The office payables ledger (manual settlement) | not started |
 
 ## Owner decisions
@@ -201,6 +201,48 @@ fonts' licence texts, as the Phase 6 follow-up (`506fef7`):
    its official repository (googlefonts/manrope, notofonts/arabic), sits beside the font files in the API
    and in the app, with a notice listing every file, its version, its own copyright line and its hash
    (pre-launch item 196, closed).
+
+### 2026-09-29 — Phase 7, document emails
+
+Asked before it was built:
+
+1. **Which documents are emailed.** Every payment receipt and refund receipt, and their corrections. A booking
+   statement is not emailed.
+2. **What the email carries.** The key facts in the body, in English and Arabic, and the PDF itself attached, in the
+   customer's preferred language — both, Arabic first, for a customer who never chose. An email waits for its PDF
+   rather than going without it.
+
+With the schema and the migration SQL, approved before the local restart:
+
+3. **A voided receipt is never emailed again.** Its correction is, automatically, and carries the correction's PDFs
+   only — never the voided copy, which the customer's account already keeps.
+4. **A verified address only.** No financial-document email goes to an address the customer has not verified,
+   checked as each email is sent: the one owed at issue and an administrator's "Email it again" alike.
+5. **TEST receipts never reach an arbitrary inbox.** The local Mailpit and the Logging transport stay the safe
+   default. Through a real mail provider outside Production, a TEST receipt goes only to an address on the explicit
+   allowlist `FinancialDocuments:Email:TestRecipients`, which is empty by default.
+6. **Replies go to Khadra's support address**, `FinancialDocuments:Issuer:SupportEmail`, set as Reply-To.
+7. **The wording** keeps the customer's full registered name in the greeting, says "in your Khadra account" /
+   «في حسابك على خضرا» — the website and the app both open it — and is singular when one PDF is attached and
+   plural when both the Arabic and the English are.
+8. **The recipient's address is kept** as delivery evidence for now. Its retention and erasure are pre-launch item
+   203; no automatic deletion is added yet.
+9. **Brevo's duplicate risk** — it is sent no idempotency key, so a process stopped mid-send can email a receipt
+   twice — is acceptable for local and Staging only, and is not approved as a Production risk. Before Production:
+   verify Brevo's single-send idempotency against a real test account and implement it safely, or use a provider
+   with proven idempotency such as Resend (pre-launch item 202).
+10. **The notification outbox's claim gap** — the one Phase 7 closed for these emails — is recorded as pre-launch
+    item 204 and is fixed before Production on the same ownership and lease principle.
+11. **No backfill.** A receipt issued before the Phase 7 migration is not emailed on its own; an administrator uses
+    "Email it to the customer" when one is needed.
+12. **One migration.** The first draft of the migration, applied nowhere but throwaway test databases, was removed
+    and generated again with the architecture review's constraints, rather than followed by a second migration.
+13. **A hard stop for Brevo in Production.** Until pre-launch item 202 is closed, a Production host whose mail
+    provider is Brevo — by its API or its SMTP relay — sends no financial-document email: the automatic ones and an
+    administrator's alike. The API still starts; only this delivery path stops, with a clear warning at boot and
+    whenever an administrator's request is refused. Receipts are still issued and their emails wait in the queue.
+    Local and Staging may use Brevo under the existing safeguards; Resend and providers with proven idempotency are
+    unaffected.
 
 ## Required scope for Phases 5–7: invoices and receipts reach the customer
 
