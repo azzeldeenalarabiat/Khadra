@@ -214,6 +214,65 @@
             }
           </div>
         </section>
+
+        <!-- Its PDFs (payments Phase 6): each drawn once from the stored document, with the proof of its bytes. -->
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="file-lock" class="kpi-icon" />
+            <span class="sect-t">{{ t('financialDocuments.pdfs') }}</span>
+            <span class="sect-hint">{{ t('financialDocuments.pdfsHint') }}</span>
+          </div>
+          @if (p.pdf.withheld) {
+            <div class="sect-pad">
+              <div class="banner s-warn">
+                <kh-icon name="warning" />
+                <div>{{ t('financialDocuments.pdfWithheld') }}</div>
+              </div>
+            </div>
+          }
+          @for (rendition of p.pdf.renditions; track rendition.key) {
+            <div class="kv-body">
+              <div class="td-sub">{{ rendition.title }}</div>
+              @for (row of rendition.rows; track row.k) {
+                <div class="kv-split">
+                  <div class="kv-key">{{ row.k }}</div>
+                  <div class="kv-val" [class.mono]="row.code" [class.ltr]="row.code" [class.fdoc-proof]="row.code">{{ row.v }}</div>
+                </div>
+              }
+            </div>
+          } @empty {
+            @if (!p.pdf.preparing) {
+              <div class="sect-pad"><div class="state-text">{{ t('financialDocuments.pdfNone') }}</div></div>
+            }
+          }
+          @if (p.pdf.preparing) {
+            <div class="sect-pad"><div class="state-text">{{ t('financialDocuments.pdfPreparing') }}</div></div>
+          }
+          @if (p.pdf.downloads.length) {
+            <div class="sect-pad fdoc-links">
+              @for (download of p.pdf.downloads; track download.language) {
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  [disabled]="downloading() !== null"
+                  [attr.aria-busy]="downloading() === download.language"
+                  (click)="downloadPdf(download)"
+                >
+                  <kh-icon name="download-simple" />
+                  {{ download.label }}
+                </button>
+              }
+            </div>
+          }
+          @if (pdfProblem(); as text) {
+            <div class="sect-pad" role="status">
+              <div class="banner s-bad">
+                <kh-icon name="warning" />
+                <div>{{ text }}</div>
+              </div>
+            </div>
+          }
+        </section>
       </div>
     </div>
   </div>

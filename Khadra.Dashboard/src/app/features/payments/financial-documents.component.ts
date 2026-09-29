@@ -65,6 +65,7 @@ export class FinancialDocumentsComponent {
     relative: (iso) => this.formats.relative(iso),
     storedMoney: (amount, currency) => this.formats.storedMoney(amount, currency),
     frozenTime: (local) => this.formats.frozenTime(local),
+    count: (value) => this.formats.number(value),
   };
 
   protected readonly vocabulary = loaded(this.service.vocabulary);

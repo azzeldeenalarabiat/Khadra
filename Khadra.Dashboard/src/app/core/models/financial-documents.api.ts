@@ -90,6 +90,40 @@ export interface FinancialDocument {
   readonly snapshot: unknown;
   readonly links: FinancialDocumentLinks;
   readonly voided: { readonly voidedAt: string; readonly replacedBy: FinancialDocumentLink | null } | null;
+  /**
+   * The PDFs the CUSTOMER is offered (payments Phase 6): empty for a voided document, which the customer is
+   * no longer handed. Absent from a server older than Phase 6. The administrator's downloads come from
+   * `AdminFinancialDocument.renditions` instead.
+   */
+  readonly pdf?: FinancialDocumentPdf;
+}
+
+/** What the customer is offered as PDFs: the languages drawn, and whether one is still being drawn. */
+export interface FinancialDocumentPdf {
+  readonly languages: readonly string[];
+  readonly preparing: boolean;
+}
+
+/** One PDF drawn of a document (payments Phase 6): what drew it, and the proof of its bytes. */
+export interface FinancialDocumentRendition {
+  /** `en` or `ar`. */
+  readonly language: string;
+  /** `Pdf`. */
+  readonly format: string;
+  readonly templateVersion: number;
+  readonly rendererVersion: string;
+  /** SHA-256 of the stored file: which bytes were handed out. */
+  readonly contentSha256: string;
+  readonly sizeBytes: number;
+  readonly renderedAt: string;
+  /** The document's own content hash when it was drawn: which record the file pictures. */
+  readonly snapshotSha256: string;
+}
+
+/** A link to a private file, good for a few minutes. */
+export interface SignedFileLink {
+  readonly url: string;
+  readonly expiresAt: string;
 }
 
 /** An administrator's void, reason and all. */
@@ -117,6 +151,8 @@ export interface AdminFinancialDocument {
   readonly coversThrough: string | null;
   readonly checkpointFingerprint: string | null;
   readonly void: FinancialDocumentVoid | null;
+  /** Every PDF drawn of it, a voided document's included. Absent from a server older than Phase 6. */
+  readonly renditions?: readonly FinancialDocumentRendition[];
 }
 
 /** A document family owed and not issued, and why. */

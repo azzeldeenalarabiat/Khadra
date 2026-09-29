@@ -116,6 +116,7 @@ export class AdminBookingDetailComponent {
       relative: (iso) => this.formats.relative(iso),
       storedMoney: (amount, currency) => this.formats.storedMoney(amount, currency),
       frozenTime: (local) => this.formats.frozenTime(local),
+      count: (value) => this.formats.number(value),
     };
     return {
       documents: data.documents.map((row) => documentRow(row, words, format)),

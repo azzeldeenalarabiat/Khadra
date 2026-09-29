@@ -92,6 +92,8 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'financial_documents.correction_failed': 'problem.correctionFailed',
   'financial_documents.void_reason_required': 'problem.reasonRejected',
   'financial_documents.void_reason_too_long': 'problem.reasonRejected',
+  // A document's PDF not drawn yet (payments Phase 6).
+  'financial_documents.pdf_not_ready': 'problem.pdfNotReady',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */

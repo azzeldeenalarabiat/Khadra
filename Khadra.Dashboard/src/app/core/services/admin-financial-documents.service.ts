@@ -7,8 +7,12 @@ import {
   AdminFinancialDocumentListItem,
   FinancialDocumentHold,
   FinancialDocumentVocabulary,
+  SignedFileLink,
   VoidedFinancialDocument,
 } from '../models/financial-documents.api';
+
+/** Where every private file is served from: a minted link that points anywhere else is not followed. */
+const PRIVATE_FILES = '/api/v1/documents/';
 
 /** The documents list's filters, each a value the API reads as it is. */
 export interface DocumentFilters {
@@ -90,6 +94,18 @@ export class AdminFinancialDocumentsService {
   setFilters(filters: DocumentFilters): void {
     this.filters.set(filters);
     this.page.set(1);
+  }
+
+  /**
+   * One PDF of a document (payments Phase 6), fetched through a link minted now — it lasts minutes — with the
+   * bytes coming through the session like every private file. Rejects with the server's refusal.
+   */
+  async pdf(documentId: string, language: string): Promise<Blob> {
+    const link = await firstValueFrom(
+      this.http.get<SignedFileLink>(`${this.base}/${documentId}/pdf-link`, { params: { language } }),
+    );
+    if (!link.url.startsWith(PRIVATE_FILES)) throw { status: 0 };
+    return firstValueFrom(this.http.get(link.url, { responseType: 'blob' }));
   }
 
   /**

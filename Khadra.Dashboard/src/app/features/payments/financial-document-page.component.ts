@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
@@ -13,6 +14,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import {
   DocumentFormat,
   DocumentWords,
+  PdfDownloadView,
   documentPage,
   refusalReport,
   voidDialogWords,
@@ -21,10 +23,16 @@ import {
 } from './financial-documents.presenter';
 
 /**
+ * How long a downloaded PDF's object URL outlives the click. Revoked at once, some browsers cancel the
+ * download they were handed; kept, it holds the file in memory until the tab closes.
+ */
+const OBJECT_URL_GRACE_MS = 30_000;
+
+/**
  * One issued financial document, as the administrator reads it (payments Phase 5b): the document exactly
  * as issued, the facts it recorded, the proof of what was issued, its family and links, and its void when
  * there is one — with the one action this console takes on a document, voiding a wrong one, which issues
- * its correction in the same transaction.
+ * its correction in the same transaction — and its PDFs (Phase 6), each with the proof of its bytes.
  */
 @Component({
   selector: 'kh-financial-document-page',
@@ -40,6 +48,13 @@ export class FinancialDocumentPageComponent {
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  // Not `document`: that is this page's word for what it shows.
+  private readonly browserPage = inject(DOCUMENT);
+
+  /** The language of the PDF being fetched, while one is. */
+  protected readonly downloading = signal<string | null>(null);
+  /** Why the last PDF could not be fetched, in the console's language. */
+  protected readonly pdfProblem = signal<string | null>(null);
 
   private readonly documentId = toSignal(
     this.route.paramMap.pipe(map((params) => params.get('documentId'))),
@@ -70,6 +85,7 @@ export class FinancialDocumentPageComponent {
     relative: (iso) => this.formats.relative(iso),
     storedMoney: (amount, currency) => this.formats.storedMoney(amount, currency),
     frozenTime: (local) => this.formats.frozenTime(local),
+    count: (value) => this.formats.number(value),
   };
 
   protected readonly page = computed(() => {
@@ -95,6 +111,38 @@ export class FinancialDocumentPageComponent {
 
   protected reload(): void {
     this.resource.reload();
+  }
+
+  /**
+   * Fetches one PDF — through a link minted on the click, with the bytes coming through the session — and
+   * saves it under the document's number and its language. A voided document's too: it is the record as
+   * issued, which the administrator may still need.
+   */
+  protected async downloadPdf(download: PdfDownloadView): Promise<void> {
+    const page = this.page();
+    const browser = this.browserPage.defaultView;
+    if (!page || !browser || this.downloading()) return;
+
+    this.downloading.set(download.language);
+    this.pdfProblem.set(null);
+    try {
+      const file = await this.service.pdf(page.id, download.language);
+      const address = browser.URL.createObjectURL(file);
+      const anchor = this.browserPage.createElement('a');
+      anchor.href = address;
+      anchor.download = download.fileName;
+      anchor.rel = 'noopener';
+      this.browserPage.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      browser.setTimeout(() => browser.URL.revokeObjectURL(address), OBJECT_URL_GRACE_MS);
+    } catch (error) {
+      this.pdfProblem.set(
+        problemMessage(snapshotProblem(error), this.i18n.lang(), this.t) ?? this.t('common.serviceDidNotRespond'),
+      );
+    } finally {
+      this.downloading.set(null);
+    }
   }
 
   /**

@@ -37,6 +37,7 @@ export class FinancialDocumentHoldsComponent {
     relative: (iso) => this.formats.relative(iso),
     storedMoney: (amount, currency) => this.formats.storedMoney(amount, currency),
     frozenTime: (local) => this.formats.frozenTime(local),
+    count: (value) => this.formats.number(value),
   };
 
   protected readonly page = this.service.holdsPage;

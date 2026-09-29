@@ -11,6 +11,7 @@ import {
   AdminFinancialDocumentListItem,
   FinancialDocument,
   FinancialDocumentHold,
+  FinancialDocumentRendition,
 } from '../../core/models/financial-documents.api';
 import { Money } from '../../core/models/fleet.api';
 import { readDocumentContent } from './financial-document-content';
@@ -69,6 +70,7 @@ const format: DocumentFormat = {
   relative: (iso) => `relative ${iso.slice(0, 16)}`,
   storedMoney: (amount, currency) => `[${amount} ${currency}]`,
   frozenTime: (local) => `<${local}>`,
+  count: (value) => `#${value}`,
 };
 
 /** The administrator's page around a customer page from the fixture. */
@@ -389,5 +391,88 @@ describe('voiding a document', () => {
     const reason = snapshotProblem({ status: 400, error: { title: 'One or more validation errors occurred.', errors: { reason: ['The field Reason must be ...'] } } });
     expect(problemMessage(reason, 'en', en)).toBe('Check the reason: it is missing, or longer than the platform allows.');
     expect(problemMessage(reason, 'en', en)).not.toMatch(/\d/);
+  });
+});
+
+describe('the PDFs of a document, as the administrator reads them (payments Phase 6)', () => {
+  const rendition = (language: string, templateVersion: number, over: Partial<FinancialDocumentRendition> = {}): FinancialDocumentRendition => ({
+    language,
+    format: 'Pdf',
+    templateVersion,
+    rendererVersion: 'QuestPDF 2026.9.1',
+    contentSha256: `${language}${templateVersion}`.padEnd(64, '0'),
+    sizeBytes: 84213,
+    renderedAt: '2026-09-29T09:15:00+00:00',
+    snapshotSha256: 'a3f1c2d4e5b6978800112233445566778899aabbccddeeff0011223344556677',
+    ...over,
+  });
+
+  it('lists every PDF drawn with the proof of its bytes, English first and the newest template first', () => {
+    const view = documentPage(
+      adminPage('payment-receipt-paid-in-full', { renditions: [rendition('ar', 1), rendition('en', 1), rendition('en', 2)] }),
+      english,
+      format,
+    ).pdf;
+
+    expect(view.renditions.map((item) => item.title)).toEqual(['English · template 2', 'English · template 1', 'Arabic · template 1']);
+    expect(view.renditions[2]!.rows).toEqual([
+      { k: 'Drawn', v: '2026-09-29T09:15', code: false },
+      { k: 'Drawn with', v: 'QuestPDF 2026.9.1', code: true },
+      { k: 'Size', v: '#84213 bytes', code: false },
+      { k: 'File hash (SHA-256)', v: 'ar1'.padEnd(64, '0'), code: true },
+      { k: 'Drawn from content hash', v: 'a3f1c2d4e5b6978800112233445566778899aabbccddeeff0011223344556677', code: true },
+    ]);
+    // One download per language — the server serves its newest template — saved under the number and the language.
+    expect(view.downloads).toEqual([
+      { language: 'en', label: 'Download PDF (English)', fileName: 'TEST-PAY-2026-000002-en.pdf' },
+      { language: 'ar', label: 'Download PDF (Arabic)', fileName: 'TEST-PAY-2026-000002-ar.pdf' },
+    ]);
+    expect(view.withheld).toBe(false);
+    expect(view.preparing).toBe(false);
+  });
+
+  it('words it all in Arabic', () => {
+    const view = documentPage(adminPage('payment-receipt-paid-in-full', { renditions: [rendition('ar', 1)] }), arabic, format).pdf;
+    expect(view.renditions[0]!.title).toBe('العربية · القالب 1');
+    expect(view.downloads[0]!.label).toBe('تنزيل PDF (بالعربية)');
+    expect(view.renditions[0]!.rows.map((row) => row.k)).toEqual(['تاريخ الإنشاء', 'أداة الإنشاء', 'الحجم', 'بصمة الملف (SHA-256)', 'أُنشئ من بصمة المحتوى']);
+  });
+
+  it('still offers a voided document as issued, and says the customer is no longer handed it', () => {
+    const view = documentPage(
+      adminPage('payment-receipt-deposit-voided', { renditions: [rendition('en', 1), rendition('ar', 1)] }),
+      english,
+      format,
+    ).pdf;
+    expect(view.downloads.map((download) => download.language)).toEqual(['en', 'ar']);
+    expect(view.withheld).toBe(true);
+    expect(view.preparing).toBe(false);
+  });
+
+  it('takes "being drawn" from the server, and shows nothing it does not know', () => {
+    const none = documentPage(adminPage('booking-statement-receipt-corrected', { renditions: [] }), english, format).pdf;
+    expect(none).toEqual({ downloads: [], renditions: [], preparing: true, withheld: false });
+
+    const strange = documentPage(
+      adminPage('payment-receipt-paid-in-full', {
+        // `constructor` is a property of every object: only the table's own keys are languages.
+        renditions: [rendition('fr', 1), rendition('constructor', 1), rendition('en', 1, { format: 'Html' })],
+      }),
+      english,
+      format,
+    ).pdf;
+    expect(strange.renditions).toEqual([]);
+    expect(strange.downloads).toEqual([]);
+
+    // A server older than Phase 6 sends neither field: nothing is offered and nothing is being drawn.
+    const older = adminPage('payment-receipt-paid-in-full');
+    const { pdf: _absent, ...page } = older.document;
+    expect(documentPage({ ...older, document: page }, english, format).pdf).toEqual({ downloads: [], renditions: [], preparing: false, withheld: false });
+  });
+
+  it('words a PDF that is not drawn yet', () => {
+    const problem = snapshotProblem({ status: 409, error: { code: 'financial_documents.pdf_not_ready', title: 'The PDF of this document is being prepared.' } });
+    expect(problemMessage(problem, 'en', en)).toBe('This PDF is still being drawn. Try again shortly.');
+    expect(problemMessage(problem, 'ar', ar)).toBe('ما زال ملف PDF هذا قيد الإنشاء. حاول مجددًا بعد قليل.');
   });
 });

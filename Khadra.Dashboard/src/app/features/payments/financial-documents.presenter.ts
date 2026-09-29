@@ -45,6 +45,8 @@ export interface DocumentFormat {
   relative(iso: string): string;
   storedMoney(amount: string, currency: string): string;
   frozenTime(local: string): string;
+  /** A whole number, grouped in the console's language: a PDF's size in bytes. */
+  count(value: number): string;
 }
 
 export function pick(text: Bilingual, arabic: boolean): string {
@@ -311,6 +313,72 @@ export interface DocumentPageView {
    * pass rather than with the void (owner, 2026-09-28), so the void dialog says so.
    */
   readonly statementFollows: boolean;
+  /** Its PDFs (payments Phase 6): each one drawn, with its proof, and a download per language. */
+  readonly pdf: PdfSectionView;
+}
+
+/** One PDF download: the language, its button, and the name the saved file gets. */
+export interface PdfDownloadView {
+  readonly language: string;
+  readonly label: string;
+  readonly fileName: string;
+}
+
+/** One PDF drawn of the document: which language and template, and the proof of what was stored. */
+export interface PdfRenditionView {
+  readonly key: string;
+  readonly title: string;
+  readonly rows: readonly ProofRow[];
+}
+
+export interface PdfSectionView {
+  /** One per language drawn, English first: what a download serves is that language's newest template. */
+  readonly downloads: readonly PdfDownloadView[];
+  /** Every PDF drawn, English first, newest template first. */
+  readonly renditions: readonly PdfRenditionView[];
+  /** The server's word that a PDF the customer will be offered is still being drawn. */
+  readonly preparing: boolean;
+  /** Voided: the customer is no longer handed these files, which say nothing of the void. */
+  readonly withheld: boolean;
+}
+
+/** The two languages a PDF is drawn in; one this console has never heard of is not shown. */
+const PDF_LANGUAGES: Readonly<Record<string, { readonly name: TranslationKey; readonly download: TranslationKey }>> = {
+  en: { name: 'financialDocuments.pdfEnglish', download: 'financialDocuments.pdfDownloadEn' },
+  ar: { name: 'financialDocuments.pdfArabic', download: 'financialDocuments.pdfDownloadAr' },
+};
+
+export function pdfSection(page: AdminFinancialDocument, words: DocumentWords, format: DocumentFormat): PdfSectionView {
+  const { t } = words;
+  const order = (language: string) => (language === 'en' ? 0 : 1);
+  const drawn = (page.renditions ?? [])
+    .filter((rendition) => rendition.format === 'Pdf' && Object.hasOwn(PDF_LANGUAGES, rendition.language))
+    .sort((a, b) => order(a.language) - order(b.language) || b.templateVersion - a.templateVersion);
+  const languages = [...new Set(drawn.map((rendition) => rendition.language))];
+
+  return {
+    downloads: languages.map((language) => ({
+      language,
+      label: t(PDF_LANGUAGES[language].download),
+      fileName: `${page.document.number}-${language}.pdf`,
+    })),
+    renditions: drawn.map((rendition) => ({
+      key: `${rendition.language}:${rendition.templateVersion}`,
+      title: t('financialDocuments.pdfTitle', {
+        language: t(PDF_LANGUAGES[rendition.language].name),
+        n: rendition.templateVersion,
+      }),
+      rows: [
+        { k: t('financialDocuments.pdfRendered'), v: format.when(rendition.renderedAt), code: false },
+        { k: t('financialDocuments.pdfRenderer'), v: rendition.rendererVersion, code: true },
+        { k: t('financialDocuments.pdfSize'), v: t('financialDocuments.pdfBytes', { n: format.count(rendition.sizeBytes) }), code: false },
+        { k: t('financialDocuments.pdfHash'), v: rendition.contentSha256, code: true },
+        { k: t('financialDocuments.pdfDrawnFrom'), v: rendition.snapshotSha256, code: true },
+      ],
+    })),
+    preparing: page.document.pdf?.preparing === true,
+    withheld: page.document.status === 'Voided' && drawn.length > 0,
+  };
 }
 
 /** What the console reports about a document its reader refused whole. */
@@ -407,6 +475,7 @@ export function documentPage(page: AdminFinancialDocument, words: DocumentWords,
       : null,
     canVoid: document.status === 'Current',
     statementFollows: document.type === 'PaymentReceipt' || document.type === 'RefundReceipt',
+    pdf: pdfSection(page, words, format),
   };
 }
 
