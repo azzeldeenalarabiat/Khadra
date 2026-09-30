@@ -11,7 +11,7 @@ import {
   PayoutFormat,
   PayoutWords,
   balanceRow,
-  netText,
+  movedText,
   payableRow,
   settlementLineRow,
   settlementRow,
@@ -82,7 +82,7 @@ export class DealerPayoutsComponent {
     if (!detail) return null;
     return {
       settlement: settlementRow(detail.settlement, 'office', this.words(), this.format),
-      movement: netText(detail.settlement.amount, 'office', this.words(), this.format),
+      movement: movedText(detail.settlement.amount, this.words(), this.format),
       lines: detail.lines.map((line) => settlementLineRow(line, 'office', this.words(), this.format)),
     };
   });

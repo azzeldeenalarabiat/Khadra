@@ -9,7 +9,7 @@ import { AdminPayablesService } from '../../core/services/admin-payables.service
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
-import { PayoutFormat, PayoutWords, netText, settlementLineRow, settlementRow } from './payouts.presenter';
+import { PayoutFormat, PayoutWords, movedText, settlementLineRow, settlementRow } from './payouts.presenter';
 
 /**
  * One settlement (payments Phase 8): what moved, which way, on which day, under which reference, who recorded it, and
@@ -59,7 +59,7 @@ export class OfficeSettlementComponent {
     const words = this.words();
     return {
       settlement: settlementRow(detail.settlement, 'admin', words, this.format),
-      movement: netText(detail.settlement.amount, 'admin', words, this.format),
+      movement: movedText(detail.settlement.amount, words, this.format),
       lines: detail.lines.map((line) => settlementLineRow(line, 'admin', words, this.format)),
     };
   });

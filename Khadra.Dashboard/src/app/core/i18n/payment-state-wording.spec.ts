@@ -4,6 +4,7 @@ import { EN, TranslationKey } from './en';
 import { MessageParams } from './language';
 import { resolveMessage } from './resolve';
 import { statusKey } from './status-key';
+import { penaltyStandingKey } from './money-words';
 
 /**
  * Two consistency fixes the owner asked for before Phase 3 (2026-09-25), against the REAL dictionaries.
@@ -56,5 +57,32 @@ describe('the free-cancellation window', () => {
       }
     }
     expect(JSON.stringify(Object.values(AR))).not.toContain('ساعة بعد الموافقة');
+  });
+});
+
+/**
+ * Payments Phase 8 (owner, 2026-09-29): a customer's penalty of the whole deposit is KEPT when the dispute window
+ * closes with no dispute, so no console may go on saying a penalty becomes money only through a dispute — for that
+ * penalty, or once it has been kept.
+ */
+describe('where an assessed penalty stands, in both consoles', () => {
+  it('reads the server state and flag, and keeps the old sentence only for a penalty that still needs a dispute', () => {
+    expect(penaltyStandingKey({ state: 'KeptFromDeposit', requiresTicketToEnforce: false }, 'admin')).toBe('penaltyStanding.keptFromDeposit');
+    expect(penaltyStandingKey({ state: 'ResolvedByDispute', requiresTicketToEnforce: false }, 'office')).toBe('penaltyStanding.resolvedByDispute');
+    expect(penaltyStandingKey({ state: 'Assessed', requiresTicketToEnforce: false }, 'admin')).toBe('penaltyStanding.keptUnlessDisputed');
+    expect(penaltyStandingKey({ state: 'Assessed', requiresTicketToEnforce: true }, 'admin')).toBe('adminBooking.assessedNotChargedMoney');
+    expect(penaltyStandingKey({ state: 'Assessed', requiresTicketToEnforce: true }, 'office')).toBe('dealerBooking.assessedNotChargedMoney');
+    // An older API sends neither: the old sentence, which was true for it.
+    expect(penaltyStandingKey({}, 'office')).toBe('dealerBooking.assessedNotChargedMoney');
+  });
+
+  it('never says "nothing is charged" where the kept penalty could make it false', () => {
+    expect(en('penaltyStanding.keptFromDeposit')).toBe('Kept from the deposit: the dispute window closed with no dispute.');
+    expect(ar('penaltyStanding.keptFromDeposit')).toBe('احتُفظ بها من العربون: انتهت مهلة النزاع دون فتح نزاع.');
+    for (const key of ['dealerDispute.settlesAsIfNone', 'dealerDispute.theAmicablePathThe', 'disputeDetail.thisTicketWasWithdrawn', 'dealerBooking.thePlatformAnswersWithin'] as const) {
+      expect(en(key), key).not.toMatch(/nothing is charged/i);
+      expect(ar(key), key).not.toContain('لا يُحصَّل شيء من أحد');
+    }
+    expect(en('adminBooking.noShowBody', { customer: 'Rana' })).toContain('kept from the deposit only when the dispute window closes with no dispute');
   });
 });

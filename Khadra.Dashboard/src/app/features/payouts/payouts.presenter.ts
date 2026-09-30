@@ -48,6 +48,26 @@ export function netText(net: Money, audience: Audience, words: PayoutWords, form
   return { text: words.t('payouts.net.even'), tone: 'dim' };
 }
 
+/**
+ * A net a settlement has closed, in the past tense: the money has moved, so nobody "owes" it any more. What a settled
+ * payable and a settlement's lines say.
+ */
+export function settledText(net: Money, audience: Audience, words: PayoutWords, format: PayoutFormat): { readonly text: string; readonly tone: Tone } {
+  const amount = format.money(positive(net));
+  if (net.amount > 0) return { text: words.t(audience === 'admin' ? 'payouts.net.owedToOffice' : 'payouts.net.owedToYou', { amount }), tone: 'ok' };
+  if (net.amount < 0) return { text: words.t(audience === 'admin' ? 'payouts.net.owedByOffice' : 'payouts.net.owedByYou', { amount }), tone: 'warn' };
+  return { text: words.t('payouts.net.even'), tone: 'dim' };
+}
+
+/**
+ * What a settlement moved: the positive figure — its direction ("Paid to the office", "Received from the office") says
+ * which way — or nothing, when it netted to zero.
+ */
+export function movedText(amount: Money, words: PayoutWords, format: PayoutFormat): { readonly text: string; readonly tone: Tone } {
+  if (amount.amount === 0) return { text: words.t('payouts.net.even'), tone: 'dim' };
+  return { text: format.money(positive(amount)), tone: amount.amount > 0 ? 'ok' : 'warn' };
+}
+
 /** The money that went towards the office carries +; what is taken from it carries −. */
 const TOWARDS_OFFICE: ReadonlySet<string> = new Set(['RentalRevenue', 'DisputeShare', 'PenaltyKept']);
 
@@ -186,7 +206,9 @@ export interface PayableRow {
 }
 
 export function payableRow(payable: OfficePayable, audience: Audience, words: PayoutWords, format: PayoutFormat): PayableRow {
-  const net = netText(payable.net, audience, words, format);
+  const net = payable.state === 'Settled'
+    ? settledText(payable.net, audience, words, format)
+    : netText(payable.net, audience, words, format);
   const holds = (payable.holds ?? []).map((hold) => holdRow(hold, words, format));
   const open = payable.state !== 'Settled';
   return {
@@ -269,7 +291,7 @@ export interface SettlementLineRow {
 }
 
 export function settlementLineRow(line: OfficeSettlementLine, audience: Audience, words: PayoutWords, format: PayoutFormat): SettlementLineRow {
-  const net = netText(line.net, audience, words, format);
+  const net = settledText(line.net, audience, words, format);
   return {
     payableId: line.payableId,
     bookingId: line.bookingId,
@@ -334,7 +356,11 @@ export interface OfficeCard {
  */
 export function officeCard(office: FinancialOffice | null | undefined, audience: Audience, words: PayoutWords, format: PayoutFormat): OfficeCard | null {
   if (!office || office.state === 'NotApplicable') return null;
-  const net = office.net ? netText(office.net, audience, words, format) : null;
+  const net = office.net
+    ? office.state === 'Settled'
+      ? settledText(office.net, audience, words, format)
+      : netText(office.net, audience, words, format)
+    : null;
   return {
     state: words.label('payableState', office.state),
     stateTone: stateTone(office.state),

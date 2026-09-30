@@ -586,7 +586,7 @@ export const AR = {
   'dealerBooking.settlementWindow': 'مهلة التسوية',
   'dealerBooking.termsFrozenOnThis': 'الشروط المجمَّدة على هذا الحجز',
   'dealerBooking.thePlatformAnswersWithin':
-    'تردّ المنصة ضمن مدة الخدمة المحددة؛ ولا يُحصَّل شيء بغير تذكرة',
+    'تردّ المنصة ضمن مدة الخدمة المحددة',
   'dealerBooking.timeline': 'التسلسل الزمني',
   'dealerBooking.vehicle': 'السيارة',
   'dealerBooking.whatWentWrong': 'ما الذي حدث',
@@ -689,7 +689,7 @@ export const AR = {
   'disputeDetail.theDecisionYourNote':
     'يُعرض القرار كاملًا على العميل، ولا يُعرض على مكتب التأجير إلا حصته وأي مبلغ يُحصَّل منه. وتُعرض ملاحظتك واسمك ووقت التسجيل على الطرفين وتُكتب في سجل التدقيق، فلا تذكر في الملاحظة حصة العميل أو حصة المنصة.',
   'disputeDetail.thisTicketWasWithdrawn':
-    'سحب هذه التذكرة الطرفُ الذي فتحها، فلا يُحصَّل شيء من أحد، ويُسوّى الحجز كأن نزاعًا لم يُرفع.',
+    'سحب هذه التذكرة الطرفُ الذي فتحها، فيُسوّى الحجز كأن نزاعًا لم يُرفع.',
   'disputeDetail.transferredToTheDealer': 'المحوَّل إلى المكتب',
   'dealerApply.allThreeAreRequired':
     'الوثائق الثلاث مطلوبة جميعًا. بصيغة JPEG أو PNG أو PDF. تُحفظ بشكل خاص، ولا يفتحها إلا المشرف الذي يراجع طلبك.',
@@ -952,6 +952,10 @@ export const AR = {
   'bookingsList.vehicle': 'السيارة',
   'adminBooking.assessedNotChargedMoney':
     'مقدَّرة لا محصَّلة. ولا تصبح الغرامة مبلغًا فعليًا إلا حين يبتّ مشرف في نزاع.',
+  'penaltyStanding.keptFromDeposit': 'احتُفظ بها من العربون: انتهت مهلة النزاع دون فتح نزاع.',
+  'penaltyStanding.resolvedByDispute': 'حُسمت في نزاع: قراره هو ما آل إليه هذا التقدير.',
+  'penaltyStanding.keptUnlessDisputed':
+    'مقدَّرة ولم تُحصَّل بعد. يُحتفظ بها من العربون عند انتهاء مهلة النزاع، ما لم يقضِ نزاع بغير ذلك.',
   'adminBooking.cancelBooking': 'إلغاء الحجز',
   'adminBooking.expireBooking': 'إنهاء صلاحية الحجز',
   'adminBooking.frozenWhenTheBooking': 'جُمِّدت عند إنشاء الحجز',
@@ -1464,10 +1468,10 @@ export const AR = {
   'dealerDashboard.occupancyRate': 'نسبة الإشغال',
   'dealerDispute.withdrawThisDispute': 'سحب هذا النزاع؟',
   'dealerDispute.theAmicablePathThe':
-    'الطريق الودّي: تُغلق التذكرة، ولا يُحصَّل شيء من أحد، ويُسوّى الحجز كأن نزاعًا لم يُرفع. ويمكنك فتح نزاع جديد ما دامت المهلة مفتوحة.',
+    'الطريق الودّي: تُغلق التذكرة، ويُسوّى الحجز كأن نزاعًا لم يُرفع. ويمكنك فتح نزاع جديد ما دامت المهلة مفتوحة.',
   'dealerDispute.withdrawDispute': 'سحب النزاع',
   'dealerDispute.disputeWithdrawn': 'سُحب النزاع',
-  'dealerDispute.nothingIsChargedTo': 'لا يُحصَّل شيء من أحد.',
+  'dealerDispute.settlesAsIfNone': 'يُسوّى الحجز كأن نزاعًا لم يُرفع.',
   'dealerEmployees.staffIsTheOwners': 'إدارة الموظفين من شأن صاحب المكتب',
   'dealerEmployees.whoWorksHereWhat':
     'من يعمل هنا، وما الذي يجوز له الاطّلاع عليه، ومن يُدعى أو يُوقف — كلها قرارات صاحب المكتب. أما صلاحياتك أنت فمكانها شاشة الإعدادات.',
@@ -2167,7 +2171,7 @@ export const AR = {
     '{which} إنهاء الصلاحية يُحرِّر السيارة، ولا تُقدَّر أي غرامة على أحد.',
   'adminBooking.noShowTitle': 'تسجيل عدم حضور على الحجز {reference}؟',
   'adminBooking.noShowBody':
-    'لم تُستلَم السيارة من قِبل {customer}. يُقدِّر هذا ما تنص عليه شروط هذا الحجز نفسه، ولا يُحصَّل أي مبلغ.',
+    'لم تُستلَم السيارة من قِبل {customer}. يُقدِّر هذا ما تنص عليه شروط هذا الحجز نفسه. لا يُحصَّل شيء الآن: لا يُحتفظ بغرامة على العميل من العربون إلا عند انتهاء مهلة النزاع دون فتح نزاع.',
   'dealerBooking.requestedAt': 'طُلب في {when}',
 
   // Wave Two 2026-09-17: one clock for every deadline and SLA — remaining, overdue by, expired
@@ -3596,6 +3600,10 @@ export const AR = {
   'payouts.net.toYou': 'تدين لك خضرا بمبلغ {amount}',
   'payouts.net.byYou': 'تدين لخضرا بمبلغ {amount}',
   'payouts.net.even': 'لا شيء على أيّ من الطرفين',
+  'payouts.net.owedToOffice': 'كانت خضرا تدين للمكتب بمبلغ {amount}',
+  'payouts.net.owedByOffice': 'كان المكتب يدين لخضرا بمبلغ {amount}',
+  'payouts.net.owedToYou': 'كانت خضرا تدين لك بمبلغ {amount}',
+  'payouts.net.owedByYou': 'كنت تدين لخضرا بمبلغ {amount}',
   'payouts.line.less': 'يُخصم: {line}',
   'payouts.officeTitle': 'تحويلات المكتب',
   'payouts.officeSubtitle': 'رصيده، والحجوزات التي يتكوّن منها، وكل تسوية سُجّلت.',
@@ -3685,12 +3693,12 @@ export const AR = {
   'finance.groupTest': '{currency} — أموال تجريبية',
   'finance.commissionEarned': 'العمولة المكتسبة',
   'finance.payablesRecorded': {
-    zero: 'لا حجوزات',
-    one: 'على حجز واحد',
-    two: 'على حجزين',
-    few: 'على {count} حجوزات',
-    many: 'على {count} حجزًا',
-    other: 'على {count} حجز',
+    zero: 'لا حجوزات صارت نهائية في هذه المدة',
+    one: 'من حجز واحد صار نهائيًا في هذه المدة',
+    two: 'من حجزين صارا نهائيين في هذه المدة',
+    few: 'من {count} حجوزات صارت نهائية في هذه المدة',
+    many: 'من {count} حجزًا صار نهائيًا في هذه المدة',
+    other: 'من {count} حجز صار نهائيًا في هذه المدة',
   },
   'finance.keptFromDisputes': 'ما احتُفظ به من النزاعات',
   'finance.keptFromDisputesHint': 'ما أبقته قرارات النزاع لخضرا — وليس عمولة.',

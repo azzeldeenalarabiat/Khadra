@@ -27,7 +27,7 @@ import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { commissionRate } from '../../core/i18n/commission-rate';
-import { MoneyFormat } from '../../core/i18n/money-words';
+import { MoneyFormat, penaltyStandingKey } from '../../core/i18n/money-words';
 import { confirmedStepKey } from './booking-payment.presenter';
 import { officeMoney } from './office-money.presenter';
 import { toRenterDocumentsPanel } from './renter-documents.presenter';
@@ -691,6 +691,11 @@ export class DealerBookingDetailComponent {
   /** True when the sentence on screen is the frozen English one rather than a worded code. */
   protected penaltyReasonIsFrozen(penalty: PenaltyAssessment): boolean {
     return !(penalty.reasonCode && enumKey('penaltyReason', penalty.reasonCode));
+  }
+
+  /** Where the penalty stands, from the server's state (payments Phase 8): never "not charged" once it was kept. */
+  protected penaltyStanding(penalty: PenaltyAssessment): TranslationKey {
+    return penaltyStandingKey(penalty, 'office');
   }
 
   protected reload(): void {

@@ -11,10 +11,14 @@ import {
   PayoutWords,
   balanceRow,
   currentAmountOf,
+  financeGroup,
   lineRow,
+  movedText,
   netText,
   officeCard,
   payableRow,
+  settledText,
+  settlementLineRow,
   settlementRow,
 } from './payouts.presenter';
 
@@ -135,6 +139,60 @@ describe('a settlement', () => {
     expect(row.amount).toBe('15 JOD');
     expect(row.amountTone).toBe('dim');
     expect(row.voided).toEqual({ when: '2026-10-10T09:00', by: null, reason: null });
+  });
+});
+
+describe('money a settlement has moved', () => {
+  it('speaks of what was owed in the past tense, because it no longer is', () => {
+    expect(settledText(jod(12), 'admin', words('en'), format).text).toBe('Khadra owed the office 12 JOD');
+    expect(settledText(jod(-5), 'admin', words('en'), format).text).toBe('The office owed Khadra 5 JOD');
+    expect(settledText(jod(12), 'office', words('en'), format).text).toBe('Khadra owed you 12 JOD');
+    expect(settledText(jod(-5), 'office', words('en'), format).text).toBe('You owed Khadra 5 JOD');
+    expect(settledText(jod(12), 'admin', words('ar'), format).text).toBe('كانت خضرا تدين للمكتب بمبلغ 12 JOD');
+    expect(settledText(jod(0), 'admin', words('en'), format).text).toBe('Nothing either way');
+  });
+
+  it('says a settled payable was owed, and an open one is owed', () => {
+    const settlement = { settlementId: 's-1', number: 'TEST-SET-2026-000001', paidOn: '2026-10-09' };
+
+    expect(payableRow(payable({ state: 'Settled', settlement }), 'admin', words('en'), format).net).toBe('Khadra owed the office 12 JOD');
+    expect(payableRow(payable(), 'admin', words('en'), format).net).toBe('Khadra owes the office 12 JOD');
+    expect(
+      settlementLineRow({ payableId: 'p-1', bookingId: 'b-1', bookingReference: 'KH-ABCD1234', outcome: 'PenaltyKept', net: jod(12) }, 'admin', words('en'), format).net,
+    ).toBe('Khadra owed the office 12 JOD');
+  });
+
+  it('states what moved as the positive figure beside its direction, or nothing when it netted', () => {
+    expect(movedText(jod(12), words('en'), format)).toEqual({ text: '12 JOD', tone: 'ok' });
+    expect(movedText(jod(-15), words('en'), format)).toEqual({ text: '15 JOD', tone: 'warn' });
+    expect(movedText(jod(0), words('ar'), format).text).toBe('لا شيء على أيّ من الطرفين');
+  });
+});
+
+describe('the finance figures', () => {
+  it("states the server's sums, and counts the bookings behind them without claiming commission on each", () => {
+    const group = financeGroup(
+      {
+        currency: 'JOD', isTest: true, commissionEarned: jod(132), keptFromDisputes: jod(0), officeMoney: jod(147), officeCharges: jod(0),
+        paidToOffices: jod(12), receivedFromOffices: jod(0), owedToOffices: jod(3), owedByOffices: jod(0), payablesRecorded: 11,
+      },
+      words('en'),
+      format,
+    );
+
+    expect(group.isTest).toBe(true);
+    expect(group.cards[0]).toEqual({ label: 'Commission earned', value: '132 JOD', hint: 'From 11 bookings final in this span' });
+    expect(group.cards.map((card) => card.value)).toEqual(['132 JOD', '0 JOD', '12 JOD', '0 JOD', '3 JOD', '0 JOD']);
+    expect(
+      financeGroup(
+        {
+          currency: 'JOD', isTest: false, commissionEarned: jod(6), keptFromDisputes: jod(0), officeMoney: jod(18), officeCharges: jod(0),
+          paidToOffices: jod(0), receivedFromOffices: jod(0), owedToOffices: jod(12), owedByOffices: jod(0), payablesRecorded: 2,
+        },
+        words('ar'),
+        format,
+      ).cards[0].hint,
+    ).toBe('من حجزين صارا نهائيين في هذه المدة');
   });
 });
 

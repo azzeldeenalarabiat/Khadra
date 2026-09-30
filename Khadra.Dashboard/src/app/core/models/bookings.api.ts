@@ -259,6 +259,14 @@ export interface PenaltyAssessment {
    */
   readonly reasonCode: string | null;
   readonly assessedAt: string;
+  /**
+   * Whether nothing can come of this assessment without a dispute. False only for a customer's penalty of the whole
+   * deposit, which the office payables ledger keeps when the dispute window closes with no dispute (payments
+   * Phase 8). An older API does not send it: read as true.
+   */
+  readonly requiresTicketToEnforce?: boolean;
+  /** Where it stands: `Assessed`, `ResolvedByDispute` or `KeptFromDeposit`. A state this build does not know says nothing new. */
+  readonly state?: string | null;
 }
 
 export interface Handover {

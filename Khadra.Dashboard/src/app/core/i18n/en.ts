@@ -527,6 +527,11 @@ export const EN = {
   // Booking details (admin).
   'adminBooking.assessedNotChargedMoney':
     'Assessed, not charged. A penalty becomes money only when an administrator resolves a dispute.',
+  // Where a penalty stands (payments Phase 8): a customer's penalty of the whole deposit is kept when the window closes.
+  'penaltyStanding.keptFromDeposit': 'Kept from the deposit: the dispute window closed with no dispute.',
+  'penaltyStanding.resolvedByDispute': 'Resolved through a dispute: its decision is what this assessment became.',
+  'penaltyStanding.keptUnlessDisputed':
+    'Assessed, not charged yet. It is kept from the deposit when the dispute window closes, unless a dispute decides otherwise.',
   'adminBooking.cancelBooking': 'Cancel booking',
   'adminBooking.expireBooking': 'Expire booking',
   'adminBooking.frozenWhenTheBooking': 'Frozen when the booking was made',
@@ -607,7 +612,7 @@ export const EN = {
   'disputeDetail.theDecisionYourNote':
     "The customer is shown the whole decision; the rental office only its own share and any charge to it. Your note, your name and the timestamp are shown to both and written to the audit log, so leave the customer's and the platform's shares out of the note.",
   'disputeDetail.thisTicketWasWithdrawn':
-    'This ticket was withdrawn by the party who opened it, so nothing is charged to anyone and the booking settles as if no dispute had been raised.',
+    'This ticket was withdrawn by the party who opened it, so the booking settles as if no dispute had been raised.',
   'disputeDetail.transferredToTheDealer': 'Transferred to the dealer',
 
   // Audit log.
@@ -760,7 +765,7 @@ export const EN = {
   'dealerBooking.settlementWindow': 'Settlement window',
   'dealerBooking.termsFrozenOnThis': 'Terms frozen on this booking',
   'dealerBooking.thePlatformAnswersWithin':
-    'The platform answers within its SLA; nothing is charged without a ticket',
+    'The platform answers within its SLA',
   'dealerBooking.timeline': 'Timeline',
   'dealerBooking.vehicle': 'Vehicle',
   'dealerBooking.whatWentWrong': 'What went wrong',
@@ -1670,10 +1675,10 @@ export const EN = {
     'Both names change together. Everything already pointing at this entry follows the new name.',
   'dealerDispute.withdrawThisDispute': 'Withdraw this dispute?',
   'dealerDispute.theAmicablePathThe':
-    'The amicable path: the ticket closes, nothing is charged to anyone, and the booking settles as if no dispute had been raised. You can open a new one while the window is still open.',
+    'The amicable path: the ticket closes and the booking settles as if no dispute had been raised. You can open a new one while the window is still open.',
   'dealerDispute.withdrawDispute': 'Withdraw dispute',
   'dealerDispute.disputeWithdrawn': 'Dispute withdrawn',
-  'dealerDispute.nothingIsChargedTo': 'Nothing is charged to anyone.',
+  'dealerDispute.settlesAsIfNone': 'The booking settles as if no dispute had been raised.',
   'dealerSettings.twoFactorAuthentication': 'Two-factor authentication',
   'dealerSettings.notLiveYetSign': 'Not live yet. Sign-in is email and password.',
   'dealerSettings.notLiveYetInvitations':
@@ -2369,7 +2374,7 @@ export const EN = {
     '{which} Expiring releases the car. No penalty is assessed against anyone.',
   'adminBooking.noShowTitle': 'Mark {reference} as a no-show?',
   'adminBooking.noShowBody':
-    "{customer} never collected the car. This assesses whatever this booking's own terms say is owed — nothing is charged.",
+    "{customer} never collected the car. This assesses whatever this booking's own terms say is owed. Nothing is charged now: a penalty on the customer is kept from the deposit only when the dispute window closes with no dispute.",
   'dealerBooking.requestedAt': 'Requested {when}',
 
   // Wave Two 2026-09-17: one clock for every deadline and SLA — remaining, overdue by, expired
@@ -3525,6 +3530,11 @@ export const EN = {
   'payouts.net.toYou': 'Khadra owes you {amount}',
   'payouts.net.byYou': 'You owe Khadra {amount}',
   'payouts.net.even': 'Nothing either way',
+  // What a settlement closed: past tense, because the money has moved (a settled payable, a settlement's lines).
+  'payouts.net.owedToOffice': 'Khadra owed the office {amount}',
+  'payouts.net.owedByOffice': 'The office owed Khadra {amount}',
+  'payouts.net.owedToYou': 'Khadra owed you {amount}',
+  'payouts.net.owedByYou': 'You owed Khadra {amount}',
   'payouts.line.less': 'Less {line}',
   'payouts.officeTitle': 'Office payouts',
   'payouts.officeSubtitle': 'Its balance, the bookings behind it, and every settlement recorded.',
@@ -3603,7 +3613,8 @@ export const EN = {
   'finance.group': 'In {currency}',
   'finance.groupTest': '{currency} — test money',
   'finance.commissionEarned': 'Commission earned',
-  'finance.payablesRecorded': { one: 'on {count} booking', other: 'on {count} bookings' },
+  // Every booking whose outcome became final in the span, commission or not: never "earned on N bookings".
+  'finance.payablesRecorded': { one: 'From {count} booking final in this span', other: 'From {count} bookings final in this span' },
   'finance.keptFromDisputes': 'Kept from disputes',
   'finance.keptFromDisputesHint': 'What resolved disputes left with Khadra — not commission.',
   'finance.paidToOffices': 'Paid to offices',

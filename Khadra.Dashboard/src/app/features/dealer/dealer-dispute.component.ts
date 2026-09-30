@@ -172,7 +172,7 @@ export class DealerDisputeComponent {
         confirm: this.t('dealerDispute.withdrawDispute'),
         result: {
           title: this.t('dealerDispute.disputeWithdrawn'),
-          body: this.t('dealerDispute.nothingIsChargedTo'),
+          body: this.t('dealerDispute.settlesAsIfNone'),
           tone: 'warn',
         },
       },
@@ -182,7 +182,7 @@ export class DealerDisputeComponent {
       },
       {
         title: this.t('dealerDispute.disputeWithdrawn'),
-        body: this.t('dealerDispute.nothingIsChargedTo'),
+        body: this.t('dealerDispute.settlesAsIfNone'),
         tone: 'warn',
       },
     );

@@ -122,6 +122,21 @@ export function tookMoney(status: string): boolean {
   return status === 'Applied' || status === 'Orphaned';
 }
 
+/**
+ * Where an assessed penalty stands, as the key of the sentence under it (payments Phase 8): kept from the deposit, resolved
+ * by a dispute, to be kept unless a dispute decides otherwise — a customer's penalty of the whole deposit — or, for every
+ * other assessment, money only through a dispute. Read from the server's state and flag, never from the clock.
+ */
+export function penaltyStandingKey(
+  penalty: { readonly state?: string | null; readonly requiresTicketToEnforce?: boolean },
+  audience: 'admin' | 'office',
+): TranslationKey {
+  if (penalty.state === 'KeptFromDeposit') return 'penaltyStanding.keptFromDeposit';
+  if (penalty.state === 'ResolvedByDispute') return 'penaltyStanding.resolvedByDispute';
+  if (penalty.requiresTicketToEnforce === false) return 'penaltyStanding.keptUnlessDisputed';
+  return audience === 'admin' ? 'adminBooking.assessedNotChargedMoney' : 'dealerBooking.assessedNotChargedMoney';
+}
+
 export function paysOut(commission: FinancialCommission | null): boolean {
   return commission !== null && commission.state !== 'NotEarned' && commission.state !== 'NotApplicable';
 }
