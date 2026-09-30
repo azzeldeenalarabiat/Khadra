@@ -86,9 +86,12 @@ function payoutLines(financials: BookingFinancials, t: Translate, format: MoneyF
   if (net.amount === 0) return [];
 
   const amount = format.money({ amount: Math.abs(net.amount), currency: net.currency });
-  const lines: MoneyLine[] = [
-    { k: t('dealerReports.netPayout'), v: t(net.amount > 0 ? 'payouts.net.toYou' : 'payouts.net.byYou', { amount }), hi: true },
-  ];
+  // Once a settlement has paid it, nobody owes it any more: the past tense, as on the payouts page.
+  const settled = office.state === 'Settled';
+  const key = net.amount > 0
+    ? settled ? 'payouts.net.owedToYou' : 'payouts.net.toYou'
+    : settled ? 'payouts.net.owedByYou' : 'payouts.net.byYou';
+  const lines: MoneyLine[] = [{ k: t('dealerReports.netPayout'), v: t(key, { amount }), hi: true }];
   const settlement = office.settlement;
   const where =
     office.state === 'Settled' && settlement

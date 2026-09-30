@@ -209,9 +209,10 @@ describe("the office's Financial section", () => {
       ['Net payout', 'You owe Khadra 5 JOD'],
       ['Where it stands', 'Not due yet: something on this booking is still open'],
     ]);
-    expect(lines(recorded('Settled', 12, { settlementId: 's-1', number: 'SET-2026-000001', paidOn: '2026-10-12' })).at(-1)).toEqual([
-      'Where it stands',
-      'Paid under SET-2026-000001 on 2026-10-12',
+    expect(lines(recorded('Settled', 12, { settlementId: 's-1', number: 'SET-2026-000001', paidOn: '2026-10-12' })).slice(-2)).toEqual([
+      // Paid: owed, not owes.
+      ['Net payout', 'Khadra owed you 12 JOD'],
+      ['Where it stands', 'Paid under SET-2026-000001 on 2026-10-12'],
     ]);
     // A booking that came to nothing either way shows no payout line (item 158).
     expect(recorded('NothingDue', 0).lines.some((line) => line.k === 'Net payout')).toBe(false);

@@ -554,7 +554,7 @@ export const AR = {
   'dealerBooking.attributedTo': 'منسوبة إلى',
   'dealerBooking.commission': 'العمولة',
   'dealerBooking.commissionIsDeductedFrom':
-    'تُخصم العمولة من دفعة البطاقة بالنسبة المجمَّدة عند إنشاء هذا الحجز. وجدولة التحويلات لم تُفعَّل بعد، لذا لا يُعرض صافي المبلغ.',
+    'تُخصم العمولة من دفعة البطاقة بالنسبة المجمَّدة عند إنشاء هذا الحجز، ولا تتجاوز ما يعود به الحجز عليك. وتجد في صفحة التحويلات ما تدين لك به خضرا، وكل دفعة منه.',
   'dealerBooking.customer': 'العميل',
   'dealerBooking.history': 'السجل على خضرا',
   'dealerBooking.historyHint': 'ما سجّلته المنصة. لا تشاركه المكاتب الأخرى.',

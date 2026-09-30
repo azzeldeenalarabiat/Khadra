@@ -728,8 +728,10 @@ export const EN = {
     'Assessed, not charged. Money only moves when the platform resolves a dispute ticket.',
   'dealerBooking.attributedTo': 'Attributed to',
   'dealerBooking.commission': 'Commission',
+  // Payments Phase 8: the ledger works the payout out, so the net IS shown above this note. It names no payment
+  // method: how an office is paid waits on the acquiring arrangement (owner, 2026-09-24).
   'dealerBooking.commissionIsDeductedFrom':
-    'Commission is deducted from the card payment at the rate frozen when this booking was made. Payout scheduling is not live yet, so no net figure is shown.',
+    'Commission is deducted from the card payment at the rate frozen when this booking was made, and never more than the booking brings you. What Khadra owes you, and each payment of it, is recorded on your Payouts page.',
   'dealerBooking.customer': 'Customer',
   'dealerBooking.history': 'History on Khadra',
   'dealerBooking.historyHint': 'What the platform recorded. Not shared by other galleries.',

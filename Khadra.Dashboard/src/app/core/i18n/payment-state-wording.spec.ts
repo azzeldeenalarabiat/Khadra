@@ -86,3 +86,12 @@ describe('where an assessed penalty stands, in both consoles', () => {
     expect(en('adminBooking.noShowBody', { customer: 'Rana' })).toContain('kept from the deposit only when the dispute window closes with no dispute');
   });
 });
+
+describe("the office's booking money, once payouts are live", () => {
+  it('no longer says the net payout is not shown', () => {
+    expect(en('dealerBooking.commissionIsDeductedFrom')).not.toMatch(/not live|no net figure/i);
+    expect(en('dealerBooking.commissionIsDeductedFrom')).toContain('Payouts page');
+    expect(ar('dealerBooking.commissionIsDeductedFrom')).not.toContain('لم تُفعَّل بعد');
+    expect(ar('dealerBooking.commissionIsDeductedFrom')).toContain('صفحة التحويلات');
+  });
+});
