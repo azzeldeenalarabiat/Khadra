@@ -1793,10 +1793,11 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get disputeWithdrawConfirm =>
-      'هل تسحبه؟ سيُبلَّغ مكتب التأجير ولن يُخصم شيء من أحد.';
+      'سيتم سحب النزاع، وسيُسوّى الحجز وفق قواعد الإلغاء والغرامات المطبقة عليه.';
 
   @override
-  String get disputeWithdrawn => 'تم السحب. لم يُخصم شيء.';
+  String get disputeWithdrawn =>
+      'تم سحب النزاع، وسيُسوّى الحجز وفق قواعد الإلغاء والغرامات المطبقة عليه.';
 
   @override
   String get disputeStatusOpen => 'مفتوح';

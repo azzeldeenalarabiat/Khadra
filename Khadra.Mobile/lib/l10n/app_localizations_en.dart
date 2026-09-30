@@ -1734,10 +1734,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get disputeWithdrawConfirm =>
-      'Withdraw this? The rental office will be told, and nothing will be charged to anyone.';
+      'The dispute will be withdrawn, and the booking will settle according to its existing cancellation and penalty rules.';
 
   @override
-  String get disputeWithdrawn => 'Withdrawn. Nothing has been charged.';
+  String get disputeWithdrawn =>
+      'The dispute has been withdrawn, and the booking will settle according to its existing cancellation and penalty rules.';
 
   @override
   String get disputeStatusOpen => 'Open';

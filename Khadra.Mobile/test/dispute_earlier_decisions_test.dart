@@ -153,7 +153,7 @@ void main() {
   });
 
   group('the screen', () {
-    Future<void> pump(WidgetTester tester, Dispute dispute, Locale locale) async {
+    Future<FakeApi> pump(WidgetTester tester, Dispute dispute, Locale locale) async {
       tester.view.physicalSize = const Size(412, 915);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -187,6 +187,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      return api;
     }
 
     /// Ends by tearing the screen down, so Riverpod's disposal timer runs inside the test.
@@ -200,6 +201,39 @@ void main() {
 
     for (final (locale, l10n) in [(const Locale('en'), en), (const Locale('ar'), ar)]) {
       final tag = locale.languageCode;
+
+      // Owner, 2026-09-30 (payments Phase 8): a withdrawn dispute leaves the booking to its own rules, which may keep a
+      // customer's penalty of the whole deposit — so neither message may promise that nothing is charged.
+      screenTest('withdrawing says the booking settles by its own rules, before and after, in $tag', (tester) async {
+        final api = await pump(tester, Dispute.fromJson(disputeJson()), locale);
+
+        final withdraw = find.widgetWithText(OutlinedButton, l10n.disputeWithdraw);
+        await tester.ensureVisible(withdraw);
+        await tester.tap(withdraw);
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text(tag == 'en'
+              ? 'The dispute will be withdrawn, and the booking will settle according to its existing cancellation and penalty rules.'
+              : 'سيتم سحب النزاع، وسيُسوّى الحجز وفق قواعد الإلغاء والغرامات المطبقة عليه.'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.widgetWithText(FilledButton, l10n.disputeWithdraw));
+        await tester.pumpAndSettle();
+
+        expect(api.withdrawnTicketIds, ['t-2']);
+        expect(
+          find.text(tag == 'en'
+              ? 'The dispute has been withdrawn, and the booking will settle according to its existing cancellation and penalty rules.'
+              : 'تم سحب النزاع، وسيُسوّى الحجز وفق قواعد الإلغاء والغرامات المطبقة عليه.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining(tag == 'en' ? 'Nothing has been charged' : 'لم يُخصم شيء'), findsNothing);
+        // The message goes, as a message does, before the screen is torn down.
+        await tester.pump(const Duration(seconds: 5));
+        await tester.pumpAndSettle();
+      });
 
       screenTest('a second dispute after a whole split says there is nothing left, in $tag', (tester) async {
         await pump(tester, Dispute.fromJson(disputeJson(held: 0, onBooking: 18, decided: 18)), locale);

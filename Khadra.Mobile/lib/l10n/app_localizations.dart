@@ -2888,16 +2888,16 @@ abstract class AppLocalizations {
   /// **'Withdraw the dispute'**
   String get disputeWithdraw;
 
-  /// No description provided for @disputeWithdrawConfirm.
+  /// Owner, 2026-09-30 (payments Phase 8): a withdrawn dispute leaves the booking to its own rules, which may keep a customer's penalty; never promise that nothing is charged.
   ///
   /// In en, this message translates to:
-  /// **'Withdraw this? The rental office will be told, and nothing will be charged to anyone.'**
+  /// **'The dispute will be withdrawn, and the booking will settle according to its existing cancellation and penalty rules.'**
   String get disputeWithdrawConfirm;
 
-  /// No description provided for @disputeWithdrawn.
+  /// Owner, 2026-09-30: the confirmation's sentence, once the withdrawal has happened.
   ///
   /// In en, this message translates to:
-  /// **'Withdrawn. Nothing has been charged.'**
+  /// **'The dispute has been withdrawn, and the booking will settle according to its existing cancellation and penalty rules.'**
   String get disputeWithdrawn;
 
   /// No description provided for @disputeStatusOpen.

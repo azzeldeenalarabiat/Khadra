@@ -255,6 +255,17 @@ class FakeApi extends KhadraApi {
     return found;
   }
 
+  /// Every ticket the app asked to withdraw, in order.
+  final List<String> withdrawnTicketIds = [];
+
+  @override
+  Future<Dispute> withdrawDispute(String ticketId) async {
+    withdrawnTicketIds.add(ticketId);
+    final found = disputeById;
+    if (found == null) throw StateError("no dispute was staged for $ticketId");
+    return found;
+  }
+
   /// The financial state the booking's financials endpoint answers with
   /// (payments Phase 4). Null by default: an API without Phase 4, whose 404 the
   /// app reads as "fall back to what the booking carries".
