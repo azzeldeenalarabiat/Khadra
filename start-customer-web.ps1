@@ -115,7 +115,7 @@ function Wait-Port {
         }
         Start-Sleep -Seconds 2
     }
-    Write-Host ("  {0,-13} did NOT come up on {1} - see {2}\{0}.log and .err.log" -f $Label, $Port, $logs) -ForegroundColor Red
+    Write-Host ("  {0,-13} did NOT come up on {1} within {3} s - it may still be building: see {2}\{0}.log and .err.log" -f $Label, $Port, $logs, $TimeoutSeconds) -ForegroundColor Red
     return $false
 }
 
@@ -315,8 +315,10 @@ if (-not $apiUp -and $api -and (Select-String -Path (Join-Path $logs 'web-api.er
 }
 $null = Wait-Port 7243 'console-bff' $consoleBff
 $null = Wait-Port 7244 'customer-bff' $customerBff
-$null = Wait-Port 4400 'website' $site
-$null = Wait-Port 4200 'console' $console
+# The two Angular dev servers listen only once their first build is done, and the website's includes the server
+# bundle: on 2026-09-30 it took 198 s and came up half a minute after a 240 s wait had given up on it.
+$null = Wait-Port 4400 'website' $site -TimeoutSeconds 480
+$null = Wait-Port 4200 'console' $console -TimeoutSeconds 480
 
 # Ready means the database answered; Development applies pending migrations before it listens.
 Write-Host "`nChecking the API" -ForegroundColor Cyan
