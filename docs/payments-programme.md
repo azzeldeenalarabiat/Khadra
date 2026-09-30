@@ -19,7 +19,7 @@ deliver is written down so it cannot be dropped. The rules already in force are 
 | 5 | Issued documents: payment receipts, refund receipts and booking statement versions, with numbering and immutable snapshots | plan approved 2026-09-27 (`docs/payments-phase5-plan.md`); SQL approved and applied locally only (scratch proof 35/35, then `khadra_web_it`); **5a, the backend, built** (`7a8d277`) — issued by the settlement pass with holds, customer and administrator endpoints, void and correct; **5b, the clients, done** — website (`b813b2c`, `3c2df2b`), app in the unreleased 1.3.0 (`1337d54`), console (`d26304f`, `b252c70`); the review's follow-ups R1–R7 (`1315fd5`); `no-store` on the administrator's documents and both financials endpoints (`ec176c4`, item 180); the forced void race (`1e7f720`, item 182); a receipt's correction brings the booking's statement a new version (`07a7284`, item 181); PostgreSQL proof 23/23 and final live verification 2026-09-29 (`docs/payments-phase5b-plan.md` §18); Staging not migrated |
 | 6 | PDF rendering and secure download | **built and verified locally** 2026-09-29 — backend `9bc92de`, website `c2e9ff4`, app in the unreleased 1.3.0 `bd52ac4`, console `487c4b4` — QuestPDF under its Community licence (eligibility confirmed by the owner 2026-09-29): each issued document drawn once from its stored snapshot as a PDF in English and Arabic, stored privately, recorded in the append-only `financial_document_renditions` (migration `20260928222747_FinancialDocumentRenditions`, applied locally only, to `khadra_web_it`), downloaded through short-lived links; scratch PostgreSQL proof 46/46, Linux rendering 91/91 offline; live run on `khadra_web_it`: 86 PDFs for 43 documents, downloads byte-identical to storage; **the follow-up** (`506fef7`, owner's three decisions of 2026-09-29): a voided document's customer is given a copy stamped VOID / «ملغى» naming its correction, drawn beside the untouched original (migration `20260929020747_FinancialDocumentRenditionKind`, applied locally only), the on-screen pages leave the commercial registrations out as the PDF does, and the fonts' OFL texts ship beside the fonts; Staging not migrated (`docs/payments-phase5-plan.md` §22) |
 | 7 | Receipt and invoice email | **done locally** 2026-09-29 (`730a9c5`) — every payment and refund receipt, and every correction, emailed to its customer with its PDF (never a booking statement) by a background service of its own: queued in the transaction that issues the receipt, retried, and ended Sent, Skipped or Failed with every attempt kept in an append-only history the administrator reads, where a receipt can also be emailed again; English and Arabic; the owner's thirteen decisions below, the Production hard stop on Brevo among them; migration `20260929164711_FinancialDocumentDeliveries` (SQL approved by the owner 2026-09-29, applied locally only, to `khadra_web_it`); scratch PostgreSQL proof 55/55; verified live through Mailpit (`docs/payments-phase5-plan.md` §23); Staging not migrated |
-| 8 | The office payables ledger (manual settlement) | not started |
+| 8 | The office payables ledger (manual settlement) | **built and verified locally** 2026-09-29 to 30 — item 171 `011d064`, backend `b2818ea`, console `c35d27c`, website `f977d2c`, app in the unreleased 1.3.0 `007bab4`; after the owner's decisions of 2026-09-30, `efb8b00` (`HeldDepositFinder` deleted, item 214), `a49a4c9` (a kept penalty issues a booking statement, item 212) and the approved wording said once in the house Arabic (`b100b7a`, `2c24d7e`, `86adad7`, `14bb917`, `e7e90ab`); fixes from the live check `4761aa2`, `7b417da`, `2843956`, `437f1e0`, and the office's payouts pinned by tests `1360d3a` (the website's unrelated «على أنت» fixed on its own, `023d53d`) — one payable per final paid booking, recorded by the settlement pass from the one calculator (version 2) and frozen; manual settlements of an office's whole due balance, numbered `SET-`/`TEST-SET-`, audited, voidable; holds; Payouts and Finance in the console, the office's own payouts; item 164 closed by the owner's decision (a customer's uncontested penalty of the whole deposit is kept, for the office less commission); items 162, 171, 206, 207, 212–215 closed; migration `20260929195432_OfficePayables` (SQL approved by the owner 2026-09-30, applied locally only, to `khadra_web_it`); scratch PostgreSQL proof 59/59; verified live 2026-09-30 as the administrator, the customer and the office (`docs/payments-phase5-plan.md` §24), which opened items 217–219; Staging not migrated |
 
 ## Owner decisions
 
@@ -243,6 +243,63 @@ With the schema and the migration SQL, approved before the local restart:
     whenever an administrator's request is refused. Receipts are still issued and their emails wait in the queue.
     Local and Staging may use Brevo under the existing safeguards; Resend and providers with proven idempotency are
     unaffected.
+
+### 2026-09-29 — Phase 8, the office payables ledger
+
+The ledger rests on the architecture decided on 2026-09-24 (above): a payable per booking, settled by hand with an
+immutable audit entry and no payout rail; payable at `Completed`, never settled while a relevant refund or dispute
+on the booking is open; commission earned at `Completed` when nothing affects settlement, and not earned when the
+whole payment is refunded. Asked before it was built:
+
+1. **A deposit held for a customer's penalty goes to the office, less the commission (pre-launch item 164).** When a
+   paid booking that never ran ends with a penalty on the customer — a late cancellation, a self-pickup no-show — and
+   its dispute window closes with no dispute, the penalty is final: the deposit it was assessed on is kept, and it is
+   owed to the office less Khadra's frozen commission. This amends spec 3.3 ("with no dispute ticket, no penalty is
+   applied at all") for this one case; every other assessment — the office's, a range, one on nothing — still needs a
+   ticket.
+2. **The commission on a rental completed through a dispute is earned, capped at the office's money** on the booking.
+3. **An office that owes Khadra is netted against what Khadra owes it.** A settlement pays the net balance of an
+   office's due payables; when the office owes more than it is owed, the settlement records the money received from
+   it, entered by an administrator.
+
+Decided by the owner on 2026-09-30, with the migration design approved (the defaults the build had taken, confirmed
+or replaced):
+
+4. **The kept-penalty wording.** What a customer reads once the penalty is kept, said ONCE — in the booking page's
+   penalty notice and in the booking statement's Penalty section (the Arabic in the house vocabulary: «العربون» is the
+   booking deposit, «التأمين» only ever the security deposit the office holds, and the window is «مهلة النزاع»):
+   - English: "The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and
+     applied according to the booking’s cancellation terms."
+   The deposit line — in Payments and in the statement's Deposit section — states the amount and where it went
+   instead: "Your deposit of {amount} was kept as the penalty assessed on this booking." / «احتُفظ بعربونك البالغ
+   {amount} بوصفه الغرامة المقدَّرة على هذا الحجز.»
+   - Arabic: «انتهت مهلة النزاع دون فتح نزاع. تم تثبيت حسم العربون وتطبيقه وفق شروط إلغاء الحجز.»
+5. **A kept penalty issues a new booking statement version** (item 212), so the current statement reflects the
+   outcome: a seventh checkpoint, worded "Deposit penalty finalized" / «تثبيت حسم العربون».
+6. **An amount an office owes Khadra remains an office debit**, netted against what Khadra owes that office, with no
+   separate manual debt path (item 213).
+7. **Khadra's earned commission is always capped at the office's final money** from the booking, cancellations and
+   dispute outcomes included (item 215).
+8. **Any refund that is not Settled blocks the office payout**: the office is never paid while a customer refund
+   obligation remains unresolved (item 207).
+9. **No partial settlements in Phase 8**: a settlement records the whole currently-settleable balance (item 206).
+10. **The customer penalty stays locked at 100%** of the deposit for now (item 205).
+11. **A suspended office may still read its own payout and ledger history**, and gains no financial action.
+12. **`HeldDepositFinder` is deleted**, once proven to have no remaining caller, test or runtime dependency (item 214).
+13. **Office invoicing, and JoFotara, stay a legal and accounting pre-launch decision**; no invoicing scheme is built
+    (item 216).
+14. **CLAUDE.md is not edited yet**; the wording that replaces its "Penalties are ASSESSED…" rule is proposed to the owner
+    after the live verification.
+15. **A dispute's withdrawal, in the app** (found in the live check): "The dispute will be withdrawn, and the booking will
+    settle according to its existing cancellation and penalty rules." / «سيتم سحب النزاع، وسيُسوّى الحجز وفق قواعد الإلغاء
+    والغرامات المطبقة عليه.» — in the confirmation, and, once done, with its first clause in the past tense ("The dispute
+    has been withdrawn, …" / «تم سحب النزاع، …»). The installed apps' old promise that nothing is charged is part of item 208.
+
+Two notes the owner added. The two old sandbox bookings the first pass keeps as penalties (KH-X73CZSRH and
+KH-EVUYXLJD, cancelled under the old "nothing is charged" words) are acceptable for local verification only, and their
+historical wording is no precedent for Production. And the sentences a customer reads BEFORE cancelling — the cancel
+sheet and the booking terms — are still drafts; with the installed apps' old promise, they are the launch gate of
+item 208, a precondition of the first real provider (item 76).
 
 ## Required scope for Phases 5–7: invoices and receipts reach the customer
 

@@ -17,6 +17,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Payments | done | done | **deposit checkout + provider webhook done**; NO PROVIDER CONFIGURED |
 | Shortlist | done | done | **save / forget / list / membership done** |
 | Financial Documents | done | done | **issued by the settlement pass, with holds; customer and administrator endpoints; void and correct** (payments Phase 5a); **read on the website, in the app and in the console** (payments Phase 5b) |
+| Payables | done | done | **the office payables ledger, recorded by the settlement pass; manual settlements, voids and holds; administrator and office endpoints; Payouts and Finance in the console** (payments Phase 8) |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
@@ -37,6 +38,7 @@ Disputes ──resolution (money instructions)──▶ Payments, Bookings
 Platform Settings ──IBusinessRulesProvider──▶ Bookings (frozen onto each booking as BookingTerms), Shortlist (the cap)
 Shortlist ──(VehicleId only)──▶ reads Fleet's catalogue; Fleet learns nothing about customers
 Financial Documents ──reads, by id only, never writes──▶ Bookings, Payments, Disputes, Dealers, Fleet, Identity (names), Platform Settings (lookups)
+Payables ──reads, by id only, never writes──▶ Bookings, Payments, Disputes, Dealers, Identity (names); records from the Payments calculator's office position
 ```
 
 Communication is by `Id`, by explicit application contracts, or by domain events. A context never mutates another context's aggregate, and there are no navigation properties across contexts.
@@ -185,8 +187,8 @@ that produced it (`Terms.CommissionBasis`); bookings made before keep the whole-
 showed, written onto them by the `FrozenCommission` migration. Against a 20% deposit on the whole rental,
 every booking longer than a day now leaves the platform holding `Deposit − Commission` that belongs to
 the office. The owner accepted that on 2026-09-24, with a manual office-payable ledger (payable at
-`Completed`, marked paid by an administrator, audited) and no payout rail yet — built in the payments
-phases that follow this note, and until it exists the debt is recorded nowhere.
+`Completed`, marked paid by an administrator, audited) and no payout rail yet — built in payments Phase 8
+as its own context, Payables (§11).
 
 **What was not built, and why (true until 2026-09-24).** No `DealerLedger`, no payout rail, no dealer
 charge: at the confirmed 20% commission and 20% deposit the two were equal, so the platform never paid a
@@ -220,11 +222,11 @@ its provider reference — a receipt that arrived before the reference was saved
 `IPaymentDashboardReader` returns FACTS that `FinanceSummaryBuilder` adds up: the month's applied payments
 loaded as payments, so booking money and fee are the aggregate's own arithmetic, and the refunds settled
 in it or still owed. The work queue's money rows have no deadline (`slaDeadlineAt` null): refused refunds
-and captures being refunded as one grouped row each, and each deposit pre-launch item 164 is about as its
-own — found by a candidate query and kept only where the calculator reads `HeldUnresolved`
-(`HeldDepositFinder`), so the calculator stays the one definition. Rows with a deadline come before
-refused refunds, which the payment sweep is already sending again; the bell carries the refused refunds
-and leaves the watched rows to the dashboard. The office reads its money from its projection only: its
+and captures being refunded as one grouped row each. (Until Phase 8 each deposit pre-launch item 164 was
+about had a watched row of its own; the ledger gave those deposits an exit and retired the row.) Rows with
+a deadline come before refused refunds, which the payment sweep is already sending again; the bell carries
+the refused refunds (and, since Phase 8, the offices' payables the ledger holds back) and leaves the watched
+rows to the dashboard. The office reads its money from its projection only: its
 own copy of a booking (`BookingDto.ForDealer`) carries no refund list and no fee, and its copy of a
 dispute decision (`DisputeResolutionDto.ForDealer`) only the basis, its own share and any charge to it.
 
@@ -302,8 +304,8 @@ projection — so nothing a customer may not see can reach an append-only record
 
 **The facts are the queue.** No row records that a document is due. The settlement pass, right after the
 payment sweep, asks: which captured payment has no receipt row, which settled refund has none, which
-booking's checkpoints — a capture, a settled refund, a resolved dispute, the ending, cash at a handover,
-and nothing else — are newer than its latest statement (or were committed just after it, inside
+booking's checkpoints — a capture, a settled refund, a resolved dispute, the ending, cash at a handover, a
+receipt corrected, a penalty the office payables ledger kept (payments Phase 8, item 212), and nothing else — are newer than its latest statement (or were committed just after it, inside
 `LateCommitMarginMinutes`), with the checkpoint fingerprint deciding. Each document is issued in its own
 scope and transaction: compose, take the number from its series row (`INSERT … ON CONFLICT … RETURNING`,
 so a rollback returns it and a series has no gaps), insert. What cannot be issued goes on HOLD
@@ -348,13 +350,58 @@ history and can email a receipt again, audited by its number, and a Failed email
 the work queue. TEST receipts reach only the local Mailpit or, through a real provider, an allowlist; replies go to
 Khadra's support address.
 
+## 11. Payables
+
+What Khadra owes each rental office, and what each office owes Khadra, booking by booking, with the settlements an
+administrator records by hand (payments Phase 8; owner, 2026-09-24 and 2026-09-29 — the decisions are in
+`docs/payments-programme.md`, the design in `docs/payments-phase5-plan.md` §24). There is no payout rail: a
+settlement records a payment made outside the platform.
+
+**One payable per final paid booking, recorded from the one calculator.** `OfficePayable` (`Khadra.Domain/Payables`)
+is written by the settlement pass, after the payment sweep, for every paid booking whose outcome is final — a
+completed rental past `Payables:FinalityMarginMinutes`, a cancellation or a no-show once its dispute window has
+closed, never while a dispute is live — and only from `BookingFinancialsCalculator`'s office position, so the ledger
+adds no arithmetic of its own. Its lines (`OfficePayableLine`: the rental, a dispute's share or the kept penalty
+towards the office; the commission and any dispute charge against it) and figures are frozen: the aggregate derives
+them from the lines, CHECK constraints tie them together, and a trigger refuses any change except the settlement
+pointer, and that pointer only from nothing to a settlement, or back when the settlement is voided. A payable is
+recorded even when it nets to zero, so every final booking has its answer. A booking the ledger cannot record — its
+records contradict one another, or its penalty is not the whole deposit — is HELD (`OfficePayableHold`) with a
+growing retry, never silently skipped; an unsettled payable whose records later disagree is held `Contradicted`; and
+an administrator may hold a payable by hand. Holds are the work queue's `PayablesOnHold` row.
+
+**Due is derived, never stored.** A payable is due when it is final, unsettled, not held, not blocked, and not zero.
+Blocks are read live from the other contexts on every read — a refund not yet settled on any payment of the booking,
+or a live dispute — so nothing has to remember to clear them.
+
+**Settled by hand, all of an office's due balance at once.** `OfficeSettlement` pays every due payable of one office
+in one currency and one kind of money, for exactly the figure the administrator was shown: the handler re-reads what
+is due inside the transaction, after taking the settlement's number from its series row (`SET-{year}` or
+`TEST-SET-{year}`, through the same `IFinancialDocumentSeries` as the documents, so two settlements serialise on the
+row and a rollback leaves no gap), and refuses a changed balance with the balance due now. The net can run either way
+(owner, 2026-09-29: netted), so a settlement is a payout, money received, or a netting at zero. Settlements, their
+lines and their voids are append-only; a void (`OfficeSettlementVoid`, with a reason) reopens what it covered. Every
+settlement, void, hold and release by an administrator is audited in the same transaction as the action.
+
+**Test money stays test money.** `provider` on a payable and a settlement is copied from the booking's confirming
+payment, so a sandbox booking's payable is `SANDBOX`, it is settled only with other sandbox money, and its settlement
+is numbered `TEST-SET-…`; the migration's rollback refuses once real money is in the ledger.
+
+**Who sees what.** The administrator: everything, under `/admin/office-balances`, `/admin/office-payables`,
+`/admin/offices/{dealerId}/settlements`, `/admin/office-settlements/{id}` and `/admin/finance/summary`. The office's
+owner and any employee granted the reports: its own payables and settlements, under `/dealers/me/payouts`, whatever
+the dealership's standing — a suspended office is still owed, or still owes — without the kind of money, the notes,
+who recorded or voided a settlement and why, the holds or the blocks. The customer:
+nothing — the ledger reaches a customer only as the deposit's `KeptAsPenalty`, the penalty's `KeptFromDeposit` and the
+booking statement version a kept penalty issues (item 212), with the owner's approved sentence said once.
+
 ## Owner decisions required
 
 These change field shapes, so they are worth settling before the affected context is built.
 
 1. **Customer cancellation penalty.** Spec 5.5 says a penalty applies to a late-cancelling customer but never names it. The code currently assumes 100% of the deposit, consistent with "deposit is forfeited" on a no-show. Confirm or replace.
 2. **Dealer non-delivery tier.** Spec 2.2 leaves 25%-50% open. The range travels with each booking and an Admin picks inside it; confirm whether that stands or a flat rate is preferred.
-3. **Held deposit with no ticket — half decided.** The owner decided on 2026-09-26 that a deposit goes back when the booking's dispute window closes CLEANLY (no ticket that was not withdrawn, no penalty against the customer; Phase 3). A deposit held for a penalty against the customer with no ticket is still open: pre-launch item 164, which the office payables ledger (payments Phase 8) settles. Until then the customer reads the owner's neutral sentence and nothing is promised to either side.
+3. **Held deposit with no ticket — decided.** The owner decided on 2026-09-26 that a deposit goes back when the booking's dispute window closes CLEANLY (no ticket that was not withdrawn, no penalty against the customer; Phase 3), and on 2026-09-29 that a deposit held for a penalty against the customer with no ticket is KEPT as the penalty when the window closes, owed to the office less Khadra's commission (pre-launch item 164, closed by payments Phase 8). The customer's sentences for it are drafts awaiting the owner (item 208).
 4. **Vehicle security deposit.** Does the damage deposit pass through the platform on card, or is it cash at handover? Card authorization holds typically lapse after about seven days, so holding one for a ten-day rental invites chargebacks. The model currently records it as cash on the handover record.
 5. **Delivery fee ownership.** Does the dealer keep the 10 JOD, or the platform?
 6. **Quick-cancellation processing fee** (spec 2.3), **minimum renter age**, and the **international driving permit requirement** for foreign renters (spec 2.2), all still unset.
@@ -366,8 +413,9 @@ customer app ships. What is left is not another context:
 
 1. **A merchant account and one `IPaymentProvider` adapter.** The single thing standing between an
    approved booking and a confirmed one (pre-launch item 76).
-2. **The owner's four open answers**: the cancellation-refund rule (item 77), the review window
-   length (item 80), the dealer non-delivery tier, and the held deposit with no ticket.
+2. **The owner's three open answers**: the cancellation-refund rule (item 77), the review window
+   length (item 80) and the dealer non-delivery tier. (The held deposit with no ticket was answered on
+   2026-09-29 and built in payments Phase 8.)
 3. **A way to moderate a review** (item 81). `Hide` exists on the aggregate, every reader honours it,
    and nothing calls it — which matters more now that a rating follows a person.
 4. **An outbox for cross-context events.** Domain events dispatch after commit with nothing to

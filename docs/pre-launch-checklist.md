@@ -2023,6 +2023,11 @@ adapter's refund events must name the refund they settle), item 156 (the owner's
 gallery or admin cancelling a paid booking inside the free window), and item 158 (hide or zero the
 frozen commission and payout on a refunded cancellation).
 
+**A precondition since payments Phase 8 (2026-09-30): item 208.** A customer's uncontested penalty is now kept
+from the deposit when the dispute window closes, and the apps already installed still promise otherwise. Before
+the first real provider takes a real deposit, the owner signs off the D1 wording, a build carrying it is
+published, and the minimum supported version is raised to it — publish first.
+
 `Payments:Provider` is `None`, and `UnconfiguredPaymentProvider` is the only implementation this build
 ships. Every checkout answers 503 `payments.provider_unavailable`; the webhook answers 401, because
 with no secret there is no way to tell a provider from anyone else who found the URL.
@@ -4367,7 +4372,7 @@ first. It is a schema change and a contract addition, so it is decided before it
 
 ### 162. From the one-day commission on, the platform holds office money nothing records
 
-**Status:** open · **Raised:** 2026-09-24 · **Owner decision taken; build pending**
+**Status:** closed · **Raised:** 2026-09-24 · **Closed:** 2026-09-30 (payments Phase 8, `b2818ea`) — the office payables ledger records what Khadra owes each office, booking by booking, and an administrator settles it by hand.
 
 Commission is 20% of one day's rental (frozen per booking since `FrozenCommission`), the deposit 20%
 of the whole rental. On any booking longer than a day the deposit exceeds the commission, and the
@@ -4381,6 +4386,20 @@ money may move — which item 76 already guarantees, since there is no merchant 
 when no dispute or refund affects settlement; not earned when the whole payment is refunded; and two
 cases are left **Undecided** for this ledger to settle — a booking that completed through a dispute
 resolution, and a deposit held for a customer penalty (Phase 4 takes no commission from it).
+
+**How it closed.** Every paid booking whose outcome is final — a completed rental once a finality margin has
+passed, a cancellation or a no-show once its dispute window has closed, never while a dispute is live — is given
+ONE `OfficePayable`, recorded by the settlement pass from the one calculator: the office's money, Khadra's
+commission and any charge a dispute put on the office, each a line, and the net as one signed figure. Its figures
+are frozen (a database trigger refuses any change to them), and a pass checks each unsettled one against its
+booking's records again, holding it back if they no longer agree (item 209). An administrator settles an office's
+due balance by hand from `/payouts` — the day it was paid, a reference, a note — for exactly the figure the screen
+showed; the settlement is numbered (`SET-2026-000001`, `TEST-SET-…` for sandbox money), audited in the same
+transaction, and voidable with a reason, which reopens what it covered. Nothing is due while a refund or a live
+dispute on the booking is open (item 207 says which refunds count) or while an administrator holds it, and a
+settlement pays the whole due balance (item 206). The two cases this item left Undecided are decided: commission is
+the frozen figure capped at the office's money (owner, 2026-09-29), and the held deposit is item 164. The office reads
+its own payables and settlements at `/dealer/payouts`. Real money still waits for item 76.
 
 ### 163. A refund event can arrive before the platform has recorded the refund as sent
 
@@ -4399,7 +4418,7 @@ event reads "No refund matched" beside the refund still showing Sent. The race i
 
 ### 164. A deposit held for a penalty against the customer has no way out once the window closes
 
-**Status:** open · **Raised:** 2026-09-26 (Fable advisor review) · **Owner decision**
+**Status:** closed · **Raised:** 2026-09-26 (Fable advisor review) · **Closed:** 2026-09-30 (payments Phase 8, `b2818ea`) — owner decision of 2026-09-29: the deposit is kept as the penalty, for the office less Khadra's commission.
 
 A late cancellation or a self-pickup no-show assesses a penalty against the customer on the deposit.
 Phase 3 correctly does not release that deposit when the window closes. But money moves only through a
@@ -4423,6 +4442,19 @@ every such booking since launch, loaded with its payments and tickets, each time
 every administrator's console polls it every 60 seconds while open, on every screen, for the bell. Harmless at today's volumes. **Cap it** (list the oldest few with a total, or keep a watermark)
 before the set passes a few hundred bookings, or retire the query when Phase 8 gives these deposits an
 exit and the set stops growing.
+
+**How it closed.** The owner decided on 2026-09-29: when a paid booking that never ran ends with a penalty on the
+customer, and its dispute window closes with no dispute, the penalty is final — the deposit it was assessed on is
+kept, and it is owed to the office less Khadra's frozen commission. It amends spec 3.3 for this one case; every
+other assessment (the office's, a range, one on nothing) still needs a ticket, so
+`PenaltyAssessment.RequiresTicketToEnforce` is now false for a customer's fixed penalty alone. The ledger records
+the booking's payable as `PenaltyKept`, and from then — from the recorded payable, never from the clock — the
+calculator reads the deposit as `KeptAsPenalty` and the penalty as `KeptFromDeposit`. Only the whole deposit can be
+kept, so the penalty is locked at 100% until a partial path exists (item 205); the customer's sentences for it, on
+the website, in app 1.3.0 and on the booking statement, are drafts awaiting the owner, and the installed apps' old
+promise is a launch gate (item 208). The `DepositAwaitingDecision` work-queue row is retired with the unbounded
+read behind it: these deposits now have an exit, and a booking the ledger cannot record is a `PayablesOnHold` row
+instead. `HeldDepositFinder` itself is unused and waits for the owner's word to be deleted (item 214).
 
 ### 165. Bookings that ended before Phase 3 are settled by today's rule when it deploys
 
@@ -4522,7 +4554,7 @@ it), so nothing here would have to change first.
 
 ### 171. A later dispute's basis leans on ticket opening times, and dispute_tickets has no plain booking index
 
-**Status:** open · **Raised:** 2026-09-26 (Fable advisor review of item 169) · **Low priority**
+**Status:** closed · **Raised:** 2026-09-26 (Fable advisor review of item 169) · **Closed:** 2026-09-30 (payments Phase 8, `011d064`; the index in `b2818ea`)
 
 `DisputedDeposit.For` counts the resolved tickets opened BEFORE the one asked about. That is exact
 while one API node writes `OpenedAt` (only one ticket per booking can be live, so a ticket always opens
@@ -4533,6 +4565,11 @@ other resolved ticket; for a resolved one read what earlier disputes decided as 
 subtracted from the deposit on the booking — and add a plain index on `dispute_tickets.booking_id`
 (the only one today is the partial index for live rows), which `ListResolvedForBookingAsync` and
 `HasClaimOnDepositAsync` both scan without. The index needs a migration; the table is small.
+
+**How it closed.** Exactly as proposed. `DisputedDeposit.For` compares no timestamps: a live ticket counts every
+other resolved ticket of its booking, and a resolved one reads what earlier disputes decided as the deposit less the
+basis it was itself decided against, which its resolution stores. Two tests pin both whatever the tickets' clocks
+say. The plain index, `ix_dispute_tickets_booking`, ships in the Phase 8 migration, which needed one anyway.
 
 ### 172. Invoices and receipts must reach the customer — the required scope of payments Phases 5–7
 
@@ -4602,7 +4639,8 @@ left for later.
 **Status:** open · **Raised:** 2026-09-27 (while wording the audit subjects)
 
 `previous_value` and `new_value` are printed as stored, in the row and in its expanded detail. Most
-are enum names — "Open", "Suspended", "PendingReview", "Admin" — which the console could word the
+are enum names — "Open", "Suspended", "PendingReview", "Admin", and since payments Phase 8 a payable hold's
+reason ("Manual") — which the console could word the
 way it words every other status, but nothing maps them yet. Some are English composed on the server
 and can only be shown as they are: the dispute resolution summary ("Resolved: of 18.000 JOD held,
 refund …", item 50), the handover line ("PickedUp (Pickup, Code)"), the code lock ("Pickup code
@@ -5013,3 +5051,243 @@ the claim count it left; the sender works a row only while the count is still th
 token on the outbox row, so a claim taken over between the read and the send is refused by the database; tests force
 the takeover on SQLite and on PostgreSQL — `FinancialDocumentEmailTests` and `PostgresFinancialDocumentEmailTests`
 show the pattern.
+
+## The office payables ledger (payments Phase 8, 2026-09-30)
+
+What Khadra owes each rental office, booking by booking, and the settlements an administrator records by hand
+(`docs/payments-programme.md`, Phase 8; `docs/payments-phase5-plan.md` §24), and what that knowingly leaves for
+later. Nothing here moves money: a settlement records a payment made outside the platform, and until item 76 the
+only money any of it describes is sandbox money.
+
+### 205. Only the whole deposit can be kept as a customer's penalty, so the penalty percent is locked at 100
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 8) · **Owner decision (2026-09-30): keep the lock at 100% for now** · **Before the penalty percent changes**
+
+Since item 164 closed, a customer's uncontested penalty is kept from the deposit when the dispute window closes. The
+ledger can keep only the WHOLE deposit: it records `PenaltyKept` when the penalty is fixed and equals what the
+deposit holds. Anything less would leave part of the deposit owed back to the customer with no way to send it — the
+clean-close release returns the whole deposit or nothing, and nothing while a penalty stands on the customer — so
+such a booking would be held (`PenaltyNotWholeDeposit`) and never recorded. The API therefore refuses to start with
+`BusinessRules:CustomerCancellationPenaltyPercent` set to anything but 100 (`DependencyInjection`, pinned by
+`BusinessRulesConfigurationTests`); a self-pickup no-show already assesses the whole deposit. The server's own word
+follows the same line: `requiresTicketToEnforce` is false only for a customer's penalty of the WHOLE deposit, and the
+ledger keeps nothing the assessment says a dispute must decide. **To close, before the percent changes:** a partial
+path — the rest of the deposit refunded when the window closes, with its receipt — the ledger keeping only the
+penalty, and the lock lifted. The customer clients must change with it: the website's and the app's cancel sheets
+choose their sentence by whether the penalty is a range, not by `requiresTicketToEnforce`, so today a penalty below
+the whole deposit would be told "kept from your deposit". None can be assessed while the lock holds, and none was
+frozen before it unless an environment overrode the tracked setting, which has said 100 since the first commit.
+
+### 206. A settlement pays an office's whole due balance, or nothing
+
+**Status:** closed · **Raised:** 2026-09-29 (payments Phase 8) · **Closed:** 2026-09-30 by the owner's decision — no partial settlements in Phase 8; a settlement records the whole currently-settleable balance.
+
+An administrator settles every due payable of one office, in one currency and one kind of money, at once, and for
+exactly the balance the screen showed (`expectedAmount`; a different figure is refused with `409
+payables.balance_changed` and the balance due now). A payable is left out only by holding it, which is audited.
+Paying part of a balance — 100 of 150 — is not offered. That keeps "a payable is settled by one settlement" true, and
+an office that both owes and is owed is never split in a way nobody can reconstruct later. **To close:** the owner
+says whether partial payments are needed. If they are, a settlement covers an explicit set of payables the
+administrator chooses — never part of one payable.
+
+**How it closed.** The owner decided on 2026-09-30: no partial settlements in Phase 8. A settlement records the
+whole currently-settleable balance, exactly as built; a payable is kept out of one only by holding it. Should partial
+payments ever be wanted, the shape above — an explicit set of payables, never part of one — is where to start.
+
+### 207. Any refund not yet settled blocks an office's payable
+
+**Status:** closed · **Raised:** 2026-09-29 (payments Phase 8) · **Closed:** 2026-09-30 by the owner's decision — keep the safe rule: any refund that is not Settled blocks the office payout.
+
+The owner's rule (2026-09-24) is that a payable is never marked settled while a relevant refund or dispute on its
+booking is open. The ledger reads it cautiously: ANY refund on ANY payment of the booking that is not `Settled` —
+being sent, delayed, or refused for good — and any live dispute ticket. The payable then reads Blocked and names
+what blocks it (`RefundOutstanding`, with the refund, or `DisputeLive`), read live on every screen, never stored.
+The cost of the caution: a refund refused for good blocks the office's payable until that refund itself is settled,
+and nothing in the ledger can lift it. **To close:** the owner confirms this reading or narrows it — for example to
+the refunds that change what the office is owed — and the block follows.
+
+**How it closed.** The owner decided on 2026-09-30 to keep the safe rule for now: any refund that is not `Settled`
+blocks the office payout, because an office is never paid while a customer refund obligation remains unresolved.
+That is the rule as built; the cost above is accepted, and a refund refused for good is resolved as a refund first.
+
+### 208. Installed apps still tell a cancelling customer that nothing is charged without a dispute
+
+**Status:** open · **Raised:** 2026-09-29 (payments Phase 8) · **A precondition of closing item 76 — a launch gate, not a follow-up**
+
+Since item 164 closed, a customer's uncontested penalty is kept from the deposit when the window closes. The apps
+already installed (1.1.0, 1.2.x) say otherwise, in words built into them: their cancel sheet reads "Cancelling now
+assesses {amount} against you. Nothing is charged unless a dispute is opened and settled.", and their booking terms
+"… Nothing is taken without a dispute being opened and settled." The server does what it can without breaking them:
+`requiresTicketToEnforce` is now false for a customer's penalty of the whole deposit, which hides the extra "Nothing
+has been charged" line those builds add under it; but the two sentences above are shown unconditionally. The website
+and app 1.3.0 (unreleased) carry replacement sentences in English and Arabic. What a customer reads once the penalty
+is kept — once, in the booking page's penalty notice and in the statement's Penalty section, while the deposit line
+states the amount — is the owner's approved sentence (2026-09-30): "The dispute window ended without a dispute. The assessed deposit penalty has now been
+finalized and applied according to the booking’s cancellation terms." / «انتهت مهلة النزاع دون فتح نزاع. تم تثبيت
+حسم العربون وتطبيقه وفق شروط إلغاء الحجز.» The two sentences a customer reads BEFORE cancelling — the cancel
+sheet's and the booking terms' "It is kept from your deposit when the dispute window closes, unless a dispute decides
+otherwise." — are still drafts awaiting the owner. So are two the app has always had, which the kept penalty made
+untrue for a booking with a customer's penalty of the whole deposit, installed builds included: withdrawing a dispute
+asks "Withdraw this? The rental office will be told, and nothing will be charged to anyone." and then says "Withdrawn.
+Nothing has been charged." — yet the booking then settles as if no dispute had been raised, which keeps that penalty
+(found in the Phase 8 live check, 2026-09-30, where the consoles' own versions were corrected). The owner approved their
+replacement the same day and app 1.3.0 carries it (`2843956`): "The dispute will be withdrawn, and the booking will
+settle according to its existing cancellation and penalty rules." / «سيتم سحب النزاع، وسيُسوّى الحجز وفق قواعد الإلغاء
+والغرامات المطبقة عليه.», and, once done, the same with its first clause in the past tense. The installed builds keep
+the old sentences until a build carrying these is published and required. No real deposit can be kept today —
+Production has no provider (item 76). But the rule is not only for windows that close from now on: the ledger's work
+query has no lower bound on when a booking ended, so the FIRST pass after the Phase 8 migration records every paid
+cancellation and no-show already past its window, and every such deposit with a customer's penalty on it is kept —
+on the local database and on Staging, sandbox money cancelled under the old words. The owner accepted that for the two
+such local bookings, KH-X73CZSRH and KH-EVUYXLJD, for local verification only (2026-09-30): their historical wording is
+no precedent for Production. **To close, before a real
+provider — a precondition of closing item 76:** the owner signs the wording off in both languages; a build carrying
+it is published; and `MobileApp:MinimumSupportedVersion` is raised to that build, publish first as the contract rule
+requires, so that no customer can cancel a real booking under the old promise.
+
+### 209. A payable its records later contradict cannot be corrected
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 8)
+
+A recorded payable is frozen — a database trigger refuses any change to its figures — and every pass checks the
+unsettled ones against their bookings' records again. A difference (a refund or a dispute decision recorded after
+the booking was final, or a corrected record) opens a `Contradicted` hold: the payable cannot be settled, and it is
+a row on the administrator's work queue. The hold lifts itself if the records come back into agreement, but when
+they do not, nothing can replace the payable: one per booking, and no adjustment line. **To close:** a supersede —
+the contradicted payable voided and a new one recorded from today's records, both audited, and for a settled one a
+correcting settlement — designed with the owner.
+
+### 210. The ledger looks for ended bookings by today's dispute window, not the one each booking froze
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 8) · **Low priority**
+
+The payables pass looks for cancelled and no-show bookings whose end is older than the finality margin plus TODAY's
+`PostReturnSettlementHours`, because the window each booking froze is not a column a query can read. Each booking is
+then judged by its own frozen window, so nothing is ever recorded early; but a booking whose window is shorter than
+today's is found late, and one whose window is longer — or whose dispute is still live — is looked at and turned
+away on every pass until it is final, taking a place in the pass's batch (`Payables:MaxBookingsPerPass`). Completed
+rentals are looked at first, so they are never crowded out. **To close:** store the window's end on the booking
+(written when the booking ends) and query it.
+
+### 211. Two of the ledger's reads grow with the whole history
+
+**Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 8) · **Low priority**
+
+Finance's "kept by Khadra from disputes" loads every resolved dispute ticket and filters by when it was decided in
+memory, because the decision is one stored JSON document; and the office balances read every settlement to find
+each office's latest. Both are cheap at today's volume. **To close, before either reaches a few thousand rows:** keep
+the decision time where SQL can filter it, and pick each office's latest settlement in SQL.
+
+### 212. A kept penalty does not bring the booking's statement a new version
+
+**Status:** closed · **Raised:** 2026-09-29 (payments Phase 8) · **Closed:** 2026-09-30 (owner's decision; `a49a4c9`) — a seventh checkpoint: a penalty kept brings the statement a new version.
+
+When the ledger records a penalty as kept, the booking's financial state changes — the deposit reads `KeptAsPenalty`
+and the penalty `KeptFromDeposit` — but none of the six checkpoints that issue a booking statement version fires,
+because none of them is "the window closed with the penalty kept". The customer's latest statement goes on saying the
+deposit is held. The checkpoints are a closed list the owner set (2026-09-27, amended once for item 181), so the
+ledger does not add one on its own. **To close:** the owner approves a seventh checkpoint — the recorded `PenaltyKept`
+payable — with its words in both languages, and the settlement pass issues the version as it does for the other six.
+Recommended.
+
+**How it closed.** The owner approved it on 2026-09-30: when a penalty becomes kept, a new booking statement version
+is issued so the current statement reflects the outcome. The checkpoint is the ledger's RECORD — the `PenaltyKept`
+payable, by its id and the instant it was recorded (`StatementCheckpoints`, cause `PenaltyKept`, worded "Deposit
+penalty finalized" / «تثبيت حسم العربون» from the owner's own sentence) — never the window's closing, so it is the
+same row the deposit's `KeptAsPenalty` is read from, and the statement cannot state one without the other. The work
+query finds a booking whose payable was recorded after its latest statement; the documents step, which the settlement
+pass runs right after the payables step, issues the version in the same pass. Its Penalty section carries the owner's
+approved sentence, once; its Deposit section, the amount and where it went. No schema change: a cause is stored by name.
+
+### 213. A dispute's charge on the office goes to Khadra
+
+**Status:** closed · **Raised:** 2026-09-29 (payments Phase 8) · **Closed:** 2026-09-30 by the owner's decision — an amount an office owes Khadra remains an office debit, netted against what Khadra owes that office.
+
+A dispute resolution may put a charge on the office (`DisputeResolution.DealerCharge`, the non-delivery penalty
+among them). The ledger takes every such charge off the office's net (a `DisputeCharge` line), so the office pays it
+by being paid less, or by paying Khadra when it is owed less than the charge (owner, 2026-09-29: netted). Where the
+money then goes is not decided: nothing passes it on to the customer, whose share of a dispute is only what the
+resolution returns of the deposit, so Khadra keeps it, and Finance counts it among the office charges. **To close:**
+the owner says whether a charge on the office compensates the customer, stays with Khadra, or depends on the kind of
+charge, and the ledger and the customer's refunds follow.
+
+**How it closed.** The owner decided on 2026-09-30: an amount an office owes Khadra remains an office debit and is
+netted against what Khadra owes that office — exactly the `DisputeCharge` line as built — with no separate, unrelated
+manual debt path for it. The customer's money from a dispute stays what the resolution returns of the deposit.
+
+### 214. `HeldDepositFinder` is unused
+
+**Status:** closed · **Raised:** 2026-09-30 (payments Phase 8) · **Closed:** 2026-09-30 (`efb8b00`) — deleted with the owner's approval, once proven unused.
+
+It fed the `DepositAwaitingDecision` work-queue row, which Phase 8 retired (item 164). The finder,
+`IBookingRepository.ListHeldForCustomerPenaltyAsync` with its two implementations, and the tests that exercise them
+are still in the tree, the finder still registered, because deleting files waits for the owner's word. **To close:**
+delete them.
+
+**How it closed.** The owner approved the deletion on 2026-09-30, on condition of proof that nothing still depended on
+it. Nothing did: no handler, service or reader resolved the finder — its registration was its only runtime trace —
+and nothing but the finder called the query. The finder, its registration, the query in `IBookingRepository` with
+its two implementations, and the two tests that exercised only them (one on SQLite, one on PostgreSQL) are gone; the
+solution builds and every other test passes without them.
+
+### 215. The commission on a cancelled booking a dispute decided follows the owner's rule for rentals
+
+**Status:** closed · **Raised:** 2026-09-29 (payments Phase 8) · **Closed:** 2026-09-30 by the owner's confirmation — Khadra's earned commission is always capped at the office's final money from the booking, cancellations and dispute outcomes included.
+
+The owner decided that the commission on a rental completed through a dispute is earned and capped at the office's
+money on the booking, and that a kept penalty goes to the office less the commission (2026-09-29). The ledger applies
+the same rule to every final booking, including a cancellation or a no-show whose deposit a dispute decided: the
+office's share, less the frozen commission capped at that share, and no commission where the office's share is
+nothing. **To close:** the owner confirms it, or says what a dispute-decided cancellation should earn Khadra instead.
+
+**How it closed.** Confirmed by the owner on 2026-09-30: Khadra's earned commission is always capped at the office's
+final money from the booking, cancellations and dispute outcomes included — the rule as built.
+
+### 216. Khadra never invoices an office for its commission
+
+**Status:** open · **Raised:** 2026-09-30 (payments Phase 8) · **Legal and accounting decision, before real money** · **Owner (2026-09-30): stays a pre-launch decision; no invoicing scheme is built yet**
+
+The ledger records Khadra's commission on every final booking, each settlement records what was paid or received, and
+the office reads both on its payouts page. Neither is an issued document: nothing numbered, frozen and given to the
+office states the commission as a charge, and nothing is called a tax invoice. Whether Khadra must invoice each office
+for its commission — a tax invoice, and Jordan's national e-invoicing system (JoFotara) — is a legal and accounting
+question, left open since the Phase 5 plan (`docs/payments-phase5-plan.md` §11) and not decided by Phase 8. **To
+close:** the owner's legal and tax advisers decide; if an invoice is required, it is an issued financial document of
+its own, built as the Phase 5 documents are, from the settlement or the payable.
+
+### 217. Three console sentences say an office is paid by bank transfer, which nothing has decided
+
+**Status:** open · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Owner decision, before real money**
+
+The owner's architecture (2026-09-24) keeps office settlement manual, with no payout rail and no real money movement
+"until the provider/acquiring arrangement says how office settlement works". Three sentences in the console name a
+method all the same, in both languages: the administrator's note on an office's payouts ("Pay or collect by bank
+transfer first, then record the settlement here …", `payouts.byHandNote`), the office's payouts page ("Khadra pays
+what it owes you by bank transfer …", `dealerPayouts.howItWorks`) and the office's reports ("Khadra pays what it owes
+you by bank transfer, booking by booking once each outcome is final …", `dealerReports.payoutsAreNotLive`). The last
+also reads as one payment per booking, where a settlement pays the whole due balance at once (item 206), and its key
+still says payouts are not live. The office's booking page, reworded in the same check (`437f1e0`), names no method.
+**To close:** the owner says how an office is paid; the three sentences say that, or say only that the payment is
+made outside the platform and recorded here.
+
+### 218. The customer website drops «أنت» into two more Arabic sentences
+
+**Status:** open · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Presentation only**
+
+The website words who did something by dropping a party word into a sentence. In English that reads well ("by
+you"); in Arabic the pronoun attaches to what precedes it, so a free-standing «أنت» is wrong. The customer's own
+penalty read «قُدِّر مبلغ … على أنت» and was fixed on its own (`023d53d`), with a sentence of its own for the reader.
+Two strings of the same pattern remain: `booking.by` («بواسطة أنت») and `dispute.openedBy` («فتحه أنت»). **To close:**
+give the reader a sentence of their own in each, as the penalty now has, with a test that refuses the free-standing
+pronoun.
+
+### 219. A system hold's detail is shown as the calculator's codes
+
+**Status:** open · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Presentation only**
+
+When the payables pass holds a booking because its records need review, the hold's detail is the calculator's issue
+codes joined by commas (`PayablesPassCommands`), and both payouts screens print it as a code in a Latin run — the
+local relic KH-95JGHJQZ reads "EndingRefundMissing", on the English screen and the Arabic one alike. The console
+already words every one of those codes (`financialIssue.*`, as a booking's Money section shows them). **To close:**
+word a system hold's detail through the same dictionary, the codes it does not know shown as they are, and keep an
+administrator's typed reason as typed.

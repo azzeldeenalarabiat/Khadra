@@ -496,7 +496,7 @@ minimum supported version stays 1.1.0.
   was issued; the document itself holds both.
 - Which documents are emailed, and attachment or link, are Phase 7 decisions.
 
-## 11. Phase 8 — what is left for settlements
+## 11. Phase 8 — what is left for settlements (built 2026-09-29 to 30, see §24)
 
 The office payables ledger and its settlement; the office's own statements; commission earned versus
 undecided; anything Khadra invoices to offices — which is where a genuine **tax invoice**, and Jordan's
@@ -1233,4 +1233,160 @@ language is set only by the app's push registration, and this customer's is Engl
 tests.
 
 **Not yet done.** An email in Arabic, and one queued at issue rather than asked for, seen live (both proven by the
-tests); pre-launch items 202–204; the Staging migration, which waits for the owner; Phase 8.
+tests); pre-launch items 202–204; the Staging migration, which waits for the owner; Phase 8 (built since, §24).
+
+## 24. What Phase 8 built (2026-09-29 to 30)
+
+§11's office payables ledger and its settlement, built as one local work package on the architecture of 2026-09-24
+(a payable per booking, settled by hand and audited, no payout rail) and the owner's three decisions of 2026-09-29 —
+a customer's uncontested penalty is kept for the office less the commission (item 164), the commission on a rental
+completed through a dispute is earned and capped at the office's money, and an office that owes Khadra is netted
+against what Khadra owes it (`docs/payments-programme.md`, Phase 8, 1–3). Where the owner had not spoken it took the
+cautious default and recorded it for the owner (4–10 there; pre-launch items 205–216). The architecture advisor
+reviewed the design before it was built, the backend once it was, and the whole change set at the end.
+
+**One calculator, now with the office's position.** `BookingFinancialsCalculator` (version 2) gained
+`OfficePosition`: whether the booking's outcome is final, what it was, and the lines that say what the office is owed —
+all from verdicts the aggregates already give. A completed rental with no decided dispute is `Rental`, the office's
+money everything paid online; one completed through a dispute is `RentalAfterDispute`, what was paid above the deposit
+plus the dispute's share to the office; a cancellation or a no-show is `PaymentReturned` when the whole payment went
+back, `DisputeDecided` (the shares) when a dispute decided the deposit, `PenaltyKept` when the window closed with no
+dispute on a customer's penalty of the whole deposit (item 164), and otherwise `DepositReleased`, owed nothing. The
+commission is the frozen figure capped at the office's money; every charge a resolution put on the office is a line
+against it; the net is signed and no line is zero. A booking is final at `FinishedAt` when completed and when its
+dispute window closes when cancelled, and never while a dispute is live. A penalty that is not the whole deposit is
+`Undetermined` (item 205). The check behind `needsReview` gained a refund with no cause on a completed booking
+(`RefundWithoutCause`), a clean-close refund beside a customer's penalty or a whole-payment refund on an ending that
+does not return the whole payment (`RefundsConflict`), and a booking whose recorded online payment differs from what
+its payment applied (`PaidOnlineDisagrees`). The customer's projection never carries the office's position.
+
+**Item 164, closed by the owner's decision.** `PenaltyAssessment.RequiresTicketToEnforce` is false for a customer's
+fixed penalty of the whole deposit alone — every other assessment still needs a ticket, and the calculator keeps
+nothing the assessment says a dispute must decide. The calculator reads the deposit as `KeptAsPenalty`, and the
+booking's penalty reads `KeptFromDeposit`, only once the ledger has RECORDED the booking's payable as `PenaltyKept` —
+never from the clock, so a booking the pass has not reached, or has held, still reads held. A booking statement issued
+after that states the penalty as kept where it states the deposit kept, never "no amount has been charged yet" beside
+it. The customer penalty is locked at 100% by startup validation (item 205; owner, 2026-09-30: keep it). Once kept, the
+customer reads the owner's approved sentence (2026-09-30), said once — in the booking page's penalty notice and the
+statement's Penalty section — while the deposit line states the amount and where it went.
+
+**The statement that follows (item 212; owner, 2026-09-30).** A kept penalty is the seventh checkpoint: the ledger's
+recorded `PenaltyKept` payable, by id and the instant it was recorded (`StatementCheckpoints`), read from the same
+record as the deposit's state, so a statement cannot state the one without the other. The document work query finds a
+booking whose payable was recorded after its latest statement's coverage, and the documents step — run by the same pass
+right after the payables step — issues the new version, caused `PenaltyKept` ("Deposit penalty finalized" / «تثبيت حسم
+العربون»). A cause is stored by name, so no schema changed.
+
+**Recorded by the settlement pass.** After the payment sweep and before documents, the pass asks SQL for paid
+bookings that ended — completed ones past `Payables:FinalityMarginMinutes` (10), first; cancellations and no-shows
+past the margin and today's window (item 210) — that have no payable and are not held until later, and records each
+in its own scope from the calculator: `OfficePayable.Record` derives its figures from the lines and refuses anything
+the calculator should never produce. A booking whose records need review, or whose penalty cannot be kept, is HELD
+(`NeedsReview`, `PenaltyNotWholeDeposit`) and looked at again after a delay that doubles from `RetryInitialSeconds`
+(300) to `RetryMaxSeconds` (21600); a hold the booking no longer needs is released by the pass. Two passes recording
+one booking meet the unique booking index, and the loser stands down. The same pass re-checks a page of unsettled
+payables against their records each tick (`MaxVerificationsPerPass`, 50, moving through all of them in turn): a
+difference is a `Contradicted` hold, lifted again when the records agree (item 209). Log events 2800–2803.
+
+**Due, blocked, held.** A payable is due when it is final, unsettled, not held, not blocked and not zero. Blocks are
+never stored: any refund not yet settled on any payment of the booking (item 207) or a live dispute ticket, read on
+every read and named on screen. An administrator may hold a payable with a reason and release it with a note, both
+audited (`OfficePayableHeld`, `OfficePayableReleased`, labelled by the booking's reference).
+
+**Settled by hand, the whole due balance.** `POST /admin/offices/{dealerId}/settlements` names the currency, the kind
+of money (`SANDBOX` or the real provider), the day it was paid (not in the future, by the Amman calendar), a
+reference and a note, and the amount the administrator was shown. Inside one transaction the handler takes the next
+number from the series row (`SET-2026-000001`, or `TEST-SET-2026-000001` for sandbox money), which serialises two
+settlements, re-reads what is due, and refuses anything that moved: `409 payables.balance_changed` carrying
+`currentAmount`, or `payables.nothing_due`; the number rolls back with it, so a series has no gaps. The settlement's
+direction follows its signed amount — `Payout` when Khadra pays, `Received` when the office pays, `Netted` at zero —
+its lines name each payable and its net, each payable points to it, and the audit entry (`OfficeSettlementRecorded`,
+labelled by the number) is in the same save; a concurrent change to a payable fails on its `xmin`
+(`payables.changed_concurrently`). A settlement is voided with a reason (`OfficeSettlementVoided`): the void is a row
+of its own, keyed by the settlement, and the payables it covered are due again. Log events 2810–2812.
+
+**Frozen in the database.** Migration `20260929195432_OfficePayables` adds six tables and one index:
+`office_payables` (one per booking; `xmin`), `office_payable_lines`, `office_settlements` (number unique),
+`office_settlement_lines` (a payable once per settlement), `office_settlement_voids` (keyed by the settlement),
+`office_payable_holds` (one open hold per booking and reason; `xmin`), and `ix_dispute_tickets_booking` (item 171).
+CHECKs tie a payable's figures together (`net = office_money − commission − office_charges`, the commission never
+above the office's money), keep every line positive, and match a settlement's sign to its direction. A trigger
+refuses any change to a payable except its settlement pointer, and that only from nothing to a settlement or back to
+nothing — never from one settlement to another, never a rewritten settlement time; the lines, settlements, their
+lines and voids are append-only; nothing is deleted or truncated. Its rollback refuses once any payable or
+settlement is real money: fixed forward, never reverted. Every constraint is named.
+
+**What the administrator sees.** `/payouts`: each office's balance per currency and kind of money — what is due,
+which way, and what is not due yet — with its last settlement, and every hold. An office's page lists its payables
+(open, settled, all, by day), each with its lines, state, blocks and holds, and its settlements; "Record settlement"
+shows the due balance in words ("Khadra owes the office …" / "The office owes Khadra …") and sends back exactly that
+figure. A settlement's page lists what it covered and offers the void. `/finance`: for a span of Amman days, per
+currency and kind of money, the commission earned, what Khadra kept from disputes, the offices' money and charges,
+what was paid to and received from offices, and what is owed either way now. A booking's Money section shows the
+office's position and its payable. The work queue's `PayablesOnHold` row replaced `DepositAwaitingDecision`, and the
+audit log and the dashboard's activity name every settlement by its number and every hold and release by its
+booking's reference, in both languages.
+
+**What the office sees.** `/dealer/payouts`, for the owner or an employee granted the reports — a suspended office
+too, read-only, since it is still owed or still owes (a default for the owner) — its balance, its payables and its
+settlements, without the kind of money, the notes, who recorded or voided a settlement and why, the holds or the
+blocks. A booking's money reads the ledger's net and state; the reports link to the payouts.
+
+**What the customer sees.** The two new states, on the website and in app 1.3.0 — the deposit `KeptAsPenalty` and the
+penalty `KeptFromDeposit` — the owner's approved sentence in the penalty notice, once, and the amount on the deposit
+line (2026-09-30) — the new statement version, and new
+terms at booking and at cancellation saying that a penalty is kept from the deposit when the dispute window closes
+unless a dispute decides otherwise, which are still drafts (item 208). Nothing an installed build reads changed shape
+(`docs/contracts/README.md`).
+
+**Item 171, alongside.** A later dispute's basis compares no timestamps, and its index ships in this migration.
+
+**Verified.** Backend 2,576 tests, none failed, with the 59 opt-in PostgreSQL proofs passed on a throwaway
+`postgres:18` (constraints and triggers, two administrators settling one office at once, a hold landing
+mid-settlement, the xmin conflict, the rollback guard); console 353 with `i18n:check` clean and a production build;
+website 238 and its build; app 718 and `flutter analyze` clean — each figure as it stands after the live check's
+fixes. The architecture advisor reviewed the change set at the end: "sound with changes", nothing blocking, the
+migration fit to apply as it stood; its three fixes and two smaller ones went in before the commits.
+
+**Verified live** on 2026-09-30, on the local `khadra_web_it` through the owner's stack. The migration applied on boot.
+The first pass recorded 11 payables — one per booking, each once; after sixty passes there were still 11 — and held
+KH-95JGHJQZ, the known relic whose records say a refund is missing, as the one booking it could not record. It kept the
+penalties of KH-EVUYXLJD (18.000 JOD, 12.000 to the office after the 6.000 commission) and KH-X73CZSRH (40.000, nothing
+to the office after its old whole-rental commission), and the documents step issued their new statements at once,
+`TEST-STM-2026-000021` and `000022`: caused "Deposit penalty finalized" / «تثبيت حسم العربون», the Deposit section its
+amount, the Penalty section the owner's sentence once, both PDFs drawn. As the administrator, Payouts showed Al-Nadeem
+Rentals owed 12.000 JOD now and 3.000 not yet (a refund still on its way), and the held booking; `TEST-SET-2026-000001`
+recorded the 12.000 on the Amman day with a reference and a note; the same settlement asked for again from a stale
+second tab was refused `409 payables.nothing_due` and took no number; the void reopened the payable; a hold took it out
+of what was due and its release put it back; and `TEST-SET-2026-000002` settled it again, the series at 2 with no gap.
+Finance (commission 132.000, paid to offices 12.000, the voided settlement left out), the audit log's five entries,
+the dashboard's activity and its `PayablesOnHold` row read right in English and in Arabic. As the customer, on the
+website: the booking's penalty notice carries the owner's sentence once, its Payments deposit line the amount, and
+version 2 of the statement is the current one, in both languages. As the office, signed in as Al-Nadeem Rentals'
+owner: its payouts showed its own balance and no other office's — nothing due and 3.000 JOD not due yet, the
+administrator's figures once the settlement had paid the 12.000 (Finance counts the blocked 3.000 as owed) — with
+`TEST-SET-2026-000002` as its last settlement and `TEST-SET-2026-000001` marked voided, showing only when it was
+voided; KH-EVUYXLJD sat under Settled, "Khadra owed you 12.000 JOD" under `000002`. The API's answers to it carried no
+kind of money, note, recorder, void reason, hold, block or calculator version, and the page offered no action: a held
+payable reads "On hold" to the office, never who held it or why, and once released it reads as any other. The
+booking's own money read the penalty kept from the deposit, the 6.000 commission earned, "Khadra owed you 12.000 JOD"
+and "Paid under TEST-SET-2026-000002", in English and in Arabic. An account with no office was kept out by the
+console's gate.
+
+Fixed during the check, each its own commit: a settlement's page said the office was still "owed" money it had been
+paid, and both consoles still said a penalty "becomes money only when an administrator resolves a dispute" under one
+the ledger had kept (`4761aa2`, with the withdrawn-dispute, no-show and Finance wording); the app's withdrawal promised
+that nothing is charged, which the owner re-worded the same day (`2843956`); the local start script gave up on the
+website 30 seconds before its first 198-second build finished (`7b417da`); and the office's booking page said Khadra
+"owes" it what a settlement had paid, above a note that payouts were not live (`437f1e0`). The office's payouts had no
+handler test of their own — its own office only, the reports grant, what administrators alone read — and now have
+(`1360d3a`, each guard broken once to watch its test fail). Apart from the ledger, the website said a customer's own
+penalty was assessed «على أنت» where Arabic says «عليك»; that was fixed on its own (`023d53d`), and two strings of the
+same pattern are item 218. Queries on this machine stalled for 10–15 seconds at a time throughout — the booking sweep
+and the email claim as much as the ledger — which is the host, not the code.
+
+**Not yet done.** The Staging migration, which waits for the owner. Pre-launch items 205 (a customer penalty below the
+whole deposit), 208 (the draft sentences a customer reads before cancelling, and the installed apps' old promise — a
+precondition of the first real provider), 209–211, 216 (whether Khadra invoices offices), 217 (three console
+sentences name a way of paying offices that nobody has decided), and 218–219 (presentation). The CLAUDE.md rule the
+kept penalty amends, whose new wording is the owner's to adopt.
