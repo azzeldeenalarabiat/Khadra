@@ -503,6 +503,9 @@ export const EN = {
   'booking.pickedUpText': 'Return it by {when}.',
   'booking.penalty': 'An amount of {amount} has been assessed against {party}.',
   'booking.penaltyRange': 'Between {min} and {max} has been assessed against {party}.',
+  // The reader's own penalty: its own sentence, because Arabic says «عليك», never «على أنت».
+  'booking.penaltyYou': 'An amount of {amount} has been assessed against you.',
+  'booking.penaltyRangeYou': 'Between {min} and {max} has been assessed against you.',
   // Pre-launch item 173, the owner's words (2026-09-26): where an assessed penalty stands.
   'booking.penaltyState.Assessed': 'A penalty has been assessed, but no amount has been charged yet.',
   'booking.penaltyState.ResolvedByDispute': 'This penalty was resolved through a dispute. See Payments for the final amount.',

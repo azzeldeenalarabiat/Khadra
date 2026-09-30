@@ -633,6 +633,19 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     expect(arabicKept.text).not.toContain('حسم مبلغ التأمين');
   });
 
+  it('says a penalty on the customer is assessed against them in words their language allows', async () => {
+    const english = await render(withPenaltyState('Assessed'), 'en');
+    expect(english.text).toContain('An amount of');
+    expect(english.text).toContain('has been assessed against you.');
+    TestBed.resetTestingModule();
+
+    // «عليك», never «على أنت»: the reader's own penalty is not the party word dropped into a sentence.
+    const arabic = await render(withPenaltyState('Assessed'), 'ar');
+    expect(arabic.text).toContain('قُدِّر مبلغ');
+    expect(arabic.text).toContain('عليك.');
+    expect(arabic.text).not.toContain('على أنت');
+  });
+
   it('never again says nothing has been charged, and says nothing under a penalty state it does not know', async () => {
     const unknown = await render(withPenaltyState('SomethingNewer'), 'en');
     const missing = { ...lateCancelled, penalty: PAST_WINDOW_PENALTY };

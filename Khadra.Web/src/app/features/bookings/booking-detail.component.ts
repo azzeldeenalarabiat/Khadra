@@ -334,6 +334,22 @@ export class BookingDetailComponent {
   }
 
   /**
+   * What was assessed and against whom. The customer's own penalty has a sentence of its own, because Arabic says it is
+   * «عليك», never «على أنت»: the party word cannot simply be dropped into the sentence for the reader themselves.
+   */
+  protected penaltySentence(penalty: PenaltyAssessment): string {
+    const you = penalty.attributedTo === 'Customer';
+    if (penalty.isRange) {
+      const range = { min: this.format.money(penalty.minAmount), max: this.format.money(penalty.maxAmount) };
+      return you
+        ? this.t('booking.penaltyRangeYou', range)
+        : this.t('booking.penaltyRange', { ...range, party: this.party(penalty.attributedTo) });
+    }
+    const amount = this.format.money(penalty.maxAmount);
+    return you ? this.t('booking.penaltyYou', { amount }) : this.t('booking.penalty', { amount, party: this.party(penalty.attributedTo) });
+  }
+
+  /**
    * Where an assessed penalty stands, in the owner's words (pre-launch item 173): the server's state,
    * never one worked out here. A state this site does not know is left unsaid.
    */
