@@ -2047,7 +2047,9 @@ it, and what makes it allowable is three mechanisms rather than an intention —
    document guards. Render leaves `ASPNETCORE_ENVIRONMENT` unset, which defaults to Production, so
    this bites exactly where it should.
 2. **Data, in both directions.** `PaymentsStartupCheck` refuses to start whenever this database's
-   payments and this process's provider are different kinds of money. The sandbox will not run on a
+   payments and this process's provider are different kinds of money. It never guesses: when the
+   database cannot be read at boot, every payment is held until it can, and the same finding then
+   stops the host (item 221). The sandbox will not run on a
    database holding real payments — the guard that catches a local process pointed at the production
    connection string — and **nothing else will run on a database holding sandbox payments**, which is
    the direction that would otherwise bite on launch day: sandbox-confirmed bookings, reading
@@ -5332,7 +5334,7 @@ with a nominative fallback for "a booking", since «حجزاً» is written as a
 
 ### 221. The startup checks crash the API when the database refuses the connection
 
-**Status:** open · **Raised:** 2026-10-01 (running the tests for items 217–219; confirmed by the architecture review) · **Owner decision: a payments guard**
+**Status:** closed · **Raised:** 2026-10-01 (running the tests for items 217–219; confirmed by the architecture review) · **Closed:** 2026-10-01 (`4b59ab4`, and `2292dde` for the suite's own test database) — the owner's decision (S12): the startup payments guard must not crash the API merely because PostgreSQL is temporarily unreachable.
 
 `PaymentsStartupCheck` and `FinancialDocumentsStartupCheck` read the database at boot and catch `DbException`, so that
 a table they cannot read does not stop the platform: with no provider configured, "nothing this process can do moves
@@ -5347,3 +5349,24 @@ outage crash-loops until the database is back, instead of starting and serving `
 owner's approval:** in both checks, catch an exception whose inner chain holds a `DbException`, keeping the sandbox's
 rethrow; tests with a refused connection (`None` starts and logs, `Sandbox` refuses with the guard's own message); and
 decide `AdminBootstrapper` in the same change — or record that a database outage at boot is fatal by design.
+
+**Closed by** recognising an unreadable database however it arrives, and by HOLDING payments rather than refusing to
+start or assuming the answer — the owner chose that over the sandbox refusing with the guard's own message.
+`DatabaseUnreadable` walks the inner chain for a `DbException`, a `TimeoutException` or a `SocketException` (never an
+`InvalidOperationException` on its own, because the guard's own refusal is one), and every log line quotes that cause
+rather than EF's wrapper, whose sentence for a refused connection advises enabling retries. Every provider is registered
+behind `VerifiedPaymentProvider`, which reads as unconfigured — so each handler takes its existing "no provider" path —
+and answers its four calls `503 payments.provider_unavailable` until `PaymentVerification` is settled by a read of the
+guard's own query (`PaymentDatabaseCheck`, one copy shared by the boot check and `DeferredStartupService`). A clean
+read opens payments; the other kind of money stops the host with exit code 1, in both directions — `None` on a
+database holding sandbox money included, which an unreadable boot used to skip for good. A database that answers at
+boot is judged there, exactly as before. `Name` and `Mode` pass through while held, so `/app-config` and the
+consoles' Sandbox banner still say what the process would take. A database that does not answer is logged once at
+Warning and then at Debug; one that answers and says no (a missing table, a refused login) at Warning on every
+attempt, with its SQLSTATE. The bootstrap is deferred, not dropped: the same service retries it until it runs, a
+refusal found then stops the host, and a misconfigured bootstrap still fails the boot because that is checked before
+the database is touched. `PaymentsHeldUntilVerifiedTests` proves each, the whole API starting on a database that
+refuses included; the suite's test hosts now point at a port nothing listens on, so it no longer depends on what runs
+on localhost:5432. **Left as it is, deliberately:** `/health/ready` does not wait for the guard. The window is at most
+thirty seconds after the database returns, every payment operation is held in it, and tying readiness to the latch
+changes how a host is judged healthy at deploy time — a decision for when it is needed, not inside this fix.
