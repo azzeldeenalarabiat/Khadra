@@ -5,13 +5,14 @@ import { MessageParams } from '../../core/i18n/language';
 import { resolveMessage } from '../../core/i18n/resolve';
 import { EnumFamily, enumKey } from '../../core/i18n/status-key';
 import { Money } from '../../core/models/fleet.api';
-import { OfficeBalance, OfficePayable, OfficeSettlement } from '../../core/models/payables.api';
+import { OfficeBalance, OfficePayable, OfficeSettlement, PayableHold } from '../../core/models/payables.api';
 import {
   PayoutFormat,
   PayoutWords,
   balanceRow,
   currentAmountOf,
   financeGroup,
+  holdRow,
   lineRow,
   movedText,
   netText,
@@ -113,6 +114,34 @@ describe('a payable', () => {
     expect(held.holds[0].reason).toBe('Held by an administrator');
     expect([settled.canHold, settled.canRelease]).toEqual([false, false]);
     expect(settled.settlement).toEqual({ id: 's-1', number: 'SET-2026-000001', day: '2026-10-09' });
+  });
+
+  it("words a hold's detail by who wrote it (pre-launch item 219)", () => {
+    const hold = (reason: string, detail: string | null): PayableHold => ({
+      holdId: 'h-1', bookingId: 'b-1', bookingReference: 'KH-95JGHJQZ', payableId: null, reason, detail,
+      openedAt: '2026-09-30T03:00:00Z', openedBy: null,
+    });
+
+    // The pass's issue codes, worded as a booking's Money section words them, one per line, in both languages.
+    const review = hold('NeedsReview', 'EndingRefundMissing, RefundsConflict');
+    expect(holdRow(review, words('en'), format).detail).toEqual({
+      kind: 'worded',
+      lines: ["A refund this booking's ending owes was never recorded", 'Refunds were recorded that cannot both apply'],
+    });
+    expect(holdRow(review, words('ar'), format).detail?.lines[0]).toBe('لم يُسجَّل استرداد يستحقه انتهاء هذا الحجز');
+    // A code this build has no word for is still shown, never dropped.
+    expect(holdRow(hold('NeedsReview', 'SomethingNewer'), words('en'), format).detail?.lines).toEqual(['SomethingNewer']);
+
+    // An administrator's reason as typed; what the server composed, English and figures, as it is.
+    expect(holdRow(hold('Manual', 'Waiting for the office to confirm'), words('ar'), format).detail).toEqual({
+      kind: 'typed',
+      lines: ['Waiting for the office to confirm'],
+    });
+    expect(holdRow(hold('Contradicted', 'the net is now 10.000, recorded 12.000'), words('ar'), format).detail).toEqual({
+      kind: 'server',
+      lines: ['the net is now 10.000, recorded 12.000'],
+    });
+    expect(holdRow(hold('NeedsReview', '  '), words('en'), format).detail).toBeNull();
   });
 
   it('gives the office no action at all', () => {

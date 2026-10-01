@@ -114,8 +114,10 @@
                 </td>
                 <td class="td">
                   <div>{{ hold.reason }}</div>
-                  @if (hold.detail) {
-                    <div class="td-sub mono ltr">{{ hold.detail }}</div>
+                  @if (hold.detail; as detail) {
+                    @for (line of detail.lines; track $index) {
+                      <div class="td-sub" [class.mono]="detail.kind === 'server'" [class.ltr]="detail.kind === 'server'" [class.user-text]="detail.kind === 'typed'">{{ line }}</div>
+                    }
                   }
                 </td>
                 <td class="td">{{ hold.opened }}</td>

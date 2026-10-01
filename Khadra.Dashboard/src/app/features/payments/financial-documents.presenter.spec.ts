@@ -303,7 +303,7 @@ describe('the lists', () => {
     expect(documentRow(rows.find((item) => item.number === 'TEST-PAY-2026-000001')!, arabic, format).standing.label).toBe('ملغى');
   });
 
-  it('words a hold by its kind and reason, in both languages, and spells out a reason it does not know', () => {
+  it('words a hold by its kind, its reason and the issues it waits on, in both languages, and spells out a reason it does not know', () => {
     const hold: FinancialDocumentHold = {
       holdId: 'h-1',
       documentType: 'BookingStatement',
@@ -322,10 +322,20 @@ describe('the lists', () => {
       reason: "The booking's records need review",
       attempts: 7,
       nextAttempt: 'relative 2026-09-27T09:00',
-      lastError: 'EndingRefundMissing',
+      // The calculator's issue codes, worded as the booking's Money section words them (pre-launch item 219).
+      issues: ["A refund this booking's ending owes was never recorded"],
+      lastError: null,
     });
-    expect(holdRow(hold, arabic, format).reason).toBe('سجلات الحجز تحتاج إلى مراجعة');
-    expect(holdRow({ ...hold, reason: 'ProviderUnreachable' }, english, format).reason).toBe('Provider unreachable');
+    expect(holdRow(hold, arabic, format)).toMatchObject({
+      reason: 'سجلات الحجز تحتاج إلى مراجعة',
+      issues: ['لم يُسجَّل استرداد يستحقه انتهاء هذا الحجز'],
+    });
+    // Any other failure keeps the server's own log line, as it is.
+    expect(holdRow({ ...hold, reason: 'ProviderUnreachable', lastError: 'Timed out after 15 s.' }, english, format)).toMatchObject({
+      reason: 'Provider unreachable',
+      issues: [],
+      lastError: 'Timed out after 15 s.',
+    });
   });
 
   it('words what is being prepared by kind, and a kind this build does not know plainly', () => {

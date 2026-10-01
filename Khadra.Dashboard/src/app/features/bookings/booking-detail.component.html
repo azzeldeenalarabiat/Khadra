@@ -192,7 +192,13 @@
                 @for (hold of office.holds; track hold.id) {
                   <div class="kv-split">
                     <div class="kv-key">{{ hold.reason }}</div>
-                    <div class="kv-val td-sub user-text">{{ hold.detail }}</div>
+                    <div class="kv-val">
+                      @if (hold.detail; as detail) {
+                        @for (line of detail.lines; track $index) {
+                          <div class="td-sub" [class.mono]="detail.kind === 'server'" [class.ltr]="detail.kind === 'server'" [class.user-text]="detail.kind === 'typed'">{{ line }}</div>
+                        }
+                      }
+                    </div>
                   </div>
                 }
                 @for (block of office.blocks; track $index) {

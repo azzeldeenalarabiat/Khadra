@@ -69,6 +69,9 @@
                 </td>
                 <td class="td">
                   <div>{{ row.reason }}</div>
+                  @for (issue of row.issues; track $index) {
+                    <div class="td-sub">{{ issue }}</div>
+                  }
                   @if (row.lastError) {
                     <div class="td-sub mono ltr fdoc-error">{{ row.lastError }}</div>
                   }

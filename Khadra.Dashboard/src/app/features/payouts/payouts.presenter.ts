@@ -1,5 +1,6 @@
 import { TranslationKey } from '../../core/i18n/en';
 import { MessageParams } from '../../core/i18n/language';
+import { issueLines } from '../../core/i18n/issue-words';
 import { EnumFamily } from '../../core/i18n/status-key';
 import { Tone } from '../../core/models/console.models';
 import { FinancialOffice } from '../../core/models/financials.api';
@@ -156,10 +157,20 @@ export function balanceRow(balance: OfficeBalance, audience: Audience, words: Pa
 
 // ── Payables ────────────────────────────────────────────────────────────────────────────────────
 
+/** What a hold says beyond its reason, and how a screen shows it (pre-launch item 219). */
+export interface HoldDetail {
+  /**
+   * `worded`: in this console's words — the issues a booking's records need reviewing for. `server`: as the server
+   * composed it, English and figures, shown left to right. `typed`: as the administrator who held it typed it.
+   */
+  readonly kind: 'worded' | 'server' | 'typed';
+  readonly lines: readonly string[];
+}
+
 export interface HoldRow {
   readonly id: string;
   readonly reason: string;
-  readonly detail: string | null;
+  readonly detail: HoldDetail | null;
   readonly opened: string;
   readonly by: string | null;
   readonly manual: boolean;
@@ -171,13 +182,26 @@ export function holdRow(hold: PayableHold, words: PayoutWords, format: PayoutFor
   return {
     id: hold.holdId,
     reason: words.label('payableHoldReason', hold.reason),
-    detail: hold.detail,
+    detail: holdDetail(hold, words),
     opened: format.dateTime(hold.openedAt),
     by: hold.openedBy,
     manual: hold.reason === 'Manual',
     bookingId: hold.bookingId,
     reference: hold.bookingReference,
   };
+}
+
+/**
+ * A hold's detail. The pass holds a booking whose records need review with the calculator's issue codes, which this
+ * console words, one per line; an administrator's reason is shown as typed; anything else the server composed — what
+ * a payable no longer matches, a penalty that is not the whole deposit — is shown as it is.
+ */
+function holdDetail(hold: PayableHold, words: PayoutWords): HoldDetail | null {
+  const detail = hold.detail?.trim();
+  if (!detail) return null;
+  if (hold.reason === 'Manual') return { kind: 'typed', lines: [detail] };
+  if (hold.reason === 'NeedsReview') return { kind: 'worded', lines: issueLines(detail, words.label) };
+  return { kind: 'server', lines: [detail] };
 }
 
 export interface PayableRow {

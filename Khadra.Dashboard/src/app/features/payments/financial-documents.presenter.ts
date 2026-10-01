@@ -1,4 +1,5 @@
 import { TranslationKey } from '../../core/i18n/en';
+import { issueLines } from '../../core/i18n/issue-words';
 import { MessageParams } from '../../core/i18n/language';
 import { EnumFamily, StatusScope } from '../../core/i18n/status-key';
 import { Tone } from '../../core/models/console.models';
@@ -116,11 +117,16 @@ export interface HoldRow {
   readonly firstFailed: string;
   readonly lastFailed: string;
   readonly nextAttempt: string;
-  /** The server's own log line, machine English: shown as it is, left to right. */
+  /** The issues the booking's records need reviewing for, worded (pre-launch item 219); empty for any other reason. */
+  readonly issues: readonly string[];
+  /** Any other failure: the server's own log line, machine English, shown as it is, left to right. */
   readonly lastError: string | null;
 }
 
 export function holdRow(hold: FinancialDocumentHold, words: DocumentWords, format: DocumentFormat): HoldRow {
+  // A document held because the booking's records need review carries the calculator's issue codes: each attempt
+  // writes its reason and its error together, so this reason never sits beside some other failure's log line.
+  const review = hold.reason === 'RecordsNeedReview';
   return {
     id: hold.holdId,
     type: words.enumLabel('financialDocumentType', hold.documentType),
@@ -131,7 +137,8 @@ export function holdRow(hold: FinancialDocumentHold, words: DocumentWords, forma
     firstFailed: format.when(hold.firstFailedAt),
     lastFailed: format.when(hold.lastFailedAt),
     nextAttempt: format.relative(hold.nextAttemptAt),
-    lastError: hold.lastError,
+    issues: review ? issueLines(hold.lastError, words.enumLabel) : [],
+    lastError: review ? null : hold.lastError,
   };
 }
 
