@@ -25,9 +25,15 @@ namespace Khadra.Tests.Support;
 /// </remarks>
 internal static class TestHostConfiguration
 {
-    /// <summary>A database nobody has, on credentials nobody holds.</summary>
+    /// <summary>A database nobody has, on credentials nobody holds, at an address nothing listens on.</summary>
+    /// <remarks>
+    /// Port 1 rather than Postgres's own (2026-10-01, after pre-launch item 221), so every host meets the same outage
+    /// whatever runs on this machine: on 5432 a developer's running Postgres answered with a refused login and an idle
+    /// machine with a refused connection, and the suite once passed or failed on which. And one second, because Windows
+    /// answers a refused local connection only after retrying it, and every test host meets it at boot.
+    /// </remarks>
     public const string UnreachableConnection =
-        "Host=localhost;Database=khadra_tests;Username=x;Password=y";
+        "Host=127.0.0.1;Port=1;Database=khadra_tests;Username=x;Password=y;Timeout=1";
 
     /// <summary>
     /// Said in the one voice <c>Program.cs</c> cannot talk over, for the whole test process, before a

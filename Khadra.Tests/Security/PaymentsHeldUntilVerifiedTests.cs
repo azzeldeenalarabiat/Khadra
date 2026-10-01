@@ -54,16 +54,13 @@ public sealed class PaymentsHeldUntilVerifiedTests
     private const string Secret = "a-sandbox-webhook-secret-for-the-tests";
     private const string ConsoleBaseUrl = "http://192.0.2.10:5012";
 
-    /// <summary>Nothing listens on port 1: the connection is refused, as in a real outage.</summary>
-    private const string RefusedConnection = "Host=127.0.0.1;Port=1;Database=khadra_tests;Username=x;Password=y;Timeout=1";
-
     // ------------------------------------------------------------------ what counts as "could not read"
 
     [Fact]
     public async Task A_refused_connection_is_unreadable_however_EF_hands_it_over()
     {
         var options = new DbContextOptionsBuilder<KhadraDbContext>()
-            .UseNpgsql(RefusedConnection)
+            .UseNpgsql(TestHostConfiguration.UnreachableConnection)
             .UseSnakeCaseNamingConvention()
             .Options;
         await using var context = new KhadraDbContext(options);
@@ -336,7 +333,7 @@ public sealed class PaymentsHeldUntilVerifiedTests
     // ------------------------------------------------------------------ the whole API, on a database that refuses
     //
     // Every host in this suite is pointed at a database nobody has (TestHostConfiguration), and that is the outage
-    // these three boot into: refused where nothing listens, refused at login where something does.
+    // these boot into.
 
     /// <summary>With no provider, the platform starts, as it always meant to.</summary>
     [Theory]
