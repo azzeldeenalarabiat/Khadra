@@ -1,4 +1,3 @@
-using System.Data.Common;
 using Khadra.Application.FinancialDocuments.ReadModels;
 using Khadra.Application.FinancialDocuments.Rendering;
 using Khadra.Infrastructure.Persistence;
@@ -44,10 +43,11 @@ internal static partial class FinancialDocumentsStartupCheck
             if (onHold > 0)
                 LogOnHold(logger, onHold);
         }
-        catch (DbException unreadable)
+        catch (Exception unreadable) when (DatabaseUnreadable.IsCauseOf(unreadable))
         {
-            // The first request that needs the database will say so more usefully than this would.
-            LogHoldsUnreadable(logger, unreadable.Message);
+            // The first request that needs the database will say so more usefully than this would. Refused or timed
+            // out as well as answered wrongly: EF hands a refused connection over wrapped (pre-launch item 221).
+            LogHoldsUnreadable(logger, DatabaseUnreadable.Reason(unreadable));
         }
     }
 

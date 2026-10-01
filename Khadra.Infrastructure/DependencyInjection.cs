@@ -79,6 +79,11 @@ public static class DependencyInjection
         // settlement pass's: a stalled mail server must not delay a single booking deadline.
         services.AddHostedService<FinancialDocumentEmailService>();
 
+        // What the boot could not ask because the database did not answer — the payments guard, the first
+        // administrator — asked again until it can be (pre-launch item 221). Idle once both are settled.
+        services.AddSingleton<DeferredStartupWork>();
+        services.AddHostedService<DeferredStartupService>();
+
         return services;
     }
 
@@ -449,7 +454,11 @@ public static class DependencyInjection
         services.AddSingleton<IAdminDashboardSettings, AdminDashboardSettings>();
         services.AddSingleton<IDealerConsoleSettings, DealerConsoleSettings>();
         services.AddSingleton<IPaymentSettings, PaymentSettings>();
-        services.AddSingleton<IPaymentProvider>(SelectPaymentProvider);
+        // Every provider is held until the payments guard has read this database (pre-launch item 221): the latch
+        // the boot check or DeferredStartupService opens, and the one wrapper whichever provider is configured.
+        services.AddSingleton<PaymentVerification>();
+        services.AddSingleton<IPaymentProvider>(provider => new VerifiedPaymentProvider(
+            SelectPaymentProvider(provider), provider.GetRequiredService<PaymentVerification>()));
         services.AddSingleton<IPaymentProviderProbe, PaymentProviderProbe>();
     }
 

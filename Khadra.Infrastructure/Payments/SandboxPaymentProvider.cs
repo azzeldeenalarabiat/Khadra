@@ -35,7 +35,8 @@ namespace Khadra.Infrastructure.Payments;
 /// <b>Database.</b> <c>PaymentsStartupCheck</c> throws if the <c>payments</c> table has ever held a
 /// row from any other provider. A database that has taken real money never runs a fake, whatever the
 /// environment claims, and this is the one that catches a staging process pointed at the production
-/// connection string.
+/// connection string. When the table cannot be read at boot, every payment operation is held until it
+/// can, and the same finding then stops the host (pre-launch item 221).
 /// </item>
 /// </list>
 /// <para>

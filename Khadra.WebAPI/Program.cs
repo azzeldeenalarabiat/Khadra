@@ -604,11 +604,24 @@ if (app.Environment.IsDevelopment())
 // Every environment, not just Development, and after any migration: this is the only way a platform
 // that has never had an administrator gets one, because inviting an administrator requires being
 // one. A no-op unless Admin:Bootstrap is configured AND no administrator has ever existed.
+//
+// A database that does not answer is not a reason to refuse to start (pre-launch item 221) — but the first
+// administrator is the one thing no user action can retry, so a bootstrap that could not ask is asked again in the
+// background until it is settled, and a refusal found then stops the host as it would have here. A misconfigured
+// bootstrap still fails here: that is checked before the database is touched.
 using (var bootstrapScope = app.Services.CreateScope())
 {
-    await bootstrapScope.ServiceProvider
-        .GetRequiredService<AdminBootstrapper>()
-        .EnsureAsync();
+    try
+    {
+        await bootstrapScope.ServiceProvider
+            .GetRequiredService<AdminBootstrapper>()
+            .EnsureAsync();
+    }
+    catch (Exception unreadable) when (DatabaseUnreadable.IsCauseOf(unreadable))
+    {
+        app.Services.GetRequiredService<Khadra.Infrastructure.Scheduling.DeferredStartupWork>().DeferAdminBootstrap();
+        Program.LogAdminBootstrapDeferred(app.Logger, DatabaseUnreadable.Reason(unreadable));
+    }
 }
 
 // Says, on every start, whether mail will actually be delivered.
@@ -686,6 +699,12 @@ static FixedWindowRateLimiterOptions FixedWindow(int permitLimit, TimeSpan windo
 // Exposes the entry point to WebApplicationFactory in Khadra.Tests.
 public partial class Program
 {
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "The first-administrator bootstrap could not ask the database whether an administrator exists, so " +
+                  "it has not run yet. The API starts anyway and asks again in the background until it can. {Reason}")]
+    internal static partial void LogAdminBootstrapDeferred(ILogger logger, string reason);
+
     [LoggerMessage(
         Level = LogLevel.Warning,
         Message = "KnownProxies is empty, so X-Forwarded-For is ignored and every request is rate " +

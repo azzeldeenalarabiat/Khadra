@@ -38,7 +38,9 @@ namespace Khadra.Tests.Security;
 /// <item><b>Environment.</b> A Production host refuses to start on the sandbox at all.</item>
 /// <item><b>Data.</b> Any host refuses to start on the sandbox against a database that has ever held
 /// a payment from another provider — the guard that catches a staging process pointed at the
-/// production connection string, which is the likeliest way this actually goes wrong.</item>
+/// production connection string, which is the likeliest way this actually goes wrong. A database it
+/// cannot read at boot no longer stops it: every payment is held until the question can be answered,
+/// and the same finding stops it then (pre-launch item 221, <see cref="PaymentsHeldUntilVerifiedTests"/>).</item>
 /// </list>
 /// <para>
 /// None of the three is sufficient alone. An environment variable can be forgotten, copied or
@@ -94,6 +96,13 @@ public sealed class SandboxPaymentGuardTests
     }
 
     /// <summary>
+    /// The provider configuration chose. Every one is registered held behind <see cref="VerifiedPaymentProvider"/>
+    /// until the data guard has read the database (pre-launch item 221), so the choice is the one inside.
+    /// </summary>
+    private static IPaymentProvider Chosen(ServiceProvider container) =>
+        Assert.IsType<VerifiedPaymentProvider>(container.GetRequiredService<IPaymentProvider>()).Inner;
+
+    /// <summary>
     /// Refusal is the default. A platform with nothing configured takes no money, and says so.
     /// </summary>
     [Theory]
@@ -102,8 +111,7 @@ public sealed class SandboxPaymentGuardTests
     [InlineData("none")]
     [InlineData("  None  ")]
     public void Nothing_configured_selects_the_provider_that_refuses(string? provider) =>
-        Assert.IsType<UnconfiguredPaymentProvider>(
-            Container(provider).GetRequiredService<IPaymentProvider>());
+        Assert.IsType<UnconfiguredPaymentProvider>(Chosen(Container(provider)));
 
     [Theory]
     [InlineData("SANDBOX")]
@@ -111,8 +119,7 @@ public sealed class SandboxPaymentGuardTests
     [InlineData("Sandbox")]
     [InlineData("  SANDBOX  ")]
     public void The_sandbox_is_selected_whatever_the_case_or_spacing(string provider) =>
-        Assert.IsType<SandboxPaymentProvider>(
-            Container(provider).GetRequiredService<IPaymentProvider>());
+        Assert.IsType<SandboxPaymentProvider>(Chosen(Container(provider)));
 
     /// <summary>
     /// A name nothing implements is refused, rather than falling back to the one that refuses.
@@ -184,8 +191,7 @@ public sealed class SandboxPaymentGuardTests
     /// <summary>And the absent secret does not bother the provider that takes no money anyway.</summary>
     [Fact]
     public void No_provider_needs_no_webhook_secret() =>
-        Assert.IsType<UnconfiguredPaymentProvider>(
-            Container(PaymentOptions.NoProvider, webhookSecret: null).GetRequiredService<IPaymentProvider>());
+        Assert.IsType<UnconfiguredPaymentProvider>(Chosen(Container(PaymentOptions.NoProvider, webhookSecret: null)));
 
     /// <summary>
     /// The sandbox needs an absolute address for its own checkout page, or it is refused at boot.
@@ -215,8 +221,7 @@ public sealed class SandboxPaymentGuardTests
     /// <summary>And nothing else is asked for one.</summary>
     [Fact]
     public void No_provider_needs_no_console_address() =>
-        Assert.IsType<UnconfiguredPaymentProvider>(
-            Container(PaymentOptions.NoProvider, consoleBaseUrl: null).GetRequiredService<IPaymentProvider>());
+        Assert.IsType<UnconfiguredPaymentProvider>(Chosen(Container(PaymentOptions.NoProvider, consoleBaseUrl: null)));
 
     // ------------------------------------------------------------------ 2. the environment guard
 
@@ -297,7 +302,8 @@ public sealed class SandboxPaymentGuardTests
     }
 
     /// <summary>
-    /// Every other environment gets PAST the environment guard — and is then stopped by the data one.
+    /// Every other environment gets PAST the environment guard — and starts, with the sandbox held until the data
+    /// guard can read the database.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -307,17 +313,13 @@ public sealed class SandboxPaymentGuardTests
     /// what this test has to prove is that the ENVIRONMENT is not what stops these three.
     /// </para>
     /// <para>
-    /// It cannot prove that by booting all the way, and the reason is the suite's own design rather
-    /// than a limitation: <c>TestHostConfiguration</c> points every test host at a database nobody
-    /// has, deliberately, after a <c>dotnet test</c> once migrated a developer's real one. The
-    /// sandbox refuses to run against a database it cannot read, so these hosts stop there — one step
-    /// LATER than Production does, on a different question, which is exactly the distinction under
-    /// test. The assertions name both: the message must be the data guard's, and must not be the
-    /// environment guard's.
-    /// </para>
-    /// <para>
-    /// That the pipeline boots whole on the sandbox is covered where a real database exists — the
-    /// manual lifecycle run against local Postgres — rather than pretended at here.
+    /// <c>TestHostConfiguration</c> points every test host at a database nobody has, deliberately, after
+    /// a <c>dotnet test</c> once migrated a developer's real one. Until 2026-10-01 the sandbox refused to
+    /// start against a database it could not read, so these hosts stopped one step LATER than Production,
+    /// on the data guard's question. Since pre-launch item 221 they boot whole — the sandbox named, so
+    /// every banner still says what it is, and HELD, taking nothing, because the data guard has not been
+    /// answered. Which is the same distinction under test: the environment is not what stops them. What
+    /// the data guard does once it can be answered is <see cref="PaymentsHeldUntilVerifiedTests"/>.
     /// </para>
     /// </remarks>
     [Theory]
@@ -327,15 +329,14 @@ public sealed class SandboxPaymentGuardTests
     public async Task Every_other_environment_gets_past_the_environment_guard(string environment)
     {
         using var factory = Api(environment, PaymentOptions.SandboxProvider);
+        using var client = factory.CreateClient();
 
-        var failure = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-        {
-            using var client = factory.CreateClient();
-            await client.GetAsync(new Uri("/health/live", UriKind.Relative));
-        });
+        using var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative));
 
-        Assert.Contains("could not read the payments table", failure.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("must never run in Production", failure.Message, StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var provider = factory.Services.GetRequiredService<IPaymentProvider>();
+        Assert.Equal(PaymentProviders.Sandbox, provider.Name);
+        Assert.False(provider.IsConfigured);
     }
 
     /// <summary>
