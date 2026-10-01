@@ -1387,6 +1387,6 @@ and the email claim as much as the ledger — which is the host, not the code.
 
 **Not yet done.** The Staging migration, which waits for the owner. Pre-launch items 205 (a customer penalty below the
 whole deposit), 208 (the draft sentences a customer reads before cancelling, and the installed apps' old promise — a
-precondition of the first real provider), 209–211, 216 (whether Khadra invoices offices), 217 (three console
-sentences name a way of paying offices that nobody has decided), and 218–219 (presentation). The CLAUDE.md rule the
-kept penalty amends, whose new wording is the owner's to adopt.
+precondition of the first real provider), 209–211, 216 (whether Khadra invoices offices) and 220 (presentation). The
+items the check opened, 217–219, were closed on 2026-10-01 (`651ef89`, `ed48341`, `f1e2f7c`, `d88ad0a`, `9dbc5f0`), and CLAUDE.md now carries the kept
+penalty's exception to its penalties rule, the Payables context and the shorter list of screens not built.

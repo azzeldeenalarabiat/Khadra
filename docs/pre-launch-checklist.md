@@ -5257,7 +5257,7 @@ its own, built as the Phase 5 documents are, from the settlement or the payable.
 
 ### 217. Three console sentences say an office is paid by bank transfer, which nothing has decided
 
-**Status:** open · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Owner decision, before real money**
+**Status:** closed · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Closed:** 2026-10-01 (`651ef89`) — the owner's instruction: neutral settlement wording while the payout method is not decided.
 
 The owner's architecture (2026-09-24) keeps office settlement manual, with no payout rail and no real money movement
 "until the provider/acquiring arrangement says how office settlement works". Three sentences in the console name a
@@ -5270,9 +5270,18 @@ still says payouts are not live. The office's booking page, reworded in the same
 **To close:** the owner says how an office is paid; the three sentences say that, or say only that the payment is
 made outside the platform and recorded here.
 
+**How it closed.** The owner asked on 2026-10-01 for neutral settlement wording, the payout method not being
+finalized. The three sentences now say a settlement records a payment made outside the platform; the settlement's
+reference is a "Payment reference"; the dealer settings card that offered "Bank details for payouts", under a note
+that payouts were not built, is "Payout details" and says Khadra does not collect them here, pointing to the Payouts
+page; the two keys whose names said otherwise are renamed (`dealerReports.howPayoutsWork`,
+`dealerSettings.payoutDetails`), and the reports' sentence no longer reads as one payment per booking; the domain's
+and the API's doc comments say "payment" too. A test keeps every one of these sentences free of a bank or a transfer
+in both languages. Once the acquiring arrangement settles how an office is paid, these sentences may name it.
+
 ### 218. The customer website drops «أنت» into two more Arabic sentences
 
-**Status:** open · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Presentation only**
+**Status:** closed · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Closed:** 2026-10-01 (`d88ad0a` website, `9dbc5f0` app 1.3.0, `f1e2f7c` console) — the owner asked for natural Arabic wording.
 
 The website words who did something by dropping a party word into a sentence. In English that reads well ("by
 you"); in Arabic the pronoun attaches to what precedes it, so a free-standing «أنت» is wrong. The customer's own
@@ -5281,9 +5290,19 @@ Two strings of the same pattern remain: `booking.by` («بواسطة أنت») a
 give the reader a sentence of their own in each, as the penalty now has, with a test that refuses the free-standing
 pronoun.
 
+**How it closed.** On 2026-10-01. On the website the history reads «· من قِبلك» and a dispute «فُتح من قِبلك في …»
+(`d88ad0a`), the form the site already used for a cancellation («أُلغي من قِبلك»). The same pattern was found in
+two more places and fixed with it. The app's label for the customer was «عليك», "against you", since its first
+commit, so its history read «· بواسطة عليك» and a dispute's decision labelled the share refunded TO the customer
+«عليك»; the label is «أنت» and the history says «من قِبلك» (`9dbc5f0`, app 1.3.0 — installed builds keep their
+words). The office's notifications put «أنت» in the actor's place, «قبل أنت KH-…»; what the reader did now reads
+«أنت من قبِل KH-…», the console's own form («أنت من يحددها») (`f1e2f7c`). Each is tested in Arabic on the words a
+reader sees: the website's page test now strips the direction isolates before it searches, without which its earlier
+negative check could not have failed. A colleague named in those notifications is item 220.
+
 ### 219. A system hold's detail is shown as the calculator's codes
 
-**Status:** open · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Presentation only**
+**Status:** closed · **Raised:** 2026-09-30 (payments Phase 8 live check) · **Closed:** 2026-10-01 (`ed48341`) — at the owner's request.
 
 When the payables pass holds a booking because its records need review, the hold's detail is the calculator's issue
 codes joined by commas (`PayablesPassCommands`), and both payouts screens print it as a code in a Latin run — the
@@ -5291,3 +5310,22 @@ local relic KH-95JGHJQZ reads "EndingRefundMissing", on the English screen and t
 already words every one of those codes (`financialIssue.*`, as a booking's Money section shows them). **To close:**
 word a system hold's detail through the same dictionary, the codes it does not know shown as they are, and keep an
 administrator's typed reason as typed.
+
+**How it closed.** On 2026-10-01. One helper, `issueLines`, words the codes through the console's existing
+`financialIssue` sentences, one per line, and spells out a code this build has no word for. It serves both kinds of
+hold that carry them: a payable held because its booking's records need review (both payouts screens and the
+administrator's booking page), and a financial document held for the same reason, whose "last error" was the same
+codes (the document holds screen). A hold's detail now says who wrote it: worded issues; an administrator's reason,
+shown as typed; or what the server composed in English with figures — what a payable no longer matches, a penalty
+that is not the whole deposit — still shown as it is, left to right, as item 174 records for the audit log.
+
+### 220. The office's notifications give every colleague a masculine verb
+
+**Status:** open · **Raised:** 2026-10-01 (while closing item 218) · **Presentation only**
+
+The office's notifications name a colleague after the verb — «قبل {who} {what}», «رفض», «سجّل … استلام» and
+«… إرجاع», «حدّث», «أعاد … تفعيل», and the employee's «منحك {who}» and «ألغى {who}» — and the verb is always
+masculine. Arabic agrees a verb with a feminine subject («قبلت سارة …»), and the platform does not know, and should
+not ask, anyone's gender. What the reader did themselves is already worded for anyone (item 218). **To close:** a
+construction that agrees with anyone — the passive with «من قِبل {who}», or the colleague named first as a label —
+with a nominative fallback for "a booking", since «حجزاً» is written as an object.
