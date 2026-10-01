@@ -5329,3 +5329,21 @@ masculine. Arabic agrees a verb with a feminine subject («قبلت سارة …
 not ask, anyone's gender. What the reader did themselves is already worded for anyone (item 218). **To close:** a
 construction that agrees with anyone — the passive with «من قِبل {who}», or the colleague named first as a label —
 with a nominative fallback for "a booking", since «حجزاً» is written as an object.
+
+### 221. The startup checks crash the API when the database refuses the connection
+
+**Status:** open · **Raised:** 2026-10-01 (running the tests for items 217–219; confirmed by the architecture review) · **Owner decision: a payments guard**
+
+`PaymentsStartupCheck` and `FinancialDocumentsStartupCheck` read the database at boot and catch `DbException`, so that
+a table they cannot read does not stop the platform: with no provider configured, "nothing this process can do moves
+money, so the platform still starts". A refused connection never arrives as one. EF's execution strategy wraps a
+transient failure — a refused connection, a socket error, a timeout — in an `InvalidOperationException` neither catch
+sees, so the host crashes at boot instead. A failed login is not transient and is caught, which is why the backend
+suite passes whenever any Postgres answers on localhost:5432 and about 94 host-starting tests fail when nothing does.
+Severity is low: on the sandbox the guard is fatal on an unreadable table by design, so only the message changes; with
+no provider (Production) the intended "log and start" is already unreachable while `Admin:Bootstrap:Email` is set,
+because `AdminBootstrapper` reads `users` first and fails the same way. Either way a host booting during a database
+outage crash-loops until the database is back, instead of starting and serving `/health/live`. **To close, with the
+owner's approval:** in both checks, catch an exception whose inner chain holds a `DbException`, keeping the sandbox's
+rethrow; tests with a refused connection (`None` starts and logs, `Sandbox` refuses with the guard's own message); and
+decide `AdminBootstrapper` in the same change — or record that a database outage at boot is fatal by design.
