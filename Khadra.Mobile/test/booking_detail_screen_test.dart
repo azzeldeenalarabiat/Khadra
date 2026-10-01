@@ -313,6 +313,32 @@ void main() {
     expect(find.text(ar.bookingPayDeposit), findsNothing);
   });
 
+  // Pre-launch item 218: the reader's own act has a phrase of its own — «من قِبلك», never «بواسطة أنت» or, as the
+  // party label once made it, «بواسطة عليك» — and the office is named as before.
+  screenTest('says who made each change in words Arabic allows', (tester) async {
+    await pump(
+      tester,
+      bookingOf(status: 'Confirmed', depositPaid: true, history: [
+        changeJson('Requested', now),
+        changeJson('Approved', now.add(const Duration(hours: 1)), from: 'Requested', actor: 'Dealer'),
+        changeJson('Confirmed', now.add(const Duration(hours: 2)), from: 'Approved'),
+      ]),
+      locale: const Locale('ar'),
+    );
+
+    await tester.scrollUntilVisible(
+      // The office's line, which there is one of: a finder for several cannot be scrolled to before any is built.
+      find.text(ar.bookingActivityBy(ar.bookingPartyDealer)),
+      300,
+      scrollable: find.descendant(of: find.byType(ListView), matching: find.byType(Scrollable)).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(ar.bookingActivityByYou), findsNWidgets(2));
+    expect(find.text(ar.bookingActivityBy(ar.bookingPartyDealer)), findsOneWidget);
+    expect(find.textContaining('بواسطة عليك'), findsNothing);
+    expect(find.textContaining('بواسطة أنت'), findsNothing);
+  });
+
   screenTest('an office that has left is named in Arabic, not in English',
       (tester) async {
     await pump(

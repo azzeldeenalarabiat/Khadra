@@ -932,6 +932,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get bookingActivityByYou => 'by you';
+
+  @override
   String get bookingPaymentSummary => 'Payment';
 
   @override

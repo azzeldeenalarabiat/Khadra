@@ -2228,7 +2228,10 @@ class _ActivityRow extends StatelessWidget {
               if (party.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(
-                  l10n.bookingActivityBy(party),
+                  // The reader's own act has a phrase of its own: «من قِبلك», never «بواسطة أنت» (item 218).
+                  change.actorParty == 'Customer'
+                      ? l10n.bookingActivityByYou
+                      : l10n.bookingActivityBy(party),
                   style: const TextStyle(
                       color: KhadraColors.neutral600, fontSize: 12),
                 ),

@@ -289,6 +289,10 @@ void main() {
         expect(find.textContaining(tag == 'en' ? 'nothing left to split' : 'فلم يبقَ منه'), findsNothing);
         // Pre-launch item 173: a resolution moves money, so its card never says nothing was charged.
         expect(find.text(l10n.bookingPenaltyNotCharged), findsNothing);
+        // Pre-launch item 218: the customer's share is labelled as the customer — never «عليك», "against you", over
+        // money that goes back to them.
+        expect(find.text(l10n.bookingPartyCustomer), findsWidgets);
+        expect(find.text('عليك'), findsNothing);
       });
     }
   });

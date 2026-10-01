@@ -971,6 +971,9 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
+  String get bookingActivityByYou => 'من قِبلك';
+
+  @override
   String get bookingPaymentSummary => 'الدفع';
 
   @override
@@ -1227,7 +1230,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'انتهت مهلة النزاع دون فتح نزاع. تم تثبيت حسم العربون وتطبيقه وفق شروط إلغاء الحجز.';
 
   @override
-  String get bookingPartyCustomer => 'عليك';
+  String get bookingPartyCustomer => 'أنت';
 
   @override
   String get bookingPartyDealer => 'مكتب التأجير';

@@ -1586,6 +1586,12 @@ abstract class AppLocalizations {
   /// **'by {party}'**
   String bookingActivityBy(String party);
 
+  /// Pre-launch item 218: the reader's own act in the history has a phrase of its own — Arabic says «من قِبلك», never «بواسطة أنت».
+  ///
+  /// In en, this message translates to:
+  /// **'by you'**
+  String get bookingActivityByYou;
+
   /// No description provided for @bookingPaymentSummary.
   ///
   /// In en, this message translates to:
@@ -2024,7 +2030,7 @@ abstract class AppLocalizations {
   /// **'The dispute window ended without a dispute. The assessed deposit penalty has now been finalized and applied according to the booking’s cancellation terms.'**
   String get bookingPenaltyStateKeptFromDeposit;
 
-  /// No description provided for @bookingPartyCustomer.
+  /// The customer as a party: a label, or the party in a sentence about someone else. A sentence about the reader's own act has its own wording (pre-launch item 218).
   ///
   /// In en, this message translates to:
   /// **'you'**
