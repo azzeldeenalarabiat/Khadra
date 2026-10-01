@@ -286,7 +286,7 @@
       <ul class="history">
         @for (change of b.history; track change.occurredAt + change.toStatus) {
           <li>
-            <span>{{ status(change.toStatus) }} <span class="faint">· {{ i18n.t('booking.by', { party: party(change.actorParty) }) }}</span></span>
+            <span>{{ status(change.toStatus) }} <span class="faint">· {{ changedBy(change.actorParty) }}</span></span>
             <span class="faint small">{{ format.dateTime(change.occurredAt) }}</span>
             @if (reasonLabel(change.reasonCode)) { <span class="small muted">{{ reasonLabel(change.reasonCode) }}</span> }
           </li>

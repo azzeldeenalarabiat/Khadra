@@ -9,6 +9,7 @@ import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { httpData } from '../../core/http/http-data';
+import { disputeParty, openedByText } from './dispute-presentation';
 import { decidedEarlier, earlierDecisionNotice, readsAsWaived } from './earlier-decisions';
 
 /** `GET /api/v1/disputes/{id}` — only the fields this page shows. */
@@ -45,7 +46,6 @@ interface Dispute {
 }
 
 const STATUSES = ['Open', 'UnderReview', 'Resolved', 'Withdrawn'];
-const PARTIES = ['Customer', 'Dealer', 'Admin'];
 
 /**
  * A dispute, read-only — where a "your dispute was updated" notification lands. What the customer
@@ -61,6 +61,7 @@ const PARTIES = ['Customer', 'Dealer', 'Admin'];
 export class DisputeComponent {
   protected readonly i18n = inject(I18nService);
   protected readonly format = inject(FormatService);
+  private readonly t = this.i18n.t.bind(this.i18n);
 
   readonly ticketId = input<string>('');
   protected readonly dispute = httpData<Dispute>(() => {
@@ -102,7 +103,12 @@ export class DisputeComponent {
   }
 
   protected party(party: string): string {
-    return PARTIES.includes(party) ? this.i18n.t(`dispute.party.${party}` as TranslationKey) : party;
+    return disputeParty(this.t, party);
+  }
+
+  /** Who opened it and when: «فُتح من قِبلك» for the customer's own, never «فتحه أنت» (pre-launch item 218). */
+  protected openedBy(party: string, openedAt: string): string {
+    return openedByText(this.t, party, this.format.dateTime(openedAt));
   }
 
   protected tone(status: string): string {

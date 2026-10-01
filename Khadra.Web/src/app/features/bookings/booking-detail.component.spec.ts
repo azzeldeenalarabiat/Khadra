@@ -599,6 +599,8 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
 
   /** Pre-launch item 173: the penalty notice states where the penalty stands, from the server's state. */
   const withPenaltyState = (state: string | null) => ({ ...lateCancelled, penalty: { ...PAST_WINDOW_PENALTY, state } });
+  /** What a reader sees: without the direction isolates the dictionary wraps each value in. */
+  const visible = (text: string) => text.replace(/[\u2068\u2069]/g, '');
 
   it('says an assessed penalty has charged nothing yet, and a resolved one where its final amount is, in both languages', async () => {
     const assessed = await render(withPenaltyState('Assessed'), 'en');
@@ -639,11 +641,25 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     expect(english.text).toContain('has been assessed against you.');
     TestBed.resetTestingModule();
 
-    // «عليك», never «على أنت»: the reader's own penalty is not the party word dropped into a sentence.
+    // «عليك», never «على أنت»: the reader's own penalty is not the party word dropped into a sentence. Checked on the
+    // visible words: every value sits in a direction isolate, which would hide the old phrase from a plain search.
     const arabic = await render(withPenaltyState('Assessed'), 'ar');
     expect(arabic.text).toContain('قُدِّر مبلغ');
     expect(arabic.text).toContain('عليك.');
-    expect(arabic.text).not.toContain('على أنت');
+    expect(visible(arabic.text)).not.toContain('على أنت');
+  });
+
+  it('says who made each change in the history in words their language allows (pre-launch item 218)', async () => {
+    const english = await render(withPenaltyState('Assessed'), 'en');
+    expect(visible(english.text)).toContain('· by you');
+    expect(visible(english.text)).toContain('· by the rental office');
+    TestBed.resetTestingModule();
+
+    // «من قِبلك», never «بواسطة أنت»: the reader's own act has a phrase of its own; the office is named as before.
+    const arabic = visible((await render(withPenaltyState('Assessed'), 'ar')).text);
+    expect(arabic).toContain('· من قِبلك');
+    expect(arabic).toContain('· بواسطة مكتب التأجير');
+    expect(arabic).not.toContain('بواسطة أنت');
   });
 
   it('never again says nothing has been charged, and says nothing under a penalty state it does not know', async () => {

@@ -66,6 +66,11 @@ export function partyLabel(t: Translate, party: string | null | undefined): stri
   }
 }
 
+/** Who made a change, as the history says it: the reader's own act in a phrase of its own (pre-launch item 218). */
+export function byWhom(t: Translate, party: string | null | undefined): string {
+  return party === 'Customer' ? t('booking.byYou') : t('booking.by', { party: partyLabel(t, party) });
+}
+
 export function countdownText(t: Translate, parts: CountdownParts | null): string {
   if (!parts) return '';
   if (parts.over) return t('countdown.over');

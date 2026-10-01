@@ -451,6 +451,8 @@ export const EN = {
   'booking.stage.NoShow': 'Not collected',
   'booking.stage.Expired': 'Time ran out',
   'booking.by': 'by {party}',
+  // The reader's own act: Arabic says «من قِبلك», never «بواسطة أنت» (pre-launch item 218).
+  'booking.byYou': 'by you',
   'booking.party.Customer': 'you',
   'booking.party.Dealer': 'the rental office',
   'booking.party.Admin': 'Khadra',
@@ -784,6 +786,7 @@ export const EN = {
   'dispute.status.Resolved': 'Settled',
   'dispute.status.Withdrawn': 'Withdrawn',
   'dispute.openedBy': 'Opened by {party} on {date}',
+  'dispute.openedByYou': 'Opened by you on {date}',
   'dispute.reason': 'What went wrong',
   'dispute.answerBy': 'Khadra will answer by {deadline}.',
   'dispute.statements': 'The conversation',

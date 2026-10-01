@@ -28,7 +28,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
-import { LIFECYCLE, countdownText, partyLabel, stageLabel, statusLabel, statusTone } from './booking-presentation';
+import { LIFECYCLE, byWhom, countdownText, partyLabel, stageLabel, statusLabel, statusTone } from './booking-presentation';
 import { countdownParts } from './countdown';
 import { HandoverCodeComponent } from './handover-code.component';
 import { chosenOption } from './payment-choice';
@@ -331,6 +331,11 @@ export class BookingDetailComponent {
 
   protected party(party: string | null): string {
     return partyLabel(this.t, party);
+  }
+
+  /** Who made a change in the history: «من قِبلك» for the reader, never «بواسطة أنت» (pre-launch item 218). */
+  protected changedBy(party: string | null): string {
+    return byWhom(this.t, party);
   }
 
   /**
