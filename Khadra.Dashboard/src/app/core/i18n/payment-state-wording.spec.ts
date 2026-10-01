@@ -95,3 +95,34 @@ describe("the office's booking money, once payouts are live", () => {
     expect(ar('dealerBooking.commissionIsDeductedFrom')).toContain('صفحة التحويلات');
   });
 });
+
+describe('how an office is paid, which is not decided yet (pre-launch item 217)', () => {
+  // The owner's architecture (2026-09-24) leaves the method to the acquiring arrangement: the consoles say a settlement
+  // records a payment made outside the platform, and never name a bank or a transfer.
+  const keys = [
+    'payouts.byHandNote',
+    'payouts.colReference',
+    'payouts.record.reference',
+    'dealerPayouts.howItWorks',
+    'dealerReports.howPayoutsWork',
+    'dealerSettings.payoutDetails',
+    'dealerSettings.notLiveYetPayouts',
+    'dealerBooking.commissionIsDeductedFrom',
+  ] as const;
+
+  it('names no payment method, in either language', () => {
+    for (const key of keys) {
+      expect(EN[key]).not.toMatch(/bank|transfer/i);
+      expect(AR[key]).not.toMatch(/مصرفي|بنكي|البنكية/);
+    }
+    expect(en('payouts.byHandNote')).toContain('outside the platform');
+    expect(ar('payouts.byHandNote')).toContain('خارج المنصة');
+  });
+
+  it('no longer says payouts are not built', () => {
+    expect(en('dealerSettings.notLiveYetPayouts')).not.toMatch(/payouts are not built/i);
+    expect(en('dealerSettings.notLiveYetPayouts')).toContain('Payouts page');
+    expect(ar('dealerSettings.notLiveYetPayouts')).not.toContain('التحويلات لم تُبنَ');
+    expect(ar('dealerSettings.notLiveYetPayouts')).toContain('صفحة التحويلات');
+  });
+});

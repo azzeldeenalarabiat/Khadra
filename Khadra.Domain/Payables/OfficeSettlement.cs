@@ -10,7 +10,7 @@ namespace Khadra.Domain.Payables;
 /// <summary>
 /// An administrator's record that money moved between Khadra and one rental office, by hand, outside the platform
 /// (payments Phase 8; owner, 2026-09-24): the amount, the day it moved, who recorded it, and exactly which payables
-/// it closed. There is no payout rail — the platform records a transfer it did not make, and never makes one.
+/// it closed. There is no payout rail — the platform records a payment it did not make, and never makes one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -52,7 +52,7 @@ public sealed class OfficeSettlement : AggregateRoot, IAppendOnly
     /// <summary>The day the money moved, in Amman, as the administrator recorded it. Never in the future.</summary>
     public DateOnly PaidOn { get; private set; }
 
-    /// <summary>The bank's or the transfer's own reference, when there is one.</summary>
+    /// <summary>The payment's own reference, when there is one.</summary>
     public string? Reference { get; private set; }
 
     /// <summary>The administrator's note. Administrators see it; the office does not.</summary>

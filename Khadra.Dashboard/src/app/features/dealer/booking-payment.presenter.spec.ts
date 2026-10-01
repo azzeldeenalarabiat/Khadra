@@ -79,7 +79,7 @@ describe('the approval waits for a payment, whichever the customer chooses', () 
 
 describe('the sentences that describe where money goes', () => {
   // A full payment charges the whole booking by card, delivery fee included, and leaves no cash.
-  const keys = ['dealerReports.payoutsAreNotLive', 'dealerSettings.notLiveYetPayouts', 'dealerDelivery.chargedToTheCustomer'] as const;
+  const keys = ['dealerReports.howPayoutsWork', 'dealerSettings.notLiveYetPayouts', 'dealerDelivery.chargedToTheCustomer'] as const;
 
   it('never say the card payment is a deposit, in either language', () => {
     for (const key of keys) {

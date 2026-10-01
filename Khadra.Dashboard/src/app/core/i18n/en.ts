@@ -1030,8 +1030,9 @@ export const EN = {
   'dealerReports.noListedVehiclesIn': 'No listed vehicles in this period.',
   'dealerReports.occupancy': 'Occupancy',
   'dealerReports.occupancyByVehicle': 'Occupancy by vehicle',
-  'dealerReports.payoutsAreNotLive':
-    'Khadra pays what it owes you by bank transfer, booking by booking once each outcome is final: see Payouts. Commission is deducted from the card payment; any balance is collected in cash at handover.',
+  // Names no payment method: how an office is paid waits on the acquiring arrangement (owner, 2026-09-24; item 217).
+  'dealerReports.howPayoutsWork':
+    'What Khadra owes you becomes due booking by booking, once each outcome is final, and is paid together with everything else then due to you: see Payouts. Commission is deducted from the card payment; any balance is collected in cash at handover.',
   'dealerReports.platformCommission': 'Platform commission',
   'dealerReports.rentalRevenue': 'Rental revenue',
   'dealerReports.rentalTotalsOfThose': 'Rental totals of those bookings',
@@ -1685,9 +1686,9 @@ export const EN = {
   'dealerSettings.notLiveYetSign': 'Not live yet. Sign-in is email and password.',
   'dealerSettings.notLiveYetInvitations':
     'Not live yet. Invitations and password links go by email; everything else is on the dashboard.',
-  'dealerSettings.bankDetailsForPayouts': 'Bank details for payouts',
+  'dealerSettings.payoutDetails': 'Payout details',
   'dealerSettings.notLiveYetPayouts':
-    'Not live yet. Payouts are not built; commission is deducted from the card payment and any balance is collected in cash.',
+    'Not live yet. Khadra does not collect payout details here; what it owes you, and each payment of it, is on your Payouts page. Commission is deducted from the card payment and any balance is collected in cash.',
   'dealerSettings.pauseOrCloseThe': 'Pause or close the dealership',
   'dealerSettings.notLiveYetHide':
     'Not live yet. Hide individual cars from the fleet page to stop taking bookings; ask the platform to close the account.',
@@ -3494,7 +3495,7 @@ export const EN = {
 
   'payouts.subtitle': 'What Khadra owes each rental office, or is owed by it, booking by booking once each outcome is final.',
   'payouts.byHandNote':
-    'Nothing here moves money. Pay or collect by bank transfer first, then record the settlement here: it closes every payable due in one currency, netted, under a number, and is audited.',
+    'Nothing here moves money. Pay or collect outside the platform first, then record the settlement here: it closes every payable due in one currency, netted, under a number, and is audited.',
   'payouts.balancesTitle': 'Balances',
   'payouts.loadFailed': 'Payouts could not be loaded.',
   'payouts.empty': 'No office has a payable yet',
@@ -3513,7 +3514,7 @@ export const EN = {
   'payouts.colDirection': 'Direction',
   'payouts.colAmount': 'Amount',
   'payouts.colPaidOn': 'Paid on',
-  'payouts.colReference': 'Transfer reference',
+  'payouts.colReference': 'Payment reference',
   'payouts.colRecorded': 'Recorded',
   'payouts.colSettlement': 'Settlement',
   'payouts.bookingsCount': { one: '{count} booking', other: '{count} bookings' },
@@ -3551,7 +3552,7 @@ export const EN = {
   'payouts.record.note': 'This closes every payable due now, under a new settlement number, and cannot be edited — only voided.',
   'payouts.record.testNote': 'Test money: the settlement is numbered as a test and moves nothing real.',
   'payouts.record.paidOn': 'Day the money moved',
-  'payouts.record.reference': 'Transfer reference (optional)',
+  'payouts.record.reference': 'Payment reference (optional)',
   'payouts.record.noteLabel': 'Note',
   'payouts.record.confirm': 'Record settlement',
   'payouts.record.done': 'Settlement recorded',
@@ -3635,7 +3636,7 @@ export const EN = {
   'dealerPayouts.subtitle': 'What Khadra owes you, or you owe Khadra, booking by booking once each outcome is final.',
   'dealerPayouts.notGranted': 'Payouts are for the owner, and staff the owner has granted the reports to.',
   'dealerPayouts.howItWorks':
-    'Khadra pays what it owes you by bank transfer and records each payment here, with its number. A charge a dispute assessed on you is taken from what you are owed.',
+    'Khadra pays what it owes you outside the platform and records each payment here, with its number. A charge a dispute assessed on you is taken from what you are owed.',
   'dealerPayouts.loadFailed': 'Payouts could not be loaded.',
   'dealerPayouts.dueNow': 'Due now',
   'dealerPayouts.empty': 'Nothing recorded yet',

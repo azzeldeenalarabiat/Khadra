@@ -21,7 +21,7 @@ const NOT_LIVE: readonly { readonly title: TranslationKey; readonly body: Transl
     title: 'employeeSettings.notificationPreferences',
     body: 'dealerSettings.notLiveYetInvitations',
   },
-  { title: 'dealerSettings.bankDetailsForPayouts', body: 'dealerSettings.notLiveYetPayouts' },
+  { title: 'dealerSettings.payoutDetails', body: 'dealerSettings.notLiveYetPayouts' },
   { title: 'dealerSettings.pauseOrCloseThe', body: 'dealerSettings.notLiveYetHide' },
 ];
 
@@ -34,7 +34,7 @@ type PasswordField = (typeof PASSWORD_FIELDS)[number];
  *
  * What is real: the account as the platform knows it, and changing your own password (which signs
  * out every other session, by design). What the design shows and the platform does not have --
- * two-factor, notification preferences, pausing or closing the account, bank details for payouts,
+ * two-factor, notification preferences, pausing or closing the account, payout details,
  * tax settings -- is listed as "not live" rather than drawn as working controls.
  */
 @Component({

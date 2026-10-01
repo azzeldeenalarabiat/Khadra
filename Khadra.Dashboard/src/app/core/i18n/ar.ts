@@ -603,8 +603,8 @@ export const AR = {
   'dealerReports.noListedVehiclesIn': 'لا توجد سيارات معروضة في هذه الفترة.',
   'dealerReports.occupancy': 'نسبة الإشغال',
   'dealerReports.occupancyByVehicle': 'الإشغال حسب السيارة',
-  'dealerReports.payoutsAreNotLive':
-    'تحوّل خضرا ما تستحقه بتحويل مصرفي، حجزًا بحجز بعد أن تصبح نتيجة كل حجز نهائية: انظر التحويلات. تُخصم العمولة من دفعة البطاقة؛ ويُحصَّل الرصيد المتبقي، إن وُجد، نقدًا عند التسليم.',
+  'dealerReports.howPayoutsWork':
+    'ما تدين لك به خضرا يستحق حجزًا بحجز متى صارت نتيجة كل حجز نهائية، ويُدفع مع كل ما يستحق لك حينها: انظر التحويلات. تُخصم العمولة من دفعة البطاقة؛ ويُحصَّل الرصيد المتبقي، إن وُجد، نقدًا عند التسليم.',
   'dealerReports.platformCommission': 'عمولة المنصة',
   'dealerReports.rentalRevenue': 'إيرادات التأجير',
   'dealerReports.rentalTotalsOfThose': 'إجمالي قيمة تلك الحجوزات',
@@ -1517,9 +1517,9 @@ export const AR = {
   'dealerSettings.notLiveYetSign': 'لم تُفعَّل بعد. تسجيل الدخول بالبريد الإلكتروني وكلمة المرور.',
   'dealerSettings.notLiveYetInvitations':
     'لم تُفعَّل بعد. تُرسَل الدعوات وروابط كلمات المرور بالبريد الإلكتروني؛ وكل ما عدا ذلك في لوحة التحكم.',
-  'dealerSettings.bankDetailsForPayouts': 'البيانات البنكية للتحويلات',
+  'dealerSettings.payoutDetails': 'بيانات استلام التحويلات',
   'dealerSettings.notLiveYetPayouts':
-    'لم تُفعَّل بعد. التحويلات لم تُبنَ؛ وتُخصم العمولة من دفعة البطاقة ويُحصَّل الرصيد المتبقي، إن وُجد، نقدًا.',
+    'لم تُفعَّل بعد. لا تجمع خضرا بيانات استلام التحويلات هنا؛ وتجد في صفحة التحويلات ما تدين لك به وكل دفعة منه. وتُخصم العمولة من دفعة البطاقة ويُحصَّل الرصيد المتبقي، إن وُجد، نقدًا.',
   'dealerSettings.pauseOrCloseThe': 'إيقاف المكتب مؤقتًا أو إغلاقه',
   'dealerSettings.notLiveYetHide':
     'لم تُفعَّل بعد. أخفِ السيارات فرادى من صفحة الأسطول لوقف استقبال الحجوزات؛ واطلب من المنصة إغلاق الحساب.',
@@ -3551,7 +3551,7 @@ export const AR = {
 
   'payouts.subtitle': 'ما تدين به خضرا لكل مكتب تأجير، أو ما يدين به المكتب لها، حجزًا بحجز بعد أن تصبح نتيجة كل حجز نهائية.',
   'payouts.byHandNote':
-    'لا شيء هنا ينقل أموالًا. ادفع أو حصّل بتحويل مصرفي أولًا، ثم سجّل التسوية هنا: فهي تُغلق كل مستحق بعملة واحدة، بعد المقاصّة، برقم خاص بها، وتُسجَّل في سجل التدقيق.',
+    'لا شيء هنا ينقل أموالًا. ادفع أو حصّل خارج المنصة أولًا، ثم سجّل التسوية هنا: فهي تُغلق كل مستحق بعملة واحدة، بعد المقاصّة، برقم خاص بها، وتُسجَّل في سجل التدقيق.',
   'payouts.balancesTitle': 'الأرصدة',
   'payouts.loadFailed': 'تعذّر تحميل التحويلات.',
   'payouts.empty': 'لا مستحقات لأي مكتب بعد',
@@ -3570,7 +3570,7 @@ export const AR = {
   'payouts.colDirection': 'الاتجاه',
   'payouts.colAmount': 'المبلغ',
   'payouts.colPaidOn': 'تاريخ التحويل',
-  'payouts.colReference': 'مرجع التحويل',
+  'payouts.colReference': 'مرجع الدفعة',
   'payouts.colRecorded': 'سُجّلت',
   'payouts.colSettlement': 'التسوية',
   'payouts.bookingsCount': {
@@ -3617,7 +3617,7 @@ export const AR = {
   'payouts.record.note': 'يُغلق هذا كل مستحق الآن، برقم تسوية جديد، ولا يمكن تعديله — يمكن إلغاؤه فقط.',
   'payouts.record.testNote': 'أموال تجريبية: تُرقَّم التسوية على أنها تجريبية ولا تنقل شيئًا حقيقيًا.',
   'payouts.record.paidOn': 'تاريخ انتقال المال',
-  'payouts.record.reference': 'مرجع التحويل (اختياري)',
+  'payouts.record.reference': 'مرجع الدفعة (اختياري)',
   'payouts.record.noteLabel': 'ملاحظة',
   'payouts.record.confirm': 'تسجيل التسوية',
   'payouts.record.done': 'سُجّلت التسوية',
@@ -3718,7 +3718,7 @@ export const AR = {
   'dealerPayouts.subtitle': 'ما تدين لك به خضرا، أو ما تدين به لها، حجزًا بحجز بعد أن تصبح نتيجة كل حجز نهائية.',
   'dealerPayouts.notGranted': 'التحويلات لمالك المكتب، وللموظفين الذين منحهم المالك صلاحية التقارير.',
   'dealerPayouts.howItWorks':
-    'تحوّل خضرا ما تدين لك به بتحويل مصرفي، وتسجّل كل دفعة هنا برقمها. وأي مبلغ حمّله عليك قرار نزاع يُخصم مما تستحقه.',
+    'تدفع خضرا ما تدين لك به خارج المنصة، وتسجّل كل دفعة هنا برقمها. وأي مبلغ حمّله عليك قرار نزاع يُخصم مما تستحقه.',
   'dealerPayouts.loadFailed': 'تعذّر تحميل التحويلات.',
   'dealerPayouts.dueNow': 'المستحق الآن',
   'dealerPayouts.empty': 'لم يُسجَّل شيء بعد',

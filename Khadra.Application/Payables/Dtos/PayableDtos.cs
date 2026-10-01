@@ -170,7 +170,7 @@ public sealed record OfficeSettlementVoidDto(DateTimeOffset VoidedAt, string? Vo
 /// <summary>A settlement recorded by hand: Khadra paid the office, the office paid Khadra, or the two cancelled out.</summary>
 /// <param name="Direction"><c>Payout</c>, <c>Received</c> or <c>Netted</c>.</param>
 /// <param name="Amount">Signed from Khadra's side.</param>
-/// <param name="Reference">The transfer's own reference, as recorded.</param>
+/// <param name="Reference">The payment's own reference, as recorded.</param>
 /// <param name="Note">The administrator's note. Administrators only.</param>
 /// <param name="RecordedBy">The administrator who recorded it. Administrators only.</param>
 /// <param name="Void">Set when it was voided; the reason is the administrators' only.</param>
