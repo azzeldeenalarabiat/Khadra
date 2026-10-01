@@ -2157,16 +2157,23 @@ export const EN = {
   // One notification for a deposit and for a payment in full; the row does not say which.
   'notifications.customerPaid': 'A customer paid for {what}',
   'notifications.approved': '{who} approved {what}',
+  // What the reader did themselves has sentences of its own: Arabic says «أنت من قبِل», never «قبل أنت» (item 218).
+  'notifications.approvedByYou': 'You approved {what}',
   'notifications.rejected': '{who} rejected {what}',
+  'notifications.rejectedByYou': 'You rejected {what}',
   'notifications.recordedPickup': '{who} recorded the pickup for {what}',
+  'notifications.recordedPickupByYou': 'You recorded the pickup for {what}',
   'notifications.recordedReturn': '{who} recorded the return for {what}',
+  'notifications.recordedReturnByYou': 'You recorded the return for {what}',
   'notifications.updated': '{who} updated {what}',
+  'notifications.updatedByYou': 'You updated {what}',
   'notifications.dealerApproved': 'Your dealership was approved',
   'notifications.dealerRejected': 'Your dealership’s application was rejected',
   'notifications.dealerClarification': 'The platform asked for more on your application',
   'notifications.dealerSuspended': 'Your dealership was suspended',
   'notifications.dealerReactivated': 'Your dealership is trading again',
   'notifications.staffReactivated': '{who} reactivated a member of staff',
+  'notifications.staffReactivatedByYou': 'You reactivated a member of staff',
   'notifications.reportAccessGranted': '{who} gave you access to financial reports',
   'notifications.reportAccessRevoked': '{who} removed your access to financial reports',
 

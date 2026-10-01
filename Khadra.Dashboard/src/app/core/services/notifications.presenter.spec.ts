@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { AttentionItem, AttentionQueue } from '../models/dashboard.api';
 import { DealerDashboard, UpcomingHandover } from '../models/dealer-console.api';
-import { toAdminNotifications, toDealerNotifications } from './notifications.presenter';
+import { NotificationItem, NotificationKind } from '../models/notifications.api';
+import { notificationSentence, toAdminNotifications, toDealerNotifications } from './notifications.presenter';
+import { AR } from '../i18n/ar';
 import { EN } from '../i18n/en';
 import { resolveMessage } from '../i18n/resolve';
 import { Translate } from './dashboard.presenter';
@@ -309,5 +311,44 @@ describe('toDealerNotifications', () => {
     // Two counts collapse to one row each; the five handovers-in-window are listed individually.
     expect(rows).toHaveLength(5);
     expect(new Set(rows.map((row) => row.id)).size).toBe(5);
+  });
+});
+
+describe('notificationSentence (pre-launch item 218)', () => {
+  // Real Arabic, without the direction isolates the resolver wraps each value in.
+  const ar: Translate = (key, params) =>
+    (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[\u2068\u2069]/g, '');
+  const item = (over: Partial<NotificationItem> = {}): NotificationItem => ({
+    notificationId: 'n-1',
+    kind: 'BookingApproved',
+    subjectId: 'b-1',
+    subjectReference: 'KH-ABCD1234',
+    actorName: 'Rana Haddad',
+    isMine: false,
+    occurredAt: '2026-09-30T09:00:00Z',
+    readAt: null,
+    isRead: false,
+    ...over,
+  });
+
+  it("says what the reader did in a sentence of its own, never «أنت» dropped into the actor's place", () => {
+    expect(notificationSentence(item({ isMine: true }), ar)).toBe('أنت من قبِل KH-ABCD1234');
+    expect(notificationSentence(item({ isMine: true }), t)).toBe('You approved KH-ABCD1234');
+
+    const kinds: readonly NotificationKind[] = ['BookingApproved', 'BookingRejected', 'BookingPickedUp', 'BookingReturned', 'StaffReactivated'];
+    // A kind this build does not know falls back to "updated", and that fallback reads right for the reader too.
+    for (const kind of [...kinds, 'SomethingNewer' as NotificationKind]) {
+      const arabic = notificationSentence(item({ kind, isMine: true }), ar);
+      expect(arabic.startsWith('أنت من ')).toBe(true);
+      expect(notificationSentence(item({ kind, isMine: true }), t)).toMatch(/^You /);
+    }
+  });
+
+  it('names a colleague as it always has', () => {
+    expect(notificationSentence(item(), ar)).toBe('قبل Rana Haddad KH-ABCD1234');
+    expect(notificationSentence(item(), t)).toBe('Rana Haddad approved KH-ABCD1234');
+    expect(notificationSentence(item({ kind: 'BookingPickedUp', subjectReference: null }), t)).toBe(
+      'Rana Haddad recorded the pickup for a booking',
+    );
   });
 });

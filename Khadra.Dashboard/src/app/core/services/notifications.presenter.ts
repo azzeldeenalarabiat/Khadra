@@ -1,9 +1,62 @@
 import { AttentionItem, AttentionQueue } from '../models/dashboard.api';
 import { DealerDashboard } from '../models/dealer-console.api';
+import { NotificationItem } from '../models/notifications.api';
 import { Tone } from '../models/console.models';
 import { IconName } from '../../shared/icon/icon-paths';
 import { relativeTime } from '../i18n/relative-time';
 import { Translate, toQueueItems } from './dashboard.presenter';
+
+/**
+ * The sentence for one of the reader's notifications, composed here rather than stored.
+ *
+ * Every kind in the server's vocabulary has a case; an unknown one falls back to something true rather than to an
+ * empty line, because a new kind should degrade, not disappear. Named PARAMETERS rather than a template literal:
+ * Arabic does not put the actor and the object where English puts them, so a sentence is one message with two holes
+ * in it, not three pieces concatenated. And what the reader did themselves has sentences of its own (pre-launch item
+ * 218): Arabic does not drop «أنت» into the actor's place — «قبل أنت KH-…» — it says «أنت من قبِل KH-…».
+ */
+export function notificationSentence(item: NotificationItem, t: Translate): string {
+  const mine = item.isMine;
+  const who = mine ? t('notifications.you') : item.actorName;
+  const what = item.subjectReference ?? t('notifications.aBooking');
+  const parts = { who, what };
+
+  switch (item.kind) {
+    // The one kind raised from outside the dealership. Its row carries no actor on purpose -- a customer's name is
+    // never copied into this table -- so it does not use `who`.
+    case 'BookingRequested':
+      return t('notifications.customerRequested', { what });
+    case 'BookingApproved':
+      return mine ? t('notifications.approvedByYou', { what }) : t('notifications.approved', parts);
+    case 'BookingRejected':
+      return mine ? t('notifications.rejectedByYou', { what }) : t('notifications.rejected', parts);
+    case 'BookingPickedUp':
+      return mine ? t('notifications.recordedPickupByYou', { what }) : t('notifications.recordedPickup', parts);
+    case 'BookingReturned':
+      return mine ? t('notifications.recordedReturnByYou', { what }) : t('notifications.recordedReturn', parts);
+    case 'BookingConfirmed':
+      return t('notifications.customerPaid', { what });
+    case 'DealerApproved':
+      return t('notifications.dealerApproved');
+    case 'DealerRejected':
+      return t('notifications.dealerRejected');
+    case 'DealerClarificationRequested':
+      return t('notifications.dealerClarification');
+    case 'DealerSuspended':
+      return t('notifications.dealerSuspended');
+    case 'DealerReactivated':
+      return t('notifications.dealerReactivated');
+    case 'StaffReactivated':
+      return mine ? t('notifications.staffReactivatedByYou') : t('notifications.staffReactivated', { who });
+    // Raised for the employee whose access changed, by somebody else: never the reader's own act.
+    case 'ReportAccessGranted':
+      return t('notifications.reportAccessGranted', { who });
+    case 'ReportAccessRevoked':
+      return t('notifications.reportAccessRevoked', { who });
+    default:
+      return mine ? t('notifications.updatedByYou', { what }) : t('notifications.updated', parts);
+  }
+}
 
 /** One line in the notifications panel. Every field is derived from a record the server sent. */
 export interface NotificationRow {

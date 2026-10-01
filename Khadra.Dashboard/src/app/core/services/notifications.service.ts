@@ -6,6 +6,7 @@ import { LiveRefreshService } from './live-refresh.service';
 import { liveResource } from './live-surface';
 import { SessionService } from './session.service';
 import { I18nService } from '../i18n/i18n.service';
+import { notificationSentence } from './notifications.presenter';
 
 /**
  * The signed-in person's notifications.
@@ -73,54 +74,9 @@ export class NotificationsService {
     return changed;
   }
 
-  /**
-   * The sentence for a row, composed here rather than stored.
-   *
-   * Every kind in the server's vocabulary has a case; an unknown one falls back to something true
-   * rather than to an empty line, because a new kind should degrade, not disappear.
-   */
+  /** The sentence for a row, composed rather than stored: `notificationSentence`. */
   describe(item: NotificationItem): string {
-    // Named PARAMETERS rather than a template literal, and that is the whole reason this could not
-    // be keyed by codemod: Arabic does not put the actor and the object where English puts them, so
-    // the sentence has to be one message with two holes in it, not three pieces concatenated.
-    const who = item.isMine ? this.t('notifications.you') : item.actorName;
-    const what = item.subjectReference ?? this.t('notifications.aBooking');
-    const parts = { who, what };
-
-    switch (item.kind) {
-      // The one kind raised from outside the dealership. Its row carries no actor on purpose --
-      // a customer's name is never copied into this table -- so it does not use `who`.
-      case 'BookingRequested':
-        return this.t('notifications.customerRequested', { what });
-      case 'BookingApproved':
-        return this.t('notifications.approved', parts);
-      case 'BookingRejected':
-        return this.t('notifications.rejected', parts);
-      case 'BookingPickedUp':
-        return this.t('notifications.recordedPickup', parts);
-      case 'BookingReturned':
-        return this.t('notifications.recordedReturn', parts);
-      case 'BookingConfirmed':
-        return this.t('notifications.customerPaid', { what });
-      case 'DealerApproved':
-        return this.t('notifications.dealerApproved');
-      case 'DealerRejected':
-        return this.t('notifications.dealerRejected');
-      case 'DealerClarificationRequested':
-        return this.t('notifications.dealerClarification');
-      case 'DealerSuspended':
-        return this.t('notifications.dealerSuspended');
-      case 'DealerReactivated':
-        return this.t('notifications.dealerReactivated');
-      case 'StaffReactivated':
-        return this.t('notifications.staffReactivated', { who });
-      case 'ReportAccessGranted':
-        return this.t('notifications.reportAccessGranted', { who });
-      case 'ReportAccessRevoked':
-        return this.t('notifications.reportAccessRevoked', { who });
-      default:
-        return this.t('notifications.updated', parts);
-    }
+    return notificationSentence(item, this.t);
   }
 
   /** Where a row leads, for the console the reader is standing in. */
