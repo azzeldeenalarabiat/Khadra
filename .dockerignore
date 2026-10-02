@@ -58,6 +58,11 @@ Khadra.Mobile/
 docs/
 **/*.md
 !README.md
+# Except one Markdown file that IS an input: the PDF fonts' licence notice. The API
+# project ships it beside the fonts in every publish (pre-launch item 196), so a
+# context without it fails `dotnet publish` with MSB3030 instead of shipping the
+# fonts without their notice.
+!Khadra.Infrastructure/FinancialDocuments/Fonts/FONTS.md
 docker-compose*.yml
 Dockerfile*
 .dockerignore
