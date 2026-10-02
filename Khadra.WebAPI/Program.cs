@@ -437,22 +437,23 @@ if (app.Environment.IsProduction())
     }
 }
 
-// A TEST issuer identity signs documents on this machine's sandbox and nowhere else (owner, 2026-09-27).
+// A TEST issuer identity signs documents on a sandbox and nowhere else: a developer's machine (owner,
+// 2026-09-27) and Staging (owner, 2026-10-02 — decision S3 of the payments rollout to Staging).
 //
-// It exists so issued documents can be clicked through locally before Khadra's real legal identity is
-// decided. What keeps it there is this line, not an intention: any environment but Development, or any
-// payment provider but SANDBOX, refuses to start with it — Staging included, which is sandbox too. The
-// issuer itself is the second lock: a test identity never signs real money (DocumentPreparation), and
-// sandbox money is always numbered TEST-.
+// It exists so issued documents, their PDFs and their emails can be exercised before Khadra's real legal
+// identity is decided, and it implies none: every document it signs is sandbox money, numbered TEST- and
+// watermarked TEST on every PDF, and never a legal invoice. What keeps it there is this line, not an
+// intention: Production, any other environment, or any payment provider but SANDBOX refuses to start with
+// it. The issuer itself is the second lock: a test identity never signs real money (DocumentPreparation).
 if (builder.Configuration.GetValue<bool>($"{FinancialDocumentOptions.SectionName}:Issuer:TestIdentity"))
 {
     var provider = builder.Configuration[$"{PaymentOptions.SectionName}:Provider"]?.Trim();
-    if (!app.Environment.IsDevelopment()
+    if (!(app.Environment.IsDevelopment() || app.Environment.IsStaging())
         || !string.Equals(provider, PaymentOptions.SandboxProvider, StringComparison.OrdinalIgnoreCase))
     {
         throw new InvalidOperationException(
             "FinancialDocuments:Issuer:TestIdentity is set, which signs documents with a test identity. It is " +
-            "allowed only in Development with Payments:Provider 'SANDBOX'. Remove the test identity, or " +
+            "allowed only in Development or Staging with Payments:Provider 'SANDBOX'. Remove the test identity, or " +
             "configure Khadra's real legal identity with TestIdentity false.");
     }
 }

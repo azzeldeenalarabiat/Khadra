@@ -1,3 +1,4 @@
+using System.Net;
 using Khadra.Infrastructure.Configuration;
 using Khadra.Tests.Support;
 using Microsoft.AspNetCore.Hosting;
@@ -62,11 +63,33 @@ public sealed class FinancialDocumentConfigurationTests
 
     // ── The environment guard ──────────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// A test identity starts on a sandbox in Development (owner, 2026-09-27) and on Staging (owner, 2026-10-02,
+    /// decision S3): Staging's documents can then be issued, drawn and emailed, every one TEST-numbered.
+    /// </summary>
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Staging")]
+    public async Task A_test_identity_starts_in_Development_and_Staging_on_the_sandbox(string environment)
+    {
+        using var factory = Api(environment, "SANDBOX");
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(new Uri("/health/live", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    /// <summary>
+    /// And nowhere else: not off the sandbox, not in another environment, and not in Production whatever its
+    /// provider — Production's own guards satisfied, so that the refusal below is this one.
+    /// </summary>
     [Theory]
     [InlineData("Testing", "SANDBOX")]
-    [InlineData("Staging", "SANDBOX")]
+    [InlineData("Staging", "None")]
     [InlineData("Development", "None")]
-    public async Task A_test_identity_starts_nowhere_but_Development_on_the_sandbox(string environment, string provider)
+    [InlineData("Production", "None")]
+    public async Task A_test_identity_starts_nowhere_else(string environment, string provider)
     {
         using var factory = Api(environment, provider);
 
@@ -110,7 +133,13 @@ public sealed class FinancialDocumentConfigurationTests
                         ["Payments:Provider"] = provider,
                         ["Payments:WebhookSecret"] = "a-sandbox-webhook-secret-for-the-tests",
                         ["Payments:SandboxConsoleBaseUrl"] = "http://192.0.2.10:5012",
-                        ["Email:Provider"] = "Logging",
+                        ["Email:Provider"] = environment == "Production" ? "Resend" : "Logging",
+                        ["Email:ApiKey"] = "re_not_a_real_key",
+                        ["Email:FromAddress"] = "onboarding@resend.dev",
+                        ["Documents:Provider"] = "Supabase",
+                        ["Documents:Supabase:Url"] = "https://project.supabase.co",
+                        ["Documents:Supabase:Bucket"] = "khadra-documents",
+                        ["Documents:Supabase:ServiceKey"] = "not-a-real-key",
                         ["FinancialDocuments:Issuer:LegalNameEn"] = "TEST Issuer",
                         ["FinancialDocuments:Issuer:LegalNameAr"] = "جهة تجريبية",
                         ["FinancialDocuments:Issuer:CommercialRegistration"] = "TEST-0000",

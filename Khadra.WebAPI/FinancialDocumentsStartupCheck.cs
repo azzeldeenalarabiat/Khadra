@@ -58,8 +58,8 @@ internal static partial class FinancialDocumentsStartupCheck
     private static partial void LogNotIssued(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Warning,
-        Message = "FINANCIAL DOCUMENTS ARE SIGNED BY A TEST IDENTITY ({LegalName}). Allowed only in Development "
-                  + "with SANDBOX payments; every document it signs is numbered TEST-, and it never signs real money.")]
+        Message = "FINANCIAL DOCUMENTS ARE SIGNED BY A TEST IDENTITY ({LegalName}). Allowed only in Development or "
+                  + "Staging with SANDBOX payments; every document it signs is numbered TEST-, and it never signs real money.")]
     private static partial void LogTestIdentity(ILogger logger, string legalName);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Financial documents issued as {LegalName}.")]

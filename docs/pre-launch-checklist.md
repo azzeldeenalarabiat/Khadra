@@ -4704,9 +4704,11 @@ No permanent financial document is issued with placeholder or incomplete issuer 
 commercial registration, address (English and Arabic), support email and phone, every document owed
 waits on hold (`IssuerNotConfigured`), the boot log says FINANCIAL DOCUMENTS ARE NOT ISSUED, and the
 administrator's work queue lists them. A half-configured identity refuses to start and names what is
-missing. A clearly marked TEST identity (`TestIdentity` true) exists for local sandbox testing only:
-`Program.cs` refuses it in any environment but Development and with any payment provider but
-`SANDBOX` — Staging included — and the issuer never lets it sign real money. **To close:** the owner
+missing. A clearly marked TEST identity (`TestIdentity` true) exists for sandbox testing only:
+`Program.cs` refuses it in any environment but Development and Staging — Staging since the owner's decision S3
+of 2026-10-02, so Staging's documents can be exercised — and with any payment provider but `SANDBOX`, and the
+issuer never lets it sign real money. It implies no legal identity: every document it signs is TEST-numbered,
+watermarked and not an invoice. **To close:** the owner
 gives the identity; it is set in Production's environment with `TestIdentity` false, and the boot log
 reads "Financial documents issued as …". **Since payments Phase 6 (owner, 2026-09-29),** Khadra's commercial
 registration is captured in every snapshot but not printed in a PDF's body, nor — since the Phase 6 follow-up —

@@ -62,9 +62,9 @@ public sealed class FinancialDocumentIssuerOptions
     public string? SupportPhone { get; init; }
 
     /// <summary>
-    /// A clearly marked local test identity (owner, 2026-09-27): allowed ONLY in Development with the
-    /// SANDBOX payment provider — <c>Program.cs</c> refuses to start anything else with it — and it never
-    /// signs real money even there. Every document it signs is sandbox money, so every number is TEST-.
+    /// A clearly marked test identity: allowed ONLY in Development (owner, 2026-09-27) or Staging (owner,
+    /// 2026-10-02) with the SANDBOX payment provider — <c>Program.cs</c> refuses to start anything else with it —
+    /// and it never signs real money even there. Every document it signs is sandbox money, so every number is TEST-.
     /// </summary>
     public bool TestIdentity { get; init; }
 

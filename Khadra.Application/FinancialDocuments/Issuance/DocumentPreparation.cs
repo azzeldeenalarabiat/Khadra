@@ -179,7 +179,7 @@ public sealed class DocumentPreparation(
         }
 
         // A test identity signs sandbox money only (owner, 2026-09-27). Startup already refuses it outside
-        // Development with the sandbox; this is the second lock, on the money itself.
+        // Development and Staging with the sandbox; this is the second lock, on the money itself.
         if (issuer.IsTestIdentity && !PaymentProviders.IsSandbox(provider))
         {
             return (null, null, new Preparation.OnHold(

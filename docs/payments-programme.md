@@ -301,6 +301,15 @@ historical wording is no precedent for Production. And the sentences a customer 
 sheet and the booking terms — are still drafts; with the installed apps' old promise, they are the launch gate of
 item 208, a precondition of the first real provider (item 76).
 
+### 2026-10-02 — the rollout to Staging
+
+The owner's decisions S1–S13 for bringing Phases 5–8 to Staging are recorded with their runbook,
+`docs/releases/2026-10-payments-on-staging.md`. One changes code: **S3, a TEST-only issuer identity on Staging** —
+`FinancialDocuments:Issuer:TestIdentity` is allowed in Development or Staging with the sandbox, and refused in
+Production, in any other environment and with any other provider. It implies no legal identity: every Staging document
+stays TEST-numbered, watermarked and non-legal, and Khadra's real identity is still pre-launch item 178. With it, S4:
+Staging's financial email goes only to an explicit allowlist of test inboxes.
+
 ## Required scope for Phases 5–7: invoices and receipts reach the customer
 
 Recorded 2026-09-26 as REQUIRED scope, not an option (pre-launch item 172). Invoices and receipts are

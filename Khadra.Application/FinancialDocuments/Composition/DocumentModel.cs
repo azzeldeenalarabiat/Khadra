@@ -23,8 +23,8 @@ public sealed record BilingualText(string En, string Ar)
 /// until every part is configured, nothing is issued (<see cref="IssuanceHoldReason.IssuerNotConfigured"/>).
 /// </summary>
 /// <param name="IsTestIdentity">
-/// A clearly marked local test identity (owner, 2026-09-27): only ever configured in Development with
-/// sandbox payments, and it never signs real money. Not written into the snapshot — the identity's own
+/// A clearly marked test identity (owner, 2026-09-27; Staging since 2026-10-02): only ever configured in
+/// Development or Staging with sandbox payments, and it never signs real money. Not written into the snapshot — the identity's own
 /// words say what it is, and every document it signs is numbered TEST-.
 /// </param>
 public sealed record DocumentIssuer(
