@@ -9,7 +9,7 @@ import { SeoService } from '../../core/seo/seo.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { httpData } from '../../core/http/http-data';
-import { disputeParty, openedByText } from './dispute-presentation';
+import { DisputeRefund, disputeParty, disputeRefundText, openedByText } from './dispute-presentation';
 import { decidedEarlier, earlierDecisionNotice, readsAsWaived } from './earlier-decisions';
 
 /** `GET /api/v1/disputes/{id}` — only the fields this page shows. */
@@ -36,7 +36,8 @@ interface Dispute {
     readonly note: string;
     readonly resolvedAt: string;
   } | null;
-  readonly booking: { readonly reference: string };
+  /** The customer's copy of the booking: its refunds say what became of this decision's refund (E2E F43). */
+  readonly booking: { readonly reference: string; readonly refunds?: readonly DisputeRefund[] };
   /** What this ticket can split; on a later ticket, what earlier disputes left (item 169). */
   readonly depositHeld?: Money;
   /** Added 2026-09-26; absent from an older API. */
@@ -85,6 +86,20 @@ export class DisputeComponent {
   protected readonly earlierDecided = computed(() => {
     const d = this.dispute.value();
     return d ? decidedEarlier(d) : null;
+  });
+
+  /** What became of the refund this decision gave the customer — requested, on its way, refunded — or nothing. */
+  protected readonly refundText = computed(() => {
+    const d = this.dispute.value();
+    return d?.resolution
+      ? disputeRefundText(
+          (key, params) => this.i18n.t(key, params),
+          d.ticketId,
+          d.booking.refunds,
+          (value) => this.format.money(value),
+          (iso) => this.format.dateTime(iso),
+        )
+      : null;
   });
 
   /** "Nothing is owed by either side" — only where no earlier dispute makes that untrue. */

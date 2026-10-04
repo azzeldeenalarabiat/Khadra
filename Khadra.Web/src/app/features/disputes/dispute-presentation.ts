@@ -20,3 +20,47 @@ export function openedByText(t: Translate, party: string, date: string): string 
     ? t('dispute.openedByYou', { date })
     : t('dispute.openedBy', { party: disputeParty(t, party), date });
 }
+
+/** A refund as the dispute page reads it from the customer's copy of the booking. */
+export interface DisputeRefund {
+  readonly reason: string;
+  readonly amount: { readonly amount: number; readonly currency: string };
+  readonly status: string;
+  readonly requestedAt: string;
+  readonly sentAt: string | null;
+  readonly settledAt: string | null;
+  readonly disputeTicketId: string | null;
+}
+
+/**
+ * What became of the customer's refund from this dispute's decision, in their words — or null when there is
+ * none to speak of.
+ *
+ * The page used to say, whatever had happened, that the amounts shown were "not a payment that has already been
+ * made to you" — written before payments existed, and false the moment the refund settled (E2E F43). The refund is
+ * read from the booking the dispute arrives with: the one whose `disputeTicketId` is this ticket's. A status this
+ * build does not know is left unsaid rather than guessed.
+ */
+export function disputeRefundText(
+  t: Translate,
+  ticketId: string,
+  refunds: readonly DisputeRefund[] | null | undefined,
+  money: (value: DisputeRefund['amount']) => string,
+  date: (iso: string) => string,
+): string | null {
+  const refund = (refunds ?? []).find((candidate) => candidate.disputeTicketId === ticketId);
+  if (!refund) return null;
+  const amount = money(refund.amount);
+  switch (refund.status) {
+    case 'Settled':
+      return t('dispute.refundSettled', { amount, date: date(refund.settledAt ?? refund.requestedAt) });
+    case 'Sent':
+      return t('dispute.refundOnItsWay', { amount, date: date(refund.sentAt ?? refund.requestedAt) });
+    case 'Requested':
+      return t('dispute.refundRequested', { amount });
+    case 'Failed':
+      return t('dispute.refundDelayed', { amount });
+    default:
+      return null;
+  }
+}

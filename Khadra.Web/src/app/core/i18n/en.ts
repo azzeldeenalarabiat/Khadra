@@ -795,7 +795,11 @@ export const EN = {
   'dispute.refund': 'Refunded to you',
   'dispute.dealerCharge': 'Charged to the rental office',
   'dispute.waived': 'Nothing is owed by either side.',
-  'dispute.recordedNotPaid': 'This is the settlement Khadra recorded. Amounts shown are not a payment that has already been made to you.',
+  // What became of the refund this decision gave the customer (E2E F43: the page used to say it was never paid).
+  'dispute.refundRequested': 'Your refund of {amount} has been requested and will go to your original payment method.',
+  'dispute.refundOnItsWay': 'Your refund of {amount} is on its way to your original payment method. We started it on {date}; your bank may take additional time to show it.',
+  'dispute.refundSettled': '{amount} was refunded to your original payment method on {date}. Your bank may take additional time to show it.',
+  'dispute.refundDelayed': 'Your refund of {amount} has not gone through yet. Khadra is sending it again; there is nothing you need to do.',
   'dispute.closedAt': 'Closed {date}',
   'dispute.inApp': 'To add a statement or withdraw the dispute, use the Khadra app.',
   // Item 169 (owner, 2026-09-26): the server's figures; the page picks the sentence, never the amount.
