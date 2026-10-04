@@ -17,6 +17,18 @@ export function homeRouteFor(user: SessionUser | null): string {
 }
 
 /**
+ * The root of the dealer console a person works in: `/employee` for staff, `/dealer` for the owner.
+ *
+ * A screen mounted in BOTH consoles links through this, never to a written `/dealer/...`: the owner's
+ * console is the owner's alone (`dealerStaffGuard`), so such a link sends an employee back to their own
+ * dashboard — a dead click that looks exactly like a broken one. Answered beside `homeRouteFor` so the
+ * two cannot disagree about where staff belong.
+ */
+export function dealerConsoleRoot(user: SessionUser | null | undefined): '/dealer' | '/employee' {
+  return user?.role === 'DealerEmployee' ? '/employee' : '/dealer';
+}
+
+/**
  * Where "your account" goes.
  *
  * The rail and the topbar are shared by both sides of the console, so a single `/security` link

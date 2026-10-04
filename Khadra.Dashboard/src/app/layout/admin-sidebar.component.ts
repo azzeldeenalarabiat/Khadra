@@ -96,16 +96,21 @@ export class AdminSidebarComponent {
    *
    * A group left with no items disappears with them; an empty "Team" heading is a promise of a
    * screen that is not there.
+   *
+   * The employee's rail is filtered the same way: its Finance group (Reports, Payouts) is the owner's
+   * grant to one person, so it appears only for an employee who holds it (E2E F19 — the grant used to
+   * exist with no screen to use it on).
    */
   protected readonly groups = computed<readonly NavGroup[]>(() => {
-    if (this.isEmployee()) return EMPLOYEE_NAV;
-    if (!this.isDealer()) return NAV_GROUPS;
+    if (!this.isEmployee() && !this.isDealer()) return NAV_GROUPS;
 
     const permissions = this.console.permissions();
-    return DEALER_NAV.map((group) => ({
-      ...group,
-      items: group.items.filter((item) => this.holds(item.requires, permissions)),
-    })).filter((group) => group.items.length > 0);
+    return (this.isEmployee() ? EMPLOYEE_NAV : DEALER_NAV)
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => this.holds(item.requires, permissions)),
+      }))
+      .filter((group) => group.items.length > 0);
   });
 
   private holds(

@@ -34,7 +34,7 @@
           {{ t('dealerReports.revenueCommissionAndOccupancy') }}
         </div>
         <div class="state-actions">
-          <a class="btn btn-secondary btn-sm" routerLink="/dealer/dashboard">{{
+          <a class="btn btn-secondary btn-sm" [routerLink]="[root(), 'dashboard']">{{
             t('dealerReports.backToDashboard')
           }}</a>
         </div>
@@ -126,7 +126,7 @@
           </div>
           <div class="money-line">
             <span class="k-label">{{ t('dealerReports.netPayout') }}</span
-            ><a class="row-link" routerLink="/dealer/payouts">{{ t('dealerReports.seePayouts') }}</a>
+            ><a class="row-link" [routerLink]="[root(), 'payouts']">{{ t('dealerReports.seePayouts') }}</a>
           </div>
           <div class="note-box is-plain">
             <kh-icon name="info" />

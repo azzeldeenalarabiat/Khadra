@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ReportPeriod } from '../../core/models/dealer-console.api';
+import { dealerConsoleRoot } from '../../core/guards/role.guards';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
+import { SessionService } from '../../core/services/session.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TranslationKey } from '../../core/i18n/en';
@@ -38,6 +40,9 @@ export class DealerReportsComponent {
   protected readonly t = inject(I18nService).t;
   protected readonly formats = inject(FormatService);
   private readonly service = inject(DealerConsoleService);
+  private readonly session = inject(SessionService);
+  /** Links stay inside the console this screen is open in: the owner's, or the employee's (E2E F19). */
+  protected readonly root = computed(() => dealerConsoleRoot(this.session.user()));
 
   /**
    * The period tabs, worded in the reader's language.

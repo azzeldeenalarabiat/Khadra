@@ -3,9 +3,11 @@ import { RouterLink } from '@angular/router';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { PayableScope } from '../../core/services/admin-payables.service';
+import { dealerConsoleRoot } from '../../core/guards/role.guards';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { DealerPayoutsService } from '../../core/services/dealer-payouts.service';
 import { loaded } from '../../core/services/loaded';
+import { SessionService } from '../../core/services/session.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import {
   PayoutFormat,
@@ -35,6 +37,9 @@ export class DealerPayoutsComponent {
   private readonly formats = inject(FormatService);
   private readonly service = inject(DealerPayoutsService);
   private readonly console = inject(DealerConsoleService);
+  private readonly session = inject(SessionService);
+  /** Links stay inside the console this screen is open in: the owner's, or the employee's (E2E F19). */
+  protected readonly root = computed(() => dealerConsoleRoot(this.session.user()));
 
   /** Whether this member of staff holds the grant: `null` until `GET /dealers/me` answers. */
   protected readonly granted = computed(() => this.console.permissions()?.canViewReports ?? null);

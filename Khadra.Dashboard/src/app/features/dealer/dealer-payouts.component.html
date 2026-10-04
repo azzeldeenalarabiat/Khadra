@@ -109,7 +109,7 @@
                 @for (row of payableRows(); track row.id) {
                   <tr>
                     <td class="td">
-                      <a class="row-link mono ltr" [routerLink]="['/dealer/bookings', row.bookingId]">{{ row.reference }}</a>
+                      <a class="row-link mono ltr" [routerLink]="[root(), 'bookings', row.bookingId]">{{ row.reference }}</a>
                       <div class="td-sub">{{ t('payouts.finalOn', { when: row.final }) }}</div>
                     </td>
                     <td class="td">{{ row.outcome }}</td>
@@ -232,7 +232,7 @@
               <tbody>
                 @for (line of o.lines; track line.payableId) {
                   <tr>
-                    <td class="td"><a class="row-link mono ltr" [routerLink]="['/dealer/bookings', line.bookingId]">{{ line.reference }}</a></td>
+                    <td class="td"><a class="row-link mono ltr" [routerLink]="[root(), 'bookings', line.bookingId]">{{ line.reference }}</a></td>
                     <td class="td">{{ line.outcome }}</td>
                     <td class="td"><span class="num" [class]="'s-' + line.netTone">{{ line.net }}</span></td>
                   </tr>

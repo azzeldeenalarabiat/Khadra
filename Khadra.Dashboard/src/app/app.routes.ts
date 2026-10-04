@@ -542,6 +542,23 @@ export const routes: Routes = [
                 (m) => m.EmployeeBusinessComponent,
               ),
           },
+          // The office's Reports and Payouts for an employee the owner granted them (E2E F19). The same
+          // screens as the owner's: each decides on the screen, from `GET /dealers/me`, whether this person
+          // holds the grant, and the API refuses anyone who does not regardless.
+          {
+            path: 'reports',
+            title: title('nav.reports'),
+            loadComponent: () =>
+              import('./features/dealer/dealer-reports.component').then(
+                (m) => m.DealerReportsComponent,
+              ),
+          },
+          {
+            path: 'payouts',
+            title: title('nav.payouts'),
+            loadComponent: () =>
+              import('./features/dealer/dealer-payouts.component').then((m) => m.DealerPayoutsComponent),
+          },
           {
             path: 'notifications',
             title: title('nav.notifications'),

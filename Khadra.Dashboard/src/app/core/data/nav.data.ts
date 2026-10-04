@@ -138,9 +138,10 @@ export const DEALER_NAV: readonly NavGroup[] = [
  * profile editor plus a delivery editor plus a staff screen, and there is no Team group at all
  * because staff are not theirs to manage.
  *
- * Reports is deliberately absent even for an employee who HOLDS the grant: the design gives them no
- * Finance group, and the figures they are allowed reach them through the dealer console. If the
- * owner wants a reports screen here later it is an addition, not a filter.
+ * Finance (Reports, Payouts) is here only for an employee the owner GRANTED it, filtered by the same
+ * `requires` as the owner's rail. The design gave employees no Finance group, and the figures were
+ * meant to reach them through the dealer console — which an employee cannot open — so the grant
+ * existed with no screen to use it on (E2E F19). The owner approved the addition on 2026-10-05.
  */
 export const EMPLOYEE_NAV: readonly NavGroup[] = [
   {
@@ -157,6 +158,18 @@ export const EMPLOYEE_NAV: readonly NavGroup[] = [
   {
     groupKey: 'nav.group.business',
     items: [{ labelKey: 'nav.myBusiness', icon: 'storefront', route: '/employee/business' }],
+  },
+  {
+    groupKey: 'nav.group.finance',
+    items: [
+      { labelKey: 'nav.reports', icon: 'chart-line-up', route: '/employee/reports', requires: 'view-reports' },
+      {
+        labelKey: 'nav.payouts',
+        icon: 'currency-circle-dollar',
+        route: '/employee/payouts',
+        requires: 'view-reports',
+      },
+    ],
   },
   {
     groupKey: 'nav.group.system',
@@ -231,6 +244,8 @@ export const SCREEN_TITLES: Readonly<Record<string, TranslationKey>> = {
   'employee/fleet': 'nav.fleet',
   'employee/fleet/:id': 'screen.vehicleDetails',
   'employee/business': 'screen.myBusiness',
+  'employee/reports': 'nav.reports',
+  'employee/payouts': 'nav.payouts',
   'employee/notifications': 'nav.notifications',
   'employee/settings': 'nav.settings',
   'employee/disputes/:id': 'screen.dispute',
