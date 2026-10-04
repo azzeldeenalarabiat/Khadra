@@ -280,3 +280,16 @@ describe('handover refusals', () => {
     expect(problemMessage(problem, 'en', t)).toBe(`«${key}»`);
   });
 });
+
+/** The API's 401s and role-based 403s carry a code since E2E F10; the console words them in either language. */
+describe('who-is-asking refusals', () => {
+  it.each([
+    [401, 'auth.unauthenticated', 'problem.signedOut'],
+    [401, 'auth.session_invalid', 'problem.signedOut'],
+    [403, 'auth.forbidden', 'problem.notPermitted'],
+  ])('words a %s with %s', (status, code, key) => {
+    const problem = snapshotProblem({ status, error: { code, title: 'English from the server.', traceId: '00-x' } });
+    expect(problemMessage(problem, 'en', t)).toBe(`«${key}»`);
+    expect(problemMessage(problem, 'ar', t)).toBe(`«${key}»`);
+  });
+});

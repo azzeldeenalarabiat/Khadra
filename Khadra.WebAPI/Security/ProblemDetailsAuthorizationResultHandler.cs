@@ -39,8 +39,20 @@ internal sealed class ProblemDetailsAuthorizationResultHandler : IAuthorizationM
             return;
         }
 
+        // A forbid with no domain reason — a role the endpoint does not admit — used to be an empty 403,
+        // which every screen read as "the service did not respond" (E2E F10). It now carries a stable
+        // code too. Clients still decide permissions from GET /dealers/me, never from this refusal.
+        if (authorizeResult.Forbidden)
+        {
+            await WriteAsync(context, NotPermitted);
+            return;
+        }
+
         await _fallback.HandleAsync(next, context, policy, authorizeResult);
     }
+
+    private static readonly Error NotPermitted =
+        Error.Forbidden("auth.forbidden", "Your account is not allowed to do that.");
 
     private static async Task WriteAsync(HttpContext context, Error error)
     {
@@ -49,7 +61,6 @@ internal sealed class ProblemDetailsAuthorizationResultHandler : IAuthorizationM
             : StatusCodes.Status403Forbidden;
 
         context.Response.StatusCode = status;
-        context.Response.ContentType = "application/problem+json";
         await context.Response.WriteAsJsonAsync(new ProblemDetails
         {
             Status = status,
@@ -61,6 +72,6 @@ internal sealed class ProblemDetailsAuthorizationResultHandler : IAuthorizationM
                 ["code"] = error.Code,
                 ["traceId"] = context.TraceIdentifier
             }
-        }, context.RequestAborted);
+        }, options: (System.Text.Json.JsonSerializerOptions?)null, contentType: "application/problem+json", context.RequestAborted);
     }
 }

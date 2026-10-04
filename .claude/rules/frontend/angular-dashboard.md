@@ -112,12 +112,11 @@ reverting the whole console.
     drops the controls entirely and says once, in a `banner s-warn` at the top of the screen, whose
     they are. Four dead buttons per card is noise, and half of them cannot be disabled anyway: an
     `<a routerLink>` ignores `[disabled]` and stays clickable.
-- **Never decide a permission from a failed request.** A role failure returns a *bodiless* 403 —
-  `ProblemDetailsAuthorizationResultHandler` writes ProblemDetails only when the approved-dealer
-  handler is the one that failed — and every screen renders a bodiless failure as "the service did
-  not respond", which reads as a broken platform to someone who is simply not the owner. Ask
-  `GET /dealers/me` instead and decide before the click: `DealerConsoleService.permissions` holds one
-  field per API policy. It is three-valued — `null` until that call answers — and every consumer
+- **Never decide a permission from a failed request.** A role failure is a 403 with the generic code
+  `auth.forbidden` (it was *bodiless* until E2E F10, and every screen rendered that as "the service did
+  not respond") — a refusal of one request, which says nothing about which of the owner's grants this
+  person holds. Ask `GET /dealers/me` instead and decide before the click:
+  `DealerConsoleService.permissions` holds one field per API policy. It is three-valued — `null` until that call answers — and every consumer
   branches on `null` separately, or an owner's own controls flash in a beat late and a guard bounces
   them off their own form on a cold load.
 - **A resource you gate must not strand its screen.** Once a request is not sent, no 403 ever

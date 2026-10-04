@@ -103,6 +103,10 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'auth.user_not_found': 'problem.notFound',
   'auth.account_suspended': 'problem.accountSuspended',
   'auth.invalid_token': 'problem.invalidToken',
+  // The API's bare 401s and role-based 403s carry these since E2E F10 (they had no code before).
+  'auth.unauthenticated': 'problem.signedOut',
+  'auth.session_invalid': 'problem.signedOut',
+  'auth.forbidden': 'problem.notPermitted',
   'admin.cannot_deactivate_self': 'adminUsers.youCannotDeactivateYour',
   'admin.last_administrator': 'adminUsers.thisIsTheLast',
   'admin.invitation_accepted': 'problem.invitationAccepted',

@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Net.Http.Headers;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -110,7 +111,32 @@ builder.Services
                 var user = await users.GetByIdAsync(userId, context.HttpContext.RequestAborted);
                 if (user is null || user.Status != UserStatus.Active || !user.MatchesSecurityStamp(securityStamp))
                     context.Fail("The user session is no longer valid.");
-            }
+            },
+            // A 401 is ProblemDetails with a stable code like every other refusal (E2E F10), not an empty
+            // body: `auth.unauthenticated` when no token came, `auth.session_invalid` when one came and was
+            // refused (expired, malformed, or its account's security stamp moved on). The header is exactly
+            // the one the framework writes, and every client keeps keying on the STATUS: the app refreshes
+            // once on any 401, and the BFFs end their session on one.
+            OnChallenge = async context =>
+            {
+                context.HandleResponse();
+                var response = context.Response;
+                response.StatusCode = StatusCodes.Status401Unauthorized;
+                response.Headers.Append(HeaderNames.WWWAuthenticate, context.Options.Challenge);
+                var refused = context.AuthenticateFailure is not null;
+                await response.WriteAsJsonAsync(new ProblemDetails
+                {
+                    Status = StatusCodes.Status401Unauthorized,
+                    Title = refused ? "Your session is no longer valid. Sign in again." : "Sign in to continue.",
+                    Type = "https://httpstatuses.com/401",
+                    Instance = context.Request.Path,
+                    Extensions =
+                    {
+                        ["code"] = refused ? "auth.session_invalid" : "auth.unauthenticated",
+                        ["traceId"] = context.HttpContext.TraceIdentifier,
+                    },
+                }, options: (System.Text.Json.JsonSerializerOptions?)null, contentType: "application/problem+json");
+            },
         };
     });
 
@@ -579,6 +605,15 @@ static bool SameAddress(IPAddress claimed, IPAddress resolved) =>
     claimed.Equals(resolved) ||
     (resolved.IsIPv4MappedToIPv6 && claimed.Equals(resolved.MapToIPv4())) ||
     (claimed.IsIPv4MappedToIPv6 && claimed.MapToIPv4().Equals(resolved));
+
+// Every answer is exactly the type it says it is (E2E F10). The API serves JSON, ProblemDetails, and stored files
+// whose type comes from their extension — never anything a browser should second-guess into a page or a script.
+// Set before anything runs, so refusals, files and errors all carry it.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.XContentTypeOptions = "nosniff";
+    await next(context).ConfigureAwait(false);
+});
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 if (!app.Environment.IsDevelopment())
