@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { problemMessage } from '../../core/i18n/problem';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { toneClass } from '../../core/models/console.models';
 import { IconComponent } from '../icon/icon.component';
@@ -32,16 +33,35 @@ import { IconComponent } from '../icon/icon.component';
   imports: [IconComponent],
 })
 export class ConfirmModalComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   private readonly ui = inject(ConsoleUiService);
   private readonly dialog = viewChild<ElementRef<HTMLDialogElement>>('dlg');
 
   protected readonly modal = this.ui.modal;
   protected readonly busy = this.ui.modalBusy;
 
-  /** What the admin typed or chose, keyed by field NAME. Rebuilt for every dialog. */
-  private readonly values = signal<Record<string, string>>({});
+  /**
+   * What the admin typed or chose, keyed by field NAME. Rebuilt for every dialog, and the controls are
+   * bound to it — so what the dialog shows is what it will send.
+   *
+   * They were bound to the field's starting value instead, and the `@for` keeps its elements by field
+   * name. A re-seeded dialog therefore emptied this record while the boxes went on showing the old
+   * text — a note on screen that would be sent as nothing (E2E F52).
+   */
+  protected readonly values = signal<Record<string, string>>({});
   protected readonly toneClass = toneClass;
+
+  /**
+   * Why the last attempt was refused, worded in the language on screen — inside the dialog, because a
+   * toast cannot be seen over a modal `<dialog>` (E2E F53).
+   */
+  protected readonly refusal = computed(() => {
+    const refused = this.ui.modalRefusal();
+    if (!refused) return null;
+    if (refused.kind === 'local') return this.t(refused.refusal.key, refused.refusal.params);
+    return problemMessage(refused.problem, this.i18n.lang(), this.t) ?? this.t('common.serviceDidNotRespond');
+  });
 
   constructor() {
     effect(() => {

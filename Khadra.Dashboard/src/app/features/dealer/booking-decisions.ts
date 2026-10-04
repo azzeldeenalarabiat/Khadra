@@ -3,6 +3,8 @@ import { DealerBookingsService, HandoverInput } from '../../core/services/dealer
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { TranslationKey } from '../../core/i18n/en';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { LocalRefusal } from '../../core/i18n/problem';
+import { ModalField } from '../../core/models/console.models';
 
 /** The three handover figures, by the stable name the dialog returns them under. */
 const ODOMETER = 'odometerKm';
@@ -113,7 +115,7 @@ export class BookingDecisions {
       async (values) => {
         const code = values['reason'] ?? reasons[0].value;
         const details = values['details']?.trim();
-        if (!details) throw { error: { title: this.t('dealerDecide.reject.needDetails') } };
+        if (!details) throw new LocalRefusal('dealerDecide.reject.needDetails');
         await this.service.reject(bookingId, code, details);
         done();
       },
@@ -144,20 +146,7 @@ export class BookingDecisions {
         title: this.t('dealerDecide.pickup.title', { vehicle }),
         body: this.t('dealerDecide.pickup.body', { reference }),
         fields: [
-          {
-            name: CODE,
-            label: this.t('dealerDecide.codeLabel'),
-            type: 'text',
-            optional: true,
-            placeholder: this.t('dealerDecide.codePlaceholder'),
-          },
-          {
-            name: UNVERIFIED,
-            label: this.t('dealerDecide.unverifiedLabel'),
-            type: 'text',
-            optional: true,
-            placeholder: this.t('dealerDecide.unverifiedPlaceholder'),
-          },
+          ...this.proofFields(),
           {
             name: ODOMETER,
             label: this.t('dealerDecide.odometerLabel'),
@@ -221,20 +210,7 @@ export class BookingDecisions {
         title: this.t('dealerDecide.return.title', { vehicle }),
         body: this.t('dealerDecide.return.body', { reference }),
         fields: [
-          {
-            name: CODE,
-            label: this.t('dealerDecide.codeLabel'),
-            type: 'text',
-            optional: true,
-            placeholder: this.t('dealerDecide.codePlaceholder'),
-          },
-          {
-            name: UNVERIFIED,
-            label: this.t('dealerDecide.unverifiedLabel'),
-            type: 'text',
-            optional: true,
-            placeholder: this.t('dealerDecide.unverifiedPlaceholder'),
-          },
+          ...this.proofFields(),
           {
             name: ODOMETER,
             label: this.t('dealerDecide.odometerLabel'),
@@ -298,11 +274,15 @@ export class BookingDecisions {
       const raw = values[name]?.trim();
       if (!raw) return null;
       const parsed = Number(raw);
-      if (!Number.isFinite(parsed)) {
-        throw { error: { title: this.t('dealerDecide.mustBeANumber', { field: label }) } };
-      }
+      if (!Number.isFinite(parsed)) throw new LocalRefusal('dealerDecide.mustBeANumber', { field: label });
       return parsed;
     };
+    const handoverCode = values[CODE]?.trim() || null;
+    const unverifiedReason = values[UNVERIFIED]?.trim() || null;
+    // With a code the server proves the handover by it and never reads the reason, so a reason typed
+    // beside a code would be dropped without a word. Refused here instead, before anything is sent: the
+    // office chooses which one it means (E2E F52).
+    if (handoverCode && unverifiedReason) throw new LocalRefusal('dealerDecide.codeAndReason');
     return {
       odometerKm: number(ODOMETER, this.t('dealerDecide.odometerLabel')),
       fuelLevel: number(FUEL, this.t('dealerDecide.fuelLabel')),
@@ -310,8 +290,35 @@ export class BookingDecisions {
       notes: values['notes']?.trim() || null,
       // Sent as entered: typed digits (spaces are fine) or the whole QR payload from a scanner. The
       // server reads both, and checks a scanned code belongs to THIS booking.
-      handoverCode: values[CODE]?.trim() || null,
-      unverifiedReason: values[UNVERIFIED]?.trim() || null,
+      handoverCode,
+      unverifiedReason,
     };
+  }
+
+  /**
+   * How a handover is proved: the customer's code, or the reason there is none. Shared by pickup and
+   * return so the two dialogs cannot drift apart.
+   *
+   * The code is one line with a number pad, not a textarea: it is six digits, or the QR payload a
+   * scanner types into the same box — and Return in a textarea would add a line to either.
+   */
+  private proofFields(): ModalField[] {
+    return [
+      {
+        name: CODE,
+        label: this.t('dealerDecide.codeLabel'),
+        type: 'line',
+        inputMode: 'numeric',
+        optional: true,
+        placeholder: this.t('dealerDecide.codePlaceholder'),
+      },
+      {
+        name: UNVERIFIED,
+        label: this.t('dealerDecide.unverifiedLabel'),
+        type: 'text',
+        optional: true,
+        placeholder: this.t('dealerDecide.unverifiedPlaceholder'),
+      },
+    ];
   }
 }

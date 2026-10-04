@@ -197,7 +197,7 @@ export interface ModalField {
   /** For a `date` field: the latest day that may be chosen, `yyyy-MM-dd`. */
   readonly max?: string;
   /** For a `line` field: the on-screen keyboard to ask for, and what the browser may autofill. */
-  readonly inputMode?: 'text' | 'email' | 'tel';
+  readonly inputMode?: 'text' | 'email' | 'tel' | 'numeric';
   readonly autocomplete?: string;
   /**
    * Choices for a `select`. Value and label are separate for the same reason `name` exists: the

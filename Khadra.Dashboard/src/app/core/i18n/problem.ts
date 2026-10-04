@@ -20,6 +20,27 @@ export interface ProblemSnapshot {
   readonly traceId: string | null;
   /** Per-field messages from a validation failure, as the server wrote them. */
   readonly errors: Readonly<Record<string, readonly string[]>> | null;
+  /**
+   * How many more wrong guesses a customer's handover code can take, sent beside
+   * `handover.code_invalid` only when the guess was counted. Absent everywhere else.
+   */
+  readonly attemptsRemaining?: number | null;
+}
+
+/**
+ * A refusal the console decides itself, before anything is sent: a required reason left out, a figure
+ * that is not a number.
+ *
+ * These used to be thrown shaped like a server's answer — `{ error: { title: t('…') } }` — and a refusal
+ * with a title and no status is exactly what `problemMessage` declines to word in Arabic, so an Arabic
+ * office read "The service did not respond" for a box it had left empty. Held as a KEY, it is worded in
+ * the language on screen, and re-worded if that changes while it is showing.
+ */
+export class LocalRefusal {
+  constructor(
+    readonly key: TranslationKey,
+    readonly params?: MessageParams,
+  ) {}
 }
 
 /** Reads the parts of an `HttpErrorResponse` (or anything shaped like one) that a screen may use. */
@@ -30,14 +51,19 @@ export function snapshotProblem(error: unknown): ProblemSnapshot {
   };
   const body = (
     typeof failure.error === 'object' && failure.error !== null ? failure.error : {}
-  ) as { code?: unknown; title?: unknown; traceId?: unknown; errors?: unknown };
+  ) as { code?: unknown; title?: unknown; traceId?: unknown; errors?: unknown; attemptsRemaining?: unknown };
 
+  const attemptsRemaining = body.attemptsRemaining;
   return {
     status: typeof failure.status === 'number' ? failure.status : 0,
     code: typeof body.code === 'string' ? body.code : null,
     title: typeof body.title === 'string' && body.title.trim() !== '' ? body.title : null,
     traceId: typeof body.traceId === 'string' ? body.traceId : null,
     errors: isFieldErrors(body.errors) ? body.errors : null,
+    // Only when the server sent a count: every other refusal keeps the shape it always had.
+    ...(typeof attemptsRemaining === 'number' && Number.isInteger(attemptsRemaining) && attemptsRemaining >= 0
+      ? { attemptsRemaining }
+      : {}),
   };
 }
 
@@ -116,6 +142,16 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'payables.hold_reason_required': 'problem.reasonRejected',
   'payables.hold_reason_too_long': 'problem.reasonRejected',
   'payables.finance_span_invalid': 'problem.financeSpanInvalid',
+  // Proving a handover. `handover.code_invalid` with a count of tries left is worded in `problemMessage`.
+  'handover.code_invalid': 'problem.handoverCodeInvalid',
+  'handover.code_expired': 'problem.handoverCodeExpired',
+  'handover.code_used': 'problem.handoverCodeUsed',
+  'handover.code_locked': 'problem.handoverCodeLocked',
+  'handover.code_required': 'problem.handoverCodeRequired',
+  'handover.reason_required': 'problem.handoverReasonRequired',
+  'handover.not_available': 'problem.handoverNotAvailable',
+  'handover.invalid_odometer': 'problem.handoverInvalidOdometer',
+  'handover.invalid_fuel': 'problem.handoverInvalidFuel',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */
@@ -164,6 +200,12 @@ export function problemMessage(
   language: Language,
   t: (key: TranslationKey, params?: MessageParams) => string,
 ): string | null {
+  // A wrong handover code that was counted says how many tries the customer's code has left, so the
+  // office can stop and ask before it locks.
+  if (problem.code === 'handover.code_invalid' && typeof problem.attemptsRemaining === 'number') {
+    return t('problem.handoverCodeInvalidTries', { count: problem.attemptsRemaining });
+  }
+
   const byCode = problem.code ? WORDED_CODES[problem.code] : undefined;
   if (byCode) return t(byCode);
 

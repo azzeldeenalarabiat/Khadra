@@ -235,3 +235,48 @@ describe('a validation key is a path, not a flat name', () => {
     expect(fieldMessageFor(null, ['about.en'], 'en', t)).toBeNull();
   });
 });
+
+/**
+ * Handover refusals (E2E F53). An office pressed a wrong-code refusal it could not see three times and
+ * used three of the customer's five tries; the console now words every handover code in both languages,
+ * and says how many tries a counted wrong guess left.
+ */
+describe('handover refusals', () => {
+  const wrongCode = (body: Record<string, unknown>) =>
+    snapshotProblem({ status: 400, error: { code: 'handover.code_invalid', title: 'That handover code is not right.', ...body } });
+
+  it('keeps the count of tries left when the server sends one, and only then', () => {
+    expect(wrongCode({ attemptsRemaining: 3, maxAttempts: 5 }).attemptsRemaining).toBe(3);
+    expect('attemptsRemaining' in wrongCode({})).toBe(false);
+    // Anything that is not a whole, non-negative count is no count at all.
+    expect('attemptsRemaining' in wrongCode({ attemptsRemaining: '3' })).toBe(false);
+    expect('attemptsRemaining' in wrongCode({ attemptsRemaining: -1 })).toBe(false);
+    expect('attemptsRemaining' in wrongCode({ attemptsRemaining: 1.5 })).toBe(false);
+  });
+
+  it('says how many tries are left after a counted wrong guess, in either language', () => {
+    expect(problemMessage(wrongCode({ attemptsRemaining: 4 }), 'en', t)).toBe('«problem.handoverCodeInvalidTries:4»');
+    expect(problemMessage(wrongCode({ attemptsRemaining: 1 }), 'ar', t)).toBe('«problem.handoverCodeInvalidTries:1»');
+  });
+
+  it('words a wrong code that cost nothing without a count', () => {
+    // A replaced code, or none on record: the same code, and no try was used.
+    expect(problemMessage(wrongCode({}), 'en', t)).toBe('«problem.handoverCodeInvalid»');
+    expect(problemMessage(wrongCode({}), 'ar', t)).toBe('«problem.handoverCodeInvalid»');
+  });
+
+  it.each([
+    ['handover.code_expired', 'problem.handoverCodeExpired'],
+    ['handover.code_used', 'problem.handoverCodeUsed'],
+    ['handover.code_locked', 'problem.handoverCodeLocked'],
+    ['handover.code_required', 'problem.handoverCodeRequired'],
+    ['handover.reason_required', 'problem.handoverReasonRequired'],
+    ['handover.not_available', 'problem.handoverNotAvailable'],
+    ['handover.invalid_odometer', 'problem.handoverInvalidOdometer'],
+    ['handover.invalid_fuel', 'problem.handoverInvalidFuel'],
+  ])('words %s in Arabic too, never as the generic refusal', (code, key) => {
+    const problem = snapshotProblem({ status: 400, error: { code, title: 'English from the server.' } });
+    expect(problemMessage(problem, 'ar', t)).toBe(`«${key}»`);
+    expect(problemMessage(problem, 'en', t)).toBe(`«${key}»`);
+  });
+});

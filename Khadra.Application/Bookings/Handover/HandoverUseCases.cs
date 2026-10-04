@@ -127,7 +127,8 @@ public sealed class HandoverVerifier(
             if (current is null)
                 return HandoverErrors.CodeInvalid;
 
-            var lockedBefore = current.FailedAttempts >= settings.MaxFailedAttempts;
+            var failedBefore = current.FailedAttempts;
+            var lockedBefore = failedBefore >= settings.MaxFailedAttempts;
             var verified = current.Verify(
                 presented.Value.ForThisBooking && service.Matches(current.CodeHash, booking.Id, type, presented.Value.Code),
                 settings.MaxFailedAttempts,
@@ -150,7 +151,9 @@ public sealed class HandoverVerifier(
 
                 // Commit the failed attempt (and any audit entry) now; the handover is not going ahead.
                 await unitOfWork.SaveChangesAsync(cancellationToken);
-                return verified.Error;
+                return current.FailedAttempts > failedBefore && verified.Error.Code == HandoverErrors.CodeInvalid.Code
+                    ? WithTriesLeft(verified.Error, current.FailedAttempts)
+                    : verified.Error;
             }
 
             return HandoverProof.ByCode(current.Id);
@@ -163,6 +166,26 @@ public sealed class HandoverVerifier(
             ? HandoverErrors.CodeRequired
             : HandoverProof.NotRequired;
     }
+
+    /// <summary>
+    /// A wrong guess that counted, with how many the customer's code can still take
+    /// (<c>attemptsRemaining</c>) out of how many it allows (<c>maxAttempts</c>).
+    /// </summary>
+    /// <remarks>
+    /// Only a guess that was COUNTED says so. The same <c>handover.code_invalid</c> also answers a code the
+    /// customer has since replaced, or no code at all, and neither of those costs an attempt — a count
+    /// there would be a number about nothing. The office console showed none of this once (E2E F53): a
+    /// refusal it could not see, pressed three times, used three of the customer's five tries.
+    /// </remarks>
+    private Error WithTriesLeft(Error refused, int failedAttempts) =>
+        refused with
+        {
+            Extensions = new Dictionary<string, object?>
+            {
+                ["attemptsRemaining"] = Math.Max(0, settings.MaxFailedAttempts - failedAttempts),
+                ["maxAttempts"] = settings.MaxFailedAttempts,
+            },
+        };
 
     /// <summary>
     /// What the dealer entered, as the six digits to check and whether it was aimed at this booking.

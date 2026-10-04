@@ -356,6 +356,49 @@ public sealed class BookingDecisionTests
     }
 
     [Fact]
+    public async Task A_wrong_code_says_how_many_tries_the_customers_code_has_left()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, _) = context.GivenCodeFor(booking, HandoverType.Pickup);
+        var wrong = code == "000000" ? "000001" : "000000";
+        async Task<Error> Guess() =>
+            (await context.Handlers().Handle(
+                new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: wrong), CancellationToken.None)).Error;
+
+        var first = await Guess();
+        Assert.Equal("handover.code_invalid", first.Code);
+        Assert.Equal(4, Assert.IsType<int>(first.Extensions!["attemptsRemaining"]));
+        Assert.Equal(5, Assert.IsType<int>(first.Extensions!["maxAttempts"]));
+
+        await Guess();
+        await Guess();
+        var fourth = await Guess();
+        Assert.Equal(1, Assert.IsType<int>(fourth.Extensions!["attemptsRemaining"]));
+
+        // The fifth locks it: that refusal is its own code, and a count of nothing left would add nothing.
+        var fifth = await Guess();
+        Assert.Equal("handover.code_locked", fifth.Code);
+        Assert.Null(fifth.Extensions);
+    }
+
+    [Fact]
+    public async Task A_replaced_code_is_refused_without_costing_a_try_or_claiming_a_count()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Pickup);
+        row.Supersede(context.Clock.UtcNow);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: code), CancellationToken.None);
+
+        Assert.Equal("handover.code_invalid", result.Error.Code);
+        Assert.Null(result.Error.Extensions);
+        Assert.Equal(0, row.FailedAttempts);
+    }
+
+    [Fact]
     public async Task Five_wrong_codes_lock_it_and_even_the_right_one_then_fails()
     {
         var context = new Context();

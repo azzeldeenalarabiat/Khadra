@@ -1348,6 +1348,8 @@ export const EN = {
   'handover.unverifiedAdmin': 'Unverified handover: the dealer recorded it without the customer\'s code. Their reason:',
   'handover.verifiedByCode': 'Verified with the customer\'s handover code',
   'dealerDecide.mustBeANumber': '{field} must be a number.',
+  'dealerDecide.codeAndReason':
+    "Enter the customer's code, or say why there is none — not both. With a code, the reason would not be kept.",
   'dealerDecide.pickup.title': 'Hand over {vehicle}?',
   'dealerDecide.pickup.body':
     'Records that {reference} started and the keys changed hands. The odometer and fuel level protect both sides if the return is disputed.',
@@ -2272,6 +2274,21 @@ export const EN = {
   'problem.unavailable': 'The service could not complete that. Nothing has been changed.',
   'problem.rejectedDetails': 'The details were rejected. Check them and send again.',
   'problem.reference': 'reference {traceId}',
+  // Handover refusals. An office once pressed a refusal it could not see three times, and used three of the
+  // customer's five tries (E2E F53); each of these says what to do next.
+  'problem.handoverCodeInvalid': 'That code is not right. Ask the customer to check it, or to show a new one.',
+  'problem.handoverCodeInvalidTries': {
+    one: 'That code is not right. {count} try left before it locks — ask the customer to check it, or to show a new one.',
+    other: 'That code is not right. {count} tries left before it locks — ask the customer to check it, or to show a new one.',
+  },
+  'problem.handoverCodeExpired': 'That code has expired. Ask the customer to show a new one.',
+  'problem.handoverCodeUsed': 'That code has already been used.',
+  'problem.handoverCodeLocked': 'Too many wrong codes, so this one is locked. Ask the customer to show a new one.',
+  'problem.handoverCodeRequired': "Enter the customer's code, or record the handover as unverified and say why.",
+  'problem.handoverReasonRequired': 'Say a little more about why the handover could not be verified.',
+  'problem.handoverNotAvailable': 'There is no handover to record on this booking right now. Reload the page.',
+  'problem.handoverInvalidOdometer': 'The odometer reading cannot be negative.',
+  'problem.handoverInvalidFuel': 'The fuel level must be between 0 (empty) and 1 (full).',
   'common.customerAccountClosed': 'Customer account closed',
   'common.dealerNoLongerOnPlatform': 'Dealer no longer on the platform',
   'common.accountClosed': 'Account closed',

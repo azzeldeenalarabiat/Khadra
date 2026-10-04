@@ -2,8 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { inject } from '@angular/core';
 import { ModalConfig, Toast, Tone } from '../models/console.models';
-import { I18nService } from '../i18n/i18n.service';
-import { problemMessage, snapshotProblem } from '../i18n/problem';
+import { LocalRefusal, ProblemSnapshot, snapshotProblem } from '../i18n/problem';
 
 /**
  * Console-wide UI state: the open confirmation dialog and the transient toast.
@@ -22,13 +21,22 @@ import { problemMessage, snapshotProblem } from '../i18n/problem';
 @Injectable({ providedIn: 'root' })
 export class ConsoleUiService {
   private readonly router = inject(Router);
-  private readonly i18n = inject(I18nService);
   private toastTimer?: ReturnType<typeof setTimeout>;
 
   readonly modal = signal<ModalConfig | null>(null);
   readonly toast = signal<Toast | null>(null);
   /** True while a confirm handler is in flight, so the dialog can disable itself. */
   readonly modalBusy = signal(false);
+  /**
+   * Why the open dialog's work was refused, shown INSIDE the dialog.
+   *
+   * It used to be a toast, and the toast could not be seen: the dialog is a native `<dialog>` opened
+   * with `showModal()`, which puts it and its backdrop in the browser's top layer, above every z-index
+   * the toast could have. An office pressing a refusal it could not see used three of a customer's five
+   * handover tries (E2E F53). Held as facts, not words, so a language switch re-words it; cleared by the
+   * next attempt, by closing, and by the next dialog.
+   */
+  readonly modalRefusal = signal<ModalRefusal | null>(null);
 
   // The work the open dialog will do when confirmed. A dialog cannot be opened without one.
   private pendingAction: ((values: Record<string, string>) => Promise<ActionOutcome>) | null = null;
@@ -60,8 +68,13 @@ export class ConsoleUiService {
     action: (values: Record<string, string>) => Promise<ActionOutcome>,
     result: { title: string; body: string; tone?: Tone },
   ): void {
+    // A dialog whose work is in flight is not replaced under it: its answer would arrive for a dialog
+    // nobody can see any more, and the new one would be re-seeded while its first request was still
+    // reading the old values.
+    if (this.modalBusy()) return;
     this.pendingAction = action;
     this.pendingResult = result;
+    this.modalRefusal.set(null);
     this.modal.set(config);
   }
 
@@ -69,6 +82,7 @@ export class ConsoleUiService {
     if (this.modalBusy()) return;
     this.pendingAction = null;
     this.pendingResult = null;
+    this.modalRefusal.set(null);
     this.modal.set(null);
   }
 
@@ -85,6 +99,7 @@ export class ConsoleUiService {
     }
 
     this.modalBusy.set(true);
+    this.modalRefusal.set(null);
     try {
       // What the work itself found, where that differs from what the dialog promised. An action
       // that reports nothing keeps the wording it was opened with; one that learned something the
@@ -100,21 +115,14 @@ export class ConsoleUiService {
       );
     } catch (error) {
       // The dialog stays open on failure: closing it would leave the admin unsure whether the
-      // decision landed, which for an approval is the worst thing to be unsure about.
+      // decision landed, which for an approval is the worst thing to be unsure about. So the refusal
+      // is shown in the dialog itself, where the operator is looking, and Confirm is usable again for
+      // a corrected attempt. The dialog words it through `problemMessage`, in the language on screen.
       this.modalBusy.set(false);
-      // Worded as it is shown, in the language on screen: a toast is gone in seconds, so there is no
-      // refusal left standing to re-word on a switch. The server's English only ever reads in English.
-      //
-      // Through `problemMessage`, not the server's sentence alone. An Arabic console used to answer
-      // every refusal with one line — "رُفض الطلب. لم يتغيّر شيء." — so a taken email address, a
-      // malformed phone number, an expired session and a fallen-over service were indistinguishable
-      // on screen, and the one thing the operator needed was the one thing thrown away.
-      const t = this.i18n.t;
-      this.showToast(
-        t('common.thatDidNotGoThrough'),
-        problemMessage(snapshotProblem(error), this.i18n.lang(), t) ??
-          t('common.serviceDidNotRespond'),
-        'bad',
+      this.modalRefusal.set(
+        error instanceof LocalRefusal
+          ? { kind: 'local', refusal: error }
+          : { kind: 'problem', problem: snapshotProblem(error) },
       );
     }
   }
@@ -147,6 +155,14 @@ export class ConsoleUiService {
  * relay would not take — which the dialog could not have predicted and must not paper over.
  */
 export type ActionOutcome = { title?: string; body?: string; tone?: Tone } | void;
+
+/**
+ * Why a dialog's work was refused: the server's answer, kept as facts, or a refusal the console decided
+ * before sending anything. Either way the dialog chooses the words, in the language on screen.
+ */
+export type ModalRefusal =
+  | { readonly kind: 'problem'; readonly problem: ProblemSnapshot }
+  | { readonly kind: 'local'; readonly refusal: LocalRefusal };
 
 /** Splits on the first separator only, so a body may itself contain one. */
 function splitOnce(value: string, separator: string): [string, string] {
