@@ -785,6 +785,7 @@ export const AR: Record<TranslationKey, Message> = {
   'handover.recorded': 'تم تسجيل التسليم.',
   'handover.notAvailable': 'لا يوجد رمز تسليم لهذا الحجز الآن.',
   'handover.qrAlt': 'رمز QR لعملية التسليم هذه',
+  'handover.qrUnavailable': 'تعذّر رسم رمز QR هنا. اعرض الأرقام الستة بدلًا منه — فهي تؤدي الغرض نفسه.',
   'handover.verified.Code': 'تم التحقق برمزك',
   'handover.verified.Unverified': 'سُجّل دون رمزك',
   'handover.verified.NotRequired': 'سُجّل دون رمز',

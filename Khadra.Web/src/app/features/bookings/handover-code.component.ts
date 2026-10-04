@@ -40,6 +40,8 @@ export class HandoverCodeComponent implements OnInit {
 
   protected readonly code = signal<HandoverCode | null>(null);
   protected readonly qr = signal<string | null>(null);
+  /** The QR could not be drawn in this browser. The six digits still work, so that is all it says. */
+  protected readonly qrFailed = signal(false);
   protected readonly busy = signal(false);
   protected readonly problem = signal<ProblemSnapshot | null>(null);
 
@@ -77,12 +79,9 @@ export class HandoverCodeComponent implements OnInit {
     if (this.busy()) return;
     this.busy.set(true);
     this.problem.set(null);
+    let issued: HandoverCode;
     try {
-      const code = await firstValueFrom(this.http.post<HandoverCode>(`/api/v1/bookings/${this.bookingId()}/handover-code`, {}));
-      this.code.set(code);
-      this.now.set(Date.now());
-      const QRCode = await import('qrcode');
-      this.qr.set(await QRCode.toDataURL(code.qrPayload, { margin: 1, width: 440, errorCorrectionLevel: 'M' }));
+      issued = await firstValueFrom(this.http.post<HandoverCode>(`/api/v1/bookings/${this.bookingId()}/handover-code`, {}));
     } catch (error) {
       const problem = snapshotProblem(error);
       // A refused request for a NEW code leaves the one on screen working: the server replaces a code
@@ -93,8 +92,51 @@ export class HandoverCodeComponent implements OnInit {
         this.qr.set(null);
       }
       this.problem.set(problem);
+      this.busy.set(false);
+      return;
+    }
+
+    this.code.set(issued);
+    this.now.set(Date.now());
+    // Drawing the QR is this browser's own work, kept apart from the request. A failure here once fell into
+    // the request's catch, and the customer read "Khadra is not answering" beside a code that was working
+    // (E2E F29). Now only the QR is missing, and the panel says the six digits still work.
+    try {
+      this.qr.set(await drawQr(issued.qrPayload));
+      this.qrFailed.set(false);
+    } catch {
+      this.qr.set(null);
+      this.qrFailed.set(true);
     } finally {
       this.busy.set(false);
     }
   }
+}
+
+/** The part of the `qrcode` package the panel uses. */
+type QrLibrary = Pick<typeof import('qrcode'), 'toDataURL'>;
+
+/**
+ * The QR library out of whatever `import('qrcode')` returned.
+ *
+ * The package is CommonJS, and the production bundle hands its exports over under `default` — the module
+ * itself has no `toDataURL`. Calling it there threw on every open on Staging, and no QR was ever drawn
+ * (E2E F29). Either shape is accepted, so a bundler change cannot quietly break it again.
+ */
+export function qrLibrary(loaded: unknown): QrLibrary | null {
+  const usable = (candidate: unknown): candidate is QrLibrary =>
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    // Asked with `in` first: a module namespace may refuse a read of an export it does not have.
+    'toDataURL' in candidate &&
+    typeof (candidate as QrLibrary).toDataURL === 'function';
+  if (usable(loaded)) return loaded;
+  const inner = typeof loaded === 'object' && loaded !== null ? (loaded as { default?: unknown }).default : undefined;
+  return usable(inner) ? inner : null;
+}
+
+async function drawQr(payload: string): Promise<string> {
+  const library = qrLibrary(await import('qrcode'));
+  if (!library) throw new Error('The QR library did not load.');
+  return library.toDataURL(payload, { margin: 1, width: 440, errorCorrectionLevel: 'M' });
 }

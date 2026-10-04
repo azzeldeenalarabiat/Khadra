@@ -680,6 +680,7 @@ export const EN = {
   'handover.recorded': 'Handover recorded.',
   'handover.notAvailable': 'There is no handover code for this booking right now.',
   'handover.qrAlt': 'QR code for this handover',
+  'handover.qrUnavailable': 'The QR could not be drawn here. Show the six digits instead — they work the same way.',
   'handover.verified.Code': 'Verified with your code',
   'handover.verified.Unverified': 'Recorded without your code',
   'handover.verified.NotRequired': 'Recorded without a code',

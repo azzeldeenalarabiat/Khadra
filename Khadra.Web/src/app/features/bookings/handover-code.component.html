@@ -17,6 +17,8 @@
     <div class="handover__code" [class.is-expired]="remaining()?.over">
       @if (qr(); as image) {
         <img class="handover__qr" [src]="image" [alt]="i18n.t('handover.qrAlt')" width="220" height="220" />
+      } @else if (qrFailed()) {
+        <p class="faint small">{{ i18n.t('handover.qrUnavailable') }}</p>
       }
       <p class="handover__digits ltr" aria-live="polite">{{ digits() }}</p>
     </div>

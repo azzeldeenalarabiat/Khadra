@@ -2,11 +2,21 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it } from 'vitest';
-import { HandoverCodeComponent } from './handover-code.component';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HandoverCodeComponent, qrLibrary } from './handover-code.component';
 
 const BOOKING = '01a0d082-8706-7748-af32-79cb5883e591';
 const URL = `/api/v1/bookings/${BOOKING}/handover-code`;
+
+/**
+ * `qrcode` exactly as the PRODUCTION bundle hands it over: a CommonJS package, its exports under `default`
+ * and nothing on the module itself (E2E F29). Under Node the package resolves to its server build, where
+ * the real import works either way, so without this the tests could not see what broke in the browser.
+ */
+const qrDraw = vi.hoisted(() => ({
+  draw: async (payload: string): Promise<string> => `data:image/png;base64,${btoa(payload)}`,
+}));
+vi.mock('qrcode', () => ({ default: { toDataURL: (payload: string) => qrDraw.draw(payload) } }));
 
 describe('HandoverCodeComponent', () => {
   let http: HttpTestingController;
@@ -99,5 +109,71 @@ describe('HandoverCodeComponent', () => {
     await settle(fixture);
 
     expect(fixture.nativeElement.querySelector('.handover__digits')).toBeNull();
+  });
+});
+
+/** The website's pickup code panel draws its QR whichever way the bundler hands the library over (E2E F29). */
+describe('HandoverCodeComponent — the QR', () => {
+  let http: HttpTestingController;
+  const working = qrDraw.draw;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HandoverCodeComponent],
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    qrDraw.draw = working;
+  });
+
+  async function openAndAnswer() {
+    const fixture = TestBed.createComponent(HandoverCodeComponent);
+    fixture.componentRef.setInput('bookingId', BOOKING);
+    fixture.componentRef.setInput('expected', 'Pickup');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    http.expectOne(URL).flush({
+      type: 'Pickup',
+      code: '469258',
+      qrPayload: 'khadra-handover:v1:KH-X:469258',
+      expiresAt: new Date(Date.now() + 120_000).toISOString(),
+    });
+    for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('draws the QR of the payload the server issued, from a library handed over under `default`', async () => {
+    const element = await openAndAnswer();
+
+    const image = element.querySelector('img.handover__qr') as HTMLImageElement | null;
+    expect(image?.getAttribute('src')).toBe(`data:image/png;base64,${btoa('khadra-handover:v1:KH-X:469258')}`);
+    expect(element.querySelector('[role=alert]')).toBeNull();
+  });
+
+  it('never blames the server when only the QR could not be drawn — the digits stay, and say they work', async () => {
+    qrDraw.draw = async () => {
+      throw new Error('No canvas in this browser.');
+    };
+
+    const element = await openAndAnswer();
+
+    expect(element.querySelector('[role=alert]')).toBeNull();
+    expect(element.querySelector('img.handover__qr')).toBeNull();
+    expect(element.textContent).toContain('469 258');
+    // The site opens in Arabic by default; the note says the six digits still work, in the language on screen.
+    expect(element.textContent).toMatch(/six digits|الأرقام الستة/);
+  });
+
+  it('picks the library out of either shape, and refuses a module that has none', () => {
+    const library = { toDataURL: async () => 'data:,' };
+    expect(qrLibrary(library)).toBe(library);
+    expect(qrLibrary({ default: library })).toBe(library);
+    expect(qrLibrary({ default: {} })).toBeNull();
+    expect(qrLibrary(undefined)).toBeNull();
   });
 });
