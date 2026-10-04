@@ -148,6 +148,11 @@ function depositSentence(financials: BookingFinancials, t: Translate, format: Pa
       ? t('payments.deposit.DecidedByDispute', { share: format.money(share), amount })
       : t('payments.deposit.DecidedByDisputeNothing', { amount });
   }
+  // Paid in full online, the deposit is not "held until you collect the car": it is part of a payment that
+  // already covers the whole rental, and the line beside it says nothing is due (E2E F26).
+  if (deposit.state === 'Held' && financials.balance.state === 'PaidInFull') {
+    return t('payments.deposit.HeldInFullPayment', { amount });
+  }
   return DEPOSIT_STATES.has(deposit.state)
     ? t(`payments.deposit.${deposit.state}` as TranslationKey, { amount, date })
     : null;

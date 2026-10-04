@@ -584,6 +584,7 @@ export const EN = {
   'payments.cashRecordedReturn': 'Cash the office recorded at return',
   'payments.balanceNotDue': 'Nothing further is due on this booking.',
   'payments.deposit.Held': 'Your deposit of {amount} is held until you collect the car, when it counts towards the rental.',
+  'payments.deposit.HeldInFullPayment': 'Your deposit of {amount} is part of the full amount you paid online.',
   'payments.deposit.AppliedToRental': 'Your deposit of {amount} counts towards the rental.',
   'payments.deposit.InSettlementWindow': 'Your deposit of {amount} is held until {date}, in case a dispute is opened.',
   'payments.deposit.UnderDispute': 'Your deposit of {amount} is held while the dispute is open.',

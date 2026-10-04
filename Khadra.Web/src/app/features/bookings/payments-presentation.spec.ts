@@ -217,3 +217,31 @@ describe('the Payments section', () => {
     }
   });
 });
+
+/** A booking paid in full online (E2E F26): its deposit is not "held until you collect the car". */
+describe('the deposit of a booking paid in full', () => {
+  const paidInFull = () =>
+    state({
+      summary: {
+        rentalSubtotal: jod(25), deliveryFee: jod(0), bookingTotal: jod(25), requiredDeposit: jod(5),
+        securityDeposit: jod(150), paidOnline: jod(25), processingFees: jod(0), chargedOnline: jod(25),
+        refunded: jod(0), refundInProgress: jod(0), refundDelayed: jod(0),
+      },
+      balance: { state: 'PaidInFull', amount: jod(0), cashRecorded: [] },
+      deposit: { amount: jod(5) },
+    });
+
+  it('says the deposit is part of what was paid, beside "nothing to pay the office" — in both languages', () => {
+    const english = paymentsView(paidInFull(), en, format);
+    const arabic = paymentsView(paidInFull(), ar, format);
+
+    expect(english.balanceText).toBe('You paid the whole booking online, so there is nothing to pay the office.');
+    expect(english.deposit).toBe('Your deposit of 5 JOD is part of the full amount you paid online.');
+    expect(arabic.deposit).toBe('عربونك البالغ 5 JOD جزء من المبلغ الكامل الذي دفعته عبر الإنترنت.');
+    expect(english.deposit).not.toContain('until you collect the car');
+  });
+
+  it('keeps the held-until-pickup sentence for a booking that paid the deposit only', () => {
+    expect(paymentsView(state(), en, format).deposit).toContain('is held until you collect the car');
+  });
+});

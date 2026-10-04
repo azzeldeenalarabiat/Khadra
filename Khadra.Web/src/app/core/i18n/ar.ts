@@ -698,6 +698,7 @@ export const AR: Record<TranslationKey, Message> = {
   'payments.cashRecordedReturn': 'النقد الذي سجّله المكتب عند الإرجاع',
   'payments.balanceNotDue': 'لا يترتب على هذا الحجز أي مبلغ آخر.',
   'payments.deposit.Held': 'عربونك البالغ {amount} محتجز حتى تستلم السيارة، وعندها يُحتسب من قيمة الإيجار.',
+  'payments.deposit.HeldInFullPayment': 'عربونك البالغ {amount} جزء من المبلغ الكامل الذي دفعته عبر الإنترنت.',
   'payments.deposit.AppliedToRental': 'يُحتسب عربونك البالغ {amount} من قيمة الإيجار.',
   'payments.deposit.InSettlementWindow': 'عربونك البالغ {amount} محتجز حتى {date} تحسّبًا لفتح نزاع.',
   'payments.deposit.UnderDispute': 'عربونك البالغ {amount} محتجز ما دام النزاع مفتوحًا.',
