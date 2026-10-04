@@ -7,16 +7,6 @@
   },
   "ReverseProxy": {
     "Routes": {
-      "auth-register": {
-        "ClusterId": "webapi",
-        "AuthorizationPolicy": "Anonymous",
-        "Match": {
-          "Path": "/api/v1/auth/register",
-          "Methods": [
-            "POST"
-          ]
-        }
-      },
       "auth-register-dealer-owner": {
         "ClusterId": "webapi",
         "AuthorizationPolicy": "Anonymous",

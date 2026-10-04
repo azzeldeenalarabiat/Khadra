@@ -36,7 +36,8 @@ public sealed class BffProxyRouteTests
         "/api/v1/app-config",
         "/api/v1/auth/accept-invitation",
         "/api/v1/auth/forgot-password",
-        "/api/v1/auth/register",
+        // Customer registration is NOT here: the console has no customer sign-up page, and forwarding it
+        // anonymously only widened what a caller could reach through the console host (E2E F11).
         "/api/v1/auth/register-dealer-owner",
         "/api/v1/auth/resend-verification",
         "/api/v1/auth/reset-password",
@@ -126,6 +127,20 @@ public sealed class BffProxyRouteTests
             .Single(candidate => PathOf(candidate) == "/api/{**catch-all}");
 
         Assert.False(IsAnonymous(catchAll));
+    }
+
+    /// <summary>
+    /// The console registers gallery owners, never customers: its own page posts to
+    /// <c>register-dealer-owner</c>. Customer sign-up through the console host reached the API without a
+    /// session all the same (E2E F11); now it can only fall to the catch-all, which needs one.
+    /// </summary>
+    [Fact]
+    public void The_console_does_not_forward_customer_registration()
+    {
+        var paths = Routes().EnumerateObject().Select(entry => PathOf(entry.Value)).ToList();
+
+        Assert.DoesNotContain("/api/v1/auth/register", paths);
+        Assert.Contains("/api/v1/auth/register-dealer-owner", paths);
     }
 
     [Fact]
