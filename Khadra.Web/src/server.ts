@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { negotiateLanguage } from './app/core/i18n/negotiate';
 import { ServerRenderContext } from './app/core/http/server-context';
 import { PRIVATE_PAGES } from './app/app.routes.server';
+import { CLOSED_ROBOTS_TAG, indexableFrom, robotsTxt } from './app/core/seo/indexing';
 import { carsSitemap, officesSitemap, pagesSitemap, sitemapIndex } from './sitemap';
 
 /**
@@ -21,11 +22,14 @@ import { carsSitemap, officesSitemap, pagesSitemap, sitemapIndex } from './sitem
  *   KHADRA_PUBLIC_BASE_URL  the public origin, e.g. https://www.example.jo — canonical URLs, sitemap
  *   KHADRA_EDGE_SECRET      shared with the BFF (BffSecurity:FrontendSharedSecret); proves a request
  *                           came through it, so the client address it names can be believed
+ *   KHADRA_INDEXABLE        "true" ONLY in Production. Anything else, unset included, keeps every search
+ *                           engine out: Disallow: / in robots.txt, noindex on every response, no sitemap
  *   PORT                    default 4000
  */
 const apiBaseUrl = process.env['KHADRA_API_URL'] ?? 'http://localhost:5112';
 const publicBaseUrl = (process.env['KHADRA_PUBLIC_BASE_URL'] ?? 'https://localhost:7244').replace(/\/$/, '');
 const edgeSecret = process.env['KHADRA_EDGE_SECRET'] ?? '';
+const indexable = indexableFrom(process.env['KHADRA_INDEXABLE']);
 
 if (process.env['NODE_ENV'] === 'production' && (!process.env['KHADRA_API_URL'] || !process.env['KHADRA_PUBLIC_BASE_URL'])) {
   throw new Error('KHADRA_API_URL and KHADRA_PUBLIC_BASE_URL must be set: the renderer has no host to assume.');
@@ -35,6 +39,15 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 app.disable('x-powered-by');
 const angularApp = new AngularNodeAppEngine();
+
+// A copy search engines may not index says so on EVERY response — pages, files and redirects alike — so no
+// crawler that ignores robots.txt can list it either (E2E F3: a Staging copy was open to all of them).
+if (!indexable) {
+  app.use((_request, response, next) => {
+    response.setHeader('X-Robots-Tag', CLOSED_ROBOTS_TAG);
+    next();
+  });
+}
 
 /** Content-hashed build output (`main-ABCD1234.js`) never changes under its name; everything else may. */
 const HASHED = /-[A-Z0-9]{8}\.(?:js|css|woff2?|ttf|png|jpg|svg)$/;
@@ -69,17 +82,7 @@ app.get('/', (request, response) => {
 
 app.get('/robots.txt', (_request, response) => {
   response.type('text/plain').setHeader('Cache-Control', 'public, max-age=3600');
-  response.send(
-    [
-      'User-agent: *',
-      'Disallow: /api/',
-      'Disallow: /bff/',
-      ...PRIVATE_PAGES.flatMap((page) => ['ar', 'en'].map((language) => `Disallow: /${language}/${page.replace('/**', '/')}`)),
-      '',
-      `Sitemap: ${publicBaseUrl}/sitemap.xml`,
-      '',
-    ].join('\n'),
-  );
+  response.send(robotsTxt(indexable, publicBaseUrl, PRIVATE_PAGES));
 });
 
 const sitemaps: Record<string, () => Promise<string>> = {
@@ -111,6 +114,12 @@ function cachedSitemap(path: string, build: () => Promise<string>): Promise<stri
 
 for (const [path, build] of Object.entries(sitemaps)) {
   app.get(path, (_request, response, next) => {
+    // A closed copy publishes no map of itself for a crawler to follow.
+    if (!indexable) {
+      response.status(404).setHeader('Cache-Control', 'no-cache');
+      response.send();
+      return;
+    }
     cachedSitemap(path, build)
       .then((xml) => {
         response.type('application/xml').setHeader('Cache-Control', 'public, max-age=3600');

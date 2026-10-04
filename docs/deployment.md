@@ -375,7 +375,11 @@ Customer BFF environment:
 
 Renderer environment: `KHADRA_API_URL` (private address when there is one), `KHADRA_PUBLIC_BASE_URL`
 (the public origin — canonical URLs and the sitemap are built from it), `KHADRA_EDGE_SECRET`,
-`NG_ALLOWED_HOSTS` (the host name the BFF forwards to, e.g. `khadra-web`).
+`NG_ALLOWED_HOSTS` (the host name the BFF forwards to, e.g. `khadra-web`), and — **in Production only** —
+`KHADRA_INDEXABLE=true`. Without it the renderer keeps every search engine out: `robots.txt` answers
+`Disallow: /`, every response carries `X-Robots-Tag: noindex, nofollow`, and there is no sitemap. That is
+the right default for Staging and any other copy (E2E F3: a Staging copy was open to every crawler), and
+the one launch step Production must not forget, or the public site is never indexed.
 
 API, once the website is live on that environment (pre-launch items 142 and 143, in that order):
 `App__CustomerAppBaseUrl` = the public origin, and on staging `Payments__ReturnUrlBase` = the same.
