@@ -608,10 +608,15 @@ static bool SameAddress(IPAddress claimed, IPAddress resolved) =>
 
 // Every answer is exactly the type it says it is (E2E F10). The API serves JSON, ProblemDetails, and stored files
 // whose type comes from their extension — never anything a browser should second-guess into a page or a script.
-// Set before anything runs, so refusals, files and errors all carry it.
+// Added as the response STARTS, not before the pipeline runs: the exception handler clears the headers before it
+// writes its ProblemDetails, and a header set earlier would be gone from every 500, 409 and 400 it answers.
 app.Use(async (context, next) =>
 {
-    context.Response.Headers.XContentTypeOptions = "nosniff";
+    context.Response.OnStarting(static state =>
+    {
+        ((HttpResponse)state).Headers.XContentTypeOptions = "nosniff";
+        return Task.CompletedTask;
+    }, context.Response);
     await next(context).ConfigureAwait(false);
 });
 app.UseExceptionHandler();

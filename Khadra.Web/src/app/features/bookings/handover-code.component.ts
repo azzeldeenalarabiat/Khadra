@@ -96,6 +96,9 @@ export class HandoverCodeComponent implements OnInit {
       return;
     }
 
+    // The previous code's QR goes with it: a replaced code is dead, and its picture must not sit beside the new
+    // digits while the new one is drawn.
+    this.qr.set(null);
     this.code.set(issued);
     this.now.set(Date.now());
     // Drawing the QR is this browser's own work, kept apart from the request. A failure here once fell into

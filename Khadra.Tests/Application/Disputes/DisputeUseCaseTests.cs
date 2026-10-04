@@ -1024,6 +1024,29 @@ public sealed class DisputeUseCaseTests
     }
 
     /// <summary>
+    /// The customer's copy keeps the refund the decision gave them, tied to the ticket — the website reads its status
+    /// from exactly this row (Fix &amp; Polish W1-5, E2E F43), so the dispute payload needed no field of its own.
+    /// </summary>
+    [Fact]
+    public async Task The_customer_is_given_the_refund_their_decision_created_tied_to_the_ticket()
+    {
+        var (context, booking, ticket, held, _) = await SplitThreeWaysAsync();
+        var refundId = Guid.NewGuid();
+        context.BookingReader.ContextAsync(booking.Id, Arg.Any<CancellationToken>())
+            .Returns(new BookingContext(null, "Petra Wheels", false, null, "Layla Odeh", false, null, null,
+                Refunds: [new RefundDto(refundId, Guid.NewGuid(), "DisputeResolution", MoneyDto.From(Money.Jod(held / 2)), "Settled", Build.Now, Build.Now, Build.Now, null, ticket.Id.Value)],
+                HasResolvedDispute: true));
+
+        var customer = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None);
+
+        var refund = Assert.Single(customer.Booking.Refunds!);
+        Assert.Equal(refundId, refund.RefundId);
+        Assert.Equal(ticket.Id.Value, refund.DisputeTicketId);
+        Assert.Equal("Settled", refund.Status);
+        Assert.NotNull(refund.SettledAt);
+    }
+
+    /// <summary>
     /// Through the handler, not the composer: "my dispute" is the one path that can hand the office a
     /// decision (a resolved ticket takes no statement and cannot be withdrawn), and it must pass the
     /// office as the reader.

@@ -57,13 +57,15 @@
               (input)="setField(field.name, $event)"
             />
           } @else if (field.type === 'date') {
-            <!-- A calendar day, yyyy-MM-dd whatever the reader's language: the value the API reads as it is. -->
+            <!-- A calendar day, yyyy-MM-dd whatever the reader's language: the value the API reads as it is.
+                 Seeded once, not bound to the values: a date typed through an incomplete state reports "" and,
+                 written back, would clear every segment mid-edit. A dialog's elements are new each time it opens. -->
             <input
               class="input ltr"
               type="date"
               [id]="'modal-field-' + $index"
               [attr.max]="field.max ?? null"
-              [value]="values()[field.name] ?? ''"
+              [value]="field.value ?? ''"
               (input)="setField(field.name, $event)"
             />
           } @else if (field.type === 'password') {

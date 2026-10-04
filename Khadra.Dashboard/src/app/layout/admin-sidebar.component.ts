@@ -4,8 +4,9 @@ import { SessionService } from '../core/services/session.service';
 import { AdminDashboardService } from '../core/services/admin-dashboard.service';
 import { loaded } from '../core/services/loaded';
 import { DEALER_NAV, EMPLOYEE_NAV, NAV_GROUPS } from '../core/data/nav.data';
-import { NavCount, NavGroup, NavRequirement, Tone } from '../core/models/console.models';
-import { DealerConsoleService, DealerPermissions } from '../core/services/dealer-console.service';
+import { NavCount, NavGroup, Tone } from '../core/models/console.models';
+import { DealerConsoleService } from '../core/services/dealer-console.service';
+import { railFor } from './rail';
 import { NotificationsService } from '../core/services/notifications.service';
 import { accountRouteFor } from '../core/guards/role.guards';
 import { initialsOf, roleLabel } from '../core/models/user-display';
@@ -103,24 +104,8 @@ export class AdminSidebarComponent {
    */
   protected readonly groups = computed<readonly NavGroup[]>(() => {
     if (!this.isEmployee() && !this.isDealer()) return NAV_GROUPS;
-
-    const permissions = this.console.permissions();
-    return (this.isEmployee() ? EMPLOYEE_NAV : DEALER_NAV)
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => this.holds(item.requires, permissions)),
-      }))
-      .filter((group) => group.items.length > 0);
+    return railFor(this.isEmployee() ? EMPLOYEE_NAV : DEALER_NAV, this.console.permissions());
   });
-
-  private holds(
-    requires: NavRequirement | undefined,
-    permissions: DealerPermissions | null,
-  ): boolean {
-    if (!requires) return true;
-    if (!permissions) return false;
-    return requires === 'manage-staff' ? permissions.canManageStaff : permissions.canViewReports;
-  }
 
   // Both sides share this rail, so the account link has to answer for whichever side is reading it.
   protected readonly accountRoute = computed(() => accountRouteFor(this.session.user() ?? null));

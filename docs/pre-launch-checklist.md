@@ -5449,3 +5449,13 @@ or resolved on its booking (item 43), or a settlement recorded or voided. The ow
 the run mentioned none of them. **To close:** office kinds for each, in-app and by email (owner, 2026-10-05); web push
 for offices is a roadmap item of its own.
 
+
+### 227. The public website must be told it may be indexed, or it never will be
+
+**Status:** open, launch step · **Raised:** 2026-10-05 (Fix & Polish W1-10, E2E F3)
+
+Since Wave 1 the website's renderer keeps every search engine out unless `KHADRA_INDEXABLE=true` is set: `robots.txt`
+answers `Disallow: /`, every response carries `X-Robots-Tag: noindex, nofollow`, and there is no sitemap. That is the
+right default for Staging and every other copy. **To close, at the website's Production launch:** set
+`KHADRA_INDEXABLE=true` on the Production renderer only (`docs/deployment.md`, renderer environment), then confirm
+`/robots.txt` names the sitemap, `/sitemap.xml` answers 200, and a public page carries no `X-Robots-Tag`.

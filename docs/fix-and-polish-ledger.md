@@ -29,9 +29,9 @@ this batch (decision D6).
 | Wave | Change | Kind | Effect on installed apps |
 |---|---|---|---|
 | 1 | `handover.code_invalid` from `POST /bookings/{id}/pickup` and `/return` carries `attemptsRemaining` and `maxAttempts` when the wrong guess was counted | additive | none: office-only endpoints |
-| 1 | A bare 401 is ProblemDetails with `code` `auth.unauthenticated` (no token) or `auth.session_invalid` (a token was refused), sent as `application/problem+json`. `WWW-Authenticate: Bearer` and the status are unchanged | additive (body) | none: the app refreshes once on any 401 by status and maps only `auth.invalid_refresh_token`; both BFFs end their session on a 401 by status |
+| 1 | A bare 401 is ProblemDetails with `code` `auth.unauthenticated` (no token) or `auth.session_invalid` (a token was refused), sent as `application/problem+json`. `WWW-Authenticate: Bearer` and the status are unchanged | additive (body) | not breaking: the app refreshes once on any 401 by status and maps only `auth.invalid_refresh_token`; both BFFs end their session on a 401 by status. A customer who still sees a 401 after the single refresh now reads the server's English title ("Your session is no longer valid. Sign in again.") where the framework's bare 401 gave them nothing to show |
 | 1 | A 403 for a role the endpoint does not admit is ProblemDetails with `code` `auth.forbidden` (it was empty) | additive (body) | none: the status is unchanged and the app already parses `application/problem+json` |
-| 1 | `X-Content-Type-Options: nosniff` on every API answer | none | none |
+| 1 | `X-Content-Type-Options: nosniff` on every API answer — added as the response starts, so the exception handler's 500/409/400 answers carry it too | none | none |
 | 1 | The console BFF no longer forwards `POST /api/v1/auth/register` anonymously | none | none: the app calls the API directly; the customer website's BFF keeps its own route |
 | 1 | The website's dispute page reads the refund's status from the booking's existing `refunds[]` (`disputeTicketId`) | none | none: no API change |
 
@@ -42,4 +42,4 @@ this batch (decision D6).
 | F50 | Stop showing the customer the office's and Khadra's shares of a dispute decision (decision 3); show only the customer's own share. |
 | F43 (W1-5) | Show what became of the dispute's refund (requested, on its way, refunded on a date, being sent again), read from the booking's `refunds[]` by `disputeTicketId`, as the website now does. |
 | F26 (W1-6) | On a booking paid in full, stop saying the deposit "is held until you collect the car"; say it is part of the full amount paid online. |
-| F10 (W1-12) | Optional: word `auth.unauthenticated` and `auth.session_invalid` instead of the generic line, if one ever shows after the single refresh. |
+| F10 (W1-12) | Optional: word `auth.unauthenticated` and `auth.session_invalid` in both languages; today an unmapped code shows the server's English title. |

@@ -26,12 +26,16 @@ namespace Khadra.Tests.Security;
 public sealed class AuthRefusalCodeTests : IDisposable
 {
     private readonly User _customer = Users.Customer();
+    // An account whose lookup fails outright: its token takes the request down the exception handler's 500.
+    private readonly User _unreadable = Users.Customer(email: "broken@example.com", phone: "0791234568");
     private readonly WebApplicationFactory<Khadra.WebAPI.WebApiAssemblyMarker> _factory;
 
     public AuthRefusalCodeTests()
     {
         var users = Substitute.For<IUserRepository>();
         users.GetByIdAsync(_customer.Id, Arg.Any<CancellationToken>()).Returns(_customer);
+        users.GetByIdAsync(_unreadable.Id, Arg.Any<CancellationToken>())
+            .Returns<User?>(_ => throw new InvalidOperationException("The user store is unreadable."));
 
         _factory = new WebApplicationFactory<Khadra.WebAPI.WebApiAssemblyMarker>()
             .WithWebHostBuilder(builder =>
@@ -96,15 +100,20 @@ public sealed class AuthRefusalCodeTests : IDisposable
     }
 
     [Fact]
-    public async Task Every_answer_tells_the_browser_not_to_sniff_its_type()
+    public async Task Answers_refusals_files_and_errors_tell_the_browser_not_to_sniff_their_type()
     {
         using var client = _factory.CreateClient();
+        using var broken = _factory.CreateClient();
+        broken.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", TokenFor(_unreadable));
 
         using var config = await client.GetAsync(new Uri("/api/v1/app-config", UriKind.Relative));
         using var refused = await client.GetAsync(new Uri("/api/v1/auth/me", UriKind.Relative));
         using var missingImage = await client.GetAsync(new Uri($"/api/v1/vehicle-images/vehicles/{Guid.NewGuid()}/x.jpg", UriKind.Relative));
+        // The exception handler clears the headers before it writes its ProblemDetails; the header must survive that.
+        using var failed = await broken.GetAsync(new Uri("/api/v1/auth/me", UriKind.Relative));
 
-        foreach (var response in new[] { config, refused, missingImage })
+        Assert.Equal(HttpStatusCode.InternalServerError, failed.StatusCode);
+        foreach (var response in new[] { config, refused, missingImage, failed })
             Assert.Equal("nosniff", Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));
     }
 

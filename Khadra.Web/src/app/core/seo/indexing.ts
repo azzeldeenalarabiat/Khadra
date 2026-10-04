@@ -5,7 +5,7 @@
  * unset included, is closed: a Staging copy was open to every crawler, with a sitemap pointing at it, where it could
  * compete in search with the real site and show test cars and test prices to the public (E2E F3). Closed is the
  * safe default — a forgotten variable costs a staging copy nothing, and costs Production only a launch step, which
- * `docs/production.md` lists.
+ * `docs/deployment.md` (renderer environment) and pre-launch checklist item 227 record.
  */
 export function indexableFrom(value: string | undefined): boolean {
   return value?.trim().toLowerCase() === 'true';
