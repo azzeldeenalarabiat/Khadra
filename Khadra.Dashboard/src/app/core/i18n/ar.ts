@@ -1224,7 +1224,7 @@ export const AR = {
   'dealerDecide.codePlaceholder': 'الأرقام الستة على هاتف العميل',
   'dealerDecide.unverifiedLabel': 'لا يوجد رمز؟ اذكر السبب',
   'dealerDecide.unverifiedPlaceholder': 'مثال: بطارية الهاتف فارغة؛ تم التحقق من الرخصة والهوية',
-  'dealerDecide.codeNote': 'اطلب من العميل رمز التسليم من تطبيق خضرا. من دونه يُسجَّل التسليم غير موثَّق مع السبب الذي تذكره، وتراجعه المنصة.',
+  'dealerDecide.codeNote': 'اطلب من العميل رمز التسليم — يجده في تطبيق خضرا أو على موقع خضرا، ستة أرقام ورمز QR. من دونه يُسجَّل التسليم غير موثَّق مع السبب الذي تذكره، وتراجعه المنصة.',
   'handover.unverified': 'سُلّمت دون رمز العميل',
   'handover.unverifiedBadge': 'غير موثَّق',
   'handover.unverifiedAdmin': 'تسليم غير موثَّق: سجّله المكتب دون رمز العميل. السبب الذي ذكره:',

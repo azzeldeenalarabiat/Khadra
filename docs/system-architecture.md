@@ -166,7 +166,7 @@ Domain and in Application. The status table and the open owner decisions are in
 |---|---|---|
 | `Admin` | The platform owner | Approve/reject dealers, resolve disputes, see every booking, invite other admins |
 | `DealerOwner` | The rental office's owner | Everything about their own dealership: profile, fleet, bookings, staff, delivery settings |
-| `DealerEmployee` | Staff at one dealership | The day-to-day: bookings, pickups, returns, fleet. Never staff management |
+| `DealerEmployee` | Staff at one dealership | The day-to-day: bookings, pickups, returns. The fleet read-only (every fleet write is the owner's); the office's reports and payouts only when the owner grants them. Never staff management |
 | `Customer` | A renter | Browse, book, pay, raise a dispute, review |
 
 Authorization is **default-deny**: every endpoint requires a valid bearer token

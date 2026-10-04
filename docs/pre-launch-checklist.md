@@ -46,7 +46,13 @@ When it is answered, the trigger is two lines beside the existing one.
 
 ### 2. Dispute resolutions are recorded but never executed
 
-**Status:** open by design · **Raised:** 2026-09-03 · **Owner confirmed:** no real money moves yet
+**Status:** closed · **Raised:** 2026-09-03 · **Closed:** 2026-10-05 — Payments executes every leg of a decision; proved on Staging in the E2E run.
+
+**How it closed.** The customer's share is refunded automatically when the decision is recorded (`RequestRefund`,
+reason `DisputeResolution`), and on Staging both decided disputes of the E2E run were refunded and settled
+(KH-U7ZDLNFJ 1.500, KH-F96QHCNA 5.000). The office's share and any charge reach the office through the ledger's
+`DisputeShare` / `DisputeCharge` lines once the booking is final (KH-F96QHCNA's `DisputeDecided` payable, settled
+under TEST-SET-2026-000002); Khadra's share is what it keeps. The text below is kept for the record.
 
 An Admin resolving a dispute records a `DepositDisposition` — a three-way split of the deposit that
 must balance — and an optional `DealerCharge`. Nothing acts on it: the Payments context is not built,
@@ -514,7 +520,7 @@ rewrite a past booking — that part is already safe.
 
 ### 26. Cities have no consumer yet
 
-**Status:** open · **Raised:** 2026-09-04
+**Status:** closed · **Raised:** 2026-09-04 · **Closed:** 2026-10-05 (found by the Wave 1 documentation pass) — both halves of "To close" are built: `CityId` is on `UpdateDealerProfileCommand` with a select in the dealer profile, and the catalogue filters by it (`CatalogueReader` matches on `CityId`; E2E S3 searched by Amman).
 
 `/cities` curates the list and `GET /api/v1/cities` serves it, but nothing reads it. Dealer locations
 are coordinates and distance is measured from them, so the platform works without it; a city cannot
@@ -2745,6 +2751,10 @@ again, so the five steps are attemptable. They still need a handset; nothing bel
 **Status:** open, BLOCKING · **Raised:** 2026-09-11 · **Decided by the owner, 2026-09-11** ·
 **First hop landed; held open for the on-device migration test**
 
+**Update, 2026-10-05.** The release APK builds (staging flavour 1.3.0+4 from `665114c`, 2026-10-03, signed with
+the release key) and installs over the previous staging build on the owner's phone, which opens. Whether an existing
+sign-in survived that upgrade — the migration this item is held open for — was not recorded, so it stays open.
+
 `flutter build apk` fails. `file_picker` 11.0.3 applies its own Kotlin Gradle Plugin, and this
 toolchain has moved to Flutter's built-in Kotlin, which no longer links a plugin that does:
 
@@ -4114,6 +4124,11 @@ update — the new read-only `/disputes/{id}` page.
 **To close:** an office verifies a pickup code and a return code shown by the website (and one
 unverified handover with a reason) on staging, with the customer page watching.
 
+**Update, 2026-10-05 (E2E run).** On Staging an office verified a pickup and a return by the customer's code, refused
+a wrong code three times, and recorded a return unverified with its reason — but every code came from the APP
+(Khadra TEST). The website's panel showed its six digits with no QR and a false "Khadra is not answering" (E2E F29,
+fixed in Wave 1). Still open: the website's own codes, now with their QR, are verified in the Wave 1 Staging check.
+
 ### 145. A mistyped car or office URL is corrected with a canonical tag, not a 301
 
 **Status:** open · **Raised:** 2026-09-23
@@ -4128,7 +4143,7 @@ renderer can make that one extra API read cheaply (item 140).
 
 ### 146. Disputes have no pages on the website
 
-**Status:** open · **Raised:** 2026-09-23
+**Status:** open, narrowed · **Raised:** 2026-09-23 · **Updated:** 2026-10-05 — the website now has the read-only `/disputes/{id}` page (decision, the customer's own share, the refund's status since Wave 1), and dispute notifications open it. What remains is opening and answering a dispute on the website: E2E F31, Wave 3 (C4).
 
 The booking page says when a dispute is open, and the notifications list shows dispute updates, but a
 customer opens, reads and answers a dispute only in the app for now. A dispute notification on the
@@ -4250,7 +4265,7 @@ which is true.
 
 ### 153. The console's handover refusals are easy to miss on a narrow screen
 
-**Status:** open · **Raised:** 2026-09-24
+**Status:** closed · **Raised:** 2026-09-24 · **Closed:** 2026-10-05 (Wave 1, W1-8) — the cause was not the width. The console's one dialog is a native `<dialog>` opened with `showModal()`, in the browser's top layer, so the toast sat under it at EVERY width (E2E F53: an office pressed an invisible wrong-code refusal three times and used three of the customer's five tries). Every dialog now shows its refusal inside itself, worded in both languages; a counted wrong code says how many tries are left; the code field is one numeric line; and the note names the app AND the website.
 
 A wrong, expired or locked code is refused with a clear sentence, but as a toast, which on a narrow
 console window sits behind the still-open handover dialog. The dialog's note also says the code is
@@ -4497,7 +4512,7 @@ website, chosen when the penalty is attributed to the customer, with an Arabic t
 
 ### 168. The office's approve dialog says free cancellation starts at approval
 
-**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run) · **Fix before release**
+**Status:** open · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run) · **Fix before release** · Reproduced on Staging in the E2E run (F22); planned in Wave 3 (E2).
 
 The dealer console's approve confirmation (`dealerDecide.approve.body`, English and Arabic) ends
 "The customer's free-cancellation window starts now." Since 2026-09-25 the window starts when the
@@ -4653,7 +4668,7 @@ new rows (item 50 for disputes; the handover and lookup writers too); show what 
 
 ### 175. "System" is English on the Arabic console
 
-**Status:** open · **Raised:** 2026-09-27
+**Status:** open · **Raised:** 2026-09-27 · Reproduced on Staging in the E2E run (F14); planned in Wave 5 (H, with D11).
 
 An entry recorded with no actor (the bootstrap administrator's invitation, and any recorder that
 finds no signed-in admin) carries `AuditEntry.SystemActorName`, "System", as its actor name. The
@@ -5173,6 +5188,14 @@ away on every pass until it is final, taking a place in the pass's batch (`Payab
 rentals are looked at first, so they are never crowded out. **To close:** store the window's end on the booking
 (written when the booking ends) and query it.
 
+**Evidence, 2026-10-04 (Staging E2E).** C5 (KH-2LK5L9E9) froze a one-hour window under a temporary Staging override and
+was marked a no-show at 13:00:58 UTC; with the setting back at 48 h the pass will not find it until about
+2026-10-06 13:11 UTC — some 47 hours after it became final. In production the late case follows only an INCREASE of the
+setting. **Planned (Fix & Polish B5, Wave 4, advisor-reviewed):** a nullable `bookings.dispute_window_ends_at` written
+where the window starts (cancellation, no-show, return), pinned equal to `Booking.DisputeWindowEndsAt` by a domain test,
+and read as `COALESCE(column, finished_at + today's window)` — no SQL backfill of the window inside the `terms` JSON,
+whose TimeSpan text PostgreSQL cannot be trusted to parse.
+
 ### 211. Two of the ledger's reads grow with the whole history
 
 **Status:** open · **Raised:** 2026-09-29 (architecture review of payments Phase 8) · **Low priority**
@@ -5372,3 +5395,57 @@ refuses included; the suite's test hosts now point at a port nothing listens on,
 on localhost:5432. **Left as it is, deliberately:** `/health/ready` does not wait for the guard. The window is at most
 thirty seconds after the database returns, every payment operation is held in it, and tying readiness to the latch
 changes how a host is judged healthy at deploy time — a decision for when it is needed, not inside this fix.
+
+---
+
+## Found by the Staging end-to-end run (2026-10-03 to 2026-10-05)
+
+The run's full findings are F1–F58 in its report; these are the ones the checklist did not already hold.
+
+### 222. The website's content security policy blocks Angular's event-replay script
+
+**Status:** open · **Raised:** 2026-10-05 (recorded at B12; Fix & Polish J4, Wave 5)
+
+`BffSecuritySettings` serves `script-src 'self'` with no nonce, and the renderer starts `AngularNodeAppEngine` without
+one, so the inline script `provideClientHydration` adds to replay early clicks is refused. Pages still hydrate; a
+click made before hydration finishes is lost. **To close:** allow that script by hash or nonce — never
+`unsafe-inline` — and test SSR, hydration and an early click in both languages.
+
+### 223. The renderer warns that it does not trust the forwarded headers it receives
+
+**Status:** open · **Raised:** 2026-10-05 (recorded at B12; Fix & Polish J5, with the always-on hosting of D1)
+
+The renderer logs a `trustProxyHeaders` notice on every start. **To close:** trust the BFF explicitly, as one
+deployment, when the renderer moves onto private networking (item 140).
+
+### 224. There are no Terms of Service, no Privacy notice, and no consent at registration
+
+**Status:** open, launch blocker · **Raised:** 2026-10-05 (E2E F7; Fix & Polish G1) · **Owner, 2026-10-05:** draft the
+texts from Khadra's actual flows; they are reviewed before any production use
+
+Nothing on the website, the console or the app links to terms or a privacy notice, and registration asks for no
+consent, while items 177 and 203 already assume a privacy notice exists. **To close:** versioned legal documents
+served by the API; a consent record per person, document version, time, channel and language, producible for the data
+subject; links on every client; clients enforce first, the server only in a release that raises the minimum app version.
+
+### 225. A pickup and its code are allowed at any time before the rental starts
+
+**Status:** open, High · **Raised:** 2026-10-05 (E2E F51; Fix & Polish D4, Wave 3) · **Owner, 2026-10-05:** the
+earliest pickup is the rental start minus the existing 120-minute turnaround — `Booking.HoldStart`
+
+`Booking.RecordPickup` checks only that the booking is Confirmed, `RecordReturn` only that it is PickedUp, and a
+pickup code is issued whenever the booking is Confirmed. An office alone could record a pickup and a return days
+early, the booking would complete, and the office would collect a Rental payable for a rental that never happened.
+**To close:** pickup and code issuance only from `HoldStart` (already frozen per booking — no new `BookingTerms`
+property, which would read as zero on every existing booking), no return before the rental starts, and the refusal
+recorded in the app contract ledger: installed apps offer the code on every confirmed booking.
+
+### 226. The office is told nothing when its money changes
+
+**Status:** open · **Raised:** 2026-10-05 (E2E F58; Fix & Polish C5, Wave 3 — in-app and email, owner 2026-10-05)
+
+No office notification kind exists for a no-show the system marks, an approval that expired unpaid, a dispute opened
+or resolved on its booking (item 43), or a settlement recorded or voided. The owner's 51 stored notifications after
+the run mentioned none of them. **To close:** office kinds for each, in-app and by email (owner, 2026-10-05); web push
+for offices is a roadmap item of its own.
+

@@ -1342,7 +1342,7 @@ export const EN = {
   'dealerDecide.codePlaceholder': 'The 6 digits on the customer\'s phone',
   'dealerDecide.unverifiedLabel': 'No code? Say why',
   'dealerDecide.unverifiedPlaceholder': 'e.g. Phone battery dead; licence and ID checked',
-  'dealerDecide.codeNote': 'Ask the customer for the handover code in their Khadra app. Without one, the handover is recorded as unverified with your reason, and the platform reviews it.',
+  'dealerDecide.codeNote': 'Ask the customer for the handover code — they have it in the Khadra app or on the Khadra website, as six digits and a QR. Without one, the handover is recorded as unverified with your reason, and the platform reviews it.',
   'handover.unverified': 'Handed over without the customer\'s code',
   'handover.unverifiedBadge': 'Unverified',
   'handover.unverifiedAdmin': 'Unverified handover: the dealer recorded it without the customer\'s code. Their reason:',
