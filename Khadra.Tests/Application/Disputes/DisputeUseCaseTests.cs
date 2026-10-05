@@ -1452,7 +1452,92 @@ public sealed class DisputeUseCaseTests
         Assert.Equal(-(charge + 1m), preview.Office.Net.Amount);
     }
 
+    /// <summary>
+    /// The ledger holds a booking whose records contradict one another for review, whatever a decision says (advisor's
+    /// review of Wave 2). The preview runs the ledger's own check, so it says so rather than promising a recording.
+    /// </summary>
+    [Fact]
+    public async Task The_preview_says_when_the_ledger_will_hold_the_booking_instead_of_recording_it()
+    {
+        var context = new Context();
+        var (booking, payment) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, Id.New(), booking.Period.Start).IsSuccess);
+        Assert.True(booking.RecordReturn(BookingParty.Dealer, Id.New(), booking.Period.End).IsSuccess);
+        context.Clock.UtcNow = booking.Period.End.AddHours(1);
+        context.GivenBooking(booking);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.Period.End.AddMinutes(30)));
+
+        // Its records agree: nothing to hold it for.
+        context.Payments.ListForBookingAsync(booking.Id, Arg.Any<CancellationToken>()).Returns([payment]);
+        var agreeing = await context.Admin().Handle(Preview(ticket.Id, 18m, 0m, 0m), CancellationToken.None);
+        Assert.True(agreeing.IsSuccess, agreeing.IsFailure ? agreeing.Error.Code : null);
+        Assert.Empty(agreeing.Value.LedgerIssues);
+
+        // The payment that confirmed it is missing from its records: the ledger would hold it, and the preview says why.
+        context.Payments.ListForBookingAsync(booking.Id, Arg.Any<CancellationToken>()).Returns([]);
+        var contradicting = await context.Admin().Handle(Preview(ticket.Id, 18m, 0m, 0m), CancellationToken.None);
+        Assert.True(contradicting.IsSuccess, contradicting.IsFailure ? contradicting.Error.Code : null);
+        Assert.Equal(["ConfirmingPaymentMissing"], contradicting.Value.LedgerIssues);
+    }
+
+    /// <summary>
+    /// A decision made after a cancellation's window closed: the booking is final already, so the ledger records it once
+    /// its margin after the window has passed, and on its very next pass if that has passed too. The floor is never
+    /// "now plus the margin", which the ledger does not wait for (advisor's review of Wave 2).
+    /// </summary>
+    [Fact]
+    public async Task A_decision_after_the_window_closed_is_recorded_when_the_margin_after_the_window_passes()
+    {
+        var context = new Context();
+        var booking = CancelledByTheOffice(context);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.FinishedAt!.Value.AddHours(1)));
+        var windowEnds = booking.DisputeWindowEndsAt!.Value;
+        var margin = context.PayablesSettings.FinalityMargin;
+        var charge = booking.Penalty!.MinAmount.Amount;
+
+        // Inside the margin: the floor is the window's end plus the margin, not now plus it.
+        context.Clock.UtcNow = windowEnds.Add(margin / 2);
+        var inside = (await context.Admin().Handle(Preview(ticket.Id, 18m, 0m, 0m, charge), CancellationToken.None)).Value;
+        Assert.Equal(windowEnds.Add(margin), inside.RecordedNotBefore);
+        Assert.False(inside.RecordedAtNextPass);
+        // The window has closed: no further dispute can be opened on the booking.
+        Assert.Null(inside.FurtherDecisionsPossibleUntil);
+
+        // Past it: the next pass records it.
+        context.Clock.UtcNow = windowEnds.Add(margin * 3);
+        var past = (await context.Admin().Handle(Preview(ticket.Id, 18m, 0m, 0m, charge), CancellationToken.None)).Value;
+        Assert.Equal(context.Clock.UtcNow, past.RecordedNotBefore);
+        Assert.True(past.RecordedAtNextPass);
+        Assert.Null(past.FurtherDecisionsPossibleUntil);
+    }
+
     // ── The office's expected outcome (Wave 2 C1) ────────────────────────────────────────────────
+
+    /// <summary>
+    /// A second dispute still open on the booking will change the office's figures however long ago the window closed
+    /// (an SLA can outlast a window), and the office's copy of the first says so (advisor's review of Wave 2).
+    /// </summary>
+    [Fact]
+    public async Task The_offices_copy_says_when_another_dispute_on_the_booking_is_still_open()
+    {
+        var context = new Context();
+        var booking = CancelledByTheOffice(context);
+        var first = context.GivenTicket(OpenTicket(booking, booking.FinishedAt!.Value.AddHours(1)));
+        var charge = booking.Penalty!.MinAmount.Amount;
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(first.Id, 18m, 0m, 0m, charge, "The office cancelled late."), CancellationToken.None)).IsSuccess);
+        context.GivenResolved(booking, first);
+        context.Clock.UtcNow = booking.DisputeWindowEndsAt!.Value.AddHours(1);
+
+        var alone = (await context.Composer().ComposeAsync(first, booking, BookingParty.Dealer, CancellationToken.None)).ExpectedOutcome!;
+        Assert.False(alone.AnotherDisputeOpen);
+        Assert.Null(alone.FurtherDecisionsPossibleUntil);
+
+        context.Tickets.HasLiveTicketAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(true);
+        var withAnother = (await context.Composer().ComposeAsync(first, booking, BookingParty.Dealer, CancellationToken.None)).ExpectedOutcome!;
+        Assert.Equal(OfficeOutcomeSources.Projected, withAnother.Source);
+        Assert.True(withAnother.AnotherDisputeOpen);
+    }
 
     [Fact]
     public async Task The_offices_copy_of_a_decided_dispute_projects_what_it_comes_to_until_the_ledger_records_it()

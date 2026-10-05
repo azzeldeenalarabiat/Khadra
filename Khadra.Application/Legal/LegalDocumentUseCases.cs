@@ -136,7 +136,7 @@ public sealed class LegalDocumentHandlers(
         ArgumentNullException.ThrowIfNull(request);
 
         LegalDocumentKind? kind = null;
-        if (request.Kind is not null && (kind = LegalDocumentKind.FromSlug(request.Kind)) is null)
+        if (request.Kind is not null && (kind = LegalDocumentKind.FromNameOrSlug(request.Kind)) is null)
             return LegalErrors.KindUnknown;
 
         var now = clock.UtcNow;
@@ -232,7 +232,7 @@ public sealed class LegalDocumentHandlers(
         string? bodyAr,
         CancellationToken cancellationToken)
     {
-        var kind = LegalDocumentKind.FromSlug(kindName);
+        var kind = LegalDocumentKind.FromNameOrSlug(kindName);
         if (kind is null)
             return LegalErrors.KindUnknown;
         if (!LegalTextRules.WithinCeiling(bodyEn) || !LegalTextRules.WithinCeiling(bodyAr))

@@ -16,7 +16,9 @@ namespace Khadra.Application.Disputes.Dtos;
 /// <item>that the customer "was refunded": the refund is requested, and the payment sweep sends it;</item>
 /// <item>an exact recording time: <see cref="RecordedNotBefore"/> is a floor, not a promise;</item>
 /// <item>finality before a cancellation's or a no-show's dispute window closes: another dispute may still be opened
-/// until <see cref="FurtherDecisionsPossibleUntil"/>, and would change these figures.</item>
+/// until <see cref="FurtherDecisionsPossibleUntil"/>, and would change these figures;</item>
+/// <item>a recording at all while the booking's records contradict one another: the ledger holds such a booking for
+/// review instead, and <see cref="LedgerIssues"/> says why.</item>
 /// </list>
 /// </para>
 /// <para>
@@ -28,10 +30,23 @@ namespace Khadra.Application.Disputes.Dtos;
 /// <param name="OfficeState"><c>Final</c>, or <c>NotApplicable</c> when nothing was paid online.</param>
 /// <param name="Outcome">The payable's outcome, as the payouts page names it; null when not applicable.</param>
 /// <param name="Lines">The payable's lines, in the payouts page's shape. A line from this decision carries this ticket's id.</param>
-/// <param name="RecordedNotBefore">The earliest the ledger can record it: the later of now and the final moment, plus its margin.</param>
+/// <param name="RecordedNotBefore">
+/// The earliest the ledger can record it: the final moment plus the ledger's margin, and never before now. For a
+/// decision made after a cancellation's window closed that moment has passed, and <see cref="RecordedAtNextPass"/> says
+/// so.
+/// </param>
 /// <param name="FurtherDecisionsPossibleUntil">
 /// When the booking's dispute window closes, for a cancellation or a no-show; null for a returned booking, which the
 /// decision completes.
+/// </param>
+/// <param name="LedgerIssues">
+/// Where the booking's records already contradict one another (<c>FinancialIssues</c> codes, as the booking's Money
+/// section names them): the ledger HOLDS such a booking for review rather than recording it, whatever this decision
+/// says. Empty when they agree. Added after the advisor's review of Wave 2.
+/// </param>
+/// <param name="RecordedAtNextPass">
+/// Whether the booking is final and past the ledger's margin already, so the ledger's next pass records it. Decided
+/// here, on the server's clock, so a browser whose clock is behind cannot word it as a time still to come.
 /// </param>
 public sealed record ResolutionPreviewDto(
     string StatusAfter,
@@ -44,7 +59,9 @@ public sealed record ResolutionPreviewDto(
     ResolutionPreviewEarlierDto? EarlierDecisions,
     DateTimeOffset RecordedNotBefore,
     DateTimeOffset? FurtherDecisionsPossibleUntil,
-    int CalculatorVersion);
+    int CalculatorVersion,
+    IReadOnlyList<string> LedgerIssues,
+    bool RecordedAtNextPass);
 
 /// <param name="RefundRequested">What this decision returns to the customer: requested, and sent by the payment sweep.</param>
 public sealed record ResolutionPreviewCustomerDto(MoneyDto RefundRequested);

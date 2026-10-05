@@ -149,6 +149,11 @@ export interface OfficeExpectedOutcome {
   readonly finalAt: string;
   /** While a cancellation's or a no-show's dispute window is open, when it closes; another dispute may change this. */
   readonly furtherDecisionsPossibleUntil: string | null;
+  /**
+   * Another dispute on the booking is open right now, so its decision can still change these projected figures, even
+   * after the window closed. Added after the advisor's review of Wave 2; absent from an older API.
+   */
+  readonly anotherDisputeOpen?: boolean;
 }
 
 /**
@@ -185,6 +190,14 @@ export interface ResolutionPreview {
   readonly recordedNotBefore: string;
   readonly furtherDecisionsPossibleUntil: string | null;
   readonly calculatorVersion: number;
+  /**
+   * Where the booking's records already contradict one another (`financialIssue` codes): the payouts ledger HOLDS such a
+   * booking for review instead of recording it, whatever is decided. Empty when they agree. Added after the advisor's
+   * review of Wave 2; absent from an older API.
+   */
+  readonly ledgerIssues?: readonly string[];
+  /** The booking is final and past the ledger's margin already, so its next pass records it (the server's clock). */
+  readonly recordedAtNextPass?: boolean;
 }
 
 export interface EvidenceUpload {

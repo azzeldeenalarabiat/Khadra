@@ -46,6 +46,42 @@ public sealed class BookingAfterDisputeTests
         Assert.Equal(booking.DisputeWindowEndsAt, after.FurtherDisputesUntil);
     }
 
+    /// <summary>Decided after its window closed, a cancellation is final already and no further dispute can be opened.</summary>
+    [Fact]
+    public void A_cancellation_decided_after_its_window_closed_promises_no_further_disputes()
+    {
+        var (booking, _) = Build.PaidBooking();
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        var windowEnds = booking.DisputeWindowEndsAt!.Value;
+
+        var after = BookingDisputeSettlement.AfterResolution(booking, windowEnds.AddMinutes(30)).Value;
+
+        Assert.Equal(windowEnds, after.FinalAt);
+        Assert.Null(after.FurtherDisputesUntil);
+    }
+
+    /// <summary>
+    /// The settlement sweep completed the booking while the ticket was being opened: resolving leaves it as it is
+    /// (<c>CloseAfterDisputeResolved</c> succeeds as a no-op), and the preview says the same instead of refusing.
+    /// </summary>
+    [Fact]
+    public void A_booking_the_sweep_completed_stays_completed_and_final_when_it_finished()
+    {
+        var (booking, _) = Build.PaidBooking();
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, Id.New(), booking.Period.Start).IsSuccess);
+        Assert.True(booking.RecordReturn(BookingParty.Dealer, Id.New(), booking.Period.End).IsSuccess);
+        var settledAt = booking.DisputeWindowEndsAt!.Value.AddMinutes(1);
+        Assert.True(booking.Settle(settledAt, hasOpenDispute: false).IsSuccess);
+
+        var after = BookingDisputeSettlement.AfterResolution(booking, settledAt.AddMinutes(5)).Value;
+
+        Assert.Same(BookingStatus.Completed, after.Status);
+        Assert.Equal(booking.FinishedAt, after.FinalAt);
+        Assert.Null(after.FurtherDisputesUntil);
+        Assert.True(BookingDisputeSettlement.CloseAfterDispute(booking, Id.New(), settledAt.AddMinutes(5)).IsSuccess);
+        Assert.Equal(after.FinalAt, booking.FinishedAt);
+    }
+
     [Fact]
     public void A_booking_still_running_cannot_be_decided()
     {

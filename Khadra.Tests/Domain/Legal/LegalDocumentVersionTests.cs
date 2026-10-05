@@ -120,5 +120,17 @@ public sealed class LegalDocumentVersionTests
     [InlineData("cookies")]
     [InlineData("")]
     [InlineData(null)]
-    public void An_unknown_document_is_nothing(string? slug) => Assert.Null(LegalDocumentKind.FromSlug(slug));
+    public void An_unknown_document_is_nothing(string? slug)
+    {
+        Assert.Null(LegalDocumentKind.FromSlug(slug));
+        Assert.Null(LegalDocumentKind.FromNameOrSlug(slug));
+    }
+
+    /// <summary>An administrator's request names the kind as the console sends it, by name, or by its slug.</summary>
+    [Theory]
+    [InlineData("Terms", "Terms")]
+    [InlineData("privacy", "Privacy")]
+    [InlineData("PRIVACY", "Privacy")]
+    public void An_administrator_names_a_document_by_its_name_or_its_slug(string value, string kind) =>
+        Assert.Equal(kind, LegalDocumentKind.FromNameOrSlug(value)!.Name);
 }

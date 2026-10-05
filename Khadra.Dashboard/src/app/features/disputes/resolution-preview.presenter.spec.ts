@@ -132,6 +132,42 @@ describe("the administrator's preview", () => {
 
     expect(previewView(later, words(en), format).notes).toContain('These figures include the 2 earlier decisions on this booking.');
   });
+
+  // ── After the advisor's review of Wave 2 ─────────────────────────────────────────────────────────
+
+  it('says a cancellation stays what it is, and only a returned booking becomes completed', () => {
+    const cancelled: ResolutionPreview = { ...e3, statusAfter: 'Cancelled', outcome: 'DisputeDecided' };
+
+    expect(previewView(cancelled, words(en), format, 'Cancelled').statusLine).toBe('The booking stays Cancelled.');
+    expect(previewView(cancelled, words(ar), format, 'Cancelled').statusLine).toBe('تبقى حالة الحجز Cancelled.');
+    expect(previewView(e3, words(en), format, 'Returned').statusLine).toBe('The booking becomes Completed.');
+  });
+
+  it('promises no recording when the ledger will hold the booking for review, and says why', () => {
+    const held: ResolutionPreview = { ...e3, ledgerIssues: ['EndingRefundMissing', 'RefundsConflict'] };
+    const label = (_family: string, name: string | null | undefined) => `issue:${name}`;
+
+    const view = previewView(held, { ...words(en), label }, format);
+
+    expect(view.notes).toContain(
+      'The payouts ledger will hold this booking for review instead of recording it, because its records disagree:',
+    );
+    expect(view.notes).toContain('issue:EndingRefundMissing');
+    expect(view.notes).toContain('issue:RefundsConflict');
+    expect(view.notes.some((note) => note.includes('no earlier than'))).toBe(false);
+    expect(previewConfirmSentence(held, words(en), format)).toBe(
+      'The payouts ledger will hold this booking for review instead of recording it, because its records disagree.',
+    );
+  });
+
+  it('says a booking already final is recorded at the next pass, on the server’s word, not at a time to come', () => {
+    const final: ResolutionPreview = { ...e3, recordedAtNextPass: true, ledgerIssues: [] };
+
+    const notes = previewView(final, words(en), format).notes;
+
+    expect(notes).toContain('The booking is final already, so the payouts ledger records it at its next pass, within minutes.');
+    expect(notes.some((note) => note.includes('no earlier than'))).toBe(false);
+  });
 });
 
 describe("the office's reading of a decided dispute", () => {
@@ -166,5 +202,21 @@ describe("the office's reading of a decided dispute", () => {
     );
 
     expect(view.notes).toEqual(['As recorded in your payouts.']);
+  });
+
+  it('says another open dispute can still change the projection, however long ago the window closed', () => {
+    const view = officeOutcomeView(
+      { ...outcome, furtherDecisionsPossibleUntil: null, anotherDisputeOpen: true },
+      words(en),
+      format,
+    );
+
+    expect(view.notes).toEqual([
+      'Worked out from the decision. Your payouts will show these figures once the booking is recorded there.',
+      'Another dispute on this booking is still open, and its decision can change these figures.',
+    ]);
+    expect(officeOutcomeView({ ...outcome, anotherDisputeOpen: true }, words(ar), format).notes).toContain(
+      'ما زال نزاع آخر على هذا الحجز مفتوحًا، وقد يغيّر قراره هذه الأرقام.',
+    );
   });
 });

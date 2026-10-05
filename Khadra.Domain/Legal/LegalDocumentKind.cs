@@ -27,4 +27,13 @@ public sealed class LegalDocumentKind : Enumeration
     /// <summary>The kind a path segment names, or null for one this build does not know.</summary>
     public static LegalDocumentKind? FromSlug(string? slug) =>
         GetAll<LegalDocumentKind>().FirstOrDefault(kind => string.Equals(kind.Slug, slug, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// The kind an administrator's request names: by its name (<c>Terms</c>), as the console sends it, or else by its
+    /// slug. Asked by name first, so a later kind whose slug is not its lower-cased name is still found (advisor's review
+    /// of Wave 2). Null for one this build does not know.
+    /// </summary>
+    public static LegalDocumentKind? FromNameOrSlug(string? value) =>
+        GetAll<LegalDocumentKind>().FirstOrDefault(kind => string.Equals(kind.Name, value, StringComparison.OrdinalIgnoreCase))
+        ?? FromSlug(value);
 }

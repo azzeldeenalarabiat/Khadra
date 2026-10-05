@@ -139,6 +139,8 @@ public sealed class ResolutionPreviewLedgerTests : IDisposable
         Assert.Equal(preview.Office.Net.Amount, payable.Net);
         Assert.Equal(preview.CalculatorVersion, payable.CalculatorVersion);
         Assert.True(payable.RecordedAt >= preview.RecordedNotBefore);
+        // Recorded, not held: the ledger's check found nothing, and the preview had named nothing either.
+        Assert.Empty(preview.LedgerIssues);
     }
 
     [Fact]
@@ -186,6 +188,39 @@ public sealed class ResolutionPreviewLedgerTests : IDisposable
 
         await ResolveAsync(new ResolveDisputeCommand(ticket.Id, 18m, 0m, 0m, charge, "The office cancelled late."), decidedAt);
         // Not before its window closes, whatever was decided.
+        _harness.Now = booking.DisputeWindowEndsAt!.Value.AddMinutes(-1);
+        Assert.DoesNotContain(PayableStep.Recorded, await _harness.PassAsync());
+        _harness.Now = preview.RecordedNotBefore;
+        Assert.Contains(PayableStep.Recorded, await _harness.PassAsync());
+
+        var payable = Assert.Single(await _harness.PayablesAsync());
+        AssertRecordedAsPreviewed(preview, payable);
+        Assert.Equal(booking.DisputeWindowEndsAt, payable.FinalAt);
+    }
+
+    /// <summary>
+    /// A no-show: the customer's penalty is the whole deposit, and a dispute splits it instead. The booking stays a
+    /// no-show, final when its window closes, exactly as for a cancellation (the approved plan's NoShow case, added after
+    /// the advisor's review of Wave 2).
+    /// </summary>
+    [Fact]
+    public async Task A_no_shows_decision_is_recorded_as_previewed_once_its_window_closes()
+    {
+        _harness.Bookings.Now = _harness.Now;
+        var (paid, _) = await _harness.Bookings.PaidAsync(PaymentProviders.Sandbox);
+        var booking = await ChangeBookingAsync(paid.Id, stored =>
+            Assert.True(stored.MarkNoShow(stored.Period.Start.Add(stored.Terms.NoShowTimeout).AddMinutes(1)).IsSuccess));
+        Assert.Same(BookingStatus.NoShow, booking.Status);
+        Assert.Same(BookingParty.Customer, booking.Penalty!.AttributedTo);
+        var ticket = await OpenAsync(booking, booking.FinishedAt!.Value.AddMinutes(30));
+        var decidedAt = booking.FinishedAt.Value.AddHours(1);
+
+        // Half back to the customer, half to the office for the day it held the car.
+        var preview = await PreviewAsync(new PreviewDisputeResolutionQuery(ticket.Id, 9m, 0m, 9m, null, null), decidedAt);
+        Assert.Equal("NoShow", preview.StatusAfter);
+        Assert.Equal(booking.DisputeWindowEndsAt, preview.FurtherDecisionsPossibleUntil);
+
+        await ResolveAsync(new ResolveDisputeCommand(ticket.Id, 9m, 0m, 9m, null, "The customer was delayed, and said so."), decidedAt);
         _harness.Now = booking.DisputeWindowEndsAt!.Value.AddMinutes(-1);
         Assert.DoesNotContain(PayableStep.Recorded, await _harness.PassAsync());
         _harness.Now = preview.RecordedNotBefore;

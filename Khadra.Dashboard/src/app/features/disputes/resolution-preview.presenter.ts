@@ -24,8 +24,18 @@ export interface PreviewView {
   readonly notes: readonly string[];
 }
 
-/** The administrator's preview, beneath the amounts and again in the confirmation. */
-export function previewView(preview: ResolutionPreview, words: PreviewWords, format: PayoutFormat): PreviewView {
+/**
+ * The administrator's preview, beneath the amounts and again in the confirmation.
+ *
+ * `statusBefore` is the booking's status as the dispute shows it now: a cancellation or a no-show "stays" what it is,
+ * and only a returned booking "becomes" completed.
+ */
+export function previewView(
+  preview: ResolutionPreview,
+  words: PreviewWords,
+  format: PayoutFormat,
+  statusBefore?: string,
+): PreviewView {
   const t = words.t;
   const rows: KeyValue[] = [
     { k: t('disputePreview.refundRequested'), v: format.money(preview.customer.refundRequested) },
@@ -35,7 +45,7 @@ export function previewView(preview: ResolutionPreview, words: PreviewWords, for
 
   if (preview.officeState !== 'Final') {
     notes.push(t('disputePreview.notApplicable'));
-    return { statusLine: statusLine(preview, words), rows, lines: [], net: null, notes };
+    return { statusLine: statusLine(preview, words, statusBefore), rows, lines: [], net: null, notes };
   }
 
   // The office's part is the payable's own lines, as the payouts page shows them: its money, less the commission
@@ -47,11 +57,11 @@ export function previewView(preview: ResolutionPreview, words: PreviewWords, for
     }),
   );
   if (preview.earlierDecisions) notes.push(t('disputePreview.earlier', { count: preview.earlierDecisions.count }));
-  notes.push(...timing(preview.recordedNotBefore, preview.furtherDecisionsPossibleUntil, words, format));
+  notes.push(...timing(preview, words, format));
   notes.push(t('disputePreview.settledByHand'));
 
   return {
-    statusLine: statusLine(preview, words),
+    statusLine: statusLine(preview, words, statusBefore),
     rows,
     lines: preview.lines.map((line) => lineRow(line, words, format)),
     net: netText(preview.office.net, 'admin', words, format),
@@ -59,10 +69,14 @@ export function previewView(preview: ResolutionPreview, words: PreviewWords, for
   };
 }
 
-/** One sentence for the confirmation dialog: what the ledger will record, and until when it may still change. */
+/**
+ * One sentence for the confirmation dialog: what the ledger will record, and until when it may still change. A booking
+ * whose records disagree is not promised a recording at all: the ledger holds it for review (advisor's review of Wave 2).
+ */
 export function previewConfirmSentence(preview: ResolutionPreview, words: PreviewWords, format: PayoutFormat): string {
   const t = words.t;
   if (preview.officeState !== 'Final') return t('disputePreview.notApplicable');
+  if (preview.ledgerIssues?.length) return t('disputePreview.confirmHeld');
   const net = netText(preview.office.net, 'admin', words, format).text;
   return preview.furtherDecisionsPossibleUntil
     ? t('disputePreview.confirmUntil', { net, when: format.dateTime(preview.furtherDecisionsPossibleUntil) })
@@ -78,6 +92,8 @@ export function officeOutcomeView(outcome: OfficeExpectedOutcome, words: PayoutW
   if (outcome.furtherDecisionsPossibleUntil) {
     notes.push(t('disputePreview.untilWindowOffice', { when: format.dateTime(outcome.furtherDecisionsPossibleUntil) }));
   }
+  // However long ago the window closed, an open dispute can still change a projection (advisor's review of Wave 2).
+  if (outcome.anotherDisputeOpen) notes.push(t('officeOutcome.anotherOpen'));
   return {
     statusLine: '',
     rows: [],
@@ -87,12 +103,29 @@ export function officeOutcomeView(outcome: OfficeExpectedOutcome, words: PayoutW
   };
 }
 
-function statusLine(preview: ResolutionPreview, words: PreviewWords): string {
-  return words.t('disputePreview.statusAfter', { status: words.status(preview.statusAfter) });
+function statusLine(preview: ResolutionPreview, words: PreviewWords, statusBefore?: string): string {
+  const status = words.status(preview.statusAfter);
+  return statusBefore === preview.statusAfter
+    ? words.t('disputePreview.statusStays', { status })
+    : words.t('disputePreview.statusAfter', { status });
 }
 
-function timing(notBefore: string, until: string | null, words: PreviewWords, format: PayoutFormat): string[] {
-  const lines = [words.t('disputePreview.recordedNotBefore', { when: format.dateTime(notBefore) })];
-  if (until) lines.push(words.t('disputePreview.untilWindow', { when: format.dateTime(until) }));
+/**
+ * When the ledger records it, as the server judged it. A booking whose records disagree is held, not recorded, so it
+ * is given the reasons instead of a time; one already final records at the next pass; anything else no earlier than
+ * the floor. And, for a cancellation or a no-show, until when another dispute may still change it.
+ */
+function timing(preview: ResolutionPreview, words: PreviewWords, format: PayoutFormat): string[] {
+  const t = words.t;
+  const lines = preview.ledgerIssues?.length
+    ? [t('disputePreview.ledgerHolds'), ...preview.ledgerIssues.map((code) => words.label('financialIssue', code))]
+    : [
+        preview.recordedAtNextPass
+          ? t('disputePreview.recordedNextPass')
+          : t('disputePreview.recordedNotBefore', { when: format.dateTime(preview.recordedNotBefore) }),
+      ];
+  if (preview.furtherDecisionsPossibleUntil) {
+    lines.push(t('disputePreview.untilWindow', { when: format.dateTime(preview.furtherDecisionsPossibleUntil) }));
+  }
   return lines;
 }

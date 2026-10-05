@@ -35,6 +35,7 @@ const TEXT_REASONS: Readonly<Record<string, TranslationKey>> = {
   link: 'legal.reasonLink',
   heading: 'legal.reasonHeading',
   code: 'legal.reasonCode',
+  nesting: 'legal.reasonNesting',
   unsupported: 'legal.reasonUnsupported',
 };
 

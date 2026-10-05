@@ -37,8 +37,8 @@ public interface ILegalTextRenderer
 
 /// <param name="Line">The line it is on, from 1.</param>
 /// <param name="Reason">
-/// A stable code a console words: <c>html</c>, <c>image</c>, <c>link</c>, <c>heading</c>, <c>code</c> or
-/// <c>unsupported</c>.
+/// A stable code a console words: <c>html</c>, <c>image</c>, <c>link</c>, <c>heading</c>, <c>code</c>,
+/// <c>nesting</c> (lists, quotes or emphasis nested deeper than the renderer goes) or <c>unsupported</c>.
 /// </param>
 public sealed record LegalTextProblem(int Line, string Reason)
 {
@@ -47,5 +47,6 @@ public sealed record LegalTextProblem(int Line, string Reason)
     public const string Link = "link";
     public const string Heading = "heading";
     public const string Code = "code";
+    public const string Nesting = "nesting";
     public const string Unsupported = "unsupported";
 }

@@ -362,7 +362,7 @@ export class DisputeDetailComponent {
 
   protected readonly previewShown = computed(() => {
     const preview = this.preview();
-    return preview ? previewView(preview, this.previewWords(), this.previewFormat) : null;
+    return preview ? previewView(preview, this.previewWords(), this.previewFormat, this.dispute()?.booking.status) : null;
   });
 
   protected readonly canResolve = computed(

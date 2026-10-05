@@ -50,6 +50,15 @@ describe('a refused preview or publish', () => {
     expect(legalRefusal(partial, en, 'en')).toBe('One of the texts uses something that cannot be published.');
   });
 
+  it('words Markdown nested too deeply to render, with the line it starts on', () => {
+    const problem = refused({ code: 'legal.text_unsupported', language: 'en', line: 5, reason: 'nesting' });
+
+    expect(legalRefusal(problem, en, 'en')).toBe(
+      'The English text cannot be published as it stands. Line 5 nests lists, quotes or emphasis deeper than a page can show.',
+    );
+    expect(legalRefusal(problem, ar, 'ar')).toContain('يضع القوائم أو الاقتباسات أو التنسيق بعضها داخل بعض');
+  });
+
   it('words a reason this build does not know as unpublished Markdown', () => {
     const problem = refused({ code: 'legal.text_unsupported', language: 'en', line: 2, reason: 'tables' });
 

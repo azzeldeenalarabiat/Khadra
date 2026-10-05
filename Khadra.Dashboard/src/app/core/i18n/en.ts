@@ -3733,6 +3733,7 @@ export const EN = {
   'disputePreview.working': 'Working out what this decision does…',
   'disputePreview.waiting': 'Shown once the three amounts add up to the deposit held.',
   'disputePreview.statusAfter': 'The booking becomes {status}.',
+  'disputePreview.statusStays': 'The booking stays {status}.',
   'disputePreview.refundRequested': 'Refund requested to the customer',
   'disputePreview.keptByKhadra': 'Kept by Khadra from the deposit',
   'disputePreview.officeLines': 'For the office, as the payouts ledger will record it',
@@ -3743,15 +3744,21 @@ export const EN = {
     other: 'These figures include the {count} earlier decisions on this booking.',
   },
   'disputePreview.recordedNotBefore': 'The payouts ledger records it no earlier than {when}.',
+  'disputePreview.recordedNextPass': 'The booking is final already, so the payouts ledger records it at its next pass, within minutes.',
+  'disputePreview.ledgerHolds':
+    'The payouts ledger will hold this booking for review instead of recording it, because its records disagree:',
   'disputePreview.untilWindow': 'If nothing else is decided on this booking before {when}: another dispute may still be opened until then.',
   'disputePreview.untilWindowOffice': 'If nothing else is decided on this booking before {when}: another dispute may still be opened until then.',
   'disputePreview.settledByHand': 'The office is paid only when an administrator settles its payouts, and a payable can be held.',
   'disputePreview.notApplicable': 'Nothing was paid online for this booking, so the payouts ledger records nothing for it.',
   'disputePreview.confirm': 'As the payouts ledger will record it: {net}.',
   'disputePreview.confirmUntil': 'As the payouts ledger will record it: {net}, if nothing else is decided on this booking before {when}.',
+  'disputePreview.confirmHeld':
+    'The payouts ledger will hold this booking for review instead of recording it, because its records disagree.',
   'officeOutcome.title': 'What this decision comes to for you',
   'officeOutcome.projected': 'Worked out from the decision. Your payouts will show these figures once the booking is recorded there.',
   'officeOutcome.recorded': 'As recorded in your payouts.',
+  'officeOutcome.anotherOpen': 'Another dispute on this booking is still open, and its decision can change these figures.',
   'officeOutcome.openPayouts': 'Open your payouts',
 
   // ── The legal texts (Wave 2 G1) ──────────────────────────────────────────────────────────────────
@@ -3824,6 +3831,7 @@ export const EN = {
     'has a link that goes somewhere other than https:, mailto: or a page on this site',
   'legal.reasonHeading': 'has a heading deeper than ####',
   'legal.reasonCode': 'has code (a line indented by four spaces counts as code)',
+  'legal.reasonNesting': 'nests lists, quotes or emphasis deeper than a page can show',
   'legal.reasonUnsupported': 'uses Markdown that is not published',
   'legal.linksLabel': 'Legal',
   'auditLog.actionLegalDocumentPublished': 'Legal document published',

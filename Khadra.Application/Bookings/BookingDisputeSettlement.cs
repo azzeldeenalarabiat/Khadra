@@ -73,17 +73,21 @@ public static class BookingDisputeSettlement
     /// The decision's preview reads this, so what an administrator is shown and what resolving does cannot part. A
     /// returned booking is completed by the decision, and final at it: a completed booking cannot be disputed again.
     /// A cancellation or a no-show is already over and stays as it is, final only when its frozen dispute window
-    /// closes, because another dispute may be opened until then. Nothing else is resolved.
+    /// closes, because another dispute may be opened until then; once it has closed, none can. A booking the
+    /// settlement sweep completed while the ticket was being opened stays completed, final when it finished, as
+    /// <c>Booking.CloseAfterDisputeResolved</c> leaves it (advisor's review of Wave 2). Nothing else is resolved.
     /// </remarks>
     public static Result<BookingAfterDispute, Error> AfterResolution(Booking booking, DateTimeOffset decidedAt)
     {
         ArgumentNullException.ThrowIfNull(booking);
         if (booking.Status == BookingStatus.Returned)
             return new BookingAfterDispute(BookingStatus.Completed, decidedAt, null);
+        if (booking.Status == BookingStatus.Completed)
+            return new BookingAfterDispute(BookingStatus.Completed, booking.FinishedAt ?? decidedAt, null);
         if ((booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.NoShow) &&
             booking.DisputeWindowEndsAt is { } windowEnds)
         {
-            return new BookingAfterDispute(booking.Status, windowEnds, windowEnds);
+            return new BookingAfterDispute(booking.Status, windowEnds, windowEnds > decidedAt ? windowEnds : null);
         }
 
         return BookingErrors.NotReturned;

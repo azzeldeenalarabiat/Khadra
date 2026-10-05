@@ -202,6 +202,10 @@ public sealed partial class DisputeViewComposer(
         if (office.Outcome is null)
             return null;
 
+        // This ticket is decided, so a live ticket on the booking is another one, and its decision will change these
+        // figures however long ago the window closed: the ledger waits for it too (advisor's review of Wave 2).
+        var anotherOpen = await tickets.HasLiveTicketAsync(booking.Id, cancellationToken);
+
         MoneyDto Projected(decimal amount) => new(Money.AtScale(amount), currency);
         return new OfficeExpectedOutcomeDto(
             OfficeOutcomeSources.Projected,
@@ -214,7 +218,8 @@ public sealed partial class DisputeViewComposer(
             office.Lines.Select(line => new PayableLineDto(line.Kind.Name, Projected(line.Amount), line.SourceId?.Value)).ToList(),
             final,
             // Another dispute may still be opened on a cancellation or a no-show until its window closes.
-            booking.Status != BookingStatus.Completed && now < final ? final : null);
+            booking.Status != BookingStatus.Completed && now < final ? final : null,
+            anotherOpen);
     }
 
     /// <summary>

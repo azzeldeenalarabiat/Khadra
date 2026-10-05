@@ -87,6 +87,11 @@ public sealed record DisputeDto(
 /// While a cancellation's or a no-show's dispute window is still open, when it closes: until then another dispute may
 /// change these figures. Null once nothing can.
 /// </param>
+/// <param name="AnotherDisputeOpen">
+/// Whether another dispute on the booking is open right now, so its decision can still change these projected figures
+/// even after the window closed (an SLA can outlast a window). Always false once recorded. Added after the advisor's
+/// review of Wave 2.
+/// </param>
 public sealed record OfficeExpectedOutcomeDto(
     string Source,
     Guid? PayableId,
@@ -97,7 +102,8 @@ public sealed record OfficeExpectedOutcomeDto(
     MoneyDto Net,
     IReadOnlyList<Payables.Dtos.PayableLineDto> Lines,
     DateTimeOffset FinalAt,
-    DateTimeOffset? FurtherDecisionsPossibleUntil);
+    DateTimeOffset? FurtherDecisionsPossibleUntil,
+    bool AnotherDisputeOpen = false);
 
 /// <summary>Where an office's expected outcome comes from: see <see cref="OfficeExpectedOutcomeDto"/>.</summary>
 public static class OfficeOutcomeSources

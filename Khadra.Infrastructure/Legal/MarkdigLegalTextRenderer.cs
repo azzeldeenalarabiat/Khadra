@@ -25,6 +25,11 @@ namespace Khadra.Infrastructure.Legal;
 /// <b>Rendered with HTML parsing OFF</b> as a second layer. A text that passed the check contains no HTML, so both
 /// parses agree on it. Clients add a third layer: Angular sanitises <c>innerHTML</c>.
 /// </para>
+/// <para>
+/// <b>Nothing too deep for Markdig.</b> Markdig refuses Markdown nested beyond its own limits by throwing, in the parser
+/// for blocks and in the HTML renderer for emphasis. The check runs both passes, so a text the public page could not
+/// render is refused before it is published, never answered later with a 500 to every reader.
+/// </para>
 /// </remarks>
 internal sealed class MarkdigLegalTextRenderer : ILegalTextRenderer
 {
@@ -47,7 +52,9 @@ internal sealed class MarkdigLegalTextRenderer : ILegalTextRenderer
     {
         ArgumentNullException.ThrowIfNull(markdown);
 
-        var document = Markdown.Parse(markdown, Checking);
+        if (!Manageable(markdown, out var document))
+            return new LegalTextProblem(FirstUnmanageableLine(markdown), LegalTextProblem.Nesting);
+
         foreach (var node in document.Descendants())
         {
             var reason = Refusal(node);
@@ -62,6 +69,56 @@ internal sealed class MarkdigLegalTextRenderer : ILegalTextRenderer
     {
         ArgumentNullException.ThrowIfNull(markdown);
         return Markdown.ToHtml(markdown, Rendering);
+    }
+
+    /// <summary>
+    /// Whether both passes take the text: Markdig throws <see cref="ArgumentException"/> on Markdown nested past its
+    /// limits ("too deeply nested"), the only exception it raises for a string it was given.
+    /// </summary>
+    private static bool Manageable(string markdown, out MarkdownDocument document)
+    {
+        try
+        {
+            document = Markdown.Parse(markdown, Checking);
+            _ = Markdown.ToHtml(markdown, Rendering);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            document = null!;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The line a too-deep text first becomes unmanageable on, so the administrator can find it: the shortest prefix of
+    /// whole lines that one of the passes refuses, found by halving. Only ever run on a text already refused, so its
+    /// cost (a few dozen parses at most) is paid for pathological input alone.
+    /// </summary>
+    private static int FirstUnmanageableLine(string markdown)
+    {
+        var ends = new List<int>();
+        for (var index = 0; index < markdown.Length; index++)
+        {
+            if (markdown[index] == '\n')
+                ends.Add(index + 1);
+        }
+
+        if (ends.Count == 0 || ends[^1] != markdown.Length)
+            ends.Add(markdown.Length);
+
+        var low = 0;
+        var high = ends.Count - 1;
+        while (low < high)
+        {
+            var middle = (low + high) / 2;
+            if (Manageable(markdown[..ends[middle]], out _))
+                low = middle + 1;
+            else
+                high = middle;
+        }
+
+        return low + 1;
     }
 
     /// <summary>Why a node cannot be published, or null when it can.</summary>

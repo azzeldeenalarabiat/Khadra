@@ -51,6 +51,8 @@ this batch (decision D6).
 | 2 | `chargedToDealerEarlier` and `slaState` on the dispute DTO | additive | none: null on the customer's and the office's copies; named-key parsing ignores them |
 | 2 | `POST /api/v1/admin/disputes/{id}/resolution-preview` | new endpoint | none: administrators only |
 | 2 | `expectedOutcome` on the office's copy of a decided dispute | additive | none: the app never receives an office's copy |
+| 2 | After the advisor's review: `ledgerIssues` and `recordedAtNextPass` on the resolution preview, and `anotherDisputeOpen` on `expectedOutcome` | additive | none: administrators' and offices' copies only |
+| 2 | `legal.text_unsupported` may carry the reason `nesting` (Markdown nested deeper than the renderer goes) | new value | none: administrators only |
 | 2 | A refund an administrator's dispute decision or cancellation ordered raises its notification with the actor `Khadra` (no actor id); push and email have a platform wording | value, wording | the in-app line reads "Khadra: your payment has been refunded"; no new kind, so no unknown-kind line |
 | 2 | `GET /api/v1/legal-documents/{terms|privacy}/current`: anonymous, public cache 300 s, weak ETag. The approved scope named `/legal-documents/current`; the advisor's review made it one document per call, before any app reads it | new endpoint | none until 1.4.0 reads it |
 | 2 | `legal` block on `/app-config`: each text in force and its page URLs; null when the database cannot be read ("not known", never "nothing published") | additive | none: ignored by named-key parsing |

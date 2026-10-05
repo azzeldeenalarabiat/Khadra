@@ -45,6 +45,29 @@ public sealed class LegalTextRendererTests
     public void Anything_outside_the_subset_is_refused_with_its_line(string markdown, int line, string reason) =>
         Assert.Equal(new LegalTextProblem(line, reason), Check(markdown));
 
+    /// <summary>
+    /// Markdown nested past Markdig's own limits is refused, with the line it starts failing on (advisor's review of
+    /// Wave 2). Markdig throws on it: in the parser for quotes and lists, in the HTML renderer alone for emphasis. Thrown
+    /// through, the first was a 500 for the administrator, and the second would have passed the check and then broken
+    /// the public page for every reader.
+    /// </summary>
+    [Fact]
+    public void Markdown_nested_past_the_renderers_limits_is_refused_with_its_line()
+    {
+        const int MaxBody = 200_000;
+        var quotes = new string('>', MaxBody - 2) + " x";
+        var lists = string.Concat(Enumerable.Repeat("- ", (MaxBody - 1) / 2)) + "x";
+        var emphasis = new string('*', MaxBody / 2 - 1) + "x" + new string('*', MaxBody / 2 - 1);
+
+        Assert.Equal(new LegalTextProblem(1, LegalTextProblem.Nesting), Check(quotes));
+        Assert.Equal(new LegalTextProblem(1, LegalTextProblem.Nesting), Check(lists));
+        Assert.Equal(new LegalTextProblem(1, LegalTextProblem.Nesting), Check(emphasis));
+        Assert.Equal(new LegalTextProblem(5, LegalTextProblem.Nesting), Check("Fine.\n\nStill fine.\n\n" + emphasis));
+
+        // Nesting a legal text actually uses is untouched.
+        Assert.Null(Check("> Quoted\n>\n> - a point\n>   - and a sub-point with *emphasis*"));
+    }
+
     /// <summary>Links are judged on their DECODED target: an entity or a backslash cannot smuggle a scheme in.</summary>
     [Theory]
     [InlineData("[x](javascript:alert(1))")]

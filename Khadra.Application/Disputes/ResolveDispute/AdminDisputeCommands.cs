@@ -352,7 +352,20 @@ public sealed class AdminDisputeHandlers(
             .ToList();
         var office = BookingFinancialsCalculator.OfficeAtFinality(booking, after.Value.Status, after.Value.FinalAt, decided, currency);
 
-        return ResolutionPreview(booking, ticket, disposition, office, earlier, after.Value, now, currency);
+        // The ledger's own consistency check, on the records as they stand (advisor's review of Wave 2): a booking whose
+        // records contradict one another is HELD for review instead of recorded, whatever this decision says, and the
+        // preview must not promise otherwise. Read with this ticket live, as the ledger would read the booking now. The
+        // decision cannot add a contradiction of its own: its shares balance by construction, and its refund has the
+        // ticket for a cause.
+        var ledgerIssues = BookingFinancialsCalculator.Calculate(
+                booking,
+                await payments.ListForBookingAsync(booking.Id, cancellationToken),
+                earlier,
+                hasLiveDispute: true,
+                now)
+            .Issues;
+
+        return ResolutionPreview(booking, ticket, disposition, office, earlier, after.Value, ledgerIssues, now, currency);
     }
 
     private ResolutionPreviewDto ResolutionPreview(
@@ -362,12 +375,18 @@ public sealed class AdminDisputeHandlers(
         OfficePosition office,
         List<DisputeTicket> earlier,
         BookingAfterDispute after,
+        IReadOnlyList<string> ledgerIssues,
         DateTimeOffset now,
         string currency)
     {
         MoneyDto Of(decimal amount) => new(Money.AtScale(amount), currency);
 
-        var notBefore = (now > after.FinalAt ? now : after.FinalAt).Add(payables.FinalityMargin);
+        // The ledger takes a booking once it is final and the margin has passed (advisor's review of Wave 2). A decision
+        // made after a cancellation's window closed can find that moment already behind it: the next pass records it
+        // then, and the floor is now, not now plus the margin.
+        var ready = after.FinalAt.Add(payables.FinalityMargin);
+        var atNextPass = ready <= now;
+        var notBefore = atNextPass ? now : ready;
         var earlierDecisions = earlier.Count == 0
             ? null
             : new ResolutionPreviewEarlierDto(
@@ -394,7 +413,9 @@ public sealed class AdminDisputeHandlers(
             earlierDecisions,
             notBefore,
             after.FurtherDisputesUntil,
-            BookingFinancials.CalculatorVersion);
+            BookingFinancials.CalculatorVersion,
+            ledgerIssues,
+            atNextPass);
     }
 
     /// <summary>A decision that passed every check, and the facts it was checked against.</summary>
