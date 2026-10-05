@@ -362,6 +362,48 @@
               }
             </div>
 
+            <!-- What the decision does to the money (Wave 2 C1; E2E F37): the server's figures for exactly this
+                 split, from the office function the payouts ledger itself records with. -->
+            <div class="preview-box stack stack-9" aria-live="polite">
+              <span class="k">{{ t('disputePreview.title') }}</span>
+              @if (previewShown(); as view) {
+                <div class="page-sub">{{ view.statusLine }}</div>
+                <div class="kv-body">
+                  @for (row of view.rows; track row.k) {
+                    <div class="kv-split">
+                      <div class="kv-key">{{ row.k }}</div>
+                      <div class="kv-val num">{{ row.v }}</div>
+                    </div>
+                  }
+                </div>
+                @if (view.lines.length) {
+                  <span class="k">{{ t('disputePreview.officeLines') }}</span>
+                  <div class="kv-body">
+                    @for (line of view.lines; track $index) {
+                      <div class="kv-split">
+                        <div class="kv-key">{{ line.label }}</div>
+                        <div class="kv-val num">{{ line.amount }}</div>
+                      </div>
+                    }
+                  </div>
+                }
+                @if (view.net; as net) {
+                  <div class="money-line" [class]="'s-' + net.tone">
+                    <span class="k-label">{{ net.text }}</span>
+                  </div>
+                }
+                @for (note of view.notes; track $index) {
+                  <div class="field-hint">{{ note }}</div>
+                }
+              } @else if (previewProblemText(); as message) {
+                <div class="field-error" role="status">{{ message }}</div>
+              } @else if (previewPending()) {
+                <div class="field-hint">{{ t('disputePreview.working') }}</div>
+              } @else {
+                <div class="field-hint">{{ t('disputePreview.waiting') }}</div>
+              }
+            </div>
+
             <div class="field">
               <label for="admin-note">{{ t('disputeDetail.adminNoteRequired') }}</label>
               <textarea

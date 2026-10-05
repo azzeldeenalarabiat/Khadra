@@ -27,6 +27,8 @@ import {
 } from '../../core/models/disputes.api';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { decidedEarlier, earlierDecisionNotice } from '../disputes/earlier-decisions.presenter';
+import { officeOutcomeView } from '../disputes/resolution-preview.presenter';
+import { PayoutFormat } from '../payouts/payouts.presenter';
 
 /**
  * A dispute from the dealer's side (spec 3.3).
@@ -66,6 +68,22 @@ export class DealerDisputeComponent {
   /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
   private readonly data = loaded(this.resource);
   protected readonly dispute = computed(() => this.data() ?? null);
+
+  private readonly outcomeFormat: PayoutFormat = {
+    money: (value) => this.formats.money(value.amount, value.currency),
+    dateTime: (iso) => this.formats.dateTime(iso),
+    day: (isoDay) => this.formats.calendarDay(isoDay),
+  };
+
+  /**
+   * What the decision comes to for the office's money (Wave 2 C1; E2E F37): the payable its Payouts page will show, or
+   * shows already. The server's figures, from the one office function the payouts ledger uses.
+   */
+  protected readonly outcome = computed(() => {
+    const outcome = this.dispute()?.expectedOutcome;
+    this.i18n.lang();
+    return outcome ? officeOutcomeView(outcome, { t: this.t, label: this.i18n.enumLabel }, this.outcomeFormat) : null;
+  });
   protected readonly body = signal('');
   protected readonly busy = signal(false);
   /** The last refusal, held as facts: its words are chosen below, so a language switch re-words it. */

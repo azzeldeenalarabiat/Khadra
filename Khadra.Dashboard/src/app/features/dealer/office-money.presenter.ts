@@ -62,7 +62,7 @@ export function officeMoney(financials: BookingFinancials, t: Translate, format:
       k: t('dealerBooking.platformCommissionFrozen', {
         rate: commissionRate(t, format.percent(commission.percent), commission.basis),
       }),
-      v: commissionText(t, commission, format),
+      v: commissionText(t, commission, format, 'office'),
     });
   }
   lines.push(...payoutLines(financials, t, format));

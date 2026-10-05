@@ -3158,7 +3158,8 @@ export const AR = {
   'money.commission.projected': '{amount} · إن دُفع الحجز',
   'money.commission.expected': '{amount} · متوقعة',
   'money.commission.earned': '{amount} · مكتسبة',
-  'money.commission.undecided': '{amount} · لم تُحسم بعد',
+  'money.commission.undecided': '{amount} · تُحسم حين يصبح الحجز نهائيًا، ولا تتجاوز أبدًا أموال المكتب عليه',
+  'money.commission.undecidedOffice': '{amount} · تُحسم حين يصبح الحجز نهائيًا، ولا تتجاوز أبدًا أموالك عليه',
   'money.commission.notEarned': 'غير مكتسبة — أُعيدت الدفعة',
   'money.commission.notApplicable': 'لا شيء — لم يُدفع الحجز',
 
@@ -3807,6 +3808,35 @@ export const AR = {
     'لم يعد ممكنًا ردّ مبلغ من دفعة العميل، فلم يُحسم شيء. أعد تحميل التذكرة.',
   'disputeDetail.refundExceedsCapture':
     'حصة العميل أكبر مما تبقّى من دفعته للردّ، فلم يُحسم شيء.',
+
+  // ── ما يفعله قرار النزاع بالأموال (Wave 2 C1) ─────────────────────────────────────────────────────
+  'disputePreview.title': 'ما يفعله هذا القرار بالأموال',
+  'disputePreview.working': 'جارٍ حساب أثر هذا القرار…',
+  'disputePreview.waiting': 'يظهر حين تساوي المبالغ الثلاثة العربون المحتجَز.',
+  'disputePreview.statusAfter': 'تصبح حالة الحجز {status}.',
+  'disputePreview.refundRequested': 'استرداد مطلوب للعميل',
+  'disputePreview.keptByKhadra': 'تحتفظ به خضرا من العربون',
+  'disputePreview.officeLines': 'للمكتب، كما سيسجّله سجل المستحقات',
+  'disputePreview.commissionCapped': 'العمولة المثبّتة على الحجز {frozen}، ولا تتجاوز أبدًا أموال المكتب عليه، وهي هنا {money}.',
+  'disputePreview.earlier': {
+    zero: 'لا تشمل هذه الأرقام أي قرار سابق على هذا الحجز.',
+    one: 'تشمل هذه الأرقام القرار السابق على هذا الحجز.',
+    two: 'تشمل هذه الأرقام القرارين السابقين على هذا الحجز.',
+    few: 'تشمل هذه الأرقام {count} قرارات سابقة على هذا الحجز.',
+    many: 'تشمل هذه الأرقام {count} قرارًا سابقًا على هذا الحجز.',
+    other: 'تشمل هذه الأرقام {count} قرار سابق على هذا الحجز.',
+  },
+  'disputePreview.recordedNotBefore': 'يسجّله سجل المستحقات في موعد لا يسبق {when}.',
+  'disputePreview.untilWindow': 'إن لم يُقرَّر شيء آخر على هذا الحجز قبل {when}: يبقى فتح نزاع آخر ممكنًا حتى ذلك الحين.',
+  'disputePreview.untilWindowOffice': 'إن لم يُقرَّر شيء آخر على هذا الحجز قبل {when}: يبقى فتح نزاع آخر ممكنًا حتى ذلك الحين.',
+  'disputePreview.settledByHand': 'لا يُدفع للمكتب إلا حين يسوّي مشرف تحويلاته، ويجوز تعليق المستحق.',
+  'disputePreview.notApplicable': 'لم يُدفع شيء عبر الإنترنت لهذا الحجز، فلا يسجّل له سجل المستحقات شيئًا.',
+  'disputePreview.confirm': 'كما سيسجّله سجل المستحقات: {net}.',
+  'disputePreview.confirmUntil': 'كما سيسجّله سجل المستحقات: {net}، إن لم يُقرَّر شيء آخر على هذا الحجز قبل {when}.',
+  'officeOutcome.title': 'ما يعنيه هذا القرار لك',
+  'officeOutcome.projected': 'محسوب من القرار. وستظهر هذه الأرقام في التحويلات حين يُسجَّل الحجز هناك.',
+  'officeOutcome.recorded': 'كما سُجّل في التحويلات.',
+  'officeOutcome.openPayouts': 'افتح التحويلات',
 
   // ── النصوص القانونية (Wave 2 G1) ─────────────────────────────────────────────────────────────────
   'nav.legalDocuments': 'المستندات القانونية',

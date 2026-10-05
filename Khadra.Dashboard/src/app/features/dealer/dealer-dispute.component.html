@@ -92,6 +92,37 @@
           </div>
         </div>
       </section>
+
+      <!-- What the decision comes to for the office's money (Wave 2 C1): the payable its Payouts page shows, or will. -->
+      @if (outcome(); as view) {
+        <section class="sect">
+          <div class="sect-h">
+            <kh-icon name="currency-circle-dollar" class="kpi-icon" />
+            <span class="sect-t">{{ t('officeOutcome.title') }}</span>
+          </div>
+          <div class="sect-pad stack stack-9">
+            <div class="kv-body">
+              @for (line of view.lines; track $index) {
+                <div class="kv-split">
+                  <div class="kv-key">{{ line.label }}</div>
+                  <div class="kv-val num">{{ line.amount }}</div>
+                </div>
+              }
+            </div>
+            @if (view.net; as net) {
+              <div class="money-line" [class]="'s-' + net.tone">
+                <span class="k-label outcome-net">{{ net.text }}</span>
+              </div>
+            }
+            @for (note of view.notes; track $index) {
+              <div class="field-hint">{{ note }}</div>
+            }
+            <div>
+              <a class="btn btn-secondary btn-sm" routerLink="/dealer/payouts">{{ t('officeOutcome.openPayouts') }}</a>
+            </div>
+          </div>
+        </section>
+      }
     }
 
     <section class="sect">

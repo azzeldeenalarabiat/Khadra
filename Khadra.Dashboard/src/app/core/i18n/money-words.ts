@@ -90,7 +90,12 @@ export function balanceLines(t: Translate, balance: FinancialBalance, format: Mo
  * Khadra's commission, with its state (owner, 2026-09-26). A booking that earned nothing says so
  * instead of printing a frozen figure beside it as though it were owed (pre-launch item 158).
  */
-export function commissionText(t: Translate, commission: FinancialCommission, format: MoneyFormat): string {
+export function commissionText(
+  t: Translate,
+  commission: FinancialCommission,
+  format: MoneyFormat,
+  reader: 'admin' | 'office' = 'admin',
+): string {
   const amount = format.money(commission.amount);
   switch (commission.state) {
     case 'Projected':
@@ -102,7 +107,9 @@ export function commissionText(t: Translate, commission: FinancialCommission, fo
       // otherwise, from an API that does not send it.
       return t('money.commission.earned', { amount: commission.earned ? format.money(commission.earned) : amount });
     case 'Undecided':
-      return t('money.commission.undecided', { amount });
+      // Decided at finality and capped at the office's final money (owner, 2026-09-29; E2E F37): said here, so
+      // neither reader takes the frozen figure for what will be taken.
+      return t(reader === 'office' ? 'money.commission.undecidedOffice' : 'money.commission.undecided', { amount });
     case 'NotEarned':
       return t('money.commission.notEarned');
     case 'NotApplicable':

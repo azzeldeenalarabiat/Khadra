@@ -2,7 +2,7 @@ import { HttpClient, httpResource } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { PagedResult } from '../models/bookings.api';
-import { Dispute, DisputeListItem, DisputeQueueCounts } from '../models/disputes.api';
+import { Dispute, DisputeListItem, DisputeQueueCounts, ResolutionPreview } from '../models/disputes.api';
 import { AdminDashboardService } from './admin-dashboard.service';
 
 /** What the queue is filtered to. `live` is the default because it is the queue an admin works. */
@@ -76,6 +76,24 @@ export class AdminDisputesService {
     },
   ): Promise<Dispute> {
     return firstValueFrom(this.http.post<Dispute>(`${this.base}/${ticketId}/resolve`, split));
+  }
+
+  /**
+   * What a decision WOULD do, before it is made (Wave 2 C1): the same refusals as resolving, and the office's money as
+   * the payouts ledger would record it. Writes nothing; the note may still be empty.
+   */
+  preview(
+    ticketId: string,
+    split: {
+      readonly refundToCustomer: number;
+      readonly retainedByPlatform: number;
+      readonly transferredToDealer: number;
+      readonly dealerCharge: number | null;
+    },
+  ): Promise<ResolutionPreview> {
+    return firstValueFrom(
+      this.http.post<ResolutionPreview>(`${this.base}/${ticketId}/resolution-preview`, split),
+    );
   }
 
   refreshList(): void {

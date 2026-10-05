@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   effect,
   inject,
@@ -10,7 +11,12 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
-import { Dispute, DisputeResolution, DisputeStatement } from '../../core/models/disputes.api';
+import {
+  Dispute,
+  DisputeResolution,
+  DisputeStatement,
+  ResolutionPreview,
+} from '../../core/models/disputes.api';
 import { AdminDisputesService } from '../../core/services/admin-disputes.service';
 import { roundTo } from '../../core/services/money';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
@@ -32,6 +38,11 @@ import {
   splitPlaces,
   stepFor,
 } from './dispute-form.presenter';
+import { PayoutFormat } from '../payouts/payouts.presenter';
+import { PreviewWords, previewConfirmSentence, previewView } from './resolution-preview.presenter';
+
+/** How long the split must rest before its preview is asked for: a pause in typing, not a business figure. */
+const PREVIEW_PAUSE_MS = 400;
 
 /** The four shapes spec 3.3 names, each one a preset split of the deposit the booking holds. */
 type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
@@ -90,6 +101,21 @@ export class DisputeDetailComponent {
       this.seededFor = d.ticketId;
       this.seed(d);
     });
+    // The preview follows the split, after a pause: one request when typing stops, not one per keystroke.
+    effect(() => {
+      const split = this.previewSplit();
+      const key = this.previewKey();
+      clearTimeout(this.previewTimer);
+      if (!split || !key) return;
+      this.previewTimer = setTimeout(() => {
+        const { ticketId, ...body } = split;
+        this.service
+          .preview(ticketId, body)
+          .then((preview) => this.previewAnswer.set({ key, preview }))
+          .catch((error: unknown) => this.previewAnswer.set({ key, problem: snapshotProblem(error) }));
+      }, PREVIEW_PAUSE_MS);
+    });
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.previewTimer));
   }
 
   protected readonly resource = this.service.dispute;
@@ -268,6 +294,75 @@ export class DisputeDetailComponent {
     return d
       ? earlierDecisionNotice(d, this.t, (value) => this.formats.money(value.amount, value.currency))
       : null;
+  });
+
+  // ── What the decision does to the money (Wave 2 C1; E2E F37) ───────────────────────────────────
+  //
+  // Asked of the server whenever the split rests, once it adds up and passes the form's own checks: the preview runs
+  // every check resolving runs, then the office's money exactly as the payouts ledger would record it. Shown only for
+  // the split it was taken of, so a figure on screen is never one the current amounts would not produce.
+
+  private readonly previewFormat: PayoutFormat = {
+    money: (value) => this.formats.money(value.amount, value.currency),
+    dateTime: (iso) => this.formats.dateTime(iso),
+    day: (isoDay) => this.formats.calendarDay(isoDay),
+  };
+
+  private readonly previewWords = computed<PreviewWords>(() => {
+    this.i18n.lang();
+    return {
+      t: this.t,
+      label: this.i18n.enumLabel,
+      status: (name: string) => this.statusLabel(name, 'booking'),
+    };
+  });
+
+  /** The split a preview would be taken of, or null while it cannot be: unbalanced, refused here, or not live. */
+  private readonly previewSplit = computed(() => {
+    const d = this.dispute();
+    if (!d?.isLive || !this.balanced() || this.placesHint() !== null || this.chargeIssue() !== null) return null;
+    const charge = this.allowance()?.kind === 'range' ? this.dealerCharge().trim() : '';
+    return {
+      ticketId: d.ticketId,
+      refundToCustomer: this.refund(),
+      retainedByPlatform: this.platform(),
+      transferredToDealer: this.dealer(),
+      dealerCharge: charge === '' ? null : Number(charge),
+    };
+  });
+
+  private readonly previewKey = computed(() => {
+    const split = this.previewSplit();
+    return split ? JSON.stringify(split) : null;
+  });
+
+  private readonly previewAnswer = signal<
+    | { readonly key: string; readonly preview: ResolutionPreview }
+    | { readonly key: string; readonly problem: ProblemSnapshot }
+    | null
+  >(null);
+  private previewTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** The preview of the split on screen, or null while there is none for it yet. */
+  protected readonly preview = computed(() => {
+    const answer = this.previewAnswer();
+    return answer && answer.key === this.previewKey() && 'preview' in answer ? answer.preview : null;
+  });
+
+  protected readonly previewProblemText = computed(() => {
+    const answer = this.previewAnswer();
+    return answer && answer.key === this.previewKey() && 'problem' in answer
+      ? disputeRefusal(answer.problem, this.t, this.i18n.lang())
+      : null;
+  });
+
+  protected readonly previewPending = computed(
+    () => this.previewKey() !== null && this.preview() === null && this.previewProblemText() === null,
+  );
+
+  protected readonly previewShown = computed(() => {
+    const preview = this.preview();
+    return preview ? previewView(preview, this.previewWords(), this.previewFormat) : null;
   });
 
   protected readonly canResolve = computed(
@@ -586,7 +681,11 @@ export class DisputeDetailComponent {
               dealerShare: this.formats.money(this.dealer(), cur),
               dealer: this.dealerName(d),
             }),
-        note: this.t('disputeDetail.decisionRecordedNoFunds'),
+        // What the payouts ledger will record, when the preview of exactly this split is on screen.
+        note: [
+          ...(this.preview() ? [previewConfirmSentence(this.preview()!, this.previewWords(), this.previewFormat)] : []),
+          this.t('disputeDetail.decisionRecordedNoFunds'),
+        ].join(' '),
         confirm: this.t('disputeDetail.resolveDispute'),
         result: {
           title: this.t('disputeDetail.disputeResolved'),

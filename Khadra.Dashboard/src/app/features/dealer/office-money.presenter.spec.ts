@@ -102,7 +102,7 @@ describe("the office's Financial section", () => {
       ['Refund — paid above the deposit', 'Refund of 84.75 JOD to the customer initiated'],
       ['Deposit', 'Decided by a dispute'],
       ['Dispute decision — to you', '9 JOD'],
-      ['Platform commission · 20% of one daily rate (frozen on this booking)', '6 JOD · not decided yet'],
+      ['Platform commission · 20% of one daily rate (frozen on this booking)', '6 JOD · decided when the booking is final, and never more than your money on it'],
       ['Net payout', "Worked out once this booking's outcome is final"],
     ]);
     const text = JSON.stringify(view.lines);

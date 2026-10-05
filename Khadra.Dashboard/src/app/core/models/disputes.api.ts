@@ -1,5 +1,6 @@
 import { Booking } from './bookings.api';
 import { Money } from './fleet.api';
+import { PayableLine } from './payables.api';
 
 /**
  * A dispute as the API returns it to the administrator (Khadra.Application/Disputes/Dtos). The rental
@@ -126,7 +127,65 @@ export type OfficeDisputeResolution = Omit<
 /** A dispute as the rental office receives it: the same ticket, with the office's copy of the decision. */
 export type OfficeDispute = Omit<Dispute, 'resolution'> & {
   readonly resolution: OfficeDisputeResolution | null;
+  /**
+   * What a decided dispute comes to for the office's money (Wave 2 C1): projected by the ledger's own office function
+   * until the payouts ledger records the booking, the recorded payable after. Null while the ticket is undecided, on
+   * a booking nothing was paid online for, and from an older API.
+   */
+  readonly expectedOutcome?: OfficeExpectedOutcome | null;
 };
+
+/** `Projected` while no payable exists; `Recorded` once the payouts ledger recorded one. */
+export interface OfficeExpectedOutcome {
+  readonly source: 'Projected' | 'Recorded' | string;
+  readonly payableId: string | null;
+  readonly outcome: string;
+  readonly officeMoney: Money;
+  readonly commission: Money;
+  readonly charges: Money;
+  /** Signed: below zero, the office owes. */
+  readonly net: Money;
+  readonly lines: readonly PayableLine[];
+  readonly finalAt: string;
+  /** While a cancellation's or a no-show's dispute window is open, when it closes; another dispute may change this. */
+  readonly furtherDecisionsPossibleUntil: string | null;
+}
+
+/**
+ * What a decision WOULD do, before it is made (Wave 2 C1; E2E F37), from
+ * `POST /api/v1/admin/disputes/{id}/resolution-preview`. Nothing is written to produce it. It states what the records
+ * will say, never what money will do: the customer's refund is requested, the office is paid only when settled, and
+ * nothing is final while a cancellation's dispute window is open.
+ */
+export interface ResolutionPreview {
+  /** The booking's status once decided: `Completed` for a returned booking, else unchanged. */
+  readonly statusAfter: string;
+  /** `Final`, or `NotApplicable` when nothing was paid online. */
+  readonly officeState: string;
+  readonly outcome: string | null;
+  readonly lines: readonly PayableLine[];
+  readonly customer: { readonly refundRequested: Money };
+  readonly platform: { readonly retainedShare: Money; readonly commission: Money };
+  readonly office: {
+    readonly share: Money;
+    readonly money: Money;
+    readonly frozenCommission: Money;
+    readonly commission: Money;
+    readonly charges: Money;
+    /** Signed: below zero, the office owes. */
+    readonly net: Money;
+  };
+  readonly earlierDecisions: {
+    readonly count: number;
+    readonly toCustomer: Money;
+    readonly keptByPlatform: Money;
+    readonly toOffice: Money;
+    readonly chargedToOffice: Money;
+  } | null;
+  readonly recordedNotBefore: string;
+  readonly furtherDecisionsPossibleUntil: string | null;
+  readonly calculatorVersion: number;
+}
 
 export interface EvidenceUpload {
   readonly uploadUrl: string;

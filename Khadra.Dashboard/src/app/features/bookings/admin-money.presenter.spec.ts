@@ -87,7 +87,7 @@ describe("the administrator's Money section", () => {
       ['Dispute decision — to the office', '9 JOD'],
       ['Dispute decision — kept by Khadra', '0 JOD'],
       ['Security deposit', '150 JOD'],
-      ['Platform commission (20% of one daily rate)', '6 JOD · not decided yet'],
+      ['Platform commission (20% of one daily rate)', "6 JOD · decided when the booking is final, and never more than the office's money on it"],
     ]);
   });
 

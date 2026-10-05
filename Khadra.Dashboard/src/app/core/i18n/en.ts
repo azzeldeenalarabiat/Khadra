@@ -3131,7 +3131,10 @@ export const EN = {
   'money.commission.projected': '{amount} · if the booking is paid',
   'money.commission.expected': '{amount} · expected',
   'money.commission.earned': '{amount} · earned',
-  'money.commission.undecided': '{amount} · not decided yet',
+  'money.commission.undecided':
+    "{amount} · decided when the booking is final, and never more than the office's money on it",
+  'money.commission.undecidedOffice':
+    '{amount} · decided when the booking is final, and never more than your money on it',
   'money.commission.notEarned': 'Not earned — the payment went back',
   'money.commission.notApplicable': 'None — the booking was never paid',
 
@@ -3722,6 +3725,34 @@ export const EN = {
     "The customer's payment can no longer be refunded, so nothing was decided. Reload the ticket.",
   'disputeDetail.refundExceedsCapture':
     "The customer's share is more than is left of their payment to refund, so nothing was decided.",
+
+  // ── What a dispute decision does to the money (Wave 2 C1; E2E F37) ────────────────────────────────
+  // Every figure is the server's, from the one office function the payouts ledger uses. The words say
+  // what the records will say, never what money will do.
+  'disputePreview.title': 'What this decision does to the money',
+  'disputePreview.working': 'Working out what this decision does…',
+  'disputePreview.waiting': 'Shown once the three amounts add up to the deposit held.',
+  'disputePreview.statusAfter': 'The booking becomes {status}.',
+  'disputePreview.refundRequested': 'Refund requested to the customer',
+  'disputePreview.keptByKhadra': 'Kept by Khadra from the deposit',
+  'disputePreview.officeLines': 'For the office, as the payouts ledger will record it',
+  'disputePreview.commissionCapped':
+    "The commission frozen on the booking is {frozen}, and it is never more than the office's money on it, here {money}.",
+  'disputePreview.earlier': {
+    one: 'These figures include the earlier decision on this booking.',
+    other: 'These figures include the {count} earlier decisions on this booking.',
+  },
+  'disputePreview.recordedNotBefore': 'The payouts ledger records it no earlier than {when}.',
+  'disputePreview.untilWindow': 'If nothing else is decided on this booking before {when}: another dispute may still be opened until then.',
+  'disputePreview.untilWindowOffice': 'If nothing else is decided on this booking before {when}: another dispute may still be opened until then.',
+  'disputePreview.settledByHand': 'The office is paid only when an administrator settles its payouts, and a payable can be held.',
+  'disputePreview.notApplicable': 'Nothing was paid online for this booking, so the payouts ledger records nothing for it.',
+  'disputePreview.confirm': 'As the payouts ledger will record it: {net}.',
+  'disputePreview.confirmUntil': 'As the payouts ledger will record it: {net}, if nothing else is decided on this booking before {when}.',
+  'officeOutcome.title': 'What this decision comes to for you',
+  'officeOutcome.projected': 'Worked out from the decision. Your payouts will show these figures once the booking is recorded there.',
+  'officeOutcome.recorded': 'As recorded in your payouts.',
+  'officeOutcome.openPayouts': 'Open your payouts',
 
   // ── The legal texts (Wave 2 G1) ──────────────────────────────────────────────────────────────────
   // Every version is published from this screen and is permanent. The texts themselves are the

@@ -1689,3 +1689,19 @@
 .legal-links {
   gap: 14px;
 }
+
+/* What a dispute decision does to the money (Wave 2 C1): the server's preview, under the amounts. */
+.preview-box {
+  padding: 12px 14px;
+  border: 1px dashed var(--tint-4);
+  border-radius: 8px;
+}
+/* The net, in its tone: who owes whom, as the payouts page words it. */
+.preview-box .money-line .k-label {
+  color: var(--c, var(--text-70));
+  font-weight: 500;
+}
+.money-line .k-label.outcome-net {
+  color: var(--c, var(--text-70));
+  font-weight: 500;
+}
