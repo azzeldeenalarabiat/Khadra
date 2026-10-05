@@ -14,7 +14,7 @@ describe('whether the website may be indexed', () => {
   });
 
   it('disallows everything and names no sitemap on a closed copy', () => {
-    const closed = robotsTxt(false, 'https://khadra-web-staging.example', PRIVATE_PAGES);
+    const closed = robotsTxt(false, 'https://staging.example', PRIVATE_PAGES);
 
     expect(closed).toBe('User-agent: *\nDisallow: /\n');
     expect(closed).not.toContain('Sitemap');
