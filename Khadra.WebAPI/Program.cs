@@ -687,6 +687,10 @@ PushStartupCheck.Report(app.Services);
 // phone showing its update screen.
 MobileAppStartupCheck.Report(app.Services);
 
+// And whether the legal pages are linked anywhere (Wave 2 G1), so a missing website address is not
+// discovered by somebody looking for the terms.
+LegalPagesStartupCheck.Report(app.Services);
+
 // Not in Development, and the reason is a device rather than a preference.
 //
 // A phone testing the customer app talks to this API over the local network, where there is no

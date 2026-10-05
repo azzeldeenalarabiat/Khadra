@@ -6,6 +6,7 @@ using Khadra.Domain.Disputes;
 using Khadra.Domain.FinancialDocuments;
 using Khadra.Domain.Fleet;
 using Khadra.Domain.IdentityAccess;
+using Khadra.Domain.Legal;
 using Khadra.Domain.Notifications;
 using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
@@ -51,6 +52,7 @@ public sealed class KhadraDbContext(DbContextOptions<KhadraDbContext> options) :
     public DbSet<OfficeSettlement> OfficeSettlements => Set<OfficeSettlement>();
     public DbSet<OfficeSettlementVoid> OfficeSettlementVoids => Set<OfficeSettlementVoid>();
     public DbSet<OfficePayableHold> OfficePayableHolds => Set<OfficePayableHold>();
+    public DbSet<LegalDocumentVersion> LegalDocumentVersions => Set<LegalDocumentVersion>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

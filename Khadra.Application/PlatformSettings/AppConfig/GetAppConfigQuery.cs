@@ -1,6 +1,7 @@
 using CSharpFunctionalExtensions;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Legal.ReadModels;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.Fleet;
@@ -51,7 +52,43 @@ public sealed record AppConfigDto(
     PaymentsConfigDto Payments,
     VocabulariesDto Vocabularies,
     /// The oldest customer-app build this API serves.
-    MobileAppConfigDto MobileApp);
+    MobileAppConfigDto MobileApp,
+    /// The legal texts in force and where they are published (Wave 2 G1). Null when they could not be read just
+    /// now: not known, never "nothing published", which is an empty list. Added 2026-10-05, last.
+    LegalConfigDto? Legal);
+
+/// <summary>
+/// The legal texts in force, and the public pages that show them (Wave 2 G1).
+/// </summary>
+/// <remarks>
+/// <para>
+/// Every client links to the published page here rather than typing a URL: the console's sign-in, registration and
+/// invitation pages today, the app later. A document with nothing in force is absent, so a link is offered only to
+/// a page that has something to show.
+/// </para>
+/// <para>
+/// Never an invented empty list. When the database cannot be read, the block is null: "not known now". It is not
+/// an empty list, which would say "nothing is published" and would be a lie. The rest of <c>/app-config</c> still
+/// answers, because it never needed the database, and an outdated app reads its update screen from it.
+/// </para>
+/// </remarks>
+public sealed record LegalConfigDto(IReadOnlyList<LegalConfigDocumentDto> Documents);
+
+/// <param name="Kind"><c>Terms</c> or <c>Privacy</c>.</param>
+/// <param name="Slug">The document's path segment: <c>terms</c>, <c>privacy</c>.</param>
+/// <param name="PageUrls">
+/// The public page in each language, built from <c>App:CustomerAppBaseUrl</c>; null while that is not set, and no
+/// link is invented then.
+/// </param>
+public sealed record LegalConfigDocumentDto(
+    string Kind,
+    string Slug,
+    Guid VersionId,
+    string VersionLabel,
+    DateTimeOffset EffectiveFrom,
+    LegalPageUrlsDto? PageUrls);
+
+public sealed record LegalPageUrlsDto(string En, string Ar);
 
 /// <summary>
 /// What kind of money this deployment moves, published so no screen has to guess.
@@ -178,7 +215,10 @@ public sealed class GetAppConfigHandler(
     IDocumentPolicySettings documents,
     IAuthPolicySettings authPolicy,
     IPaymentProvider payments,
-    IMobileAppPolicySettings mobileApp)
+    IMobileAppPolicySettings mobileApp,
+    ILegalDocumentReader legal,
+    ICustomerSiteSettings site,
+    IClock clock)
     : IRequestHandler<GetAppConfigQuery, Result<AppConfigDto, Error>>
 {
     public async Task<Result<AppConfigDto, Error>> Handle(
@@ -186,6 +226,7 @@ public sealed class GetAppConfigHandler(
         CancellationToken cancellationToken)
     {
         var rules = await businessRules.GetAsync(cancellationToken);
+        var legalInForce = await legal.CurrentIfReadableAsync(clock.UtcNow, cancellationToken);
 
         return new AppConfigDto(
             calendar.TimeZoneId,
@@ -216,7 +257,25 @@ public sealed class GetAppConfigHandler(
                 [.. Enumeration.GetAll<BookingRejectionReason>().Select(Vocabulary.Describe)]),
             new MobileAppConfigDto(
                 mobileApp.MinimumSupportedVersion?.ToString(),
-                mobileApp.UpdateUrl?.AbsoluteUri));
+                mobileApp.UpdateUrl?.AbsoluteUri),
+            legalInForce is null
+                ? null
+                : new LegalConfigDto([.. legalInForce.Select(version => new LegalConfigDocumentDto(
+                    version.Kind.Name,
+                    version.Kind.Slug,
+                    version.VersionId.Value,
+                    version.VersionLabel,
+                    version.EffectiveFrom,
+                    PageUrls(version.Kind.Slug)))]));
+    }
+
+    /// <summary>The website's page for a document, in each language: the same paths the website serves.</summary>
+    private LegalPageUrlsDto? PageUrls(string slug)
+    {
+        if (site.BaseUrl is not { } baseUrl)
+            return null;
+        var root = baseUrl.AbsoluteUri.TrimEnd('/');
+        return new LegalPageUrlsDto($"{root}/en/{slug}", $"{root}/ar/{slug}");
     }
 }
 

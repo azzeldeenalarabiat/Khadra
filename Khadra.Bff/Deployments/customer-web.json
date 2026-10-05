@@ -90,6 +90,16 @@
           ]
         }
       },
+      "legal-document-current": {
+        "ClusterId": "webapi",
+        "AuthorizationPolicy": "Anonymous",
+        "Match": {
+          "Path": "/api/v1/legal-documents/{kind}/current",
+          "Methods": [
+            "GET"
+          ]
+        }
+      },
       "catalogue-vehicles": {
         "ClusterId": "webapi",
         "AuthorizationPolicy": "Anonymous",

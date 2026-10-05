@@ -21,6 +21,9 @@
     <!-- PDF renditions of issued financial documents (payments Phase 6). Community licence: the owner
          confirmed on 2026-09-29 that Khadra qualifies (docs/pre-launch-checklist.md). -->
     <PackageVersion Include="QuestPDF" Version="2026.9.1" />
+    <!-- The published legal texts (Wave 2 G1): a CommonMark subset checked and rendered on the server, so the
+         administrator's preview and the public page come from one renderer. BSD-2-Clause. -->
+    <PackageVersion Include="Markdig" Version="1.4.0" />
     <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.22.0" />
     <PackageVersion Include="Microsoft.Extensions.Options.DataAnnotations" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />

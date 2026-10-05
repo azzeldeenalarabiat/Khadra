@@ -1,5 +1,6 @@
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Legal.ReadModels;
 using Khadra.Application.PlatformSettings.AppConfig;
 using Khadra.Domain.Common;
 using Khadra.Domain.Fleet;
@@ -24,7 +25,10 @@ public sealed class AppConfigTests
         int passwordMinimumLength = 8,
         PaymentMode paymentMode = PaymentMode.None,
         string? minimumAppVersion = null,
-        string? updateUrl = null)
+        string? updateUrl = null,
+        IReadOnlyList<CurrentLegalVersion>? legalInForce = null,
+        string? customerSite = null,
+        bool unreadable = false)
     {
         var payments = Substitute.For<IPaymentProvider>();
         payments.Mode.Returns(paymentMode);
@@ -44,13 +48,21 @@ public sealed class AppConfigTests
             AppVersion.TryParse(minimumAppVersion, out var minimum) ? minimum : null);
         mobileApp.UpdateUrl.Returns(updateUrl is null ? null : new Uri(updateUrl));
 
+        var legal = Substitute.For<ILegalDocumentReader>();
+        legal.CurrentIfReadableAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(unreadable ? null : legalInForce ?? []);
+        var site = Substitute.For<ICustomerSiteSettings>();
+        site.BaseUrl.Returns(customerSite is null ? null : new Uri(customerSite));
+
         return new GetAppConfigHandler(
             calendar,
             TestBusinessRules.Provider(minimumRenterAge: minimumRenterAge),
             documents,
             authPolicy,
             payments,
-            mobileApp);
+            mobileApp,
+            legal,
+            site,
+            new TestClock(Build.Now));
     }
 
     /// <summary>
@@ -267,5 +279,52 @@ public sealed class AppConfigTests
 
         Assert.Null(config.MobileApp.MinimumSupportedVersion);
         Assert.Null(config.MobileApp.UpdateUrl);
+    }
+
+    // ── The legal texts (Wave 2 G1) ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task It_names_each_legal_text_in_force_and_its_public_page_in_both_languages()
+    {
+        var terms = new CurrentLegalVersion(Khadra.Domain.Legal.LegalDocumentKind.Terms, Id.New(), "2026-10", Build.Now.AddDays(-1));
+
+        var config = (await Handler(legalInForce: [terms], customerSite: "https://www.khadra.example/")
+            .Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        var document = Assert.Single(config.Legal!.Documents);
+        Assert.Equal("Terms", document.Kind);
+        Assert.Equal("terms", document.Slug);
+        Assert.Equal(terms.VersionId.Value, document.VersionId);
+        Assert.Equal("2026-10", document.VersionLabel);
+        Assert.Equal("https://www.khadra.example/en/terms", document.PageUrls!.En);
+        Assert.Equal("https://www.khadra.example/ar/terms", document.PageUrls.Ar);
+    }
+
+    [Fact]
+    public async Task No_link_is_invented_while_the_website_address_is_not_set()
+    {
+        var privacy = new CurrentLegalVersion(Khadra.Domain.Legal.LegalDocumentKind.Privacy, Id.New(), "1.0", Build.Now.AddDays(-1));
+
+        var config = (await Handler(legalInForce: [privacy]).Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        Assert.Null(Assert.Single(config.Legal!.Documents).PageUrls);
+    }
+
+    [Fact]
+    public async Task A_text_with_nothing_in_force_is_absent()
+    {
+        var config = (await Handler(customerSite: "https://www.khadra.example").Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        Assert.Empty(config.Legal!.Documents);
+    }
+
+    /// <summary>Unknown is not "nothing published": the block is null, and everything else still answers.</summary>
+    [Fact]
+    public async Task Legal_texts_that_cannot_be_read_are_not_known_rather_than_absent()
+    {
+        var config = (await Handler(unreadable: true).Handle(new GetAppConfigQuery(), CancellationToken.None)).Value;
+
+        Assert.Null(config.Legal);
+        Assert.Equal("Asia/Amman", config.TimeZone);
     }
 }

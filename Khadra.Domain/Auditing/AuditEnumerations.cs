@@ -70,6 +70,10 @@ public sealed class AuditAction : Enumeration
     public static readonly AuditAction OfficePayableHeld = new(32, "OfficePayableHeld");
     public static readonly AuditAction OfficePayableReleased = new(33, "OfficePayableReleased");
 
+    // An administrator published a version of a legal text (Wave 2 G1). Labelled by the version's label; the new value
+    // names the document, and the entry is the record of who published it.
+    public static readonly AuditAction LegalDocumentPublished = new(34, "LegalDocumentPublished");
+
     private AuditAction(int id, string name) : base(id, name)
     {
     }
@@ -97,6 +101,9 @@ public sealed class AuditEntityType : Enumeration
     // A settlement with a rental office, and one booking's payable (payments Phase 8).
     public static readonly AuditEntityType OfficeSettlement = new(11, "OfficeSettlement");
     public static readonly AuditEntityType OfficePayable = new(12, "OfficePayable");
+
+    // A published version of a legal text (Wave 2 G1).
+    public static readonly AuditEntityType LegalDocument = new(13, "LegalDocument");
 
     private AuditEntityType(int id, string name) : base(id, name)
     {

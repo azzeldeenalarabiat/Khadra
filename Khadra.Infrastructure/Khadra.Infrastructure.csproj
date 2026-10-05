@@ -16,6 +16,7 @@
     <PackageReference Include="BCrypt.Net-Next" />
     <PackageReference Include="MailKit" />
     <PackageReference Include="QuestPDF" />
+    <PackageReference Include="Markdig" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />

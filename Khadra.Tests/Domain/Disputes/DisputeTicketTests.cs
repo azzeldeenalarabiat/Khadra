@@ -298,8 +298,8 @@ public sealed class DepositDispositionTests
     /// </summary>
     [Theory]
     [InlineData(null, null)]
-    [InlineData(0, "dispute.dealer_charge_out_of_range")]
-    [InlineData(25, null)]
+    [InlineData(0.0, "dispute.dealer_charge_out_of_range")]
+    [InlineData(25.0, null)]
     [InlineData(24.999, "dispute.dealer_charge_out_of_range")]
     [InlineData(50.001, "dispute.dealer_charge_out_of_range")]
     public void The_shared_charge_check_and_the_decision_give_the_same_verdict(double? charge, string? expected)

@@ -15,6 +15,7 @@ using Khadra.Application.Payments.ReadModels;
 using Khadra.Application.Reviews.ReadModels;
 using Khadra.Application.Shortlist.ReadModels;
 using Khadra.Application.IdentityAccess.ReadModels;
+using Khadra.Application.Legal.ReadModels;
 using Khadra.Domain.Common;
 using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings.Repositories;
@@ -23,6 +24,7 @@ using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.FinancialDocuments.Repositories;
 using Khadra.Domain.Fleet.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Legal.Repositories;
 using Khadra.Domain.Notifications.Repositories;
 using Khadra.Domain.Payables.Repositories;
 using Khadra.Domain.Payments.Repositories;
@@ -32,6 +34,7 @@ using Khadra.Infrastructure.Configuration;
 using Khadra.Infrastructure.Documents;
 using Khadra.Infrastructure.FinancialDocuments;
 using Khadra.Infrastructure.Geocoding;
+using Khadra.Infrastructure.Legal;
 using Khadra.Application.Bookings.Handover;
 using Khadra.Application.Bookings.Reminders;
 using Khadra.Application.Notifications.Delivery;
@@ -302,6 +305,8 @@ public static class DependencyInjection
                 "MobileApp: UpdateUrl must be an absolute http(s) address, or empty.")
             .ValidateOnStart();
         services.AddSingleton<IMobileAppPolicySettings, MobileAppPolicySettings>();
+        // Where the customer website is published, for the legal page links on /app-config (Wave 2 G1).
+        services.AddSingleton<ICustomerSiteSettings, CustomerSiteSettings>();
         services.AddOptions<PaymentOptions>()
             .Bind(configuration.GetSection(PaymentOptions.SectionName))
             .ValidateDataAnnotations()
@@ -402,6 +407,9 @@ public static class DependencyInjection
         services.AddScoped<IOfficePayableRepository, OfficePayableRepository>();
         services.AddScoped<IOfficeSettlementRepository, OfficeSettlementRepository>();
         services.AddScoped<IOfficePayableHoldRepository, OfficePayableHoldRepository>();
+        // The published legal texts (Wave 2 G1), and the one renderer their preview and their public page share.
+        services.AddScoped<ILegalDocumentVersionRepository, LegalDocumentVersionRepository>();
+        services.AddSingleton<ILegalTextRenderer, MarkdigLegalTextRenderer>();
         services.AddScoped<INotifier, Notifier>();
         services.AddScoped<INotificationDeliveryRepository, NotificationDeliveryRepository>();
 
@@ -429,6 +437,7 @@ public static class DependencyInjection
         services.AddScoped<ICityRepository, CityRepository>();
         services.AddScoped<ICustomerAdminReader, CustomerAdminReader>();
         services.AddScoped<IDisputeAdminReader, DisputeAdminReader>();
+        services.AddScoped<ILegalDocumentReader, LegalDocumentReader>();
         // The administrator's payments list, refunds queue and payment page, and the dashboard's money
         // panel and attention rows (payments Phase 4b).
         services.AddScoped<IPaymentAdminReader, PaymentAdminReader>();

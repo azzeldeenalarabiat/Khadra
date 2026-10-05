@@ -63,6 +63,9 @@ public sealed class BffProxyRouteTests
         "/api/v1/galleries",
         "/api/v1/galleries/{dealerId:guid}",
         "/api/v1/galleries/{dealerId:guid}/reviews",
+        // The legal texts in force (Wave 2 G1): read before anyone has an account. The console needs no route of its
+        // own -- it links to the website's pages, from /app-config.
+        "/api/v1/legal-documents/{kind}/current",
         "/api/v1/vehicle-images/{**path}",
         "/api/v1/vehicles",
         "/api/v1/vehicles/facets",
