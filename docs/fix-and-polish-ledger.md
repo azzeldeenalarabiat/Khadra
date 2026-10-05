@@ -34,6 +34,15 @@ this batch (decision D6).
 | 1 | `X-Content-Type-Options: nosniff` on every API answer — added as the response starts, so the exception handler's 500/409/400 answers carry it too | none | none |
 | 1 | The console BFF no longer forwards `POST /api/v1/auth/register` anonymously | none | none: the app calls the API directly; the customer website's BFF keeps its own route |
 | 1 | The website's dispute page reads the refund's status from the booking's existing `refunds[]` (`disputeTicketId`) | none | none: no API change |
+| 2 | Every money amount is serialised at the currency's full scale (`1.500`, never `1.5`); a decided dispute stored before 2026-10-05 is served padded | value | none: the same number in JSON |
+| 2 | `dispute.amount_precision` refuses an amount with more decimals than the currency has, from resolve and its preview | new code | none: administrators only |
+| 2 | `chargedToDealerEarlier` and `slaState` on the dispute DTO | additive | none: null on the customer's and the office's copies; named-key parsing ignores them |
+| 2 | `POST /api/v1/admin/disputes/{id}/resolution-preview` | new endpoint | none: administrators only |
+| 2 | `expectedOutcome` on the office's copy of a decided dispute | additive | none: the app never receives an office's copy |
+| 2 | A refund an administrator's dispute decision or cancellation ordered raises its notification with the actor `Khadra` (no actor id); push and email have a platform wording | value, wording | the in-app line reads "Khadra: your payment has been refunded"; no new kind, so no unknown-kind line |
+| 2 | `GET /api/v1/legal-documents/{terms|privacy}/current`: anonymous, public cache 300 s, weak ETag. The approved scope named `/legal-documents/current`; the advisor's review made it one document per call, before any app reads it | new endpoint | none until 1.4.0 reads it |
+| 2 | `legal` block on `/app-config`: each text in force and its page URLs; null when the database cannot be read ("not known", never "nothing published") | additive | none: ignored by named-key parsing |
+| 2 | `/api/v1/admin/legal-documents` (list, detail, preview, publish) | new endpoints | none: administrators only |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
@@ -43,3 +52,5 @@ this batch (decision D6).
 | F43 (W1-5) | Show what became of the dispute's refund (requested, on its way, refunded on a date, being sent again), read from the booking's `refunds[]` by `disputeTicketId`, as the website now does. |
 | F26 (W1-6) | On a booking paid in full, stop saying the deposit "is held until you collect the car"; say it is part of the full amount paid online. |
 | F10 (W1-12) | Optional: word `auth.unauthenticated` and `auth.session_invalid` in both languages; today an unmapped code shows the server's English title. |
+| F7 (W2 G1) | Link to the Terms and the Privacy notice from `/app-config.legal.documents[].pageUrls` (registration and profile), showing no link while a text has none; the consent checkbox comes with Wave 4's consent design. |
+| F48 (W2 C6) | Nothing required: a refund Khadra made already reads "Khadra: …" from data. Revisit the Arabic "Khadra" with branding in Wave 5. |

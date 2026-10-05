@@ -328,3 +328,76 @@ not a backend-only feature. When Phases 5–7 are done, the customer experience 
 
 Phases 5–7 may implement these in the order already planned; none of them may be dropped or
 narrowed without the owner.
+
+## Designs written ahead of their build
+
+### 2026-10-05: Fix & Polish B1 and B5, for Wave 4 (under D8)
+
+Written in Wave 2 and reviewed by the advisor with the Wave 2 scope. Nothing here is built yet. Each is built in
+Wave 4, under the owner's D8 approval for Payments code.
+
+#### B1: a second capture notice is not unaccounted money (E2E F30)
+
+**What happens today.** A provider that sends a second `captured` event, with a new event id, for an attempt that
+is already Applied gets past the replay fast path (`receipts.HasSeenAsync` matches event ids only). Then:
+
+- `CanAcceptCapture` refuses with `payments.already_captured`, and the capture is routed to `Orphan`.
+- `Orphan` fails, because an Applied payment cannot be orphaned, and the API logs at Error that the amount is
+  "UNACCOUNTED FOR". The receipt's outcome reads `Orphaned`.
+- The money is right throughout. The administrator's payment page lists "Capture not applied" with no alert, and the
+  dashboard's count of captures that could not be applied reads 0. Nobody can tell from either screen whether money
+  is missing.
+
+**Three tiers, in order:**
+
+1. **The same event id** is answered by the existing fast path, and nothing is applied again (unchanged).
+2. **A capture reference.** `ProviderEvent` gains an optional `CaptureReference`, and `Payment` a nullable
+   `ProviderCaptureReference`, written when a capture is applied. This is one migration: a nullable column, no data.
+   For an event on an Applied attempt:
+   - the same reference is a **Duplicate**: a new `ProviderEventOutcome`, logged at Information, changing nothing;
+   - a different reference is a **SecondCapture**: an incident. The card was charged twice. It is logged at Error
+     with both amounts, raised as an administrator's attention row, and **never refunded automatically**: the
+     money is real, and what happens to it is decided by a person.
+3. **No reference** (the sandbox today, and any provider that sends none): the captured amount and currency are
+   compared with what this attempt applied. Equal is a Duplicate; different is a SecondCapture.
+
+**Also:**
+
+- A receipt's outcome never reads `Orphaned` when nothing was orphaned.
+- The sandbox emits a deterministic capture reference (derived from its session), so tier 2 is exercised on Staging.
+- The dashboard's attention metric (B2) counts SecondCapture incidents.
+- The payment page shows each one with its alert.
+
+**Tests:** each tier; the receipt's outcome; the log level; that no refund is ever raised; and the dashboard metric.
+
+**Contract:** none for the customer app. The console words the two new outcomes.
+
+#### B5: the ledger finds ended bookings by the window each one froze (checklist 210)
+
+**What happens today.** The payables pass looks for cancelled and no-show bookings whose end is older than TODAY's
+`PostReturnSettlementHours` plus the finality margin, because the window each booking froze lives only inside the
+`terms` JSON. A booking that froze a shorter window is found late. One that froze a longer window is looked at and
+turned away on every pass until it is final.
+
+**The design:**
+
+- **A nullable `bookings.dispute_window_ends_at`**, written by the aggregate where the window starts: cancellation,
+  no-show and return. `Booking.DisputeWindowEndsAt` stays the domain's truth, and a domain test pins the stored
+  column equal to it for every way a booking can end.
+- **The candidate queries read `COALESCE(dispute_window_ends_at, finished_at + today's window)`**:
+  - the payables pass's cancelled and no-show candidates;
+  - `ListDueForSettlementAsync`;
+  - `ListDueForDepositReleaseAsync`.
+
+  A booking that ended before Wave 4 keeps today's behaviour. **There is no SQL backfill**: the frozen window is a
+  .NET `TimeSpan` written as text inside the `terms` JSON, which PostgreSQL cannot be trusted to parse.
+- **One derivation**, shared by the three queries and `Booking.Settle`, and kept in step by a test. Three copies of
+  one rule would drift apart the way this one did from the frozen terms.
+- **The migration** adds one nullable column, and a partial index on it where it is not null if the candidate query
+  needs one. No data is changed.
+
+**Tests:**
+
+- the column against the domain's property for each ending;
+- a booking found by its own shorter window, without waiting for today's;
+- a booking ended before the column existed, found exactly as before.
