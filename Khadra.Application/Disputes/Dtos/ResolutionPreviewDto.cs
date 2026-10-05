@@ -36,8 +36,9 @@ namespace Khadra.Application.Disputes.Dtos;
 /// so.
 /// </param>
 /// <param name="FurtherDecisionsPossibleUntil">
-/// When the booking's dispute window closes, for a cancellation or a no-show; null for a returned booking, which the
-/// decision completes.
+/// When the booking's dispute window closes, for a cancellation or a no-show whose window is still open. Null for a
+/// returned booking, which the decision completes, and for a cancellation or a no-show decided after its window
+/// closed, when no further dispute can be opened.
 /// </param>
 /// <param name="LedgerIssues">
 /// Where the booking's records already contradict one another (<c>FinancialIssues</c> codes, as the booking's Money

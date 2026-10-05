@@ -342,7 +342,14 @@ key is predictable or a ticket names a key twice.
 
 ### 16. The dispute console rounds money to two decimals; JOD has three
 
-**Status:** open · **Raised:** 2026-09-04
+**Status:** closed · **Raised:** 2026-09-04 · **Closed:** 2026-10-05 — the form follows the API's minor units (Wave 2 C7).
+
+**How it closed.** The console reads the currency's minor units from `/app-config` (`FormatService.minorUnits`), and
+the dispute form's four amount fields step, round and check at that scale: `step="0.001"` on every leg and on the
+office charge, "At most 3 decimal places." beside a fourth decimal, and Resolve disabled until it is fixed. The server
+refuses the same amount itself (`dispute.amount_precision`) before any `Money` is built, and serialises every amount
+at full scale. Shown in the browser on a fresh local database (Wave 2 regression, KH-952EVX9L: a 14.300 deposit split
+2.000 / 0.150 / 12.150 and recorded exactly). The text below is kept for the record.
 
 `Money` persists at `(18,3)` and rounds to three places — JOD's minor unit is the fils, a thousandth.
 The dispute resolution screen's `round()` works at two. A deposit with a non-zero third decimal
@@ -5500,3 +5507,15 @@ be stopped from entering force. **To close, when announcing a change ahead is wa
 `effective_from > now`, in the shape of `financial_document_voids`. Then add the "upcoming" read, and an insert
 trigger that takes an advisory lock and keeps every kind's `effective_from` increasing among the versions not
 withdrawn.
+
+### 230. A gallery named exactly "Khadra" would be announced as the platform
+
+**Status:** open · **Raised:** 2026-10-05 (Fix & Polish C6; advisor's review of Wave 2) · **Owner decision**
+
+A refund Khadra makes is announced as Khadra's: `Notification.IsFromPlatform` is true when a notification has no actor
+user and its actor name is exactly `Khadra`. A gallery's own notifications to its customers carry no actor user
+either, only the gallery's business name, and `BusinessName.Create` reserves no name. So an office approved under the
+exact name "Khadra" would have every refund and booking push and email worded as the platform's. An administrator
+approves and locks every business name, which is why C6 shipped name-based as scoped. **To close:** refuse the
+platform's name ("Khadra", and "خضرا" for good measure, compared case-insensitively after trimming) in
+`BusinessName.Create` only, leaving `FromPersisted` as it is; or, later, give notifications an actor-kind column.
