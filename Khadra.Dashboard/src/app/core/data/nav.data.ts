@@ -39,6 +39,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       { labelKey: 'nav.cities', icon: 'map-pin', route: '/cities' },
       { labelKey: 'nav.carTypes', icon: 'car-simple', route: '/car-types' },
       { labelKey: 'nav.settings', icon: 'sliders-horizontal', route: '/settings' },
+      { labelKey: 'nav.legalDocuments', icon: 'gavel', route: '/legal-documents' },
     ],
   },
   {
@@ -211,6 +212,7 @@ export const SCREEN_TITLES: Readonly<Record<string, TranslationKey>> = {
   cities: 'nav.cities',
   'car-types': 'nav.carTypes',
   settings: 'screen.platformSettings',
+  'legal-documents': 'screen.legalDocuments',
   notifications: 'nav.notifications',
   'audit-logs': 'screen.auditLogs',
   'admin-users': 'screen.adminUsers',

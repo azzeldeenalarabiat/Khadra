@@ -19,6 +19,17 @@ const pages: Routes = [
   },
   { path: 'dealers', loadComponent: () => import('./features/dealers/dealers.component').then((m) => m.DealersComponent) },
   { path: 'dealers/:slug', loadComponent: () => import('./features/dealer/dealer.component').then((m) => m.DealerComponent) },
+  // The legal texts in force (Wave 2 G1): public and indexable, rendered on the server like every public page.
+  {
+    path: 'terms',
+    data: { legal: 'terms' },
+    loadComponent: () => import('./features/legal/legal-page.component').then((m) => m.LegalPageComponent),
+  },
+  {
+    path: 'privacy',
+    data: { legal: 'privacy' },
+    loadComponent: () => import('./features/legal/legal-page.component').then((m) => m.LegalPageComponent),
+  },
 
   // Signing in, and the pages an email links to. Rendered in the browser only; never indexed.
   {

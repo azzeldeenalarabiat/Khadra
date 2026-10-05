@@ -1473,3 +1473,60 @@ $md: 1023px;
     }
   }
 }
+
+// ── Legal texts (Wave 2 G1) ─────────────────────────────────────────────────────
+// The API renders a checked Markdown subset to plain HTML with no classes and no direction: headings,
+// paragraphs, lists, quotes, rules and links. Everything here is that HTML's look, in logical properties,
+// so the Arabic text mirrors with the page.
+.legal-page__head {
+  margin-block-end: var(--s-5);
+}
+.legal-text {
+  color: var(--n-800);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  h1,
+  h2,
+  h3,
+  h4 {
+    margin-block: var(--s-5) var(--s-3);
+    line-height: 1.35;
+  }
+  h1 {
+    font-size: 22px;
+  }
+  h2 {
+    font-size: 19px;
+  }
+  h3 {
+    font-size: 17px;
+  }
+  h4 {
+    font-size: 15px;
+  }
+  p,
+  ul,
+  ol,
+  blockquote {
+    margin-block: 0 var(--s-3);
+  }
+  ul,
+  ol {
+    padding-inline-start: var(--s-5);
+  }
+  blockquote {
+    margin-inline: 0;
+    padding-inline-start: var(--s-4);
+    border-inline-start: 3px solid var(--divider);
+    color: var(--text-muted);
+  }
+  hr {
+    border: 0;
+    border-block-start: 1px solid var(--divider);
+    margin-block: var(--s-5);
+  }
+  a {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+}

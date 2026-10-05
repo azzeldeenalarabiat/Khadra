@@ -11,6 +11,7 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { spellEnumName } from '../../core/i18n/status-key';
+import { legalKindLabel } from '../../core/i18n/legal-kind';
 import { auditSubject, subjectValue } from '../../core/services/audit-subject';
 
 /**
@@ -54,6 +55,7 @@ const ACTION_LABELS: Readonly<Record<string, TranslationKey>> = {
   OfficeSettlementVoided: 'auditLog.actionOfficeSettlementVoided',
   OfficePayableHeld: 'auditLog.actionOfficePayableHeld',
   OfficePayableReleased: 'auditLog.actionOfficePayableReleased',
+  LegalDocumentPublished: 'auditLog.actionLegalDocumentPublished',
 };
 
 /** The server's audit record types (`AuditEntityType`), worded the same way as the actions. */
@@ -70,6 +72,7 @@ const ENTITY_TYPE_LABELS: Readonly<Record<string, TranslationKey>> = {
   FinancialDocument: 'auditLog.entityFinancialDocument',
   OfficeSettlement: 'auditLog.entityOfficeSettlement',
   OfficePayable: 'auditLog.entityOfficePayable',
+  LegalDocument: 'auditLog.entityLegalDocument',
 };
 
 /**
@@ -275,6 +278,8 @@ export class AuditLogComponent {
         return this.t('auditLog.subjectDispute', { reference: subject.reference });
       case 'customer':
         return this.t('auditLog.subjectCustomer', { reference: subject.reference });
+      case 'legal':
+        return legalKindLabel(subject.document, this.t);
       default:
         return subjectValue(subject);
     }

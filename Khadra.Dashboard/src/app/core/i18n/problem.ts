@@ -25,6 +25,11 @@ export interface ProblemSnapshot {
    * `handover.code_invalid` only when the guess was counted. Absent everywhere else.
    */
   readonly attemptsRemaining?: number | null;
+  /**
+   * Where a legal text cannot be published (`legal.text_unsupported`, Wave 2 G1): which language, which line, and a
+   * stable reason. Present only beside that code.
+   */
+  readonly textProblem?: { readonly language: 'en' | 'ar'; readonly line: number; readonly reason: string };
 }
 
 /**
@@ -51,7 +56,16 @@ export function snapshotProblem(error: unknown): ProblemSnapshot {
   };
   const body = (
     typeof failure.error === 'object' && failure.error !== null ? failure.error : {}
-  ) as { code?: unknown; title?: unknown; traceId?: unknown; errors?: unknown; attemptsRemaining?: unknown };
+  ) as {
+    code?: unknown;
+    title?: unknown;
+    traceId?: unknown;
+    errors?: unknown;
+    attemptsRemaining?: unknown;
+    language?: unknown;
+    line?: unknown;
+    reason?: unknown;
+  };
 
   const attemptsRemaining = body.attemptsRemaining;
   return {
@@ -63,6 +77,15 @@ export function snapshotProblem(error: unknown): ProblemSnapshot {
     // Only when the server sent a count: every other refusal keeps the shape it always had.
     ...(typeof attemptsRemaining === 'number' && Number.isInteger(attemptsRemaining) && attemptsRemaining >= 0
       ? { attemptsRemaining }
+      : {}),
+    // Only beside the code that sends it, and only whole: a line with no language is no help to anyone.
+    ...(body.code === 'legal.text_unsupported' &&
+    (body.language === 'en' || body.language === 'ar') &&
+    typeof body.line === 'number' &&
+    Number.isInteger(body.line) &&
+    body.line > 0 &&
+    typeof body.reason === 'string'
+      ? { textProblem: { language: body.language, line: body.line, reason: body.reason } }
       : {}),
   };
 }
@@ -156,6 +179,16 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'handover.not_available': 'problem.handoverNotAvailable',
   'handover.invalid_odometer': 'problem.handoverInvalidOdometer',
   'handover.invalid_fuel': 'problem.handoverInvalidFuel',
+  // Publishing a legal text (Wave 2 G1). The screen's own form words these with the line and language of a text it
+  // cannot publish; inside the confirm dialog, which a race can still reach, the sentence alone.
+  'legal.label_invalid': 'legal.labelInvalid',
+  'legal.label_taken': 'legal.labelTaken',
+  'legal.body_required': 'legal.bodyRequired',
+  'legal.body_too_long': 'legal.bodyTooLong',
+  'legal.body_invalid_characters': 'legal.bodyInvalidCharacters',
+  'legal.text_unsupported': 'legal.textUnsupportedSomewhere',
+  'legal.publish_conflict': 'legal.publishConflict',
+  'legal.kind_unknown': 'legal.kindUnknown',
 };
 
 /** The same, for the fields a validation failure can name. Keys are lower-cased server names. */

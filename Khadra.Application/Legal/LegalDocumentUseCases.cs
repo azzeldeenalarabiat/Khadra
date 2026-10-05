@@ -85,13 +85,14 @@ public sealed class LegalDocumentHandlers(
         var version = drafted.Value.Version;
 
         versions.Add(version);
-        // Who published what, in the same transaction as the version itself. The label names it; the entry is the
-        // only place the publisher's name is written.
+        // Who published what, in the same transaction as the version itself, and the only place the publisher's name
+        // is written. Labelled by the document's KIND NAME, a code each console words in its reader's language. An
+        // English phrase here could never be rewritten; the version labels are the change.
         audit.Record(
             AuditAction.LegalDocumentPublished,
             AuditEntityType.LegalDocument,
             version.Id,
-            $"{version.Kind.Name} {version.VersionLabel}",
+            version.Kind.Name,
             drafted.Value.Current?.VersionLabel,
             version.VersionLabel);
 

@@ -8,6 +8,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageParams } from '../../core/i18n/language';
 import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { LegalLinksComponent } from '../../shared/legal-links/legal-links.component';
 
 /**
  * A refusal, held as KEYS rather than as words.
@@ -37,7 +38,7 @@ interface Notice {
   selector: 'kh-sign-in',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './sign-in.component.html',
-  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent, LegalLinksComponent],
 })
 export class SignInComponent {
   protected readonly t = inject(I18nService).t;

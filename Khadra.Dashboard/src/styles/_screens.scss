@@ -1613,3 +1613,79 @@
   vertical-align: middle;
   opacity: 0.6;
 }
+
+// ── Legal documents (Wave 2 G1) ───────────────────────────────────────────────────────────────
+// The server renders a checked Markdown subset to plain HTML with no classes: headings, paragraphs, lists,
+// quotes, rules and links. The panes give it the console's type, and their dir attribute mirrors the Arabic.
+.field-label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+  color: var(--text-70);
+}
+.legal-source {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.legal-render {
+  padding: 14px 16px;
+  border: 1px solid var(--tint-3);
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  max-height: 520px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.legal-render h1,
+.legal-render h2,
+.legal-render h3,
+.legal-render h4 {
+  margin-block: 14px 8px;
+  line-height: 1.35;
+}
+.legal-render h1 {
+  font-size: 18px;
+}
+.legal-render h2 {
+  font-size: 16px;
+}
+.legal-render h3,
+.legal-render h4 {
+  font-size: 14px;
+}
+.legal-render p,
+.legal-render ul,
+.legal-render ol,
+.legal-render blockquote {
+  margin-block: 0 10px;
+}
+.legal-render ul,
+.legal-render ol {
+  padding-inline-start: 22px;
+}
+.legal-render blockquote {
+  margin-inline: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 3px solid var(--tint-4);
+  color: var(--text-70);
+}
+.legal-render hr {
+  border: 0;
+  border-block-start: 1px solid var(--tint-4);
+  margin-block: 14px;
+}
+.legal-render a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+.legal-hash {
+  font-size: 11.5px;
+  word-break: break-all;
+}
+
+/* The legal texts in force, linked where somebody joins or signs in (Wave 2 G1). */
+.legal-links {
+  gap: 14px;
+}

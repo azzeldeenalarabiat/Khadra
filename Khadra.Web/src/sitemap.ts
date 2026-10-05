@@ -31,8 +31,22 @@ export async function sitemapIndex(publicBaseUrl: string): Promise<string> {
 
 export async function pagesSitemap(publicBaseUrl: string, apiBaseUrl: string): Promise<string> {
   const cities = await getJson<{ id: string; isActive: boolean }[]>(`${apiBaseUrl}/api/v1/cities`);
-  const paths = ['', 'cars', 'dealers', ...cities.filter((city) => city.isActive).map((city) => `cars?city=${city.id}`)];
+  const config = await getJson<{ legal?: { documents: readonly { slug: string }[] } | null }>(`${apiBaseUrl}/api/v1/app-config`);
+  const paths = [
+    '',
+    'cars',
+    'dealers',
+    ...cities.filter((city) => city.isActive).map((city) => `cars?city=${city.id}`),
+    // A legal page only while a version of it is in force: an unpublished one answers 404. When the API could not
+    // say (null), none is claimed.
+    ...legalPaths(config.legal?.documents ?? []),
+  ];
   return urlset(publicBaseUrl, paths);
+}
+
+/** The legal pages this website has, of the documents in force. */
+export function legalPaths(documents: readonly { slug: string }[]): string[] {
+  return ['terms', 'privacy'].filter((slug) => documents.some((document) => document.slug === slug));
 }
 
 export async function carsSitemap(publicBaseUrl: string, apiBaseUrl: string): Promise<string> {

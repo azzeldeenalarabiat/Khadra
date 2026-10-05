@@ -816,6 +816,16 @@ export const EN = {
   'dispute.party.Customer': 'you',
   'dispute.party.Dealer': 'the rental office',
   'dispute.party.Admin': 'Khadra',
+
+  // The legal texts (Wave 2 G1). The texts themselves are published from the console; these are the page around them.
+  'legal.terms': 'Terms of Service',
+  'legal.privacy': 'Privacy notice',
+  'legal.version': 'Version {label} · in force since {date}',
+  'legal.notPublished': 'This document has not been published yet.',
+  'legal.footer': 'Legal',
+  'seo.legal.title': '{title} — Khadra',
+  'seo.legal.termsDescription': 'The terms on which Khadra connects customers with licensed car rental offices in Jordan.',
+  'seo.legal.privacyDescription': 'What personal data Khadra keeps, why, for how long, and the choices you have about it.',
 } satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

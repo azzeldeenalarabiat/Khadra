@@ -18,6 +18,7 @@ Khadra is a modular monolith built with Clean Architecture and DDD building bloc
 | Shortlist | done | done | **save / forget / list / membership done** |
 | Financial Documents | done | done | **issued by the settlement pass, with holds; customer and administrator endpoints; void and correct** (payments Phase 5a); **read on the website, in the app and in the console** (payments Phase 5b) |
 | Payables | done | done | **the office payables ledger, recorded by the settlement pass; manual settlements, voids and holds; administrator and office endpoints; Payouts and Finance in the console** (payments Phase 8) |
+| Legal | done | done | **the Terms of Service and the Privacy notice, published from the console one append-only version at a time; the version in force read anonymously; pages on the website, links in the console** (Wave 2 G1); consent capture is Wave 4 |
 
 "Dashboard read model only" means the tables and the read-side queries behind the `GET /api/v1/admin/dashboard/*` panel endpoints exist, but no command handlers do: nothing yet approves a dealer or resolves a dispute through the API.
 
@@ -39,6 +40,7 @@ Platform Settings ──IBusinessRulesProvider──▶ Bookings (frozen onto ea
 Shortlist ──(VehicleId only)──▶ reads Fleet's catalogue; Fleet learns nothing about customers
 Financial Documents ──reads, by id only, never writes──▶ Bookings, Payments, Disputes, Dealers, Fleet, Identity (names), Platform Settings (lookups)
 Payables ──reads, by id only, never writes──▶ Bookings, Payments, Disputes, Dealers, Identity (names); records from the Payments calculator's office position
+Legal ──(version id)──▶ consents (Wave 4, beside the user's bare id from Identity & Access); reads Identity (publisher names) by id only
 ```
 
 Communication is by `Id`, by explicit application contracts, or by domain events. A context never mutates another context's aggregate, and there are no navigation properties across contexts.
@@ -394,6 +396,32 @@ the dealership's standing — a suspended office is still owed, or still owes �
 who recorded or voided a settlement and why, the holds or the blocks. The customer:
 nothing — the ledger reaches a customer only as the deposit's `KeptAsPenalty`, the penalty's `KeptFromDeposit` and the
 booking statement version a kept penalty issues (item 212), with the owner's approved sentence said once.
+
+## 12. Legal
+
+The legal texts (Wave 2 G1; pre-launch item 224). The owner decided on 2026-10-05 that they live in the database and are
+published through an Admin screen. The advisor reviewed the schema before its migration was written.
+
+`LegalDocumentVersion` is one published version of one document (`LegalDocumentKind`: `Terms`, `Privacy`; add-only), in
+English and Arabic. Append-only, like `financial_documents`: the `IAppendOnly` guard, row and TRUNCATE triggers, and a
+migration `Down` that refuses while any version exists.
+
+- **In force when published.** `effective_from = published_at`; nothing schedules until a scheduled version can be
+  withdrawn (item 229). Every version is later than the one before it, so the version in force is the newest, and a
+  unique index on (kind, effective_from) settles two administrators publishing at once.
+- **The text is the record.** Markdown in a checked subset, LF line ends, each body hashed on its own (SHA-256 of the
+  UTF-8 bytes, what `sha256sum` gives), so a file approved outside the system can be checked against what was
+  published. The publisher is an id; their name is in the audit entry written in the same transaction.
+- **One renderer.** Markdig on the server checks a text against a closed list of node types (raw HTML, images, code
+  and any link but `https:`, `mailto:` or a path on the site are refused, with the line) and renders it to HTML at
+  read time. The console's preview and the public page therefore come from the same function.
+- **Reads.** `GET /api/v1/legal-documents/{terms|privacy}/current` is anonymous, publicly cached for five minutes, with
+  a weak ETag naming the version and the renderer. `/app-config` carries a `legal` block: each text in force, and its
+  page on the website from `App:CustomerAppBaseUrl`. The block is null, "not known", when the database cannot be
+  read, never an empty list (item 228).
+- **Consent (Wave 4)**, designed now so this table never moves: `legal_consents` with the user's bare id, the version
+  id (FK, restrict), when, channel and language as smart enums, and an action (a withdrawal is a new row); not
+  unique; no IP address or user agent.
 
 ## Owner decisions required
 

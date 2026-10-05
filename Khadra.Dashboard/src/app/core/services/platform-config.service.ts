@@ -2,12 +2,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { FormatService } from '../i18n/format.service';
+import { LegalConfig, LegalConfigDocument } from '../models/legal.api';
 
 /** The slice of `/api/v1/app-config` the console needs. The endpoint sends a good deal more. */
 interface AppConfigResponse {
   readonly timeZone?: string;
   readonly currency?: { readonly code?: string; readonly minorUnits?: number };
   readonly payments?: { readonly mode?: string };
+  /** Null when the API could not read the legal texts just now; absent from an older API. */
+  readonly legal?: LegalConfig | null;
 }
 
 /**
@@ -50,12 +53,22 @@ export class PlatformConfigService {
    */
   readonly isSandbox = this.sandbox.asReadonly();
 
+  private readonly legalDocuments = signal<readonly LegalConfigDocument[]>([]);
+
+  /**
+   * The legal texts in force, each with its public page (Wave 2 G1), for the links on the sign-in, registration and
+   * invitation pages. Empty until the server has said, and while it cannot say: a link is only ever offered to a
+   * page the server named.
+   */
+  readonly legal = this.legalDocuments.asReadonly();
+
   async load(): Promise<void> {
     try {
       const config = await firstValueFrom(this.http.get<AppConfigResponse>('/api/v1/app-config'));
       this.formats.useCurrencyMinorUnits(config?.currency?.minorUnits);
       this.formats.useTimeZone(config?.timeZone);
       this.sandbox.set(config?.payments?.mode?.toLowerCase() === 'sandbox');
+      this.legalDocuments.set(config?.legal?.documents ?? []);
     } catch {
       // Deliberately swallowed. See the class comment: the console still works.
     }

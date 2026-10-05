@@ -176,3 +176,29 @@ existing row has always meant), for the two ways of paying an approved booking â
 the full amount. The one write sets `online_paid` to the frozen deposit on every booking a payment
 already confirmed, since the deposit was the only way to confirm until this release. Apply after
 script 6 and before deploying the API; run its catch-up section once more after the deploy.
+
+## 8. `2026-10-05-legal-documents.sql`
+
+The legal texts (Wave 2 G1). It creates one table, `legal_document_versions`, with:
+
+- its five CHECKs;
+- the two unique indexes the publish handler recognises by name (`ux_legal_document_versions_kind_effective_from`,
+  `ux_legal_document_versions_kind_version_label`);
+- its append-only triggers (row UPDATE/DELETE and TRUNCATE, on the existing `khadra_table_is_append_only()`).
+
+Generated with `dotnet ef migrations script 20260929195432_OfficePayables 20261005062940_LegalDocumentVersions
+--idempotent`, so it is guarded by `__EFMigrationsHistory` and safe to run twice. It writes no rows: the texts arrive
+only through the console's *Legal documents* screen, never by script.
+
+1. Run it before deploying the API that serves `/legal-documents` (an older API ignores the table).
+2. **Run script 2 (`supabase-lockdown.sql`) again.** It is a new table in `public`. The lockdown loops over every
+   table, and its default-privilege revoke already covers tables created later, but running it again is the step
+   that proves it.
+3. Deploy the API.
+
+There is no rollback script. The migration's `Down` refuses while any version exists, because a published legal text
+is evidence. Before anything is published, dropping the table and its history row is the whole rollback.
+
+Proved on 2026-10-05 against a throwaway PostgreSQL 18 (`PostgresLegalDocumentsTests`): the constraint and index
+names, the triggers refusing UPDATE, DELETE and TRUNCATE, each stored hash equal to
+`encode(sha256(convert_to(body,'UTF8')),'hex')`, and the refused rollback.

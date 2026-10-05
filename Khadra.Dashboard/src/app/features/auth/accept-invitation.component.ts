@@ -7,6 +7,7 @@ import { I18nService } from '../../core/i18n/i18n.service';
 import { TranslationKey } from '../../core/i18n/en';
 import { LanguageSwitchComponent } from '../../shared/language-switch/language-switch.component';
 import { IconComponent } from '../../shared/icon/icon.component';
+import { LegalLinksComponent } from '../../shared/legal-links/legal-links.component';
 
 /**
  * An invited employee takes up their account (spec 4.2).
@@ -19,7 +20,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
   selector: 'kh-accept-invitation',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './accept-invitation.component.html',
-  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent],
+  imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent, LegalLinksComponent],
 })
 export class AcceptInvitationComponent {
   protected readonly t = inject(I18nService).t;

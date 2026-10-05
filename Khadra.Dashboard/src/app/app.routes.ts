@@ -293,6 +293,15 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/settings/settings.component').then((m) => m.SettingsComponent),
           },
+          // The legal texts (Wave 2 G1): published here, one permanent version at a time, and nowhere else.
+          {
+            path: 'legal-documents',
+            title: title('screen.legalDocuments'),
+            loadComponent: () =>
+              import('./features/legal/legal-documents.component').then(
+                (m) => m.LegalDocumentsComponent,
+              ),
+          },
           notBuilt('notifications', 'nav.notifications'),
           {
             path: 'security',

@@ -1,0 +1,248 @@
+<div class="stack stack-14 page-wide">
+  <header class="dc-head">
+    <div class="grow">
+      <h1 class="page-title">{{ t('screen.legalDocuments') }}</h1>
+      <div class="page-sub">{{ t('legal.subtitle') }}</div>
+    </div>
+  </header>
+
+  @if (failure(); as message) {
+    <section class="sect">
+      <div class="state-block">
+        <div class="state-icon is-bad"><kh-icon name="cloud-slash" /></div>
+        <div class="state-title">{{ t('legal.couldntLoad') }}</div>
+        <div class="state-text">{{ message }}</div>
+        <div class="state-actions">
+          <button type="button" class="btn btn-primary btn-sm" (click)="reload()">{{ t('common.retry') }}</button>
+        </div>
+      </div>
+    </section>
+  } @else {
+    <!-- The version in force of each document, or plainly nothing. -->
+    <div class="split-2">
+      @for (card of cards(); track card.kind) {
+        <section class="sect sect-pad stack stack-9">
+          <div class="row row-gap-8">
+            <kh-icon name="gavel" class="kpi-icon" />
+            <span class="sect-t">{{ card.label }}</span>
+            @if (card.current) {
+              <span class="pill s-ok">{{ t('legal.stateCurrent') }}</span>
+            }
+          </div>
+          @if (card.current; as current) {
+            <div class="page-sub">{{ inForce(current) }}</div>
+            <div class="page-sub">{{ t('legal.publishedBy', { name: publisher(current) }) }}</div>
+            <div class="row row-gap-8">
+              <button type="button" class="btn btn-secondary btn-sm" (click)="view(current)">{{ t('legal.view') }}</button>
+              <button type="button" class="btn btn-primary btn-sm" (click)="startPublishing(card.kind)">
+                {{ t('legal.publishNew') }}
+              </button>
+            </div>
+          } @else if (versions.isLoading() && rows().length === 0) {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          } @else {
+            <div class="page-sub">{{ t('legal.nothingPublished') }}</div>
+            <div>
+              <button type="button" class="btn btn-primary btn-sm" (click)="startPublishing(card.kind)">
+                {{ t('legal.publishFirst') }}
+              </button>
+            </div>
+          }
+        </section>
+      }
+    </div>
+
+    @if (formOpen()) {
+      <section class="sect sect-pad stack stack-12" aria-labelledby="legal-form-title">
+        <div class="row row-gap-8">
+          <kh-icon name="pencil-simple" class="kpi-icon" />
+          <span id="legal-form-title" class="sect-t">{{ t('legal.formTitle') }}</span>
+        </div>
+
+        @if (problemText(); as message) {
+          <div class="banner s-bad" role="alert">
+            <kh-icon name="warning-circle" class="banner-icon" />
+            <div class="banner-body"><div class="banner-text">{{ message }}</div></div>
+          </div>
+        }
+
+        <div class="field">
+          <span class="field-label">{{ t('legal.document') }}</span>
+          <div class="seg" role="radiogroup" [attr.aria-label]="t('legal.document')">
+            @for (option of kinds; track option) {
+              <label class="seg-opt">
+                <input type="radio" name="legal-kind" [checked]="kind() === option" (change)="chooseKind(option)" />
+                {{ kindLabel(option) }}
+              </label>
+            }
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="legal-label">{{ t('legal.versionLabel') }}</label>
+          <input id="legal-label" class="input" type="text" dir="auto" [value]="label()" (input)="label.set(text($event))" />
+          <div class="field-hint">{{ t('legal.versionLabelHint') }}</div>
+        </div>
+
+        <div class="field-hint">{{ t('legal.markdownHint') }}</div>
+        <div class="split-2">
+          <div class="field">
+            <label for="legal-en">{{ t('legal.englishText') }}</label>
+            <textarea
+              id="legal-en"
+              class="input legal-source"
+              rows="16"
+              dir="ltr"
+              lang="en"
+              [value]="bodyEn()"
+              (input)="bodyEn.set(text($event))"
+            ></textarea>
+          </div>
+          <div class="field">
+            <label for="legal-ar">{{ t('legal.arabicText') }}</label>
+            <textarea
+              id="legal-ar"
+              class="input legal-source"
+              rows="16"
+              dir="rtl"
+              lang="ar"
+              [value]="bodyAr()"
+              (input)="bodyAr.set(text($event))"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="row row-gap-8">
+          <button type="button" class="btn btn-secondary btn-md" [disabled]="previewing()" (click)="renderPreview()">
+            <kh-icon name="eye" />
+            {{ previewing() ? t('legal.previewing') : t('legal.preview') }}
+          </button>
+          <button type="button" class="btn btn-primary btn-md" [disabled]="!canPublish()" (click)="publish()">
+            {{ t('legal.publish') }}
+          </button>
+          <button type="button" class="btn btn-ghost btn-md" (click)="cancel()">{{ t('common.cancel') }}</button>
+        </div>
+        @if (!preview()) {
+          <div class="field-hint">{{ t('legal.previewNeeded') }}</div>
+        }
+
+        @if (preview(); as p) {
+          <div class="stack stack-9">
+            <span class="k">{{ t('legal.previewTitle') }}</span>
+            @if (previewStale()) {
+              <div class="banner s-warn" role="status">
+                <kh-icon name="warning-circle" class="banner-icon" />
+                <div class="banner-body"><div class="banner-text">{{ t('legal.previewStale') }}</div></div>
+              </div>
+            }
+            <div class="page-sub">{{ replaces(p) }}</div>
+            <div class="split-2">
+              <!-- The server's HTML carries no direction or language of its own: each pane states both. -->
+              <div class="legal-render" dir="ltr" lang="en" [innerHTML]="p.html.en"></div>
+              <div class="legal-render" dir="rtl" lang="ar" [innerHTML]="p.html.ar"></div>
+            </div>
+          </div>
+        }
+      </section>
+    }
+
+    @if (viewing()) {
+      <section class="sect sect-pad stack stack-12">
+        @if (versionFailure(); as message) {
+          <div class="banner s-bad" role="alert">
+            <kh-icon name="warning-circle" class="banner-icon" />
+            <div class="banner-body"><div class="banner-text">{{ message }}</div></div>
+          </div>
+        } @else if (version(); as v) {
+          <div class="row row-gap-8">
+            <kh-icon name="gavel" class="kpi-icon" />
+            <span class="sect-t grow">{{ detailTitle(v.summary) }}</span>
+            <span class="pill" [class]="stateTone(v.summary.state)">{{ stateLabel(v.summary.state) }}</span>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="closeView()">{{ t('common.close') }}</button>
+          </div>
+          <div class="page-sub">{{ inForce(v.summary) }} · {{ t('legal.publishedBy', { name: publisher(v.summary) }) }}</div>
+          <div class="split-2">
+            <div class="legal-render" dir="ltr" lang="en" [innerHTML]="v.html.en"></div>
+            <div class="legal-render" dir="rtl" lang="ar" [innerHTML]="v.html.ar"></div>
+          </div>
+          <div class="kv-body">
+            <div class="kv-split">
+              <div class="kv-key">{{ t('legal.sha256') }} · {{ t('legal.englishText') }}</div>
+              <div class="kv-val mono ltr legal-hash">{{ v.sha256.en }}</div>
+            </div>
+            <div class="kv-split">
+              <div class="kv-key">{{ t('legal.sha256') }} · {{ t('legal.arabicText') }}</div>
+              <div class="kv-val mono ltr legal-hash">{{ v.sha256.ar }}</div>
+            </div>
+          </div>
+          <div class="field-hint">{{ t('legal.sha256Hint') }}</div>
+        } @else {
+          <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+        }
+      </section>
+    }
+
+    <section class="sect sect-clip">
+      <div class="sect-h">
+        <span class="sect-t">{{ t('legal.versionsTitle') }}</span>
+      </div>
+      @if (versions.isLoading() && rows().length === 0) {
+        <div class="sect-pad" aria-busy="true" aria-live="polite">
+          @for (row of [0, 1, 2]; track row) {
+            <div class="skel-row"><div class="skel" [style.width.%]="100"></div></div>
+          }
+        </div>
+      } @else if (rows().length === 0) {
+        <div class="state-block is-empty">
+          <div class="state-icon is-outline"><kh-icon name="gavel" /></div>
+          <div class="state-text">{{ t('legal.noVersions') }}</div>
+        </div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table table-wide">
+            <thead>
+              <tr>
+                <th>{{ t('legal.colDocument') }}</th>
+                <th>{{ t('legal.colVersion') }}</th>
+                <th>{{ t('common.state') }}</th>
+                <th>{{ t('legal.colInForceSince') }}</th>
+                <th>{{ t('legal.colPublishedBy') }}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows(); track row.versionId) {
+                <tr>
+                  <td class="td">{{ kindLabel(row.kind) }}</td>
+                  <td class="td"><span class="user-text">{{ row.versionLabel }}</span></td>
+                  <td class="td"><span class="pill" [class]="stateTone(row.state)">{{ stateLabel(row.state) }}</span></td>
+                  <td class="td">{{ when(row.effectiveFrom) }}</td>
+                  <td class="td">{{ publisher(row) }}</td>
+                  <td class="td td-num">
+                    <button type="button" class="btn btn-secondary btn-xs" (click)="view(row)">{{ t('legal.view') }}</button>
+                    <a
+                      class="btn btn-ghost btn-xs"
+                      [routerLink]="['/audit-logs']"
+                      [queryParams]="historyFor(row)"
+                    >{{ t('legal.history') }}</a>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (totalPages() > 1) {
+          <div class="list-toolbar">
+            <button type="button" class="btn btn-secondary btn-xs" [disabled]="!hasPrevious()" (click)="previous()">
+              {{ t('common.previous') }}
+            </button>
+            <span class="page-sub">{{ t('common.pageOf', { page: pageNumber(), total: totalPages() }) }}</span>
+            <button type="button" class="btn btn-secondary btn-xs" [disabled]="!hasNext()" (click)="next()">
+              {{ t('common.next') }}
+            </button>
+          </div>
+        }
+      }
+    </section>
+  }
+</div>

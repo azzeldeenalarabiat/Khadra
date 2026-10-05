@@ -1,0 +1,26 @@
+@if (notPublished()) {
+  <section class="container page page--narrow">
+    <kh-state-panel icon="file-text" [title]="title()" [text]="i18n.t('legal.notPublished')">
+      <div class="row-actions"><a class="btn btn--secondary" [routerLink]="i18n.link()">{{ i18n.t('nav.home') }}</a></div>
+    </kh-state-panel>
+  </section>
+} @else if (problem(); as failure) {
+  <section class="container page page--narrow"><kh-state-panel kind="error" [problem]="failure" (action)="document.reload()" /></section>
+} @else if (document.value(); as d) {
+  <article class="container page page--narrow legal-page" [attr.aria-labelledby]="'legal-title'">
+    <header class="legal-page__head">
+      <h1 id="legal-title">{{ title() }}</h1>
+      <p class="muted small">
+        {{ i18n.t('legal.version', { label: d.versionLabel, date: format.date(d.effectiveFrom) }) }}
+      </p>
+    </header>
+    <!-- The API's HTML carries no direction or language of its own, so the element holding it states both. -->
+    <div class="legal-text" [attr.lang]="i18n.language()" [attr.dir]="i18n.language() === 'ar' ? 'rtl' : 'ltr'" [innerHTML]="html()"></div>
+  </article>
+} @else {
+  <section class="container page page--narrow" aria-busy="true">
+    <div class="skeleton skeleton--title"></div>
+    <div class="skeleton skeleton--text"></div>
+    <div class="skeleton skeleton--text"></div>
+  </section>
+}

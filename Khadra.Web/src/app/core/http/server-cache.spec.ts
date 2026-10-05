@@ -19,6 +19,13 @@ describe('server cache', () => {
     expect(serverCacheKey('/api/v1/vehicles/facets?cityId=x', 'ar')).toBeNull();
   });
 
+  it('holds the legal texts in force, one entry per text, and nothing else under that path', () => {
+    expect(serverCacheKey('/api/v1/legal-documents/terms/current', 'ar')).toBe('ar|/api/v1/legal-documents/terms/current');
+    expect(serverCacheKey('/api/v1/legal-documents/privacy/current', 'en')).not.toBeNull();
+    expect(serverCacheKey('/api/v1/legal-documents/cookies/current', 'en')).toBeNull();
+    expect(serverCacheKey('/api/v1/admin/legal-documents', 'en')).toBeNull();
+  });
+
   it('never holds availability, prices, a quote or anything with a query', () => {
     expect(serverCacheKey('/api/v1/vehicles', 'ar')).toBeNull();
     expect(serverCacheKey('/api/v1/vehicles?page=1', 'ar')).toBeNull();

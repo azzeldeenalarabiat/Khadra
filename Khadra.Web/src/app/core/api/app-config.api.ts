@@ -1,3 +1,5 @@
+import { LegalConfig } from './legal.api';
+
 /**
  * `GET /api/v1/app-config` — the platform's published facts. Hand-written to the API's
  * `AppConfigDto` (Khadra.Application/PlatformSettings/AppConfig/GetAppConfigQuery.cs), as the console
@@ -32,6 +34,11 @@ export interface AppConfig {
     readonly cancellationReasons: readonly VocabularyEntry[];
     readonly rejectionReasons: readonly VocabularyEntry[];
   };
+  /**
+   * The legal texts in force (Wave 2 G1). Null when the API could not read them just now: not known, never
+   * "nothing published", which is an empty list. Absent from an older API.
+   */
+  readonly legal?: LegalConfig | null;
 }
 
 /** `name` is what the API accepts and returns; the labels are what a reader sees. */

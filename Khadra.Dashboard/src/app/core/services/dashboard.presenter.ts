@@ -16,6 +16,7 @@ import { formatCalendarDate } from '../i18n/date-format';
 import { formatNumber } from '../i18n/number-format';
 import { clockDuration, relativeTime, slaReading } from '../i18n/relative-time';
 import { spellEnumName } from '../i18n/status-key';
+import { legalKindLabel } from '../i18n/legal-kind';
 import { KpiCard, QueueItem } from '../data/dashboard.data';
 import { auditSubject, subjectValue } from './audit-subject';
 
@@ -383,6 +384,7 @@ const ACTIVITY_ICONS: Readonly<Record<string, IconName>> = {
   OfficeSettlementVoided: 'file-x',
   OfficePayableHeld: 'pause-circle',
   OfficePayableReleased: 'check-circle',
+  LegalDocumentPublished: 'gavel',
 };
 
 /**
@@ -426,6 +428,8 @@ const ACTIVITY_SENTENCES: Readonly<Record<string, TranslationKey>> = {
   OfficeSettlementVoided: 'activity.officeSettlementVoided',
   OfficePayableHeld: 'activity.officePayableHeld',
   OfficePayableReleased: 'activity.officePayableReleased',
+  // Labelled by the document's KIND NAME, worded here: never an English phrase in a table that cannot be rewritten.
+  LegalDocumentPublished: 'activity.legalDocumentPublished',
 };
 
 /** The lookup actions are shared by both lists; the entry's type says which one changed. */
@@ -461,7 +465,11 @@ export function toActivityRows(
  * sentence for still reads: its name spelled out, which beats an empty line.
  */
 function activityText(entry: ActivityEntry, t: Translate): string {
-  const params = { actor: entry.actorName, subject: subjectValue(auditSubject(entry)) };
+  const subject = auditSubject(entry);
+  const params = {
+    actor: entry.actorName,
+    subject: subject.kind === 'legal' ? legalKindLabel(subject.document, t) : subjectValue(subject),
+  };
   const key = LOOKUP_SENTENCES[entry.action]?.[entry.entityType] ?? ACTIVITY_SENTENCES[entry.action];
   return key ? t(key, params) : t('activity.other', { ...params, action: spellEnumName(entry.action) });
 }

@@ -19,6 +19,8 @@ export type AuditSubject =
   | { readonly kind: 'booking'; readonly reference: string }
   /** A customer, by the short reference the audit trail has always used for one — never a name. */
   | { readonly kind: 'customer'; readonly reference: string }
+  /** A published legal text, by its document's kind name (Wave 2 G1): a code, worded by each screen. */
+  | { readonly kind: 'legal'; readonly document: string }
   /** Anything else, as it was recorded: a name somebody typed, or a label from a newer server. */
   | { readonly kind: 'label'; readonly label: string };
 
@@ -34,6 +36,7 @@ export function auditSubject(entry: AuditSubjectFacts): AuditSubject {
   const reference = entry.bookingReference;
   if (entry.entityType === 'Dispute' && reference) return { kind: 'dispute', reference };
   if (entry.entityType === 'Booking' && reference) return { kind: 'booking', reference };
+  if (entry.entityType === 'LegalDocument') return { kind: 'legal', document: entry.subjectLabel };
   if (entry.entityType === 'Customer' && entry.entityId) {
     return { kind: 'customer', reference: customerReference(entry.entityId) };
   }
@@ -44,7 +47,7 @@ export function auditSubject(entry: AuditSubjectFacts): AuditSubject {
 
 /** The value a subject contributes to a sentence: the reference, or the label as recorded. */
 export const subjectValue = (subject: AuditSubject): string =>
-  subject.kind === 'label' ? subject.label : subject.reference;
+  subject.kind === 'label' ? subject.label : subject.kind === 'legal' ? subject.document : subject.reference;
 
 /**
  * A customer's short reference: the first eight hex digits of their id — the characters the server

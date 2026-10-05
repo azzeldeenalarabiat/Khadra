@@ -5428,6 +5428,22 @@ consent, while items 177 and 203 already assume a privacy notice exists. **To cl
 served by the API; a consent record per person, document version, time, channel and language, producible for the data
 subject; links on every client; clients enforce first, the server only in a release that raises the minimum app version.
 
+**First slice built, 2026-10-05 (Wave 2 G1, `fix/polish-wave2`):**
+
+- Versioned legal documents in the database, published only through the console's *Legal documents* screen. Each
+  version is append-only and audited, and in force at once.
+- `GET /api/v1/legal-documents/{terms|privacy}/current`.
+- The website's `/{en,ar}/terms` and `/{en,ar}/privacy` pages, footer links and sitemap entries.
+- Links on the console's sign-in, registration and invitation pages, from `/app-config`.
+
+Still open, so the item stays open:
+
+- the texts themselves (DRAFT, for the owner's review, then legal review before any Production use);
+- the consent record and its capture (Wave 4);
+- the app's link and consent (1.4.0);
+- server enforcement, only in a release that raises the minimum app version;
+- items 228 and 229.
+
 ### 225. A pickup and its code are allowed at any time before the rental starts
 
 **Status:** open, High · **Raised:** 2026-10-05 (E2E F51; Fix & Polish D4, Wave 3) · **Owner, 2026-10-05:** the
@@ -5459,3 +5475,28 @@ answers `Disallow: /`, every response carries `X-Robots-Tag: noindex, nofollow`,
 right default for Staging and every other copy. **To close, at the website's Production launch:** set
 `KHADRA_INDEXABLE=true` on the Production renderer only (`docs/deployment.md`, renderer environment), then confirm
 `/robots.txt` names the sitemap, `/sitemap.xml` answers 200, and a public page carries no `X-Robots-Tag`.
+
+### 228. The legal pages are linked only where the website's address is set
+
+**Status:** open, launch step · **Raised:** 2026-10-05 (Fix & Polish G1; advisor's schema review)
+
+`/app-config` links each legal text in force to its page on the customer website, built from
+`App:CustomerAppBaseUrl`. While that setting is empty there is no link anywhere: not on the website's footer,
+and not on the console's sign-in, registration or invitation pages. The API says so on every start with
+`LEGAL PAGE LINKS ARE NOT PUBLISHED`. It is empty in tracked `appsettings.json`. **To close, at Production
+launch:** set `App:CustomerAppBaseUrl` to the public website's origin on the Production API. Then confirm that the
+startup log reads `Legal pages are linked on …`, and that `/app-config` carries `legal.documents[].pageUrls` for
+each text in force. Item 91 records the same address for the emails' links.
+
+### 229. A legal text cannot be scheduled ahead, because a scheduled version could not be withdrawn
+
+**Status:** open, deferred by design · **Raised:** 2026-10-05 (Fix & Polish G1; advisor's schema review)
+
+Every version of a legal text is in force the moment it is published (`effective_from = published_at`). The
+column and its `effective_from >= published_at` CHECK exist, and nothing schedules. A version scheduled for later
+would refuse every urgent correction until its date, and, the table being append-only, a mistaken one could not
+be stopped from entering force. **To close, when announcing a change ahead is wanted:** add a
+`legal_document_version_withdrawals` table first. It is append-only, keyed by the version, and allowed only while
+`effective_from > now`, in the shape of `financial_document_voids`. Then add the "upcoming" read, and an insert
+trigger that takes an advisory lock and keeps every kind's `effective_from` increasing among the versions not
+withdrawn.

@@ -13,6 +13,13 @@
       <a [routerLink]="['/ar']" hreflang="ar" lang="ar">العربية</a>
       <a [routerLink]="['/en']" hreflang="en" lang="en">English</a>
     </nav>
+    @if (legal().length) {
+      <nav class="site-footer__links" [attr.aria-label]="i18n.t('legal.footer')">
+        @for (link of legal(); track link.slug) {
+          <a [routerLink]="i18n.link(link.slug)">{{ link.label }}</a>
+        }
+      </nav>
+    }
     <p class="muted site-footer__rights">{{ i18n.t('footer.rights', { year }) }}</p>
   </div>
 </footer>

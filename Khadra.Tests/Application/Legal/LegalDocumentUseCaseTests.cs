@@ -86,7 +86,8 @@ public sealed class LegalDocumentUseCaseTests
         Assert.Same(AuditAction.LegalDocumentPublished, entry.Action);
         Assert.Same(AuditEntityType.LegalDocument, entry.EntityType);
         Assert.Equal(version.Id, entry.EntityId);
-        Assert.Equal("Terms 2026-10", entry.SubjectLabel);
+        // The kind's name, a code a console words; never an English phrase in a table that cannot be rewritten.
+        Assert.Equal("Terms", entry.SubjectLabel);
         Assert.Equal(previous.VersionLabel, entry.PreviousValue);
         Assert.Equal("2026-10", entry.NewValue);
         // The publisher's name is written here, and only here.

@@ -1,0 +1,7 @@
+@if (links().length) {
+  <nav class="auth-foot legal-links" [attr.aria-label]="t('legal.linksLabel')">
+    @for (link of links(); track link.kind) {
+      <a class="auth-link" [href]="link.url" target="_blank" rel="noopener">{{ link.label }}</a>
+    }
+  </nav>
+}

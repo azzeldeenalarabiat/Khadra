@@ -3722,6 +3722,82 @@ export const EN = {
     "The customer's payment can no longer be refunded, so nothing was decided. Reload the ticket.",
   'disputeDetail.refundExceedsCapture':
     "The customer's share is more than is left of their payment to refund, so nothing was decided.",
+
+  // ── The legal texts (Wave 2 G1) ──────────────────────────────────────────────────────────────────
+  // Every version is published from this screen and is permanent. The texts themselves are the
+  // administrator's; these are the screen around them.
+  'nav.legalDocuments': 'Legal documents',
+  'screen.legalDocuments': 'Legal documents',
+  'legal.subtitle':
+    'The Terms of Service and the Privacy notice that customers and rental offices read. Every version is permanent: a correction is a new version.',
+  'legal.terms': 'Terms of Service',
+  'legal.privacy': 'Privacy notice',
+  'legal.stateCurrent': 'In force',
+  'legal.stateSuperseded': 'Replaced',
+  'legal.nothingPublished':
+    'Nothing published yet. Its public page says so, and no link to it is shown anywhere.',
+  'legal.inForceSince': 'Version {label} · in force since {date}',
+  'legal.publishedBy': 'Published by {name}',
+  'legal.publishNew': 'Publish a new version',
+  'legal.publishFirst': 'Publish the first version',
+  'legal.view': 'View',
+  'legal.history': 'History',
+  'legal.versionsTitle': 'Every version',
+  'legal.colDocument': 'Document',
+  'legal.colVersion': 'Version',
+  'legal.colInForceSince': 'In force since',
+  'legal.colPublishedBy': 'Published by',
+  'legal.noVersions': 'No version of either document has been published.',
+  'legal.couldntLoad': "Couldn't load the legal documents",
+  'legal.formTitle': 'Publish a new version',
+  'legal.document': 'Document',
+  'legal.versionLabel': 'Version label',
+  'legal.versionLabelHint':
+    'How this version is named on the public page. Each label is used once per document.',
+  'legal.englishText': 'English text',
+  'legal.arabicText': 'Arabic text',
+  'legal.markdownHint':
+    'Markdown: # headings down to ####, **bold**, *italic*, lists, > quotes, --- lines, and links to https:, mailto: or a page on this site (/en/…). No HTML, images or code.',
+  'legal.preview': 'Preview',
+  'legal.previewing': 'Rendering…',
+  'legal.previewTitle': 'Preview: what the public page will show',
+  'legal.previewStale': 'The form changed after this preview. Preview again before publishing.',
+  'legal.previewNeeded': 'Preview the texts first: what is published is exactly what was previewed.',
+  'legal.replaces': 'Replaces version {label}, in force since {date}.',
+  'legal.firstVersion': 'The first version of this document.',
+  'legal.publish': 'Publish',
+  'legal.confirmTitle': 'Publish version {label} of the {document}?',
+  'legal.confirmBody':
+    'It is in force from the moment you publish it, on its public page and wherever the platform links to it. It can never be changed or removed: a correction is a new version.',
+  'legal.published': 'Published',
+  'legal.publishedBody': 'Version {label} of the {document} is now in force.',
+  'legal.detailTitle': '{document}, version {label}',
+  'legal.sha256': 'SHA-256',
+  'legal.sha256Hint':
+    'Of each text exactly as published. The same file run through sha256sum gives the same value.',
+  'legal.labelInvalid': 'A version label is required. Keep it short, with no line breaks or tabs.',
+  'legal.labelTaken': 'This document already has a version with that label.',
+  'legal.bodyRequired': 'Both the English and the Arabic text are required.',
+  'legal.bodyTooLong': 'One of the texts is longer than the server accepts.',
+  'legal.bodyInvalidCharacters':
+    'One of the texts contains a control character or a broken character. Paste it again as plain text.',
+  'legal.publishConflict':
+    'Another version of this document was published at the same moment. Reload the list and try again.',
+  'legal.kindUnknown': 'There is no such legal document.',
+  'legal.versionNotFound': 'That version was not found.',
+  'legal.textUnsupported': 'The {text} cannot be published as it stands. Line {line} {reason}.',
+  'legal.textUnsupportedSomewhere': 'One of the texts uses something that cannot be published.',
+  'legal.reasonHtml': 'contains HTML, which is never published',
+  'legal.reasonImage': 'has an image',
+  'legal.reasonLink':
+    'has a link that goes somewhere other than https:, mailto: or a page on this site',
+  'legal.reasonHeading': 'has a heading deeper than ####',
+  'legal.reasonCode': 'has code (a line indented by four spaces counts as code)',
+  'legal.reasonUnsupported': 'uses Markdown that is not published',
+  'legal.linksLabel': 'Legal',
+  'auditLog.actionLegalDocumentPublished': 'Legal document published',
+  'auditLog.entityLegalDocument': 'Legal document',
+  'activity.legalDocumentPublished': '{actor} published a new version of the {subject}',
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

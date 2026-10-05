@@ -942,4 +942,14 @@ export const AR: Record<TranslationKey, Message> = {
   'dispute.party.Customer': 'أنت',
   'dispute.party.Dealer': 'مكتب التأجير',
   'dispute.party.Admin': 'خضرا',
+
+  // النصوص القانونية (Wave 2 G1).
+  'legal.terms': 'شروط الخدمة',
+  'legal.privacy': 'إشعار الخصوصية',
+  'legal.version': 'الإصدار {label} · ساري منذ {date}',
+  'legal.notPublished': 'لم يُنشر هذا المستند بعد.',
+  'legal.footer': 'قانوني',
+  'seo.legal.title': '{title} — خضرا',
+  'seo.legal.termsDescription': 'الشروط التي تربط بها خضرا العملاء بمكاتب تأجير السيارات المرخّصة في الأردن.',
+  'seo.legal.privacyDescription': 'ما البيانات الشخصية التي تحتفظ بها خضرا، ولماذا، وإلى متى، وما خياراتك بشأنها.',
 };
