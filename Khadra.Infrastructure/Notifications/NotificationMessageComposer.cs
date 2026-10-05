@@ -89,6 +89,14 @@ internal sealed class NotificationMessageComposer(
             // Part of the payment is back and part is not (yet): never "your payment has been refunded".
             "Part of your payment refunded", "Booking {ref} with {actor}: part of your payment has been refunded to your original payment method. Open Khadra to see the amount. Your bank may take some time to show it.",
             "تم استرداد جزء من دفعتك", "الحجز {ref} مع {actor}: تم استرداد جزء من دفعتك إلى وسيلة الدفع الأصلية. افتح خضرا لمعرفة المبلغ. قد يحتاج البنك بعض الوقت لإظهاره في حسابك."),
+        // The platform's own refunds (Wave 2 C6; E2E F48): an administrator's dispute decision or cancellation. They
+        // name no rental office, which did not make them.
+        ["YourDepositRefunded:Platform"] = new(
+            "Payment refunded", "Khadra has refunded your payment for booking {ref} to your original payment method. Your bank may take some time to show it.",
+            "تم استرداد دفعتك", "أعادت خضرا دفعتك للحجز {ref} إلى وسيلة الدفع الأصلية. قد يحتاج البنك بعض الوقت لإظهار المبلغ في حسابك."),
+        ["YourPartialRefundSettled:Platform"] = new(
+            "Part of your payment refunded", "Khadra has refunded part of your payment for booking {ref} to your original payment method. Open Khadra to see the amount. Your bank may take some time to show it.",
+            "تم استرداد جزء من دفعتك", "أعادت خضرا جزءًا من دفعتك للحجز {ref} إلى وسيلة الدفع الأصلية. افتح خضرا لمعرفة المبلغ. قد يحتاج البنك بعض الوقت لإظهاره في حسابك."),
         ["YourDisputeUpdated"] = new(
             "Dispute updated", "There is an update on the dispute for booking {ref}.",
             "تحديث على النزاع", "هناك تحديث على النزاع الخاص بالحجز {ref}."),
@@ -156,6 +164,9 @@ internal sealed class NotificationMessageComposer(
         var key = notification.Kind.Name;
         if (key == "YourBookingApproved" && notification.DueAt is not null && payments.Mode != PaymentMode.None)
             key = "YourBookingApproved:Pay";
+        // What the platform did, worded as the platform's where a kind has such a variant (Wave 2 C6).
+        if (notification.IsFromPlatform && Texts.ContainsKey(key + ":Platform"))
+            key += ":Platform";
         return Texts.GetValueOrDefault(key, Fallback);
     }
 

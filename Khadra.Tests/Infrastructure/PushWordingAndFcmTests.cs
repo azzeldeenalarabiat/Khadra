@@ -98,6 +98,51 @@ public sealed class PushWordingAndFcmTests
         Assert.Contains("KH-1", en.Body, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A refund the platform made (an administrator's dispute decision or cancellation) is Khadra's, and names no rental
+    /// office, which did not make it (Wave 2 C6; E2E F48). In both languages, and for both refund kinds.
+    /// </summary>
+    [Theory]
+    [InlineData("YourDepositRefunded", "Khadra has refunded your payment", "أعادت خضرا دفعتك")]
+    [InlineData("YourPartialRefundSettled", "Khadra has refunded part of your payment", "أعادت خضرا جزءًا من دفعتك")]
+    public void A_refund_the_platform_made_is_announced_as_khadras(string kindName, string english, string arabic)
+    {
+        var kind = Enumeration.FromName<NotificationKind>(kindName);
+        var platform = Notification.Raise(Id.New(), kind, Notification.PlatformActorName, Now, Id.New(), "KH-1");
+        Assert.True(platform.IsFromPlatform);
+
+        var en = Composer(PaymentMode.Sandbox).ComposePush(platform, Language.English);
+        var ar = Composer(PaymentMode.Sandbox).ComposePush(platform, Language.Arabic);
+
+        Assert.StartsWith(english, en.Body, StringComparison.Ordinal);
+        Assert.StartsWith(arabic, ar.Body, StringComparison.Ordinal);
+        Assert.Contains("KH-1", en.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain(" with ", en.Body, StringComparison.Ordinal);
+        var email = Composer(PaymentMode.Sandbox).ComposeEmail(platform, Users.Customer());
+        Assert.Contains(english, email.TextBody, StringComparison.Ordinal);
+    }
+
+    /// <summary>Every other refund follows the office's booking, and keeps the office's name.</summary>
+    [Fact]
+    public void A_refund_the_offices_booking_made_keeps_the_offices_name()
+    {
+        var office = Notification.Raise(Id.New(), NotificationKind.YourDepositRefunded, "Petra", Now, Id.New(), "KH-1");
+        Assert.False(office.IsFromPlatform);
+
+        var en = Composer(PaymentMode.Sandbox).ComposePush(office, Language.English);
+
+        Assert.StartsWith("Booking KH-1 with Petra", en.Body, StringComparison.Ordinal);
+    }
+
+    /// <summary>A person whose name happens to be the platform's is still a person: only no actor id and the name say platform.</summary>
+    [Fact]
+    public void Only_the_platform_with_no_person_behind_it_is_from_the_platform()
+    {
+        var person = Notification.Raise(Id.New(), NotificationKind.YourDepositRefunded, Notification.PlatformActorName, Now, actorUserId: Id.New());
+
+        Assert.False(person.IsFromPlatform);
+    }
+
     [Fact]
     public void Every_kind_that_wakes_a_phone_has_its_own_words_in_both_languages()
     {

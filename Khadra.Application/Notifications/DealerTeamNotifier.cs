@@ -110,7 +110,7 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
 
         var actorName = actorUserId is { } actor
             ? await NameOfAsync(actor, cancellationToken)
-            : PlatformActorName;
+            : Notification.PlatformActorName;
 
         notifier.Raise(Notification.Raise(
             recipientUserId, kind, actorName, now, subjectId, subjectReference, actorUserId));
@@ -158,6 +158,19 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// The CUSTOMER, told what the PLATFORM did to their booking: an administrator's dispute decision, or a refund the
+    /// platform made (Wave 2 C6; E2E F48). Named Khadra, never the rental office: the office did not do it, and a
+    /// customer told that the office refunded them would thank or blame the wrong party. Staged, not saved.
+    /// </summary>
+    public Task NotifyCustomerFromPlatformAsync(
+        Id customerUserId,
+        NotificationKind kind,
+        DateTimeOffset now,
+        Id? subjectId = null,
+        string? subjectReference = null) =>
+        NotifyCustomerAsync(customerUserId, Notification.PlatformActorName, kind, now, subjectId, subjectReference);
+
     /// <summary>The owner and every ACTIVE employee. A deactivated one has no standing (spec 4.2).</summary>
     private static List<Id> Recipients(Dealer dealer, Id exceptUserId)
     {
@@ -184,7 +197,6 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         return user?.Name.Value ?? UnknownActorName;
     }
 
-    private const string PlatformActorName = "Khadra";
     private const string UnknownActorName = "A colleague";
 
     // Deliberately not a name. See NotifyTeamOfCustomerActionAsync.

@@ -1044,6 +1044,73 @@ public sealed class PaymentUseCaseTests
             notification.Kind == NotificationKind.YourDepositRefunded));
     }
 
+    // ---------------------------------------------------------------- who made the refund (Wave 2 C6; E2E F48)
+
+    /// <summary>The refund an administrator's dispute decision ordered is Khadra's: the office did not make it.</summary>
+    [Fact]
+    public async Task A_refund_a_dispute_decision_ordered_is_announced_as_khadras()
+    {
+        var context = new Context();
+        var (booking, payment) = Build.PaidBooking(customerId: CustomerId);
+        context.Bookings.GetByIdAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(booking);
+        context.GivenDealerFor(booking);
+        var refund = payment.RequestRefund(Money.Jod(booking.Pricing.DepositAmount.Amount), Id.New(), Now).Value;
+        Assert.Same(RefundReason.DisputeResolution, refund.Reason);
+        refund.MarkSent("rf_dispute", Now);
+        context.GivenReference(payment);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_dispute", "rf_dispute"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.RecipientUserId == booking.CustomerId &&
+            notification.Kind == NotificationKind.YourDepositRefunded &&
+            notification.ActorName == Notification.PlatformActorName &&
+            notification.ActorUserId == null &&
+            notification.IsFromPlatform));
+    }
+
+    /// <summary>An administrator's cancellation is Khadra's act too, and so is the refund it orders.</summary>
+    [Fact]
+    public async Task A_refund_an_administrators_cancellation_ordered_is_announced_as_khadras()
+    {
+        var context = new Context();
+        var booking = context.GivenApproved();
+        context.GivenDealerFor(booking);
+        var payment = PendingFor(booking, booking.Pricing.DepositAmount.Amount);
+        Assert.True(payment.Apply(Money.Jod(booking.Pricing.DepositAmount.Amount), Now, Now).IsSuccess);
+        Assert.True(booking.ConfirmDepositPaid(payment.Id, Now).IsSuccess);
+        Assert.True(booking.Cancel(BookingParty.Admin, Id.New(), "Office closed.", Now).IsSuccess);
+        BookingEndingRefunds.Record(booking, payment, Now);
+        var refund = Assert.Single(payment.Refunds);
+        Assert.Same(RefundReason.PlatformCancellation, refund.Reason);
+        refund.MarkSent("rf_platform", Now);
+        context.GivenReference(payment);
+
+        Deliver(context, RefundEventFor(payment, ProviderEventKind.RefundSettled, "evt_platform", "rf_platform"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.Kind == NotificationKind.YourDepositRefunded && notification.IsFromPlatform));
+    }
+
+    /// <summary>A refund the office's own booking rules made keeps the office's name, as it always did.</summary>
+    [Fact]
+    public async Task A_free_cancellation_refund_keeps_the_offices_name()
+    {
+        var context = new Context();
+        var (booking, _) = FreelyCancelled(context);
+        await context.Sweep().Handle(new SettlePaymentsCommand(), CancellationToken.None);
+
+        Deliver(context, RefundEvent(ProviderEventKind.RefundSettled, "evt_refund_office"));
+        Assert.True((await Receive(context)).IsSuccess);
+
+        context.Notifier.Received(1).Raise(Arg.Is<Notification>(notification =>
+            notification.RecipientUserId == booking.CustomerId &&
+            !notification.IsFromPlatform &&
+            notification.ActorName != Notification.PlatformActorName));
+    }
+
     // ---------------------------------------------------------------- deposit or full payment (2026-09-24)
 
     private static IBusinessRulesProvider RulesWithFee(decimal percent, string basis = "FullAmount")

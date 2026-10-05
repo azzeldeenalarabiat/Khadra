@@ -55,6 +55,20 @@ public sealed class Notification : AggregateRoot, ISoftDeletable
 
     public bool IsRead => ReadAt is not null;
 
+    /// <summary>
+    /// The name a notification carries when the platform itself acted: an administrator's dispute decision, an
+    /// administrator's cancellation and the refunds they order, an expiry (Wave 2 C6; E2E F48). One definition, so
+    /// every place that raises such a notification and every place that words one agree on it.
+    /// </summary>
+    public const string PlatformActorName = "Khadra";
+
+    /// <summary>
+    /// Whether the platform itself acted, rather than a person or a rental office: no person's id, and the platform's
+    /// own name. What the push and the email are worded from, so a refund Khadra made never reads as the office's.
+    /// </summary>
+    public bool IsFromPlatform =>
+        ActorUserId is null && string.Equals(ActorName, PlatformActorName, StringComparison.Ordinal);
+
     private Notification()
     {
     }

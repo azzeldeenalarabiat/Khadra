@@ -330,14 +330,25 @@ public sealed partial class ReceiveProviderEventHandler(
         var booking = await bookings.GetByIdAsync(payment.BookingId, cancellationToken);
         if (booking is not null)
         {
-            var dealer = await dealers.GetByIdAsync(booking.DealerId, cancellationToken);
-            await team.NotifyCustomerAsync(
-                booking.CustomerId,
-                dealer?.BusinessName.Value ?? string.Empty,
-                payment.IsRefundedInFull ? NotificationKind.YourDepositRefunded : NotificationKind.YourPartialRefundSettled,
-                now,
-                booking.Id,
-                booking.Reference.Value);
+            var kind = payment.IsRefundedInFull ? NotificationKind.YourDepositRefunded : NotificationKind.YourPartialRefundSettled;
+            // A refund the PLATFORM made is announced as Khadra's (Wave 2 C6; E2E F48): an administrator's dispute
+            // decision, or an administrator's cancellation. Every other refund follows the office's booking, and keeps
+            // the office's name.
+            if (refund.Reason == RefundReason.DisputeResolution || refund.Reason == RefundReason.PlatformCancellation)
+            {
+                await team.NotifyCustomerFromPlatformAsync(booking.CustomerId, kind, now, booking.Id, booking.Reference.Value);
+            }
+            else
+            {
+                var dealer = await dealers.GetByIdAsync(booking.DealerId, cancellationToken);
+                await team.NotifyCustomerAsync(
+                    booking.CustomerId,
+                    dealer?.BusinessName.Value ?? string.Empty,
+                    kind,
+                    now,
+                    booking.Id,
+                    booking.Reference.Value);
+            }
         }
 
         return ProviderEventOutcome.Acted;

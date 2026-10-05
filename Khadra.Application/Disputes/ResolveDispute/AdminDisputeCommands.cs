@@ -442,9 +442,8 @@ public sealed class AdminDisputeHandlers(
     /// decided this, not the gallery. Nothing about the outcome travels in the push — the app shows it.
     /// </remarks>
     private Task TellCustomerAsync(DisputeTicket ticket, Domain.Bookings.Booking booking) =>
-        team.NotifyCustomerAsync(
+        team.NotifyCustomerFromPlatformAsync(
             booking.CustomerId,
-            "Khadra",
             NotificationKind.YourDisputeUpdated,
             clock.UtcNow,
             ticket.Id,
