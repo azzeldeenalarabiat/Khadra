@@ -292,6 +292,34 @@ public sealed class DepositDispositionTests
             Build.Now,
             alreadyChargedToDealer: Money.Jod(alreadyCharged));
 
+    /// <summary>
+    /// One statement of the office-charge rule (Wave 2 C1): the decision's preview asks the shared check before
+    /// anything exists, the decision asks it again inside Create, and the two give the same verdict.
+    /// </summary>
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(0, "dispute.dealer_charge_out_of_range")]
+    [InlineData(25, null)]
+    [InlineData(24.999, "dispute.dealer_charge_out_of_range")]
+    [InlineData(50.001, "dispute.dealer_charge_out_of_range")]
+    public void The_shared_charge_check_and_the_decision_give_the_same_verdict(double? charge, string? expected)
+    {
+        var money = charge is { } amount ? Money.Jod((decimal)amount) : null;
+
+        var checkedAlone = DisputeResolution.CheckDealerCharge(money, DealerPenalty(), Money.Jod(0m));
+        var decided = DisputeResolution.Create(
+            DepositDisposition.RefundEverything(Deposit).Value,
+            money,
+            DealerPenalty(),
+            "Decided.",
+            Id.New(),
+            Build.Now,
+            Money.Jod(0m));
+
+        Assert.Equal(expected, checkedAlone.IsFailure ? checkedAlone.Error.Code : null);
+        Assert.Equal(expected, decided.IsFailure ? decided.Error.Code : null);
+    }
+
     [Theory]
     [InlineData(25, 25)]    // the minimum first, then up to the maximum
     [InlineData(25, 1)]     // the floor bound only the first charge

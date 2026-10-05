@@ -7,11 +7,14 @@ using Khadra.Application.Common.Dtos;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Disputes.Dtos;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Payables.Dtos;
+using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Disputes.Repositories;
+using Khadra.Domain.Payables.Repositories;
 using Khadra.Domain.Payments;
 using Microsoft.Extensions.Logging;
 
@@ -33,6 +36,7 @@ public sealed partial class DisputeViewComposer(
     IDocumentLinkSigner signer,
     IDisputeTicketRepository tickets,
     IAdminDashboardSettings dashboard,
+    IOfficePayableRepository payables,
     IClock clock,
     ILogger<DisputeViewComposer> logger)
 {
@@ -101,7 +105,10 @@ public sealed partial class DisputeViewComposer(
                     .ToList()))
             .ToList();
 
-        var basis = await BasisAsync(ticket, booking, context, cancellationToken);
+        // Read once, for the basis and for the office's outcome alike. Sequential, never concurrent: every reader here
+        // shares the scoped DbContext.
+        var resolvedTickets = await tickets.ListResolvedForBookingAsync(booking.Id, cancellationToken);
+        var basis = Basis(ticket, booking, context, resolvedTickets);
         var decision = ticket.Resolution is { } resolved
             ? DisputeResolutionDto.From(resolved, NameOf(resolved.ResolvedByAdminId), Closed(resolved.ResolvedByAdminId))
             : null;
@@ -139,25 +146,89 @@ public sealed partial class DisputeViewComposer(
             // Administrators only (owner decision 3): a customer is never shown what the office was charged,
             // and the SLA panel is the administrator's alone. The parties' copies carry null.
             viewer == BookingParty.Admin ? basis.ChargedEarlier : null,
-            viewer == BookingParty.Admin ? DisputeSlaStates.For(ticket, dashboard.SlaWarningThreshold, now) : null);
+            viewer == BookingParty.Admin ? DisputeSlaStates.For(ticket, dashboard.SlaWarningThreshold, now) : null,
+            // The office's copy only: what the decision comes to for its money (Wave 2 C1).
+            viewer == BookingParty.Dealer ? await ExpectedOutcomeAsync(ticket, booking, resolvedTickets, now, cancellationToken) : null);
+    }
+
+    /// <summary>
+    /// What a decided dispute comes to for the office (Wave 2 C1; E2E F37): the recorded payable once the ledger has
+    /// one, and before that the projection of the ledger's own office function. The office's dispute page and its
+    /// Payouts page therefore cannot disagree. Null while the ticket is undecided, and for a booking nothing was paid
+    /// online for, which never gets a payable.
+    /// </summary>
+    private async Task<OfficeExpectedOutcomeDto?> ExpectedOutcomeAsync(
+        DisputeTicket ticket,
+        Booking booking,
+        IReadOnlyList<DisputeTicket> resolved,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (ticket.Resolution is null || booking.DepositPaymentId is null)
+            return null;
+
+        var recorded = await payables.GetByBookingAsync(booking.Id, cancellationToken);
+        if (recorded is not null)
+        {
+            MoneyDto Recorded(decimal amount) => new(Money.AtScale(amount), recorded.Currency);
+            return new OfficeExpectedOutcomeDto(
+                OfficeOutcomeSources.Recorded,
+                recorded.Id.Value,
+                recorded.Outcome.Name,
+                Recorded(recorded.OfficeMoney),
+                Recorded(recorded.Commission),
+                Recorded(recorded.OfficeCharges),
+                Recorded(recorded.Net),
+                recorded.Lines.Select(line => new PayableLineDto(line.Kind.Name, Recorded(line.Amount), line.SourceId?.Value)).ToList(),
+                recorded.FinalAt,
+                null);
+        }
+
+        // A decision completes a returned booking, so a decided ticket's booking is completed, cancelled or a no-show.
+        var finalAt =
+            booking.Status == BookingStatus.Completed ? booking.FinishedAt
+            : booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.NoShow ? booking.DisputeWindowEndsAt
+            : null;
+        if (finalAt is not { } final)
+            return null;
+
+        var currency = booking.Pricing.CurrencyCode;
+        var decided = resolved
+            .Where(other => other.Id != ticket.Id && other.BookingId == booking.Id && other.Resolution is not null)
+            .Append(ticket)
+            .Select(DecidedDispute.Of)
+            .ToList();
+        var office = BookingFinancialsCalculator.OfficeAtFinality(booking, booking.Status, final, decided, currency);
+        if (office.Outcome is null)
+            return null;
+
+        MoneyDto Projected(decimal amount) => new(Money.AtScale(amount), currency);
+        return new OfficeExpectedOutcomeDto(
+            OfficeOutcomeSources.Projected,
+            null,
+            office.Outcome.Name,
+            Projected(office.OfficeMoney.Amount),
+            Projected(office.Commission.Amount),
+            Projected(office.Charges.Amount),
+            Projected(office.Net),
+            office.Lines.Select(line => new PayableLineDto(line.Kind.Name, Projected(line.Amount), line.SourceId?.Value)).ToList(),
+            final,
+            // Another dispute may still be opened on a cancellation or a no-show until its window closes.
+            booking.Status != BookingStatus.Completed && now < final ? final : null);
     }
 
     /// <summary>
     /// The three deposit figures a ticket shows, all from <see cref="DisputedDeposit"/>: a resolved
     /// ticket keeps the basis it was decided against, never a recomputed one.
     /// </summary>
-    private async Task<(MoneyDto Held, MoneyDto? OnBooking, MoneyDto? DecidedEarlier, MoneyDto? ChargedEarlier)> BasisAsync(
+    private (MoneyDto Held, MoneyDto? OnBooking, MoneyDto? DecidedEarlier, MoneyDto? ChargedEarlier) Basis(
         DisputeTicket ticket,
         Booking booking,
         BookingContext context,
-        CancellationToken cancellationToken)
+        IReadOnlyList<DisputeTicket> resolved)
     {
         var released = (context.Refunds ?? []).Any(refund => refund.Reason == RefundReason.DisputeWindowClosed.Name);
-        var basis = DisputedDeposit.For(
-            ticket,
-            booking,
-            released,
-            await tickets.ListResolvedForBookingAsync(booking.Id, cancellationToken));
+        var basis = DisputedDeposit.For(ticket, booking, released, resolved);
 
         if (basis.IsFailure)
         {

@@ -29,6 +29,14 @@ public sealed class AdminDisputesController : ApiControllerBase
         [Range(0, double.MaxValue)] decimal? DealerCharge,
         [Required, MaxLength(2000)] string Note);
 
+    /// <summary>The decision's body, with the note optional: a preview follows the amounts while they are typed.</summary>
+    public sealed record PreviewRequest(
+        [Range(0, double.MaxValue)] decimal RefundToCustomer,
+        [Range(0, double.MaxValue)] decimal RetainedByPlatform,
+        [Range(0, double.MaxValue)] decimal TransferredToDealer,
+        [Range(0, double.MaxValue)] decimal? DealerCharge,
+        [MaxLength(2000)] string? Note);
+
     /// <summary>The queue. Live tickets by default, soonest deadline first.</summary>
     [HttpGet]
     [ProducesResponseType<PagedResult<DisputeListItem>>(StatusCodes.Status200OK)]
@@ -90,6 +98,33 @@ public sealed class AdminDisputesController : ApiControllerBase
     {
         var result = await Mediator.Send(
             new ResolveDisputeCommand(
+                Id.From(ticketId),
+                request.RefundToCustomer,
+                request.RetainedByPlatform,
+                request.TransferredToDealer,
+                request.DealerCharge,
+                request.Note),
+            cancellationToken);
+        return FromResult(result);
+    }
+
+    /// <summary>
+    /// What the decision WOULD do, before it is made (Wave 2 C1; E2E F37): every refusal resolving gives, and the
+    /// office's money as the payables ledger would record it. Writes nothing, and is never cached.
+    /// </summary>
+    [HttpPost("{ticketId:guid}/resolution-preview")]
+    [ProducesResponseType<ResolutionPreviewDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> PreviewResolution(
+        Guid ticketId,
+        [FromBody] PreviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        KeepOutOfCaches();
+        var result = await Mediator.Send(
+            new PreviewDisputeResolutionQuery(
                 Id.From(ticketId),
                 request.RefundToCustomer,
                 request.RetainedByPlatform,

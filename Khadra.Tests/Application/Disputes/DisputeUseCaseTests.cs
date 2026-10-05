@@ -23,6 +23,7 @@ using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications;
 using Khadra.Domain.Notifications.Repositories;
+using Khadra.Domain.Payables.Repositories;
 using System.Text.Json;
 using Khadra.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -50,6 +51,11 @@ public sealed class DisputeUseCaseTests
         public IBookingReader BookingReader { get; } = Substitute.For<IBookingReader>();
         public IDisputeAdminReader Names { get; } = Substitute.For<IDisputeAdminReader>();
         public IDocumentLinkSigner Signer { get; } = Substitute.For<IDocumentLinkSigner>();
+
+        /// <summary>The office payables ledger: nothing recorded unless a test says otherwise.</summary>
+        public IOfficePayableRepository Payables { get; } = Substitute.For<IOfficePayableRepository>();
+
+        public TestPayablesSettings PayablesSettings { get; } = new();
 
         /// <summary>The work queue's at-risk threshold, as configured by default (AdminDashboardOptions).</summary>
         public IAdminDashboardSettings Dashboard { get; } = DashboardWith(0.75m);
@@ -105,7 +111,7 @@ public sealed class DisputeUseCaseTests
         }
 
         public DisputeViewComposer Composer() =>
-            new(Bookings, BookingReader, Names, Signer, Tickets, Dashboard, Clock, NullLogger<DisputeViewComposer>.Instance);
+            new(Bookings, BookingReader, Names, Signer, Tickets, Dashboard, Payables, Clock, NullLogger<DisputeViewComposer>.Instance);
 
         /// <summary>The booking's resolved tickets as the repository answers them, oldest first (item 169).</summary>
         public void GivenResolved(Booking booking, params DisputeTicket[] resolved) =>
@@ -122,7 +128,7 @@ public sealed class DisputeUseCaseTests
 
         public AdminDisputeHandlers Admin() => new(
             Tickets, Bookings, Payments, Names, Composer(), new DisputeAuditor(AuditTrail, Actor, Clock),
-            new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()), Actor, Clock, UnitOfWork);
+            new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()), PayablesSettings, Actor, Clock, UnitOfWork);
     }
 
     /// <summary>A booking the customer cancelled after paying: terminal, with the deposit held and a penalty assessed.</summary>
@@ -1267,5 +1273,247 @@ public sealed class DisputeUseCaseTests
         Assert.Equal(held, customer.GetProperty("refundToCustomer").GetProperty("amount").GetDecimal());
         Assert.Equal(0m, customer.GetProperty("retainedByPlatform").GetProperty("amount").GetDecimal());
         Assert.Equal(JsonValueKind.True, customer.GetProperty("waivesEverything").ValueKind);
+    }
+    // ── The decision's preview (Wave 2 C1; E2E F37) ──────────────────────────────────────────────
+
+    /// <summary>
+    /// A deposit-paid booking collected and returned, its window still open: E3's shape on Staging. 18 deposit,
+    /// 6 frozen commission, nothing paid above the deposit. The clock is an hour after the return.
+    /// </summary>
+    private static Booking ReturnedBooking(Context context)
+    {
+        var (booking, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, Id.New(), booking.Period.Start).IsSuccess);
+        Assert.True(booking.RecordReturn(BookingParty.Dealer, Id.New(), booking.Period.End).IsSuccess);
+        booking.ClearDomainEvents();
+        context.Clock.UtcNow = booking.Period.End.AddHours(1);
+        return context.GivenBooking(booking);
+    }
+
+    /// <summary>A paid booking the OFFICE cancelled late: a penalty against the office, the deposit held.</summary>
+    private static Booking CancelledByTheOffice(Context context)
+    {
+        var (booking, _) = Build.PaidBooking(customerId: CustomerId, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        Assert.True(booking.Cancel(BookingParty.Dealer, Id.New(), "No car.", booking.FreeCancellationDeadline!.Value.AddMinutes(1)).IsSuccess);
+        booking.ClearDomainEvents();
+        Assert.Same(BookingParty.Dealer, booking.Penalty!.AttributedTo);
+        context.Clock.UtcNow = booking.FinishedAt!.Value.AddHours(2);
+        return context.GivenBooking(booking);
+    }
+
+    private static PreviewDisputeResolutionQuery Preview(Id ticketId, decimal refund, decimal platform, decimal dealer, decimal? charge = null, string? note = null) =>
+        new(ticketId, refund, platform, dealer, charge, note);
+
+    /// <summary>
+    /// E2E F37: the administrator set Khadra's part explicitly, and the office's share was then cut by commission at
+    /// finality without anything saying so. The preview says it, in the ledger's own figures, before the decision.
+    /// </summary>
+    [Fact]
+    public async Task The_preview_shows_the_office_its_share_and_the_commission_taken_from_it()
+    {
+        var context = new Context();
+        var booking = ReturnedBooking(context);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.Period.End.AddMinutes(30)));
+
+        var result = await context.Admin().Handle(Preview(ticket.Id, 10m, 4m, 4m), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var preview = result.Value;
+        Assert.Equal("Completed", preview.StatusAfter);
+        Assert.Equal("Final", preview.OfficeState);
+        Assert.Equal("RentalAfterDispute", preview.Outcome);
+        Assert.Equal(
+            [("DisputeShare", 4m, (Guid?)ticket.Id.Value), ("Commission", 4m, null)],
+            preview.Lines.Select(line => (line.Kind, line.Amount.Amount, line.TicketId)));
+        Assert.Equal(10m, preview.Customer.RefundRequested.Amount);
+        Assert.Equal(4m, preview.Platform.RetainedShare.Amount);
+        Assert.Equal(4m, preview.Platform.Commission.Amount);
+        Assert.Equal(4m, preview.Office.Share.Amount);
+        Assert.Equal(4m, preview.Office.Money.Amount);
+        // The frozen figure and what is taken, separately: the cap is the office's money (owner, 2026-09-29).
+        Assert.Equal(6m, preview.Office.FrozenCommission.Amount);
+        Assert.Equal(4m, preview.Office.Commission.Amount);
+        Assert.Equal(0m, preview.Office.Charges.Amount);
+        Assert.Equal(0m, preview.Office.Net.Amount);
+        Assert.Null(preview.EarlierDecisions);
+        // A returned booking is completed by the decision: final at it, and recorded no sooner than the margin after.
+        Assert.Null(preview.FurtherDecisionsPossibleUntil);
+        Assert.Equal(context.Clock.UtcNow.Add(context.PayablesSettings.FinalityMargin), preview.RecordedNotBefore);
+        Assert.Equal(2, preview.CalculatorVersion);
+        // At the currency's full scale on the wire (E2E F36), the net included.
+        Assert.Equal("4.000", preview.Office.Share.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal("0.000", preview.Office.Net.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task The_preview_writes_nothing_and_needs_no_note()
+    {
+        var context = new Context();
+        var booking = ReturnedBooking(context);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.Period.End.AddMinutes(30)));
+
+        var silent = await context.Admin().Handle(Preview(ticket.Id, 18m, 0m, 0m), CancellationToken.None);
+        var blank = await context.Admin().Handle(Preview(ticket.Id, 18m, 0m, 0m, note: "   "), CancellationToken.None);
+
+        Assert.True(silent.IsSuccess, silent.IsFailure ? silent.Error.Code : null);
+        Assert.True(blank.IsSuccess, blank.IsFailure ? blank.Error.Code : null);
+        Assert.True(ticket.Status.IsLive);
+        Assert.Null(ticket.Resolution);
+        Assert.Same(BookingStatus.Returned, booking.Status);
+        Assert.Empty(context.Audited);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        context.Notifier.DidNotReceiveWithAnyArgs().Raise(default!);
+    }
+
+    /// <summary>One drafter: what resolving refuses, the preview refuses, with the same code.</summary>
+    [Theory]
+    [InlineData(9, 0, 0, null, "dispute.disposition_unbalanced")]
+    [InlineData(17.9995, 0.0005, 0, null, "dispute.amount_precision")]
+    [InlineData(18, 0, 0, 1.0, "dispute.dealer_charge_unassessed")]
+    public async Task The_preview_refuses_what_resolving_refuses(double refund, double platform, double dealer, double? charge, string expected)
+    {
+        var context = new Context();
+        var booking = ReturnedBooking(context);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.Period.End.AddMinutes(30)));
+        var (r, p, d, c) = ((decimal)refund, (decimal)platform, (decimal)dealer, (decimal?)charge);
+
+        var previewed = await context.Admin().Handle(Preview(ticket.Id, r, p, d, c), CancellationToken.None);
+        var resolved = await context.Admin().Handle(new ResolveDisputeCommand(ticket.Id, r, p, d, c, "Decided."), CancellationToken.None);
+
+        Assert.Equal(expected, previewed.Error.Code);
+        Assert.Equal(expected, resolved.Error.Code);
+        Assert.True(ticket.Status.IsLive);
+    }
+
+    [Fact]
+    public async Task A_closed_or_missing_ticket_is_refused_for_what_it_is_not_for_its_amounts()
+    {
+        var context = new Context();
+        var booking = ReturnedBooking(context);
+        var withdrawn = context.GivenTicket(OpenTicket(booking, booking.Period.End.AddMinutes(30)));
+        Assert.True(withdrawn.Withdraw(CustomerId, booking.Period.End.AddMinutes(40)).IsSuccess);
+
+        // Amounts that would not balance either way: the ticket's state answers first.
+        var previewed = await context.Admin().Handle(Preview(withdrawn.Id, 1m, 0m, 0m), CancellationToken.None);
+        var resolved = await context.Admin().Handle(new ResolveDisputeCommand(withdrawn.Id, 1m, 0m, 0m, null, "No."), CancellationToken.None);
+        var missing = await context.Admin().Handle(Preview(Id.New(), 18m, 0m, 0m), CancellationToken.None);
+
+        Assert.Equal("dispute.already_withdrawn", previewed.Error.Code);
+        Assert.Equal("dispute.already_withdrawn", resolved.Error.Code);
+        Assert.Equal("dispute.not_found", missing.Error.Code);
+    }
+
+    [Fact]
+    public async Task A_cancellations_preview_says_another_dispute_may_change_it_until_its_window_closes()
+    {
+        var context = new Context();
+        var booking = CancelledByTheOffice(context);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.FinishedAt!.Value.AddHours(1)));
+        var windowEnds = booking.DisputeWindowEndsAt!.Value;
+        var charge = booking.Penalty!.MinAmount.Amount;
+
+        var result = await context.Admin().Handle(Preview(ticket.Id, 18m, 0m, 0m, charge), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var preview = result.Value;
+        Assert.Equal("Cancelled", preview.StatusAfter);
+        Assert.Equal("DisputeDecided", preview.Outcome);
+        // No share, so no commission; the charge is taken from nothing, and the office owes it.
+        Assert.Equal([("DisputeCharge", charge, (Guid?)ticket.Id.Value)], preview.Lines.Select(line => (line.Kind, line.Amount.Amount, line.TicketId)));
+        Assert.Equal(-charge, preview.Office.Net.Amount);
+        Assert.Equal(windowEnds, preview.FurtherDecisionsPossibleUntil);
+        Assert.Equal(windowEnds.Add(context.PayablesSettings.FinalityMargin), preview.RecordedNotBefore);
+    }
+
+    [Fact]
+    public async Task The_preview_includes_what_earlier_disputes_on_the_booking_decided()
+    {
+        var context = new Context();
+        var booking = CancelledByTheOffice(context);
+        var charge = booking.Penalty!.MinAmount.Amount;
+        var first = context.GivenTicket(OpenTicket(booking, booking.FinishedAt!.Value.AddMinutes(30)));
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(first.Id, 18m, 0m, 0m, charge, "The office cancelled late."), CancellationToken.None)).IsSuccess);
+        context.GivenResolved(booking, first);
+        var second = context.GivenTicket(OpenTicket(booking, booking.FinishedAt.Value.AddHours(1)));
+
+        var result = await context.Admin().Handle(Preview(second.Id, 0m, 0m, 0m, 1m), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var preview = result.Value;
+        var earlier = preview.EarlierDecisions!;
+        Assert.Equal(1, earlier.Count);
+        Assert.Equal(18m, earlier.ToCustomer.Amount);
+        Assert.Equal(charge, earlier.ChargedToOffice.Amount);
+        Assert.Equal(
+            [("DisputeCharge", charge, (Guid?)first.Id.Value), ("DisputeCharge", 1m, second.Id.Value)],
+            preview.Lines.Select(line => (line.Kind, line.Amount.Amount, line.TicketId)));
+        Assert.Equal(charge + 1m, preview.Office.Charges.Amount);
+        Assert.Equal(-(charge + 1m), preview.Office.Net.Amount);
+    }
+
+    // ── The office's expected outcome (Wave 2 C1) ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task The_offices_copy_of_a_decided_dispute_projects_what_it_comes_to_until_the_ledger_records_it()
+    {
+        var context = new Context();
+        var booking = CancelledByTheOffice(context);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.FinishedAt!.Value.AddHours(1)));
+        var live = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None);
+        Assert.Null(live.ExpectedOutcome);
+        var charge = booking.Penalty!.MinAmount.Amount;
+
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, 18m, 0m, 0m, charge, "The office cancelled late."), CancellationToken.None)).IsSuccess);
+        context.GivenResolved(booking, ticket);
+
+        var office = (await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None)).ExpectedOutcome!;
+        Assert.Equal(OfficeOutcomeSources.Projected, office.Source);
+        Assert.Null(office.PayableId);
+        Assert.Equal("DisputeDecided", office.Outcome);
+        Assert.Equal(-charge, office.Net.Amount);
+        Assert.Equal(charge, office.Charges.Amount);
+        Assert.Equal(booking.DisputeWindowEndsAt, office.FinalAt);
+        // The window is still open: another dispute may yet change it.
+        Assert.Equal(booking.DisputeWindowEndsAt, office.FurtherDecisionsPossibleUntil);
+
+        // Nobody else is given it.
+        Assert.Null((await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None)).ExpectedOutcome);
+        Assert.Null((await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None)).ExpectedOutcome);
+    }
+
+    [Fact]
+    public async Task Once_the_ledger_recorded_the_booking_the_offices_copy_is_the_recorded_payable()
+    {
+        var context = new Context();
+        var booking = CancelledByTheOffice(context);
+        var ticket = context.GivenTicket(OpenTicket(booking, booking.FinishedAt!.Value.AddHours(1)));
+        var charge = booking.Penalty!.MinAmount.Amount;
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, 18m, 0m, 0m, charge, "The office cancelled late."), CancellationToken.None)).IsSuccess);
+        context.GivenResolved(booking, ticket);
+        var payable = Khadra.Domain.Payables.OfficePayable.Record(
+            new Khadra.Domain.Payables.PayableDraft(
+                booking.Id,
+                booking.DealerId,
+                booking.Reference.Value,
+                "JOD",
+                "TestProvider",
+                Khadra.Domain.Payables.PayableOutcome.DisputeDecided,
+                booking.DisputeWindowEndsAt!.Value,
+                2,
+                [new(Khadra.Domain.Payables.PayableLineKind.DisputeCharge, charge, ticket.Id)]),
+            booking.DisputeWindowEndsAt.Value.AddMinutes(10));
+        context.Payables.GetByBookingAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(payable);
+
+        var office = (await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None)).ExpectedOutcome!;
+
+        Assert.Equal(OfficeOutcomeSources.Recorded, office.Source);
+        Assert.Equal(payable.Id.Value, office.PayableId);
+        Assert.Equal(payable.Net, office.Net.Amount);
+        Assert.Equal(payable.FinalAt, office.FinalAt);
+        Assert.Null(office.FurtherDecisionsPossibleUntil);
+        Assert.Equal([("DisputeCharge", charge, (Guid?)ticket.Id.Value)], office.Lines.Select(line => (line.Kind, line.Amount.Amount, line.TicketId)));
     }
 }

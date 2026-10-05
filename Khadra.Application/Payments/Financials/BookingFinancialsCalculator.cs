@@ -436,22 +436,66 @@ public static class BookingFinancialsCalculator
     /// </remarks>
     private static OfficePosition Office(Booking booking, List<DisputeTicket> decided, bool hasLiveDispute, DateTimeOffset now, string currency)
     {
-        var zero = Money.ZeroIn(currency);
         if (booking.DepositPaymentId is null)
-            return new OfficePosition(OfficeStates.NotApplicable, null, null, [], zero, Money.ZeroIn(currency), Money.ZeroIn(currency), 0m, null);
+            return NotApplicableOffice(currency);
 
         var finalAt =
             booking.Status == BookingStatus.Completed ? booking.FinishedAt
             : booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.NoShow ? booking.DisputeWindowEndsAt
             : null;
         if (finalAt is not { } final || now < final || hasLiveDispute)
+        {
+            var zero = Money.ZeroIn(currency);
             return new OfficePosition(OfficeStates.Open, null, null, [], zero, Money.ZeroIn(currency), Money.ZeroIn(currency), 0m, null);
+        }
 
+        return OfficeAtFinality(booking, booking.Status, final, decided.Select(DecidedDispute.Of).ToList(), currency);
+    }
+
+    /// <summary>
+    /// What a booking comes to for its rental office once its money is final, at the status and final moment GIVEN
+    /// (Wave 2 C1; E2E F37): the body of the office's position after its finality gate, as one pure function.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The ledger reaches it through <see cref="Calculate"/>, with the booking's own status and final moment once
+    /// they are final. A dispute decision's preview calls it with the status the decision WOULD leave and the moment
+    /// it would make final (<c>BookingDisputeSettlement.AfterResolution</c>), which the booking does not carry yet,
+    /// and with the decision among <paramref name="decided"/>. One function, so what an administrator is shown
+    /// before deciding and what the ledger records after cannot disagree.
+    /// </para>
+    /// <para>
+    /// The given status may differ from the booking's own only by the completion a decision makes: a returned
+    /// booking previewed as completed. Anything else is a programming error.
+    /// </para>
+    /// </remarks>
+    /// <param name="decided">Every decided dispute on the booking; taken in the order they were opened.</param>
+    public static OfficePosition OfficeAtFinality(
+        Booking booking,
+        BookingStatus status,
+        DateTimeOffset finalAt,
+        IReadOnlyList<DecidedDispute> decided,
+        string currency)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        ArgumentNullException.ThrowIfNull(status);
+        ArgumentNullException.ThrowIfNull(decided);
+        if (status != booking.Status && !(status == BookingStatus.Completed && booking.Status == BookingStatus.Returned))
+            throw new ArgumentException($"Booking {booking.Id} is {booking.Status.Name}; it cannot be read as {status.Name}.", nameof(status));
+        if (booking.DepositPaymentId is null)
+            return NotApplicableOffice(currency);
+
+        var final = finalAt;
+        var ordered = decided
+            .OrderBy(dispute => dispute.OpenedAt)
+            .ThenBy(dispute => dispute.TicketId.Value)
+            .ToList();
+        var zero = Money.ZeroIn(currency);
         var lines = new List<PayableLineDraft>();
         PayableOutcome outcome;
-        if (booking.Status == BookingStatus.Completed)
+        if (status == BookingStatus.Completed)
         {
-            if (decided.Count == 0)
+            if (ordered.Count == 0)
             {
                 outcome = PayableOutcome.Rental;
                 AddLine(lines, PayableLineKind.RentalRevenue, booking.OnlinePaid.Amount, null);
@@ -460,15 +504,15 @@ public static class BookingFinancialsCalculator
             {
                 outcome = PayableOutcome.RentalAfterDispute;
                 AddLine(lines, PayableLineKind.RentalRevenue, booking.PaidAboveDeposit.Amount, null);
-                AddShares(lines, decided);
+                AddShares(lines, ordered);
             }
         }
         else if (booking.ReturnsWholePayment)
             outcome = PayableOutcome.PaymentReturned;
-        else if (decided.Count > 0)
+        else if (ordered.Count > 0)
         {
             outcome = PayableOutcome.DisputeDecided;
-            AddShares(lines, decided);
+            AddShares(lines, ordered);
         }
         else if (booking.HasPenaltyAgainstCustomer)
         {
@@ -494,10 +538,10 @@ public static class BookingFinancialsCalculator
         var money = lines.Sum(line => line.Amount);
         var commission = Math.Min(booking.Pricing.CommissionAmount.Amount, money);
         AddLine(lines, PayableLineKind.Commission, commission, null);
-        foreach (var ticket in decided)
+        foreach (var dispute in ordered)
         {
-            if (ticket.Resolution!.DealerCharge is { } charge)
-                AddLine(lines, PayableLineKind.DisputeCharge, charge.Amount, ticket.Id);
+            if (dispute.DealerCharge is { } charge)
+                AddLine(lines, PayableLineKind.DisputeCharge, charge.Amount, dispute.TicketId);
         }
 
         var charges = lines.Where(line => line.Kind == PayableLineKind.DisputeCharge).Sum(line => line.Amount);
@@ -513,11 +557,15 @@ public static class BookingFinancialsCalculator
             null);
     }
 
+    /// <summary>Nothing was paid online, so the booking never reaches the office payables ledger.</summary>
+    private static OfficePosition NotApplicableOffice(string currency) =>
+        new(OfficeStates.NotApplicable, null, null, [], Money.ZeroIn(currency), Money.ZeroIn(currency), Money.ZeroIn(currency), 0m, null);
+
     /// <summary>The office's share of the deposit, one line per dispute that transferred any.</summary>
-    private static void AddShares(List<PayableLineDraft> lines, List<DisputeTicket> decided)
+    private static void AddShares(List<PayableLineDraft> lines, List<DecidedDispute> decided)
     {
-        foreach (var ticket in decided)
-            AddLine(lines, PayableLineKind.DisputeShare, ticket.Resolution!.Deposit.TransferredToDealer.Amount, ticket.Id);
+        foreach (var dispute in decided)
+            AddLine(lines, PayableLineKind.DisputeShare, dispute.TransferredToDealer.Amount, dispute.TicketId);
     }
 
     /// <summary>A line only for money that exists: a payable carries no zero lines.</summary>

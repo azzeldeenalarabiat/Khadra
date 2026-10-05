@@ -2,8 +2,12 @@ using CSharpFunctionalExtensions;
 using FluentValidation;
 using Khadra.Application.Bookings;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Dtos;
 using Khadra.Application.Disputes.Dtos;
 using Khadra.Application.Disputes.ReadModels;
+using Khadra.Application.Payables.Dtos;
+using Khadra.Application.Payables.ReadModels;
+using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
@@ -46,6 +50,19 @@ public sealed record ResolveDisputeCommand(
     decimal? DealerCharge,
     string Note) : ICommand<Result<DisputeDto, Error>>;
 
+/// <summary>
+/// What a decision WOULD do, before it is made (Wave 2 C1; E2E F37): every check resolving makes, then the office's
+/// money as the ledger would record it. Writes nothing. A query carried by POST, because it takes the decision's
+/// whole body. The note is optional, so the preview can follow the amounts while they are still being typed.
+/// </summary>
+public sealed record PreviewDisputeResolutionQuery(
+    Id TicketId,
+    decimal RefundToCustomer,
+    decimal RetainedByPlatform,
+    decimal TransferredToDealer,
+    decimal? DealerCharge,
+    string? Note) : IQuery<Result<ResolutionPreviewDto, Error>>;
+
 public sealed class ListDisputesQueryValidator : AbstractValidator<ListDisputesQuery>
 {
     private static readonly string[] Statuses = ["live", "open", "underreview", "resolved", "withdrawn", "closed", "all"];
@@ -68,6 +85,19 @@ public sealed class ResolveDisputeCommandValidator : AbstractValidator<ResolveDi
     }
 }
 
+/// <summary>Resolve's rules, but for the note, which a preview may not have yet.</summary>
+public sealed class PreviewDisputeResolutionQueryValidator : AbstractValidator<PreviewDisputeResolutionQuery>
+{
+    public PreviewDisputeResolutionQueryValidator()
+    {
+        RuleFor(query => query.RefundToCustomer).GreaterThanOrEqualTo(0m);
+        RuleFor(query => query.RetainedByPlatform).GreaterThanOrEqualTo(0m);
+        RuleFor(query => query.TransferredToDealer).GreaterThanOrEqualTo(0m);
+        RuleFor(query => query.DealerCharge).GreaterThanOrEqualTo(0m).When(query => query.DealerCharge.HasValue);
+        RuleFor(query => query.Note).MaximumLength(2000);
+    }
+}
+
 public sealed class AdminDisputeHandlers(
     IDisputeTicketRepository tickets,
     IBookingRepository bookings,
@@ -76,6 +106,7 @@ public sealed class AdminDisputeHandlers(
     DisputeViewComposer composer,
     DisputeAuditor auditor,
     DealerTeamNotifier team,
+    IPayablesSettings payables,
     ICurrentActor actor,
     IClock clock,
     IUnitOfWork unitOfWork) :
@@ -83,7 +114,8 @@ public sealed class AdminDisputeHandlers(
     IRequestHandler<GetDisputeQueueCountsQuery, Result<DisputeQueueCounts, Error>>,
     IRequestHandler<GetDisputeForReviewQuery, Result<DisputeDto, Error>>,
     IRequestHandler<AssignDisputeCommand, Result<DisputeDto, Error>>,
-    IRequestHandler<ResolveDisputeCommand, Result<DisputeDto, Error>>
+    IRequestHandler<ResolveDisputeCommand, Result<DisputeDto, Error>>,
+    IRequestHandler<PreviewDisputeResolutionQuery, Result<ResolutionPreviewDto, Error>>
 {
     public async Task<Result<PagedResult<DisputeListItem>, Error>> Handle(
         ListDisputesQuery request,
@@ -148,62 +180,28 @@ public sealed class AdminDisputeHandlers(
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var ticket = await tickets.GetByIdAsync(request.TicketId, cancellationToken);
-        if (ticket is null)
-            return DisputeErrors.NotFound;
-
-        // The booking is loaded, not summarised: its frozen deposit is the basis of the split, its
-        // assessed penalty is the range a dealer charge must fall inside, and it is about to be
-        // closed. A ticket whose booking will not load is a data-integrity failure and stops here.
-        var booking = await bookings.GetByIdAsync(ticket.BookingId, cancellationToken);
-        if (booking is null)
-            return DisputeErrors.BookingMissing;
-
+        var drafted = await DraftAsync(
+            request.TicketId,
+            request.RefundToCustomer,
+            request.RetainedByPlatform,
+            request.TransferredToDealer,
+            request.DealerCharge,
+            cancellationToken);
+        if (drafted.IsFailure)
+            return drafted.Error;
+        var (ticket, booking, basis, disposition, dealerCharge, _) = drafted.Value;
         var now = clock.UtcNow;
 
-        // A deposit the window already released is not held any more (Phase 3). Asked only while the
-        // booking holds one at all.
-        var released =
-            !BookingDisputeSettlement.DepositHeldFor(booking).IsZero &&
-            booking.DepositPaymentId is { } depositPaymentId &&
-            (await payments.GetByIdAsync(depositPaymentId, cancellationToken))?.RefundFor(RefundReason.DisputeWindowClosed) is not null;
-
-        // What THIS ticket may split: the deposit less what the booking's earlier disputes decided
-        // (owner, 2026-09-26; item 169). Every resolution still decides the whole of its basis, so a
-        // ticket opened after one was resolved splits nothing and can close only with a note.
-        var basis = DisputedDeposit.For(
-            ticket,
-            booking,
-            released,
-            await tickets.ListResolvedForBookingAsync(booking.Id, cancellationToken));
-        if (basis.IsFailure)
-            return basis.Error;
-        var held = basis.Value.Basis;
-        var currency = held.CurrencyCode;
-
-        // Before any Money is built: Money rounds, and a split typed with a fourth decimal would otherwise
-        // be decided in a form the administrator never entered (E2E F36).
-        if (!FitsCurrency(request))
-            return DisputeErrors.AmountPrecision;
-
-        var disposition = DepositDisposition.Create(
-            held,
-            Money.Create(request.RefundToCustomer, currency),
-            Money.Create(request.RetainedByPlatform, currency),
-            Money.Create(request.TransferredToDealer, currency));
-        if (disposition.IsFailure)
-            return disposition.Error;
-
-        // Attributed to the signed-in admin, never to an id in the request body. The office charge is
-        // bounded by the booking's range across every dispute on it, not per ticket.
+        // Attributed to the signed-in admin, never to an id in the request body. Create states the office-charge
+        // rule again, so the aggregate keeps its own invariant whatever called it.
         var resolution = DisputeResolution.Create(
-            disposition.Value,
-            request.DealerCharge is { } charge ? Money.Create(charge, currency) : null,
+            disposition,
+            dealerCharge,
             booking.Penalty,
             request.Note,
             actor.UserId!.Value,
             now,
-            basis.Value.ChargedToDealerEarlier);
+            basis.ChargedToDealerEarlier);
         if (resolution.IsFailure)
             return resolution.Error;
 
@@ -224,7 +222,7 @@ public sealed class AdminDisputeHandlers(
         // The other two legs -- what the platform keeps and what goes to the dealer -- have no rail
         // and are settled by hand. That is the standing gap the architecture doc records, not
         // something this handler can close.
-        var refunded = await RecordCustomerRefundAsync(booking.Id, ticket.Id, disposition.Value.RefundToCustomer, now, cancellationToken);
+        var refunded = await RecordCustomerRefundAsync(booking.Id, ticket.Id, disposition.RefundToCustomer, now, cancellationToken);
         if (refunded.IsFailure)
             return refunded.Error;
 
@@ -247,11 +245,166 @@ public sealed class AdminDisputeHandlers(
         return await composer.ComposeAsync(ticket, booking, BookingParty.Admin, cancellationToken);
     }
 
-    private static bool FitsCurrency(ResolveDisputeCommand request) =>
-        Money.FitsMinorUnits(request.RefundToCustomer) &&
-        Money.FitsMinorUnits(request.RetainedByPlatform) &&
-        Money.FitsMinorUnits(request.TransferredToDealer) &&
-        (request.DealerCharge is not { } charge || Money.FitsMinorUnits(charge));
+    /// <summary>
+    /// What a decision would be, after every check resolving makes and before anything changes (Wave 2 C1). Resolve
+    /// is this plus its unchanged mutation steps; the preview is this plus the office's money. One drafter, so the two
+    /// cannot refuse different things.
+    /// </summary>
+    private async Task<Result<ResolutionDraft, Error>> DraftAsync(
+        Id ticketId,
+        decimal refundToCustomer,
+        decimal retainedByPlatform,
+        decimal transferredToDealer,
+        decimal? dealerCharge,
+        CancellationToken cancellationToken)
+    {
+        var ticket = await tickets.GetByIdAsync(ticketId, cancellationToken);
+        if (ticket is null)
+            return DisputeErrors.NotFound;
+        // Asked first, as DisputeTicket.Resolve asks again: a closed ticket is refused for being closed, not for
+        // amounts measured against a basis it no longer has.
+        if (ticket.Status == DisputeStatus.Resolved)
+            return DisputeErrors.AlreadyResolved;
+        if (ticket.Status == DisputeStatus.Withdrawn)
+            return DisputeErrors.AlreadyWithdrawn;
+
+        // The booking is loaded, not summarised: its frozen deposit is the basis of the split, its
+        // assessed penalty is the range a dealer charge must fall inside, and it is about to be
+        // closed. A ticket whose booking will not load is a data-integrity failure and stops here.
+        var booking = await bookings.GetByIdAsync(ticket.BookingId, cancellationToken);
+        if (booking is null)
+            return DisputeErrors.BookingMissing;
+
+        // A deposit the window already released is not held any more (Phase 3). Asked only while the
+        // booking holds one at all.
+        var released =
+            !BookingDisputeSettlement.DepositHeldFor(booking).IsZero &&
+            booking.DepositPaymentId is { } depositPaymentId &&
+            (await payments.GetByIdAsync(depositPaymentId, cancellationToken))?.RefundFor(RefundReason.DisputeWindowClosed) is not null;
+
+        // What THIS ticket may split: the deposit less what the booking's earlier disputes decided
+        // (owner, 2026-09-26; item 169). Every resolution still decides the whole of its basis, so a
+        // ticket opened after one was resolved splits nothing and can close only with a note.
+        var resolved = await tickets.ListResolvedForBookingAsync(booking.Id, cancellationToken);
+        var basis = DisputedDeposit.For(ticket, booking, released, resolved);
+        if (basis.IsFailure)
+            return basis.Error;
+        var held = basis.Value.Basis;
+        var currency = held.CurrencyCode;
+
+        // Before any Money is built: Money rounds, and a split typed with a fourth decimal would otherwise
+        // be decided in a form the administrator never entered (E2E F36).
+        if (!Money.FitsMinorUnits(refundToCustomer) ||
+            !Money.FitsMinorUnits(retainedByPlatform) ||
+            !Money.FitsMinorUnits(transferredToDealer) ||
+            (dealerCharge is { } typed && !Money.FitsMinorUnits(typed)))
+        {
+            return DisputeErrors.AmountPrecision;
+        }
+
+        var disposition = DepositDisposition.Create(
+            held,
+            Money.Create(refundToCustomer, currency),
+            Money.Create(retainedByPlatform, currency),
+            Money.Create(transferredToDealer, currency));
+        if (disposition.IsFailure)
+            return disposition.Error;
+
+        // The office charge is bounded by the booking's range across every dispute on it, not per ticket.
+        var charge = dealerCharge is { } amount ? Money.Create(amount, currency) : null;
+        var fits = DisputeResolution.CheckDealerCharge(charge, booking.Penalty, basis.Value.ChargedToDealerEarlier);
+        if (fits.IsFailure)
+            return fits.Error;
+
+        var earlier = resolved
+            .Where(other => other.Id != ticket.Id && other.BookingId == booking.Id && other.Resolution is not null)
+            .ToList();
+        return new ResolutionDraft(ticket, booking, basis.Value, disposition.Value, charge, earlier);
+    }
+
+    public async Task<Result<ResolutionPreviewDto, Error>> Handle(
+        PreviewDisputeResolutionQuery request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var drafted = await DraftAsync(
+            request.TicketId,
+            request.RefundToCustomer,
+            request.RetainedByPlatform,
+            request.TransferredToDealer,
+            request.DealerCharge,
+            cancellationToken);
+        if (drafted.IsFailure)
+            return drafted.Error;
+        var (ticket, booking, basis, disposition, dealerCharge, earlier) = drafted.Value;
+        var now = clock.UtcNow;
+
+        var after = BookingDisputeSettlement.AfterResolution(booking, now);
+        if (after.IsFailure)
+            return after.Error;
+
+        // This decision among the booking's others, as the ledger will read them all once it is recorded.
+        var currency = booking.Pricing.CurrencyCode;
+        var decided = earlier
+            .Select(DecidedDispute.Of)
+            .Append(new DecidedDispute(ticket.Id, ticket.OpenedAt, disposition.TransferredToDealer, dealerCharge))
+            .ToList();
+        var office = BookingFinancialsCalculator.OfficeAtFinality(booking, after.Value.Status, after.Value.FinalAt, decided, currency);
+
+        return ResolutionPreview(booking, ticket, disposition, office, earlier, after.Value, now, currency);
+    }
+
+    private ResolutionPreviewDto ResolutionPreview(
+        Booking booking,
+        DisputeTicket ticket,
+        DepositDisposition disposition,
+        OfficePosition office,
+        List<DisputeTicket> earlier,
+        BookingAfterDispute after,
+        DateTimeOffset now,
+        string currency)
+    {
+        MoneyDto Of(decimal amount) => new(Money.AtScale(amount), currency);
+
+        var notBefore = (now > after.FinalAt ? now : after.FinalAt).Add(payables.FinalityMargin);
+        var earlierDecisions = earlier.Count == 0
+            ? null
+            : new ResolutionPreviewEarlierDto(
+                earlier.Count,
+                Of(earlier.Sum(other => other.Resolution!.Deposit.RefundToCustomer.Amount)),
+                Of(earlier.Sum(other => other.Resolution!.Deposit.RetainedByPlatform.Amount)),
+                Of(earlier.Sum(other => other.Resolution!.Deposit.TransferredToDealer.Amount)),
+                Of(earlier.Sum(other => other.Resolution!.DealerCharge?.Amount ?? 0m)));
+
+        return new ResolutionPreviewDto(
+            after.Status.Name,
+            office.State,
+            office.Outcome?.Name,
+            office.Lines.Select(line => new PayableLineDto(line.Kind.Name, Of(line.Amount), line.SourceId?.Value)).ToList(),
+            new ResolutionPreviewCustomerDto(MoneyDto.From(disposition.RefundToCustomer)),
+            new ResolutionPreviewPlatformDto(MoneyDto.From(disposition.RetainedByPlatform), MoneyDto.From(office.Commission)),
+            new ResolutionPreviewOfficeDto(
+                MoneyDto.From(disposition.TransferredToDealer),
+                MoneyDto.From(office.OfficeMoney),
+                MoneyDto.From(booking.Pricing.CommissionAmount),
+                MoneyDto.From(office.Commission),
+                MoneyDto.From(office.Charges),
+                Of(office.Net)),
+            earlierDecisions,
+            notBefore,
+            after.FurtherDisputesUntil,
+            BookingFinancials.CalculatorVersion);
+    }
+
+    /// <summary>A decision that passed every check, and the facts it was checked against.</summary>
+    private sealed record ResolutionDraft(
+        DisputeTicket Ticket,
+        Booking Booking,
+        DisputeBasis Basis,
+        DepositDisposition Disposition,
+        Money? DealerCharge,
+        List<DisputeTicket> Earlier);
 
     /// <summary>
     /// Records what the resolution returns to the customer, against the payment that actually took it.

@@ -159,42 +159,60 @@ public sealed class DisputeResolution : ValueObject
         if (resolvedByAdminId.IsEmpty)
             throw new DomainException("A resolution requires the admin who made it.");
 
-        if (dealerCharge is not null)
-        {
-            // Nothing to pick inside: either the booking blamed nobody, or it blamed the customer.
-            if (assessedPenalty is null || assessedPenalty.AttributedTo != BookingParty.Dealer)
-                return DisputeErrors.DealerChargeWithoutAssessment;
-
-            if (!string.Equals(
-                    dealerCharge.CurrencyCode,
-                    assessedPenalty.MinAmount.CurrencyCode,
-                    StringComparison.Ordinal))
-            {
-                return DisputeErrors.DealerChargeCurrencyMismatch;
-            }
-
-            // What earlier disputes charged counts only in the currency of the range it counts against.
-            if (alreadyChargedToDealer is not null &&
-                !string.Equals(
-                    alreadyChargedToDealer.CurrencyCode,
-                    assessedPenalty.MinAmount.CurrencyCode,
-                    StringComparison.Ordinal))
-            {
-                return DisputeErrors.DealerChargeCurrencyMismatch;
-            }
-
-            // A flat penalty is simply a range whose ends are equal, so the owner's still-open tier
-            // decision does not change this check. Across the booking's disputes the range is shared:
-            // what earlier resolutions charged comes off the top, and the floor applies only to the
-            // first charge.
-            var charged = alreadyChargedToDealer?.Amount ?? 0m;
-            var floor = charged > 0m ? 0m : assessedPenalty.MinAmount.Amount;
-            var ceiling = assessedPenalty.MaxAmount.Amount - charged;
-            if (dealerCharge.Amount < floor || dealerCharge.Amount > ceiling)
-                return DisputeErrors.DealerChargeOutsideAssessment;
-        }
+        var charge = CheckDealerCharge(dealerCharge, assessedPenalty, alreadyChargedToDealer);
+        if (charge.IsFailure)
+            return charge.Error;
 
         return new DisputeResolution(deposit, dealerCharge, note.Trim(), resolvedByAdminId, resolvedAt);
+    }
+
+    /// <summary>
+    /// Whether a charge to the office fits inside the penalty the booking assessed against it. It is the one
+    /// statement of the rule: the decision applies it, and so does the decision's preview, which checks
+    /// before anything is written (Wave 2 C1).
+    /// </summary>
+    /// <param name="dealerCharge">The charge, or null for none, which always fits.</param>
+    /// <param name="assessedPenalty">The penalty the BOOKING assessed, or null if it assessed none.</param>
+    /// <param name="alreadyChargedToDealer">What earlier resolutions on the same booking charged the office.</param>
+    public static UnitResult<Error> CheckDealerCharge(
+        Money? dealerCharge,
+        PenaltyAssessment? assessedPenalty,
+        Money? alreadyChargedToDealer)
+    {
+        if (dealerCharge is null)
+            return UnitResult.Success<Error>();
+
+        // Nothing to pick inside: either the booking blamed nobody, or it blamed the customer.
+        if (assessedPenalty is null || assessedPenalty.AttributedTo != BookingParty.Dealer)
+            return DisputeErrors.DealerChargeWithoutAssessment;
+
+        if (!string.Equals(
+                dealerCharge.CurrencyCode,
+                assessedPenalty.MinAmount.CurrencyCode,
+                StringComparison.Ordinal))
+        {
+            return DisputeErrors.DealerChargeCurrencyMismatch;
+        }
+
+        // What earlier disputes charged counts only in the currency of the range it counts against.
+        if (alreadyChargedToDealer is not null &&
+            !string.Equals(
+                alreadyChargedToDealer.CurrencyCode,
+                assessedPenalty.MinAmount.CurrencyCode,
+                StringComparison.Ordinal))
+        {
+            return DisputeErrors.DealerChargeCurrencyMismatch;
+        }
+
+        // A flat penalty is simply a range whose ends are equal, so the owner's still-open tier decision
+        // does not change this check. Across the booking's disputes the range is shared: what earlier
+        // resolutions charged comes off the top, and the floor applies only to the first charge.
+        var charged = alreadyChargedToDealer?.Amount ?? 0m;
+        var floor = charged > 0m ? 0m : assessedPenalty.MinAmount.Amount;
+        var ceiling = assessedPenalty.MaxAmount.Amount - charged;
+        return dealerCharge.Amount < floor || dealerCharge.Amount > ceiling
+            ? DisputeErrors.DealerChargeOutsideAssessment
+            : UnitResult.Success<Error>();
     }
 
     public bool WaivesEverything =>

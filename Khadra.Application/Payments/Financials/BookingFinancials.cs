@@ -1,5 +1,6 @@
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
+using Khadra.Domain.Disputes;
 using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 
@@ -168,6 +169,23 @@ public sealed record OfficePosition(
     string? UndeterminedBecause)
 {
     public bool IsFinal => State == OfficeStates.Final;
+}
+
+/// <summary>
+/// One decided dispute as the office's money reads it: the deposit share it gave the office and any charge it
+/// assessed on the office (Wave 2 C1). A resolved ticket gives one; so does a decision's preview, before any ticket
+/// carries it.
+/// </summary>
+/// <param name="OpenedAt">When the ticket was opened: a booking's disputes are taken in that order, then by id.</param>
+public sealed record DecidedDispute(Id TicketId, DateTimeOffset OpenedAt, Money TransferredToDealer, Money? DealerCharge)
+{
+    public static DecidedDispute Of(DisputeTicket ticket)
+    {
+        ArgumentNullException.ThrowIfNull(ticket);
+        var resolution = ticket.Resolution
+            ?? throw new ArgumentException($"Dispute {ticket.Id} has not been decided.", nameof(ticket));
+        return new DecidedDispute(ticket.Id, ticket.OpenedAt, resolution.Deposit.TransferredToDealer, resolution.DealerCharge);
+    }
 }
 
 /// <summary>

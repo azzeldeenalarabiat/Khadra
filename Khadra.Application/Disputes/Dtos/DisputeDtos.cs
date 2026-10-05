@@ -64,9 +64,47 @@ public sealed record DisputeDto(
     MoneyDto? ChargedToDealerEarlier = null,
     /// <summary>
     /// <see cref="DisputeSlaStates"/>: Closed, OnTime, AtRisk or Overdue, for the administrator's SLA panel
-    /// (E2E F42). Administrators only: null on the parties' copies. Added 2026-10-05, last.
+    /// (E2E F42). Administrators only: null on the parties' copies. Added 2026-10-05.
     /// </summary>
-    string? SlaState = null);
+    string? SlaState = null,
+    /// <summary>
+    /// What a decided dispute comes to for the office's money (Wave 2 C1; E2E F37). The office's copy only, and only
+    /// once the ticket is decided: null on a live ticket and on every other reader's copy. Added 2026-10-05, last.
+    /// </summary>
+    OfficeExpectedOutcomeDto? ExpectedOutcome = null);
+
+/// <summary>
+/// What a decided dispute comes to for the rental office (Wave 2 C1; E2E F37). Before the office payables ledger
+/// records the booking, it is projected by the one office function the ledger uses. Once the ledger has recorded it,
+/// it is the recorded payable, with its id. The office's dispute page and its Payouts page therefore cannot disagree.
+/// </summary>
+/// <param name="Source"><c>Projected</c> while no payable exists; <c>Recorded</c> once the ledger recorded one.</param>
+/// <param name="PayableId">The recorded payable; null while projected.</param>
+/// <param name="Outcome">The payable's outcome, as the payouts page names it.</param>
+/// <param name="Net">What the office is owed on the booking: below zero, it owes.</param>
+/// <param name="FinalAt">When the booking's money became, or becomes, final.</param>
+/// <param name="FurtherDecisionsPossibleUntil">
+/// While a cancellation's or a no-show's dispute window is still open, when it closes: until then another dispute may
+/// change these figures. Null once nothing can.
+/// </param>
+public sealed record OfficeExpectedOutcomeDto(
+    string Source,
+    Guid? PayableId,
+    string Outcome,
+    MoneyDto OfficeMoney,
+    MoneyDto Commission,
+    MoneyDto Charges,
+    MoneyDto Net,
+    IReadOnlyList<Payables.Dtos.PayableLineDto> Lines,
+    DateTimeOffset FinalAt,
+    DateTimeOffset? FurtherDecisionsPossibleUntil);
+
+/// <summary>Where an office's expected outcome comes from: see <see cref="OfficeExpectedOutcomeDto"/>.</summary>
+public static class OfficeOutcomeSources
+{
+    public const string Projected = "Projected";
+    public const string Recorded = "Recorded";
+}
 
 public sealed record DisputeStatementDto(
     Guid StatementId,

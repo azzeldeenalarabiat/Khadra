@@ -64,4 +64,33 @@ public static class BookingDisputeSettlement
         ArgumentNullException.ThrowIfNull(booking);
         return booking.CloseAfterDisputeResolved(adminUserId, now);
     }
+
+    /// <summary>
+    /// Where a booking would stand once a dispute on it is resolved at <paramref name="decidedAt"/>, read without
+    /// changing it (Wave 2 C1): the status the decision leaves, and the moment the booking's money becomes final.
+    /// </summary>
+    /// <remarks>
+    /// The decision's preview reads this, so what an administrator is shown and what resolving does cannot part. A
+    /// returned booking is completed by the decision, and final at it: a completed booking cannot be disputed again.
+    /// A cancellation or a no-show is already over and stays as it is, final only when its frozen dispute window
+    /// closes, because another dispute may be opened until then. Nothing else is resolved.
+    /// </remarks>
+    public static Result<BookingAfterDispute, Error> AfterResolution(Booking booking, DateTimeOffset decidedAt)
+    {
+        ArgumentNullException.ThrowIfNull(booking);
+        if (booking.Status == BookingStatus.Returned)
+            return new BookingAfterDispute(BookingStatus.Completed, decidedAt, null);
+        if ((booking.Status == BookingStatus.Cancelled || booking.Status == BookingStatus.NoShow) &&
+            booking.DisputeWindowEndsAt is { } windowEnds)
+        {
+            return new BookingAfterDispute(booking.Status, windowEnds, windowEnds);
+        }
+
+        return BookingErrors.NotReturned;
+    }
 }
+
+/// <summary>Where a booking would stand after a dispute decision: see <see cref="BookingDisputeSettlement.AfterResolution"/>.</summary>
+/// <param name="FinalAt">When nothing more can change its money, so the office payables ledger may record it.</param>
+/// <param name="FurtherDisputesUntil">Until when another dispute may still be opened on it; null once the decision ends that.</param>
+public sealed record BookingAfterDispute(BookingStatus Status, DateTimeOffset FinalAt, DateTimeOffset? FurtherDisputesUntil);
