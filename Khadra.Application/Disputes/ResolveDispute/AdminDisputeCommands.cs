@@ -181,6 +181,11 @@ public sealed class AdminDisputeHandlers(
         var held = basis.Value.Basis;
         var currency = held.CurrencyCode;
 
+        // Before any Money is built: Money rounds, and a split typed with a fourth decimal would otherwise
+        // be decided in a form the administrator never entered (E2E F36).
+        if (!FitsCurrency(request))
+            return DisputeErrors.AmountPrecision;
+
         var disposition = DepositDisposition.Create(
             held,
             Money.Create(request.RefundToCustomer, currency),
@@ -241,6 +246,12 @@ public sealed class AdminDisputeHandlers(
 
         return await composer.ComposeAsync(ticket, booking, BookingParty.Admin, cancellationToken);
     }
+
+    private static bool FitsCurrency(ResolveDisputeCommand request) =>
+        Money.FitsMinorUnits(request.RefundToCustomer) &&
+        Money.FitsMinorUnits(request.RetainedByPlatform) &&
+        Money.FitsMinorUnits(request.TransferredToDealer) &&
+        (request.DealerCharge is not { } charge || Money.FitsMinorUnits(charge));
 
     /// <summary>
     /// Records what the resolution returns to the customer, against the payment that actually took it.

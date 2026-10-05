@@ -606,8 +606,6 @@ export const EN = {
   'disputeDetail.platformSla': 'Platform SLA',
   'disputeDetail.resolvingRecordsTheDecision':
     "Resolving records the decision. The customer's share is refunded to their original payment method automatically; what the platform keeps and what goes to the office are settled by hand.",
-  'disputeDetail.separateFromTheDeposit':
-    'Separate from the deposit, and only inside the range this booking assessed.',
   'disputeDetail.takeThisOn': 'Take this on',
   'disputeDetail.theDecisionYourNote':
     "The customer is shown the whole decision; the rental office only its own share and any charge to it. Your note, your name and the timestamp are shown to both and written to the audit log, so leave the customer's and the platform's shares out of the note.",
@@ -3690,6 +3688,40 @@ export const EN = {
   'sandbox.title': 'Test payments',
   'sandbox.body':
     'This platform is running a sandbox payment provider. No card is charged and no money moves, so any booking confirmed here is not a real rental.',
+
+  // ── The resolution form (E2E F34, F35, F36; checklist 16) ────────────────────────────────────────
+  // It says before the click what the server would refuse after it, and words every code the resolve
+  // path can return. Every figure in these sentences is the server's.
+  'disputeDetail.chargeNotAssessedHint':
+    'This booking assessed no penalty against the office, so there is nothing to charge it.',
+  'disputeDetail.chargeExhaustedHint':
+    'Earlier disputes on this booking already charged the office the whole penalty it assessed.',
+  'disputeDetail.chargeRangeHint':
+    'Separate from the deposit, and only inside the penalty this booking assessed: {range}.',
+  'disputeDetail.chargeAfterEarlierHint':
+    'Separate from the deposit. Earlier disputes on this booking charged the office {charged}, so this one can charge up to {max}.',
+  'disputeDetail.chargeOutOfRangeHint': 'Outside what this booking lets you charge the office.',
+  'disputeDetail.notAnAmount': 'Enter an amount, or leave it empty.',
+  'disputeDetail.tooManyPlaces': {
+    one: 'At most {count} decimal place.',
+    other: 'At most {count} decimal places.',
+  },
+  'disputeDetail.chargeUnassessed':
+    'This booking assessed no penalty against the office, so nothing can be charged to it.',
+  'disputeDetail.chargeCurrencyMismatch':
+    'A charge to the office must be in the currency of the penalty this booking assessed.',
+  'disputeDetail.dispositionCurrencyMismatch':
+    'Every amount in a decision must be in the currency of the deposit held.',
+  'disputeDetail.amountPrecision':
+    'One of the amounts has more decimal places than this currency has. Nothing was decided.',
+  'disputeDetail.bookingMissing':
+    'The booking behind this dispute could not be loaded, so nothing can be decided on it.',
+  'disputeDetail.bookingNotReturned':
+    'The car has not been returned, so the deposit cannot be decided yet.',
+  'disputeDetail.paymentNotLive':
+    "The customer's payment can no longer be refunded, so nothing was decided. Reload the ticket.",
+  'disputeDetail.refundExceedsCapture':
+    "The customer's share is more than is left of their payment to refund, so nothing was decided.",
 } as const satisfies Record<string, Message>;
 
 export type TranslationKey = keyof typeof EN;

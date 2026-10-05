@@ -63,6 +63,33 @@ public sealed class MoneyTests
         Assert.Equal("JOD", money.CurrencyCode);
     }
 
+    /// <summary>
+    /// A decimal keeps the scale it was typed with, so a split entered as 1.5 used to travel and be audited as
+    /// "1.5" beside every stored amount's 1.500 (E2E F36). Padded at construction: same value, full scale.
+    /// </summary>
+    [Fact]
+    public void Writes_every_amount_at_the_currencys_full_scale_without_changing_its_value()
+    {
+        var typed = Money.Jod(1.5m);
+
+        Assert.Equal("1.500", typed.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal("0.000", Money.ZeroIn("JOD").Amount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(Money.Jod(1.500m), typed);
+        Assert.Equal(Money.Jod(1.500m).GetHashCode(), typed.GetHashCode());
+        Assert.Equal("1.500", Money.AtScale(1.5m).ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public void Knows_when_an_amount_needs_more_places_than_the_currency_has()
+    {
+        Assert.True(Money.FitsMinorUnits(1.5m));
+        Assert.True(Money.FitsMinorUnits(1.234m));
+        // Trailing zeros add no precision.
+        Assert.True(Money.FitsMinorUnits(1.5000m));
+        Assert.False(Money.FitsMinorUnits(1.2345m));
+        Assert.False(Money.FitsMinorUnits(0.0005m));
+    }
+
     [Fact]
     public void Adds_and_takes_percentages_in_the_same_currency()
     {

@@ -55,7 +55,18 @@ public sealed record DisputeDto(
     /// What the booking's EARLIER resolved disputes already decided, so a later ticket's smaller basis
     /// is explained rather than a mystery. Zero on a first dispute. Added 2026-09-26, last.
     /// </summary>
-    MoneyDto? DecidedByEarlierTickets = null);
+    MoneyDto? DecidedByEarlierTickets = null,
+    /// <summary>
+    /// What the booking's earlier decisions already charged the office, so the form can bound a further
+    /// charge by what is left of the assessed range (E2E F34). Administrators only: null on the parties'
+    /// copies, because a customer is never shown the office's charges (owner decision 3). Added 2026-10-05.
+    /// </summary>
+    MoneyDto? ChargedToDealerEarlier = null,
+    /// <summary>
+    /// <see cref="DisputeSlaStates"/>: Closed, OnTime, AtRisk or Overdue, for the administrator's SLA panel
+    /// (E2E F42). Administrators only: null on the parties' copies. Added 2026-10-05, last.
+    /// </summary>
+    string? SlaState = null);
 
 public sealed record DisputeStatementDto(
     Guid StatementId,

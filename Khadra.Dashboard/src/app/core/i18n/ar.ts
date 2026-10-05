@@ -684,7 +684,6 @@ export const AR = {
   'disputeDetail.platformSla': 'مدة استجابة المنصة',
   'disputeDetail.resolvingRecordsTheDecision':
     'البتّ يسجّل القرار. تُعاد حصة العميل إلى وسيلة الدفع الأصلية تلقائيًا؛ أما ما تحتفظ به المنصة وما يذهب إلى المكتب فيُسوّى يدويًا.',
-  'disputeDetail.separateFromTheDeposit': 'منفصل عن العربون، وضمن النطاق الذي قدّره هذا الحجز فقط.',
   'disputeDetail.takeThisOn': 'تولّي هذه القضية',
   'disputeDetail.theDecisionYourNote':
     'يُعرض القرار كاملًا على العميل، ولا يُعرض على مكتب التأجير إلا حصته وأي مبلغ يُحصَّل منه. وتُعرض ملاحظتك واسمك ووقت التسجيل على الطرفين وتُكتب في سجل التدقيق، فلا تذكر في الملاحظة حصة العميل أو حصة المنصة.',
@@ -3772,4 +3771,40 @@ export const AR = {
   'sandbox.title': 'مدفوعات تجريبية',
   'sandbox.body':
     'تعمل المنصّة الآن بمزوّد دفع تجريبي. لا تُخصم أي بطاقة ولا تنتقل أي أموال، فأي حجز يُؤكَّد هنا ليس حجزًا حقيقيًا.',
+
+  // ── نموذج البتّ في النزاع (E2E F34, F35, F36; checklist 16) ──────────────────────────────────────────
+  'disputeDetail.chargeNotAssessedHint':
+    'لم يقدّر هذا الحجز أي غرامة على المكتب، فلا شيء يُفرض عليه.',
+  'disputeDetail.chargeExhaustedHint':
+    'فرضت نزاعات سابقة على هذا الحجز على المكتب كامل الغرامة التي قدّرها.',
+  'disputeDetail.chargeRangeHint':
+    'منفصل عن العربون، وضمن الغرامة التي قدّرها هذا الحجز فقط: {range}.',
+  'disputeDetail.chargeAfterEarlierHint':
+    'منفصل عن العربون. فرضت نزاعات سابقة على هذا الحجز على المكتب {charged}، فلا يملك هذا النزاع أن يفرض أكثر من {max}.',
+  'disputeDetail.chargeOutOfRangeHint': 'خارج ما يسمح هذا الحجز بفرضه على المكتب.',
+  'disputeDetail.notAnAmount': 'أدخل مبلغًا أو اترك الحقل فارغًا.',
+  'disputeDetail.tooManyPlaces': {
+    zero: 'بلا منازل عشرية.',
+    one: 'منزلة عشرية واحدة كحد أقصى.',
+    two: 'منزلتان عشريتان كحد أقصى.',
+    few: '{count} منازل عشرية كحد أقصى.',
+    many: '{count} منزلة عشرية كحد أقصى.',
+    other: '{count} منزلة عشرية كحد أقصى.',
+  },
+  'disputeDetail.chargeUnassessed':
+    'لم يقدّر هذا الحجز أي غرامة على المكتب، فلا يمكن فرض أي مبلغ عليه.',
+  'disputeDetail.chargeCurrencyMismatch':
+    'يجب أن يكون المبلغ المفروض على المكتب بعملة الغرامة التي قدّرها هذا الحجز.',
+  'disputeDetail.dispositionCurrencyMismatch':
+    'يجب أن تكون كل مبالغ القرار بعملة العربون المحتجَز.',
+  'disputeDetail.amountPrecision':
+    'أحد المبالغ يحمل منازل عشرية أكثر مما في هذه العملة. لم يُحسم شيء.',
+  'disputeDetail.bookingMissing':
+    'تعذّر تحميل الحجز الذي يقوم عليه هذا النزاع، فلا يمكن البتّ فيه.',
+  'disputeDetail.bookingNotReturned':
+    'لم تُرجَع السيارة بعد، فلا يمكن البتّ في العربون الآن.',
+  'disputeDetail.paymentNotLive':
+    'لم يعد ممكنًا ردّ مبلغ من دفعة العميل، فلم يُحسم شيء. أعد تحميل التذكرة.',
+  'disputeDetail.refundExceedsCapture':
+    'حصة العميل أكبر مما تبقّى من دفعته للردّ، فلم يُحسم شيء.',
 } as const satisfies Record<TranslationKey, Message>;

@@ -286,7 +286,15 @@ public static class AttentionQueueBuilder
         return IsAtRisk(startedAt, deadlineAt, threshold, now) ? Severities.Warning : Severities.Info;
     }
 
-    private static bool IsAtRisk(
+    /// <summary>
+    /// Whether something with an SLA is close enough to its deadline to call out: the deadline has passed,
+    /// or at least <paramref name="threshold"/> of its window has elapsed.
+    /// </summary>
+    /// <remarks>
+    /// The one rule. The work queue uses it, and so does a dispute's own SLA panel
+    /// (<c>DisputeSlaStates</c>), so the queue and the ticket cannot disagree about which disputes are at risk.
+    /// </remarks>
+    public static bool IsAtRisk(
         DateTimeOffset startedAt,
         DateTimeOffset deadlineAt,
         decimal threshold,

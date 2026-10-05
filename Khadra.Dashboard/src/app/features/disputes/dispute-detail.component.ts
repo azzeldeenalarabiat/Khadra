@@ -12,7 +12,7 @@ import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone } from '../../core/models/console.models';
 import { Dispute, DisputeResolution, DisputeStatement } from '../../core/models/disputes.api';
 import { AdminDisputesService } from '../../core/services/admin-disputes.service';
-import { roundTo, scaleOf } from '../../core/services/money';
+import { roundTo } from '../../core/services/money';
 import { ConsoleUiService } from '../../core/services/console-ui.service';
 import { IconComponent } from '../../shared/icon/icon.component';
 import { TimelineComponent } from '../../shared/timeline/timeline.component';
@@ -23,6 +23,15 @@ import { Language } from '../../core/i18n/language';
 import { ProblemSnapshot, serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { MoneyPipe } from '../../shared/money.pipe';
 import { decidedEarlier, earlierDecisionNotice } from './earlier-decisions.presenter';
+import {
+  chargeAllowance,
+  chargeProblem,
+  disputeRefusal,
+  exceedsPlaces,
+  slaTone,
+  splitPlaces,
+  stepFor,
+} from './dispute-form.presenter';
 
 /** The four shapes spec 3.3 names, each one a preset split of the deposit the booking holds. */
 type Preset = 'refund' | 'penalty' | 'partial' | 'waive';
@@ -110,7 +119,7 @@ export class DisputeDetailComponent {
    */
   protected readonly problemText = computed(() => {
     const problem = this.problem();
-    return problem ? describeRefusal(problem, this.t, this.i18n.lang()) : null;
+    return problem ? disputeRefusal(problem, this.t, this.i18n.lang()) : null;
   });
 
   /**
@@ -162,13 +171,89 @@ export class DisputeDetailComponent {
   protected readonly currency = computed(() => this.dispute()?.depositHeld.currency ?? '');
   protected readonly held = computed(() => this.dispute()?.depositHeld.amount ?? 0);
 
-  /** The precision this ticket's money is held at, read off the figures rather than assumed. */
+  /**
+   * The places the split is entered and rounded at: the currency's minor units as the server states
+   * them, or the figures' own precision until it has (E2E F35, checklist 16).
+   */
   private readonly scale = computed(() =>
-    scaleOf(this.held(), this.refund(), this.platform(), this.dealer()),
+    splitPlaces(
+      this.formats.minorUnits(),
+      this.held(),
+      this.refund(),
+      this.platform(),
+      this.dealer(),
+    ),
   );
 
-  /** What one press of an input's spinner is worth, at the deposit's own precision. */
-  protected readonly step = computed(() => 10 ** -scaleOf(this.held()));
+  /** What one press of an input's spinner is worth: one minor unit of the currency. */
+  protected readonly step = computed(() =>
+    stepFor(splitPlaces(this.formats.minorUnits(), this.held())),
+  );
+
+  /** A leg typed with more places than the currency has: the server refuses it rather than rounding (F36). */
+  protected readonly placesHint = computed(() => {
+    const units = this.formats.minorUnits();
+    const legs = [this.refund(), this.platform(), this.dealer()];
+    return units !== undefined && legs.some((leg) => exceedsPlaces(leg, units))
+      ? this.t('disputeDetail.tooManyPlaces', { count: units })
+      : null;
+  });
+
+  /** What the booking lets this ticket charge the office (F34), by the server's own rule. */
+  protected readonly allowance = computed(() => {
+    const d = this.dispute();
+    return d ? chargeAllowance(d) : null;
+  });
+
+  /** The range the charge field accepts, or null while it is closed. */
+  protected readonly chargeRange = computed(() => {
+    const allowance = this.allowance();
+    return allowance?.kind === 'range' ? allowance : null;
+  });
+
+  private readonly chargeIssue = computed(() => {
+    const allowance = this.allowance();
+    return allowance
+      ? chargeProblem(this.dealerCharge(), allowance, this.formats.minorUnits())
+      : null;
+  });
+
+  /** The line under the charge field: why it is closed, what it allows, or what is wrong with it. */
+  protected readonly chargeHint = computed<{ readonly text: string; readonly bad: boolean } | null>(
+    () => {
+      const allowance = this.allowance();
+      if (!allowance) return null;
+      if (allowance.kind === 'none') {
+        return {
+          text:
+            allowance.reason === 'notAssessed'
+              ? this.t('disputeDetail.chargeNotAssessedHint')
+              : this.t('disputeDetail.chargeExhaustedHint'),
+          bad: false,
+        };
+      }
+      const issue = this.chargeIssue();
+      const units = this.formats.minorUnits();
+      if (issue === 'tooPrecise' && units !== undefined) {
+        return { text: this.t('disputeDetail.tooManyPlaces', { count: units }), bad: true };
+      }
+      if (issue === 'notANumber') return { text: this.t('disputeDetail.notAnAmount'), bad: true };
+      // What the booking allows, in the server's figures, in the alarm tone once what was typed falls
+      // outside it.
+      const text = allowance.chargedEarlier
+        ? this.t('disputeDetail.chargeAfterEarlierHint', {
+            charged: this.formats.money(
+              allowance.chargedEarlier.amount,
+              allowance.chargedEarlier.currency,
+            ),
+            max: this.formats.money(allowance.max, allowance.currency),
+          })
+        : this.t('disputeDetail.chargeRangeHint', {
+            range: this.formats.moneyRange(allowance.min, allowance.max, allowance.currency),
+          });
+      return { text, bad: issue === 'outOfRange' };
+    },
+  );
 
   protected readonly allocated = computed(() =>
     roundTo(this.refund() + this.platform() + this.dealer(), this.scale()),
@@ -187,7 +272,12 @@ export class DisputeDetailComponent {
 
   protected readonly canResolve = computed(
     () =>
-      !!this.dispute()?.isLive && this.balanced() && this.note().trim().length > 0 && !this.busy(),
+      !!this.dispute()?.isLive &&
+      this.balanced() &&
+      this.placesHint() === null &&
+      this.chargeIssue() === null &&
+      this.note().trim().length > 0 &&
+      !this.busy(),
   );
 
   protected readonly tone = computed<Tone>(() => {
@@ -198,13 +288,16 @@ export class DisputeDetailComponent {
     return d.isOverdue ? 'bad' : 'warn';
   });
 
-  /** The platform's promise on this ticket: "7h remaining", then "Overdue by 13h" — the server's flag OR the clock. */
+  /**
+   * The platform's promise on this ticket: "7h remaining", then "Overdue by 13h" — the server's flag OR
+   * the clock — tinted by the server's SLA state, the work queue's own rule (F42).
+   */
   protected readonly sla = computed(() => {
     const d = this.dispute();
-    if (!d) return { figure: '', over: false };
-    if (!d.isLive) return { figure: this.t('disputeDetail.closed'), over: false };
+    if (!d) return { figure: '', tone: null };
+    if (!d.isLive) return { figure: this.t('disputeDetail.closed'), tone: null };
     const reading = this.formats.sla(d.slaDeadline, d.isOverdue);
-    return { figure: reading.text, over: reading.passed };
+    return { figure: reading.text, tone: slaTone(d, reading.passed) };
   });
 
   protected readonly age = computed(() => {
@@ -418,7 +511,7 @@ export class DisputeDetailComponent {
           d.booking.penalty && !d.booking.penalty.isNothingOwed ? d.booking.penalty : null;
         const toDealer =
           owed?.attributedTo === 'Customer' ? Math.min(held, owed.minAmount.amount) : 0;
-        const places = scaleOf(held, toDealer);
+        const places = splitPlaces(this.formats.minorUnits(), held, toDealer);
         this.dealer.set(roundTo(toDealer, places));
         this.refund.set(roundTo(held - toDealer, places));
         this.platform.set(0);
@@ -465,7 +558,8 @@ export class DisputeDetailComponent {
   protected resolve(): void {
     const d = this.dispute();
     if (!d || !this.canResolve()) return;
-    const charge = this.dealerCharge().trim();
+    // Only a charge the booking allows is ever sent; the field is closed for any other.
+    const charge = this.allowance()?.kind === 'range' ? this.dealerCharge().trim() : '';
     const cur = this.currency();
 
     this.ui.openAction(
@@ -588,38 +682,6 @@ export class DisputeDetailComponent {
     return d.booking.customerAccountClosed
       ? this.t('common.customerAccountClosed')
       : d.booking.customerName;
-  }
-}
-
-/**
- * A server refusal, in the reader's own language.
- *
- * Takes `t` rather than reaching for one: this is a module function, so it has no `this` and no
- * injector. The mapping is from the server's stable error CODE, which is the only part of a refusal
- * that can be translated at all -- `Error.Message` is English and always will be until the API grows
- * request localisation (pre-launch item 49). An unmapped refusal shows the server's sentence only in
- * English; Arabic gets the console's own "refused" line.
- */
-function describeRefusal(
-  problem: ProblemSnapshot,
-  t: (key: TranslationKey) => string,
-  language: Language,
-): string {
-  switch (problem.code) {
-    case 'dispute.disposition_unbalanced':
-      return t('disputeDetail.theThreeAmountsMust');
-    case 'dispute.dealer_charge_out_of_range':
-      return t('disputeDetail.chargeOutsideRange');
-    case 'dispute.deposit_over_allocated':
-      return t('disputeDetail.depositOverAllocated');
-    case 'dispute.resolution_note_required':
-      return t('disputeDetail.aNoteIsRequired');
-    case 'dispute.already_resolved':
-      return t('disputeDetail.thisTicketHasAlready');
-    case 'dispute.already_withdrawn':
-      return t('disputeDetail.thisTicketWasWithdrawn');
-    default:
-      return serverSentence(problem, language, t) ?? t('dealerDelivery.serviceDidNotRespond');
   }
 }
 

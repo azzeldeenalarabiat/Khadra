@@ -551,7 +551,13 @@
   gap: 14px;
   padding: 9px 14px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--status-bad) 12%, transparent);
+  // Neutral unless the ticket's SLA state says otherwise (E2E F42): a closed or on-time ticket is not an
+  // alarm. The design draws only the overdue case, in this tint.
+  background: var(--tint-2);
+}
+.sla-panel.s-warn,
+.sla-panel.s-bad {
+  background: color-mix(in srgb, var(--c) 12%, transparent);
 }
 
 .sla-panel-figure {

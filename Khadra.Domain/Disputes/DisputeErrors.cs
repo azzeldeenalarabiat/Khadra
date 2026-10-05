@@ -28,6 +28,14 @@ public static class DisputeErrors
     public static readonly Error DispositionCurrencyMismatch =
         Error.Validation("dispute.disposition_currency_mismatch", "All amounts in a resolution must use the same currency.");
 
+    // Refused rather than rounded: Money rounds silently, so 1.2345 used to be accepted, rounded to 1.234 and
+    // checked for balance in its rounded form -- the administrator's own figures were never what was decided
+    // (E2E F36). Stated as a code, not a validation entry, so the console can word it.
+    public static readonly Error AmountPrecision =
+        Error.Validation(
+            "dispute.amount_precision",
+            $"Amounts can have at most {Money.MinorUnits} decimal places in this currency.");
+
     public static readonly Error StatementRequired =
         Error.Validation("dispute.statement_required", "A statement cannot be empty.");
 

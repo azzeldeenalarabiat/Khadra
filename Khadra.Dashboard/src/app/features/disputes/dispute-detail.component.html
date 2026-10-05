@@ -47,8 +47,10 @@
           }}
         </div>
       </div>
-      <div class="sla-panel">
-        <div [class]="sla().over ? 's-bad' : ''">
+      <!-- Tinted by the server's SLA state, the work queue's rule (F42): neutral when the ticket is
+           closed or on time, a warning when at risk, the alarm only when overdue. -->
+      <div class="sla-panel" [class]="sla().tone ? 's-' + sla().tone : ''">
+        <div>
           <div class="k">{{ t('disputeDetail.platformSla') }}</div>
           <div class="num sla-panel-figure status-text">{{ sla().figure }}</div>
         </div>
@@ -329,23 +331,35 @@
                 }
               </span>
             </div>
+            @if (placesHint(); as hint) {
+              <div class="field-error" role="status">{{ hint }}</div>
+            }
 
             <div class="field">
               <label for="dealer-charge">{{
                 t('disputeDetail.chargeToDealerOptionalIn', { currency: currency() })
               }}</label>
+              <!-- Closed, with the reason under it, when the booking assessed nothing the office can be
+                   charged (F34); otherwise bounded by what it assessed, less what earlier disputes on it
+                   charged. The server is still the judge, and its refusal is worded. -->
               <input
                 id="dealer-charge"
                 class="input input-num"
                 type="number"
-                min="0"
+                aria-describedby="dealer-charge-hint"
+                [attr.min]="chargeRange()?.min ?? 0"
+                [attr.max]="chargeRange()?.max ?? null"
+                [attr.aria-invalid]="chargeHint()?.bad || null"
+                [disabled]="!chargeRange()"
                 [step]="step()"
                 [value]="dealerCharge()"
                 (input)="dealerCharge.set(text($event))"
               />
-              <div class="field-hint">
-                {{ t('disputeDetail.separateFromTheDeposit') }}
-              </div>
+              @if (chargeHint(); as hint) {
+                <div id="dealer-charge-hint" [class]="hint.bad ? 'field-error' : 'field-hint'">
+                  {{ hint.text }}
+                </div>
+              }
             </div>
 
             <div class="field">

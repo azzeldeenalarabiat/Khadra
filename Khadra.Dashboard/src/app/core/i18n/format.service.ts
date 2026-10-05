@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { formatFrozenLocal } from './date-format';
 import { I18nService } from './i18n.service';
 import { formatAmount, formatNumber, formatPercent, formatPercentRange, formatStoredAmount } from './number-format';
@@ -51,15 +51,30 @@ export class FormatService {
    * Undefined until then, and undefined means "print it at whatever scale it arrived at" -- the
    * behaviour the console had before it asked. Never defaulted to 3: a hard-coded scale would be
    * this console asserting something about a currency it was not told about.
+   *
+   * A signal, because the call that sets it is not awaited: a screen opened before it answers must
+   * re-render when it does, not keep the scale it guessed at first paint.
    */
-  private currencyMinorUnits: number | undefined = undefined;
+  private readonly currencyMinorUnits = signal<number | undefined>(undefined);
 
   /** Set once, from `/api/v1/app-config`. See PlatformConfigService. */
   useCurrencyMinorUnits(units: number | undefined): void {
-    this.currencyMinorUnits =
+    this.currencyMinorUnits.set(
       typeof units === 'number' && Number.isInteger(units) && units >= 0 && units <= 4
         ? units
-        : undefined;
+        : undefined,
+    );
+  }
+
+  /**
+   * The decimal places the server says this platform's currency has, or undefined until it has said.
+   *
+   * For the inputs that ENTER money -- the dispute split steps and rounds by it (E2E F35, checklist 16) --
+   * where reading the scale off the figures on screen let a whole-dinar deposit (50.000 arrives as 50)
+   * make every input step by a whole dinar.
+   */
+  minorUnits(): number | undefined {
+    return this.currencyMinorUnits();
   }
 
   /** Set once, when the server tells the console which zone its reporting day runs on. */
@@ -370,7 +385,7 @@ export class FormatService {
    */
   money(amount: number | null | undefined, currency: string | null | undefined): string {
     if (amount === null || amount === undefined || !Number.isFinite(amount)) return '—';
-    const formatted = formatAmount(amount, this.locale(), this.currencyMinorUnits);
+    const formatted = formatAmount(amount, this.locale(), this.currencyMinorUnits());
     return this.isolate(currency ? `${formatted} ${currency}` : formatted);
   }
 
@@ -422,8 +437,8 @@ export class FormatService {
     if (max === null || max === undefined || !Number.isFinite(max) || max === min) {
       return this.money(min, currency);
     }
-    const low = formatAmount(min, this.locale(), this.currencyMinorUnits);
-    const high = formatAmount(max, this.locale(), this.currencyMinorUnits);
+    const low = formatAmount(min, this.locale(), this.currencyMinorUnits());
+    const high = formatAmount(max, this.locale(), this.currencyMinorUnits());
     return this.isolate(currency ? `${low}–${high} ${currency}` : `${low}–${high}`);
   }
 

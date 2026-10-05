@@ -14,6 +14,22 @@ public sealed class Money : ValueObject
     /// </remarks>
     public const int MinorUnits = 3;
 
+    // A zero carrying MinorUnits decimal places. Adding it pads a rounded amount to the full scale, so 1.5
+    // becomes 1.500: a decimal keeps the scale it was typed with, and without this a split entered as 1.5
+    // travelled and was audited as "1.5" while every amount read back from the (18,3) column says 1.500
+    // (E2E F36). The value is unchanged; only its written form is.
+    private static readonly decimal ScaleAnchor = new(0, 0, 0, false, MinorUnits);
+
+    /// <summary>
+    /// <paramref name="amount"/> rounded to <see cref="MinorUnits"/> and written with exactly that many places.
+    /// </summary>
+    public static decimal AtScale(decimal amount) =>
+        decimal.Round(amount, MinorUnits, MidpointRounding.ToEven) + ScaleAnchor;
+
+    /// <summary>True when <paramref name="amount"/> needs no more places than the currency has.</summary>
+    public static bool FitsMinorUnits(decimal amount) =>
+        decimal.Round(amount, MinorUnits, MidpointRounding.ToEven) == amount;
+
     public decimal Amount { get; }
     public string CurrencyCode { get; }
 
@@ -34,8 +50,8 @@ public sealed class Money : ValueObject
             throw new DomainException("Currency code must be an ISO 4217 three-letter code.");
 
         // Persisted precision is (18, MinorUnits): JOD has three minor units (fils). Round once at
-        // the boundary.
-        Amount = decimal.Round(amount, MinorUnits, MidpointRounding.ToEven);
+        // the boundary, and pad to the full scale so the written form matches what the column holds.
+        Amount = AtScale(amount);
         CurrencyCode = currencyCode.ToUpperInvariant();
     }
 

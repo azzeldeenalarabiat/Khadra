@@ -1,7 +1,9 @@
+using System.Globalization;
 using Khadra.Application.Common;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings;
+using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 
 namespace Khadra.Application.Disputes;
@@ -77,12 +79,18 @@ public sealed class DisputeAuditor(IAuditTrail auditTrail, ICurrentActor actor, 
         var deposit = resolution.Deposit;
         var currency = deposit.DepositHeld.CurrencyCode;
         var summary =
-            $"Resolved: of {deposit.DepositHeld.Amount} {currency} held, " +
-            $"refund {deposit.RefundToCustomer.Amount}, platform {deposit.RetainedByPlatform.Amount}, " +
-            $"dealer {deposit.TransferredToDealer.Amount}";
+            $"Resolved: of {Figure(deposit.DepositHeld)} {currency} held, " +
+            $"refund {Figure(deposit.RefundToCustomer)}, platform {Figure(deposit.RetainedByPlatform)}, " +
+            $"dealer {Figure(deposit.TransferredToDealer)}";
 
         return resolution.DealerCharge is { } charge
-            ? $"{summary}; dealer charged {charge.Amount} {charge.CurrencyCode}"
+            ? $"{summary}; dealer charged {Figure(charge)} {charge.CurrencyCode}"
             : summary;
     }
+
+    // Every figure at the currency's full scale and in the invariant culture: this line is stored for ever
+    // in an append-only table, so it cannot depend on the culture of whichever server wrote it, and it must
+    // read 1.500 like every other amount on the platform rather than the scale the admin typed (E2E F36).
+    private static string Figure(Money money) =>
+        Money.AtScale(money.Amount).ToString(CultureInfo.InvariantCulture);
 }

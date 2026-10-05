@@ -32,6 +32,7 @@ public sealed partial class DisputeViewComposer(
     IDisputeAdminReader names,
     IDocumentLinkSigner signer,
     IDisputeTicketRepository tickets,
+    IAdminDashboardSettings dashboard,
     IClock clock,
     ILogger<DisputeViewComposer> logger)
 {
@@ -134,14 +135,18 @@ public sealed partial class DisputeViewComposer(
             basis.Held,
             copy,
             basis.OnBooking,
-            basis.DecidedEarlier);
+            basis.DecidedEarlier,
+            // Administrators only (owner decision 3): a customer is never shown what the office was charged,
+            // and the SLA panel is the administrator's alone. The parties' copies carry null.
+            viewer == BookingParty.Admin ? basis.ChargedEarlier : null,
+            viewer == BookingParty.Admin ? DisputeSlaStates.For(ticket, dashboard.SlaWarningThreshold, now) : null);
     }
 
     /// <summary>
     /// The three deposit figures a ticket shows, all from <see cref="DisputedDeposit"/>: a resolved
     /// ticket keeps the basis it was decided against, never a recomputed one.
     /// </summary>
-    private async Task<(MoneyDto Held, MoneyDto? OnBooking, MoneyDto? DecidedEarlier)> BasisAsync(
+    private async Task<(MoneyDto Held, MoneyDto? OnBooking, MoneyDto? DecidedEarlier, MoneyDto? ChargedEarlier)> BasisAsync(
         DisputeTicket ticket,
         Booking booking,
         BookingContext context,
@@ -162,13 +167,17 @@ public sealed partial class DisputeViewComposer(
             // live ticket — non-nullable in the contract, and the only split the handler would accept.
             LogOverAllocated(logger, ticket.Id.Value, booking.Id.Value);
             var nothing = MoneyDto.From(Money.ZeroIn(booking.Pricing.CurrencyCode));
-            return (ticket.Resolution is { } decided ? MoneyDto.From(decided.Deposit.DepositHeld) : nothing, null, null);
+            return (ticket.Resolution is { } decided ? MoneyDto.From(decided.Deposit.DepositHeld) : nothing, null, null, null);
         }
 
         var held = ticket.Resolution is { } resolution
             ? MoneyDto.From(resolution.Deposit.DepositHeld)
             : MoneyDto.From(basis.Value.Basis);
-        return (held, MoneyDto.From(basis.Value.DepositOnBooking), MoneyDto.From(basis.Value.DecidedByEarlierTickets));
+        return (
+            held,
+            MoneyDto.From(basis.Value.DepositOnBooking),
+            MoneyDto.From(basis.Value.DecidedByEarlierTickets),
+            MoneyDto.From(basis.Value.ChargedToDealerEarlier));
     }
 
     [LoggerMessage(

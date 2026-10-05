@@ -4,6 +4,7 @@ using Khadra.Application.Common;
 using Khadra.Application.Common.Dtos;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Disputes;
+using Khadra.Application.Disputes.Dtos;
 using Khadra.Application.Disputes.RaiseDispute;
 using Khadra.Application.Disputes.ReadModels;
 using Khadra.Application.Disputes.ResolveDispute;
@@ -49,6 +50,16 @@ public sealed class DisputeUseCaseTests
         public IBookingReader BookingReader { get; } = Substitute.For<IBookingReader>();
         public IDisputeAdminReader Names { get; } = Substitute.For<IDisputeAdminReader>();
         public IDocumentLinkSigner Signer { get; } = Substitute.For<IDocumentLinkSigner>();
+
+        /// <summary>The work queue's at-risk threshold, as configured by default (AdminDashboardOptions).</summary>
+        public IAdminDashboardSettings Dashboard { get; } = DashboardWith(0.75m);
+
+        private static IAdminDashboardSettings DashboardWith(decimal threshold)
+        {
+            var settings = Substitute.For<IAdminDashboardSettings>();
+            settings.SlaWarningThreshold.Returns(threshold);
+            return settings;
+        }
         public IUploadTicketService Uploads { get; } = Substitute.For<IUploadTicketService>();
         public IDocumentStorage Storage { get; } = Substitute.For<IDocumentStorage>();
         public IAuditTrail AuditTrail { get; } = Substitute.For<IAuditTrail>();
@@ -94,7 +105,7 @@ public sealed class DisputeUseCaseTests
         }
 
         public DisputeViewComposer Composer() =>
-            new(Bookings, BookingReader, Names, Signer, Tickets, Clock, NullLogger<DisputeViewComposer>.Instance);
+            new(Bookings, BookingReader, Names, Signer, Tickets, Dashboard, Clock, NullLogger<DisputeViewComposer>.Instance);
 
         /// <summary>The booking's resolved tickets as the repository answers them, oldest first (item 169).</summary>
         public void GivenResolved(Booking booking, params DisputeTicket[] resolved) =>
@@ -340,6 +351,116 @@ public sealed class DisputeUseCaseTests
         Assert.Equal(ticket.Id, entry.EntityId);
         // One commit for the ticket, the booking and the audit entry together.
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    // ── Wave 2: the currency's precision, the audit line's scale, the administrator's own fields ─────
+
+    /// <summary>
+    /// Money rounds silently, so a fourth decimal used to be rounded away and the split decided in a form the
+    /// administrator never typed (E2E F36). Refused, with a code the console words, before anything changes.
+    /// </summary>
+    [Theory]
+    [InlineData("refund")]
+    [InlineData("platform")]
+    [InlineData("charge")]
+    public async Task An_amount_with_more_places_than_the_currency_has_is_refused_and_nothing_is_decided(string leg)
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+        var command = leg switch
+        {
+            "refund" => new ResolveDisputeCommand(ticket.Id, held - 0.0005m, 0.0005m, 0m, null, "A fourth decimal."),
+            "platform" => new ResolveDisputeCommand(ticket.Id, held - 1.2345m, 1.2345m, 0m, null, "A fourth decimal."),
+            _ => new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, 0.0001m, "A fourth decimal."),
+        };
+
+        var result = await context.Admin().Handle(command, CancellationToken.None);
+
+        Assert.Equal("dispute.amount_precision", result.Error.Code);
+        Assert.Same(DisputeStatus.Open, ticket.Status);
+        Assert.Empty(context.Audited);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    /// <summary>
+    /// The audit line is stored for ever: every figure at full scale and in the invariant culture, so a server
+    /// running with a decimal comma cannot write "1,5" into it (E2E F36).
+    /// </summary>
+    [Fact]
+    public async Task The_audit_line_is_written_at_full_scale_whatever_the_servers_culture()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+            var result = await context.Admin().Handle(
+                new ResolveDisputeCommand(ticket.Id, held - 1.5m, 1.5m, 0m, null, "Most of it back, a little kept."),
+                CancellationToken.None);
+            Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previous;
+        }
+
+        var entry = Assert.Single(context.Audited);
+        Assert.Contains("platform 1.500", entry.NewValue, StringComparison.Ordinal);
+        Assert.Contains(
+            $"refund {Money.AtScale(held - 1.5m).ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            entry.NewValue,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(",", entry.NewValue!.Split(';')[0].Replace(", ", "|", StringComparison.Ordinal), StringComparison.Ordinal);
+    }
+
+    /// <summary>The SLA panel is coloured by the work queue's own rule, at the same threshold (E2E F42).</summary>
+    [Theory]
+    [InlineData(1, "OnTime")]
+    [InlineData(36, "AtRisk")]
+    [InlineData(48, "Overdue")]
+    public void A_live_tickets_sla_state_follows_the_work_queues_rule(int hoursSinceOpening, string expected)
+    {
+        var ticket = OpenTicket(CancelledBooking(Build.Now), Build.Now);
+
+        Assert.Equal(expected, DisputeSlaStates.For(ticket, 0.75m, Build.Now.AddHours(hoursSinceOpening)));
+    }
+
+    [Fact]
+    public void A_ticket_no_longer_live_is_closed_whatever_the_clock_says()
+    {
+        var ticket = OpenTicket(CancelledBooking(Build.Now), Build.Now);
+        Assert.True(ticket.Withdraw(CustomerId, Build.Now.AddHours(1)).IsSuccess);
+
+        Assert.Equal(DisputeSlaStates.Closed, DisputeSlaStates.For(ticket, 0.75m, Build.Now.AddDays(10)));
+    }
+
+    /// <summary>
+    /// What the office was charged earlier and the SLA panel are the administrator's alone: a customer is never
+    /// shown the office's charges (owner decision 3), and the installed app receives this DTO.
+    /// </summary>
+    [Fact]
+    public async Task Only_the_administrators_copy_carries_the_earlier_charge_and_the_sla_state()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var composer = context.Composer();
+
+        var admin = await composer.ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
+        var customer = await composer.ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None);
+        var office = await composer.ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None);
+
+        Assert.Equal("0.000", admin.ChargedToDealerEarlier!.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(DisputeSlaStates.OnTime, admin.SlaState);
+        Assert.Null(customer.ChargedToDealerEarlier);
+        Assert.Null(customer.SlaState);
+        Assert.Null(office.ChargedToDealerEarlier);
+        Assert.Null(office.SlaState);
     }
 
     /// <summary>
@@ -721,8 +842,9 @@ public sealed class DisputeUseCaseTests
             null, null, "Already decided.", AdminId, Build.Now).Value;
 
         var line = DisputeAuditor.Describe(resolution);
-        Assert.Contains("of 0 JOD held", line, StringComparison.Ordinal);
-        Assert.Contains("refund 0, platform 0, dealer 0", line, StringComparison.Ordinal);
+        // At the currency's full scale, like every other amount on the platform (E2E F36).
+        Assert.Contains("of 0.000 JOD held", line, StringComparison.Ordinal);
+        Assert.Contains("refund 0.000, platform 0.000, dealer 0.000", line, StringComparison.Ordinal);
     }
 
     [Fact]

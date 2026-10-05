@@ -52,7 +52,21 @@ export interface Dispute {
    * 2026-09-26; absent from an older API. Shown, never subtracted by the console.
    */
   readonly decidedByEarlierTickets?: Money;
+  /**
+   * What the booking's EARLIER resolved disputes charged the office: zero when none did. The office
+   * charge on this ticket is bounded by the booking's assessed range less this (E2E F34). Added
+   * 2026-10-05, the administrator's copy only: null for the parties, absent from an older API.
+   */
+  readonly chargedToDealerEarlier?: Money | null;
+  /**
+   * Where the ticket stands against its SLA, by the work queue's own rule (E2E F42). Added 2026-10-05,
+   * the administrator's copy only: null for the parties, absent from an older API.
+   */
+  readonly slaState?: DisputeSlaState | null;
 }
+
+/** `DisputeSlaStates` on the server. A state this build does not know reads as neutral. */
+export type DisputeSlaState = 'Closed' | 'OnTime' | 'AtRisk' | 'Overdue';
 
 export interface DisputeStatement {
   readonly statementId: string;
