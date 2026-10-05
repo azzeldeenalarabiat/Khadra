@@ -21,6 +21,18 @@ The rules are CLAUDE.md's "The customer app's contract".
 | Website: `ng test` | 34 files, 241 tests |
 | App: `flutter analyze` / `flutter test` | no issues / 719 tests |
 
+### Wave 2 baseline at `a9ca9e4` (2026-10-05)
+
+The Wave 2 branch starts at `a9ca9e4`. It differs from `23f9f6a`, where Wave 1's final regression measured every suite,
+by one string inside one website test (a placeholder host), so the counts are those:
+
+| Suite | Result |
+|---|---|
+| Backend: `dotnet test Khadra.slnx`, run alone | 2,570 passed, 40 skipped (PostgreSQL-only) |
+| Console: `ng test` | 34 files, 392 tests |
+| Website: `ng test` | 35 files, 252 tests |
+| App: `flutter analyze` / `flutter test` | no issues / 719 tests |
+
 ## 2. Contract ledger — what the API serves or accepts
 
 Installed builds: 1.2.0+3 and 1.3.0+4. The tracked minimum (`MobileApp:MinimumSupportedVersion`) is not raised in
