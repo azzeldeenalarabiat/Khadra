@@ -101,14 +101,16 @@
             <span class="sect-t">{{ t('officeOutcome.title') }}</span>
           </div>
           <div class="sect-pad stack stack-9">
-            <div class="kv-body">
-              @for (line of view.lines; track $index) {
-                <div class="kv-split">
-                  <div class="kv-key">{{ line.label }}</div>
-                  <div class="kv-val num">{{ line.amount }}</div>
-                </div>
-              }
-            </div>
+            @if (view.lines.length) {
+              <div class="kv-body">
+                @for (line of view.lines; track $index) {
+                  <div class="kv-split">
+                    <div class="kv-key">{{ line.label }}</div>
+                    <div class="kv-val num">{{ line.amount }}</div>
+                  </div>
+                }
+              </div>
+            }
             @if (view.net; as net) {
               <div class="money-line" [class]="'s-' + net.tone">
                 <span class="k-label outcome-net">{{ net.text }}</span>
