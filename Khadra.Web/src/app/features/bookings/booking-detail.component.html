@@ -156,14 +156,14 @@
                 <!-- E2E F67: the customer reported that the office never handed the car over; their own words follow. -->
                 <p>{{ i18n.t('booking.cancelledAfterNonDelivery') }}</p>
                 @if (b.cancellationReason) {
-                  <p><span class="muted">{{ i18n.t('booking.yourReport') }}</span> <span class="user-text" dir="auto">{{ b.cancellationReason }}</span></p>
+                  <p><span class="muted">{{ i18n.t('booking.yourReport') }}</span>&ngsp;<span class="user-text" dir="auto">{{ b.cancellationReason }}</span></p>
                 }
               } @else {
                 <p>{{ b.cancelledBy === 'Customer' ? i18n.t('booking.cancelledByYou') : i18n.t('booking.cancelledBy', { party: party(b.cancelledBy) }) }}
                   @if (endReason()) { · {{ endReason() }} }</p>
                 <!-- Item 188: Khadra's reason for cancelling, which the server promises to both parties. -->
                 @if (khadraReason(); as reason) {
-                  <p><span class="muted">{{ i18n.t('booking.khadraWrote') }}</span> <span class="user-text" dir="auto">{{ reason }}</span></p>
+                  <p><span class="muted">{{ i18n.t('booking.khadraWrote') }}</span>&ngsp;<span class="user-text" dir="auto">{{ reason }}</span></p>
                 }
               }
               @if (b.refunds) {
@@ -178,7 +178,7 @@
               @if (endReason()) { <p>{{ endReason() }}</p> }
               <!-- E2E F21: the office's own words, which the API has always sent. -->
               @if (rejectionDetails(); as details) {
-                <p><span class="muted">{{ i18n.t('booking.officeWrote') }}</span> <span class="user-text" dir="auto">{{ details }}</span></p>
+                <p><span class="muted">{{ i18n.t('booking.officeWrote') }}</span>&ngsp;<span class="user-text" dir="auto">{{ details }}</span></p>
               }</div></div>
         }
         @case ('Expired') {

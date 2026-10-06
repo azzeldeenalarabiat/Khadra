@@ -634,7 +634,7 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     };
     const english = await render(reported, 'en');
     expect(english.text).toContain('Cancelled after you reported that the office did not hand over the car.');
-    expect(english.text).toContain('Nobody was at the counter at 19:45.');
+    expect(english.text).toContain('Your report: Nobody was at the counter at 19:45.');
     expect(english.text).not.toContain('Cancelled by you');
     TestBed.resetTestingModule();
 
@@ -921,13 +921,11 @@ describe('BookingDetailComponent, the words behind an ending (Wave 3 E1)', () =>
   it("shows the office's own words on a refusal, beside the label, in both languages (E2E F21)", async () => {
     const english = await render(rejected('VehicleUnavailable', 'The car is in for service that week.'), 'en');
     expect(english).toContain('The vehicle is no longer available');
-    expect(english).toContain('The office wrote:');
-    expect(english).toContain('The car is in for service that week.');
+    expect(english).toContain('The office wrote: The car is in for service that week.');
     TestBed.resetTestingModule();
 
     const arabic = await render(rejected('VehicleUnavailable', 'السيارة في الصيانة ذلك الأسبوع.'), 'ar');
-    expect(arabic).toContain('كتب المكتب:');
-    expect(arabic).toContain('السيارة في الصيانة ذلك الأسبوع.');
+    expect(arabic).toContain('كتب المكتب: السيارة في الصيانة ذلك الأسبوع.');
   });
 
   it('reads a refusal coded Other from the refusal list, never as a cancellation (F69)', async () => {
@@ -947,8 +945,7 @@ describe('BookingDetailComponent, the words behind an ending (Wave 3 E1)', () =>
       history: [change('Confirmed', 'Customer', null, null), change('Cancelled', 'Admin', null, 'The office has closed for the holiday.')],
     };
     const english = await render(cancelled, 'en');
-    expect(english).toContain('Khadra wrote:');
-    expect(english).toContain('The office has closed for the holiday.');
+    expect(english).toContain('Khadra wrote: The office has closed for the holiday.');
     TestBed.resetTestingModule();
 
     const arabic = await render(cancelled, 'ar');

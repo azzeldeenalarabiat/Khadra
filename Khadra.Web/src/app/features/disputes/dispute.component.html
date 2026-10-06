@@ -31,7 +31,7 @@
       <ul class="history">
         @for (statement of d.statements; track statement.statementId) {
           <li>
-            <span><strong>{{ party(statement.party) }}</strong> <span class="faint small">· {{ format.dateTime(statement.createdAt) }}</span></span>
+            <span><strong>{{ party(statement.party) }}</strong>&ngsp;<span class="faint small">· {{ format.dateTime(statement.createdAt) }}</span></span>
             <span class="prose user-text" dir="auto">{{ statement.body }}</span>
             @if (statement.evidence?.length) {
               <span class="row small">

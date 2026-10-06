@@ -69,7 +69,10 @@ describe('DisputeComponent, answering a live dispute (Wave 3 C4)', () => {
   });
 
   it('links each statement\'s evidence', async () => {
-    const { page } = await render(live);
+    const { page, text } = await render(live);
+
+    // The author and the time keep their space (E2E F76: "the rental office· 5 Oct").
+    expect(text()).toContain('the rental office · ');
 
     const link = [...page.querySelectorAll('a')].find((a) => a.textContent?.includes('counter.jpg'));
     expect(link?.getAttribute('href')).toBe('/api/v1/documents/signed-1');
