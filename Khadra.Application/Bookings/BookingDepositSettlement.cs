@@ -89,7 +89,9 @@ public static class BookingDepositSettlement
         if (!payment.Purpose.Confirms)
             return UnitResult.Failure(BookingErrors.NotAwaitingPayment);
 
-        return booking.ConfirmPayment(payment.Id, payment.AppliedToBooking, now);
+        // The payment's purpose says how it paid: the whole total is FullUpfront (E2E F54, Wave 3).
+        var option = payment.Purpose == PaymentPurpose.FullPayment ? PaymentOption.FullUpfront : PaymentOption.DepositOnly;
+        return booking.ConfirmPayment(payment.Id, payment.AppliedToBooking, now, option);
     }
 
     /// <summary>

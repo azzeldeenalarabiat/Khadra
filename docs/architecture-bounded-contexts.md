@@ -195,7 +195,7 @@ as its own context, Payables (§11).
 **What was not built, and why (true until 2026-09-24).** No `DealerLedger`, no payout rail, no dealer
 charge: at the confirmed 20% commission and 20% deposit the two were equal, so the platform never paid a
 dealer and never held dealer funds. Of the three spec cases that would need a rail, two are closed by construction —
-`CreateBookingHandler` only ever writes `PaymentOption.DepositOnly`, and both `BookingTerms.Create` and
+`CreateBookingHandler` only ever writes `PaymentOption.DepositOnly` (since Wave 3, 2026-10-06, a booking a full payment confirms reads `FullUpfront`, from the payment's purpose: E2E F54), and both `BookingTerms.Create` and
 `BusinessRuleSettings` refuse a commission above the deposit. What remains is the dealer non-delivery
 penalty, which is already an instruction with no rail (`DisputeResolution.DealerCharge`) and is settled
 by hand.

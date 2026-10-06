@@ -77,6 +77,7 @@ this batch (decision D6).
 | 3 | The customer's copy of a dispute names "Khadra" for the resolver and the assignee (ids null), and the office's name for an office-opened ticket and office statements (ids null); the customer's booking history carries no id but their own. `openedByUserId`, `authorUserId` and `resolvedByAdminId` become nullable | value | none: no installed build reads these fields |
 | 3 | `disputeWindowEndsAt` on every booking: when its dispute window closes, or null | additive | none: ignored by named-key parsing |
 | 3 | A dated `GET /vehicles` lists only cars that can be collected (office open at both local times) or delivered (eligible, office delivers); rows gain `selfPickupAvailable` | behavioural + additive | fewer results, all bookable; the shape is unchanged |
+| 3 | `paymentOption` reads `FullUpfront` on a booking a full payment confirms (it read `DepositOnly` on every booking); bookings already paid keep what they had, with no backfill | value, field unread | none: no build has ever read it |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 

@@ -649,7 +649,16 @@ public sealed class Booking : AggregateRoot
     /// checkout only ever opens one of the two.
     /// </para>
     /// </remarks>
-    public UnitResult<Error> ConfirmPayment(Id depositPaymentId, Money appliedToBooking, DateTimeOffset now)
+    /// <param name="option">
+    /// How the confirming payment paid: <see cref="PaymentOption.FullUpfront"/> for the whole total, the deposit
+    /// otherwise (E2E F54, Wave 3). Null leaves what the booking was made with. A retried confirmation of the same
+    /// payment changes nothing, this included.
+    /// </param>
+    public UnitResult<Error> ConfirmPayment(
+        Id depositPaymentId,
+        Money appliedToBooking,
+        DateTimeOffset now,
+        PaymentOption? option = null)
     {
         ArgumentNullException.ThrowIfNull(appliedToBooking);
         if (depositPaymentId.IsEmpty)
@@ -671,6 +680,8 @@ public sealed class Booking : AggregateRoot
 
         DepositPaymentId = depositPaymentId;
         _onlinePaid = appliedToBooking.Amount;
+        // Kept in step with how it was paid (E2E F54): every booking used to say DepositOnly, paid in full or not.
+        PaymentOption = option ?? PaymentOption;
         // The free-cancellation window starts at PAYMENT, not at approval. Spec 5.5 measures it
         // from approval because under the old order payment came first, so approval was the moment
         // of commitment. It is not any more: a customer who pays near the end of the payment window

@@ -66,8 +66,9 @@ public sealed class PickupMethod : Enumeration
     }
 }
 
-// Spec 5.3. FullUpfront needs a payout rail to the dealer, which does not exist yet, so the
-// application layer must keep it closed until the owner approves that work.
+// Spec 5.3. How the payment that confirmed the booking paid: the deposit, or the whole total
+// (offered since 2026-09-25). Set from the confirming payment's purpose (E2E F54, Wave 3); a booking
+// not yet paid keeps DepositOnly, the option it was made with.
 public sealed class PaymentOption : Enumeration
 {
     public static readonly PaymentOption DepositOnly = new(1, "DepositOnly");
