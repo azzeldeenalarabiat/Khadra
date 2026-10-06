@@ -27,17 +27,19 @@ namespace Khadra.WebAPI.Security;
 /// </remarks>
 internal sealed class HttpCurrentLanguage(IHttpContextAccessor accessor) : ICurrentLanguage
 {
-    public Language Current
+    public Language Current => Stated ?? Language.Default;
+
+    public Language? Stated
     {
         get
         {
             var context = accessor.HttpContext;
             if (context is null)
-                return Language.Default;
+                return null;
 
             var accepted = context.Request.GetTypedHeaders().AcceptLanguage;
             if (accepted is null || accepted.Count == 0)
-                return Language.Default;
+                return null;
 
             foreach (var entry in accepted.OrderByDescending(header => header.Quality ?? 1d))
             {
@@ -55,7 +57,7 @@ internal sealed class HttpCurrentLanguage(IHttpContextAccessor accessor) : ICurr
                     return match;
             }
 
-            return Language.Default;
+            return null;
         }
     }
 }

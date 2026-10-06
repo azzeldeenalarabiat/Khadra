@@ -20,5 +20,13 @@ namespace Khadra.Application.Common.Ports;
 /// </remarks>
 public interface ICurrentLanguage
 {
+    /// <summary>The language to answer in: <see cref="Stated"/>, or <see cref="Language.Default"/>.</summary>
     Language Current { get; }
+
+    /// <summary>
+    /// The language this request named, or null when it named none the platform has. Where a fallback other than the
+    /// default is right — a customer's stored language for the checkout's return address (Fix & Polish Wave 3, E3) —
+    /// this is the one to read, because <see cref="Current"/> cannot tell "English" from "nothing said".
+    /// </summary>
+    Language? Stated { get; }
 }

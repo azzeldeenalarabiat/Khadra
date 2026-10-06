@@ -282,6 +282,20 @@ public sealed class SandboxPaymentProviderTests
         Assert.DoesNotContain("KHD", session.Value.ProviderReference, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// The page's address carries the language the checkout was opened in, and nothing else from the request: the page
+    /// reads it back to return the customer in it (Fix & Polish Wave 3, E3).
+    /// </summary>
+    [Fact]
+    public async Task A_checkout_carries_the_language_it_was_opened_in()
+    {
+        var session = await Provider().CreateCheckoutAsync(Request(Language.Arabic));
+
+        var url = new Uri(session.Value.CheckoutUrl, UriKind.Absolute);
+        Assert.Equal("?lang=ar", url.Query);
+        Assert.DoesNotContain("app.example.com", session.Value.CheckoutUrl, StringComparison.Ordinal);
+    }
+
     /// <summary>Two checkouts never mint the same reference.</summary>
     [Fact]
     public async Task Each_checkout_gets_its_own_reference()
@@ -326,11 +340,12 @@ public sealed class SandboxPaymentProviderTests
         Assert.True(((IPaymentProvider)provider).IsConfigured);
     }
 
-    private static CheckoutRequest Request() => new(
+    private static CheckoutRequest Request(Language? language = null) => new(
         Id.New(),
         Money.Jod(75m),
         "KHD-2026-0001",
         "customer@example.com",
         Build.Now.AddMinutes(30),
-        new Uri("https://app.example.com/bookings/1"));
+        new Uri("https://app.example.com/en/bookings/1"),
+        language ?? Language.English);
 }

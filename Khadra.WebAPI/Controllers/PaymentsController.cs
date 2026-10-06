@@ -4,6 +4,7 @@ using Khadra.Domain.Payments;
 using Khadra.Application.Payments.OpenCheckout;
 using Khadra.Application.Payments.ReceiveProviderEvent;
 using Khadra.Application.Common;
+using Khadra.Application.Common.Ports;
 using Khadra.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -32,7 +33,7 @@ public sealed record OpenCheckoutRequest(string? Purpose);
 
 [ApiController]
 [Route("api/v1")]
-public sealed class PaymentsController(ICurrentActor actor) : ApiControllerBase
+public sealed class PaymentsController(ICurrentActor actor, ICurrentLanguage language) : ApiControllerBase
 {
     /// <summary>
     /// Starts, resumes or replaces the customer's checkout for a booking's deposit.
@@ -53,7 +54,7 @@ public sealed class PaymentsController(ICurrentActor actor) : ApiControllerBase
     public async Task<ActionResult> OpenDepositCheckout(Guid bookingId, CancellationToken cancellationToken)
     {
         var result = await Mediator.Send(
-            new OpenDepositCheckoutCommand(actor.UserId!.Value, Id.From(bookingId)),
+            new OpenDepositCheckoutCommand(actor.UserId!.Value, Id.From(bookingId), Language: language.Stated),
             cancellationToken);
         return FromResult(result);
     }
@@ -100,7 +101,7 @@ public sealed class PaymentsController(ICurrentActor actor) : ApiControllerBase
             return Failure(PaymentErrors.PurposeUnavailable);
 
         var result = await Mediator.Send(
-            new OpenDepositCheckoutCommand(actor.UserId!.Value, Id.From(bookingId), purpose),
+            new OpenDepositCheckoutCommand(actor.UserId!.Value, Id.From(bookingId), purpose, language.Stated),
             cancellationToken);
         return FromResult(result);
     }

@@ -175,11 +175,15 @@ internal sealed class PaymentSettings(IOptions<PaymentOptions> options, IOptions
     /// whatever the webhook has or has not yet done. A dedicated "payment succeeded" page would be
     /// claiming an outcome this platform does not know at that moment.
     /// </remarks>
-    public Uri ReturnUrlFor(Id bookingId)
+    /// <remarks>
+    /// In the language the checkout was opened in, as the website's own paths carry it (`/ar/…`, `/en/…`).
+    /// </remarks>
+    public Uri ReturnUrlFor(Id bookingId, Language language)
     {
+        ArgumentNullException.ThrowIfNull(language);
         var root = string.IsNullOrWhiteSpace(options.Value.ReturnUrlBase)
             ? app.Value.ClientBaseUrl
             : options.Value.ReturnUrlBase;
-        return new Uri($"{root.TrimEnd('/')}/bookings/{bookingId.Value}");
+        return new Uri($"{root.TrimEnd('/')}/{language.Name}/bookings/{bookingId.Value}");
     }
 }

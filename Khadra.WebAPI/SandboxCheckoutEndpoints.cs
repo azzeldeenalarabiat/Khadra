@@ -89,10 +89,13 @@ internal static class SandboxCheckoutEndpoints
     /// <see cref="CheckoutRequest.ReturnUrl"/>, and where a real hosted checkout would drop the
     /// customer. Recomputed from the row rather than carried in the checkout link, because this page
     /// is anonymous: a return address read from the query string would make it an open redirect.
+    /// Only its LANGUAGE travels in the link (Wave 3, E3), and only as one of the platform's two: the
+    /// host and the path still come from configuration and the row, and anything else is the default.
     /// </para>
     /// </remarks>
     internal static async Task<IResult> ShowAsync(
         string reference,
+        [FromQuery] string? lang,
         [FromServices] IPaymentRepository payments,
         [FromServices] IPaymentSettings settings,
         [FromServices] IClock clock,
@@ -103,8 +106,11 @@ internal static class SandboxCheckoutEndpoints
 
         if (payment is null) return Results.NotFound();
 
+        var language = Enumeration.GetAll<Language>()
+            .FirstOrDefault(known => string.Equals(known.Name, lang, StringComparison.Ordinal)) ?? Language.Default;
+
         return Results.Content(
-            Page(payment, clock.UtcNow, settings.ReturnUrlFor(payment.BookingId)),
+            Page(payment, clock.UtcNow, settings.ReturnUrlFor(payment.BookingId, language)),
             "text/html; charset=utf-8");
     }
 

@@ -288,6 +288,37 @@ public sealed class PaymentUseCaseTests
     }
 
     /// <summary>
+    /// Back from the checkout in the language it was opened in (Fix & Polish Wave 3, E3; E2E F25): the request's own,
+    /// else the customer's stored one, else the default. The device that opened the checkout returns in its own
+    /// language; a phone in Arabic cannot send a website session back to Arabic.
+    /// </summary>
+    [Theory]
+    [InlineData("ar", null, "ar")]
+    [InlineData("en", "ar", "en")]
+    [InlineData(null, "ar", "ar")]
+    [InlineData(null, null, "en")]
+    public async Task The_checkout_returns_in_the_language_it_was_opened_in(string? requested, string? stored, string expected)
+    {
+        var context = new Context();
+        var customer = Build.Customer(email: "reader@khadra.test");
+        if (stored is not null)
+            customer.ChoosePreferredLanguage(Enumeration.FromName<Language>(stored)!);
+        context.Users.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(customer);
+        var booking = context.GivenApproved();
+        CheckoutRequest? asked = null;
+        await context.Provider.CreateCheckoutAsync(Arg.Do<CheckoutRequest>(request => asked = request), Arg.Any<CancellationToken>());
+
+        var language = requested is null ? null : Enumeration.FromName<Language>(requested);
+        var result = await context.Open().Handle(
+            new OpenDepositCheckoutCommand(CustomerId, booking.Id, Language: language), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.NotNull(asked);
+        Assert.Equal(expected, asked!.Language.Name);
+        Assert.Equal($"https://app.test/{expected}/bookings/{booking.Id.Value}", asked.ReturnUrl.AbsoluteUri);
+    }
+
+    /// <summary>
     /// A provider that refuses leaves the row Initiated, not Failed: it is still usable, so the next
     /// tap resumes it with the same idempotency key rather than stacking another dead attempt.
     /// </summary>

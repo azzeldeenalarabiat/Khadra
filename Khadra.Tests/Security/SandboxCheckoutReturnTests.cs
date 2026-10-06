@@ -48,13 +48,13 @@ public sealed class SandboxCheckoutReturnTests
             Options.Create(new PaymentOptions { ReturnUrlBase = returnUrlBase }),
             Options.Create(new AppOptions { ClientBaseUrl = Console }));
 
-    private static async Task<string> PageFor(Payment payment, IPaymentSettings settings)
+    private static async Task<string> PageFor(Payment payment, IPaymentSettings settings, string? lang = null)
     {
         var payments = Substitute.For<IPaymentRepository>();
         payments.GetByProviderReferenceAsync(PaymentProviders.Sandbox, Reference, Arg.Any<CancellationToken>())
             .Returns(payment);
 
-        var result = await SandboxCheckoutEndpoints.ShowAsync(Reference, payments, settings, Clock, CancellationToken.None);
+        var result = await SandboxCheckoutEndpoints.ShowAsync(Reference, lang, payments, settings, Clock, CancellationToken.None);
 
         return Assert.IsType<ContentHttpResult>(result).ResponseContent!;
     }
@@ -64,10 +64,32 @@ public sealed class SandboxCheckoutReturnTests
     {
         var payment = OpenPayment();
 
-        var page = await PageFor(payment, Settings(Website));
+        var page = await PageFor(payment, Settings(Website), "en");
 
-        Assert.Contains($"""<a id="back" href="{Website}/bookings/{payment.BookingId.Value}">""", page, StringComparison.Ordinal);
+        Assert.Contains($"""<a id="back" href="{Website}/en/bookings/{payment.BookingId.Value}">""", page, StringComparison.Ordinal);
         Assert.DoesNotContain(Console, page, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Back in the language the checkout was opened in (Fix & Polish Wave 3, E3; E2E F25: a customer who paid from the
+    /// Arabic site came back to the English one). Only one of the platform's two languages is taken from the link;
+    /// anything else is the default, and the host and the path never come from it.
+    /// </summary>
+    [Theory]
+    [InlineData("ar", "ar")]
+    [InlineData("en", "en")]
+    [InlineData(null, "en")]
+    [InlineData("fr", "en")]
+    [InlineData("ar/../../evil.example", "en")]
+    [InlineData("AR", "en")]
+    public async Task The_checkout_returns_in_the_language_it_was_opened_in_and_nothing_else_from_the_link(string? lang, string expected)
+    {
+        var payment = OpenPayment();
+
+        var page = await PageFor(payment, Settings(Website), lang);
+
+        Assert.Contains($"""<a id="back" href="{Website}/{expected}/bookings/{payment.BookingId.Value}">""", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("evil.example", page, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -86,7 +108,7 @@ public sealed class SandboxCheckoutReturnTests
         var page = await PageFor(payment, settings);
 
         Assert.Contains(
-            $"""href="{settings.ReturnUrlFor(payment.BookingId).AbsoluteUri}">""",
+            $"""href="{settings.ReturnUrlFor(payment.BookingId, Language.Default).AbsoluteUri}">""",
             page,
             StringComparison.Ordinal);
     }
@@ -120,7 +142,7 @@ public sealed class SandboxCheckoutReturnTests
 
         var page = await PageFor(payment, Settings("https://customer.example/a&b"));
 
-        Assert.Contains($"""href="https://customer.example/a&amp;b/bookings/{payment.BookingId.Value}">""", page, StringComparison.Ordinal);
+        Assert.Contains($"""href="https://customer.example/a&amp;b/en/bookings/{payment.BookingId.Value}">""", page, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -164,7 +186,7 @@ public sealed class SandboxCheckoutReturnTests
     {
         var payments = Substitute.For<IPaymentRepository>();
 
-        var result = await SandboxCheckoutEndpoints.ShowAsync("sbx_unknown", payments, Settings(Website), Clock, CancellationToken.None);
+        var result = await SandboxCheckoutEndpoints.ShowAsync("sbx_unknown", "ar", payments, Settings(Website), Clock, CancellationToken.None);
 
         Assert.IsType<NotFound>(result);
     }

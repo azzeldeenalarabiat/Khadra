@@ -4120,6 +4120,12 @@ website once it is live; production stays on `Payments:Provider=None` and its re
 with the real provider. The sandbox checkout has not been driven end to end through the website
 (the shared development database is on `None`, and moving it to `Sandbox` would pin it there for good).
 
+**Updated in Wave 3 (`fix/polish-wave3`, 2026-10-06; E3, E2E F25).** The address now carries the language the checkout
+was opened in, `{base}/{ar|en}/bookings/{id}` — the request's `Accept-Language`, else the customer's stored language,
+else English — so a customer who pays from the Arabic site comes back to it. The sandbox page reads it from a
+whitelisted `?lang=` on its own address; the host and the path still come from configuration. Whoever sets the real
+provider's return address keeps the language segment: the website's paths all carry one.
+
 ### 144. The website's handover codes have not been verified by an office end to end
 
 **Status:** open · **Raised:** 2026-09-23 · **Updated:** 2026-09-24

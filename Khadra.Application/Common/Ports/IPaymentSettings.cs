@@ -30,12 +30,16 @@ public interface IPaymentSettings
     TimeSpan StaleAttemptGrace { get; }
 
     /// <summary>
-    /// Where the provider sends the customer back to.
+    /// Where the provider sends the customer back to: the booking's page, in <paramref name="language"/>.
     /// </summary>
     /// <remarks>
     /// It confirms NOTHING. A customer can close the tab, lose signal, or open the URL twice; the
     /// only thing that confirms a booking is a signed provider event. The app polls the booking after
     /// returning, and the return page says so.
+    /// <para>
+    /// The language is the one the checkout was opened in (Fix & Polish Wave 3, E3; E2E F25): a customer who paid
+    /// from the Arabic site came back to the English one, because the address carried no language.
+    /// </para>
     /// </remarks>
-    Uri ReturnUrlFor(Id bookingId);
+    Uri ReturnUrlFor(Id bookingId, Language language);
 }

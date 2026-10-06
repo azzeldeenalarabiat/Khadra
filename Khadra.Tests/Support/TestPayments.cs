@@ -70,8 +70,8 @@ internal static class TestPayments
         settings.CheckoutSessionLifetime.Returns(sessionLifetime ?? TimeSpan.FromMinutes(30));
         settings.CheckoutClosesBeforeDeadline.Returns(closesBeforeDeadline ?? TimeSpan.FromMinutes(5));
         settings.StaleAttemptGrace.Returns(staleGrace ?? TimeSpan.FromMinutes(15));
-        settings.ReturnUrlFor(Arg.Any<Id>())
-            .Returns(call => new Uri($"https://app.test/bookings/{call.Arg<Id>().Value}"));
+        settings.ReturnUrlFor(Arg.Any<Id>(), Arg.Any<Language>())
+            .Returns(call => new Uri($"https://app.test/{call.Arg<Language>().Name}/bookings/{call.Arg<Id>().Value}"));
         return settings;
     }
 

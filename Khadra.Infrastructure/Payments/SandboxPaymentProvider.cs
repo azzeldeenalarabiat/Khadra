@@ -121,7 +121,10 @@ internal sealed class SandboxPaymentProvider(IOptions<PaymentOptions> options, I
             return Task.FromResult(Result.Failure<CheckoutSession, Error>(PaymentErrors.ProviderUnavailable));
 
         var reference = $"sbx_{Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant()}";
-        var url = $"{options.Value.SandboxConsoleBaseUrl.TrimEnd('/')}{SandboxEvents.ConsolePath}/{reference}";
+        // The language the checkout was opened in, which the page reads back to return there (Wave 3, E3). Only a
+        // language the platform has can be written here, and the page accepts nothing else.
+        var url = $"{options.Value.SandboxConsoleBaseUrl.TrimEnd('/')}{SandboxEvents.ConsolePath}/{reference}"
+                  + $"?lang={request.Language.Name}";
 
         return Task.FromResult(Result.Success<CheckoutSession, Error>(new CheckoutSession(reference, url)));
     }

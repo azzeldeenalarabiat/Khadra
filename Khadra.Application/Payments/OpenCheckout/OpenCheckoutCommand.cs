@@ -22,7 +22,15 @@ namespace Khadra.Application.Payments.OpenCheckout;
 /// the fee policy, through <see cref="PaymentChoices"/>. The name predates the full-payment option;
 /// a missing purpose is the deposit, which is all an installed app built before it can ask for.
 /// </remarks>
-public sealed record OpenDepositCheckoutCommand(Id CustomerUserId, Id BookingId, PaymentPurpose? Purpose = null)
+/// <param name="Language">
+/// The language the request that opens the checkout named, or null: the customer comes back to their booking in it,
+/// or in their stored language when the request named none (Fix & Polish Wave 3, E3).
+/// </param>
+public sealed record OpenDepositCheckoutCommand(
+    Id CustomerUserId,
+    Id BookingId,
+    PaymentPurpose? Purpose = null,
+    Language? Language = null)
     : ICommand<Result<PaymentDto, Error>>;
 
 /// <summary>
@@ -111,7 +119,7 @@ public sealed class OpenDepositCheckoutHandler(
             // Same choice, usable, never answered by the provider: resume it with the SAME key, so the
             // provider returns the session it already made rather than making a second.
             if (sameChoice && live.IsUsable(now) && live.Status == PaymentStatus.Initiated)
-                return await AskProviderAsync(live, booking, live.Amount, cancellationToken);
+                return await AskProviderAsync(live, booking, live.Amount, request.Language, cancellationToken);
 
             // Past its own expiry, or the customer switched between deposit and full payment. Retire
             // it in the same save as the replacement, so there is never a moment with two live
@@ -140,7 +148,7 @@ public sealed class OpenDepositCheckoutHandler(
         payments.Add(payment);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return await AskProviderAsync(payment, booking, payment.Amount, cancellationToken);
+        return await AskProviderAsync(payment, booking, payment.Amount, request.Language, cancellationToken);
     }
 
     /// <summary>
@@ -155,12 +163,15 @@ public sealed class OpenDepositCheckoutHandler(
         Payment payment,
         Booking booking,
         Money amount,
+        Language? requested,
         CancellationToken cancellationToken)
     {
         var customer = await users.GetByIdAsync(booking.CustomerId, cancellationToken);
         if (customer is null)
             return BookingErrors.NotFound;
 
+        // Back in the language the checkout was opened in: the device that opened it returns in its own (E3).
+        var language = requested ?? customer.PreferredLanguage ?? Language.Default;
         var session = await provider.CreateCheckoutAsync(
             new CheckoutRequest(
                 payment.Id,
@@ -168,7 +179,8 @@ public sealed class OpenDepositCheckoutHandler(
                 booking.Reference.Value,
                 customer.Email.Value,
                 payment.ExpiresAt,
-                settings.ReturnUrlFor(booking.Id)),
+                settings.ReturnUrlFor(booking.Id, language),
+                language),
             cancellationToken);
         if (session.IsFailure)
             return session.Error;

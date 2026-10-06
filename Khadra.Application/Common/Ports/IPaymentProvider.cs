@@ -56,13 +56,18 @@ public enum ProviderEventKind
 /// before a capture could land too late to be applied. It is cheaper to refuse a customer at the
 /// card form than to take their money and give it back.
 /// </param>
+/// <param name="Language">
+/// The language the checkout was opened in, which <paramref name="ReturnUrl"/> already carries. A hosted checkout may
+/// show its own page in it; the sandbox carries it on its page's address so the page can return there (Wave 3, E3).
+/// </param>
 public sealed record CheckoutRequest(
     Id PaymentId,
     Money Amount,
     string BookingReference,
     string CustomerEmail,
     DateTimeOffset ExpiresAt,
-    Uri ReturnUrl);
+    Uri ReturnUrl,
+    Language Language);
 
 public sealed record CheckoutSession(string ProviderReference, string CheckoutUrl);
 

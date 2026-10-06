@@ -83,6 +83,7 @@ this batch (decision D6).
 | 3 | Eight office notification kinds, in the console and by email: `DisputeOpened`, `DisputeResolved`, `BookingCompleted`, `BookingMarkedNoShow`, `BookingExpiredUnpaid`, `BookingCancelledByAdmin`, `SettlementRecorded`, `SettlementVoided`. The settlement sweep no longer raises `BookingReturned` by "A customer" for a completion; rows already stored stay, and the console words them as completions | new values, office only | none: an office's notifications reach no installed app |
 | 3 | `YourDisputeOpened` (push and email) when a customer opens a dispute: its subject is the BOOKING and its `dueAt` the ticket's SLA deadline. A dispute the office opens tells the customer through the existing `YourDisputeUpdated` | new value | installed builds show their generic line in the list and the server's own push text, and a tap opens the booking (its subject), which links the dispute |
 | 3 | The website reports its language on every switch as well as at sign-in, and the console at sign-in and on every switch, through the existing `PUT /auth/me/language` | none | none |
+| 3 | The checkout's return address carries the language the checkout was opened in (`{ReturnUrlBase}/{ar|en}/bookings/{id}`): the request's `Accept-Language`, else the customer's stored language, else English. The sandbox's `checkoutUrl` gains `?lang=`, whitelisted on its page | value | none: the app's WebView reads nothing back from either address |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
