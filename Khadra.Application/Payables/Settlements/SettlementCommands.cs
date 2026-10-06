@@ -5,14 +5,17 @@ using Khadra.Application.Auditing;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.FinancialDocuments.ReadModels;
+using Khadra.Application.Notifications;
 using Khadra.Application.Payables.Dtos;
 using Khadra.Application.Payables.ReadModels;
 using Khadra.Application.Payments.Financials;
 using Khadra.Domain.Auditing;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.FinancialDocuments;
 using Khadra.Domain.FinancialDocuments.Repositories;
 using Khadra.Domain.Payables;
+using Khadra.Domain.Notifications;
 using Khadra.Domain.Payables.Repositories;
 using Khadra.Domain.Payments;
 using MediatR;
@@ -95,6 +98,8 @@ public sealed partial class RecordOfficeSettlementHandler(
     IFinancialDocumentFactsReader facts,
     IFinancialDocumentSeries series,
     AdminActionRecorder audit,
+    IDealerRepository dealers,
+    DealerTeamNotifier team,
     IUnitOfWork unitOfWork,
     IReportingCalendar calendar,
     IClock clock,
@@ -139,6 +144,8 @@ public sealed partial class RecordOfficeSettlementHandler(
 
         var settlementId = Id.New();
         var isTest = PaymentProviders.IsSandbox(request.Provider);
+        // Read for its people only, never written: who at the office may read the ledger hears of it.
+        var office = await dealers.GetByIdAsync(request.DealerId, cancellationToken);
         string? number = null;
         try
         {
@@ -179,6 +186,11 @@ public sealed partial class RecordOfficeSettlementHandler(
                         null,
                         Amount(amount, request.Currency),
                         settlement.Value.Note);
+                    // The owner and the employees granted reports hear it, in this transaction and staged after
+                    // every check that can refuse it (Fix & Polish Wave 3, C5). No amount: the row holds none, and
+                    // Payouts shows it.
+                    if (office is not null)
+                        await team.NotifyReportReadersFromPlatformAsync(office, NotificationKind.SettlementRecorded, now, settlementId, number);
                     await unitOfWork.SaveChangesAsync(token);
                 },
                 cancellationToken);
@@ -245,6 +257,8 @@ public sealed partial class VoidOfficeSettlementHandler(
     IOfficePayableRepository payables,
     IOfficeLedgerReader ledger,
     AdminActionRecorder audit,
+    IDealerRepository dealers,
+    DealerTeamNotifier team,
     IUnitOfWork unitOfWork,
     IClock clock,
     ILogger<VoidOfficeSettlementHandler> logger)
@@ -278,6 +292,9 @@ public sealed partial class VoidOfficeSettlementHandler(
             RecordOfficeSettlementHandler.Amount(settlement.Amount, settlement.Currency),
             null,
             voided.Value.Reason);
+        // As the recording was told, in the same save as the void (Wave 3, C5).
+        if (await dealers.GetByIdAsync(settlement.DealerId, cancellationToken) is { } office)
+            await team.NotifyReportReadersFromPlatformAsync(office, NotificationKind.SettlementVoided, now, settlement.Id, settlement.Number);
 
         try
         {

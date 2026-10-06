@@ -14,10 +14,11 @@ namespace Khadra.Application.Notifications;
 /// booking book with them. Spec 4.2 asks for exactly this accountability, and until this existed it
 /// lived only on the booking's own history where nobody was looking.
 ///
-/// Since 2026-09-07 one thing arrives from outside the dealership as well — a customer asking for a
-/// car — and that goes through NotifyTeamOfCustomerActionAsync, which names nobody. The remaining
-/// customer-side notifications the design draws still have no producer: there is no
-/// customer-cancellation endpoint and no scheduler for the time-based ones.
+/// Since 2026-09-07 things arrive from outside the dealership as well. What a customer did — asking for
+/// a car, cancelling, paying, reporting a car not handed over, opening a dispute — goes through
+/// NotifyTeamOfCustomerActionAsync, which names nobody. What the platform did — an expiry, a no-show, a
+/// completion, an administrator's decision, a settlement — goes through NotifyTeamFromPlatformAsync and
+/// NotifyReportReadersFromPlatformAsync, which name Khadra (Fix & Polish Wave 3, C5).
 ///
 /// The actor is never notified of their own action. They were there.
 ///
@@ -85,6 +86,49 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         notifier.RaiseMany(recipients.Select(recipient =>
             Notification.Raise(recipient, kind, CustomerActorName, now, subjectId, subjectReference)));
 
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Everyone at <paramref name="dealer"/>, told what the PLATFORM did to one of its bookings: an expiry, a no-show,
+    /// a completion, an administrator's cancellation or dispute decision (Fix & Polish Wave 3, C5).
+    /// </summary>
+    /// <remarks>
+    /// Named Khadra, with no actor id, so the line reads as the platform's in both languages and never as "a
+    /// customer" (the settlement sweep used to report a completion that way, in English inside Arabic). Nobody is
+    /// excluded: no colleague acted. Staged, not saved.
+    /// </remarks>
+    public Task NotifyTeamFromPlatformAsync(
+        Dealer dealer,
+        NotificationKind kind,
+        DateTimeOffset now,
+        Id? subjectId = null,
+        string? subjectReference = null)
+    {
+        ArgumentNullException.ThrowIfNull(dealer);
+        ArgumentNullException.ThrowIfNull(kind);
+
+        RaiseFromPlatform(Recipients(dealer, exceptUserId: Id.Empty), kind, now, subjectId, subjectReference);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The owner and every active employee granted reports, told what the payouts ledger did with the office's money
+    /// (Wave 3, C5): the ledger is theirs to read, and nobody else at the office can open it. Named Khadra. Staged,
+    /// not saved.
+    /// </summary>
+    public Task NotifyReportReadersFromPlatformAsync(
+        Dealer dealer,
+        NotificationKind kind,
+        DateTimeOffset now,
+        Id? subjectId = null,
+        string? subjectReference = null)
+    {
+        ArgumentNullException.ThrowIfNull(dealer);
+        ArgumentNullException.ThrowIfNull(kind);
+
+        var readers = Recipients(dealer, exceptUserId: Id.Empty).Where(dealer.CanViewReports).ToList();
+        RaiseFromPlatform(readers, kind, now, subjectId, subjectReference);
         return Task.CompletedTask;
     }
 
@@ -168,8 +212,23 @@ public sealed class DealerTeamNotifier(INotifier notifier, IUserRepository users
         NotificationKind kind,
         DateTimeOffset now,
         Id? subjectId = null,
-        string? subjectReference = null) =>
-        NotifyCustomerAsync(customerUserId, Notification.PlatformActorName, kind, now, subjectId, subjectReference);
+        string? subjectReference = null,
+        DateTimeOffset? dueAt = null) =>
+        NotifyCustomerAsync(customerUserId, Notification.PlatformActorName, kind, now, subjectId, subjectReference, dueAt);
+
+    private void RaiseFromPlatform(
+        List<Id> recipients,
+        NotificationKind kind,
+        DateTimeOffset now,
+        Id? subjectId,
+        string? subjectReference)
+    {
+        if (recipients.Count == 0)
+            return;
+
+        notifier.RaiseMany(recipients.Select(recipient =>
+            Notification.Raise(recipient, kind, Notification.PlatformActorName, now, subjectId, subjectReference)));
+    }
 
     /// <summary>The owner and every ACTIVE employee. A deactivated one has no standing (spec 4.2).</summary>
     private static List<Id> Recipients(Dealer dealer, Id exceptUserId)

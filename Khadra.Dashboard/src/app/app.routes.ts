@@ -388,12 +388,16 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/dealer/not-live.component').then((m) => m.NotLiveComponent),
           },
+          // The owner's own feed (Wave 3, F28): the employee's screen, in the dealer console. It was a
+          // placeholder while the rows it lists already existed.
           {
             path: 'notifications',
             title: title('nav.notifications'),
-            data: { kind: 'notifications' },
+            data: { area: 'dealer' },
             loadComponent: () =>
-              import('./features/dealer/not-live.component').then((m) => m.NotLiveComponent),
+              import('./features/employee/employee-notifications.component').then(
+                (m) => m.EmployeeNotificationsComponent,
+              ),
           },
           {
             path: 'profile',
@@ -571,6 +575,7 @@ export const routes: Routes = [
           {
             path: 'notifications',
             title: title('nav.notifications'),
+            data: { area: 'employee' },
             loadComponent: () =>
               import('./features/employee/employee-notifications.component').then(
                 (m) => m.EmployeeNotificationsComponent,

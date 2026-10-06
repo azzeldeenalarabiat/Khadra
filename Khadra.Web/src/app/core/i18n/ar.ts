@@ -895,6 +895,7 @@ export const AR: Record<TranslationKey, Message> = {
   'notification.YourPickupReminder': 'سيارتك لدى {actor} جاهزة قريبًا — جهّز رمز التسليم',
   'notification.YourReturnReminder': 'موعد إعادة سيارتك إلى {actor} قريب',
   'notification.YourDisputeUpdated': 'هناك تحديث على النزاع الخاص بك',
+  'notification.YourDisputeOpened': 'نزاعك مفتوح، وستقرّر فيه خضرا',
   'notification.unknown': 'حدّث {actor} شيئًا في حسابك',
   'notification.someone': 'مكتب التأجير',
 

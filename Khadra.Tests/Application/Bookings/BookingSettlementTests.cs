@@ -8,6 +8,7 @@ using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.IdentityAccess.Repositories;
+using Khadra.Domain.Notifications;
 using Khadra.Domain.Notifications.Repositories;
 using Khadra.Domain.Payments;
 using Khadra.Domain.Payments.Repositories;
@@ -36,11 +37,16 @@ public sealed class BookingSettlementTests
         public INotifier Notifier { get; } = Substitute.For<INotifier>();
         public IUserRepository Users { get; } = Substitute.For<IUserRepository>();
         public TestClock Clock { get; } = new(Build.Now);
+        public Dealer Office { get; } = Build.ApprovedDealer();
+        public List<Notification> Told { get; } = [];
 
         public Context()
         {
             UnitOfWork.SaveChangesAsync(Arg.Any<CancellationToken>()).Returns(1);
-            Dealers.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(Build.ApprovedDealer());
+            Dealers.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(Office);
+            Notifier.When(n => n.Raise(Arg.Any<Notification>())).Do(call => Told.Add(call.Arg<Notification>()));
+            Notifier.When(n => n.RaiseMany(Arg.Any<IEnumerable<Notification>>()))
+                .Do(call => Told.AddRange(call.Arg<IEnumerable<Notification>>()));
             Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
             Bookings.ListDueForPaymentExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
             Bookings.ListDueForNoShowAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
@@ -176,6 +182,77 @@ public sealed class BookingSettlementTests
             .Count(call => call.GetMethodInfo().Name is nameof(INotifier.Raise) or nameof(INotifier.RaiseMany));
         Assert.True(raised > 0);
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    // ---------------------------------------------------------------- what the office is told (Fix & Polish Wave 3, C5)
+    //
+    // The sweep used to tell the office of a completion only, as BookingReturned by "A customer" — untrue in both
+    // languages — and of nothing else. Each pass now tells it as Khadra, except a request it let lapse (C7).
+
+    private static Notification OfficeRow(Context context) =>
+        Assert.Single(context.Told, told => told.RecipientUserId == context.Office.OwnerUserId);
+
+    [Fact]
+    public async Task A_request_the_office_let_lapse_tells_only_its_customer()
+    {
+        var context = new Context();
+        var booking = Build.Booking();
+        context.Clock.UtcNow = booking.DecisionDeadline;
+        context.Bookings.ListDueForDecisionExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([booking]);
+
+        await context.Run();
+
+        var only = Assert.Single(context.Told);
+        Assert.Same(NotificationKind.YourBookingExpired, only.Kind);
+        Assert.Equal(booking.CustomerId, only.RecipientUserId);
+    }
+
+    [Fact]
+    public async Task An_approval_nobody_paid_for_tells_the_office_as_Khadra()
+    {
+        var context = new Context();
+        var booking = Build.ApprovedBooking();
+        context.Clock.UtcNow = booking.PaymentDeadline!.Value;
+        context.Bookings.ListDueForPaymentExpiryAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns([booking]);
+
+        await context.Run();
+
+        var office = OfficeRow(context);
+        Assert.Same(NotificationKind.BookingExpiredUnpaid, office.Kind);
+        Assert.True(office.IsFromPlatform);
+        Assert.Equal(booking.Id, office.SubjectId);
+        Assert.Contains(context.Told, told => told.Kind == NotificationKind.YourBookingExpired && told.RecipientUserId == booking.CustomerId);
+    }
+
+    [Fact]
+    public async Task A_no_show_tells_the_office_as_Khadra()
+    {
+        var context = new Context();
+        var booking = Paid(context, out _);
+        DueForNoShow(context, booking);
+
+        await context.Run();
+
+        Assert.Same(NotificationKind.BookingMarkedNoShow, OfficeRow(context).Kind);
+        Assert.True(OfficeRow(context).IsFromPlatform);
+    }
+
+    [Fact]
+    public async Task A_completion_tells_the_office_it_completed_and_never_that_a_customer_returned_the_car()
+    {
+        var context = new Context();
+        var booking = Returned(context, out var returnedAt);
+        context.Clock.UtcNow = returnedAt.Add(booking.Terms.PostReturnSettlementWindow);
+
+        await context.Run();
+
+        var office = OfficeRow(context);
+        Assert.Same(NotificationKind.BookingCompleted, office.Kind);
+        Assert.True(office.IsFromPlatform);
+        Assert.Null(office.ActorUserId);
+        Assert.DoesNotContain(context.Told, told => told.Kind == NotificationKind.BookingReturned);
     }
 
     /// <summary>

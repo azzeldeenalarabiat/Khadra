@@ -461,14 +461,20 @@ mistaken for dead code and removed.
 
 ## 12. Notifications
 
-In-app notifications, written in the same transaction as the thing they describe.
-Kinds include `BookingRequested`, `BookingApproved`, `BookingRejected`,
-`BookingConfirmed`, `BookingPickedUp`, `BookingReturned`,
-`BookingCancelledByCustomer`, `BookingNonDeliveryReported`, `DealerApproved`,
-`DealerRejected`, `DealerClarificationRequested`, `DealerSuspended`,
-`DealerReactivated`, `ReportAccessGranted`.
+In-app notifications, written in the same transaction as the thing they describe, with an outbox
+row for every channel a kind is also delivered on (`NotificationKind.DeliveredOn`).
 
-**Push notifications do not exist yet** — pre-launch item 73.
+An office's kinds include `BookingRequested`, `BookingApproved`, `BookingRejected`,
+`BookingConfirmed`, `BookingPickedUp`, `BookingReturned`, `BookingCancelledByCustomer`,
+`BookingNonDeliveryReported`, `DealerApproved`, `DealerRejected`,
+`DealerClarificationRequested`, `DealerSuspended`, `DealerReactivated` and `ReportAccessGranted`,
+in the console only. Since Fix & Polish Wave 3 (C5) eight more are also emailed: `DisputeOpened`,
+`DisputeResolved`, `BookingCompleted`, `BookingMarkedNoShow`, `BookingExpiredUnpaid`,
+`BookingCancelledByAdmin`, and `SettlementRecorded` and `SettlementVoided` (to the owner and the
+employees granted reports only). A customer's kinds are the `Your…` ones, by push, and the reminders,
+refunds and `YourDisputeOpened` by email as well.
+
+**Push is built but not yet live** — pre-launch item 73.
 
 ---
 

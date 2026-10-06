@@ -8,6 +8,8 @@ using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
+using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.IdentityAccess;
 using Khadra.Domain.IdentityAccess.Repositories;
 using Khadra.Domain.Notifications;
@@ -75,15 +77,37 @@ public sealed class AdminBookingActionTests
 
         public List<Notification> Told { get; } = [];
 
+        public IDealerRepository Dealers { get; } = Substitute.For<IDealerRepository>();
+
+        /// <summary>The office the booking belongs to: its owner, an active employee, and one deactivated.</summary>
+        public Dealer Office { get; } = Build.ApprovedDealer();
+
+        public Id ActiveEmployee { get; } = Id.New();
+
+        public Context Staffed()
+        {
+            Office.HireEmployee(ActiveEmployee, canViewReports: false, Build.Now);
+            var gone = Office.HireEmployee(Id.New(), canViewReports: false, Build.Now).Value;
+            Office.DeactivateEmployee(gone.Id, Build.Now);
+            Dealers.GetByIdAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>()).Returns(Office);
+            return this;
+        }
+
+        /// <summary>What the office was told, as against the customer's own row.</summary>
+        public List<Notification> ToldOffice(NotificationKind kind) => Told.Where(told => told.Kind == kind).ToList();
+
         public AdminBookingCommandHandlers Handlers()
         {
             Notifier.When(n => n.Raise(Arg.Any<Notification>())).Do(call => Told.Add(call.Arg<Notification>()));
+            Notifier.When(n => n.RaiseMany(Arg.Any<IEnumerable<Notification>>()))
+                .Do(call => Told.AddRange(call.Arg<IEnumerable<Notification>>()));
             return new(
             Bookings,
             Payments,
             Reader,
             new AdminActionRecorder(AuditTrail, Actor, Clock),
             new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()),
+            Dealers,
             Actor,
             UnitOfWork,
             Clock);
@@ -149,6 +173,89 @@ public sealed class AdminBookingActionTests
         Assert.Equal("Cancelled", entry.NewValue);
         Assert.Equal("The dealership was suspended mid-rental.", entry.Reason);
         Assert.Equal(AdminId, entry.ActorUserId);
+    }
+
+    // ---------------------------------------------------------------- the office is told (Fix & Polish Wave 3, C5)
+
+    /// <summary>
+    /// What an administrator did to an office's booking reaches its whole team, active staff only, as Khadra's: no
+    /// actor id, the platform's name, in the console and by email. The administrator's own name never travels.
+    /// </summary>
+    [Fact]
+    public async Task An_admin_cancellation_tells_the_whole_office_as_Khadra()
+    {
+        var context = new Context().Staffed();
+        var booking = context.Given(Build.ApprovedBooking());
+
+        await context.Handlers().Handle(
+            new CancelBookingAsAdminCommand(booking.Id, "The dealership was suspended mid-rental."),
+            CancellationToken.None);
+
+        var office = context.ToldOffice(NotificationKind.BookingCancelledByAdmin);
+        Assert.Equal(
+            new[] { context.Office.OwnerUserId, context.ActiveEmployee }.OrderBy(id => id.Value),
+            office.Select(told => told.RecipientUserId).OrderBy(id => id.Value));
+        Assert.All(office, told =>
+        {
+            Assert.True(told.IsFromPlatform);
+            Assert.Null(told.ActorUserId);
+            Assert.Equal(booking.Id, told.SubjectId);
+            Assert.Equal(booking.Reference.Value, told.SubjectReference);
+        });
+        Assert.Equal([NotificationChannel.Email], NotificationKind.BookingCancelledByAdmin.DeliveredOn());
+        // And the customer as before, named by the gallery.
+        Assert.Single(context.ToldOffice(NotificationKind.YourBookingCancelled));
+    }
+
+    [Fact]
+    public async Task An_admin_expiry_tells_the_office_of_an_approval_nobody_paid_for()
+    {
+        var context = new Context().Staffed();
+        var booking = context.Given(Build.ApprovedBooking());
+        context.At(booking.PaymentDeadline!.Value.AddMinutes(1));
+
+        await context.Handlers().Handle(new ExpireBookingAsAdminCommand(booking.Id), CancellationToken.None);
+
+        Assert.Equal(2, context.ToldOffice(NotificationKind.BookingExpiredUnpaid).Count);
+    }
+
+    /// <summary>A request the office let lapse tells the office nothing (Wave 3, C7): only its customer hears.</summary>
+    [Fact]
+    public async Task An_admin_expiry_of_an_unanswered_request_tells_the_office_nothing()
+    {
+        var context = new Context().Staffed();
+        var booking = context.Given(Build.Booking());
+        context.At(booking.DecisionDeadline.AddMinutes(1));
+
+        await context.Handlers().Handle(new ExpireBookingAsAdminCommand(booking.Id), CancellationToken.None);
+
+        var only = Assert.Single(context.Told);
+        Assert.Same(NotificationKind.YourBookingExpired, only.Kind);
+        Assert.Equal(booking.CustomerId, only.RecipientUserId);
+    }
+
+    [Fact]
+    public async Task An_admin_no_show_tells_the_office()
+    {
+        var context = new Context().Staffed();
+        var booking = context.Given(Build.ConfirmedBooking(pickupMethod: PickupMethod.SelfPickup));
+        context.At(booking.Period.Start.Add(booking.Terms.NoShowTimeout).AddMinutes(1));
+
+        await context.Handlers().Handle(new MarkBookingNoShowAsAdminCommand(booking.Id), CancellationToken.None);
+
+        Assert.Equal(2, context.ToldOffice(NotificationKind.BookingMarkedNoShow).Count);
+    }
+
+    /// <summary>A refused action tells nobody anything.</summary>
+    [Fact]
+    public async Task A_refused_action_tells_the_office_nothing()
+    {
+        var context = new Context().Staffed();
+        var booking = context.Given(Build.ApprovedBooking());
+
+        await context.Handlers().Handle(new ExpireBookingAsAdminCommand(booking.Id), CancellationToken.None);
+
+        Assert.Empty(context.Told);
     }
 
     [Fact]

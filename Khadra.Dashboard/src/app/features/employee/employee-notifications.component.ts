@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Tone } from '../../core/models/console.models';
 import { NotificationItem } from '../../core/models/notifications.api';
 import { NotificationsService } from '../../core/services/notifications.service';
@@ -12,7 +12,8 @@ import { FormatService } from '../../core/i18n/format.service';
 import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 
 /**
- * Notifications (design: Employee Console, `isNotifications`).
+ * Notifications (design: Employee Console, `isNotifications`), for the owner as for staff: the owner's page was
+ * a placeholder over rows that existed (Wave 3, F28), and `area` in the route's data is which console it is in.
  *
  * Every row is a real notification from `/api/v1/notifications` — written into the same transaction
  * as the action it describes, so a booking cannot be approved with nobody told. Nothing here is
@@ -20,12 +21,12 @@ import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
  * two answer different questions. This one is "what happened while I was away", and it keeps read
  * state, which work-in-progress cannot.
  *
- * What raises rows today is the DEALERSHIP acting on itself: a colleague answering a request or
- * handing a car over, the platform approving or suspending the business, a change to someone's own
- * access. What does not raise rows — a customer's request arriving, a customer cancelling, a pickup
- * falling due — has no producer in this repository: the customer flow is the Flutter app and there is
- * no scheduler. Those kinds are absent from the server's vocabulary rather than present and
- * permanently empty, so nothing here promises an alert that cannot come.
+ * What raises rows: a colleague answering a request or handing a car over; a customer requesting,
+ * paying for, cancelling or disputing a booking, or reporting a car not handed over; the platform
+ * deciding about the business, completing a booking, marking a no-show, expiring an approval nobody
+ * paid for, cancelling, deciding a dispute or settling the office's payouts; a change to someone's own
+ * access. A request expiring unanswered and a pickup falling due raise nothing here (Wave 3, C7): the
+ * dashboard and the bookings work those out live.
  */
 @Component({
   selector: 'kh-employee-notifications',
@@ -39,6 +40,10 @@ export class EmployeeNotificationsComponent {
   protected readonly formats = inject(FormatService);
   private readonly service = inject(NotificationsService);
   private readonly ui = inject(ConsoleUiService);
+
+  /** Which console this page is in: the owner's (`/dealer`) or an employee's (`/employee`). */
+  protected readonly area: 'dealer' | 'employee' =
+    inject(ActivatedRoute).snapshot.data['area'] === 'dealer' ? 'dealer' : 'employee';
 
   protected readonly resource = this.service.feed;
   /** Guarded: `value()` throws in the error state, so nothing reads the resource directly. */
@@ -60,7 +65,7 @@ export class EmployeeNotificationsComponent {
   }
 
   protected routeFor(item: NotificationItem): readonly string[] | null {
-    return this.service.routeFor(item, 'employee');
+    return this.service.routeFor(item, this.area);
   }
 
   /** The badge on a row: what KIND of thing happened, in one word. */
@@ -75,6 +80,20 @@ export class EmployeeNotificationsComponent {
         return this.t('handoverType.pickup');
       case 'BookingReturned':
         return this.t('handoverType.return');
+      case 'BookingConfirmed':
+      case 'BookingCancelledByCustomer':
+      case 'BookingNonDeliveryReported':
+      case 'BookingCompleted':
+      case 'BookingMarkedNoShow':
+      case 'BookingExpiredUnpaid':
+      case 'BookingCancelledByAdmin':
+        return this.t('employeeNotif.booking');
+      case 'DisputeOpened':
+      case 'DisputeResolved':
+        return this.t('employeeNotif.dispute');
+      case 'SettlementRecorded':
+      case 'SettlementVoided':
+        return this.t('employeeNotif.payout');
       case 'ReportAccessGranted':
       case 'ReportAccessRevoked':
         return this.t('employeeNotif.yourAccess');
@@ -91,18 +110,29 @@ export class EmployeeNotificationsComponent {
       case 'DealerSuspended':
       case 'DealerRejected':
       case 'ReportAccessRevoked':
+      case 'BookingCancelledByCustomer':
+      case 'BookingNonDeliveryReported':
+      case 'BookingMarkedNoShow':
+      case 'BookingCancelledByAdmin':
         return 'bad';
       case 'DealerClarificationRequested':
-      // A request is somebody waiting on this dealership, with a clock running. It is the one
-      // notification here that is a task rather than a record of one.
+      // A request is somebody waiting on this dealership, with a clock running. A dispute waits on
+      // the office's own statement. Both are tasks rather than records of one.
       case 'BookingRequested':
+      case 'DisputeOpened':
+      case 'SettlementVoided':
         return 'warn';
       case 'BookingApproved':
       case 'BookingReturned':
+      case 'BookingConfirmed':
+      case 'BookingCompleted':
       case 'DealerApproved':
       case 'DealerReactivated':
       case 'ReportAccessGranted':
+      case 'SettlementRecorded':
         return 'ok';
+      case 'BookingExpiredUnpaid':
+        return 'dim';
       default:
         return 'accent';
     }
@@ -119,6 +149,22 @@ export class EmployeeNotificationsComponent {
       case 'BookingPickedUp':
       case 'BookingReturned':
         return 'key';
+      case 'BookingConfirmed':
+      case 'BookingCompleted':
+        return 'check-circle';
+      case 'BookingCancelledByCustomer':
+      case 'BookingNonDeliveryReported':
+      case 'BookingMarkedNoShow':
+      case 'BookingCancelledByAdmin':
+        return 'x-circle';
+      case 'BookingExpiredUnpaid':
+        return 'clock';
+      case 'DisputeOpened':
+      case 'DisputeResolved':
+        return 'scales';
+      case 'SettlementRecorded':
+      case 'SettlementVoided':
+        return 'currency-circle-dollar';
       case 'ReportAccessGranted':
       case 'ReportAccessRevoked':
         return 'chart-line-up';

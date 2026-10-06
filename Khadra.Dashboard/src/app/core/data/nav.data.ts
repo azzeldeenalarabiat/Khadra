@@ -123,7 +123,12 @@ export const DEALER_NAV: readonly NavGroup[] = [
   {
     groupKey: 'nav.group.system',
     items: [
-      { labelKey: 'nav.notifications', icon: 'bell', route: '/dealer/notifications' },
+      {
+        labelKey: 'nav.notifications',
+        icon: 'bell',
+        route: '/dealer/notifications',
+        count: 'notifications-unread',
+      },
       { labelKey: 'nav.activity', icon: 'list-magnifying-glass', route: '/dealer/activity' },
       { labelKey: 'nav.settings', icon: 'sliders-horizontal', route: '/dealer/settings' },
     ],

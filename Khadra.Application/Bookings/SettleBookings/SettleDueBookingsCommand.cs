@@ -77,10 +77,13 @@ public sealed partial class SettleDueBookingsHandler(
 
         // Order matters only in that each pass reads the database fresh, so a booking settled by an
         // earlier pass is simply not returned by a later one.
+        // Fed per status, so the office is never told an approval lapsed about a request it never
+        // approved: a request it let lapse tells it nothing (Wave 3, C7).
         var unanswered = await SettleAsync(
             await bookings.ListDueForDecisionExpiryAsync(now, cancellationToken),
             booking => booking.ExpireUnanswered(now),
             NotificationKind.YourBookingExpired,
+            officeKind: null,
             now,
             count => failed += count,
             cancellationToken);
@@ -89,6 +92,7 @@ public sealed partial class SettleDueBookingsHandler(
             await bookings.ListDueForPaymentExpiryAsync(now, cancellationToken),
             booking => booking.ExpireUnpaid(now),
             NotificationKind.YourBookingExpired,
+            NotificationKind.BookingExpiredUnpaid,
             now,
             count => failed += count,
             cancellationToken);
@@ -150,7 +154,8 @@ public sealed partial class SettleDueBookingsHandler(
                 continue;
 
             BookingEndingRefunds.Record(booking, payment, now);
-            await NotifyBothPartiesAsync(booking, NotificationKind.YourBookingMarkedNoShow, now, cancellationToken);
+            await NotifyBothPartiesAsync(
+                booking, NotificationKind.YourBookingMarkedNoShow, NotificationKind.BookingMarkedNoShow, now, cancellationToken);
 
             if (await CommitAsync(booking, cancellationToken))
                 settled++;
@@ -251,7 +256,8 @@ public sealed partial class SettleDueBookingsHandler(
             if (result.IsFailure)
                 continue;
 
-            await NotifyBothPartiesAsync(booking, NotificationKind.YourBookingCompleted, now, cancellationToken);
+            await NotifyBothPartiesAsync(
+                booking, NotificationKind.YourBookingCompleted, NotificationKind.BookingCompleted, now, cancellationToken);
 
             if (await CommitAsync(booking, cancellationToken))
                 settled++;
@@ -266,6 +272,7 @@ public sealed partial class SettleDueBookingsHandler(
         IReadOnlyList<Booking> due,
         Func<Booking, UnitResult<Error>> transition,
         NotificationKind customerKind,
+        NotificationKind? officeKind,
         DateTimeOffset now,
         Action<int> onFailure,
         CancellationToken cancellationToken)
@@ -281,7 +288,7 @@ public sealed partial class SettleDueBookingsHandler(
             if (result.IsFailure)
                 continue;
 
-            await NotifyBothPartiesAsync(booking, customerKind, now, cancellationToken);
+            await NotifyBothPartiesAsync(booking, customerKind, officeKind, now, cancellationToken);
 
             if (await CommitAsync(booking, cancellationToken))
                 settled++;
@@ -293,15 +300,19 @@ public sealed partial class SettleDueBookingsHandler(
     }
 
     /// <summary>
-    /// Tells the customer and the gallery, in the transaction that records the change.
+    /// Tells the customer and the office, in the transaction that records the change.
     /// </summary>
     /// <remarks>
-    /// Nobody pressed a button here — the platform acted on a timer — so the gallery's row goes
-    /// through the same door a customer's action uses and names no person.
+    /// Nobody pressed a button here — the platform acted on a timer — so the office's row is Khadra's,
+    /// in the console and by email (Fix & Polish Wave 3, C5). It used to mirror only a completion, as
+    /// <c>BookingReturned</c> by "A customer": untrue in both languages, and English inside Arabic. An
+    /// unpaid expiry and a no-show were not mirrored at all, on the mistaken ground that the office
+    /// already had kinds for them. A request that lapsed unanswered still tells the office nothing.
     /// </remarks>
     private async Task NotifyBothPartiesAsync(
         Booking booking,
         NotificationKind customerKind,
+        NotificationKind? officeKind,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -315,23 +326,9 @@ public sealed partial class SettleDueBookingsHandler(
             booking.Id,
             booking.Reference.Value);
 
-        if (dealer is not null)
-            await NotifyGalleryAsync(dealer, booking, customerKind, now);
+        if (dealer is not null && officeKind is not null)
+            await team.NotifyTeamFromPlatformAsync(dealer, officeKind, now, booking.Id, booking.Reference.Value);
     }
-
-    /// <summary>
-    /// The gallery's own wording for the same event.
-    /// </summary>
-    /// <remarks>
-    /// A completion is news to both sides and uses the same kind; an expiry and a no-show already
-    /// have dealer-side kinds through the team feed, and adding a second row for the same fact would
-    /// double every bell. So only the completion is mirrored, and the rest reach the gallery through
-    /// the booking book they were already watching.
-    /// </remarks>
-    private Task NotifyGalleryAsync(Dealer dealer, Booking booking, NotificationKind kind, DateTimeOffset now) =>
-        kind == NotificationKind.YourBookingCompleted
-            ? team.NotifyTeamOfCustomerActionAsync(dealer, NotificationKind.BookingReturned, now, booking.Id, booking.Reference.Value)
-            : Task.CompletedTask;
 
     /// <summary>
     /// Commits one booking. A conflict is expected traffic, not a fault.

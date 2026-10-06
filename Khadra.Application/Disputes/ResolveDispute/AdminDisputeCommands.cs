@@ -12,6 +12,7 @@ using Khadra.Domain.Auditing;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Disputes.Repositories;
 using Khadra.Domain.Payments;
@@ -106,6 +107,7 @@ public sealed class AdminDisputeHandlers(
     DisputeViewComposer composer,
     DisputeAuditor auditor,
     DealerTeamNotifier team,
+    IDealerRepository dealers,
     IPayablesSettings payables,
     ICurrentActor actor,
     IClock clock,
@@ -210,9 +212,13 @@ public sealed class AdminDisputeHandlers(
         if (resolved.IsFailure)
             return resolved.Error;
 
+        // A returned booking completes with the decision; one already over stays as it is, and only a
+        // booking that really moved is announced as completed (Wave 3, C5).
+        var wasReturned = booking.Status == BookingStatus.Returned;
         var closed = BookingDisputeSettlement.CloseAfterDispute(booking, actor.UserId!.Value, now);
         if (closed.IsFailure)
             return closed.Error;
+        var completed = wasReturned && booking.Status == BookingStatus.Completed;
 
         // The disposition is a MONEY INSTRUCTION, and this is where the customer's leg of it stops
         // being a number on a screen. Recorded in this same save, so a resolution and the refund it
@@ -234,6 +240,7 @@ public sealed class AdminDisputeHandlers(
             DisputeAuditor.Describe(resolution.Value),
             resolution.Value.Note);
         await TellCustomerAsync(ticket, booking);
+        await TellOfficeOfDecisionAsync(ticket, booking, completed, now, cancellationToken);
 
         // ONE SaveChangesAsync, deliberately not IUnitOfWork.ExecuteInTransactionAsync despite the
         // architecture rule for multi-aggregate writes. Both aggregates and the audit entry are
@@ -455,6 +462,26 @@ public sealed class AdminDisputeHandlers(
         var amount = Money.Create(refundToCustomer.Amount, refundToCustomer.CurrencyCode);
         var requested = payment.RequestRefund(amount, ticketId, now);
         return requested.IsSuccess ? UnitResult.Success<Error>() : UnitResult.Failure(requested.Error);
+    }
+
+    /// <summary>
+    /// The office's team hears that Khadra decided the dispute, in the console and by email, and that the booking
+    /// completed when the decision completed it (Fix & Polish Wave 3, C5). Staged, not saved; the dealership is read,
+    /// never written.
+    /// </summary>
+    private async Task TellOfficeOfDecisionAsync(
+        DisputeTicket ticket,
+        Domain.Bookings.Booking booking,
+        bool completed,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (await dealers.GetByIdAsync(booking.DealerId, cancellationToken) is not { } dealer)
+            return;
+
+        await team.NotifyTeamFromPlatformAsync(dealer, NotificationKind.DisputeResolved, now, ticket.Id, booking.Reference.Value);
+        if (completed)
+            await team.NotifyTeamFromPlatformAsync(dealer, NotificationKind.BookingCompleted, now, booking.Id, booking.Reference.Value);
     }
 
     /// <summary>The booking's customer hears that the platform moved their dispute on. Staged, not saved.</summary>

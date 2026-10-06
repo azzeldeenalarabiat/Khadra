@@ -15,6 +15,7 @@ const CUSTOMER_KINDS = [
   'YourBookingConfirmed',
   'YourBookingCancelled',
   'YourDisputeUpdated',
+  'YourDisputeOpened',
   'YourPaymentReminder',
   'YourPickupReminder',
   'YourReturnReminder',

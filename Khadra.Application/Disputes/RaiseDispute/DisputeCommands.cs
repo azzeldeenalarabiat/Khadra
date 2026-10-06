@@ -4,11 +4,14 @@ using Khadra.Application.Bookings;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
 using Khadra.Application.Disputes.Dtos;
+using Khadra.Application.Notifications;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Disputes.Repositories;
+using Khadra.Domain.Dealers.Repositories;
+using Khadra.Domain.Notifications;
 using MediatR;
 
 namespace Khadra.Application.Disputes.RaiseDispute;
@@ -71,6 +74,8 @@ public sealed class RaiseDisputeHandlers(
     IDocumentStorage storage,
     IDocumentPolicySettings policy,
     IBusinessRulesProvider rules,
+    IDealerRepository dealers,
+    DealerTeamNotifier team,
     IClock clock,
     IUnitOfWork unitOfWork) :
     IRequestHandler<RequestDisputeEvidenceUploadCommand, Result<EvidenceUploadDto, Error>>,
@@ -142,9 +147,46 @@ public sealed class RaiseDisputeHandlers(
             return ticket.Error;
 
         await tickets.AddAsync(ticket.Value, cancellationToken);
+        await TellOfOpeningAsync(ticket.Value, booking, party.Value, request.UserId, now, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await composer.ComposeAsync(ticket.Value, booking, party.Value, cancellationToken);
+    }
+
+    /// <summary>
+    /// Who hears that a dispute was opened, staged in the save that opens it (Fix & Polish Wave 3: C5, D10).
+    /// </summary>
+    /// <remarks>
+    /// The office's whole team, in the console and by email, except a colleague who opened it themselves; the
+    /// customer is never named on the office's row. And the customer: on their own dispute, a confirmation of what
+    /// happens now and by when Khadra aims to decide -- the ticket's SLA deadline, frozen as it was opened -- whose
+    /// subject is the BOOKING, because installed apps open every kind but <c>YourDisputeUpdated</c> at the booking.
+    /// On a dispute the office opened, <c>YourDisputeUpdated</c> itself, which every installed app opens at the
+    /// dispute (C10). The dealership is read, never written.
+    /// </remarks>
+    private async Task TellOfOpeningAsync(
+        DisputeTicket ticket,
+        Booking booking,
+        BookingParty opener,
+        Id openerUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var dealer = await dealers.GetByIdAsync(booking.DealerId, cancellationToken);
+        var reference = booking.Reference.Value;
+
+        if (opener == BookingParty.Customer)
+        {
+            if (dealer is not null)
+                await team.NotifyTeamOfCustomerActionAsync(dealer, NotificationKind.DisputeOpened, now, ticket.Id, reference);
+            await team.NotifyCustomerFromPlatformAsync(
+                booking.CustomerId, NotificationKind.YourDisputeOpened, now, booking.Id, reference, ticket.SlaDeadline);
+            return;
+        }
+
+        if (dealer is not null)
+            await team.NotifyTeamAsync(dealer, openerUserId, NotificationKind.DisputeOpened, now, ticket.Id, reference, cancellationToken);
+        await team.NotifyCustomerFromPlatformAsync(booking.CustomerId, NotificationKind.YourDisputeUpdated, now, ticket.Id, reference);
     }
 
     public async Task<Result<DisputeDto, Error>> Handle(AddDisputeStatementCommand request, CancellationToken cancellationToken)

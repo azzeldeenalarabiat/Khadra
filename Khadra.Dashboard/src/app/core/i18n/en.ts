@@ -174,13 +174,6 @@ export const EN = {
   'notLive.reviews.point2':
     'Until then, your public page says "No reviews yet" rather than showing a number.',
   'notLive.reviews.point3': 'Nothing you do now affects a future rating.',
-  'notLive.notifications.body':
-    'A notification feed is not live yet. Today the dashboard already shows everything that needs your attention: pending requests, pickups and returns due, and overdue returns.',
-  'notLive.notifications.point1':
-    'Booking requests appear on the dashboard the moment the customer pays the deposit.',
-  'notLive.notifications.point2': 'Staff invitations and password links go by email.',
-
-  'notLive.notifications.point3': 'Push and SMS alerts will arrive with the customer app.',
 
   // The gate every dealer screen sits behind. Each state is a badge, a title, a paragraph and a
   // short list, and the owner and an employee are told different things about the same state:
@@ -1227,7 +1220,7 @@ export const EN = {
 
   // Employee notifications.
   'employeeNotifications.aCustomersRequestArriving':
-    "A customer's request arriving, a customer cancelling, and reminders as a pickup falls due are not here — nothing in the platform raises them yet. Your dashboard works those out live from your bookings every time you open it.",
+    'A request expiring unanswered and a pickup falling due are not here: your dashboard and your bookings show those live, every time you open them.',
   'employeeNotifications.couldntLoadYourNotifications': "Couldn't load your notifications",
   'employeeNotifications.goToTheDashboard': 'Go to the dashboard',
   'employeeNotifications.markRead': 'Mark read',
@@ -1236,7 +1229,7 @@ export const EN = {
   'employeeNotifications.open': 'Open',
   'employeeNotifications.unread': 'Unread',
   'employeeNotifications.whenAColleagueAnswers':
-    'When a colleague answers a request or hands a car over, when the platform decides something about your dealership, or when your access changes, it appears here.',
+    'When a customer requests, pays for, cancels or disputes a booking, when a colleague answers a request or hands a car over, when Khadra decides something about your bookings, your dealership or your payouts, or when your access changes, it appears here.',
 
   // Employee account settings.
   'employeeSettings.dealerEmployee': 'Dealer employee',
@@ -2183,6 +2176,20 @@ export const EN = {
   'notifications.staffReactivatedByYou': 'You reactivated a member of staff',
   'notifications.reportAccessGranted': '{who} gave you access to financial reports',
   'notifications.reportAccessRevoked': '{who} removed your access to financial reports',
+  // Wave 3 (C5, F55): what a customer did, and what the platform did, worded here; the row stores no sentence.
+  'notifications.aCustomer': 'A customer',
+  'notifications.customerCancelled': 'A customer cancelled {what}',
+  'notifications.customerReportedNonDelivery':
+    'A customer reported that the car for {what} was not handed over',
+  'notifications.customerOpenedDispute': 'A customer opened a dispute on {what}',
+  'notifications.openedDispute': '{who} opened a dispute on {what}',
+  'notifications.disputeResolved': 'Khadra decided the dispute on {what}',
+  'notifications.completed': 'Khadra completed {what}',
+  'notifications.markedNoShow': 'Khadra marked {what} a no-show',
+  'notifications.expiredUnpaid': 'Nobody paid for {what} in time, so it expired',
+  'notifications.cancelledByKhadra': 'Khadra cancelled {what}',
+  'notifications.settlementRecorded': 'Khadra recorded settlement {what}',
+  'notifications.settlementVoided': 'Khadra voided settlement {what}',
 
   // The notification presenter's plural helpers.
 
@@ -2931,6 +2938,9 @@ export const EN = {
     other: 'Showing {shown} of {count} notifications.',
   },
   'employeeNotif.team': 'Team',
+  'employeeNotif.booking': 'Booking',
+  'employeeNotif.dispute': 'Dispute',
+  'employeeNotif.payout': 'Payout',
   'employeeNotif.dealership': 'Dealership',
   'employeeNotif.notificationsMarkedRead': {
     one: '{count} notification marked read.',

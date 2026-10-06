@@ -251,6 +251,8 @@ SELECT to_regclass('office_payables') IS NULL AND to_regclass('office_settlement
             series,
             new Khadra.Application.Auditing.AdminActionRecorder(
                 new AuditTrail(context), NSubstitute.Substitute.For<Khadra.Application.Common.ICurrentActor>(), new TestClock(harness.Now)),
+            new DealerRepository(context),
+            new Khadra.Application.Notifications.DealerTeamNotifier(new Notifier(context), new UserRepository(context)),
             IssuanceHarness.UnitOfWork(context),
             DocumentFixtures.Amman,
             new TestClock(harness.Now),

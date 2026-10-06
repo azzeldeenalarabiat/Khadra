@@ -1,6 +1,7 @@
 using Khadra.Application.Auditing;
 using Khadra.Application.Common;
 using Khadra.Application.Common.Ports;
+using Khadra.Application.Notifications;
 using Khadra.Application.Payables.Dtos;
 using Khadra.Application.Payables.Holds;
 using Khadra.Application.Payables.Pass;
@@ -121,10 +122,15 @@ internal sealed class PayablesHarness(DbContextOptions<KhadraDbContext> options)
             Facts(context),
             new FinancialDocumentSeriesCounter(context),
             Audit(context),
+            new DealerRepository(context),
+            Team(context),
             IssuanceHarness.UnitOfWork(context),
             DocumentFixtures.Amman,
             new TestClock(Now),
             new RecordingLogger<RecordOfficeSettlementHandler>());
+
+    /// <summary>The real notifier: what a settlement tells the office is staged on, and saved with, the handler's context.</summary>
+    private static DealerTeamNotifier Team(KhadraDbContext context) => new(new Notifier(context), new UserRepository(context));
 
     public async Task<CSharpFunctionalExtensions.Result<OfficeSettlementDetailDto, Error>> VoidAsync(Id settlementId, string? reason)
     {
@@ -134,6 +140,8 @@ internal sealed class PayablesHarness(DbContextOptions<KhadraDbContext> options)
                 new OfficePayableRepository(context),
                 new OfficeLedgerReader(context),
                 Audit(context),
+                new DealerRepository(context),
+                Team(context),
                 IssuanceHarness.UnitOfWork(context),
                 new TestClock(Now),
                 new RecordingLogger<VoidOfficeSettlementHandler>())

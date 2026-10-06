@@ -4,8 +4,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { reportLanguage } from '../../core/i18n/report-language';
 import { SeoService } from '../../core/seo/seo.service';
 import { safeReturnUrl } from '../../core/session/auth.guards';
 import { forgetReturnAddress } from '../../core/session/return-address';
@@ -78,7 +78,7 @@ export class SignInComponent {
     }
     // The language the customer is reading in becomes the one their emails and pushes use, as the
     // app does when a language is chosen. Best effort: a failure here must not undo the sign-in.
-    void firstValueFrom(this.http.put('/api/v1/auth/me/language', { language: this.i18n.language() })).catch(() => undefined);
+    void reportLanguage(this.http, this.i18n.language());
     forgetReturnAddress(this.document.defaultView?.localStorage);
     void this.router.navigateByUrl(this.returnUrl());
   }

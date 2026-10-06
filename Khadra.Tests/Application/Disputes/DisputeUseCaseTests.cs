@@ -14,6 +14,7 @@ using Khadra.Domain.Auditing.Repositories;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
 using Khadra.Domain.Dealers.Repositories;
 using Khadra.Domain.Disputes;
 using Khadra.Domain.Payments;
@@ -96,6 +97,10 @@ public sealed class DisputeUseCaseTests
             Actor.Role.Returns(UserRole.Admin);
             Actor.Name.Returns("Rania Haddad");
             Actor.CorrelationId.Returns("test");
+            // Registered once: both handlers stage through the same notifier.
+            Notifier.When(n => n.Raise(Arg.Any<Notification>())).Do(call => Told.Add(call.Arg<Notification>()));
+            Notifier.When(n => n.RaiseMany(Arg.Any<IEnumerable<Notification>>()))
+                .Do(call => Told.AddRange(call.Arg<IEnumerable<Notification>>()));
         }
 
         public Booking GivenBooking(Booking booking)
@@ -120,15 +125,30 @@ public sealed class DisputeUseCaseTests
 
         public RaiseDisputeHandlers Raise() => new(
             Bookings, Tickets, new BookingPartyResolver(Dealers), Composer(), Uploads, Storage,
-            FakeDocumentPolicy.Default, TestBusinessRules.Provider(), Clock, UnitOfWork);
+            FakeDocumentPolicy.Default, TestBusinessRules.Provider(), Dealers, Team(), Clock, UnitOfWork);
 
         public IPaymentRepository Payments { get; } = Substitute.For<IPaymentRepository>();
 
         public INotifier Notifier { get; } = Substitute.For<INotifier>();
 
+        /// <summary>Every notification either handler staged.</summary>
+        public List<Notification> Told { get; } = [];
+
+        private DealerTeamNotifier Team() => new(Notifier, Substitute.For<IUserRepository>());
+
+        /// <summary>The booking's office, answering for its id and for its owner: the owner and one employee.</summary>
+        public Dealer Office(Id employeeUserId)
+        {
+            var dealer = Build.ApprovedDealer(ownerUserId: OwnerId);
+            dealer.HireEmployee(employeeUserId, canViewReports: false, Build.Now);
+            Dealers.GetByIdAsync(dealer.Id, Arg.Any<CancellationToken>()).Returns(dealer);
+            Dealers.GetByOwnerUserIdAsync(OwnerId, Arg.Any<CancellationToken>()).Returns(dealer);
+            return dealer;
+        }
+
         public AdminDisputeHandlers Admin() => new(
             Tickets, Bookings, Payments, Names, Composer(), new DisputeAuditor(AuditTrail, Actor, Clock),
-            new DealerTeamNotifier(Notifier, Substitute.For<IUserRepository>()), PayablesSettings, Actor, Clock, UnitOfWork);
+            Team(), Dealers, PayablesSettings, Actor, Clock, UnitOfWork);
     }
 
     /// <summary>A booking the customer cancelled after paying: terminal, with the deposit held and a penalty assessed.</summary>
@@ -169,6 +189,97 @@ public sealed class DisputeUseCaseTests
         Assert.Equal("Petra Wheels", result.Value.Booking.DealerName);
         Assert.Single(result.Value.Statements.Single().Evidence);
         await context.UnitOfWork.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    // ── Who hears that a dispute was opened (Fix & Polish Wave 3: C5, D10) ──────────────────────
+
+    /// <summary>A customer cancelled after paying, on this office's car: terminal, and disputable for seven days.</summary>
+    private static Booking CancelledAt(Dealer office)
+    {
+        var booking = Build.Booking(customerId: CustomerId, dealerId: office.Id, terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        booking.Approve(Id.New(), Build.Now.AddMinutes(10));
+        booking.ConfirmDepositPaid(Id.New(), Build.Now);
+        booking.Cancel(BookingParty.Customer, CustomerId, "Changed plans.", Build.Now.AddHours(3));
+        booking.ClearDomainEvents();
+        return booking;
+    }
+
+    /// <summary>
+    /// The customer's own dispute: the whole office is told, naming no customer, and the customer has a confirmation
+    /// whose subject is the BOOKING (installed apps open the booking) and whose moment is the ticket's frozen SLA.
+    /// </summary>
+    [Fact]
+    public async Task A_customer_opening_a_dispute_tells_the_whole_office_and_confirms_it_to_the_customer()
+    {
+        var context = new Context();
+        var employee = Id.New();
+        var office = context.Office(employee);
+        var booking = context.GivenBooking(CancelledAt(office));
+        context.Clock.UtcNow = Build.Now.AddHours(4);
+
+        var result = await context.Raise().Handle(
+            new OpenDisputeCommand(CustomerId, booking.Id, "The office never showed up.", []), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var ticket = Assert.Single(context.Added);
+        var team = context.Told.Where(told => told.Kind == NotificationKind.DisputeOpened).ToList();
+        Assert.Equal(
+            new[] { OwnerId, employee }.OrderBy(id => id.Value),
+            team.Select(told => told.RecipientUserId).OrderBy(id => id.Value));
+        Assert.All(team, told =>
+        {
+            Assert.Equal(ticket.Id, told.SubjectId);
+            Assert.Null(told.ActorUserId);
+            Assert.False(told.IsFromPlatform);
+        });
+
+        var confirmation = Assert.Single(context.Told, told => told.Kind == NotificationKind.YourDisputeOpened);
+        Assert.Equal(CustomerId, confirmation.RecipientUserId);
+        Assert.Equal(booking.Id, confirmation.SubjectId);
+        Assert.Equal(booking.Reference.Value, confirmation.SubjectReference);
+        Assert.Equal(ticket.SlaDeadline, confirmation.DueAt);
+        Assert.True(confirmation.IsFromPlatform);
+        Assert.Equal([NotificationChannel.Push, NotificationChannel.Email], NotificationKind.YourDisputeOpened.DeliveredOn());
+    }
+
+    /// <summary>
+    /// A dispute the office opened: its colleagues are told, the opener is not, and the customer hears through the
+    /// kind every installed app already opens at the dispute (C10).
+    /// </summary>
+    [Fact]
+    public async Task An_office_opening_a_dispute_tells_its_colleagues_and_updates_the_customer()
+    {
+        var context = new Context();
+        var employee = Id.New();
+        var office = context.Office(employee);
+        var booking = context.GivenBooking(CancelledAt(office));
+        context.Clock.UtcNow = Build.Now.AddHours(4);
+
+        var result = await context.Raise().Handle(
+            new OpenDisputeCommand(OwnerId, booking.Id, "The customer left the car damaged.", []), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        var ticket = Assert.Single(context.Added);
+        var colleague = Assert.Single(context.Told, told => told.Kind == NotificationKind.DisputeOpened);
+        Assert.Equal(employee, colleague.RecipientUserId);
+        Assert.Equal(OwnerId, colleague.ActorUserId);
+        var update = Assert.Single(context.Told, told => told.RecipientUserId == CustomerId);
+        Assert.Same(NotificationKind.YourDisputeUpdated, update.Kind);
+        Assert.Equal(ticket.Id, update.SubjectId);
+        Assert.DoesNotContain(context.Told, told => told.Kind == NotificationKind.YourDisputeOpened);
+    }
+
+    [Fact]
+    public async Task A_refused_opening_tells_nobody()
+    {
+        var context = new Context();
+        var office = context.Office(Id.New());
+        var booking = context.GivenBooking(CancelledAt(office));
+        context.Tickets.HasLiveTicketAsync(booking.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        await context.Raise().Handle(new OpenDisputeCommand(CustomerId, booking.Id, "Again.", []), CancellationToken.None);
+
+        Assert.Empty(context.Told);
     }
 
     [Fact]
@@ -905,6 +1016,60 @@ public sealed class DisputeUseCaseTests
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Same(BookingStatus.Completed, booking.Status);
         Assert.True(ticket.Resolution!.WaivesEverything);
+    }
+
+    // ── What the office hears of a decision (Fix & Polish Wave 3, C5) ────────────────────────────
+
+    /// <summary>
+    /// The office's team hears that Khadra decided, and — only because this decision moved a returned booking — that
+    /// the booking completed. Both as Khadra's, with no administrator named.
+    /// </summary>
+    [Fact]
+    public async Task A_decision_on_a_returned_booking_tells_the_office_it_was_decided_and_that_the_booking_completed()
+    {
+        var context = new Context();
+        var office = context.Office(Id.New());
+        var booking = Build.ConfirmedBooking(terms: Build.Terms(settlementWindow: TimeSpan.FromDays(7)));
+        var start = booking.Period.Start;
+        booking.RecordPickup(BookingParty.Dealer, Id.New(), start);
+        booking.RecordReturn(BookingParty.Dealer, Id.New(), start.AddDays(3));
+        context.Dealers.GetByIdAsync(booking.DealerId, Arg.Any<CancellationToken>()).Returns(office);
+        context.GivenBooking(booking);
+        var ticket = context.GivenTicket(
+            DisputeTicket.Open(booking.Id, booking.CustomerId, BookingParty.Customer, "Overcharged for fuel.", TimeSpan.FromHours(48), start.AddDays(3).AddHours(1)).Value);
+        context.Clock.UtcNow = start.AddDays(3).AddHours(6);
+        var held = booking.Pricing.DepositAmount.Amount;
+
+        await context.Admin().Handle(new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, null, "Refund in full."), CancellationToken.None);
+
+        var decided = context.Told.Where(told => told.Kind == NotificationKind.DisputeResolved).ToList();
+        Assert.Equal(2, decided.Count);
+        Assert.All(decided, told =>
+        {
+            Assert.Equal(ticket.Id, told.SubjectId);
+            Assert.True(told.IsFromPlatform);
+        });
+        var completed = context.Told.Where(told => told.Kind == NotificationKind.BookingCompleted).ToList();
+        Assert.Equal(2, completed.Count);
+        Assert.All(completed, told => Assert.Equal(booking.Id, told.SubjectId));
+    }
+
+    /// <summary>A booking already over is not completed by the decision, so the office is not told it was.</summary>
+    [Fact]
+    public async Task A_decision_on_a_booking_already_over_announces_no_completion()
+    {
+        var context = new Context();
+        var office = context.Office(Id.New());
+        var booking = context.GivenBooking(CancelledAt(office));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var held = booking.Pricing.DepositAmount.Amount;
+
+        var result = await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, null, "Refund in full."), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Equal(2, context.Told.Count(told => told.Kind == NotificationKind.DisputeResolved));
+        Assert.DoesNotContain(context.Told, told => told.Kind == NotificationKind.BookingCompleted);
     }
 
     [Fact]

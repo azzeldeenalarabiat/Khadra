@@ -17,15 +17,42 @@ import { Translate, toQueueItems } from './dashboard.presenter';
  */
 export function notificationSentence(item: NotificationItem, t: Translate): string {
   const mine = item.isMine;
-  const who = mine ? t('notifications.you') : item.actorName;
+  // A customer is never named to an office: the row carries the server's English stand-in, which the console words in
+  // the reader's own language (Wave 3, F55b), on the rows already stored as on new ones.
+  // The stand-in `DealerTeamNotifier` stores for a customer, compared and never shown as it is.
+  const byCustomer = item.actorName === 'A customer';
+  const who = mine ? t('notifications.you') : byCustomer ? t('notifications.aCustomer') : item.actorName;
   const what = item.subjectReference ?? t('notifications.aBooking');
   const parts = { who, what };
 
   switch (item.kind) {
-    // The one kind raised from outside the dealership. Its row carries no actor on purpose -- a customer's name is
-    // never copied into this table -- so it does not use `who`.
+    // Raised from outside the dealership. Their rows carry no actor on purpose -- a customer's name is never copied
+    // into this table -- so they do not use `who`.
     case 'BookingRequested':
       return t('notifications.customerRequested', { what });
+    case 'BookingCancelledByCustomer':
+      return t('notifications.customerCancelled', { what });
+    case 'BookingNonDeliveryReported':
+      return t('notifications.customerReportedNonDelivery', { what });
+    // Opened by the customer, or by a colleague (who is never told of their own).
+    case 'DisputeOpened':
+      return byCustomer ? t('notifications.customerOpenedDispute', { what }) : t('notifications.openedDispute', parts);
+    // What the platform did (Wave 3, C5): always Khadra, so no `who`.
+    case 'DisputeResolved':
+      return t('notifications.disputeResolved', { what });
+    case 'BookingCompleted':
+      return t('notifications.completed', { what });
+    case 'BookingMarkedNoShow':
+      return t('notifications.markedNoShow', { what });
+    case 'BookingExpiredUnpaid':
+      return t('notifications.expiredUnpaid', { what });
+    case 'BookingCancelledByAdmin':
+      return t('notifications.cancelledByKhadra', { what });
+    // A settlement's number, never an amount: the row holds none.
+    case 'SettlementRecorded':
+      return t('notifications.settlementRecorded', { what: item.subjectReference ?? '' });
+    case 'SettlementVoided':
+      return t('notifications.settlementVoided', { what: item.subjectReference ?? '' });
     case 'BookingApproved':
       return mine ? t('notifications.approvedByYou', { what }) : t('notifications.approved', parts);
     case 'BookingRejected':
@@ -33,6 +60,9 @@ export function notificationSentence(item: NotificationItem, t: Translate): stri
     case 'BookingPickedUp':
       return mine ? t('notifications.recordedPickupByYou', { what }) : t('notifications.recordedPickup', parts);
     case 'BookingReturned':
+      // Until Wave 3 the settlement sweep reported a COMPLETION this way, as a return by "A customer" (C5). A return
+      // is recorded by a member of staff, so this pair is that old completion, worded as what it was.
+      if (byCustomer) return t('notifications.completed', { what });
       return mine ? t('notifications.recordedReturnByYou', { what }) : t('notifications.recordedReturn', parts);
     case 'BookingConfirmed':
       return t('notifications.customerPaid', { what });
@@ -55,6 +85,39 @@ export function notificationSentence(item: NotificationItem, t: Translate): stri
       return t('notifications.reportAccessRevoked', { who });
     default:
       return mine ? t('notifications.updatedByYou', { what }) : t('notifications.updated', parts);
+  }
+}
+
+/** Where a row leads, for the console the reader is standing in: `/dealer` for the owner, `/employee` for staff. */
+export function notificationRoute(item: NotificationItem, area: 'employee' | 'dealer'): readonly string[] | null {
+  if (!item.subjectId) return null;
+
+  switch (item.kind) {
+    case 'BookingRequested':
+    case 'BookingApproved':
+    case 'BookingRejected':
+    case 'BookingPickedUp':
+    case 'BookingReturned':
+    case 'BookingConfirmed':
+    case 'BookingCancelledByCustomer':
+    case 'BookingNonDeliveryReported':
+    case 'BookingCompleted':
+    case 'BookingMarkedNoShow':
+    case 'BookingExpiredUnpaid':
+    case 'BookingCancelledByAdmin':
+      return [`/${area}/bookings`, item.subjectId];
+    // The subject is the TICKET.
+    case 'DisputeOpened':
+    case 'DisputeResolved':
+      return [`/${area}/disputes`, item.subjectId];
+    // Payouts lists every settlement; only the owner and the employees granted reports are told of one.
+    case 'SettlementRecorded':
+    case 'SettlementVoided':
+      return [`/${area}/payouts`];
+    // The dealership kinds point at the dealership itself, which an employee has no screen for
+    // beyond the read-only one; the row says what happened and that is the whole of it.
+    default:
+      return null;
   }
 }
 

@@ -25,7 +25,20 @@ export type NotificationKind =
   | 'DealerReactivated'
   | 'StaffReactivated'
   | 'ReportAccessGranted'
-  | 'ReportAccessRevoked';
+  | 'ReportAccessRevoked'
+  // What a customer did to one of the office's bookings, named "A customer" on the row.
+  | 'BookingCancelledByCustomer'
+  | 'BookingNonDeliveryReported'
+  // Fix & Polish Wave 3 (C5): a dispute on one of the office's bookings, opened by the customer or by a colleague,
+  // and what the platform did — each in the console and by email.
+  | 'DisputeOpened'
+  | 'DisputeResolved'
+  | 'BookingCompleted'
+  | 'BookingMarkedNoShow'
+  | 'BookingExpiredUnpaid'
+  | 'BookingCancelledByAdmin'
+  | 'SettlementRecorded'
+  | 'SettlementVoided';
 
 export interface NotificationItem {
   readonly notificationId: string;

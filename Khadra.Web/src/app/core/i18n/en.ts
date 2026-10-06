@@ -773,6 +773,7 @@ export const EN = {
   'notification.YourPickupReminder': 'Your car at {actor} is ready soon — have your handover code ready',
   'notification.YourReturnReminder': 'Your car is due back at {actor} soon',
   'notification.YourDisputeUpdated': 'There is an update on your dispute',
+  'notification.YourDisputeOpened': 'Your dispute is open, and Khadra will decide it',
   'notification.unknown': '{actor} updated something on your account',
   'notification.someone': 'The rental office',
 

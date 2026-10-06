@@ -10,10 +10,9 @@ namespace Khadra.Domain.Notifications;
 // with ad-hoc strings nobody can render.
 //
 // Every kind here has a PRODUCER in this repository today — a handler that raises it inside its own
-// transaction. Kinds the design draws but nothing can raise (a customer cancellation, "pickup
-// approaching") are deliberately absent: there is no customer-cancellation endpoint and no scheduler.
-// They arrive with their producers, not before, because a kind nothing raises is a promise of an
-// alert that never comes.
+// transaction. Kinds the design draws but nothing raises (an office's "pickup approaching") are
+// deliberately absent. They arrive with their producers, not before, because a kind nothing raises
+// is a promise of an alert that never comes.
 public sealed class NotificationKind : Enumeration
 {
     // Declared FIRST: static fields initialise in order, and every kind below reads these.
@@ -22,10 +21,13 @@ public sealed class NotificationKind : Enumeration
     // wake a phone: staff work in the console, which they have open, and a push for every colleague's
     // click would train them to ignore the ones that matter. Email is reserved for kinds a customer
     // must act on while away from the app (the reminders), because an inbox that fills with every
-    // status change stops being read.
+    // status change stops being read -- and, for an office, for what the platform or a customer does
+    // to its bookings and its money while nobody there is looking (Fix & Polish Wave 3, C5). An office
+    // colleague's own clicks stay in the console.
     private static readonly NotificationChannel[] None = [];
     private static readonly NotificationChannel[] PushOnly = [NotificationChannel.Push];
     private static readonly NotificationChannel[] PushAndEmail = [NotificationChannel.Push, NotificationChannel.Email];
+    private static readonly NotificationChannel[] EmailOnly = [NotificationChannel.Email];
 
     // A customer asked for one of the dealership's cars (CreateBookingHandler). The only kind here
     // raised by someone OUTSIDE the dealership, which is why its row carries no actor: see
@@ -107,15 +109,48 @@ public sealed class NotificationKind : Enumeration
     public static readonly NotificationKind ReportAccessGranted = new(11, "ReportAccessGranted");
     public static readonly NotificationKind ReportAccessRevoked = new(12, "ReportAccessRevoked");
 
+    // What happened to the office's bookings and money that no colleague did (Fix & Polish Wave 3, C5;
+    // E2E F28 and F55). In the console AND by email, never by push: the office works in the console,
+    // and the email is what reaches it when nobody there is looking.
+    //
+    // A dispute on one of the office's bookings (RaiseDisputeHandlers): opened by the customer, or by
+    // a colleague, who is not told of their own. Its subject is the TICKET.
+    public static readonly NotificationKind DisputeOpened = new(32, "DisputeOpened", EmailOnly);
+
+    // The platform's own acts, raised through DealerTeamNotifier.NotifyTeamFromPlatformAsync, so each
+    // reads as Khadra's and carries no actor id. A decided dispute (AdminDisputeHandlers; subject the
+    // ticket); a booking completed by the sweep or by that decision, only when it really moved
+    // (SettleDueBookingsHandler, AdminDisputeHandlers); a no-show; an APPROVED booking nobody paid for
+    // -- never a request the office did not answer, which the office would be told it let lapse; and
+    // an administrator's cancellation (AdminBookingCommandHandlers).
+    public static readonly NotificationKind DisputeResolved = new(33, "DisputeResolved", EmailOnly);
+    public static readonly NotificationKind BookingCompleted = new(34, "BookingCompleted", EmailOnly);
+    public static readonly NotificationKind BookingMarkedNoShow = new(35, "BookingMarkedNoShow", EmailOnly);
+    public static readonly NotificationKind BookingExpiredUnpaid = new(36, "BookingExpiredUnpaid", EmailOnly);
+    public static readonly NotificationKind BookingCancelledByAdmin = new(37, "BookingCancelledByAdmin", EmailOnly);
+
+    // The payouts ledger recorded or voided a settlement with the office (Record- and
+    // VoidOfficeSettlementHandler). Told to the owner and to the employees granted reports only: the
+    // ledger is theirs to read. No amount travels: the row holds none, and Payouts shows it.
+    public static readonly NotificationKind SettlementRecorded = new(38, "SettlementRecorded", EmailOnly);
+    public static readonly NotificationKind SettlementVoided = new(39, "SettlementVoided", EmailOnly);
+
+    // The customer opened a dispute (RaiseDisputeHandlers; Wave 3 D10): what happens now, and by when
+    // Khadra aims to decide, its DueAt being the ticket's frozen SLA deadline. Its subject is the
+    // BOOKING, not the ticket: installed apps open every kind but YourDisputeUpdated at
+    // /bookings/{subject}, and the booking links its dispute. A dispute the OFFICE opens reaches the
+    // customer as YourDisputeUpdated, which every installed app already opens at the dispute.
+    public static readonly NotificationKind YourDisputeOpened = new(40, "YourDisputeOpened", PushAndEmail);
+
     // Deliberately ABSENT, each for a reason rather than an oversight:
     //
     //   StaffInvited      — an invited account is inert until the link is accepted; there is nobody
     //                       to receive it, and the invitation itself goes by email.
     //   StaffDeactivated  — deactivating rotates the security stamp and ends every session that
     //                       instant (spec 4.2), so the row could never be seen by its recipient.
-    //   BookingCancelledByAdmin, DisputeOpened, DisputeResolved — for the DEALER team: real and
-    //                       worth adding, and their handlers exist; not wired yet. The customer's
-    //                       side of both now is (YourBookingCancelled, YourDisputeUpdated).
+    //   BookingExpiredUnanswered — for the office: a request it let lapse is on its own queue and
+    //                       dashboard, and the owner chose not to add it (Wave 3, C7). The customer
+    //                       is told (YourBookingExpired).
     //   YourDepositDue    — the customer IS told their booking was approved, and YourBookingApproved
     //                       is that message. A separate "pay now" alert would still be a promise of a
     //                       payment the platform cannot take: Payments ships with no provider

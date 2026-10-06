@@ -11,7 +11,8 @@ using Microsoft.Extensions.Options;
 namespace Khadra.Infrastructure.Notifications;
 
 /// <summary>
-/// The words of a push, and of a reminder email, per kind and per language.
+/// The words of a push and of an email, per kind and per language: the customer's, and since Fix & Polish Wave 3 (C5)
+/// the office's.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,6 +29,11 @@ namespace Khadra.Infrastructure.Notifications;
 /// and a push telling a customer to pay would be a promise the platform cannot keep (the reason
 /// <c>YourDepositDue</c> was never added). The approval push reads the provider's own mode and says
 /// "approved — open Khadra" instead.
+/// </para>
+/// <para>
+/// <b>An office's email names no actor.</b> Its kinds are what the platform or a customer did, and a customer is
+/// never named to an office: the stored "A customer" is English, and would sit inside the Arabic. Its link opens the
+/// console, `/dealer` for the owner and `/employee` for staff; a customer's only ever opens the website.
 /// </para>
 /// </remarks>
 internal sealed class NotificationMessageComposer(
@@ -100,6 +106,38 @@ internal sealed class NotificationMessageComposer(
         ["YourDisputeUpdated"] = new(
             "Dispute updated", "There is an update on the dispute for booking {ref}.",
             "تحديث على النزاع", "هناك تحديث على النزاع الخاص بالحجز {ref}."),
+        // The customer's own dispute, confirmed (Wave 3, D10). "No money moves" would be false: an ending's refund
+        // above the deposit is still sent while a dispute is open. {due} is the ticket's frozen SLA deadline.
+        ["YourDisputeOpened"] = new(
+            "Dispute opened", "Your dispute on booking {ref} is open. Nothing is charged to you, and nothing held on this booking is released, until Khadra decides. Khadra aims to decide by {due}.",
+            "فُتح نزاعك", "نزاعك على الحجز {ref} مفتوح. لن يُحمَّل عليك شيء، ولن يُفرَج عن شيء محجوز على هذا الحجز، حتى تقرّر خضرا. وتسعى خضرا إلى القرار قبل {due}."),
+
+        // The office's (Wave 3, C5), by email only. No {actor}: see the remarks above.
+        ["DisputeOpened"] = new(
+            "Dispute opened on {ref}", "A dispute was opened on booking {ref}. Khadra will review it; open it to read it and to add your office's statement.",
+            "فُتح نزاع على الحجز {ref}", "فُتح نزاع على الحجز {ref}. ستراجعه خضرا؛ افتحه لقراءته ولإضافة إفادة مكتبك."),
+        ["DisputeResolved"] = new(
+            "Dispute decided on {ref}", "Khadra decided the dispute on booking {ref}. Open it to see the decision and what it records for your office.",
+            "حُسم النزاع على الحجز {ref}", "حسمت خضرا النزاع على الحجز {ref}. افتحه لمعرفة القرار وما يسجّله لمكتبك."),
+        ["BookingCompleted"] = new(
+            "Booking {ref} completed", "Booking {ref} is complete: the car is back, and nothing on it is in dispute.",
+            "اكتمل الحجز {ref}", "اكتمل الحجز {ref}: عادت السيارة، ولا نزاع قائماً عليه."),
+        ["BookingMarkedNoShow"] = new(
+            "Booking {ref} marked a no-show", "Booking {ref} was marked a no-show: the customer did not collect the car in time.",
+            "سُجّل عدم حضور على الحجز {ref}", "سُجّل عدم حضور على الحجز {ref}: لم يستلم العميل السيارة في الوقت المحدد."),
+        ["BookingExpiredUnpaid"] = new(
+            "Booking {ref} expired unpaid", "Booking {ref} expired: the customer did not pay by the payment deadline. The car is free for those dates again.",
+            "انتهى الحجز {ref} دون دفع", "انتهى الحجز {ref}: لم يدفع العميل قبل انتهاء مهلة الدفع. أصبحت السيارة متاحة لتلك التواريخ من جديد."),
+        ["BookingCancelledByAdmin"] = new(
+            "Khadra cancelled booking {ref}", "Khadra cancelled booking {ref}. Open it to see the reason, which the customer is shown too.",
+            "ألغت خضرا الحجز {ref}", "ألغت خضرا الحجز {ref}. افتحه لمعرفة السبب، وهو ما يُعرض على العميل أيضاً."),
+        // A settlement's number, never its amount: the notification holds none.
+        ["SettlementRecorded"] = new(
+            "Settlement {ref} recorded", "Khadra recorded settlement {ref} with your office. Open Payouts to see what it covers.",
+            "سُجّلت التسوية {ref}", "سجّلت خضرا التسوية {ref} مع مكتبك. افتح صفحة التحويلات لمعرفة ما تشمله."),
+        ["SettlementVoided"] = new(
+            "Settlement {ref} voided", "Khadra voided settlement {ref}. What it covered is due again; open Payouts to see it.",
+            "أُلغيت التسوية {ref}", "ألغت خضرا التسوية {ref}. ما كانت تشمله مستحق من جديد؛ افتح صفحة التحويلات لمعرفته."),
     };
 
     private static readonly Wording Fallback = new(
@@ -125,10 +163,7 @@ internal sealed class NotificationMessageComposer(
 
         var wording = WordingFor(notification);
         var name = recipient.Name.Value;
-        var baseUrl = app.Value.CustomerAppBaseUrl.TrimEnd('/');
-        var link = baseUrl.Length > 0 && notification.SubjectId is { } subject
-            ? $"{baseUrl}/bookings/{subject.Value}"
-            : null;
+        var link = LinkFor(notification, recipient);
 
         var arabicBody = Fill(wording.BodyAr, notification, isolate: true);
         var englishBody = Fill(wording.BodyEn, notification, isolate: false);
@@ -136,11 +171,11 @@ internal sealed class NotificationMessageComposer(
         var englishTitle = Fill(wording.TitleEn, notification, isolate: false);
 
         var arabicHtml = $"""<div dir="rtl" lang="ar" style="text-align:right"><p>مرحباً {Html(name)}،</p><p>{Html(arabicBody)}</p>"""
-                         + (link is null ? string.Empty : $"""<p><a href="{link}">افتح الحجز</a></p>""") + "</div>";
+                         + (link is null ? string.Empty : $"""<p><a href="{link.Url}">{link.Arabic}</a></p>""") + "</div>";
         var englishHtml = $"""<div dir="ltr" lang="en"><p>Hi {Html(name)},</p><p>{Html(englishBody)}</p>"""
-                          + (link is null ? string.Empty : $"""<p><a href="{link}">Open the booking</a></p>""") + "</div>";
-        var arabicText = $"مرحباً {name}،\n\n{arabicBody}\n" + (link is null ? string.Empty : $"{link}\n");
-        var englishText = $"Hi {name},\n\n{englishBody}\n" + (link is null ? string.Empty : $"{link}\n");
+                          + (link is null ? string.Empty : $"""<p><a href="{link.Url}">{link.English}</a></p>""") + "</div>";
+        var arabicText = $"مرحباً {name}،\n\n{arabicBody}\n" + (link is null ? string.Empty : $"{link.Url}\n");
+        var englishText = $"Hi {name},\n\n{englishBody}\n" + (link is null ? string.Empty : $"{link.Url}\n");
 
         // One language when the person chose one; both, Arabic first, when they never have — which is
         // how every other email on this platform reads until they do.
@@ -157,6 +192,38 @@ internal sealed class NotificationMessageComposer(
                 arabicHtml + """<hr style="border:none;border-top:1px solid #ddd;margin:20px 0">""" + englishHtml,
                 arabicText + "\n----------\n\n" + englishText),
         };
+    }
+
+    private sealed record Link(string Url, string English, string Arabic);
+
+    /// <summary>
+    /// Where an email leads (Wave 3, C5). A member of an office opens the console, in the area their role signs them
+    /// into: a dispute at the dispute, a settlement at Payouts, anything else at its booking. A customer opens the
+    /// website's booking page, as every customer email always has.
+    /// </summary>
+    private Link? LinkFor(Notification notification, User recipient)
+    {
+        if (recipient.Role == UserRole.DealerOwner || recipient.Role == UserRole.DealerEmployee)
+        {
+            var console = app.Value.ClientBaseUrl.TrimEnd('/');
+            if (console.Length == 0)
+                return null;
+
+            var area = recipient.Role == UserRole.DealerOwner ? "dealer" : "employee";
+            var kind = notification.Kind;
+            if (kind == NotificationKind.SettlementRecorded || kind == NotificationKind.SettlementVoided)
+                return new Link($"{console}/{area}/payouts", "Open Payouts", "افتح التحويلات");
+            if (notification.SubjectId is not { } subject)
+                return null;
+            return kind == NotificationKind.DisputeOpened || kind == NotificationKind.DisputeResolved
+                ? new Link($"{console}/{area}/disputes/{subject.Value}", "Open the dispute", "افتح النزاع")
+                : new Link($"{console}/{area}/bookings/{subject.Value}", "Open the booking", "افتح الحجز");
+        }
+
+        var site = app.Value.CustomerAppBaseUrl.TrimEnd('/');
+        return site.Length > 0 && notification.SubjectId is { } booking
+            ? new Link($"{site}/bookings/{booking.Value}", "Open the booking", "افتح الحجز")
+            : null;
     }
 
     private Wording WordingFor(Notification notification)

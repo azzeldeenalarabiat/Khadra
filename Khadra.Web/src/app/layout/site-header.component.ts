@@ -1,8 +1,10 @@
+import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { I18nService } from '../core/i18n/i18n.service';
+import { reportLanguage } from '../core/i18n/report-language';
 import { NotificationsService } from '../core/api/notifications.service';
 import { SessionService } from '../core/session/session.service';
 import { DismissDirective } from '../shared/dismiss/dismiss.directive';
@@ -20,6 +22,7 @@ export class SiteHeaderComponent {
   protected readonly session = inject(SessionService);
   protected readonly notifications = inject(NotificationsService);
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
 
   protected readonly menuOpen = signal(false);
   protected readonly accountOpen = signal(false);
@@ -73,6 +76,8 @@ export class SiteHeaderComponent {
   protected switchLanguage(event: MouseEvent): void {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
     event.preventDefault();
+    // A switch is a choice: a signed-in customer's emails and pushes follow it (Wave 3, E3).
+    if (this.session.isSignedIn()) void reportLanguage(this.http, this.i18n.isArabic() ? 'en' : 'ar');
     void this.router.navigateByUrl(this.otherLanguageUrl());
   }
 

@@ -81,6 +81,7 @@ public sealed class ResolutionPreviewLedgerTests : IDisposable
             composer,
             new DisputeAuditor(new AuditTrail(context), actor, clock),
             new DealerTeamNotifier(Substitute.For<INotifier>(), Substitute.For<IUserRepository>()),
+            new DealerRepository(context),
             _harness.Settings,
             actor,
             clock,

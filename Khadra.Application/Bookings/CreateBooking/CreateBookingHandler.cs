@@ -148,7 +148,7 @@ public sealed class CreateBookingHandler(
                     // the world it reads has stopped moving under it.
                     await vehicleLock.AcquireAsync(request.VehicleId.Value, token);
 
-                    await ExpireStaleHoldsAsync(request.VehicleId, period.Value, turnaround, now, token);
+                    await ExpireStaleHoldsAsync(request.VehicleId, period.Value, turnaround, dealer, now, token);
 
                     taken = await bookings.HasOverlappingBookingAsync(
                         request.VehicleId, period.Value, turnaround, now, excludingBookingId: null, token);
@@ -218,15 +218,17 @@ public sealed class CreateBookingHandler(
     /// apart, which is a programming error and not something to swallow, so it throws.
     ///
     /// One consequence worth being honest about: this customer's request settles other people's
-    /// bookings as a side effect, and nobody is told. Those bookings are genuinely over -- their own
-    /// clock ended them, not this customer -- but the notification belongs to the background job
-    /// that does not exist yet (pre-launch items 4 and 60). Narrowing the query to holds that
+    /// bookings as a side effect. Those bookings are genuinely over -- their own clock ended them, not
+    /// this customer -- so each is told as the settlement sweep would have told it, in this save
+    /// (Fix & Polish Wave 3, C5): its own customer that it ran out of time, and the office when it
+    /// had approved it and nobody paid. It used to tell nobody. Narrowing the query to holds that
     /// overlap this candidate keeps that side effect to the rows that actually stand in the way.
     /// </remarks>
     private async Task ExpireStaleHoldsAsync(
         Id vehicleId,
         DateRange candidatePeriod,
         TimeSpan turnaroundBuffer,
+        Domain.Dealers.Dealer dealer,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -239,9 +241,10 @@ public sealed class CreateBookingHandler(
         {
             // No actor. The clock ended these, not the customer who happened to arrive next, and the
             // status history should not name them as though they had.
-            var expired = booking.Status == BookingStatus.Requested
-                ? booking.ExpireUnanswered(now)
-                : booking.ExpireUnpaid(now);
+            var wasApproved = booking.Status == BookingStatus.Approved;
+            var expired = wasApproved
+                ? booking.ExpireUnpaid(now)
+                : booking.ExpireUnanswered(now);
 
             if (expired.IsFailure)
             {
@@ -249,6 +252,18 @@ public sealed class CreateBookingHandler(
                     $"A stale hold the repository selected could not be expired ({expired.Error.Code}). " +
                     "ListStaleHoldsForVehicleAsync and the aggregate's expiry guards have drifted apart.");
             }
+
+            // The holds are on this car, so the office is this request's. Never the customer whose
+            // request this is: the bookings ended are other people's.
+            await team.NotifyCustomerAsync(
+                booking.CustomerId,
+                dealer.BusinessName.Value,
+                NotificationKind.YourBookingExpired,
+                now,
+                booking.Id,
+                booking.Reference.Value);
+            if (wasApproved)
+                await team.NotifyTeamFromPlatformAsync(dealer, NotificationKind.BookingExpiredUnpaid, now, booking.Id, booking.Reference.Value);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

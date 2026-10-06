@@ -6,7 +6,7 @@ import { LiveRefreshService } from './live-refresh.service';
 import { liveResource } from './live-surface';
 import { SessionService } from './session.service';
 import { I18nService } from '../i18n/i18n.service';
-import { notificationSentence } from './notifications.presenter';
+import { notificationRoute, notificationSentence } from './notifications.presenter';
 
 /**
  * The signed-in person's notifications.
@@ -81,19 +81,6 @@ export class NotificationsService {
 
   /** Where a row leads, for the console the reader is standing in. */
   routeFor(item: NotificationItem, area: 'employee' | 'dealer'): readonly string[] | null {
-    if (!item.subjectId) return null;
-
-    switch (item.kind) {
-      case 'BookingRequested':
-      case 'BookingApproved':
-      case 'BookingRejected':
-      case 'BookingPickedUp':
-      case 'BookingReturned':
-        return [`/${area}/bookings`, item.subjectId];
-      // The dealership kinds point at the dealership itself, which an employee has no screen for
-      // beyond the read-only one; the row says what happened and that is the whole of it.
-      default:
-        return null;
-    }
+    return notificationRoute(item, area);
   }
 }

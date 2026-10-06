@@ -71,6 +71,9 @@ public sealed class CreateBookingTests
             Notifier
                 .When(notifier => notifier.RaiseMany(Arg.Any<IEnumerable<Notification>>()))
                 .Do(call => Notified.AddRange(call.Arg<IEnumerable<Notification>>()));
+            Notifier
+                .When(notifier => notifier.Raise(Arg.Any<Notification>()))
+                .Do(call => Notified.Add(call.Arg<Notification>()));
             Reader.ContextAsync(Arg.Any<Id>(), Arg.Any<CancellationToken>())
                 .Returns(new BookingContext(null, "Petra Rentals", false, null, "Rana Sharif", false, null, null));
 
@@ -827,6 +830,47 @@ public sealed class CreateBookingTests
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
         Assert.Same(BookingStatus.Expired, stale.Status);
+    }
+
+    /// <summary>
+    /// A stale hold this request expires is told as the settlement sweep would have told it (Fix & Polish Wave 3, C5):
+    /// its own customer that it ran out of time, and the office only when it had approved it and nobody paid. It used
+    /// to tell nobody. Never the customer making this request: the booking ended is somebody else's.
+    /// </summary>
+    [Fact]
+    public async Task A_stale_request_it_expires_is_told_to_its_own_customer_and_not_to_the_office()
+    {
+        var context = new Context();
+        var stale = Build.Booking(vehicleId: context.Vehicle.Id, now: Now.AddDays(-5));
+        context.StaleHolds(stale);
+
+        await context.Handler().Handle(context.Command(), CancellationToken.None);
+
+        var told = Assert.Single(context.Notified, notification => notification.Kind == NotificationKind.YourBookingExpired);
+        Assert.Equal(stale.CustomerId, told.RecipientUserId);
+        Assert.Equal(stale.Id, told.SubjectId);
+        Assert.DoesNotContain(context.Notified, notification => notification.Kind == NotificationKind.BookingExpiredUnpaid);
+        Assert.DoesNotContain(context.Notified, notification => notification.RecipientUserId == context.Customer.Id);
+    }
+
+    [Fact]
+    public async Task A_stale_approval_it_expires_is_told_to_the_office_as_Khadra_and_to_its_own_customer()
+    {
+        var context = new Context();
+        var stale = Build.Booking(vehicleId: context.Vehicle.Id, now: Now.AddDays(-5));
+        stale.Approve(Id.New(), Now.AddDays(-5));
+        context.StaleHolds(stale);
+
+        await context.Handler().Handle(context.Command(), CancellationToken.None);
+
+        var office = Assert.Single(context.Notified, notification => notification.Kind == NotificationKind.BookingExpiredUnpaid);
+        Assert.Equal(context.Dealer.OwnerUserId, office.RecipientUserId);
+        Assert.True(office.IsFromPlatform);
+        Assert.Equal(stale.Id, office.SubjectId);
+        Assert.Contains(context.Notified, notification =>
+            notification.Kind == NotificationKind.YourBookingExpired && notification.RecipientUserId == stale.CustomerId);
+        // The office still hears of the new request, as before.
+        Assert.Contains(context.Notified, notification => notification.Kind == NotificationKind.BookingRequested);
     }
 
     /// <summary>

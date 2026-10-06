@@ -1,8 +1,10 @@
+import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { homeRouteFor } from '../../core/guards/role.guards';
 import { SessionService, SignInFailure } from '../../core/services/session.service';
+import { reportLanguage } from '../../core/services/report-language';
 import { TranslationKey } from '../../core/i18n/en';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { MessageParams } from '../../core/i18n/language';
@@ -41,8 +43,10 @@ interface Notice {
   imports: [FormsModule, RouterLink, IconComponent, LanguageSwitchComponent, LegalLinksComponent],
 })
 export class SignInComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   private readonly session = inject(SessionService);
+  private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -77,6 +81,8 @@ export class SignInComponent {
     this.busy.set(false);
 
     if (result.ok) {
+      // The language this person reads the console in becomes the one the platform's emails use (Wave 3, C6).
+      void reportLanguage(this.http, this.i18n.lang());
       // Back to wherever the guard interrupted, or the dashboard.
       // Whatever the guard interrupted, or the home this role belongs on (spec 1.5).
       const returnUrl =

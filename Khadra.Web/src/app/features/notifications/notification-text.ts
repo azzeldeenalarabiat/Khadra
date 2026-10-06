@@ -20,6 +20,8 @@ export const KNOWN_KINDS: ReadonlySet<string> = new Set([
   'YourPickupReminder',
   'YourReturnReminder',
   'YourDisputeUpdated',
+  // The customer's own dispute, confirmed (Wave 3, D10). Its subject is the booking, which links the dispute.
+  'YourDisputeOpened',
   'YourDepositRefunded',
   'YourPartialRefundSettled',
 ]);
@@ -35,7 +37,8 @@ export function notificationText(i18n: I18nService, item: NotificationItem): str
 /** "About booking KH-…" or "About dispute …", when the notification names what it is about. */
 export function notificationAbout(i18n: I18nService, item: NotificationItem): string {
   if (!item.subjectReference) return '';
-  return i18n.t(item.kind === 'YourDisputeUpdated' ? 'notifications.aboutDispute' : 'notifications.about', {
+  const aboutDispute = item.kind === 'YourDisputeUpdated' || item.kind === 'YourDisputeOpened';
+  return i18n.t(aboutDispute ? 'notifications.aboutDispute' : 'notifications.about', {
     reference: item.subjectReference,
   });
 }

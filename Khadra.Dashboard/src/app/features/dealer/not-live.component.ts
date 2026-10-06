@@ -15,11 +15,12 @@ interface NotLiveCopy {
 }
 
 /**
- * Screens the design has and the platform does not yet: reviews and notifications.
+ * Screens the design has and the platform does not yet: reviews. (Notifications were here until the
+ * owner's feed went live in Wave 3, F28.)
  *
- * Both need a module that is not built (reviews persistence; a notification feed). Rather than show
- * invented ratings or a fake inbox, the page says plainly what will be here and what already
- * exists in its place, so a dealer testing the console is not misled about what is live.
+ * Reviews need a module that is not built. Rather than show invented ratings, the page says plainly
+ * what will be here and what already exists in its place, so a dealer testing the console is not
+ * misled about what is live.
  */
 @Component({
   selector: 'kh-not-live',
@@ -36,27 +37,14 @@ export class NotLiveComponent {
 
   protected readonly t = inject(I18nService).t;
 
-  protected readonly copy = computed<NotLiveCopy>(() =>
-    this.kind() === 'reviews'
-      ? {
-          titleKey: 'nav.reviews',
-          icon: 'star',
-          bodyKey: 'notLive.reviews.body',
-          pointKeys: [
-            'notLive.reviews.point1',
-            'notLive.reviews.point2',
-            'notLive.reviews.point3',
-          ],
-        }
-      : {
-          titleKey: 'nav.notifications',
-          icon: 'bell',
-          bodyKey: 'notLive.notifications.body',
-          pointKeys: [
-            'notLive.notifications.point1',
-            'notLive.notifications.point2',
-            'notLive.notifications.point3',
-          ],
-        },
-  );
+  /** One screen today; `kind` stays so the next one not live yet is a branch, not a rewrite. */
+  protected readonly copy = computed<NotLiveCopy>(() => {
+    void this.kind();
+    return {
+      titleKey: 'nav.reviews',
+      icon: 'star',
+      bodyKey: 'notLive.reviews.body',
+      pointKeys: ['notLive.reviews.point1', 'notLive.reviews.point2', 'notLive.reviews.point3'],
+    };
+  });
 }

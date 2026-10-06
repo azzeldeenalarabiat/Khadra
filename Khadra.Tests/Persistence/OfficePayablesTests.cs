@@ -4,6 +4,7 @@ using Khadra.Domain.Auditing;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
 using Khadra.Domain.FinancialDocuments;
+using Khadra.Domain.Notifications;
 using Khadra.Domain.Payables;
 using Khadra.Domain.Payments;
 using Khadra.Infrastructure.Persistence;
@@ -388,6 +389,55 @@ public sealed class OfficePayablesTests : IDisposable
             [AuditAction.OfficePayableHeld, AuditAction.OfficePayableReleased, AuditAction.OfficeSettlementRecorded],
             (await _harness.AuditAsync()).OrderBy(entry => entry.OccurredAt).ThenBy(entry => entry.Id.Value).Select(entry => entry.Action));
         _ = blockedPayment;
+    }
+
+    /// <summary>
+    /// A settlement and its void reach the people who may read the ledger: the owner and the employees granted
+    /// reports, not the rest of the staff (Fix & Polish Wave 3, C5). As Khadra's, by the settlement's number and never
+    /// its amount, saved in the same transaction as the settlement, and each owed one email and no push.
+    /// </summary>
+    [Fact]
+    public async Task A_settlement_and_its_void_are_told_to_the_owner_and_the_report_readers_by_email()
+    {
+        var (booking, _) = await CompletedAsync();
+        await _harness.PassAsync();
+        var reader = Id.New();
+        var clerk = Id.New();
+        Id owner = default;
+        await _harness.Bookings.ChangeAsync(async context =>
+        {
+            var office = (await new DealerRepository(context).GetByIdAsync(booking.DealerId))!;
+            owner = office.OwnerUserId;
+            Assert.True(office.HireEmployee(reader, canViewReports: true, _harness.Now).IsSuccess);
+            Assert.True(office.HireEmployee(clerk, canViewReports: false, _harness.Now).IsSuccess);
+        });
+
+        var settled = (await _harness.SettleAsync(booking.DealerId, PaymentProviders.Sandbox, 12m)).Value.Settlement;
+        Assert.True((await _harness.VoidAsync(Id.From(settled.SettlementId), "Recorded against the wrong office.")).IsSuccess);
+
+        await using var context = _harness.NewContext();
+        foreach (var kind in new[] { NotificationKind.SettlementRecorded, NotificationKind.SettlementVoided })
+        {
+            var told = await context.Notifications.Where(notification => notification.Kind == kind).ToListAsync();
+            Assert.Equal(
+                new[] { owner, reader }.OrderBy(id => id.Value),
+                told.Select(notification => notification.RecipientUserId).OrderBy(id => id.Value));
+            Assert.All(told, notification =>
+            {
+                Assert.Equal(Id.From(settled.SettlementId), notification.SubjectId);
+                Assert.Equal(settled.Number, notification.SubjectReference);
+                Assert.True(notification.IsFromPlatform);
+            });
+
+            var ids = told.Select(notification => notification.Id).ToList();
+            var owed = await context.NotificationDeliveries.Where(delivery => ids.Contains(delivery.NotificationId)).ToListAsync();
+            Assert.Equal(2, owed.Count);
+            Assert.All(owed, delivery =>
+            {
+                Assert.Same(NotificationChannel.Email, delivery.Channel);
+                Assert.Same(DeliveryState.Pending, delivery.State);
+            });
+        }
     }
 
     [Fact]

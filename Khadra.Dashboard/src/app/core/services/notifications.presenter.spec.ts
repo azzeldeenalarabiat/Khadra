@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { AttentionItem, AttentionQueue } from '../models/dashboard.api';
 import { DealerDashboard, UpcomingHandover } from '../models/dealer-console.api';
 import { NotificationItem, NotificationKind } from '../models/notifications.api';
-import { notificationSentence, toAdminNotifications, toDealerNotifications } from './notifications.presenter';
+import {
+  notificationRoute,
+  notificationSentence,
+  toAdminNotifications,
+  toDealerNotifications,
+} from './notifications.presenter';
 import { AR } from '../i18n/ar';
 import { EN } from '../i18n/en';
 import { resolveMessage } from '../i18n/resolve';
@@ -374,11 +379,130 @@ describe('notificationSentence (pre-launch item 218)', () => {
     }
   });
 
-  it('names a colleague as it always has', () => {
-    expect(notificationSentence(item(), ar)).toBe('قبل Rana Haddad KH-ABCD1234');
+  /**
+   * Checklist 220: Arabic agrees a verb with its subject, and the platform does not know, and should not ask, anyone's
+   * gender. So a colleague is named in the passive, «من قِبل {who}», which agrees with anyone; and "a booking" reads
+   * right in any position («أحد الحجوزات»), where «حجزاً» was an object.
+   */
+  it('names a colleague in a construction that agrees with anyone', () => {
+    expect(notificationSentence(item(), ar)).toBe('قُبل KH-ABCD1234 من قِبل Rana Haddad');
     expect(notificationSentence(item(), t)).toBe('Rana Haddad approved KH-ABCD1234');
     expect(notificationSentence(item({ kind: 'BookingPickedUp', subjectReference: null }), t)).toBe(
       'Rana Haddad recorded the pickup for a booking',
     );
+    expect(notificationSentence(item({ kind: 'BookingPickedUp', subjectReference: null }), ar)).toBe(
+      'سُجّل استلام أحد الحجوزات من قِبل Rana Haddad',
+    );
+    expect(notificationSentence(item({ kind: 'ReportAccessGranted' }), ar)).toBe(
+      'صار بإمكانك الوصول إلى التقارير المالية بقرار من Rana Haddad',
+    );
+  });
+});
+
+describe('notificationSentence: every kind the server raises for an office (Wave 3: C5, F55, checklist 186)', () => {
+  const ar: Translate = (key, params) =>
+    (resolveMessage(AR[key], params, 'ar-JO-u-nu-latn', true) ?? key).replace(/[⁨⁩]/g, '');
+  const item = (over: Partial<NotificationItem> = {}): NotificationItem => ({
+    notificationId: 'n-1',
+    kind: 'BookingCompleted',
+    subjectId: 's-1',
+    subjectReference: 'KH-ABCD1234',
+    actorName: 'Khadra',
+    isMine: false,
+    occurredAt: '2026-10-06T09:00:00Z',
+    readAt: null,
+    isRead: false,
+    ...over,
+  });
+  /** As the server stores what a customer did: "A customer", no actor id. */
+  const byCustomer = (kind: NotificationKind) => item({ kind, actorName: 'A customer' });
+
+  const OFFICE_KINDS: readonly NotificationKind[] = [
+    'BookingRequested',
+    'BookingConfirmed',
+    'BookingCancelledByCustomer',
+    'BookingNonDeliveryReported',
+    'DisputeOpened',
+    'DisputeResolved',
+    'BookingCompleted',
+    'BookingMarkedNoShow',
+    'BookingExpiredUnpaid',
+    'BookingCancelledByAdmin',
+    'SettlementRecorded',
+    'SettlementVoided',
+  ];
+
+  it('words each kind with a sentence of its own, never the "updated" fallback, in both languages', () => {
+    for (const kind of OFFICE_KINDS) {
+      const english = notificationSentence(byCustomer(kind), t);
+      const arabic = notificationSentence(byCustomer(kind), ar);
+      expect(english, kind).not.toMatch(/updated/);
+      expect(arabic, kind).not.toMatch(/حُدّث/);
+      expect(arabic, kind).toMatch(/KH-ABCD1234/);
+    }
+  });
+
+  it("words a customer in the reader's language, never the stored English inside Arabic (F55b)", () => {
+    for (const kind of OFFICE_KINDS) expect(notificationSentence(byCustomer(kind), ar), kind).not.toMatch(/A customer/);
+    expect(notificationSentence(byCustomer('BookingCancelledByCustomer'), t)).toBe('A customer cancelled KH-ABCD1234');
+    expect(notificationSentence(byCustomer('BookingCancelledByCustomer'), ar)).toBe('ألغى أحد العملاء KH-ABCD1234');
+    expect(notificationSentence(byCustomer('DisputeOpened'), ar)).toBe('فتح أحد العملاء نزاعًا على KH-ABCD1234');
+  });
+
+  it('names a colleague who opened a dispute, in the passive', () => {
+    const colleague = item({ kind: 'DisputeOpened', actorName: 'Rana Haddad' });
+    expect(notificationSentence(colleague, t)).toBe('Rana Haddad opened a dispute on KH-ABCD1234');
+    expect(notificationSentence(colleague, ar)).toBe('فُتح نزاع على KH-ABCD1234 من قِبل Rana Haddad');
+  });
+
+  it("words what the platform did as Khadra's", () => {
+    expect(notificationSentence(item({ kind: 'BookingCancelledByAdmin' }), t)).toBe('Khadra cancelled KH-ABCD1234');
+    expect(notificationSentence(item({ kind: 'BookingExpiredUnpaid' }), t)).toBe(
+      'Nobody paid for KH-ABCD1234 in time, so it expired',
+    );
+    expect(notificationSentence(item({ kind: 'SettlementRecorded', subjectReference: 'TEST-SET-2026-000001' }), ar)).toBe(
+      'سجّلت خضرا التسوية TEST-SET-2026-000001',
+    );
+  });
+
+  /**
+   * Until Wave 3 the settlement sweep reported a completion as BookingReturned by "A customer". Those rows stay as they
+   * are (no backfill), and read as what they were.
+   */
+  it('reads an old completion the sweep stored as a return by a customer as the completion it was', () => {
+    const old = item({ kind: 'BookingReturned', actorName: 'A customer' });
+    expect(notificationSentence(old, t)).toBe('Khadra completed KH-ABCD1234');
+    expect(notificationSentence(old, ar)).toBe('أكملت خضرا KH-ABCD1234');
+    // A return a member of staff recorded is still that.
+    expect(notificationSentence(item({ kind: 'BookingReturned', actorName: 'Rana Haddad' }), t)).toBe(
+      'Rana Haddad recorded the return for KH-ABCD1234',
+    );
+  });
+});
+
+describe('notificationRoute', () => {
+  const row = (kind: NotificationKind): NotificationItem => ({
+    notificationId: 'n-1',
+    kind,
+    subjectId: 's-1',
+    subjectReference: 'KH-1',
+    actorName: 'Khadra',
+    isMine: false,
+    occurredAt: '2026-10-06T09:00:00Z',
+    readAt: null,
+    isRead: false,
+  });
+
+  it('opens a booking, a dispute or Payouts in the console the reader stands in', () => {
+    expect(notificationRoute(row('BookingExpiredUnpaid'), 'dealer')).toEqual(['/dealer/bookings', 's-1']);
+    expect(notificationRoute(row('BookingCancelledByCustomer'), 'employee')).toEqual(['/employee/bookings', 's-1']);
+    expect(notificationRoute(row('DisputeOpened'), 'dealer')).toEqual(['/dealer/disputes', 's-1']);
+    expect(notificationRoute(row('DisputeResolved'), 'employee')).toEqual(['/employee/disputes', 's-1']);
+    expect(notificationRoute(row('SettlementVoided'), 'employee')).toEqual(['/employee/payouts']);
+  });
+
+  it('opens nothing for the dealership kinds, nor without a subject', () => {
+    expect(notificationRoute(row('DealerSuspended'), 'dealer')).toBeNull();
+    expect(notificationRoute({ ...row('BookingCompleted'), subjectId: null }, 'dealer')).toBeNull();
   });
 });

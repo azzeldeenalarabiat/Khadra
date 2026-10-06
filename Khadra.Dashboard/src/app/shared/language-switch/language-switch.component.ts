@@ -1,5 +1,8 @@
+import { HttpClient } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { I18nService } from '../../core/i18n/i18n.service';
+import { reportLanguage } from '../../core/services/report-language';
+import { SessionService } from '../../core/services/session.service';
 import { IconComponent } from '../icon/icon.component';
 
 /**
@@ -22,6 +25,8 @@ import { IconComponent } from '../icon/icon.component';
 })
 export class LanguageSwitchComponent {
   private readonly i18n = inject(I18nService);
+  private readonly session = inject(SessionService);
+  private readonly http = inject(HttpClient);
 
   protected readonly t = this.i18n.t;
   protected readonly lang = this.i18n.lang;
@@ -35,7 +40,12 @@ export class LanguageSwitchComponent {
     this.other() === 'ar' ? this.t('lang.toArabic') : this.t('lang.toEnglish'),
   );
 
+  /**
+   * A switch while signed in is also told to the server, so the platform's emails follow it (Wave 3, C6); on the
+   * sign-in page there is nobody to tell yet, and signing in reports the language then.
+   */
   protected switch(): void {
     this.i18n.toggle();
+    if (this.session.user()) void reportLanguage(this.http, this.i18n.lang());
   }
 }

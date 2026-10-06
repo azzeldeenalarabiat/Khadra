@@ -8,6 +8,7 @@ using Khadra.Domain.Auditing;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Bookings.Repositories;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers.Repositories;
 using Khadra.Application.Notifications;
 using Khadra.Application.Payments;
 using Khadra.Domain.Payments.Repositories;
@@ -71,6 +72,7 @@ public sealed class AdminBookingCommandHandlers(
     IBookingReader reader,
     AdminActionRecorder audit,
     DealerTeamNotifier team,
+    IDealerRepository dealers,
     ICurrentActor actor,
     IUnitOfWork unitOfWork,
     IClock clock) :
@@ -87,6 +89,7 @@ public sealed class AdminBookingCommandHandlers(
             AuditAction.BookingCancelledByAdmin,
             request.Reason,
             NotificationKind.YourBookingCancelled,
+            _ => NotificationKind.BookingCancelledByAdmin,
             cancellationToken);
     }
 
@@ -104,6 +107,8 @@ public sealed class AdminBookingCommandHandlers(
             AuditAction.BookingExpired,
             reason: null,
             NotificationKind.YourBookingExpired,
+            // The office hears of an approval nobody paid for, never of a request it let lapse (C7).
+            previousStatus => previousStatus == BookingStatus.Approved.Name ? NotificationKind.BookingExpiredUnpaid : null,
             cancellationToken);
     }
 
@@ -116,6 +121,7 @@ public sealed class AdminBookingCommandHandlers(
             AuditAction.BookingMarkedNoShow,
             reason: null,
             NotificationKind.YourBookingMarkedNoShow,
+            _ => NotificationKind.BookingMarkedNoShow,
             cancellationToken);
     }
 
@@ -134,6 +140,7 @@ public sealed class AdminBookingCommandHandlers(
         AuditAction action,
         string? reason,
         NotificationKind customerKind,
+        Func<string, NotificationKind?> officeKind,
         CancellationToken cancellationToken)
     {
         var booking = await bookings.GetByIdAsync(bookingId, cancellationToken);
@@ -169,6 +176,11 @@ public sealed class AdminBookingCommandHandlers(
             clock.UtcNow,
             booking.Id,
             booking.Reference.Value);
+
+        // And the office, as Khadra's act, in the console and by email (Fix & Polish Wave 3, C5). The
+        // dealership is read, never written.
+        if (officeKind(previousStatus) is { } kind && await dealers.GetByIdAsync(booking.DealerId, cancellationToken) is { } dealer)
+            await team.NotifyTeamFromPlatformAsync(dealer, kind, clock.UtcNow, booking.Id, booking.Reference.Value);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

@@ -4863,6 +4863,13 @@ screen shows "A customer updated KH-…" for a cancellation, and the employee sc
 customer's request and cancellation have no producer, which is no longer true. **To close:** word every
 notification kind the server raises for office staff, in both languages, and correct the comment.
 
+**Built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** `notificationSentence` words every
+kind the server raises for an office, the eight new ones of C5 included, each with its own label, tone, icon and link
+(`notificationRoute`: a booking, a dispute, or Payouts), and the comment is corrected. A customer is worded by the
+console itself, «أحد العملاء» in Arabic, never the stored "A customer" (E2E F55b), on old rows as on new; and an old
+completion the settlement sweep stored as a return by "A customer" reads as the completion it was. The owner's own
+Notifications page is now this feed too, with its unread badge (E2E F28).
+
 ### 187. An email retry can deliver a second copy
 
 **Status:** open · **Raised:** 2026-09-28 · **Before real users**
@@ -4895,6 +4902,11 @@ or a no-show holds platform English. The office's refusal details (E2E F21) are 
 An administrator's cancellation notifies the customer only (`AdminBookingCommandHandlers`); on a confirmed
 booking the office can go on preparing a car for a rental that no longer exists. **To close:** decide, and if
 so notify the office's team as the customer's own actions already do.
+
+**Decided and built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The owner chose to tell
+the office, in the console and by email (decision D4, 5 Oct; C5). An administrator's cancellation raises
+`BookingCancelledByAdmin` for the whole team, as Khadra's, in the same save; so do an administrator's no-show and
+expiry of an approval nobody paid for, the settlement sweep's, and a dispute decision.
 
 ## Issued financial documents — after Phase 5b (2026-09-29)
 
@@ -5391,6 +5403,10 @@ masculine. Arabic agrees a verb with a feminine subject («قبلت سارة …
 not ask, anyone's gender. What the reader did themselves is already worded for anyone (item 218). **To close:** a
 construction that agrees with anyone — the passive with «من قِبل {who}», or the colleague named first as a label —
 with a nominative fallback for "a booking", since «حجزاً» is written as an object.
+
+**Built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** Every sentence about a colleague is
+in the passive with «من قِبل {who}», the grants read «صار بإمكانك … بقرار من {who}», and "a booking" is «أحد الحجوزات»,
+which reads right as a subject, an object and after «استلام». `notifications.presenter.spec.ts` pins it.
 
 ### 221. The startup checks crash the API when the database refuses the connection
 

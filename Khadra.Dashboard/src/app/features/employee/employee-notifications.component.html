@@ -56,7 +56,7 @@
           {{ t('employeeNotifications.aCustomersRequestArriving') }}
         </div>
         <div class="state-actions">
-          <a class="btn btn-secondary btn-sm" routerLink="/employee/dashboard"
+          <a class="btn btn-secondary btn-sm" [routerLink]="['/' + area, 'dashboard']"
             >{{ t('employeeNotifications.goToTheDashboard') }}</a
           >
         </div>
