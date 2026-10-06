@@ -1689,6 +1689,12 @@ delegate — and re-check every caller of it, not only this one.
 
 ### 66. Two questions the create endpoint raises
 
+**Updated 2026-10-06 (Fix & Polish Wave 3, E7; E2E F2):** a DATED catalogue search now applies the opening-hours rule to each
+office in turn, through the same `PickupHoursPolicy` the quote uses. A free car is listed when its office is open at both
+the local pickup and the local return time, or when it may be delivered and its office delivers. Rows say which, with
+`selfPickupAvailable`. The paragraphs below record why the search once left hours out: a search spans offices with no
+single schedule. Judging each office separately answers that, and search and quote can no longer disagree.
+
 **Status:** open · **Raised:** 2026-09-07 · **One answered, one still an owner decision**
 
 Both surfaced while building `POST /bookings`. Neither is a defect; both are cheap now and awkward

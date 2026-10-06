@@ -60,8 +60,10 @@
             <p class="muted small">{{ i18n.t('quote.chooseDates') }}</p>
           } @else if (quote.isLoading() && !quote.hasValue()) {
             <div aria-busy="true"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text"></div></div>
-          } @else if (quoteProblem(); as failure) {
-            <div class="notice notice--warn" role="alert"><kh-icon name="warning" /><p>{{ i18n.t('quote.failed') }}</p></div>
+          } @else if (quoteRefusal(); as refusal) {
+            <div class="notice notice--warn" role="alert"><kh-icon name="warning" />
+              <div><p>{{ refusal }}</p>
+                @if (deliveryInstead()) { <p class="small">{{ i18n.t('quote.deliveryInstead') }}</p> }</div></div>
           } @else if (quote.value(); as q) {
             @if (!q.isAvailable) {
               <div class="notice notice--bad" role="alert"><kh-icon name="x-circle" /><p>{{ i18n.t('quote.unavailable') }}</p></div>

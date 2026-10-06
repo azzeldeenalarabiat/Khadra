@@ -37,6 +37,11 @@ export interface CatalogueListing {
   /** Both halves true: the office delivers AND this car is eligible. */
   readonly isDeliveryAvailable: boolean;
   readonly gallery: CatalogueGalleryLabel;
+  /**
+   * On a dated search, whether the office's counter is open at both the pickup and the return time (Wave 3 E7); false
+   * means the car is listed because it can be delivered then. Absent or null on an undated search, and on an older API.
+   */
+  readonly selfPickupAvailable?: boolean | null;
 }
 
 /** What the bookable catalogue holds, for building its filters. Not narrowed by any filter. */

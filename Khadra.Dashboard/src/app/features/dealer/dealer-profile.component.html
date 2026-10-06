@@ -221,6 +221,8 @@
             @if (fieldError('operatingHours'); as e) {
               <div class="field-error">{{ e }}</div>
             }
+            <!-- Wave 3 E7: a dated search now lists an office's cars by these hours, so the office is told. -->
+            <div class="field-hint">{{ t('dealerProfile.hoursDecideSearches') }}</div>
           </div>
         </section>
 

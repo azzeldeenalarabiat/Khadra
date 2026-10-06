@@ -8,7 +8,10 @@
     }
   </a>
   <div class="car-card__save"><kh-save-button [vehicleId]="c.vehicleId" /></div>
-  @if (c.isDeliveryAvailable) {
+  <!-- Wave 3 E7: at the searched times the office's counter is shut, so this car comes by delivery only. -->
+  @if (c.selfPickupAvailable === false) {
+    <span class="car-card__badge badge badge--warn"><kh-icon name="truck" />{{ i18n.t('car.deliveryOnlyThen') }}</span>
+  } @else if (c.isDeliveryAvailable) {
     <span class="car-card__badge badge badge--ok"><kh-icon name="truck" />{{ i18n.t('car.delivery') }}</span>
   }
   <div class="car-card__body">

@@ -77,6 +77,8 @@ this batch (decision D6).
 | 3 | The customer's copy of a dispute names "Khadra" for the resolver and the assignee (ids null), and the office's name for an office-opened ticket and office statements (ids null); the customer's booking history carries no id but their own. `openedByUserId`, `authorUserId` and `resolvedByAdminId` become nullable | value | none: no installed build reads these fields |
 | 3 | `disputeWindowEndsAt` on every booking: when its dispute window closes, or null | additive | none: ignored by named-key parsing |
 
+| 3 | A dated `GET /vehicles` lists only cars that can be collected (office open at both local times) or delivered (eligible, office delivers); rows gain `selfPickupAvailable` | behavioural + additive | fewer results, all bookable; the shape is unchanged |
+
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
 | From | What the app must do |
@@ -92,3 +94,4 @@ this batch (decision D6).
 | F44 (W3 C3) | Link a decided or withdrawn dispute from the booking, from `disputes[]`, as the website does; today a closed decision is reachable only from a notification. |
 | F67 (W3) | A booking the customer cancelled by reporting non-delivery reads "Cancelled after you reported that the office did not hand over the car", with their report beneath, as the website does; today the app says "Cancelled by you · <report>". Recognise it by `penalty.reasonCode` `DealerDidNotHandOver` (or, assessed before codes, the office carrying the penalty on a customer cancellation). |
 | F69 (W3) | Look a reason code up in the list it belongs to: a refusal coded `Other` reads the refusal list's "Declined by the rental office", not the cancellation list's "Another reason" (`booking_detail_screen.dart` `_codeLabel`), as the website now does. |
+| F2/F1 (W3 E7) | Mark a search result "Delivery only at these times" when `selfPickupAvailable` is false, and word a refused quote by its reason (hours, dates) rather than one sentence, as the website does. |

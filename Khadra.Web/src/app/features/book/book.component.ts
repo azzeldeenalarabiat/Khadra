@@ -9,6 +9,7 @@ import { CustomerDocuments } from '../../core/api/documents.api';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
 import { problemText } from '../../core/http/problem-text';
+import { quoteRefusalText } from './quote-refusal';
 import { TranslationKey } from '../../core/i18n/en';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -110,7 +111,13 @@ export class BookComponent {
   });
   protected readonly quoteRefusal = computed(() => {
     const problem = this.quoteProblem();
-    return problem ? this.wordRefusal(problem, 'quote.failed') : null;
+    if (!problem) return null;
+    // This page's own codes first, then the wording the car page shares (E2E F1): dates by the limit they broke.
+    const key = `book.refusal.${problem.code}` as TranslationKey;
+    if (problem.code && key in this.refusalKeys) return this.i18n.t(key);
+    return quoteRefusalText(problem, this.i18n.t.bind(this.i18n), this.i18n.language(), this.appConfig.config(), (value) =>
+      this.format.dateTime(value),
+    );
   });
   private readonly refusalKeys: Record<string, true> = Object.fromEntries(
     [

@@ -8,6 +8,7 @@ import { LookupsService } from '../../core/api/lookups.service';
 import { ShortlistService } from '../../core/api/shortlist.service';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { snapshotProblem } from '../../core/http/problem';
+import { quoteRefusalText, refusedForOpeningHours } from '../book/quote-refusal';
 import { injectResponseStatus } from '../../core/http/server-context';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
@@ -91,6 +92,23 @@ export class CarDetailsComponent {
   protected readonly problem = computed(() => (this.car.error() ? snapshotProblem(this.car.error()) : null));
   protected readonly notFound = computed(() => !this.vehicleId() || this.problem()?.status === 404);
   protected readonly quoteProblem = computed(() => (this.quote.error() ? snapshotProblem(this.quote.error()) : null));
+  /**
+   * Why no price was given, in the reader's words (E2E F1): the office's hours, or dates the platform will not take,
+   * never only "could not be worked out". The quote here asks about a self-pickup, so an office shut at those times
+   * may still deliver the car, and the page says so when it can.
+   */
+  protected readonly quoteRefusal = computed(() => {
+    const problem = this.quoteProblem();
+    return problem
+      ? quoteRefusalText(problem, this.i18n.t.bind(this.i18n), this.i18n.language(), this.appConfig.config(), (value) =>
+          this.format.dateTime(value.toISOString()),
+        )
+      : null;
+  });
+  protected readonly deliveryInstead = computed(() => {
+    const car = this.car.value();
+    return refusedForOpeningHours(this.quoteProblem()) && !!car?.isDeliveryEligible && !!car.gallery.delivery?.isEnabled;
+  });
 
   protected readonly name = computed(() => {
     const car = this.car.value();

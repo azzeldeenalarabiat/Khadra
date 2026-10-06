@@ -534,6 +534,8 @@ export const AR = {
   'dealerProfile.onlyTheDealerOwner':
     'لا يستطيع تعديل هذه الصفحة إلا صاحب المكتب. ويمكنك الاطّلاع عليها.',
   'dealerProfile.operatingHours': 'ساعات العمل',
+  'dealerProfile.hoursDecideSearches':
+    'من يبحث عن وقت خارج هذه الساعات لا يرى سياراتك إلا إذا أمكن توصيلها في ذلك الوقت، إذ لا يكون أحد في المكتب لتسليمها.',
   'dealerProfile.publicPreview': 'معاينة الصفحة العامة',
   'dealerProfile.staff': 'الموظفون',
   'dealerProfile.theMapIsWaiting':

@@ -65,6 +65,68 @@ public sealed class CatalogueReaderTests : IDisposable
         return vehicle;
     }
 
+    /// <summary>
+    /// A dated search's collection rule, in SQL (Wave 3 E7; E2E F2): a car is listed when its office is open for a
+    /// self-pickup, or when it may be delivered and its office delivers. The count is taken from the same query as the
+    /// page, so a pager never promises cars the rule then drops.
+    /// </summary>
+    [Fact]
+    public async Task A_dated_search_lists_only_what_can_be_collected_or_delivered()
+    {
+        var carType = CarType.Create("Sedan", "سيدان", 1, Build.Now).Value;
+        var open = Build.ApprovedDealer(commercialRegistration: "200001");
+        var delivering = Build.ApprovedDealer(commercialRegistration: "200002");
+        Assert.True(delivering.EnableDelivery(30m, Money.Jod(5m), Build.Now).IsSuccess);
+        var neither = Build.ApprovedDealer(commercialRegistration: "200003");
+        var atOpen = Listed(open.Id, carType.Id, isDeliveryEligible: false);
+        var deliverable = Listed(delivering.Id, carType.Id, isDeliveryEligible: true);
+        var collectOnly = Listed(delivering.Id, carType.Id, isDeliveryEligible: false);
+        var stranded = Listed(neither.Id, carType.Id, isDeliveryEligible: true);
+
+        await using (var context = NewContext())
+        {
+            context.CarTypes.Add(carType);
+            context.Dealers.AddRange(open, delivering, neither);
+            context.Vehicles.AddRange(atOpen, deliverable, collectOnly, stranded);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var page = await new CatalogueReader(reader).SearchAsync(
+            new CatalogueFilter(Collection: new CollectionRule([open.Id], [delivering.Id])), Page);
+
+        Assert.Equal(
+            new[] { atOpen.Id.Value, deliverable.Id.Value }.Order(),
+            page.Items.Select(item => item.VehicleId).Order());
+        Assert.Equal(2, page.TotalCount);
+    }
+
+    /// <summary>The offices a dated search judges: those a customer may be shown, with their hours and delivery switch.</summary>
+    [Fact]
+    public async Task Office_schedules_are_read_for_the_offices_a_customer_may_be_shown()
+    {
+        var shown = Build.ApprovedDealer(commercialRegistration: "300001");
+        Assert.True(shown.EnableDelivery(30m, Money.Jod(5m), Build.Now).IsSuccess);
+        var suspended = Build.ApprovedDealer(commercialRegistration: "300002");
+        suspended.Suspend(Id.New(), "Complaints.", Build.Now);
+        var pending = Build.Dealer(commercialRegistration: "300003");
+
+        await using (var context = NewContext())
+        {
+            context.Dealers.AddRange(shown, suspended, pending);
+            await context.SaveChangesAsync();
+        }
+
+        await using var reader = NewContext();
+        var schedules = await new CatalogueReader(reader).OfficeSchedulesAsync(null, null);
+
+        var only = Assert.Single(schedules);
+        Assert.Equal(shown.Id, only.DealerId);
+        Assert.True(only.DeliveryEnabled);
+        Assert.Equal(shown.OperatingHours, only.Hours);
+        Assert.Empty(await new CatalogueReader(reader).OfficeSchedulesAsync(null, suspended.Id));
+    }
+
     [Fact]
     public async Task Only_cars_a_customer_could_actually_book_are_listed()
     {

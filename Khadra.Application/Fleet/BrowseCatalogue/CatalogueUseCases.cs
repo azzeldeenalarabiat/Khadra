@@ -170,10 +170,16 @@ public sealed class SearchCatalogueHandler(
         if (window.IsFailure)
             return window.Error;
 
+        Id? cityId = request.CityId is { } city ? Id.From(city) : null;
+        Id? dealerId = request.DealerId is { } dealer ? Id.From(dealer) : null;
+        var collection = window.Value is { } dated
+            ? await CollectionAtAsync(dated, cityId, dealerId, cancellationToken)
+            : null;
+
         var filter = new CatalogueFilter(
-            request.CityId is { } city ? Id.From(city) : null,
+            cityId,
             request.CarTypeId is { } carType ? Id.From(carType) : null,
-            request.DealerId is { } dealer ? Id.From(dealer) : null,
+            dealerId,
             request.MinDailyRate,
             request.MaxDailyRate,
             request.Transmission,
@@ -185,7 +191,8 @@ public sealed class SearchCatalogueHandler(
             request.Make,
             request.MinYear,
             request.MaxYear,
-            sort);
+            sort,
+            collection);
 
         var page = await catalogue.SearchAsync(filter, request.Page, cancellationToken);
 
@@ -193,7 +200,49 @@ public sealed class SearchCatalogueHandler(
         // CatalogueRatings. Awaited after the search, not beside it: both readers share one DbContext.
         var ratings = await CatalogueRatings.ForAsync(
             reviews, page.Items.Select(item => item.Gallery.DealerId), clock.UtcNow, cancellationToken);
-        return page with { Items = [.. page.Items.Select(item => CatalogueRatings.Apply(item, ratings))] };
+        var open = collection?.OpenForSelfPickup.Select(id => id.Value).ToHashSet();
+        return page with
+        {
+            Items =
+            [
+                .. page.Items.Select(item => CatalogueRatings.Apply(item, ratings) with
+                {
+                    SelfPickupAvailable = open?.Contains(item.Gallery.DealerId),
+                }),
+            ],
+        };
+    }
+
+    /// <summary>
+    /// Which offices can hand a car over at the searched times (Wave 3 E7; E2E F2): open at both the local pickup and the
+    /// local return time, judged by <see cref="PickupHoursPolicy"/> exactly as the quote judges them, or delivering.
+    /// </summary>
+    /// <remarks>
+    /// Checklist 66 once kept hours out of the search because a search spans offices with no single schedule. Each office
+    /// is judged on its own here instead, so search and quote cannot disagree: a car the search lists is one the quote
+    /// prices, by self-pickup or by delivery. Awaited before the search, never beside it: the readers share a DbContext.
+    /// </remarks>
+    private async Task<CollectionRule> CollectionAtAsync(
+        AvailabilityWindow window,
+        Id? cityId,
+        Id? dealerId,
+        CancellationToken cancellationToken)
+    {
+        var schedules = await catalogue.OfficeSchedulesAsync(cityId, dealerId, cancellationToken);
+        var start = window.Period.Start;
+        var end = window.Period.End;
+        var open = schedules
+            .Where(schedule => PickupHoursPolicy.Validate(
+                schedule.Hours,
+                PickupMethod.SelfPickup,
+                calendar.DayOf(start),
+                calendar.TimeOfDay(start),
+                calendar.DayOf(end),
+                calendar.TimeOfDay(end)).IsSuccess)
+            .Select(schedule => schedule.DealerId)
+            .ToList();
+        var delivering = schedules.Where(schedule => schedule.DeliveryEnabled).Select(schedule => schedule.DealerId).ToList();
+        return new CollectionRule(open, delivering);
     }
 
     /// <summary>

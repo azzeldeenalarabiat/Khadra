@@ -62,8 +62,8 @@ public sealed class BookingPricer(IBusinessRulesProvider businessRules, IReporti
 
         // Whether anybody is behind the counter at either end. Judged here, beside the other
         // gallery-specific rules, rather than in BookingWindowPolicy: the window policy is about
-        // dates every gallery shares, and this depends on WHICH gallery. It is also why the
-        // catalogue search does not apply it -- a search spans galleries and has no single schedule.
+        // dates every gallery shares, and this depends on WHICH gallery. A dated catalogue search
+        // applies the same policy to each gallery in turn (Wave 3 E7), so the two cannot disagree.
         var openingHours = PickupHoursPolicy.Validate(
             dealer.OperatingHours,
             pickupMethod,

@@ -211,6 +211,7 @@ export const AR: Record<TranslationKey, Message> = {
     other: '{count} مقعد',
   },
   'car.delivery': 'التوصيل متاح',
+  'car.deliveryOnlyThen': 'بالتوصيل فقط في هذه الأوقات',
   'car.noPhoto': 'لا توجد صورة',
   'car.view': 'عرض التفاصيل',
   'car.save': 'احفظ هذه السيارة',
@@ -283,6 +284,7 @@ export const AR: Record<TranslationKey, Message> = {
   'quote.payAfterApproval': 'لا يُخصم شيء الآن. لا يُستحق العربون إلا إذا وافق المكتب.',
   'quote.unavailable': 'هذه السيارة محجوزة في تلك التواريخ. جرّب تواريخ أخرى.',
   'quote.failed': 'تعذّر حساب السعر لتلك التواريخ.',
+  'quote.deliveryInstead': 'يمكن لهذا المكتب توصيل السيارة في هذه الأوقات بدلًا من ذلك: اختر التوصيل عند إرسال الطلب.',
   'quote.from': 'ابتداءً من',
 
   'office.title': 'مكتب التأجير',

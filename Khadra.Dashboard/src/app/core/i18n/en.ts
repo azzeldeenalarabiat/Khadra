@@ -958,6 +958,8 @@ export const EN = {
   'dealerProfile.logo': 'Logo',
   'dealerProfile.onlyTheDealerOwner': 'Only the dealer owner can edit this page. You can read it.',
   'dealerProfile.operatingHours': 'Operating hours',
+  'dealerProfile.hoursDecideSearches':
+    'Customers searching for a time outside these hours see your cars only if they can be delivered then, since nobody is at the counter to hand them over.',
   'dealerProfile.publicPreview': 'Public preview',
   'dealerProfile.staff': 'Staff',
   'dealerProfile.theMapIsWaiting':

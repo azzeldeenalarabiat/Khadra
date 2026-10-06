@@ -130,6 +130,16 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
         if (filter.MaxYear is { } maxYear)
             query = query.Where(vehicle => vehicle.Details.Year <= maxYear);
 
+        if (filter.Collection is { } collection)
+        {
+            // Materialised first, as ListByIdsAsync does: EF translates Contains over a local List.
+            var open = collection.OpenForSelfPickup.ToList();
+            var delivering = collection.Delivering.ToList();
+            query = query.Where(vehicle =>
+                open.Contains(vehicle.DealerId) ||
+                (vehicle.IsDeliveryEligible && delivering.Contains(vehicle.DealerId)));
+        }
+
         if (filter.Window is not null)
             query = FreeDuring(query, filter.Window);
 
@@ -269,7 +279,9 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
                     // A placeholder: the handler writes the published rating on (CatalogueRatings).
                     null,
                     0))
-                .First());
+                .First(),
+            // Written by the search handler from the offices' hours (Wave 3 E7); an expression tree cannot omit it.
+            null);
 
     public async Task<IReadOnlyList<CatalogueListing>> ListByIdsAsync(
         IReadOnlyCollection<Id> vehicleIds,
@@ -568,6 +580,27 @@ internal sealed class CatalogueReader(KhadraDbContext context) : ICatalogueReade
             context.Bookings, window.Now, window.HoldStart, window.Period.End);
 
         return vehicles.Where(vehicle => !holding.Any(booking => booking.VehicleId == vehicle.Id));
+    }
+
+    public async Task<IReadOnlyList<OfficeSchedule>> OfficeSchedulesAsync(
+        Id? cityId,
+        Id? dealerId,
+        CancellationToken cancellationToken = default)
+    {
+        // The offices Bookable() admits: approved and not suspended. Hours are one stored text column nothing queries
+        // into, so they are read whole and judged in memory by the handler, as the office directory already does.
+        var approved = DealerVerificationStatus.Approved;
+        var dealers = context.Dealers.AsNoTracking()
+            .Where(dealer => dealer.VerificationStatus == approved && !dealer.IsSuspended);
+        if (cityId is { } city)
+            dealers = dealers.Where(dealer => dealer.CityId == city);
+        if (dealerId is { } office)
+            dealers = dealers.Where(dealer => dealer.Id == office);
+
+        var rows = await dealers
+            .Select(dealer => new { dealer.Id, dealer.OperatingHours, dealer.Delivery.IsEnabled })
+            .ToListAsync(cancellationToken);
+        return rows.Select(row => new OfficeSchedule(row.Id, row.OperatingHours, row.IsEnabled)).ToList();
     }
 
     private async Task<PublicGallery?> LoadGalleryEmbedAsync(Id dealerId, CancellationToken cancellationToken)

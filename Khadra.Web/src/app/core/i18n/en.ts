@@ -163,6 +163,8 @@ export const EN = {
   'car.perDay': '{amount} / day',
   'car.seats': { one: '{count} seat', other: '{count} seats' },
   'car.delivery': 'Delivery available',
+  // Wave 3 E7: listed for these times because the office delivers, though its counter is shut.
+  'car.deliveryOnlyThen': 'Delivery only at these times',
   'car.noPhoto': 'No photo',
   'car.view': 'View details',
   'car.save': 'Save this car',
@@ -228,6 +230,8 @@ export const EN = {
   'quote.payAfterApproval': 'Nothing is charged now. The deposit is due only if the office accepts.',
   'quote.unavailable': 'This car is taken for those dates. Try other dates.',
   'quote.failed': 'The price could not be worked out for those dates.',
+  // E2E F1: the counter is shut then, but this office can bring the car instead.
+  'quote.deliveryInstead': 'This office can deliver the car at these times instead: choose delivery when you send the request.',
   'quote.from': 'From',
 
   'office.title': 'Rental office',

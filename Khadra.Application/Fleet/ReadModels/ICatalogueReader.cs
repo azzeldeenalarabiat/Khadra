@@ -1,6 +1,7 @@
 using Khadra.Application.Common;
 using Khadra.Application.Common.Dtos;
 using Khadra.Domain.Common;
+using Khadra.Domain.Dealers;
 
 namespace Khadra.Application.Fleet.ReadModels;
 
@@ -112,7 +113,28 @@ public interface ICatalogueReader
         GalleryDirectoryFilter filter,
         PageRequest page,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The opening hours and the delivery switch of every office a customer may be shown (approved, not suspended),
+    /// narrowed to a city or to one office when given (Wave 3 E7; E2E F2): what a dated search judges each office's
+    /// cars by, through the same rule the quote applies.
+    /// </summary>
+    Task<IReadOnlyList<OfficeSchedule>> OfficeSchedulesAsync(
+        Id? cityId,
+        Id? dealerId,
+        CancellationToken cancellationToken = default);
 }
+
+/// <summary>One office's counter hours and whether it delivers, for a dated search (Wave 3 E7).</summary>
+public sealed record OfficeSchedule(Id DealerId, OperatingHours Hours, bool DeliveryEnabled);
+
+/// <summary>
+/// Which offices can hand a car over at the searched times (Wave 3 E7; E2E F2): those open at both the local pickup and
+/// the local return time, for a self-pickup, and those that deliver. A car is listed when its office is in the first
+/// set, or when it may be delivered and its office is in the second. The radius needs the customer's address, so the
+/// quote still checks it.
+/// </summary>
+public sealed record CollectionRule(IReadOnlyList<Id> OpenForSelfPickup, IReadOnlyList<Id> Delivering);
 
 /// <summary>How a customer narrowed the office directory. Every field is optional.</summary>
 /// <remarks>
@@ -235,7 +257,9 @@ public sealed record CatalogueFilter(
     string? Make = null,
     int? MinYear = null,
     int? MaxYear = null,
-    CatalogueSort? Sort = null);
+    CatalogueSort? Sort = null,
+    // Who can hand a car over at the searched times; null for an undated search (Wave 3 E7).
+    CollectionRule? Collection = null);
 
 /// <summary>
 /// The dates a customer asked about, and everything needed to judge them.
@@ -275,7 +299,11 @@ public sealed record CatalogueListing(
     MoneyDto DailyRate,
     // Both halves must be true: the gallery offers delivery AND this car is eligible for it.
     bool IsDeliveryAvailable,
-    CatalogueGalleryLabel Gallery);
+    CatalogueGalleryLabel Gallery,
+    // On a dated search, whether the office is open at both the pickup and the return time, so the car can be collected
+    // from its counter; false means it is listed because it can be delivered then. Null on an undated search, which
+    // asked about no times. Added 2026-10-06, last (Wave 3 E7).
+    bool? SelfPickupAvailable = null);
 
 /// <summary>The gallery behind a search row: enough to recognise it, nothing more.</summary>
 /// <remarks>
