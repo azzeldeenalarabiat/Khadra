@@ -165,7 +165,12 @@ public sealed record BookingDto(
     /// </remarks>
     DateTimeOffset? PickupAvailableFrom = null,
     /// <summary>The earliest moment the return may be recorded: the rental's start. Added 2026-10-06, last.</summary>
-    DateTimeOffset? ReturnAvailableFrom = null)
+    DateTimeOffset? ReturnAvailableFrom = null,
+    /// <summary>
+    /// Every dispute on the booking, live or closed, oldest first (Wave 3 C3; E2E F44), so a closed decision stays
+    /// one link away. Added 2026-10-06, last; installed apps ignore it and keep reading <c>liveDisputeId</c>.
+    /// </summary>
+    IReadOnlyList<BookingDisputeDto>? Disputes = null)
 {
     /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
     /// <remarks>
@@ -185,6 +190,10 @@ public sealed record BookingDto(
     {
         CommissionAmount = null,
         Vehicle = ApprovedAt is null ? Vehicle?.WithoutPlate() : Vehicle,
+        // Whoever acted for the office or the platform is not named to the customer, even by id (D5 A; Q4).
+        History = History
+            .Select(change => change.ActorParty == BookingParty.Customer.Name ? change : change with { ActorUserId = null })
+            .ToList(),
     };
 
     /// <summary>
@@ -280,7 +289,8 @@ public sealed record BookingDto(
             RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: true),
             RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: false),
             booking.PickupAvailableFrom,
-            booking.ReturnAvailableFrom);
+            booking.ReturnAvailableFrom,
+            context.Disputes ?? []);
     }
 
     /// <summary>

@@ -73,6 +73,8 @@ this batch (decision D6).
 | 3 | `POST /bookings/{id}/pickup` before `pickupAvailableFrom` and `/return` before the rental start are refused: 409 `booking.pickup_too_early` / `booking.return_too_early`, with `availableFrom`. Checked before the handover code, so an early attempt costs the customer no try | new refusals | none: office-only endpoints. **Code issuance is unchanged** (owner, 2026-10-06, decision A2): `POST /bookings/{id}/handover-code` is still answered on any confirmed booking, because refusing a request installed apps make would be breaking |
 | 3 | A customer's copy of a booking (detail, list, `/bookings/next`, create/cancel/non-delivery answers) carries `vehicle.plateNumber: null` until the office approves; list rows gain `approvedAt` | value (same field, null before approval) + additive | installed builds print an empty "Plate:" on a booking awaiting the office until 1.4.0 (owner, decision A3); nothing throws |
 | 3 | `POST /dealers` (the office application) and `PUT /dealers/me/profile` refuse a business name that is one of the platform's own: 400 `dealer.business_name_reserved`, on the `businessName` field | new refusal | none: office endpoints only |
+| 3 | `disputes[]` on every booking: `{ ticketId, status, openedAt, closedAt }`, oldest first | additive | none: ignored by named-key parsing |
+| 3 | The customer's copy of a dispute names "Khadra" for the resolver and the assignee (ids null), and the office's name for an office-opened ticket and office statements (ids null); the customer's booking history carries no id but their own. `openedByUserId`, `authorUserId` and `resolvedByAdminId` become nullable | value | none: no installed build reads these fields |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
@@ -86,3 +88,4 @@ this batch (decision D6).
 | F48 (W2 C6) | Nothing required: a refund Khadra made already reads "Khadra: …" from data. Revisit the Arabic "Khadra" with branding in Wave 5. |
 | D4 (W3) | Offer "Show my pickup code" only from `pickupAvailableFrom`, and the return code only from `returnAvailableFrom`, saying when, as the website does; the server keeps issuing codes either way. |
 | F65 (W3) | Hide the "Plate" row when `vehicle.plateNumber` is null (a booking the office has not approved); today the label prints with nothing after it. |
+| F44 (W3 C3) | Link a decided or withdrawn dispute from the booking, from `disputes[]`, as the website does; today a closed decision is reachable only from a notification. |

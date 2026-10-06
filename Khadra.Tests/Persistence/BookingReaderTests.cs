@@ -425,6 +425,36 @@ public sealed class BookingReaderTests : IDisposable
         Assert.Equal(expected, context.HasResolvedDispute);
     }
 
+    /// <summary>
+    /// Every dispute on a booking, live or closed, oldest first (Wave 3 C3; E2E F44): a withdrawn first ticket and a
+    /// second one still open are both listed, each with its status and when it closed.
+    /// </summary>
+    [Fact]
+    public async Task Every_dispute_on_a_booking_is_listed_oldest_first_whatever_its_state()
+    {
+        var booking = Build.ConfirmedBooking(dealerId: _dealerId);
+        var cancelledAt = booking.FreeCancellationDeadline!.Value.AddMinutes(1);
+        Assert.True(booking.Cancel(BookingParty.Customer, booking.CustomerId, "Changed plans.", cancelledAt).IsSuccess);
+        var first = DisputeTicket.Open(booking.Id, booking.CustomerId, BookingParty.Customer, "The penalty is wrong.", TimeSpan.FromHours(48), cancelledAt.AddHours(1)).Value;
+        Assert.True(first.Withdraw(booking.CustomerId, cancelledAt.AddHours(2)).IsSuccess);
+        var second = DisputeTicket.Open(booking.Id, booking.CustomerId, BookingParty.Customer, "On reflection, it is.", TimeSpan.FromHours(48), cancelledAt.AddHours(3)).Value;
+
+        await using (var write = NewContext())
+        {
+            write.Bookings.Add(booking);
+            write.DisputeTickets.AddRange(second, first);
+            await write.SaveChangesAsync();
+        }
+
+        await using var read = NewContext();
+        var disputes = (await new BookingReader(read).ContextAsync(booking.Id)).Disputes!;
+
+        Assert.Equal([first.Id.Value, second.Id.Value], disputes.Select(dispute => dispute.TicketId));
+        Assert.Equal(["Withdrawn", "Open"], disputes.Select(dispute => dispute.Status));
+        Assert.Equal(cancelledAt.AddHours(2), disputes[0].ClosedAt);
+        Assert.Null(disputes[1].ClosedAt);
+    }
+
     [Fact]
     public async Task A_free_cancellations_refund_is_read_with_its_status_and_follows_it()
     {

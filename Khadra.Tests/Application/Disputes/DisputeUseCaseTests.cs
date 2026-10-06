@@ -1054,6 +1054,78 @@ public sealed class DisputeUseCaseTests
         Assert.Equal("Account closed", leaver.AssignedAdminName);
     }
 
+    /// <summary>
+    /// The customer's copy names the platform and the office, never their people: the decision is Khadra's (owner
+    /// decision D5 A, 2026-10-05), and an office's ticket and statements speak as the office (owner, 2026-10-06, Q4).
+    /// The office's copy and the administrator's keep every name; the customer's own words keep theirs.
+    /// </summary>
+    [Fact]
+    public async Task The_customer_reads_Khadra_and_the_office_never_a_named_person()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var staff = Id.New();
+        var ticket = context.GivenTicket(DisputeTicket.Open(
+            booking.Id, staff, BookingParty.Dealer, "The customer returned the car late.", TimeSpan.FromHours(48), Build.Now.AddHours(4)).Value);
+        Assert.True(ticket.AddStatement(BookingParty.Customer, CustomerId, "I was on time.", Build.Now.AddHours(5)).IsSuccess);
+        Assert.True(ticket.AssignToAdmin(AdminId).IsSuccess);
+        var held = booking.Pricing.DepositAmount.Amount;
+        Assert.True((await context.Admin().Handle(
+            new ResolveDisputeCommand(ticket.Id, held, 0m, 0m, null, "Refunded in full."), CancellationToken.None)).IsSuccess);
+        context.Names.NamesAsync(Arg.Any<IReadOnlyCollection<Id>>(), Arg.Any<CancellationToken>())
+            .Returns(new Dictionary<Guid, string>
+            {
+                [CustomerId.Value] = "Layla Odeh",
+                [AdminId.Value] = "Rania Haddad",
+                [staff.Value] = "Sami Khoury",
+            });
+
+        var customer = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None);
+        var office = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Dealer, CancellationToken.None);
+        var admin = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Admin, CancellationToken.None);
+
+        var officeName = customer.Booking.DealerName;
+        Assert.Equal(officeName, customer.OpenedByName);
+        Assert.Null(customer.OpenedByUserId);
+        var officeStatement = Assert.Single(customer.Statements, statement => statement.Party == "Dealer");
+        Assert.Equal(officeName, officeStatement.AuthorName);
+        Assert.Null(officeStatement.AuthorUserId);
+        Assert.Equal("Khadra", customer.AssignedAdminName);
+        Assert.Null(customer.AssignedAdminId);
+        Assert.Equal("Khadra", customer.Resolution!.ResolvedByName);
+        Assert.Null(customer.Resolution.ResolvedByAdminId);
+        var own = Assert.Single(customer.Statements, statement => statement.Party == "Customer");
+        Assert.Equal("Layla Odeh", own.AuthorName);
+        Assert.Equal(CustomerId.Value, own.AuthorUserId);
+        // The customer's history carries nobody's id but their own.
+        Assert.All(customer.Booking.History.Where(change => change.ActorParty != "Customer"), change => Assert.Null(change.ActorUserId));
+
+        foreach (var internalCopy in new[] { office, admin })
+        {
+            Assert.Equal("Sami Khoury", internalCopy.OpenedByName);
+            Assert.Equal(staff.Value, internalCopy.OpenedByUserId);
+            Assert.Equal("Rania Haddad", internalCopy.Resolution!.ResolvedByName);
+            Assert.Equal(AdminId.Value, internalCopy.Resolution.ResolvedByAdminId);
+        }
+        Assert.Equal("Rania Haddad", admin.AssignedAdminName);
+    }
+
+    /// <summary>A closed ticket is still on the booking, so a decision page is never reachable only by its address (F44).</summary>
+    [Fact]
+    public async Task A_closed_dispute_stays_listed_on_the_booking_it_decided()
+    {
+        var context = new Context();
+        var booking = context.GivenBooking(CancelledBooking(Build.Now));
+        var ticket = context.GivenTicket(OpenTicket(booking, Build.Now.AddHours(4)));
+        var listed = new BookingDisputeDto(ticket.Id.Value, "Resolved", ticket.OpenedAt, Build.Now.AddHours(6));
+        context.BookingReader.ContextAsync(booking.Id, Arg.Any<CancellationToken>())
+            .Returns(new BookingContext(null, "Petra Wheels", false, null, "Layla Odeh", false, null, null, Disputes: [listed]));
+
+        var customer = await context.Composer().ComposeAsync(ticket, booking, BookingParty.Customer, CancellationToken.None);
+
+        Assert.Equal([listed], customer.Booking.Disputes!);
+    }
+
     [Fact]
     public async Task A_resolution_says_when_the_administrator_who_made_it_has_since_left()
     {

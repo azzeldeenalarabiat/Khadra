@@ -1,5 +1,7 @@
 using Khadra.Application.Bookings.Dtos;
 using Khadra.Application.Common.Dtos;
+using Khadra.Domain.Bookings;
+using Khadra.Domain.Common;
 using Khadra.Domain.Disputes;
 
 namespace Khadra.Application.Disputes.Dtos;
@@ -25,7 +27,8 @@ public sealed record DisputeDto(
     string Status,
     bool IsLive,
     string OpenedByParty,
-    Guid OpenedByUserId,
+    /// <summary>Null on the customer's copy when office staff opened it (owner, 2026-10-06; see <see cref="ForCustomer"/>).</summary>
+    Guid? OpenedByUserId,
     string OpenedByName,
     /// <summary>True exactly when the opener's account no longer resolves, so OpenedByName is the stand-in.</summary>
     bool OpenedByAccountClosed,
@@ -71,7 +74,52 @@ public sealed record DisputeDto(
     /// What a decided dispute comes to for the office's money (Wave 2 C1; E2E F37). The office's copy only, and only
     /// once the ticket is decided: null on a live ticket and on every other reader's copy. Added 2026-10-05, last.
     /// </summary>
-    OfficeExpectedOutcomeDto? ExpectedOutcome = null);
+    OfficeExpectedOutcomeDto? ExpectedOutcome = null)
+{
+    /// <summary>
+    /// The customer's copy: the platform and the office speak as themselves, never as one of their people.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The decision is Khadra's, not one administrator's (owner decision D5 A, 2026-10-05): whoever resolved or holds
+    /// the ticket reads "Khadra", with no id. An office's statements and an office-opened ticket name the office,
+    /// not the employee who typed them (owner, 2026-10-06, Q4). Naming people to the other side invites pressure aimed
+    /// at a person. The office's copy, the administrator's and the audit trail keep every name.
+    /// </para>
+    /// <para>
+    /// No installed app reads any of these names or ids. The customer's own name and statements are unchanged.
+    /// </para>
+    /// </remarks>
+    /// <param name="officeName">The office as the customer's booking already names it.</param>
+    public DisputeDto ForCustomer(string officeName)
+    {
+        var customer = BookingParty.Customer.Name;
+        var openedByCustomer = OpenedByParty == customer;
+        return this with
+        {
+            OpenedByUserId = openedByCustomer ? OpenedByUserId : null,
+            OpenedByName = openedByCustomer ? OpenedByName : SpeakerFor(OpenedByParty, officeName),
+            OpenedByAccountClosed = openedByCustomer && OpenedByAccountClosed,
+            AssignedAdminId = null,
+            AssignedAdminName = AssignedAdminId is null ? null : Platform.Name,
+            AssignedAdminAccountClosed = false,
+            Statements = Statements
+                .Select(statement => statement.Party == customer
+                    ? statement
+                    : statement with
+                    {
+                        AuthorUserId = null,
+                        AuthorName = SpeakerFor(statement.Party, officeName),
+                        AuthorAccountClosed = false,
+                    })
+                .ToList(),
+            Resolution = Resolution?.ForCustomer(),
+        };
+    }
+
+    private static string SpeakerFor(string party, string officeName) =>
+        party == BookingParty.Dealer.Name ? officeName : Platform.Name;
+}
 
 /// <summary>
 /// What a decided dispute comes to for the rental office (Wave 2 C1; E2E F37). Before the office payables ledger
@@ -115,7 +163,8 @@ public static class OfficeOutcomeSources
 public sealed record DisputeStatementDto(
     Guid StatementId,
     string Party,
-    Guid AuthorUserId,
+    /// <summary>Null on the customer's copy when the office or the platform wrote it (see <see cref="DisputeDto.ForCustomer"/>).</summary>
+    Guid? AuthorUserId,
     string AuthorName,
     /// <summary>True exactly when the author's account no longer resolves, so AuthorName is the stand-in.</summary>
     bool AuthorAccountClosed,
@@ -144,7 +193,8 @@ public sealed record DisputeResolutionDto(
     /// </summary>
     bool? WaivesEverything,
     string Note,
-    Guid ResolvedByAdminId,
+    /// <summary>Null on the customer's copy: the decision is Khadra's (owner decision D5 A).</summary>
+    Guid? ResolvedByAdminId,
     string ResolvedByName,
     /// <summary>True exactly when the resolving administrator's account no longer resolves.</summary>
     bool ResolvedByAccountClosed,
@@ -178,6 +228,10 @@ public sealed record DisputeResolutionDto(
     /// </summary>
     public DisputeResolutionDto ForDealer() =>
         this with { RefundToCustomer = null, RetainedByPlatform = null, WaivesEverything = null };
+
+    /// <summary>The customer's copy: decided by Khadra, never by a named administrator (owner decision D5 A, 2026-10-05).</summary>
+    public DisputeResolutionDto ForCustomer() =>
+        this with { ResolvedByAdminId = null, ResolvedByName = Platform.Name, ResolvedByAccountClosed = false };
 }
 
 /// <summary>What the party gets back from a successful upload request: where to PUT, and the key to quote.</summary>

@@ -529,6 +529,8 @@ export const EN = {
   'booking.cash': 'Cash taken: {amount}',
   'booking.recordedAt': 'Recorded {date}',
   'booking.disputeOpen': 'A dispute is open on this booking. Khadra is handling it.',
+  'booking.disputeDecidedOn': 'A dispute on this booking was decided on {date}.',
+  'booking.disputeWithdrawnOn': 'A dispute on this booking was withdrawn on {date}.',
   'booking.created': 'Your request has been sent to {office}. They will answer by {deadline}; we will let you know as soon as they do.',
   'booking.notFoundTitle': 'Booking not found',
   'booking.notFoundText': 'It may belong to another account.',

@@ -187,6 +187,14 @@
         <div class="notice"><kh-icon name="gavel" /><div><p>{{ i18n.t('booking.disputeOpen') }}</p>
           <a class="link" [routerLink]="i18n.link('disputes', b.liveDisputeId)">{{ i18n.t('dispute.view') }}</a></div></div>
       }
+      <!-- Wave 3 C3 (E2E F44): a decided or withdrawn dispute stays one link away, never only by typing its address. -->
+      @if (closedDisputes().length) {
+        <div class="notice"><kh-icon name="gavel" /><div>
+          @for (dispute of closedDisputes(); track dispute.ticketId) {
+            <p>{{ i18n.t(dispute.status === 'Withdrawn' ? 'booking.disputeWithdrawnOn' : 'booking.disputeDecidedOn', { date: format.dateTime(dispute.closedAt!) }) }}
+              · <a class="link" [routerLink]="i18n.link('disputes', dispute.ticketId)">{{ i18n.t('dispute.view') }}</a></p>
+          }</div></div>
+      }
     </section>
 
     <!-- What the customer can do now -->

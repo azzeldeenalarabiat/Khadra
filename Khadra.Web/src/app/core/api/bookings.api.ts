@@ -227,6 +227,18 @@ export interface Booking {
   readonly pickupAvailableFrom?: string | null;
   /** The earliest moment the return may be recorded: the rental's start. The return code is offered from then. */
   readonly returnAvailableFrom?: string | null;
+  /** Every dispute on the booking, live or closed, oldest first (Wave 3 C3, E2E F44). Absent on an older API. */
+  readonly disputes?: readonly BookingDispute[];
+}
+
+/** One dispute on a booking: enough to link its page, live or closed. */
+export interface BookingDispute {
+  readonly ticketId: string;
+  /** Open, UnderReview, Resolved or Withdrawn. */
+  readonly status: string;
+  readonly openedAt: string;
+  /** When it was decided or withdrawn; null while it is live. */
+  readonly closedAt: string | null;
 }
 
 /**

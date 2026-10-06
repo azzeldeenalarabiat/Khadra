@@ -120,7 +120,7 @@ public sealed partial class DisputeViewComposer(
             : viewer == BookingParty.Admin ? (copy, decision)
             : throw new ArgumentOutOfRangeException(nameof(viewer), viewer.Name, "A dispute is read by the customer, the office or an administrator.");
 
-        return new DisputeDto(
+        var view = new DisputeDto(
             ticket.Id.Value,
             ticket.BookingId.Value,
             ticket.Status.Name,
@@ -149,6 +149,8 @@ public sealed partial class DisputeViewComposer(
             viewer == BookingParty.Admin ? DisputeSlaStates.For(ticket, dashboard.SlaWarningThreshold, now) : null,
             // The office's copy only: what the decision comes to for its money (Wave 2 C1).
             viewer == BookingParty.Dealer ? await ExpectedOutcomeAsync(ticket, booking, resolvedTickets, now, cancellationToken) : null);
+        // The customer's copy names the platform and the office, never their people (D5 A; owner, 2026-10-06, Q4).
+        return viewer == BookingParty.Customer ? view.ForCustomer(context.DealerName) : view;
     }
 
     /// <summary>

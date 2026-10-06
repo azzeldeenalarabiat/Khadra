@@ -399,7 +399,25 @@ internal sealed class BookingReader(KhadraDbContext context) : IBookingReader
             ConfirmingPayment: await ConfirmingPaymentAsync(bookingId, cancellationToken),
             Refunds: refunds,
             HasResolvedDispute: found.HasResolvedDispute,
-            PenaltyKept: found.PenaltyKept);
+            PenaltyKept: found.PenaltyKept,
+            Disputes: await DisputesAsync(bookingId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Every dispute on the booking, live or closed, oldest first (Wave 3 C3; E2E F44), through the
+    /// <c>ix_dispute_tickets_booking</c> index. The status is read whole and named after the query: it is a stored
+    /// enumeration, not a column a projection can take the name of.
+    /// </summary>
+    private async Task<IReadOnlyList<BookingDisputeDto>> DisputesAsync(Id bookingId, CancellationToken cancellationToken)
+    {
+        var rows = await context.DisputeTickets
+            .AsNoTracking()
+            .Where(ticket => ticket.BookingId == bookingId)
+            .OrderBy(ticket => ticket.OpenedAt)
+            .ThenBy(ticket => ticket.Id)
+            .Select(ticket => new { ticket.Id, ticket.Status, ticket.OpenedAt, ticket.ClosedAt })
+            .ToListAsync(cancellationToken);
+        return rows.Select(row => new BookingDisputeDto(row.Id.Value, row.Status.Name, row.OpenedAt, row.ClosedAt)).ToList();
     }
 
     /// <summary>

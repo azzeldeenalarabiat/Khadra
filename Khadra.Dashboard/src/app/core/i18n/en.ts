@@ -608,7 +608,7 @@ export const EN = {
     "Resolving records the decision. The customer's share is refunded to their original payment method automatically; what the platform keeps and what goes to the office are settled by hand.",
   'disputeDetail.takeThisOn': 'Take this on',
   'disputeDetail.theDecisionYourNote':
-    "The customer is shown the whole decision; the rental office only its own share and any charge to it. Your note, your name and the timestamp are shown to both and written to the audit log, so leave the customer's and the platform's shares out of the note.",
+    "The customer is shown the whole decision as Khadra's: your note and the time, never your name. The rental office is shown only its own share and any charge to it, with your note, your name and the time, and all of it is written to the audit log. So leave the customer's and the platform's shares out of the note.",
   'disputeDetail.thisTicketWasWithdrawn':
     'This ticket was withdrawn by the party who opened it, so the booking settles as if no dispute had been raised.',
   'disputeDetail.transferredToTheDealer': 'Transferred to the dealer',

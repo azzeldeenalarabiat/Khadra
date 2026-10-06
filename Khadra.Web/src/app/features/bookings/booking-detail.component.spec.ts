@@ -472,6 +472,8 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
       paid: lineIn('payments-title'),
       /** The Payments section's words, history included. */
       payments: payments?.textContent ?? '',
+      /** Where each link on the page goes. */
+      links: [...page.querySelectorAll('a')].map((link) => link.getAttribute('href') ?? ''),
     };
   }
 
@@ -621,6 +623,33 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     const arabicResolved = await render(withPenaltyState('ResolvedByDispute'), 'ar');
     expect(arabicResolved.text).toContain('تم حسم هذا الجزاء من خلال نزاع. راجع قسم المدفوعات لمعرفة المبلغ النهائي.');
     expect(arabicResolved.text).not.toContain('لم يتم خصم أي مبلغ بعد');
+  });
+
+  it('links every closed dispute, decided or withdrawn, from the booking in both languages (Wave 3 C3, E2E F44)', async () => {
+    const withClosed = {
+      ...withPenaltyState('ResolvedByDispute'),
+      disputes: [
+        { ticketId: 'd-withdrawn', status: 'Withdrawn', openedAt: '2026-10-01T08:00:00+00:00', closedAt: '2026-10-01T09:00:00+00:00' },
+        { ticketId: 'd-decided', status: 'Resolved', openedAt: '2026-10-02T08:00:00+00:00', closedAt: '2026-10-03T08:00:00+00:00' },
+      ],
+    };
+    const english = await render(withClosed, 'en');
+    expect(english.text).toContain('A dispute on this booking was withdrawn on');
+    expect(english.text).toContain('A dispute on this booking was decided on');
+    expect(english.links).toEqual(expect.arrayContaining(['/en/disputes/d-withdrawn', '/en/disputes/d-decided']));
+    TestBed.resetTestingModule();
+
+    const arabic = await render(withClosed, 'ar');
+    expect(visible(arabic.text)).toContain('صدر قرار في نزاع على هذا الحجز في');
+    expect(arabic.links).toEqual(expect.arrayContaining(['/ar/disputes/d-decided']));
+    TestBed.resetTestingModule();
+
+    // A live dispute is linked as before, and not listed again among the closed ones.
+    const live = await render({ ...lateCancelled, liveDisputeId: 'd-live', disputes: [
+      { ticketId: 'd-live', status: 'Open', openedAt: '2026-10-02T08:00:00+00:00', closedAt: null },
+    ] }, 'en');
+    expect(live.text).not.toContain('was decided on');
+    expect(live.links.filter((href) => href === '/en/disputes/d-live')).toHaveLength(1);
   });
 
   it("says a penalty the ledger kept from the deposit was kept, in the owner's approved words (payments Phase 8)", async () => {

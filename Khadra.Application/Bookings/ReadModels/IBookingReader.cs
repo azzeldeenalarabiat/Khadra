@@ -128,7 +128,20 @@ public sealed record BookingContext(
     /// window closed with no dispute (payments Phase 8; owner, 2026-09-29): the other thing an assessment can
     /// become.
     /// </summary>
-    bool PenaltyKept = false);
+    bool PenaltyKept = false,
+    /// <summary>
+    /// Every dispute on this booking, live or closed, oldest first (Wave 3 C3; E2E F44). Null only where nobody
+    /// composed it.
+    /// </summary>
+    IReadOnlyList<BookingDisputeDto>? Disputes = null);
+
+/// <summary>
+/// One dispute on a booking, enough to link it (Wave 3 C3; E2E F44): a decision page used to be reachable only while
+/// its dispute was live, and only by typing its address once it closed.
+/// </summary>
+/// <param name="Status"><c>Open</c>, <c>UnderReview</c>, <c>Resolved</c> or <c>Withdrawn</c>.</param>
+/// <param name="ClosedAt">When it was resolved or withdrawn; null while it is live.</param>
+public sealed record BookingDisputeDto(Guid TicketId, string Status, DateTimeOffset OpenedAt, DateTimeOffset? ClosedAt);
 
 /// <summary>
 /// One refund, as every screen shows it (Phase 3, 2026-09-26): WHY it is owed, HOW MUCH, and WHERE it

@@ -628,6 +628,8 @@ export const AR: Record<TranslationKey, Message> = {
   'booking.cash': 'المبلغ النقدي المستلم: {amount}',
   'booking.recordedAt': 'سُجّل {date}',
   'booking.disputeOpen': 'يوجد نزاع مفتوح على هذا الحجز، وخضرا تتولّاه.',
+  'booking.disputeDecidedOn': 'صدر قرار في نزاع على هذا الحجز في {date}.',
+  'booking.disputeWithdrawnOn': 'سُحب نزاع على هذا الحجز في {date}.',
   'booking.created': 'أُرسل طلبك إلى {office}. سيردّون قبل {deadline}، وسنخبرك فور ردّهم.',
   'booking.notFoundTitle': 'الحجز غير موجود',
   'booking.notFoundText': 'قد يكون تابعًا لحساب آخر.',

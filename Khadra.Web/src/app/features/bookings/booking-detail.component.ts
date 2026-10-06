@@ -178,6 +178,8 @@ export class BookingDetailComponent {
    */
   protected readonly handover = computed(() => handoverWindow(this.view(), this.now()));
   protected readonly canShowHandover = computed(() => this.handover().kind !== null && this.handover().open);
+  /** Disputes already decided or withdrawn, oldest first: each stays one link away (Wave 3 C3, E2E F44). */
+  protected readonly closedDisputes = computed(() => (this.view()?.disputes ?? []).filter((dispute) => !!dispute.closedAt));
   protected readonly handoverOpen = signal(false);
   protected readonly handoverRecorded = signal(false);
 
