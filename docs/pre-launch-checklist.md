@@ -5463,6 +5463,15 @@ early, the booking would complete, and the office would collect a Rental payable
 property, which would read as zero on every existing booking), no return before the rental starts, and the refusal
 recorded in the app contract ledger: installed apps offer the code on every confirmed booking.
 
+**Built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The aggregate refuses a pickup before
+`PickupAvailableFrom` (= `HoldStart`) and a return before the start, whatever proved the handover, with
+`booking.pickup_too_early` / `booking.return_too_early` carrying `availableFrom`; the office handler asks the same rule
+before it checks a code, so an early attempt costs the customer no try. Both moments travel on the booking. **One part
+of the original wording is not done, by the owner's decision A2 (2026-10-06):** code ISSUANCE is not gated. Refusing
+`POST /bookings/{id}/handover-code` where installed apps used to have it answered would be breaking; an early code is
+useless, because the office cannot record anything with it, and it expires within minutes. The website and the console
+wait for the moment instead, and app 1.4.0 will.
+
 ### 226. The office is told nothing when its money changes
 
 **Status:** open · **Raised:** 2026-10-05 (E2E F58; Fix & Polish C5, Wave 3 — in-app and email, owner 2026-10-05)

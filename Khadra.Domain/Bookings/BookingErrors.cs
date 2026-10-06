@@ -203,6 +203,29 @@ public static class BookingErrors
             "booking.non_delivery_too_early",
             "The rental has not started yet, so the gallery cannot have failed to hand the car over.");
 
+    /// <summary>
+    /// A pickup recorded before the car is this booking's: before <c>Booking.PickupAvailableFrom</c>,
+    /// the rental start less the frozen turnaround (owner, 2026-10-05; E2E F51, pre-launch item 225).
+    /// </summary>
+    /// <remarks>
+    /// Carries the moment as <c>availableFrom</c>, so the console can say when instead of just "not
+    /// yet". Sent only to the rental office: the customer app never records a handover, and the code it
+    /// asks for is still issued at any time while the booking is confirmed (owner, 2026-10-06), because
+    /// refusing that request would break every installed build.
+    /// </remarks>
+    public static Error PickupTooEarly(DateTimeOffset availableFrom) =>
+        Error.Conflict("booking.pickup_too_early", "The car cannot be collected yet.") with
+        {
+            Extensions = new Dictionary<string, object?> { ["availableFrom"] = availableFrom },
+        };
+
+    /// <summary>A return recorded before the rental has started. The mirror of <see cref="PickupTooEarly"/>.</summary>
+    public static Error ReturnTooEarly(DateTimeOffset availableFrom) =>
+        Error.Conflict("booking.return_too_early", "The rental has not started yet, so the car cannot be returned.") with
+        {
+            Extensions = new Dictionary<string, object?> { ["availableFrom"] = availableFrom },
+        };
+
     public static readonly Error SettlementTooEarly =
         Error.Conflict("booking.settlement_too_early", "The post-return settlement window has not elapsed yet.");
 

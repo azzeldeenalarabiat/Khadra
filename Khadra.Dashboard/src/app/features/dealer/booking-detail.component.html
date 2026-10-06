@@ -53,16 +53,35 @@
           <span class="page-sub">{{ t('dealerBooking.yourDealershipCannotTrade') }}</span>
         }
         @if (canPickUp()) {
-          <button type="button" class="btn btn-primary btn-md" (click)="pickUp()">
+          <!-- A window you are waiting out (Wave 3 D4): the control stays, disabled, naming the moment. -->
+          <button
+            type="button"
+            class="btn btn-primary btn-md"
+            (click)="pickUp()"
+            [disabled]="!pickupWindow().open"
+            [attr.title]="pickupWindow().opensAt ? t('dealerBooking.pickupFrom', { when: dateTime(pickupWindow().opensAt!) }) : null"
+          >
             <kh-icon name="key" />
             {{ t('dealerBooking.recordPickup') }}
           </button>
+          @if (pickupWindow().opensAt; as opens) {
+            <span class="page-sub">{{ t('dealerBooking.pickupFrom', { when: dateTime(opens) }) }}</span>
+          }
         }
         @if (canReturn()) {
-          <button type="button" class="btn btn-primary btn-md" (click)="takeBack()">
+          <button
+            type="button"
+            class="btn btn-primary btn-md"
+            (click)="takeBack()"
+            [disabled]="!returnWindow().open"
+            [attr.title]="returnWindow().opensAt ? t('dealerBooking.returnFrom', { when: dateTime(returnWindow().opensAt!) }) : null"
+          >
             <kh-icon name="arrow-square-in" />
             {{ t('dealerBooking.recordReturn') }}
           </button>
+          @if (returnWindow().opensAt; as opens) {
+            <span class="page-sub">{{ t('dealerBooking.returnFrom', { when: dateTime(opens) }) }}</span>
+          }
         }
         @if (b.liveDisputeId; as ticketId) {
           <a class="btn btn-secondary btn-md s-bad" [routerLink]="['/dealer/disputes', ticketId]">

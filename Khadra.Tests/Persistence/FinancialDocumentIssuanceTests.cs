@@ -525,7 +525,7 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
     {
         // A void that read its clock before the office recorded cash, and committed after the pass had stated
         // that cash: the correction is older than the statement's coverage, so the margin alone finds it.
-        var (booking, _) = await _harness.PaidAsync(PaymentProviders.Sandbox);
+        var (booking, _) = await _harness.PaidAsync(PaymentProviders.Sandbox, start: _harness.Now.AddHours(1));
         await _harness.PassAsync();
         var receipt = (await _harness.DocumentsAsync()).Single(document => document.Type == FinancialDocumentType.PaymentReceipt);
         var cashAt = _harness.Now.AddHours(1);
@@ -781,7 +781,7 @@ public sealed class FinancialDocumentIssuanceTests : IDisposable
         // §13 scenario 6, §18): an office's location and a car edited after their documents were issued. The
         // edit is not a checkpoint, so it issues nothing and changes nothing issued; the next version — issued
         // here by cash recorded at pickup — names the office and the car as they stand then.
-        var (booking, _) = await _harness.PaidAsync(PaymentProviders.Sandbox);
+        var (booking, _) = await _harness.PaidAsync(PaymentProviders.Sandbox, start: _harness.Now.AddHours(1));
         await _harness.PassAsync();
         var issued = await _harness.DocumentsAsync();
         Assert.Equal(2, issued.Count);

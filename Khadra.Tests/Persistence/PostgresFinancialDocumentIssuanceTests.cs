@@ -32,7 +32,7 @@ public sealed class PostgresFinancialDocumentIssuanceTests
     {
         var harness = new IssuanceHarness((await FreshDatabaseAsync("issue")).Options);
         var (refunded, refundedPayment) = await harness.PaidAsync(PaymentProviders.Sandbox, inFull: true, fee: 4.5m, unique: "11111");
-        var (collected, _) = await harness.PaidAsync(PaymentProviders.Sandbox, unique: "22222");
+        var (collected, _) = await harness.PaidAsync(PaymentProviders.Sandbox, unique: "22222", start: harness.Now.AddHours(1));
 
         var first = await harness.PassAsync();
         Assert.Equal(

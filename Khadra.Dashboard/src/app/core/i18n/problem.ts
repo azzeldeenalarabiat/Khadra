@@ -179,6 +179,9 @@ const WORDED_CODES: Readonly<Record<string, TranslationKey>> = {
   'handover.not_available': 'problem.handoverNotAvailable',
   'handover.invalid_odometer': 'problem.handoverInvalidOdometer',
   'handover.invalid_fuel': 'problem.handoverInvalidFuel',
+  // The pickup and return windows (Wave 3 D4). The booking page names the moment; the refusal points to it.
+  'booking.pickup_too_early': 'problem.pickupTooEarly',
+  'booking.return_too_early': 'problem.returnTooEarly',
   // Publishing a legal text (Wave 2 G1). The screen's own form words these with the line and language of a text it
   // cannot publish; inside the confirm dialog, which a race can still reach, the sentence alone.
   'legal.label_invalid': 'legal.labelInvalid',

@@ -218,6 +218,14 @@ export interface Booking {
   readonly refundedAmount?: Money | null;
   /** What is promised back and not there yet. Absent on an older API. */
   readonly refundOutstandingAmount?: Money | null;
+  /**
+   * The earliest moment the rental office may record the pickup (Wave 3 D4, owner 2026-10-05): the rental start less
+   * the turnaround frozen on the booking. The pickup code is offered from then. Absent on an older API, which had no
+   * window.
+   */
+  readonly pickupAvailableFrom?: string | null;
+  /** The earliest moment the return may be recorded: the rental's start. The return code is offered from then. */
+  readonly returnAvailableFrom?: string | null;
 }
 
 /**

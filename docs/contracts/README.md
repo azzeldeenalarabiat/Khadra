@@ -244,6 +244,7 @@ it still refuses a broken document whole, and the stored document still carries 
 
 ## Additive changes on record
 
+- **Additive (2026-10-06, Fix & Polish Wave 3, D4):** a booking gained `pickupAvailableFrom` and `returnAvailableFrom` — the earliest moment the rental office may record the pickup (the rental start less the turnaround frozen on the booking, its `HoldStart`) and the return (the rental start). The office's `POST /bookings/{id}/pickup` and `/return` refuse an earlier handover with **409 `booking.pickup_too_early` / `booking.return_too_early`**, `availableFrom` top-level, checked before any handover code so an early attempt costs the customer no try (owner, 2026-10-05, D12; pre-launch item 225). **Not changed, deliberately (owner, 2026-10-06):** `POST /bookings/{id}/handover-code` still issues a code on any confirmed or picked-up booking, because installed builds ask for one at any time and refusing a request they used to have accepted would be breaking. An early code proves nothing, since the office cannot record anything with it, and it expires within minutes. Installed builds ignore both fields and keep offering the code; the website offers it from `pickupAvailableFrom`, and 1.4.0 will.
 Changes that needed no raised minimum, because no installed build reads or sends anything different:
 
 - **Additive (2026-09-24):** `GET /api/v1/vehicles/facets` gained `carTypes` — `{ carTypeId, listedVehicleCount, coverImageUrl }` per type, `coverImageUrl` nullable — beside `carTypeIds`, which is unchanged and still read by installed apps.

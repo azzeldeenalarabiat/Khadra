@@ -672,6 +672,9 @@ export const EN = {
   'handover.returnTitle': 'Return code',
   'handover.showPickup': 'Show my pickup code',
   'handover.showReturn': 'Show my return code',
+  // Wave 3 D4: the moment the office can record the handover, sent by the server.
+  'handover.pickupFrom': 'Your pickup code will be available from {when}, when the office can hand the car over.',
+  'handover.returnFrom': 'Your return code will be available from {when}, when the rental starts.',
   'handover.intro': 'Show this to the rental office. They scan the code or type the six digits, and your booking updates by itself.',
   'handover.privacy': 'Only show it to the rental office’s staff when they hand over the car. Getting a new code stops this one working.',
   'handover.new': 'Get a new code',

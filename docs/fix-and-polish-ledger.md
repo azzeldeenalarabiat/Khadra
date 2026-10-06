@@ -33,6 +33,18 @@ by one string inside one website test (a placeholder host), so the counts are th
 | Website: `ng test` | 35 files, 252 tests |
 | App: `flutter analyze` / `flutter test` | no issues / 719 tests |
 
+### Wave 3 baseline at `c014987` (2026-10-06)
+
+The Wave 3 branch `fix/polish-wave3` starts at `c014987`, the commit Wave 2's final regression measured and Staging
+runs, so the counts are those:
+
+| Suite | Result |
+|---|---|
+| Backend: `dotnet test Khadra.slnx`, run alone | 2,706 passed, 43 skipped (PostgreSQL-only); PostgreSQL proofs 62 of 62 |
+| Console: `ng test` | 37 files, 461 tests |
+| Website: `ng test` | 36 files, 258 tests |
+| App: `flutter analyze` / `flutter test` | no issues / 719 tests |
+
 ## 2. Contract ledger — what the API serves or accepts
 
 Installed builds: 1.2.0+3 and 1.3.0+4. The tracked minimum (`MobileApp:MinimumSupportedVersion`) is not raised in
@@ -57,6 +69,8 @@ this batch (decision D6).
 | 2 | `GET /api/v1/legal-documents/{terms|privacy}/current`: anonymous, public cache 300 s, weak ETag. The approved scope named `/legal-documents/current`; the advisor's review made it one document per call, before any app reads it | new endpoint | none until 1.4.0 reads it |
 | 2 | `legal` block on `/app-config`: each text in force and its page URLs; null when the database cannot be read ("not known", never "nothing published") | additive | none: ignored by named-key parsing |
 | 2 | `/api/v1/admin/legal-documents` (list, detail, preview, publish) | new endpoints | none: administrators only |
+| 3 | `pickupAvailableFrom` and `returnAvailableFrom` on every booking: the earliest moment the office may record the pickup (the rental start less the frozen turnaround, `Booking.HoldStart`) and the return (the rental start) | additive | none: ignored by named-key parsing |
+| 3 | `POST /bookings/{id}/pickup` before `pickupAvailableFrom` and `/return` before the rental start are refused: 409 `booking.pickup_too_early` / `booking.return_too_early`, with `availableFrom`. Checked before the handover code, so an early attempt costs the customer no try | new refusals | none: office-only endpoints. **Code issuance is unchanged** (owner, 2026-10-06, decision A2): `POST /bookings/{id}/handover-code` is still answered on any confirmed booking, because refusing a request installed apps make would be breaking |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
@@ -68,3 +82,4 @@ this batch (decision D6).
 | F10 (W1-12) | Optional: word `auth.unauthenticated` and `auth.session_invalid` in both languages; today an unmapped code shows the server's English title. |
 | F7 (W2 G1) | Link to the Terms and the Privacy notice from `/app-config.legal.documents[].pageUrls` (registration and profile), showing no link while a text has none; the consent checkbox comes with Wave 4's consent design. |
 | F48 (W2 C6) | Nothing required: a refund Khadra made already reads "Khadra: …" from data. Revisit the Arabic "Khadra" with branding in Wave 5. |
+| D4 (W3) | Offer "Show my pickup code" only from `pickupAvailableFrom`, and the return code only from `returnAvailableFrom`, saying when, as the website does; the server keeps issuing codes either way. |

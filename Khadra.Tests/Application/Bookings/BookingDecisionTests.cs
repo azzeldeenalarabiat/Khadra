@@ -356,6 +356,60 @@ public sealed class BookingDecisionTests
     }
 
     [Fact]
+    public async Task A_pickup_tried_before_the_window_is_refused_before_the_code_costs_an_attempt()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Pickup);
+        var wrong = code == "000000" ? "000001" : "000000";
+        context.Clock.UtcNow = booking.PickupAvailableFrom.AddMinutes(-1);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: wrong), CancellationToken.None);
+
+        Assert.Equal("booking.pickup_too_early", result.Error.Code);
+        Assert.Equal(booking.PickupAvailableFrom, result.Error.Extensions!["availableFrom"]);
+        Assert.Equal(0, row.FailedAttempts);
+        Assert.Same(BookingStatus.Confirmed, booking.Status);
+        await context.UnitOfWork.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_return_tried_before_the_rental_starts_is_refused_before_the_code_costs_an_attempt()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        booking.RecordPickup(BookingParty.Dealer, OwnerId, booking.PickupAvailableFrom);
+        booking.ClearDomainEvents();
+        var (code, row) = context.GivenCodeFor(booking, HandoverType.Return);
+        var wrong = code == "000000" ? "000001" : "000000";
+        context.Clock.UtcNow = booking.Period.Start.AddMinutes(-1);
+
+        var result = await context.Handlers().Handle(
+            new RecordReturnCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: wrong), CancellationToken.None);
+
+        Assert.Equal("booking.return_too_early", result.Error.Code);
+        Assert.Equal(booking.Period.Start, result.Error.Extensions!["availableFrom"]);
+        Assert.Equal(0, row.FailedAttempts);
+        Assert.Same(BookingStatus.PickedUp, booking.Status);
+    }
+
+    [Fact]
+    public async Task The_booking_tells_every_reader_when_its_pickup_and_return_may_be_recorded()
+    {
+        var context = new Context();
+        var booking = ConfirmedFor(context);
+        var (code, _) = context.GivenCodeFor(booking, HandoverType.Pickup);
+
+        var result = await context.Handlers().Handle(
+            new RecordPickupCommand(OwnerId, booking.Id, null, null, null, null, HandoverCode: code), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : null);
+        Assert.Equal(booking.HoldStart, result.Value.PickupAvailableFrom);
+        Assert.Equal(booking.Period.Start, result.Value.ReturnAvailableFrom);
+    }
+
+    [Fact]
     public async Task A_wrong_code_says_how_many_tries_the_customers_code_has_left()
     {
         var context = new Context();

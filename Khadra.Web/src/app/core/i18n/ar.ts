@@ -777,6 +777,8 @@ export const AR: Record<TranslationKey, Message> = {
   'handover.returnTitle': 'رمز الإعادة',
   'handover.showPickup': 'أظهر رمز الاستلام',
   'handover.showReturn': 'أظهر رمز الإعادة',
+  'handover.pickupFrom': 'سيتوفر رمز الاستلام ابتداءً من {when}، عندما يستطيع المكتب تسليمك السيارة.',
+  'handover.returnFrom': 'سيتوفر رمز الإعادة ابتداءً من {when}، عند بدء الإيجار.',
   'handover.intro': 'أظهر هذا الرمز لمكتب التأجير. يمسحون الرمز أو يُدخلون الأرقام الستة، ويتحدّث حجزك تلقائيًا.',
   'handover.privacy': 'لا تُظهره إلا لموظفي مكتب التأجير عند تسليم السيارة. الحصول على رمز جديد يوقف هذا الرمز.',
   'handover.new': 'احصل على رمز جديد',

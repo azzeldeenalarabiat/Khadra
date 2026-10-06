@@ -758,6 +758,9 @@ export const EN = {
   'dealerBooking.pickup': 'Pickup',
   'dealerBooking.recordPickup': 'Record pickup',
   'dealerBooking.recordReturn': 'Record return',
+  // The pickup and return windows (Wave 3 D4, owner 2026-10-05): the server sends each moment; the console only says it.
+  'dealerBooking.pickupFrom': 'Pickup can be recorded from {when}.',
+  'dealerBooking.returnFrom': 'The return can be recorded from {when}, when the rental starts.',
   'dealerBooking.rental': 'Rental',
   'dealerBooking.rulesVersion': 'Rules version',
   'dealerBooking.sayWhatHappenedWith':
@@ -2287,6 +2290,8 @@ export const EN = {
   'problem.handoverNotAvailable': 'There is no handover to record on this booking right now. Reload the page.',
   'problem.handoverInvalidOdometer': 'The odometer reading cannot be negative.',
   'problem.handoverInvalidFuel': 'The fuel level must be between 0 (empty) and 1 (full).',
+  'problem.pickupTooEarly': 'It is too early to record this pickup. The booking shows when it can be recorded.',
+  'problem.returnTooEarly': 'The rental has not started yet, so its return cannot be recorded. The booking shows when it can be.',
   'common.customerAccountClosed': 'Customer account closed',
   'common.dealerNoLongerOnPlatform': 'Dealer no longer on the platform',
   'common.accountClosed': 'Account closed',

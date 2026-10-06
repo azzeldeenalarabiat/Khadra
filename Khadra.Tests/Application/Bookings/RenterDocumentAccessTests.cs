@@ -190,7 +190,7 @@ public sealed class RenterDocumentAccessTests
         // one nothing covers.
         var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
-        booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, Now);
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, booking.PickupAvailableFrom).IsSuccess);
         context.Given(booking);
 
         var result = await context.Handlers().Handle(
@@ -266,8 +266,8 @@ public sealed class RenterDocumentAccessTests
         // goes through the ticket and an administrator.
         var context = new RenterDocumentFixture();
         var booking = Confirmed(context);
-        booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, Now);
-        booking.RecordReturn(BookingParty.Dealer, context.OwnerUserId, Now.AddDays(1));
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, booking.PickupAvailableFrom).IsSuccess);
+        Assert.True(booking.RecordReturn(BookingParty.Dealer, context.OwnerUserId, booking.Period.Start.AddDays(1)).IsSuccess);
         context.Given(booking);
 
         var result = await context.Handlers().Handle(

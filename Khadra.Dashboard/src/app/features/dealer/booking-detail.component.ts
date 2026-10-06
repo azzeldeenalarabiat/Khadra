@@ -31,6 +31,7 @@ import { MoneyFormat, penaltyStandingKey } from '../../core/i18n/money-words';
 import { confirmedStepKey } from './booking-payment.presenter';
 import { officeMoney } from './office-money.presenter';
 import { toRenterDocumentsPanel } from './renter-documents.presenter';
+import { handoverWindow, msUntilNextOpening } from './handover-window.presenter';
 
 /**
  * The history steps this screen words as more than a status's name: who is waiting on whom, the
@@ -87,6 +88,14 @@ export class DealerBookingDetailComponent {
       this.bookingId();
       this.revealed.set(new Set());
       this.brokenPreviews.set(new Set());
+    });
+    // A page left open over the moment a pickup or return window opens enables its button then,
+    // without a reload: one timer, to the soonest moment still ahead, re-read when the booking changes.
+    effect((onCleanup) => {
+      const wait = msUntilNextOpening([this.pickupWindow(), this.returnWindow()], Date.now());
+      if (wait === null) return;
+      const timer = setTimeout(() => this.clock.set(Date.now()), wait + 500);
+      onCleanup(() => clearTimeout(timer));
     });
   }
 
@@ -587,6 +596,15 @@ export class DealerBookingDetailComponent {
   // Not Approved: the deposit has to have cleared before a car leaves the lot.
   protected readonly canPickUp = computed(() => this.booking()?.status === 'Confirmed');
   protected readonly canReturn = computed(() => this.booking()?.status === 'PickedUp');
+  /** This browser's clock, re-read when a window opens (see the constructor), never on a fast tick. */
+  private readonly clock = signal(Date.now());
+  // Wave 3 D4: the moments are the SERVER's; a button waits for its moment, disabled, saying when.
+  protected readonly pickupWindow = computed(() =>
+    handoverWindow(this.booking()?.pickupAvailableFrom, this.clock()),
+  );
+  protected readonly returnWindow = computed(() =>
+    handoverWindow(this.booking()?.returnAvailableFrom, this.clock()),
+  );
   protected readonly canDispute = computed(
     () => !!this.booking()?.canBeDisputed && !this.booking()?.liveDisputeId,
   );

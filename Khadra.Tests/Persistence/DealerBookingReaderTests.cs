@@ -75,7 +75,7 @@ public sealed class DealerBookingReaderTests : IDisposable
     private static void Collect(Booking booking, DateTimeOffset at)
     {
         Reserve(booking);
-        booking.RecordPickup(BookingParty.Dealer, Id.New(), at);
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, Id.New(), at).IsSuccess);
     }
 
     /// <summary>Approved and paid, but not collected: a claim on the dates, car still on the lot.</summary>
@@ -100,14 +100,14 @@ public sealed class DealerBookingReaderTests : IDisposable
         Assert.Contains(late.VehicleId.Value, held);
     }
 
-    /// <summary>RecordPickup has no time guard, so a car can leave before its period starts.</summary>
+    /// <summary>A pickup may be recorded from the booking's HoldStart (Wave 3 D4), so a car can leave before its period starts.</summary>
     [Fact]
     public async Task A_car_collected_early_is_held_from_the_moment_it_leaves()
     {
         var start = Build.Now.AddDays(7);
-        var early = Theirs(start, booking => Collect(booking, start.AddDays(-1)));
+        var early = Theirs(start, booking => Collect(booking, start.AddHours(-1)));
 
-        var held = await HeldAsync(start.AddHours(-12), early);
+        var held = await HeldAsync(start.AddMinutes(-30), early);
 
         Assert.Contains(early.VehicleId.Value, held);
     }

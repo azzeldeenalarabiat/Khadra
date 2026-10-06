@@ -294,10 +294,17 @@ internal sealed class IssuanceHarness(DbContextOptions<KhadraDbContext> options)
     }
 
     /// <summary>A booking paid the way production pays, with real parties saved beside it.</summary>
-    public async Task<(Booking Booking, Payment Payment)> PaidAsync(string provider, bool inFull = false, decimal fee = 0m, string unique = "")
+    public async Task<(Booking Booking, Payment Payment)> PaidAsync(string provider, bool inFull = false, decimal fee = 0m, string unique = "", DateTimeOffset? start = null)
     {
         var (customer, dealer, vehicle) = await PartiesAsync(unique);
-        var booking = Build.Booking(Now, customerId: customer.Id, dealerId: dealer.Id, vehicleId: vehicle.Id);
+        // `start` puts the rental within reach of the clock, for a test that records a handover: a pickup may be
+        // recorded only from the booking's HoldStart (Wave 3 D4). Left out, the rental starts a week ahead.
+        var booking = Build.Booking(
+            Now,
+            period: start is null ? null : Build.Period(start.Value),
+            customerId: customer.Id,
+            dealerId: dealer.Id,
+            vehicleId: vehicle.Id);
         if (booking.Approve(Id.New(), Now).IsFailure)
             throw new InvalidOperationException("The test booking could not be approved.");
         var part = inFull ? booking.Pricing.TotalPrice : booking.Pricing.DepositAmount;

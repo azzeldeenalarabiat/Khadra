@@ -62,8 +62,8 @@ public sealed class RenterDocumentReviewTests
         // well as in the handler so the two cannot drift: recording a check of something you can no
         // longer open would be writing a claim you cannot support.
         var booking = Build.ConfirmedBooking(Now);
-        booking.RecordPickup(BookingParty.Dealer, Reviewer, Now);
-        booking.RecordReturn(BookingParty.Dealer, Reviewer, Now.AddDays(1));
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, Reviewer, booking.PickupAvailableFrom).IsSuccess);
+        Assert.True(booking.RecordReturn(BookingParty.Dealer, Reviewer, booking.Period.Start.AddDays(1)).IsSuccess);
 
         var result = Record(booking, Id.New(), Now.AddDays(-1), Now.AddDays(2));
 

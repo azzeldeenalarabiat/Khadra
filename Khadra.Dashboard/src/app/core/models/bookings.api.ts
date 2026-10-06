@@ -157,6 +157,14 @@ export interface Booking {
   readonly refundedAmount?: Money | null;
   /** What is promised back and not there yet: the server's total. */
   readonly refundOutstandingAmount?: Money | null;
+  /**
+   * The earliest moment the pickup may be recorded: the rental start less the turnaround frozen on
+   * the booking (Wave 3 D4, owner 2026-10-05). The server's rule, never worked out here. Absent on an
+   * older API, where no window applied.
+   */
+  readonly pickupAvailableFrom?: string | null;
+  /** The earliest moment the return may be recorded: the rental's start. */
+  readonly returnAvailableFrom?: string | null;
 }
 
 /** One refund: why it is owed, how much, and where it is. The provider's references stay on the server. */

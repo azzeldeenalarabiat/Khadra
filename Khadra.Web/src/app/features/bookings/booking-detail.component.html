@@ -190,7 +190,7 @@
     </section>
 
     <!-- What the customer can do now -->
-    @if ((canShowHandover() && !handoverOpen()) || b.cancellation.canCancel) {
+    @if ((canShowHandover() && !handoverOpen()) || handover().opensAt || b.cancellation.canCancel) {
       <section class="card card--pad" aria-labelledby="actions-title">
         <h2 id="actions-title" class="card__title">{{ i18n.t('booking.actions') }}</h2>
         <div class="row">
@@ -202,6 +202,10 @@
             <button type="button" class="btn btn--danger" (click)="openCancel()">{{ i18n.t('cancel.title') }}</button>
           }
         </div>
+        <!-- Wave 3 D4: the office cannot record the handover before this moment, so the code is offered from then. -->
+        @if (handover().opensAt; as opens) {
+          <p class="muted">{{ i18n.t(handover().kind === 'Return' ? 'handover.returnFrom' : 'handover.pickupFrom', { when: format.dateTime(opens) }) }}</p>
+        }
       </section>
     }
     @if (handoverOpen()) {

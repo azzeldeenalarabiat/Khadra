@@ -214,8 +214,8 @@ public sealed class RenterDocumentReviewTests
     {
         var context = new RenterDocumentFixture();
         var booking = context.ConfirmedBooking();
-        booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, Now);
-        booking.RecordReturn(BookingParty.Dealer, context.OwnerUserId, Now.AddDays(1));
+        Assert.True(booking.RecordPickup(BookingParty.Dealer, context.OwnerUserId, booking.PickupAvailableFrom).IsSuccess);
+        Assert.True(booking.RecordReturn(BookingParty.Dealer, context.OwnerUserId, booking.Period.Start.AddDays(1)).IsSuccess);
         context.Given(booking);
         var licence = context.LicenceFront();
 

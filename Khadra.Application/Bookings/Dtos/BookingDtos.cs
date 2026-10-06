@@ -153,7 +153,19 @@ public sealed record BookingDto(
     /// What is promised back and not there yet — requested, sent, or refused and being sent again — in
     /// the booking's currency. Zero when nothing is. Added 2026-09-26, last.
     /// </summary>
-    MoneyDto? RefundOutstandingAmount = null)
+    MoneyDto? RefundOutstandingAmount = null,
+    /// <summary>
+    /// The earliest moment the rental office may record the pickup: the rental start less the frozen
+    /// turnaround (Booking.PickupAvailableFrom; owner, 2026-10-05). Added 2026-10-06, last.
+    /// </summary>
+    /// <remarks>
+    /// The server states the rule so no screen works it out. The office console disables its pickup
+    /// button until then; the website shows the customer's pickup code from then. Installed apps ignore
+    /// it and keep offering the code, which is still issued.
+    /// </remarks>
+    DateTimeOffset? PickupAvailableFrom = null,
+    /// <summary>The earliest moment the return may be recorded: the rental's start. Added 2026-10-06, last.</summary>
+    DateTimeOffset? ReturnAvailableFrom = null)
 {
     /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
     /// <remarks>
@@ -254,7 +266,9 @@ public sealed record BookingDto(
             context.ConfirmingPayment,
             context.Refunds ?? [],
             RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: true),
-            RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: false));
+            RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: false),
+            booking.PickupAvailableFrom,
+            booking.ReturnAvailableFrom);
     }
 
     /// <summary>

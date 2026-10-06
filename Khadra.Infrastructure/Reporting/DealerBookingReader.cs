@@ -136,8 +136,9 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
         //   too. The car is physically with the customer, so the dates cannot decide it:
         //     * an overdue return (End < now) dropped out and the dashboard called the car
         //       available, on the same payload that was reporting it under "1 overdue";
-        //     * a car handed over the evening before its period starts (Start > now -- RecordPickup
-        //       has no time guard, deliberately) dropped out the same way.
+        //     * a car handed over shortly before its period starts (Start > now -- a pickup may be
+        //       recorded from the booking's HoldStart, up to the turnaround buffer early) dropped out
+        //       the same way.
         //   Both are exactly the days a dealer looks at this figure. PickedUp holds, full stop.
         var pickedUp = BookingStatus.PickedUp;
 

@@ -208,6 +208,11 @@ public sealed class BookingDecisionHandlers(
         // second press of the button says "already picked up", not "that code was used".
         if (booking.Status != BookingStatus.Confirmed)
             return booking.RecordPickup(BookingParty.Dealer, request.ActorUserId, clock.UtcNow).Error;
+        // Then the window, still before the code: proving a code commits a wrong guess at once, so a
+        // pickup tried too early must be refused before it can cost the customer an attempt.
+        var window = booking.PickupWindowOpenAt(clock.UtcNow);
+        if (window.IsFailure)
+            return window.Error;
 
         var previous = booking.Status.Name;
         var proof = await handovers.ProveAsync(
@@ -243,6 +248,9 @@ public sealed class BookingDecisionHandlers(
 
         if (booking.Status != BookingStatus.PickedUp)
             return booking.RecordReturn(BookingParty.Dealer, request.ActorUserId, clock.UtcNow).Error;
+        var window = booking.ReturnWindowOpenAt(clock.UtcNow);
+        if (window.IsFailure)
+            return window.Error;
 
         var previous = booking.Status.Name;
         var proof = await handovers.ProveAsync(

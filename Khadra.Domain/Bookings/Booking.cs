@@ -50,6 +50,24 @@ public sealed class Booking : AggregateRoot
     /// overlapping.
     /// </remarks>
     public DateTimeOffset HoldStart { get; private set; }
+
+    /// <summary>
+    /// The earliest moment a pickup may be recorded: the instant this booking claims the car,
+    /// <see cref="HoldStart"/> (owner, 2026-10-05; E2E F51, pre-launch item 225).
+    /// </summary>
+    /// <remarks>
+    /// Before it the car is not yet this booking's, so a pickup recorded then would describe a rental
+    /// that has not begun — and, followed by a return, would complete the booking and earn the office a
+    /// rental payable for a rental that never happened. No new frozen number: the turnaround buffer is
+    /// already frozen on <see cref="Terms"/>, and an extension, whose hold carries no buffer, may be
+    /// collected from its own start. Not mapped; it is <see cref="HoldStart"/> under the name a
+    /// handover reads.
+    /// </remarks>
+    public DateTimeOffset PickupAvailableFrom => HoldStart;
+
+    /// <summary>The earliest moment a return may be recorded: the rental's own start.</summary>
+    public DateTimeOffset ReturnAvailableFrom => Period.Start;
+
     public PickupMethod PickupMethod { get; private set; } = null!;
     public GeoPoint? DeliveryLocation { get; private set; }
     public BookingPricing Pricing { get; private set; } = null!;
@@ -913,6 +931,11 @@ public sealed class Booking : AggregateRoot
             return BookingErrors.NotConfirmed;
         if (_handovers.Any(handover => handover.Type == HandoverType.Pickup))
             return BookingErrors.HandoverAlreadyRecorded;
+        // Whatever proved it: a code, an unverified handover with a reason, or none required. The
+        // window is about time, not about who was believed.
+        var window = PickupWindowOpenAt(now);
+        if (window.IsFailure)
+            return window.Error;
 
         var record = HandoverRecord.Create(
             Id, HandoverType.Pickup, recordedBy, recordedByUserId, now,
@@ -942,6 +965,9 @@ public sealed class Booking : AggregateRoot
             return BookingErrors.NotPickedUp;
         if (_handovers.Any(handover => handover.Type == HandoverType.Return))
             return BookingErrors.HandoverAlreadyRecorded;
+        var window = ReturnWindowOpenAt(now);
+        if (window.IsFailure)
+            return window.Error;
 
         var record = HandoverRecord.Create(
             Id, HandoverType.Return, recordedBy, recordedByUserId, now,
@@ -955,6 +981,29 @@ public sealed class Booking : AggregateRoot
         AddDomainEvent(new BookingReturned(Id, VehicleId, now));
         return record.Value;
     }
+
+    /// <summary>
+    /// Whether a pickup may be recorded at <paramref name="now"/>: refused before
+    /// <see cref="PickupAvailableFrom"/> with <c>booking.pickup_too_early</c>, which names that moment.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="RecordPickup"/> applies it, and the office's handler asks it BEFORE a handover code
+    /// is checked, so a code typed too early is refused without costing the customer one of their
+    /// attempts. One rule, read in both places, so the two cannot drift apart.
+    /// </remarks>
+    public UnitResult<Error> PickupWindowOpenAt(DateTimeOffset now) =>
+        now < PickupAvailableFrom
+            ? UnitResult.Failure(BookingErrors.PickupTooEarly(PickupAvailableFrom))
+            : UnitResult.Success<Error>();
+
+    /// <summary>
+    /// Whether a return may be recorded at <paramref name="now"/>: refused before the rental starts,
+    /// with <c>booking.return_too_early</c>.
+    /// </summary>
+    public UnitResult<Error> ReturnWindowOpenAt(DateTimeOffset now) =>
+        now < ReturnAvailableFrom
+            ? UnitResult.Failure(BookingErrors.ReturnTooEarly(ReturnAvailableFrom))
+            : UnitResult.Success<Error>();
 
     // The quiet path to Completed: the settlement window passed and nobody raised a dispute.
     // `hasOpenDispute` is supplied by the application layer, because tickets live in another context.

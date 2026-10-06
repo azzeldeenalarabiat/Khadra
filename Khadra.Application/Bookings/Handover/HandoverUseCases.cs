@@ -27,9 +27,12 @@ public sealed record IssueHandoverCodeCommand(Id BookingId) : ICommand<Result<Ha
 /// <para>
 /// <b>Which handover is decided by the booking</b>, never by the caller: Confirmed means the car is
 /// waiting to be collected, PickedUp means it is out and coming back. Any other status has nothing to
-/// prove and is refused. A code is available the whole time the booking is Confirmed rather than only
-/// near the start, because the dealer may hand the car over early and the code must never be stricter
-/// than the handover it proves.
+/// prove and is refused. A code is issued the whole time the booking is Confirmed, even before the
+/// pickup window opens. That is deliberate (owner, 2026-10-06): installed customer apps ask for it on
+/// any confirmed booking, and refusing a request they used to have accepted would break every one of
+/// them. The window is enforced where it protects something instead — the office cannot RECORD a
+/// pickup before <c>Booking.PickupAvailableFrom</c> or a return before the start — so an early code
+/// proves nothing, and it expires within minutes anyway. The website hides it until the window opens.
 /// </para>
 /// <para>
 /// <b>Asking again replaces the code.</b> The previous one stops working at once, so a screenshot a

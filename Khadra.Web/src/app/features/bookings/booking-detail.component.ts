@@ -31,6 +31,7 @@ import { StatePanelComponent } from '../../shared/state/state-panel.component';
 import { LIFECYCLE, byWhom, countdownText, partyLabel, stageLabel, statusLabel, statusTone } from './booking-presentation';
 import { countdownParts } from './countdown';
 import { HandoverCodeComponent } from './handover-code.component';
+import { handoverWindow } from './handover-window';
 import { chosenOption } from './payment-choice';
 import { BookingPaymentsComponent } from './booking-payments.component';
 import { httpData } from '../../core/http/http-data';
@@ -171,7 +172,12 @@ export class BookingDetailComponent {
     return [b.status, b.depositPaid, b.isPaidInFull ?? false, refunds, b.handovers.length, b.liveDisputeId ?? ''].join('|');
   });
 
-  protected readonly canShowHandover = computed(() => ['Confirmed', 'PickedUp'].includes(this.view()?.status ?? ''));
+  /**
+   * The code this booking waits for and whether the office could use it yet (Wave 3 D4): a pickup from the booking's
+   * pickupAvailableFrom, a return from the rental start — the server's moments, read against this page's clock.
+   */
+  protected readonly handover = computed(() => handoverWindow(this.view(), this.now()));
+  protected readonly canShowHandover = computed(() => this.handover().kind !== null && this.handover().open);
   protected readonly handoverOpen = signal(false);
   protected readonly handoverRecorded = signal(false);
 
