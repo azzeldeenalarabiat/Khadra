@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AR } from './ar';
-import { EN } from './en';
+import { EN, TranslationKey } from './en';
 import { Message } from './language';
 
 /**
@@ -118,5 +118,46 @@ describe('translation dictionaries', () => {
 
     expect(arabic).toBe('باللغة الإنجليزية');
     expect(english).toBe('shown in Arabic');
+  });
+});
+
+/**
+ * Office copy that states a rule (Wave 3: checklist 168 and 185, E2E F22 and F24). Each said something that stopped
+ * being true when the rule moved, and went on saying it: the free-cancellation window "starts now" at approval, and a
+ * request "expires when its rental date arrives". Neither sentence carries a number, so neither can go stale that way.
+ */
+describe('office copy that states a rule', () => {
+  const text = (dictionary: typeof EN | typeof AR, key: TranslationKey) => dictionary[key] as string;
+  const EXPIRY: TranslationKey[] = [
+    'dealerDashboard.aRequestExpiresWhen',
+    'dealerDash.oldestMadeExpiry',
+    'notifications.aRequestExpiresWhen',
+    'notifications.oldestAndExpiry',
+    'dealerBookings.onceYourVehiclesAre',
+  ];
+
+  it('opens the free-cancellation window at payment, and holds the car to the payment deadline', () => {
+    expect(text(EN, 'dealerDecide.approve.body')).toContain('free-cancellation window opens when they pay');
+    expect(text(EN, 'dealerDecide.approve.body')).toContain('payment deadline');
+    expect(text(EN, 'dealerDecide.approve.body')).not.toContain('starts now');
+    expect(text(AR, 'dealerDecide.approve.body')).toContain('مهلة الإلغاء المجاني للعميل عند الدفع');
+    expect(text(AR, 'dealerDecide.approve.body')).toContain('مهلة الدفع');
+    expect(text(AR, 'dealerDecide.approve.body')).not.toContain('من الآن');
+  });
+
+  it('expires a request at its answer deadline, not at its rental date', () => {
+    for (const key of EXPIRY) {
+      expect(text(EN, key), key).toMatch(/answer deadline|expires \{deadline\}/);
+      expect(text(EN, key), key).not.toMatch(/rental date|before pickup/);
+      expect(text(AR, key), key).toMatch(/مهلة الرد|ينتهي \{deadline\}/);
+      expect(text(AR, key), key).not.toMatch(/تاريخ (الإيجار|تأجيره|التأجير)/);
+    }
+  });
+
+  it('writes no business number into either rule', () => {
+    for (const key of ['dealerDecide.approve.body', ...EXPIRY] as TranslationKey[]) {
+      expect(text(EN, key), key).not.toMatch(/[0-9]/);
+      expect(text(AR, key), key).not.toMatch(/[0-9٠-٩]/);
+    }
   });
 });

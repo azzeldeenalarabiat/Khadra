@@ -1,3 +1,4 @@
+using Khadra.Application.Bookings.ReadModels;
 using Khadra.Application.Common;
 using Khadra.Domain.Bookings;
 using Khadra.Domain.Common;
@@ -234,16 +235,104 @@ public sealed class DealerBookingReaderTests : IDisposable
         await using var read = new KhadraDbContext(_options);
         var entries = (await new DealerBookingReader(read).ActivityAsync(_dealerId, PageRequest.From(1, 50))).Items;
 
-        var byFormer = Assert.Single(entries, entry => entry.BookingId == approvedByFormer.Id.Value);
+        // The office's own changes: each booking's request is the customer's, and is listed too (F27).
+        bool Office(DealerActivityEntry entry) => entry.ActorParty == BookingParty.Dealer.Name;
+
+        var byFormer = Assert.Single(entries, entry => entry.BookingId == approvedByFormer.Id.Value && Office(entry));
         Assert.Equal(former.Id.Value, byFormer.ActorUserId);
         Assert.Null(byFormer.ActorName);
 
-        var byCurrent = Assert.Single(entries, entry => entry.BookingId == approvedByCurrent.Id.Value);
+        var byCurrent = Assert.Single(entries, entry => entry.BookingId == approvedByCurrent.Id.Value && Office(entry));
         Assert.Equal(current.Name.Value, byCurrent.ActorName);
 
-        var byOffice = Assert.Single(entries, entry => entry.BookingId == cancelledByOffice.Id.Value);
+        var byOffice = Assert.Single(entries, entry => entry.BookingId == cancelledByOffice.Id.Value && Office(entry));
         Assert.Null(byOffice.ActorUserId);
         Assert.Null(byOffice.ActorName);
+    }
+
+    // ── Every change, whoever made it (E2E F27, Fix & Polish Wave 3) ─────────────────────────────
+    //
+    // Activity promised "every change on your bookings" and listed only the office's own: a
+    // customer's cancellation, a payment and an expiry never appeared. It lists them all now, and
+    // names a person only on the office's own changes -- the customer is "the customer" and the
+    // platform "Khadra" to an office, and an administrator's identity is not the office's to read.
+
+    [Fact]
+    public async Task Activity_lists_every_change_and_names_a_person_only_on_the_offices_own()
+    {
+        var staff = Build.Customer(email: "staff@example.jo", phone: "0794443324");
+        var renter = Build.Customer(email: "renter@example.jo", phone: "0794443325");
+        // A real account with a name, so a lookup that should not happen would be seen to.
+        var administrator = Build.Customer(email: "administrator@example.jo", phone: "0794443326");
+        var start = Build.Now.AddDays(3);
+        var cancelledByRenter = BookedBy(
+            renter.Id,
+            start,
+            booking => booking.Cancel(BookingParty.Customer, renter.Id, "Plans changed.", start.AddDays(-1).AddMinutes(5)));
+        var lapsed = BookedBy(renter.Id, start.AddDays(1), booking => booking.ExpireUnanswered(booking.DecisionDeadline));
+        var cancelledByKhadra = BookedBy(
+            renter.Id,
+            start.AddDays(2),
+            booking => booking.Cancel(BookingParty.Admin, administrator.Id, "The listing was withdrawn.", start.AddDays(1).AddMinutes(5)));
+        var approved = BookedBy(renter.Id, start.AddDays(3), booking => booking.Approve(staff.Id, start.AddDays(2).AddMinutes(5)));
+
+        await SaveAsync([staff, renter, administrator], cancelledByRenter, lapsed, cancelledByKhadra, approved);
+
+        await using var read = new KhadraDbContext(_options);
+        var entries = (await new DealerBookingReader(read).ActivityAsync(_dealerId, PageRequest.From(1, 50))).Items;
+
+        // Four requests and four answers to them.
+        Assert.Equal(8, entries.Count);
+        Assert.All(
+            entries.Where(entry => entry.ToStatus == BookingStatus.Requested.Name),
+            entry =>
+            {
+                Assert.Equal(BookingParty.Customer.Name, entry.ActorParty);
+                Assert.Null(entry.ActorUserId);
+                Assert.Null(entry.ActorName);
+            });
+
+        var byRenter = Assert.Single(entries, entry => entry.BookingId == cancelledByRenter.Id.Value && entry.ToStatus == BookingStatus.Cancelled.Name);
+        Assert.Equal(BookingParty.Customer.Name, byRenter.ActorParty);
+        Assert.Null(byRenter.ActorUserId);
+        Assert.Null(byRenter.ActorName);
+        Assert.Equal("Plans changed.", byRenter.Reason);
+
+        var expiry = Assert.Single(entries, entry => entry.BookingId == lapsed.Id.Value && entry.ToStatus == BookingStatus.Expired.Name);
+        Assert.Equal(BookingParty.System.Name, expiry.ActorParty);
+        Assert.Equal(BookingStatus.Requested.Name, expiry.FromStatus);
+
+        var byKhadra = Assert.Single(entries, entry => entry.BookingId == cancelledByKhadra.Id.Value && entry.ToStatus == BookingStatus.Cancelled.Name);
+        Assert.Equal(BookingParty.Admin.Name, byKhadra.ActorParty);
+        Assert.Null(byKhadra.ActorUserId);
+        Assert.Null(byKhadra.ActorName);
+        // A reason Khadra gives on a cancellation is shown to both parties.
+        Assert.Equal("The listing was withdrawn.", byKhadra.Reason);
+
+        var byStaff = Assert.Single(entries, entry => entry.BookingId == approved.Id.Value && entry.ToStatus == BookingStatus.Approved.Name);
+        Assert.Equal(BookingParty.Dealer.Name, byStaff.ActorParty);
+        Assert.Equal(staff.Id.Value, byStaff.ActorUserId);
+        Assert.Equal(staff.Name.Value, byStaff.ActorName);
+    }
+
+    [Fact]
+    public async Task A_member_of_staffs_own_record_holds_only_what_they_did_for_the_office()
+    {
+        var staff = Build.Customer(email: "staffer@example.jo", phone: "0794443327");
+        var start = Build.Now.AddDays(3);
+        // The same account as a booking's customer: its request is not office work, though the id matches.
+        var requestedByThem = BookedBy(staff.Id, start, null);
+        var approvedByThem = Theirs(start.AddDays(1), booking => booking.Approve(staff.Id, start));
+
+        await SaveAsync([staff], requestedByThem, approvedByThem);
+
+        await using var read = new KhadraDbContext(_options);
+        var mine = (await new DealerBookingReader(read).ActivityAsync(_dealerId, PageRequest.From(1, 50), staff.Id)).Items;
+
+        var only = Assert.Single(mine);
+        Assert.Equal(approvedByThem.Id.Value, only.BookingId);
+        Assert.Equal(BookingStatus.Approved.Name, only.ToStatus);
+        Assert.Equal(staff.Name.Value, only.ActorName);
     }
 
     /// <summary>A booking of this dealer's made by one particular customer.</summary>

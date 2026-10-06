@@ -1200,7 +1200,7 @@ export const AR = {
   'dealerDecide.reason.other': 'سبب آخر',
   'dealerDecide.approve.title': 'الموافقة على الحجز {reference}؟',
   'dealerDecide.approve.body':
-    'سيُبلَّغ {customer} وتُحجز السيارة لهذه التواريخ. وتبدأ مهلة الإلغاء المجاني للعميل من الآن.',
+    'سيُبلَّغ {customer}، وتبقى السيارة محجوزة لهذه التواريخ بانتظار الدفع. وإن لم يُدفَع الحجز قبل انتهاء مهلة الدفع، ينتهي وتعود السيارة متاحة. وتبدأ مهلة الإلغاء المجاني للعميل عند الدفع.',
   'dealerDecide.approve.noteLabel': 'ملاحظة للعميل (اختياري)',
   'dealerDecide.approve.notePlaceholder': 'تعليمات الاستلام، أو موعد التوصيل…',
   'dealerDecide.approve.noteHint': 'تُسجَّل على الحجز باسمك، ويستطيع العميل قراءتها.',
@@ -1358,9 +1358,10 @@ export const AR = {
   'customersList.couldntLoadTheCustomers': 'تعذّر تحميل قائمة العملاء',
   'customersList.joined': 'تاريخ الانضمام',
   'dealerBookings.onceYourVehiclesAre':
-    'بعد نشر سياراتك، تصل طلبات حجز العملاء إلى هنا. أجب عن الطلب قبل حلول تاريخ التأجير، وإلا انتهت صلاحيته.',
+    'بعد نشر سياراتك، تصل طلبات حجز العملاء إلى هنا. أجب عن كل طلب قبل انتهاء مهلة الرد المبيَّنة في الحجز، وإلا انتهت صلاحيته.',
   'dealerBookings.noBookingsMatchThis': 'لا توجد حجوزات تطابق هذا التبويب الآن.',
-  'dealerDashboard.aRequestExpiresWhen': 'ينتهي الطلب إذا حلّ تاريخ تأجيره دون إجابة',
+  'dealerDashboard.aRequestExpiresWhen':
+    'ينتهي الطلب الذي لا يُجاب عنه عند انتهاء مهلة الرد المبيَّنة في الحجز',
   'dealerDashboard.upcomingPickups': 'عمليات التسليم القادمة',
   'dealerDashboard.noPickupsDueIn': 'لا توجد عمليات تسليم مستحقة في هذه المدة.',
   'dealerDashboard.upcomingReturns': 'عمليات الإعادة القادمة',
@@ -1372,7 +1373,7 @@ export const AR = {
   'dealerDashboard.recentActivity': 'النشاط الأخير',
   'dealerDashboard.viewAll': 'عرض الكل',
   'dealerDashboard.bookingDecisionsAndHandovers':
-    'ستظهر هنا قرارات الحجز وعمليات التسليم التي تجريها أنت وموظفوك.',
+    'ستظهر هنا التغييرات على حجوزاتك: الطلبات والمدفوعات وردودك وعمليات التسليم.',
   'dealerDelivery.deliveryCanBeChanged': 'يمكن تغيير إعدادات التوصيل بعد اعتماد مكتبك وبدء عمله.',
   'dealerDelivery.onlyTheDealerOwner':
     'لا يستطيع تغيير إعدادات التوصيل إلا صاحب المكتب. ويمكنك الاطّلاع عليها هنا.',
@@ -1868,11 +1869,10 @@ export const AR = {
   'fleetList.onlyDealerStaffCan': 'موظفو المكاتب وحدهم يديرون الأسطول.',
   'fleetList.yourFleetCouldNot': 'تعذّر تحميل أسطولك. لم يتغيّر شيء.',
   'dealerActivity.activityCouldNotBe': 'تعذّر تحميل النشاط. لم يتغيّر شيء.',
-  'dealerActivity.requestedAwaitingYourAnswer': 'مطلوب — بانتظار ردّك',
-  'dealerActivity.approvedAwaitingPayment': 'مقبول — بانتظار الدفع',
   'dealerActivity.paymentReceivedBookingConfirmed': 'وصلت الدفعة — تأكّد الحجز',
   'dealerActivity.markedNoShow': 'سُجِّل عدم حضور',
   'dealerActivity.expiredUnanswered': 'انتهت المدة دون رد',
+  'dealerActivity.expiredUnpaid': 'انتهت المدة دون دفع',
   'dealerDispute.thatDisputeIsNot': 'هذا النزاع ليس من نزاعاتك، أو لم يعد موجوداً.',
   'dealerDispute.theDisputeCouldNot': 'تعذّر تحميل النزاع. لم يتغيّر شيء.',
   'dealerDispute.statementAdded': 'أُضيفت الإفادة',
@@ -1979,8 +1979,8 @@ export const AR = {
     other: '{count} طلب حجز بالانتظار',
   },
   'notifications.pastTheEndOf': 'تجاوزت نهاية مدة الإيجار ولم تُعَد بعد.',
-  'notifications.aRequestExpiresWhen': 'ينتهي الطلب عند حلول تاريخ الإيجار دون رد.',
-  'notifications.oldestAndExpiry': 'أقدمها {when}. وينتهي الطلب عند حلول تاريخ الإيجار دون رد.',
+  'notifications.aRequestExpiresWhen': 'ينتهي الطلب الذي لا يُجاب عنه عند انتهاء مهلة الرد.',
+  'notifications.oldestAndExpiry': 'أقدمها {when}. وأقرب طلب ينتهي {deadline} ما لم يُجَب عنه.',
 
   // The audit, customers, reports and registration screens, matching the English batches above.
   'auditLog.theAuditLogIs': 'سجل التدقيق مخصص للمشرفين.',
@@ -2112,6 +2112,8 @@ export const AR = {
 
   // Console audit 2026-09-13: the dealer bookings list and activity feed
   'dealerActivity.wasStatus': '(كانت {status})',
+  'dealerActivity.actor.customer': 'العميل',
+  'dealerActivity.actor.khadra': 'خضرا',
   'dealerActivity.pageSummary': {
     zero: '{shown} من {count} تغيير',
     one: '{shown} من تغيير واحد',
@@ -2394,7 +2396,6 @@ export const AR = {
     many: '{count} عملية إعادة',
     other: '{count} عملية إعادة',
   },
-  'dealerDash.answerBeforePickup': 'أجب قبل موعد التسليم',
   'dealerDash.ofPublished': {
     zero: 'من أصل {count} سيارة منشورة',
     one: 'من أصل سيارة واحدة منشورة',
@@ -2412,7 +2413,8 @@ export const AR = {
     other: '{count} سيارة في أسطولك',
   },
   'dealerDash.oldestMadeExpiry':
-    'قُدِّم أقدمها {when}. وينتهي الطلب إذا حلّ تاريخ تأجيره دون إجابة.',
+    'قُدِّم أقدمها {when}. وأقرب طلب ينتهي {deadline} ما لم يُجَب عنه.',
+  'dealerDash.nextExpires': 'أقرب طلب ينتهي {when}',
   'dealerDash.overdueDesc':
     'العميل: {customer}. لم تُعَد السيارة بعد؛ سجّل الإعادة عند عودتها، ودوّن أي أضرار خلال مهلة التسوية.',
   'dealerDash.pickupDesc':
@@ -2425,6 +2427,12 @@ export const AR = {
   'dealerDash.activityHandedOver': 'سُلّمت سيارة الحجز {reference} من قِبل {actor}',
   'dealerDash.activityTookBack': 'استُلمت سيارة الحجز {reference} من قِبل {actor}',
   'dealerDash.activityCancelled': 'أُلغي الحجز {reference} من قِبل {actor}',
+  'dealerDash.activityRequested': 'طُلب الحجز {reference} من قِبل {actor}',
+  'dealerDash.activityPaid': 'سُدِّد الحجز {reference} من قِبل {actor}',
+  'dealerDash.activityExpiredUnanswered': 'انتهى الحجز {reference} دون رد',
+  'dealerDash.activityExpiredUnpaid': 'انتهى الحجز {reference} دون دفع',
+  'dealerDash.activityNoShow': 'سُجِّل عدم حضور على الحجز {reference}',
+  'dealerDash.activityCompleted': 'اكتمل الحجز {reference}',
   'dealerDash.activityOther': 'غُيّرت حالة الحجز {reference} إلى «{status}» من قِبل {actor}',
   'dealerDashboard.nothingDueInWindow': {
     zero: 'لا طلبات منتظرة، ولا شيء مستحق خلال {count} ساعة.',

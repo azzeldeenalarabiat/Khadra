@@ -91,6 +91,14 @@ export class FleetListComponent {
   }));
   private readonly hires = loaded(this.onHire);
   private readonly dealer = loaded(this.consoleData.me);
+  /**
+   * Whether the office delivers at all (Wave 3, F20). A car's own eligibility reads "Delivery" only
+   * while it does: the card said so on a car whose office had switched delivery off, which the
+   * website does not offer. The delivery screen's resource, so no request of its own; not known yet
+   * shows no badge.
+   */
+  private readonly delivery = loaded(this.consoleData.delivery);
+  protected readonly officeDelivers = computed(() => this.delivery()?.isEnabled === true);
 
   /** The chips in the reader's language. A `computed`, not a field: a field words them only once. */
   protected readonly states = computed(() =>

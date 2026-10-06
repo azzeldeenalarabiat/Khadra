@@ -136,15 +136,21 @@ export function toDealerNotifications(
 
   if (dashboard.bookings.requested > 0) {
     const n = dashboard.bookings.requested;
+    const oldest = dashboard.bookings.oldestRequestedAt;
+    const earliest = dashboard.bookings.earliestDecisionDeadline;
     rows.push({
       id: 'pending-requests',
       title: t('notifications.requestsWaiting', { count: n }),
-      // The oldest is the one closest to expiring, so it is the fact worth carrying.
-      detail: dashboard.bookings.oldestRequestedAt
-        ? t('notifications.oldestAndExpiry', {
-            when: relativeTime(dashboard.bookings.oldestRequestedAt, now, localeTag),
-          })
-        : t('notifications.aRequestExpiresWhen'),
+      // The oldest, and when the first one expires: the server's moment (Wave 3, F24). The oldest is
+      // not always the next to expire -- a newer request for a sooner rental can be -- and the line
+      // used to say a request expires when its rental date arrives.
+      detail:
+        oldest && earliest
+          ? t('notifications.oldestAndExpiry', {
+              when: relativeTime(oldest, now, localeTag),
+              deadline: relativeTime(earliest, now, localeTag),
+            })
+          : t('notifications.aRequestExpiresWhen'),
       when: t('notifications.toAnswer'),
       tone: 'warn',
       icon: 'calendar-check',

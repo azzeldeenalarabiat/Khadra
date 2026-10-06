@@ -78,6 +78,8 @@ this batch (decision D6).
 | 3 | `disputeWindowEndsAt` on every booking: when its dispute window closes, or null | additive | none: ignored by named-key parsing |
 | 3 | A dated `GET /vehicles` lists only cars that can be collected (office open at both local times) or delivered (eligible, office delivers); rows gain `selfPickupAvailable` | behavioural + additive | fewer results, all bookable; the shape is unchanged |
 | 3 | `paymentOption` reads `FullUpfront` on a booking a full payment confirms (it read `DepositOnly` on every booking); bookings already paid keep what they had, with no backfill | value, field unread | none: no build has ever read it |
+| 3 | `bookings.earliestDecisionDeadline` on `GET /dealers/me/dashboard`: when the first waiting request expires unanswered, null when none waits | additive | none: office endpoint |
+| 3 | `GET /dealers/me/activity` and the dashboard's `recentActivity` list every status change on the office's bookings, not only the office's own; entries gain `actorParty`, and `actorUserId` and `actorName` are null on every change the office did not make. `?actor=me` still returns only the caller's own office changes | behavioural + additive | none: office endpoints |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 

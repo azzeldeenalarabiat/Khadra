@@ -4538,6 +4538,11 @@ PAYMENT is confirmed ("within 1 hour after payment", `Booking.FreeCancellationDe
 approval, so the office is told the wrong moment. **To close:** reword both languages to say the
 window opens when the customer pays, with a dictionary test.
 
+**Built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The dialog now says the car stays held
+for the booking's dates while the customer pays, that an unpaid booking expires at the payment deadline and frees the
+car, and that the free-cancellation window opens when they pay, in English and Arabic and with no number in it.
+`dictionaries.spec.ts` ("office copy that states a rule") fails on "starts now" or «من الآن», and on any digit.
+
 ### 169. A resolved dispute does not stop a second ticket splitting the same deposit
 
 **Status:** closed · **Raised:** 2026-09-26 (found in the payments Phase 3 browser run; older than Phase 3) · **Settled:** 2026-09-26, owner · **Built:** 2026-09-26
@@ -4841,6 +4846,13 @@ The approval dialog tells an office that the customer's free-cancellation window
 when its rental date arrives unanswered (`notifications.oldestAndExpiry`); it expires when the answer window
 ends. **To close:** reword both from the current rules, in English and Arabic, with no business number
 written into them.
+
+**Built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The approval dialog is item 168. The
+expiry is reworded everywhere the office reads it: the bell, the dashboard's hint, its "Pending requests" tile and its
+attention row, and the bookings list's empty state. Each says a request expires at its answer deadline, and the bell,
+the tile and the row name the moment, from an additive `earliestDecisionDeadline` on the dashboard: the soonest stored
+`decision_deadline` among the requests still live, which is not always the oldest request's (E2E F24). The same
+dictionary test covers them.
 
 ### 186. The office's feed words a customer's cancellation as "updated"
 
@@ -5554,3 +5566,14 @@ current name with every save, and `Create` runs before the approval lock, so a r
 carrying such a name from saving its hours. The rule is where a name is SET instead: `Dealer.Register`, which now returns
 a `Result`, and `Dealer.UpdateProfile` when the name changes. It refuses with `dealer.business_name_reserved`, on the
 `businessName` field, before any document is stored. Existing names are never checked again.
+
+### 231. A car's Activity tab reads one page of the office's trail
+
+**Status:** open · **Raised:** 2026-10-06 (Fix & Polish Wave 3, F27) · **Presentation**
+
+The vehicle page's Activity tab filters whichever page of the office's trail the Activity screen has loaded
+(`DealerConsoleService.activity`, 25 entries) down to that car's bookings. It was always partial, and it follows the
+Activity screen's page. Since Wave 3 (F27) the trail lists every change on the office's bookings — the customer's
+requests, payments and cancellations, the platform's expiries, Khadra's decisions — so those 25 entries cover a shorter
+stretch, and a car's older changes drop off sooner. **To close:** a per-vehicle read of the trail
+(`GET /dealers/me/activity?vehicleId=…`), paged on its own.

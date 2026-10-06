@@ -10,7 +10,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { KeyValue, TimelineStep, Tone, toneClass } from '../../core/models/console.models';
-import { Booking, PenaltyAssessment } from '../../core/models/bookings.api';
+import { Booking, BookingStatusChange, PenaltyAssessment } from '../../core/models/bookings.api';
 import { enumKey } from '../../core/i18n/status-key';
 import { DealerBookingsService } from '../../core/services/dealer-bookings.service';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
@@ -32,19 +32,17 @@ import { confirmedStepKey } from './booking-payment.presenter';
 import { officeMoney } from './office-money.presenter';
 import { toRenterDocumentsPanel } from './renter-documents.presenter';
 import { handoverWindow, msUntilNextOpening } from './handover-window.presenter';
+import { ActivityWords, activityEvent } from './booking-activity.presenter';
 
 /**
- * The history steps this screen words as more than a status's name: who is waiting on whom, the
- * same descriptions the activity screen gives them. Every other status goes through `statusLabel` in
- * the rental office's own wording, so a status the domain adds later still reads as words.
+ * The latest step while the booking still waits on it: who is waiting on whom. Every other step is
+ * history and reads in the past tense, as the Activity screen words it — "Requested · awaiting your
+ * answer" stayed on the page after the office had answered (Wave 3, F23).
  */
-const STEP_DESCRIPTIONS: Readonly<Record<string, TranslationKey>> = {
+const WAITING_STEPS: Readonly<Record<string, TranslationKey>> = {
   Requested: 'dealerBooking.requestedAwaitingYourAnswer',
   // Awaiting PAYMENT: the customer chooses at checkout between the deposit and the whole booking.
   Approved: 'dealerBooking.approvedAwaitingPayment',
-  // Confirmed is worded from the payment that confirmed it: see stepLabel.
-  // The handover itself, not the queue's word for the rental it starts ("Active").
-  PickedUp: 'status.pickedUp',
 };
 
 /**
@@ -73,6 +71,11 @@ export class DealerBookingDetailComponent {
   private readonly decisions = inject(BookingDecisions);
   private readonly ui = inject(ConsoleUiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly activityWords: ActivityWords = {
+    t: this.t,
+    status: this.statusLabel,
+    party: (name) => this.enumLabel('party', name),
+  };
   private readonly router = inject(Router);
 
   private readonly bookingId = toSignal(
@@ -520,8 +523,9 @@ export class DealerBookingDetailComponent {
   protected readonly timeline = computed<readonly TimelineStep[]>(() => {
     const b = this.booking();
     if (!b) return [];
-    const done = b.history.map((change) => ({
-      label: this.stepLabel(change.toStatus, b.confirmingPayment?.purpose),
+    const latest = b.history.length - 1;
+    const done = b.history.map((change, index) => ({
+      label: this.stepLabel(change, b, index === latest),
       // Independent facts, each whole: when, who, and the reason exactly as somebody typed it —
       // quoted, never translated.
       meta: [
@@ -775,12 +779,16 @@ export class DealerBookingDetailComponent {
     return Math.round((Date.parse(to) - Date.parse(from)) / 3_600_000);
   }
 
-  private stepLabel(status: string, confirmedBy?: string | null): string {
+  private stepLabel(change: BookingStatusChange, b: Booking, latest: boolean): string {
     // "Paid in full · booking confirmed" or "Deposit paid · booking confirmed" (owner, 2026-09-25).
-    if (status === 'Confirmed') return this.t(confirmedStepKey(confirmedBy));
-    const key = STEP_DESCRIPTIONS[status];
-    // The office's own wording for everything else, the same the bookings list uses.
-    return key ? this.t(key) : this.statusLabel(status, 'dealerBooking');
+    if (change.toStatus === 'Confirmed') return this.t(confirmedStepKey(b.confirmingPayment?.purpose));
+    // Waiting only while the SERVER says so: a request past its answer window, or an approval past
+    // its payment deadline, reads Requested or Approved until the sweep reaches it, and is history.
+    const waiting =
+      latest &&
+      ((change.toStatus === 'Requested' && b.isAwaitingDecision) ||
+        (change.toStatus === 'Approved' && b.isAwaitingPayment));
+    return waiting ? this.t(WAITING_STEPS[change.toStatus]) : activityEvent(change, this.activityWords);
   }
 
   private actor(party: string, userId: string | null): string {

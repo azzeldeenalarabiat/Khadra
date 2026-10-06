@@ -1316,7 +1316,7 @@ export const EN = {
   'dealerDecide.reason.other': 'Other',
   'dealerDecide.approve.title': 'Approve booking {reference}?',
   'dealerDecide.approve.body':
-    "{customer} is notified and the vehicle is held for these dates. The customer's free-cancellation window starts now.",
+    "{customer} is notified, and the car stays held for these dates while they pay. If the booking is not paid by the payment deadline, it expires and the car is free again. The customer's free-cancellation window opens when they pay.",
   'dealerDecide.approve.noteLabel': 'Note to customer (optional)',
   'dealerDecide.approve.notePlaceholder': 'Pickup instructions, delivery window…',
   'dealerDecide.approve.noteHint':
@@ -1460,7 +1460,7 @@ export const EN = {
 
   // Second pass: literal runs that sit beside control flow.
   'dealerDashboard.aRequestExpiresWhen':
-    'A request expires when its rental date arrives unanswered',
+    'An unanswered request expires at its answer deadline, shown on the booking',
   'dealerDashboard.upcomingPickups': 'Upcoming pickups',
   'dealerDashboard.noPickupsDueIn': 'No pickups due in this window.',
   'dealerDashboard.upcomingReturns': 'Upcoming returns',
@@ -1472,7 +1472,7 @@ export const EN = {
   'dealerDashboard.recentActivity': 'Recent activity',
   'dealerDashboard.viewAll': 'View all',
   'dealerDashboard.bookingDecisionsAndHandovers':
-    'Booking decisions and handovers by you and your staff will appear here.',
+    'Changes on your bookings will appear here: requests, payments, your answers and handovers.',
   'disputesList.noDisputeIsOpen':
     'No dispute is open. A customer or a dealer can open one from a finished booking, within the window that booking froze.',
   'disputesList.noTicketMatchesThis': 'No ticket matches this view right now.',
@@ -1504,7 +1504,7 @@ export const EN = {
   'auditLog.theLogFillsAs':
     'The log fills as administrators act: approving a dealer, resolving a dispute, changing a platform setting. Each entry is written in the same transaction as the action itself.',
   'dealerBookings.onceYourVehiclesAre':
-    'Once your vehicles are published, customer booking requests land here. Answer a request before its rental date arrives, or it expires.',
+    'Once your vehicles are published, customer booking requests land here. Answer each one before its answer deadline, shown on the booking, or it expires.',
   'dealerBookings.noBookingsMatchThis': 'No bookings match this tab right now.',
   'employeeNotifications.whatHappenedAtYour': 'What happened at your dealership',
   'fleetList.cars': 'cars',
@@ -2027,11 +2027,10 @@ export const EN = {
 
   // Keyed by key-copy.js, 2026-09-08.
   'dealerActivity.activityCouldNotBe': 'Activity could not be loaded. Nothing has been changed.',
-  'dealerActivity.requestedAwaitingYourAnswer': 'Requested — awaiting your answer',
-  'dealerActivity.approvedAwaitingPayment': 'Approved — awaiting payment',
   'dealerActivity.paymentReceivedBookingConfirmed': 'Payment received — booking confirmed',
   'dealerActivity.markedNoShow': 'Marked no-show',
   'dealerActivity.expiredUnanswered': 'Expired unanswered',
+  'dealerActivity.expiredUnpaid': 'Expired unpaid',
 
   // Keyed by key-copy.js, 2026-09-08.
   'dealerDispute.thatDisputeIsNot': 'That dispute is not yours to see, or no longer exists.',
@@ -2197,9 +2196,9 @@ export const EN = {
     other: '{count} booking requests are waiting',
   },
   'notifications.pastTheEndOf': 'Past the end of the rental period and not yet returned.',
-  'notifications.aRequestExpiresWhen': 'A request expires when its rental date arrives unanswered.',
+  'notifications.aRequestExpiresWhen': 'An unanswered request expires at its answer deadline.',
   'notifications.oldestAndExpiry':
-    'Oldest {when}. A request expires when its rental date arrives unanswered.',
+    'Oldest {when}. The next one expires {deadline} unless it is answered.',
 
   // Keyed by key-copy.js, 2026-09-08.
   'auditLog.theAuditLogIs': 'The audit log is for administrators.',
@@ -2332,6 +2331,9 @@ export const EN = {
 
   // Console audit 2026-09-13: the dealer bookings list and activity feed
   'dealerActivity.wasStatus': '(was {status})',
+  // Wave 3, F27: who made a change the office did not make.
+  'dealerActivity.actor.customer': 'The customer',
+  'dealerActivity.actor.khadra': 'Khadra',
   'dealerActivity.pageSummary': {
     one: '{shown} of {count} change',
     other: '{shown} of {count} changes',
@@ -2535,7 +2537,6 @@ export const EN = {
     one: '{count} return',
     other: '{count} returns',
   },
-  'dealerDash.answerBeforePickup': 'answer before pickup',
   'dealerDash.ofPublished': {
     one: 'of {count} published',
     other: 'of {count} published',
@@ -2545,7 +2546,9 @@ export const EN = {
     other: '{count} in your fleet',
   },
   'dealerDash.oldestMadeExpiry':
-    'The oldest was made {when}. A request expires when its rental date arrives unanswered.',
+    'The oldest was made {when}. The next one expires {deadline} unless it is answered.',
+  // Wave 3, F24: when the first waiting request expires, the server's moment.
+  'dealerDash.nextExpires': 'next expires {when}',
   'dealerDash.overdueDesc':
     '{customer} has not returned the car. Record the return when it comes back, and note any damage within the settlement window.',
   'dealerDash.pickupDesc':
@@ -2558,6 +2561,13 @@ export const EN = {
   'dealerDash.activityHandedOver': '{actor} handed over booking {reference}',
   'dealerDash.activityTookBack': '{actor} took back booking {reference}',
   'dealerDash.activityCancelled': '{actor} cancelled booking {reference}',
+  // Wave 3, F27: the customer's and the platform's changes.
+  'dealerDash.activityRequested': '{actor} requested booking {reference}',
+  'dealerDash.activityPaid': '{actor} paid for booking {reference}',
+  'dealerDash.activityExpiredUnanswered': 'Booking {reference} expired unanswered',
+  'dealerDash.activityExpiredUnpaid': 'Booking {reference} expired unpaid',
+  'dealerDash.activityNoShow': 'Booking {reference} was marked a no-show',
+  'dealerDash.activityCompleted': 'Booking {reference} was completed',
   'dealerDash.activityOther': '{actor} moved booking {reference} to {status}',
   'dealerDashboard.nothingDueInWindow': {
     one: 'No requests waiting, nothing due in the next hour.',
@@ -3009,7 +3019,7 @@ export const EN = {
   'vehicleDetail.currentRentalCollected': '{customer}, {period}, collected.',
   'vehicleDetail.nextRentalDelivery': '{customer}, {period}, delivery.',
   'vehicleDetail.nextRentalPickup': '{customer}, {period}, pickup.',
-  'vehicleDetail.statusByActor': '{status} by {actor}',
+  'vehicleDetail.statusByActor': '{status} · {actor}',
   'vehicleDetail.photoNumber': 'Photo {number}',
   'vehicleDetail.noPhotosYet': 'No photos yet',
   'vehicleDetail.noPhotosYetAddOne': 'No photos yet — add one before publishing',

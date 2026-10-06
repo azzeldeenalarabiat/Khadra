@@ -37,6 +37,12 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
         var oldest = requestedCount == 0
             ? null
             : await live.Where(booking => booking.Status == requested).MinAsync(booking => booking.RequestedAt, cancellationToken);
+        // When the first of them expires unanswered (E2E F24): the stored decision deadline, which is
+        // the moment, not the rental date the dashboard used to name. The oldest request is not always
+        // the first to go -- a newer one for a sooner rental can be.
+        DateTimeOffset? earliestDeadline = requestedCount == 0
+            ? null
+            : await live.Where(booking => booking.Status == requested).MinAsync(booking => booking.DecisionDeadline, cancellationToken);
         // Counted apart, never summed into one "approved" figure: a car nobody has paid for is not
         // the same thing to a gallery as a rental going out on Tuesday.
         var awaitingDeposit = await live.CountAsync(booking => booking.Status == approved, cancellationToken);
@@ -44,7 +50,7 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
         var pickedUpCount = await mine.CountAsync(booking => booking.Status == pickedUp, cancellationToken);
         var overdue = await mine.CountAsync(booking => booking.Status == pickedUp && booking.Period.End < now, cancellationToken);
 
-        return new DealerBookingCounts(requestedCount, oldest, awaitingDeposit, confirmedCount, pickedUpCount, overdue);
+        return new DealerBookingCounts(requestedCount, oldest, awaitingDeposit, confirmedCount, pickedUpCount, overdue, earliestDeadline);
     }
 
     public async Task<DealerQueueSignature> QueueSignatureAsync(Id dealerId, DateTimeOffset now, CancellationToken cancellationToken = default)
@@ -191,18 +197,23 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
     {
         ArgumentNullException.ThrowIfNull(page);
 
+        // Every change on the dealership's bookings, whoever made it (E2E F27, Wave 3): the customer's
+        // request, payment and cancellation, the platform's expiries and completions, Khadra's
+        // decisions, and the office's own. It listed only the office's, under a heading that promised
+        // every change, so a customer's cancellation or an expiry never appeared.
         var dealerParty = BookingParty.Dealer;
         var query =
             from change in context.Set<BookingStatusChange>()
             join booking in context.Bookings on change.BookingId equals booking.Id
-            where booking.DealerId == dealerId && change.ActorParty == dealerParty
+            where booking.DealerId == dealerId
             select new { change, booking };
 
         // "What I did", filtered in SQL rather than over a page. Filtering the fetched page in the
         // client would silently drop everything past the first 25 rows -- a personal record that is
-        // quietly incomplete is worse than a shared one that is honest.
+        // quietly incomplete is worse than a shared one that is honest. The office's own changes only:
+        // a member of staff's record is what they did for the office.
         if (actorUserId is { } actor)
-            query = query.Where(row => row.change.ActorUserId == actor);
+            query = query.Where(row => row.change.ActorParty == dealerParty && row.change.ActorUserId == actor);
 
         var total = await query.CountAsync(cancellationToken);
         if (total == 0)
@@ -221,15 +232,19 @@ internal sealed class DealerBookingReader(KhadraDbContext context) : IDealerBook
                 row.booking.Reference.Value,
                 row.change.To.Name,
                 row.change.From != null ? row.change.From.Name : null,
-                row.change.ActorUserId != null ? row.change.ActorUserId.Value.Value : null,
+                // A person is named only on the office's own changes. The customer is "the customer"
+                // and the platform is "Khadra" to an office, worded by the console from the party: an
+                // administrator's id and name are not the office's to read.
+                row.change.ActorParty == dealerParty && row.change.ActorUserId != null ? row.change.ActorUserId.Value.Value : null,
                 // Null for a change no person signed AND for an account that no longer resolves; the
                 // id beside it tells the console which, and the console words both. The English
                 // stand-ins that used to be written here reached Arabic screens untranslated.
-                row.change.ActorUserId != null
+                row.change.ActorParty == dealerParty && row.change.ActorUserId != null
                     ? context.Users.Where(user => user.Id == row.change.ActorUserId.Value).Select(user => user.Name.Value).FirstOrDefault()
                     : null,
                 row.change.Reason,
-                row.change.OccurredAt))
+                row.change.OccurredAt,
+                row.change.ActorParty.Name))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<DealerActivityEntry>(items, page.Page, page.PageSize, total);

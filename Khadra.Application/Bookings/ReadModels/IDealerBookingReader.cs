@@ -15,13 +15,20 @@ namespace Khadra.Application.Bookings.ReadModels;
 /// <param name="Confirmed">
 /// Approved AND paid for: the rentals that are actually going ahead, and the cars to have ready.
 /// </param>
+/// <param name="EarliestDecisionDeadline">
+/// When the first of the waiting requests expires unanswered: the soonest stored decision deadline
+/// among them, null when none waits (E2E F24, Wave 3). The oldest request is not always the first to
+/// expire — a newer one for a sooner rental can be — and the dashboard used to say a request expires
+/// at its rental date, which has not been the rule since the answer window was introduced.
+/// </param>
 public sealed record DealerBookingCounts(
     int Requested,
     DateTimeOffset? OldestRequestedAt,
     int AwaitingDeposit,
     int Confirmed,
     int PickedUp,
-    int OverdueReturns);
+    int OverdueReturns,
+    DateTimeOffset? EarliestDecisionDeadline = null);
 
 /// <summary>A pickup or a return the dealer has coming.</summary>
 /// <param name="CustomerName">
@@ -50,12 +57,18 @@ public sealed record RevenueFact(
 /// <summary>The stretch of a rental that overlaps a reporting window, for occupancy.</summary>
 public sealed record OccupancyFact(Guid VehicleId, DateTimeOffset Start, DateTimeOffset End, string Status);
 
-/// <summary>Something a member of staff did to a booking, from the booking's own history.</summary>
-/// <param name="ActorUserId">Null when no person signed the change: the rental office acted as itself.</param>
-/// <param name="ActorName">
-/// Null in two cases, told apart by <paramref name="ActorUserId"/>: no id at all (the rental office
-/// acted), or an id whose account no longer resolves (a former member of staff). The console words both.
+/// <summary>A status change on one of the dealer's bookings, from the booking's own history.</summary>
+/// <param name="ActorUserId">
+/// The member of staff who made an office change, or null: an office change no person signed (the
+/// rental office acted as itself), and every change the office did not make. The customer is "the
+/// customer" and the platform is "Khadra" to an office; an administrator's identity is not the
+/// office's to read (E2E F27, Wave 3).
 /// </param>
+/// <param name="ActorName">
+/// Null wherever <paramref name="ActorUserId"/> is, and for an id whose account no longer resolves (a
+/// former member of staff). The console words every case.
+/// </param>
+/// <param name="ActorParty">Who made the change: <c>Dealer</c>, <c>Customer</c>, <c>Admin</c> or <c>System</c>.</param>
 public sealed record DealerActivityEntry(
     Guid BookingId,
     string Reference,
@@ -64,7 +77,8 @@ public sealed record DealerActivityEntry(
     Guid? ActorUserId,
     string? ActorName,
     string? Reason,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string ActorParty);
 
 /// <summary>One booking status and how many of this dealer's bookings are in it.</summary>
 public sealed record DealerStatusCount(string Status, int Count);
@@ -137,6 +151,9 @@ public interface IDealerBookingReader
     /// <summary>Rentals (PickedUp, Returned, Completed) whose period overlaps [from, to).</summary>
     Task<IReadOnlyList<OccupancyFact>> OccupancyAsync(Id dealerId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default);
 
-    /// <summary>The dealership's trail, or one person's within it when <paramref name="actorUserId"/> is given.</summary>
+    /// <summary>
+    /// The dealership's trail: every status change on its bookings, whoever made it (E2E F27, Wave 3). When
+    /// <paramref name="actorUserId"/> is given, only that member of staff's own office changes.
+    /// </summary>
     Task<PagedResult<DealerActivityEntry>> ActivityAsync(Id dealerId, PageRequest page, Id? actorUserId = null, CancellationToken cancellationToken = default);
 }

@@ -102,6 +102,46 @@ public sealed class LapseAwareReaderTests : IDisposable
         Assert.Equal(1, counts.Requested);
         // And the "oldest waiting" stamp is the live one's, not the dead one's.
         Assert.Equal(live.RequestedAt, counts.OldestRequestedAt);
+        // As is the first deadline (E2E F24): a lapsed request has none left to name.
+        Assert.Equal(live.DecisionDeadline, counts.EarliestDecisionDeadline);
+    }
+
+    /// <summary>
+    /// The dashboard names when the first waiting request expires (E2E F24, Fix & Polish Wave 3), and that
+    /// is not always the oldest: a newer request for a sooner rental can close first.
+    /// </summary>
+    [Fact]
+    public async Task The_first_request_to_expire_need_not_be_the_oldest()
+    {
+        var older = Mine(Build.Now.AddDays(30), createdAt: Build.Now.AddHours(-3));
+        var sooner = Mine(Build.Now.AddDays(1), createdAt: Build.Now.AddHours(-1));
+
+        await GivenAsync(older, sooner);
+
+        await using var read = NewContext();
+        var counts = await new DealerBookingReader(read).CountsAsync(_dealerId, Build.Now);
+
+        Assert.True(sooner.DecisionDeadline < older.DecisionDeadline, "fixture: the newer request should close first");
+        Assert.Equal(2, counts.Requested);
+        Assert.Equal(older.RequestedAt, counts.OldestRequestedAt);
+        Assert.Equal(sooner.DecisionDeadline, counts.EarliestDecisionDeadline);
+    }
+
+    [Fact]
+    public async Task No_request_waiting_names_no_deadline()
+    {
+        // Approved, so it keeps a stored decision deadline the dashboard must not read as a request's.
+        var approved = Mine(Build.Now.AddDays(5), booking => booking.Approve(Id.New(), Build.Now.AddDays(4)));
+
+        await GivenAsync(approved);
+
+        await using var read = NewContext();
+        var counts = await new DealerBookingReader(read).CountsAsync(_dealerId, Build.Now);
+
+        Assert.Equal(0, counts.Requested);
+        Assert.Equal(1, counts.AwaitingDeposit);
+        Assert.Null(counts.OldestRequestedAt);
+        Assert.Null(counts.EarliestDecisionDeadline);
     }
 
     /// <summary>The same rule through the other door: an approval nobody paid for.</summary>

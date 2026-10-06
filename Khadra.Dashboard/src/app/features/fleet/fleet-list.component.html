@@ -145,7 +145,7 @@
                 <span class="pill car-card-status" [class]="'s-' + statusTone(car)">
                   {{ statusLabel(car) }}
                 </span>
-                @if (car.isDeliveryEligible) {
+                @if (car.isDeliveryEligible && officeDelivers()) {
                   <span class="tag-delivery car-card-delivery">
                     <kh-icon name="moped" /> {{ t('common.delivery') }}
                   </span>

@@ -11,6 +11,7 @@ import { IconComponent } from '../../shared/icon/icon.component';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { FormatService } from '../../core/i18n/format.service';
 import { TranslationKey } from '../../core/i18n/en';
+import { ActivityWords, activityIcon, activitySentence } from './booking-activity.presenter';
 
 interface Kpi {
   readonly label: string;
@@ -52,19 +53,6 @@ const FLEET_TONES: Readonly<Record<string, Tone>> = {
   Draft: 'accent',
 };
 
-/**
- * The activity sentence for each status a booking moved to, one whole message per verb: Arabic puts
- * the actor and the booking where English does not. Any other status is still worded, through the
- * office's status label.
- */
-const ACTIVITY: Readonly<Record<string, TranslationKey>> = {
-  Approved: 'dealerDash.activityApproved',
-  Rejected: 'dealerDash.activityRejected',
-  PickedUp: 'dealerDash.activityHandedOver',
-  Returned: 'dealerDash.activityTookBack',
-  Cancelled: 'dealerDash.activityCancelled',
-};
-
 /** The greeting for the hour, with the name inside the message: Arabic punctuates it differently. */
 function greetingKey(hour: number, named: boolean): TranslationKey {
   if (hour < 12) return named ? 'employeeDash.goodMorningName' : 'employeeDash.goodMorning';
@@ -86,10 +74,17 @@ function greetingKey(hour: number, named: boolean): TranslationKey {
   imports: [RouterLink, IconComponent],
 })
 export class DealerDashboardComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   // Server enum names, in the reader's language. Shared rather than per-component: the same enum
   // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
-  protected readonly statusLabel = inject(I18nService).statusLabel;
+  protected readonly statusLabel = this.i18n.statusLabel;
+  /** The words of the recent-activity lines: the Activity screen's, a whole sentence each. */
+  private readonly activityWords: ActivityWords = {
+    t: this.t,
+    status: this.statusLabel,
+    party: (name) => this.i18n.enumLabel('party', name),
+  };
   private readonly console = inject(DealerConsoleService);
   private readonly bookings = inject(DealerBookingsService);
   private readonly session = inject(SessionService);
@@ -132,6 +127,9 @@ export class DealerDashboardComponent {
           when: this.formats.relative(d.bookings.oldestRequestedAt),
         })
       : this.t('employeeDash.nothingWaiting');
+    // When the first waiting request expires: the server's moment, which need not be the oldest's
+    // (F24). The tile said "answer before pickup", and a request expires well before its pickup.
+    const earliest = d.bookings.earliestDecisionDeadline;
     // The window is the server's (`upcomingWindowHours`), so the tile says the span it counted over.
     const next = (handovers: readonly UpcomingHandover[]): string =>
       handovers[0]
@@ -141,7 +139,9 @@ export class DealerDashboardComponent {
       {
         label: this.t('dealerDashboard.pendingRequests'),
         main: this.formats.number(d.bookings.requested),
-        note: `${oldest} · ${this.t('dealerDash.answerBeforePickup')}`,
+        note: earliest
+          ? `${oldest} · ${this.t('dealerDash.nextExpires', { when: this.formats.dayAndTime(earliest) })}`
+          : oldest,
         icon: 'bell-ringing',
         route: '/dealer/bookings',
         query: { tab: 'pending' },
@@ -241,12 +241,19 @@ export class DealerDashboardComponent {
 
     if (d.bookings.requested > 0) {
       const oldest = d.bookings.oldestRequestedAt;
+      const earliest = d.bookings.earliestDecisionDeadline;
       items.push({
         type: this.t('employeeDash.bookingRequest'),
         title: this.t('employeeDash.requestsWaitingForAnswer', { count: d.bookings.requested }),
-        desc: oldest
-          ? this.t('dealerDash.oldestMadeExpiry', { when: this.formats.relative(oldest) })
-          : '',
+        // The oldest, and when the first one expires (F24): it said a request expires when its rental
+        // date arrives, which has not been the rule since requests had an answer window.
+        desc:
+          oldest && earliest
+            ? this.t('dealerDash.oldestMadeExpiry', {
+                when: this.formats.relative(oldest),
+                deadline: this.formats.dayAndTime(earliest),
+              })
+            : '',
         entity: this.t('common.bookings'),
         when: oldest ? this.formats.relative(oldest) : '',
         pill: this.statusLabel('Requested', 'dealerBooking'),
@@ -354,21 +361,15 @@ export class DealerDashboardComponent {
   }
 
   /**
-   * One line of the activity feed. Who acted is sent as facts: no user id is the rental office
-   * itself, and an id without a name is somebody whose account has since closed.
+   * One line of the activity feed, as the Activity screen words it: every change on the office's
+   * bookings, the customer's and the platform's included (F27). Who acted is sent as facts: the party,
+   * and a person only on the office's own changes.
    */
   protected describe(entry: DealerDashboard['recentActivity'][number]): string {
-    const actor =
-      entry.actorUserId === null
-        ? this.t('common.theRentalOffice')
-        : (entry.actorName ?? this.t('common.formerStaffMember'));
-    const key = ACTIVITY[entry.toStatus];
-    return key
-      ? this.t(key, { actor, reference: entry.reference })
-      : this.t('dealerDash.activityOther', {
-          actor,
-          reference: entry.reference,
-          status: this.statusLabel(entry.toStatus, 'dealerBooking'),
-        });
+    return activitySentence(entry, this.activityWords);
+  }
+
+  protected icon(entry: DealerDashboard['recentActivity'][number]): IconName {
+    return activityIcon(entry);
   }
 }

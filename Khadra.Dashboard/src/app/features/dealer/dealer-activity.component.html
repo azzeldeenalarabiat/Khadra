@@ -38,7 +38,7 @@
   } @else {
     <section class="sect">
       <div class="sect-pad">
-        @for (e of entries(); track e.bookingId + e.occurredAt) {
+        @for (e of entries(); track e.bookingId + e.occurredAt + e.toStatus) {
           <div class="act-row">
             <span class="fleet-dot" [class]="'s-' + tone(e)"></span>
             <div class="act-text">
@@ -55,8 +55,8 @@
               </div>
               <div class="page-sub">
                 {{ actor(e) }}
-                @if (e.reason) {
-                  · “<span class="user-text">{{ e.reason }}</span>”
+                @if (reason(e); as typed) {
+                  · “<span class="user-text">{{ typed }}</span>”
                 }
               </div>
             </div>

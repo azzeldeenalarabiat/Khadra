@@ -13,6 +13,12 @@ export type { LocalizedText, ResolvedText };
 export interface DealerBookingCounts {
   readonly requested: number;
   readonly oldestRequestedAt: string | null;
+  /**
+   * When the first waiting request expires unanswered: the soonest decision deadline among them,
+   * null when none waits (Wave 3, F24). Not the oldest request's: a newer one for a sooner rental can
+   * close first.
+   */
+  readonly earliestDecisionDeadline: string | null;
   /** Approved and not paid for: a car held on nothing but a clock. */
   readonly awaitingDeposit: number;
   /** Approved AND paid for: the rentals actually going ahead. */
@@ -44,11 +50,20 @@ export interface DealerActivityEntry {
   readonly reference: string;
   readonly toStatus: string;
   readonly fromStatus: string | null;
-  /** Null when nobody signed the change: the rental office (or the system) acted. */
+  /**
+   * Who made the change: `Dealer`, `Customer`, `Admin` or `System` (Wave 3, F27). Activity lists
+   * every change on the office's bookings, not only the office's own.
+   */
+  readonly actorParty: string;
+  /**
+   * The member of staff on an office change. Null for an office change nobody signed (the rental
+   * office acted), and for every change the office did not make: the customer is "the customer" and
+   * the platform "Khadra" to an office, and the server sends no person for either.
+   */
   readonly actorUserId: string | null;
   /**
-   * Null in two cases, told apart by `actorUserId`: a null id means the rental office acted; an id
-   * with a null name means that person's account no longer resolves (a former member of staff).
+   * Null wherever `actorUserId` is, and for an id whose account no longer resolves (a former member
+   * of staff).
    */
   readonly actorName: string | null;
   readonly reason: string | null;

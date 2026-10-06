@@ -25,6 +25,7 @@ import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
 import { serverSentence, snapshotProblem } from '../../core/i18n/problem';
 import { spellEnumName } from '../../core/i18n/status-key';
+import { ActivityWords, activityActor, activityEvent } from '../dealer/booking-activity.presenter';
 
 type Tab = 'overview' | 'availability' | 'bookings' | 'activity';
 
@@ -429,21 +430,20 @@ export class VehicleDetailComponent {
     );
   }
 
-  /** "Approved by Rana Haddad": one change on the car's booking, and who made it. */
-  protected logLine(e: DealerActivityEntry): string {
-    return this.t('vehicleDetail.statusByActor', {
-      status: this.statusLabel(e.toStatus, 'booking'),
-      actor: this.actor(e),
-    });
-  }
-
   /**
-   * Who made a change, as the API names them: a change recorded against no user is the rental
-   * office's own, and a user with no name is somebody whose account has since been closed.
+   * "Approved · Rana Haddad": one change on the car's booking and who made it, in the Activity
+   * screen's words — which now include the customer's and Khadra's changes (Wave 3, F27).
    */
-  private actor(e: DealerActivityEntry): string {
-    if (e.actorUserId === null) return this.t('common.theRentalOffice');
-    return e.actorName ?? this.t('common.formerStaffMember');
+  protected logLine(e: DealerActivityEntry): string {
+    const words: ActivityWords = {
+      t: this.t,
+      status: this.statusLabel,
+      party: (name) => this.i18n.enumLabel('party', name),
+    };
+    return this.t('vehicleDetail.statusByActor', {
+      status: activityEvent(e, words),
+      actor: activityActor(e, words),
+    });
   }
 
   /** The gearbox, in the reader's language. */

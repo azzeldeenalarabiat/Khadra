@@ -5,29 +5,21 @@ import { Tone } from '../../core/models/console.models';
 import { DealerConsoleService } from '../../core/services/dealer-console.service';
 import { loaded } from '../../core/services/loaded';
 import { IconComponent } from '../../shared/icon/icon.component';
-import { TranslationKey } from '../../core/i18n/en';
 import { FormatService } from '../../core/i18n/format.service';
 import { I18nService } from '../../core/i18n/i18n.service';
-
-/**
- * The changes this screen words as more than a status's name: who is waiting on whom, or what
- * happened. Every other status goes through `statusLabel`, so a status the domain adds later still
- * reads as something rather than as its identifier.
- */
-const DESCRIPTIONS: Readonly<Record<string, TranslationKey>> = {
-  Requested: 'dealerActivity.requestedAwaitingYourAnswer',
-  Approved: 'dealerActivity.approvedAwaitingPayment',
-  // Neutral: an entry carries no payment, and a booking can be paid by its deposit or in full.
-  Confirmed: 'dealerActivity.paymentReceivedBookingConfirmed',
-  PickedUp: 'status.pickedUp',
-  NoShow: 'dealerActivity.markedNoShow',
-  Expired: 'dealerActivity.expiredUnanswered',
-};
+import {
+  ActivityWords,
+  activityActor,
+  activityEvent,
+  activityReason,
+} from './booking-activity.presenter';
 
 /**
  * Activity (design `isActivity`): every status change on the dealership's bookings, newest first,
- * with the person who made it. Read straight from booking history -- there is no separate log to
- * drift from it.
+ * with who made it — the office's staff, the customer or Khadra (Wave 3, F27: it listed only the
+ * office's own, under a heading that promised every change). Read straight from booking history --
+ * there is no separate log to drift from it. The words are `booking-activity.presenter`'s, which the
+ * dashboard, a car's log and the booking page share.
  */
 @Component({
   selector: 'kh-dealer-activity',
@@ -36,12 +28,18 @@ const DESCRIPTIONS: Readonly<Record<string, TranslationKey>> = {
   imports: [RouterLink, IconComponent],
 })
 export class DealerActivityComponent {
-  protected readonly t = inject(I18nService).t;
+  private readonly i18n = inject(I18nService);
+  protected readonly t = this.i18n.t;
   // Server enum names, in the reader's language. Shared rather than per-component: the same enum
   // shows on half a dozen screens, and a copy each is a copy each to forget a new member in.
-  protected readonly statusLabel = inject(I18nService).statusLabel;
+  protected readonly statusLabel = this.i18n.statusLabel;
   private readonly formats = inject(FormatService);
   private readonly service = inject(DealerConsoleService);
+  private readonly words: ActivityWords = {
+    t: this.t,
+    status: this.statusLabel,
+    party: (name) => this.i18n.enumLabel('party', name),
+  };
 
   protected readonly page = this.service.activityPage;
   protected readonly resource = this.service.activity;
@@ -84,19 +82,19 @@ export class DealerActivityComponent {
     }
   }
 
+  /** What happened, in the past tense: a line of history, never what the booking waits for now (F23). */
   protected describe(e: DealerActivityEntry): string {
-    const key = DESCRIPTIONS[e.toStatus];
-    // The dealer's own wording for everything else, the same the bookings list uses.
-    return key ? this.t(key) : this.statusLabel(e.toStatus, 'dealerBooking');
+    return activityEvent(e, this.words);
   }
 
-  /**
-   * Who made the change, as the API names them: a change recorded against no user is the rental
-   * office's own, and a user with no name is somebody whose account has since been closed.
-   */
+  /** The member of staff, the rental office, the customer or Khadra. */
   protected actor(e: DealerActivityEntry): string {
-    if (e.actorUserId === null) return this.t('common.theRentalOffice');
-    return e.actorName ?? this.t('common.formerStaffMember');
+    return activityActor(e, this.words);
+  }
+
+  /** What somebody typed, quoted; the platform's own English on an expiry is not shown. */
+  protected reason(e: DealerActivityEntry): string | null {
+    return activityReason(e);
   }
 
   /** "06 Sept, 14:32", in the reader's language. */

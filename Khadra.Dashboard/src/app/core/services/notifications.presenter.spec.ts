@@ -130,6 +130,7 @@ describe('toDealerNotifications', () => {
       bookings: {
         requested: 0,
         oldestRequestedAt: null,
+        earliestDecisionDeadline: null,
         awaitingDeposit: 0,
         confirmed: 0,
         pickedUp: 0,
@@ -163,6 +164,7 @@ describe('toDealerNotifications', () => {
         bookings: {
           requested: 3,
           oldestRequestedAt: '2026-09-01T12:00:00Z',
+          earliestDecisionDeadline: null,
           awaitingDeposit: 0,
           confirmed: 0,
           pickedUp: 2,
@@ -186,6 +188,7 @@ describe('toDealerNotifications', () => {
         bookings: {
           requested: 1,
           oldestRequestedAt: null,
+          earliestDecisionDeadline: null,
           awaitingDeposit: 0,
           confirmed: 0,
           pickedUp: 0,
@@ -201,12 +204,17 @@ describe('toDealerNotifications', () => {
     expect(one[1].title).toBe('1 booking request is waiting');
   });
 
-  it('carries the oldest request, because that is the one about to expire', () => {
+  /**
+   * The oldest request, and when the first one expires (Wave 3, F24): the server's moment, which need not be the
+   * oldest's. The line used to say a request expires when its rental date arrives.
+   */
+  it('names when the first request expires, beside the oldest', () => {
     const [row] = toDealerNotifications(
       dashboard({
         bookings: {
           requested: 2,
           oldestRequestedAt: '2026-09-01T12:00:00Z',
+          earliestDecisionDeadline: '2026-09-05T17:00:00Z',
           awaitingDeposit: 0,
           confirmed: 0,
           pickedUp: 0,
@@ -218,7 +226,28 @@ describe('toDealerNotifications', () => {
       'en-GB',
     );
 
-    expect(row.detail).toContain('4 days ago');
+    expect(row.detail).toBe('Oldest 4 days ago. The next one expires in 5 hr unless it is answered.');
+  });
+
+  it('states the rule, with no moment, when the server names none', () => {
+    const [row] = toDealerNotifications(
+      dashboard({
+        bookings: {
+          requested: 1,
+          oldestRequestedAt: '2026-09-01T12:00:00Z',
+          earliestDecisionDeadline: null,
+          awaitingDeposit: 0,
+          confirmed: 0,
+          pickedUp: 0,
+          overdueReturns: 0,
+        },
+      }),
+      NOW,
+      t,
+      'en-GB',
+    );
+
+    expect(row.detail).toBe('An unanswered request expires at its answer deadline.');
   });
 
   it('opens the booking a handover is about', () => {
@@ -295,6 +324,7 @@ describe('toDealerNotifications', () => {
         bookings: {
           requested: 5,
           oldestRequestedAt: '2026-09-04T12:00:00Z',
+          earliestDecisionDeadline: null,
           awaitingDeposit: 0,
           confirmed: 0,
           pickedUp: 0,

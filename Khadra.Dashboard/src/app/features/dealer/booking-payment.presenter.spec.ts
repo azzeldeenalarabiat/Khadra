@@ -72,8 +72,9 @@ describe('the approval waits for a payment, whichever the customer chooses', () 
     expect(en('dealerBooking.approvedAwaitingPayment')).toBe('Approved · awaiting payment');
     expect(ar('dealerBooking.approvedAwaitingPayment')).toBe('مقبول · بانتظار الدفع');
     expect(en('dealerBooking.paymentReceived')).toBe('Payment received');
-    expect(en('dealerActivity.approvedAwaitingPayment')).toBe('Approved — awaiting payment');
-    expect(AR['dealerActivity.approvedAwaitingPayment']).not.toContain('العربون');
+    // The activity entry is history since Wave 3 (F23): the status's own name, "Approved".
+    expect(en('status.approvedBooking')).toBe('Approved');
+    expect(AR['status.approvedBooking']).not.toContain('العربون');
   });
 });
 

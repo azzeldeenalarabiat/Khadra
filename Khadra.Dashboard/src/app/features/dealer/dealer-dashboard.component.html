@@ -259,17 +259,12 @@
                 {{ t('dealerDashboard.bookingDecisionsAndHandovers') }}
               </div>
             }
-            @for (entry of d.recentActivity; track entry.occurredAt) {
+            @for (
+              entry of d.recentActivity;
+              track entry.bookingId + entry.occurredAt + entry.toStatus
+            ) {
               <div class="act-row">
-                <kh-icon
-                  [name]="
-                    entry.toStatus === 'Rejected'
-                      ? 'x-circle'
-                      : entry.toStatus === 'Approved'
-                        ? 'check-circle'
-                        : 'key'
-                  "
-                />
+                <kh-icon [name]="icon(entry)" />
                 <div>
                   <div class="act-text">{{ describe(entry) }}</div>
                   <div class="act-ts">{{ formats.relative(entry.occurredAt) }}</div>
