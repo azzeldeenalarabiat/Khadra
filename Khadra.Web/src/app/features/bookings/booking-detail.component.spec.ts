@@ -625,6 +625,50 @@ describe('BookingDetailComponent, paid by deposit or in full', () => {
     expect(arabicResolved.text).not.toContain('لم يتم خصم أي مبلغ بعد');
   });
 
+  it('tells a non-delivery cancellation as what happened, with the customer\'s report, in both languages (E2E F67)', async () => {
+    const reported = {
+      ...lateCancelled,
+      cancellationReason: 'Nobody was at the counter at 19:45.',
+      cancellationReasonCode: null,
+      penalty: { ...PAST_WINDOW_PENALTY, attributedTo: 'Dealer', isRange: true, reasonCode: 'DealerDidNotHandOver', state: 'Assessed' },
+    };
+    const english = await render(reported, 'en');
+    expect(english.text).toContain('Cancelled after you reported that the office did not hand over the car.');
+    expect(english.text).toContain('Nobody was at the counter at 19:45.');
+    expect(english.text).not.toContain('Cancelled by you');
+    TestBed.resetTestingModule();
+
+    const arabic = await render(reported, 'ar');
+    expect(visible(arabic.text)).toContain('أُلغي الحجز بعد أن أبلغت أن المكتب لم يسلّمك السيارة.');
+    TestBed.resetTestingModule();
+
+    // Assessed before penalty codes existed: the office carrying it on a customer's cancellation says the same.
+    const legacy = await render({ ...reported, penalty: { ...reported.penalty, reasonCode: null } }, 'en');
+    expect(legacy.text).toContain('Cancelled after you reported that the office did not hand over the car.');
+    TestBed.resetTestingModule();
+
+    // An ordinary late cancellation keeps its words.
+    const ordinary = await render(lateCancelled, 'en');
+    expect(ordinary.text).toContain('Cancelled by you');
+    expect(ordinary.text).not.toContain('did not hand over the car');
+  });
+
+  it('offers to open a dispute while the server allows one and none is open, naming the window (Wave 3 C4)', async () => {
+    const disputable = { ...lateCancelled, canBeDisputed: true, liveDisputeId: null, disputeWindowEndsAt: '2026-09-27T20:00:00+00:00' };
+    const offered = await render(disputable, 'en');
+    expect(offered.text).toContain('Open a dispute');
+    expect(offered.text).toContain('You can open a dispute on this booking until');
+    expect(offered.links).toContain(`/en/bookings/${ID}/dispute`);
+    TestBed.resetTestingModule();
+
+    const live = await render({ ...disputable, liveDisputeId: 'd-live' }, 'en');
+    expect(live.links).not.toContain(`/en/bookings/${ID}/dispute`);
+    TestBed.resetTestingModule();
+
+    const closed = await render({ ...disputable, canBeDisputed: false }, 'en');
+    expect(closed.links).not.toContain(`/en/bookings/${ID}/dispute`);
+  });
+
   it('links every closed dispute, decided or withdrawn, from the booking in both languages (Wave 3 C3, E2E F44)', async () => {
     const withClosed = {
       ...withPenaltyState('ResolvedByDispute'),

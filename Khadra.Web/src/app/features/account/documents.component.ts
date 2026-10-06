@@ -4,6 +4,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { firstValueFrom } from 'rxjs';
 import { CustomerDocument, CustomerDocuments } from '../../core/api/documents.api';
 import { AppConfigService } from '../../core/config/app-config.service';
+import { uploadTypeNames } from '../../core/config/upload-limits';
 import { ProblemSnapshot, snapshotProblem } from '../../core/http/problem';
 import { problemText } from '../../core/http/problem-text';
 import { TranslationKey } from '../../core/i18n/en';
@@ -139,7 +140,7 @@ export class DocumentsComponent {
   }
 
   private typeNames(types: readonly string[]): string {
-    return types.map((type) => (type.split('/')[1] ?? type).toUpperCase()).join(', ');
+    return uploadTypeNames(types);
   }
 
   private size(bytes: number): string {

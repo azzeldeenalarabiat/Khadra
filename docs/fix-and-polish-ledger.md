@@ -75,6 +75,7 @@ this batch (decision D6).
 | 3 | `POST /dealers` (the office application) and `PUT /dealers/me/profile` refuse a business name that is one of the platform's own: 400 `dealer.business_name_reserved`, on the `businessName` field | new refusal | none: office endpoints only |
 | 3 | `disputes[]` on every booking: `{ ticketId, status, openedAt, closedAt }`, oldest first | additive | none: ignored by named-key parsing |
 | 3 | The customer's copy of a dispute names "Khadra" for the resolver and the assignee (ids null), and the office's name for an office-opened ticket and office statements (ids null); the customer's booking history carries no id but their own. `openedByUserId`, `authorUserId` and `resolvedByAdminId` become nullable | value | none: no installed build reads these fields |
+| 3 | `disputeWindowEndsAt` on every booking: when its dispute window closes, or null | additive | none: ignored by named-key parsing |
 
 ## 3. App-change ledger — for the 1.4.0 release (Wave 7)
 
@@ -89,3 +90,4 @@ this batch (decision D6).
 | D4 (W3) | Offer "Show my pickup code" only from `pickupAvailableFrom`, and the return code only from `returnAvailableFrom`, saying when, as the website does; the server keeps issuing codes either way. |
 | F65 (W3) | Hide the "Plate" row when `vehicle.plateNumber` is null (a booking the office has not approved); today the label prints with nothing after it. |
 | F44 (W3 C3) | Link a decided or withdrawn dispute from the booking, from `disputes[]`, as the website does; today a closed decision is reachable only from a notification. |
+| F67 (W3) | A booking the customer cancelled by reporting non-delivery reads "Cancelled after you reported that the office did not hand over the car", with their report beneath, as the website does; today the app says "Cancelled by you · <report>". Recognise it by `penalty.reasonCode` `DealerDidNotHandOver` (or, assessed before codes, the office carrying the penalty on a customer cancellation). |

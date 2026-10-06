@@ -229,6 +229,8 @@ export interface Booking {
   readonly returnAvailableFrom?: string | null;
   /** Every dispute on the booking, live or closed, oldest first (Wave 3 C3, E2E F44). Absent on an older API. */
   readonly disputes?: readonly BookingDispute[];
+  /** When the booking's dispute window closes, or null while it has none (Wave 3 C4). Absent on an older API. */
+  readonly disputeWindowEndsAt?: string | null;
 }
 
 /** One dispute on a booking: enough to link its page, live or closed. */

@@ -170,7 +170,13 @@ public sealed record BookingDto(
     /// Every dispute on the booking, live or closed, oldest first (Wave 3 C3; E2E F44), so a closed decision stays
     /// one link away. Added 2026-10-06, last; installed apps ignore it and keep reading <c>liveDisputeId</c>.
     /// </summary>
-    IReadOnlyList<BookingDisputeDto>? Disputes = null)
+    IReadOnlyList<BookingDisputeDto>? Disputes = null,
+    /// <summary>
+    /// When the booking's dispute window closes — its frozen settlement window after the return, a cancellation or a
+    /// no-show — or null while it has none (Wave 3 C4). A screen offering "Open a dispute" names this moment rather than
+    /// working it out; whether one may be opened right now is still <see cref="CanBeDisputed"/>. Added 2026-10-06, last.
+    /// </summary>
+    DateTimeOffset? DisputeWindowEndsAt = null)
 {
     /// <summary>The customer's copy: the same booking without Khadra's commission on it.</summary>
     /// <remarks>
@@ -290,7 +296,8 @@ public sealed record BookingDto(
             RefundTotal(context.Refunds, booking.Pricing.CurrencyCode, settled: false),
             booking.PickupAvailableFrom,
             booking.ReturnAvailableFrom,
-            context.Disputes ?? []);
+            context.Disputes ?? [],
+            booking.DisputeWindowEndsAt);
     }
 
     /// <summary>

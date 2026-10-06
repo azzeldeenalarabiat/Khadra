@@ -4156,6 +4156,11 @@ The booking page says when a dispute is open, and the notifications list shows d
 customer opens, reads and answers a dispute only in the app for now. A dispute notification on the
 website stays on the notifications page instead of linking to a page that does not exist.
 
+**Built in Wave 3 (`fix/polish-wave3`, 2026-10-06), awaiting the Staging check.** The website now opens a dispute (`/bookings/{id}/dispute`,
+offered while `canBeDisputed` and none is live, naming `disputeWindowEndsAt`), adds a statement and withdraws one the
+customer opened, with evidence uploaded the app's way (an upload address, then the bytes) and every refusal worded in
+both languages. Closed disputes are linked from the booking (`disputes[]`, F44). Nothing here needs the app.
+
 ### 147. The website has not been driven through dealer approval, payment and handover
 
 **Status:** closed · **Closed:** 2026-09-24 — driven end to end through the screens, with an Al-Nadeem employee and owner in the console.

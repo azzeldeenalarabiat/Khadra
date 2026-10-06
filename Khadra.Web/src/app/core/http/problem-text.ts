@@ -28,6 +28,19 @@ const WORDED: Readonly<Record<string, TranslationKey>> = {
   rate_limited: 'problem.rateLimited',
   // Payments Phase 6: a PDF not drawn yet. A voided document's is its voided copy, which is handed out like any other.
   'financial_documents.pdf_not_ready': 'invoices.pdf.preparing',
+  // Opening and answering a dispute on the website (Wave 3 C4).
+  'dispute.booking_not_disputable': 'dispute.open.notNow',
+  'dispute.already_open': 'dispute.open.alreadyOpen',
+  'dispute.reason_required': 'dispute.open.reasonRequired',
+  'dispute.statement_required': 'dispute.add.required',
+  'dispute.invalid_evidence_type': 'dispute.evidence.refused',
+  'dispute.evidence_not_uploaded': 'dispute.evidence.refused',
+  'dispute.evidence_outside_booking': 'dispute.evidence.refused',
+  'upload.already_stored': 'dispute.evidence.refused',
+  'dispute.not_open': 'dispute.closedNow',
+  'dispute.already_resolved': 'dispute.closedNow',
+  'dispute.already_withdrawn': 'dispute.closedNow',
+  'dispute.only_opener_can_withdraw': 'dispute.onlyOpener',
 };
 
 export function problemText(

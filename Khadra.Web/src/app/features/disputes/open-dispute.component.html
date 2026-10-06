@@ -1,0 +1,58 @@
+<div class="container page page--medium booking">
+  @if (notFound()) {
+    <kh-state-panel icon="calendar-blank" [title]="i18n.t('booking.notFoundTitle')" [text]="i18n.t('booking.notFoundText')" />
+  } @else if (loadProblem(); as failure) {
+    <kh-state-panel kind="error" [problem]="failure" (action)="booking.reload()" />
+  } @else if (booking.value(); as b) {
+    <a class="crumbs small" [routerLink]="i18n.link('bookings', b.bookingId)">
+      <kh-icon [name]="i18n.isArabic() ? 'arrow-right' : 'arrow-left'" /> {{ i18n.t('dispute.onBooking', { reference: b.reference }) }}</a>
+
+    <header class="card card--pad">
+      <h1 class="booking-head__title">{{ i18n.t('dispute.open.title') }}</h1>
+      <p class="muted">{{ i18n.t('dispute.open.intro', { reference: b.reference }) }}</p>
+    </header>
+
+    @if (b.liveDisputeId; as live) {
+      <!-- One live dispute per booking: the server's rule, and the app's. The open one is a link away. -->
+      <div class="notice"><kh-icon name="gavel" /><div><p>{{ i18n.t('dispute.open.alreadyOpen') }}</p>
+        <a class="link" [routerLink]="i18n.link('disputes', live)">{{ i18n.t('dispute.view') }}</a></div></div>
+    } @else if (!canOpen()) {
+      <div class="notice"><kh-icon name="info" /><p>{{ i18n.t('dispute.open.notNow') }}</p></div>
+    } @else {
+      <section class="card card--pad stack" aria-labelledby="open-dispute-form">
+        <h2 id="open-dispute-form" class="sr-only">{{ i18n.t('dispute.open.title') }}</h2>
+        <div class="notice"><kh-icon name="scales" /><div>
+          <p>{{ i18n.t('dispute.open.money') }}</p>
+          @if (b.disputeWindowEndsAt; as until) { <p class="small">{{ i18n.t('dispute.open.until', { date: format.dateTime(until) }) }}</p> }
+        </div></div>
+
+        <label class="field">
+          <span class="field__label">{{ i18n.t('dispute.reason') }}</span>
+          <textarea class="textarea user-text" dir="auto" [value]="reason()" (input)="setReason($event)" [disabled]="busy()"></textarea>
+          <span class="field__hint">{{ i18n.t('dispute.open.reasonHint') }}</span>
+        </label>
+
+        <div class="field">
+          <span class="field__label">{{ i18n.t('dispute.evidence.label') }}</span>
+          @for (file of evidence.files(); track $index) {
+            <p class="row small"><kh-icon name="paperclip" /><span class="user-text" dir="auto">{{ file.name }}</span>
+              <button type="button" class="btn btn--ghost btn--sm" [disabled]="busy()" (click)="evidence.remove($index)"
+                [attr.aria-label]="i18n.t('dispute.evidence.remove', { name: file.name })"><kh-icon name="x" /></button></p>
+          }
+          <label class="btn btn--secondary btn--sm">
+            <kh-icon name="paperclip" />{{ i18n.t('dispute.evidence.label') }}
+            <input type="file" class="sr-only" multiple [accept]="accept()" [disabled]="busy()" (change)="choose($event)" />
+          </label>
+        </div>
+
+        @if (problemText(); as text) { <p class="field__error" role="alert">{{ text }}</p> }
+        <div class="row">
+          <button type="button" class="btn btn--primary" [disabled]="busy()" (click)="submit()">
+            {{ busy() ? i18n.t('dispute.open.sending') : i18n.t('dispute.open.submit') }}</button>
+        </div>
+      </section>
+    }
+  } @else {
+    <div class="card card--pad" aria-busy="true"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--text"></div></div>
+  }
+</div>

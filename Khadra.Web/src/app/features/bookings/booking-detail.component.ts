@@ -152,6 +152,17 @@ export class BookingDetailComponent {
     return [...reached, { stage: booking.status, label: stageLabel(this.t, booking.status, confirmedBy), at: reachedAt.get(booking.status) ?? booking.finishedAt, state: 'ended' } as Row];
   });
 
+  /**
+   * A cancellation the customer made by reporting that the office never handed the car over (E2E F67, Wave 3): told as
+   * what happened, never as "Cancelled by you". Known by the penalty's code, or, on a booking assessed before codes
+   * existed, by the office carrying the penalty on a cancellation the customer recorded.
+   */
+  protected readonly reportedNonDelivery = computed(() => {
+    const b = this.view();
+    if (!b || b.status !== 'Cancelled' || b.cancelledBy !== 'Customer' || !b.penalty) return false;
+    return b.penalty.reasonCode === 'DealerDidNotHandOver' || (!b.penalty.reasonCode && b.penalty.attributedTo === 'Dealer');
+  });
+
   /** Why it ended, when it ended early: the reason recorded on the change into its final status. */
   protected readonly endReason = computed(() => {
     const booking = this.view();
@@ -178,6 +189,11 @@ export class BookingDetailComponent {
    */
   protected readonly handover = computed(() => handoverWindow(this.view(), this.now()));
   protected readonly canShowHandover = computed(() => this.handover().kind !== null && this.handover().open);
+  /** The server's own answer — the window is open — and none is live: the app's rule for offering it (Wave 3 C4). */
+  protected readonly canOpenDispute = computed(() => {
+    const b = this.view();
+    return !!b && b.canBeDisputed && !b.liveDisputeId;
+  });
   /** Disputes already decided or withdrawn, oldest first: each stays one link away (Wave 3 C3, E2E F44). */
   protected readonly closedDisputes = computed(() => (this.view()?.disputes ?? []).filter((dispute) => !!dispute.closedAt));
   protected readonly handoverOpen = signal(false);

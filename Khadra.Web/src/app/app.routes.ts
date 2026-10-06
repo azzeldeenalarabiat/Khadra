@@ -73,6 +73,12 @@ const pages: Routes = [
     canActivate: [signedInGuard],
     loadComponent: () => import('./features/bookings/bookings.component').then((m) => m.BookingsComponent),
   },
+  // Opening a dispute on the website, as in the app (Wave 3 C4, E2E F31).
+  {
+    path: 'bookings/:bookingId/dispute',
+    canActivate: [signedInGuard],
+    loadComponent: () => import('./features/disputes/open-dispute.component').then((m) => m.OpenDisputeComponent),
+  },
   {
     path: 'bookings/:bookingId',
     canActivate: [signedInGuard],
